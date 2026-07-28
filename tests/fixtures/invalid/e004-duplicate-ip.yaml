@@ -1,0 +1,39 @@
+# E004 (NG-A004) - one IP address is assigned twice in the same prefix.
+#
+# Neither port declares a 'vlan' block, so both sit in the untagged domain and
+# 10.0.0.1 really is claimed twice.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mac: 00:1e:8c:00:00:01
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mac: 00:1e:8c:00:00:02
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-b:eth0
+  medium: copper

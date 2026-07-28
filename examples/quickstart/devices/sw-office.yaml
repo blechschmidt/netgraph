@@ -1,0 +1,20 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-office
+  labels: {site: office}
+spec:
+  vlans:
+    - id: 10
+      name: office
+  interfaces:
+    - name: port1
+      type: ethernet
+      description: Uplink to rtr-gw
+      mtu: 1500
+      vlan: {mode: access, access_vlan: 10}
+    - name: port2
+      type: ethernet
+      description: Desk
+      mtu: 1500
+      vlan: {mode: access, access_vlan: 10}

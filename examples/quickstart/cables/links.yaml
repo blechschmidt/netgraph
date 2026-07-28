@@ -1,0 +1,15 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata: {name: cbl-rtr-sw}
+spec:
+  endpoints: [rtr-gw:lan0, sw-office:port1]
+  medium: copper
+  speed: 1Gbps
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata: {name: cbl-sw-alice}
+spec:
+  endpoints: [sw-office:port2, pc-alice:eno1]
+  medium: copper
+  speed: 1Gbps

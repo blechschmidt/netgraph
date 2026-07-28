@@ -1,0 +1,35 @@
+# E014 (NG-X006) - the adapter attachments form a loop.
+#
+# 'adp-a' is plugged into 'adp-b', which is plugged back into 'adp-a'. Neither
+# chain ever reaches a host, so nothing that walks it can terminate.
+apiVersion: netgraph.dev/v1alpha1
+kind: adapter
+metadata:
+  name: adp-a
+spec:
+  form_factor: dock
+  upstream:
+    name: usb0
+    type: usb-c
+    attached_to: adp-b
+  interfaces:
+    - name: en0
+      type: ethernet
+      enabled: false
+      mtu: 1500
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: adapter
+metadata:
+  name: adp-b
+spec:
+  form_factor: usb-ethernet
+  upstream:
+    name: usb1
+    type: usb
+    attached_to: adp-a
+  interfaces:
+    - name: en1
+      type: ethernet
+      enabled: false
+      mtu: 1500

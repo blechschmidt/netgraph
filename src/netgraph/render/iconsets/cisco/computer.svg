@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="56" viewBox="0 0 72 56" role="img" aria-label="Computer">
+  <title>Computer</title>
+  <g stroke="#6b7280" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <rect x="7" y="7" width="58" height="36" rx="3" fill="#f4f5f6"/>
+    <rect x="13" y="13" width="46" height="24" fill="#d5d9de" stroke="none"/>
+    <path d="M30 43 H42 L44 48 H28 Z" fill="#d5d9de"/>
+    <rect x="20" y="48" width="32" height="5" rx="2.5" fill="#f4f5f6"/>
+  </g>
+</svg>

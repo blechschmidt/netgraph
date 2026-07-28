@@ -1,0 +1,46 @@
+# W105 (NG-A008) - a subnet holds exactly one element.
+#
+# 'pc-a:eth1' is the only interface in 192.168.99.0/24: the mask was meant to be
+# /16, or the device the port faces was never written down. Everything else here
+# exists to keep the other rules quiet - the two hosts are cabled (W103), every
+# interface carries an address (W101), and both ends agree on the MTU (W102).
+# 10.0.0.0/24 has two members, so it is not reported.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/24]
+    - name: eth1
+      type: ethernet
+      enabled: false
+      mtu: 1500
+      ipv4:
+        addresses: [192.168.99.1/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-b:eth0
+  medium: copper

@@ -1,0 +1,44 @@
+# W107 (NG-I006) - a LAG member carries its own address.
+#
+# 10.0.0.1/30 sits on 'eth0' rather than on 'bond0'. It is reachable only while
+# that one lane is up, which is the opposite of what bonding is for.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+    - name: bond0
+      type: lag
+      members: [eth0]
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-b:eth0
+  medium: copper

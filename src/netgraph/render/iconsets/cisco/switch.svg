@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="56" viewBox="0 0 72 56" role="img" aria-label="Switch">
+  <title>Switch</title>
+  <g stroke="#16a34a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M4 30 H68 V40 A2 2 0 0 1 66 42 H6 A2 2 0 0 1 4 40 Z" fill="#b2e2b2"/>
+    <path d="M17 12 H55 L68 30 H4 Z" fill="#dcf0dc"/>
+  </g>
+  <g fill="#16a34a" stroke="none">
+    <path d="M32 17.6 23 17.6 23 15.2 17 19 23 22.8 23 20.4 32 20.4 Z"/>
+    <path d="M56 17.6 47 17.6 47 15.2 41 19 47 22.8 47 20.4 56 20.4 Z"/>
+    <path d="M16 25.1 25 25.1 25 22.7 31 26.5 25 30.3 25 27.9 16 27.9 Z"/>
+    <path d="M40 25.1 49 25.1 49 22.7 55 26.5 49 30.3 49 27.9 40 27.9 Z"/>
+  </g>
+</svg>

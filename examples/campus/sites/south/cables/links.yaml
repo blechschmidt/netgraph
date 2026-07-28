@@ -1,0 +1,110 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-south-core-dist
+  description: Routed fibre uplink, core to distribution
+  labels:
+    site: south
+    medium: fiber
+spec:
+  endpoints:
+    - rtr-south-core-01:xe-0/0/0
+    - sw-south-dist-01:Ethernet52/1
+  medium: fiber
+  speed: 10Gbps
+  category: om4
+  connector: lc
+  length_m: 12
+  label: F-201
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-south-dist-acc01
+  description: VLAN trunk over fibre, distribution to access 01
+  labels:
+    site: south
+    medium: fiber
+spec:
+  endpoints:
+    - sw-south-dist-01:Ethernet49/1
+    - sw-south-acc-01:TenGigabitEthernet1/1/1
+  medium: fiber
+  speed: 10Gbps
+  category: om4
+  connector: lc
+  length_m: 45
+  label: F-202
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-south-dist-acc02
+  description: VLAN trunk over fibre, distribution to access 02
+  labels:
+    site: south
+    medium: fiber
+spec:
+  endpoints:
+    - sw-south-dist-01:Ethernet50/1
+    - sw-south-acc-02:TenGigabitEthernet1/1/1
+  medium: fiber
+  speed: 10Gbps
+  category: om4
+  connector: lc
+  length_m: 78
+  label: F-203
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-south-acc01-pc01
+  labels:
+    site: south
+    medium: copper
+spec:
+  endpoints:
+    - sw-south-acc-01:GigabitEthernet1/0/1
+    - pc-south-01:eno1
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+  length_m: 22
+  label: C-201
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-south-acc01-srv01
+  labels:
+    site: south
+    medium: copper
+spec:
+  endpoints:
+    - sw-south-acc-01:GigabitEthernet1/0/2
+    - srv-south-01:eth0
+  medium: copper
+  speed: 1Gbps
+  category: cat6a
+  connector: rj45
+  length_m: 6
+  label: C-202
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-south-acc02-pc02
+  labels:
+    site: south
+    medium: copper
+spec:
+  endpoints:
+    - sw-south-acc-02:GigabitEthernet1/0/1
+    - pc-south-02:eno1
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+  length_m: 18
+  label: C-203

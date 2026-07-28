@@ -1,0 +1,105 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-north-dist-01
+  description: |
+    Distribution switch for the North campus. It aggregates the access-layer
+    trunks, hosts the SVI gateway for every campus VLAN, and reaches the core
+    router over a routed (untagged) fibre uplink.
+  labels:
+    site: north
+    role: distribution
+    env: prod
+spec:
+  vendor: Arista
+  model: 7050SX3-48YC8
+  location: Building A, Hauptstrasse 1 / MER / U10
+  forwarding:
+    ipv4: true
+    ipv6: true
+  bridge:
+    name: br0
+    type: customer-vlan-bridge
+    address: 00:1c:73:01:d0:ff
+  vlans:
+    - id: 10
+      name: staff
+    - id: 20
+      name: lab
+    - id: 30
+      name: voice
+    - id: 99
+      name: mgmt
+  interfaces:
+    - name: br0
+      type: bridge
+      description: Switching instance carrying the access-layer trunks
+      members:
+        - Ethernet49/1
+        - Ethernet50/1
+
+    - name: Vlan10
+      type: vlan
+      parent: br0
+      description: Staff gateway
+      vlan:
+        mode: access
+        access_vlan: 10
+      ipv4:
+        addresses: [10.1.10.1/24]
+      ipv6:
+        addresses: [2001:db8:1:10::1/64]
+
+    - name: Vlan20
+      type: vlan
+      parent: br0
+      description: Teaching-lab gateway
+      vlan:
+        mode: access
+        access_vlan: 20
+      ipv4:
+        addresses: [10.1.20.1/24]
+      ipv6:
+        addresses: [2001:db8:1:20::1/64]
+
+    - name: Vlan99
+      type: vlan
+      parent: br0
+      description: Management gateway
+      vlan:
+        mode: access
+        access_vlan: 99
+      ipv4:
+        addresses: [10.1.99.1/24]
+
+    - name: Ethernet49/1
+      type: ethernet
+      description: Fibre trunk to sw-north-acc-01
+      mac: 00:1c:73:01:d0:01
+      mtu: 9000
+      vlan:
+        mode: trunk
+        trunk_vlans: [1, 10, 20, 30, 99]
+        native_vlan: 1
+
+    - name: Ethernet50/1
+      type: ethernet
+      description: Fibre trunk to sw-north-acc-02
+      mac: 00:1c:73:01:d0:02
+      mtu: 9000
+      vlan:
+        mode: trunk
+        trunk_vlans: [1, 10, 20, 30, 99]
+        native_vlan: 1
+
+    - name: Ethernet52/1
+      type: ethernet
+      description: |
+        Routed fibre uplink to rtr-north-core-01. No 'vlan' block: this port
+        is a layer-3 interface, not a bridge port.
+      mac: 00:1c:73:01:d0:04
+      mtu: 9000
+      ipv4:
+        addresses: [10.1.0.2/30]
+      ipv6:
+        addresses: [2001:db8:1::2/64]

@@ -1,0 +1,58 @@
+# W122 (NG-H005) - two elements on one hub are in different subnets.
+#
+# A hub repeats every frame to every port, so its ports are a single broadcast
+# domain. 'pc-a' and 'pc-b' are wired together and cannot reach each other.
+apiVersion: netgraph.dev/v1alpha1
+kind: hub
+metadata:
+  name: hub-a
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+    - name: port2
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.1.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-hub-a
+spec:
+  endpoints:
+    - hub-a:port1
+    - pc-a:eth0
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-hub-b
+spec:
+  endpoints:
+    - hub-a:port2
+    - pc-b:eth0
+  medium: copper

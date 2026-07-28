@@ -1,0 +1,35 @@
+# W124 (NG-X007) - an adapter is plugged into a switch.
+#
+# Adapters hang off a host bus; a switch takes a cable. A media converter
+# between two switches is modelled with 'passthrough: false' and a cable each
+# side, which draws it as the distinct node it is.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      enabled: false
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: adapter
+metadata:
+  name: adp-a
+spec:
+  form_factor: media-converter
+  passthrough: false
+  upstream:
+    name: usb0
+    type: usb
+    attached_to: sw-a
+  interfaces:
+    - name: en0
+      type: ethernet
+      enabled: false
+      mtu: 1500

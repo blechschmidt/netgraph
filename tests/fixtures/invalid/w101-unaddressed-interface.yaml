@@ -1,0 +1,57 @@
+# W101 (NG-I013) - an interface neither routes nor switches.
+#
+# 'pc-a:eth1' is enabled, carries no address and has no 'vlan' block, and no
+# other interface is stacked on it. It has to stay enabled - that is the rule -
+# so a second cable is what keeps I002 quiet about it, and 'eth0' keeps the pair
+# cabled so that W103 stays quiet too. 'pc-b:eth1' sits in a /30, which W105
+# exempts.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/24]
+    - name: eth1
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/24]
+    - name: eth1
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.1.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-b:eth0
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-eth1-b
+spec:
+  endpoints:
+    - pc-a:eth1
+    - pc-b:eth1
+  medium: copper

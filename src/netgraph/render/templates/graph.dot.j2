@@ -1,0 +1,93 @@
+{#-
+  Graphviz DOT document.
+
+  Escaping contract — read this before adding a variable
+  ------------------------------------------------------
+  The environment renders with ``autoescape=True``, so a bare ``{{ value }}``
+  is HTML-escaped. That is the correct escaping for the *inside* of an
+  HTML-like label (``label=<...>``), which is where every free-form string in
+  this template goes: Graphviz's HTML parser reads ``&amp;``, ``&lt;``,
+  ``&gt;``, ``&#34;`` and ``&#39;`` and renders the literal characters, so an
+  inventory name cannot close a ``<TD>`` or the label itself.
+
+  The other context is a DOT quoted string — node ids, tooltips, cluster and
+  edge labels. Those go through ``| dot_string``, which adds the surrounding
+  quotes *and* the backslash escapes and returns Markup so autoescape leaves it
+  alone. Forgetting the filter is a loud failure rather than a quiet hole: the
+  quotes go missing and Graphviz rejects the file.
+
+  So: inside <TABLE> use ``{{ value }}``; everywhere else use
+  ``{{ value | dot_string }}``. Never the other way round.
+
+  The one HTML *attribute* that carries a variable is ``<IMG SRC>``, and what
+  goes in it is never free-form: an icon file is named ``<kind>.<extension>``
+  for a kind from a closed set, and the directory it lives in is kept out of
+  the label entirely, in the ``imagepath`` graph attribute, where it is a DOT
+  string like any other.
+-#}
+{% macro node_block(node, pad) %}
+{{ pad }}{{ node.id | dot_string }} [shape={{ node.shape }}, fillcolor="{{ node.fill }}", color="{{ node.stroke }}"{% if node.style is not none %}, style="{{ node.style }}"{% endif %}{% if node.tooltip %}, tooltip={{ node.tooltip | dot_string }}{% endif %}, label=<
+{{ pad }}  <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+{% if node.image %}
+{{ pad }}    <TR><TD COLSPAN="3" FIXEDSIZE="TRUE" WIDTH="{{ icon_width }}" HEIGHT="{{ icon_height }}"><IMG SCALE="TRUE" SRC="{{ node.image }}"/></TD></TR>
+{% endif %}
+{{ pad }}    <TR><TD COLSPAN="3" ALIGN="CENTER"><B>{{ node.title }}</B></TD></TR>
+{{ pad }}    <TR><TD COLSPAN="3" ALIGN="CENTER">{{ node.subtitle }}</TD></TR>
+{% for row in node.rows %}
+{% if row.spans %}
+{{ pad }}    <TR><TD COLSPAN="3" ALIGN="CENTER">{{ row.port }}</TD></TR>
+{% else %}
+{{ pad }}    <TR><TD ALIGN="LEFT">{{ row.port }}</TD><TD ALIGN="LEFT">{{ row.addresses }}</TD><TD ALIGN="LEFT">{{ row.vlans }}</TD></TR>
+{% endif %}
+{% endfor %}
+{{ pad }}  </TABLE>
+{{ pad }}>];
+{%- endmacro %}
+graph netgraph {
+  graph [
+    rankdir=TB,
+    splines=true,
+    overlap=false,
+    nodesep=0.5,
+    ranksep=0.7,
+    fontname="Helvetica,Arial,sans-serif",
+    fontsize=12,
+{% if imagepath %}
+    imagepath={{ imagepath | dot_string }},
+{% endif %}
+{% if title %}
+    label={{ title | dot_string }},
+    labelloc=t,
+    fontsize=16,
+{% endif %}
+  ];
+  node [fontname="Helvetica,Arial,sans-serif", fontsize=10, style=filled, penwidth=1.2];
+  edge [fontname="Helvetica,Arial,sans-serif", fontsize=8];
+{% for group in groups %}
+
+{% if group.id %}
+  subgraph {{ group.id }} {
+    label={{ group.label | dot_string }};
+    style=rounded;
+    color="#9ca3af";
+    fontcolor="#4b5563";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+{% for node in group.nodes %}
+{{ node_block(node, "    ") }}
+{% endfor %}
+  }
+{% else %}
+{% for node in group.nodes %}
+{{ node_block(node, "  ") }}
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% if edges %}
+
+{% for edge in edges %}
+  {{ edge.source | dot_string }} -- {{ edge.target | dot_string }} [color="{{ edge.color }}", style={{ edge.style }}{% if edge.penwidth %}, penwidth={{ edge.penwidth }}{% endif %}{% if edge.label %}, label={{ edge.label | dot_string }}{% endif %}, tooltip={{ edge.tooltip | dot_string }}];
+{% endfor %}
+{% endif %}
+}

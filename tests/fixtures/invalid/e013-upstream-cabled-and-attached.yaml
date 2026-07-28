@@ -1,0 +1,40 @@
+# E013 (NG-X005) - the host attachment is declared twice.
+#
+# 'adp-a' says it is plugged into 'laptop' with 'attached_to', and a cable says
+# the same thing again. The hardware has one plug; the two spellings can drift.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: laptop
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      enabled: false
+      mtu: 1500
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: adapter
+metadata:
+  name: adp-a
+spec:
+  form_factor: usb-ethernet
+  upstream:
+    name: usb0
+    type: usb
+    attached_to: laptop
+  interfaces:
+    - name: en0
+      type: ethernet
+      enabled: false
+      mtu: 1500
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-dock
+spec:
+  endpoints:
+    - adp-a:usb0
+    - laptop:eth0
+  medium: copper

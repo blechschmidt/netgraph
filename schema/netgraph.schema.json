@@ -1,0 +1,1509 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://netgraph.dev/schema/v1alpha1/element.json",
+  "title": "netgraph element document",
+  "description": "One netgraph element declared in YAML, `apiVersion: netgraph.dev/v1alpha1`. This schema is versioned with that apiVersion: it describes structure, value grammars and the cross-field rules of a single object. Rules that span documents — that a cable endpoint resolves, that names are unique, that an address is inside its subnet — are checked by `netgraph validate`.",
+  "type": "object",
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec"
+  ],
+  "discriminator": {
+    "mapping": {
+      "adapter": "#/$defs/Adapter",
+      "cable": "#/$defs/Cable",
+      "computer": "#/$defs/Computer",
+      "hub": "#/$defs/Hub",
+      "router": "#/$defs/Router",
+      "server": "#/$defs/Server",
+      "switch": "#/$defs/Switch"
+    },
+    "propertyName": "kind"
+  },
+  "oneOf": [
+    {
+      "$ref": "#/$defs/Switch"
+    },
+    {
+      "$ref": "#/$defs/Router"
+    },
+    {
+      "$ref": "#/$defs/Hub"
+    },
+    {
+      "$ref": "#/$defs/Computer"
+    },
+    {
+      "$ref": "#/$defs/Server"
+    },
+    {
+      "$ref": "#/$defs/Cable"
+    },
+    {
+      "$ref": "#/$defs/Adapter"
+    }
+  ],
+  "$defs": {
+    "AcceptableFrames": {
+      "description": "`dot1q:acceptable-frame` (§9.3).",
+      "enum": [
+        "admit-all-frames",
+        "admit-only-VLAN-tagged-frames",
+        "admit-only-untagged-and-priority-tagged"
+      ],
+      "title": "AcceptableFrames",
+      "type": "string"
+    },
+    "Adapter": {
+      "additionalProperties": false,
+      "description": "A device presenting network interfaces over a non-network host port.",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "adapter",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. Presents interfaces over a non-network host port."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/AdapterSpec",
+          "title": "spec",
+          "description": "The body of a `adapter` document."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "title": "Adapter",
+      "type": "object"
+    },
+    "AdapterSpec": {
+      "additionalProperties": false,
+      "description": "`spec` of an `adapter` document (§8).",
+      "properties": {
+        "vendor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "vendor",
+          "description": "Hardware vendor, free text."
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "model",
+          "description": "Hardware model designation, free text."
+        },
+        "serial": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "serial",
+          "description": "Serial or asset number, free text."
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "location",
+          "description": "Physical location, free text."
+        },
+        "form_factor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "form_factor",
+          "description": "What sort of adapter this is: `usb-ethernet`, `dock`, `media-converter`, `sfp-module`. Descriptive only."
+        },
+        "passthrough": {
+          "default": true,
+          "title": "passthrough",
+          "type": "boolean",
+          "description": "May the renderer collapse the adapter into its host? True draws the host and the adapter as one node at layer 2; false keeps them separate."
+        },
+        "ports": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "ports",
+          "description": "How many downstream ports the hardware physically has. Declaring it lets the validator catch an inventory that outgrew the device (`E006`)."
+        },
+        "upstream": {
+          "$ref": "#/$defs/UpstreamPort",
+          "title": "upstream",
+          "description": "The host-facing port: the bus the adapter plugs into."
+        },
+        "interfaces": {
+          "items": {
+            "$ref": "#/$defs/Interface"
+          },
+          "minItems": 1,
+          "title": "interfaces",
+          "type": "array",
+          "description": "The network ports the adapter presents downstream. Only `ethernet`, `wifi` and `lag` are allowed (`NG-X003`).\n\nYANG: `/if:interfaces/if:interface`"
+        }
+      },
+      "required": [
+        "upstream",
+        "interfaces"
+      ],
+      "title": "AdapterSpec",
+      "type": "object"
+    },
+    "BridgeConfig": {
+      "additionalProperties": false,
+      "description": "`spec.bridge` — the 802.1Q bridge component (§6.3).",
+      "properties": {
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "name",
+          "description": "Name of the bridge component. Defaults to `metadata.name` once the document is loaded.\n\nYANG: `/dot1q:bridges/dot1q:bridge/dot1q:name`"
+        },
+        "type": {
+          "$ref": "#/$defs/BridgeType",
+          "default": "customer-vlan-bridge",
+          "title": "type",
+          "description": "802.1Q bridge type, which decides the `dot1q:port-type` of every port on the device.\n\nYANG: `/dot1q:bridges/dot1q:bridge/dot1q:bridge-type`"
+        },
+        "address": {
+          "anyOf": [
+            {
+              "type": "string",
+              "title": "MAC address",
+              "description": "An EUI-48 address in colon (`00:1e:8c:00:10:01`), dash (`00-1E-8C-00-10-01`) or Cisco dotted (`001e.8c00.1001`) form, normalised to lower-case colon form on load. Quote it: an unquoted MAC can be read as a number by a YAML 1.1 parser.",
+              "pattern": "^[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}$|^[0-9A-Fa-f]{2}(?:-[0-9A-Fa-f]{2}){5}$|^[0-9A-Fa-f]{4}(?:\\.[0-9A-Fa-f]{4}){2}$"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "address",
+          "description": "Bridge address (the bridge's own MAC), used as the spanning-tree bridge identifier.\n\nYANG: `/dot1q:bridges/dot1q:bridge/dot1q:address`"
+        }
+      },
+      "title": "BridgeConfig",
+      "type": "object"
+    },
+    "BridgeType": {
+      "description": "`dot1q:bridge/bridge-type` identities (§6.3).",
+      "enum": [
+        "customer-vlan-bridge",
+        "provider-bridge",
+        "provider-edge-bridge",
+        "two-port-mac-relay-bridge",
+        "mac-bridge"
+      ],
+      "title": "BridgeType",
+      "type": "string"
+    },
+    "Cable": {
+      "additionalProperties": false,
+      "description": "An undirected physical link between exactly two interfaces.",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "cable",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. An undirected link between exactly two interfaces. Owns no interfaces."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/CableSpec",
+          "title": "spec",
+          "description": "The body of a `cable` document."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "title": "Cable",
+      "type": "object"
+    },
+    "CableSpec": {
+      "additionalProperties": false,
+      "description": "`spec` of a `cable` document (§7).",
+      "properties": {
+        "endpoints": {
+          "items": {
+            "$ref": "#/$defs/InterfaceRef"
+          },
+          "title": "endpoints",
+          "type": "array",
+          "description": "Exactly two `device:interface` references (`NG-C001`). The link is undirected, so the pair is sorted on load and the order carries no meaning."
+        },
+        "medium": {
+          "$ref": "#/$defs/Medium",
+          "title": "medium",
+          "description": "What the link physically is. `wireless` requires both endpoints to be `type: wifi` and forbids `length_m` and `category` (`NG-C006`, `NG-C007`)."
+        },
+        "speed": {
+          "anyOf": [
+            {
+              "title": "Bit rate",
+              "description": "A link rate, either a whole number of bit/s or `<number><unit>` with unit `bps`, `kbps`, `Mbps`, `Gbps` or `Tbps` (`1Gbps`). Stored in bit/s.",
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\d+(?:\\.\\d+)?\\s*(?:[bB][pP][sS]|[kK][bB][pP][sS]|[mM][bB][pP][sS]|[gG][bB][pP][sS]|[tT][bB][pP][sS])$"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "speed",
+          "description": "Negotiated link rate. Written as bit/s or as `1Gbps`; stored in bit/s. Projected onto `if:speed` of both endpoints, which is `config false`.\n\nYANG: `…/if:speed (on both endpoints)`"
+        },
+        "duplex": {
+          "$ref": "#/$defs/Duplex",
+          "default": "full",
+          "title": "duplex",
+          "description": "Duplex of the link. `half` outside a hub link is `NG-C013`."
+        },
+        "length_m": {
+          "anyOf": [
+            {
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "length_m",
+          "description": "Physical length in metres. Documentation only."
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "category",
+          "description": "Cable category, free text (`cat6`, `cat6a`, `om4`)."
+        },
+        "connector": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "connector",
+          "description": "Connector type, free text (`rj45`, `lc`, `sc`)."
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "label",
+          "description": "The identifier printed on the cable or the patch panel. Drawn on the edge."
+        }
+      },
+      "required": [
+        "endpoints",
+        "medium"
+      ],
+      "title": "CableSpec",
+      "type": "object"
+    },
+    "Computer": {
+      "additionalProperties": false,
+      "description": "An end host, drawn as a workstation.",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "computer",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. End host, drawn as a workstation."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/DeviceSpec",
+          "title": "spec",
+          "description": "The body of a `computer` document."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "title": "Computer",
+      "type": "object"
+    },
+    "DeviceSpec": {
+      "additionalProperties": false,
+      "description": "`spec` of every device kind (§6.1).",
+      "properties": {
+        "vendor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "vendor",
+          "description": "Hardware vendor, free text. Documentation only."
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "model",
+          "description": "Hardware model designation, free text."
+        },
+        "serial": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "serial",
+          "description": "Serial or asset number, free text."
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "location",
+          "description": "Physical location, free text (site, room, rack unit)."
+        },
+        "interfaces": {
+          "items": {
+            "$ref": "#/$defs/Interface"
+          },
+          "minItems": 1,
+          "title": "interfaces",
+          "type": "array",
+          "description": "Every port and logical interface the device owns. At least one is required.\n\nYANG: `/if:interfaces/if:interface`"
+        },
+        "bridge": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BridgeConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "bridge",
+          "description": "The 802.1Q bridge component this device implements. Absent means the device is not a bridge.\n\nYANG: `/dot1q:bridges/dot1q:bridge`"
+        },
+        "vlans": {
+          "items": {
+            "$ref": "#/$defs/VlanDefinition"
+          },
+          "title": "vlans",
+          "type": "array",
+          "description": "The device VLAN database: which VLANs exist on this device, and what they are called.\n\nYANG: `…/dot1q:bridge-vlan/dot1q:vlan`"
+        },
+        "forwarding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Forwarding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "forwarding",
+          "description": "Device-wide default for per-interface IP forwarding. Defaults to true/true on a `router` and false/false on every other kind; a `hub` must not declare it."
+        }
+      },
+      "required": [
+        "interfaces"
+      ],
+      "title": "DeviceSpec",
+      "type": "object"
+    },
+    "Duplex": {
+      "description": "`spec.duplex` (§7).",
+      "enum": [
+        "full",
+        "half"
+      ],
+      "title": "Duplex",
+      "type": "string"
+    },
+    "Forwarding": {
+      "additionalProperties": false,
+      "description": "`spec.forwarding` — the device-wide default for `ip:*/forwarding`.",
+      "properties": {
+        "ipv4": {
+          "title": "ipv4",
+          "type": "boolean",
+          "description": "Default for `interfaces[].ipv4.forwarding` on this device.\n\nYANG: `…/ip:ipv4/ip:forwarding (as the default)`"
+        },
+        "ipv6": {
+          "title": "ipv6",
+          "type": "boolean",
+          "description": "Default for `interfaces[].ipv6.forwarding` on this device.\n\nYANG: `…/ip:ipv6/ip:forwarding (as the default)`"
+        }
+      },
+      "required": [
+        "ipv4",
+        "ipv6"
+      ],
+      "title": "Forwarding",
+      "type": "object"
+    },
+    "Hub": {
+      "additionalProperties": false,
+      "description": "A layer-1 repeater: no MAC table, no VLANs, no IP stack (§6.5).",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "hub",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. Layer-1 repeater. Rejects `vlan`, `ipv4`, `ipv6`, `bridge`, `vlans` and `forwarding`; every interface must be `ethernet`."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/DeviceSpec",
+          "title": "spec",
+          "description": "The body of a `hub` document."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "title": "Hub",
+      "type": "object"
+    },
+    "IPv4Address": {
+      "title": "IPv4 address",
+      "description": "One IPv4 address, written as `10.0.0.1/24` or as a mapping with `ip` and either `prefix_length` or `netmask`.",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}/(?:3[0-2]|[12]?\\d)$"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ip": {
+              "format": "ipv4",
+              "title": "Ip",
+              "type": "string"
+            },
+            "prefix_length": {
+              "maximum": 32,
+              "minimum": 0,
+              "title": "Prefix Length",
+              "type": "integer"
+            },
+            "netmask": {
+              "type": "string",
+              "title": "netmask",
+              "description": "The dotted-quad spelling of `prefix_length`, normalised away on load. Mutually exclusive with `prefix_length`; a non-contiguous mask is rejected (`NG-A003`).",
+              "pattern": "^(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}$"
+            }
+          },
+          "required": [
+            "ip"
+          ],
+          "type": "object",
+          "oneOf": [
+            {
+              "required": [
+                "prefix_length"
+              ]
+            },
+            {
+              "required": [
+                "netmask"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "IPv4Config": {
+      "title": "IPv4 configuration",
+      "description": "The RFC 8344 `ip:ipv4` container. A bare list of addresses is shorthand for `{addresses: [...]}`.",
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "default": true,
+              "title": "Enabled",
+              "type": "boolean"
+            },
+            "forwarding": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Forwarding"
+            },
+            "mtu": {
+              "anyOf": [
+                {
+                  "maximum": 65535,
+                  "minimum": 68,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Mtu"
+            },
+            "addresses": {
+              "items": {
+                "$ref": "#/$defs/IPv4Address"
+              },
+              "title": "Addresses",
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IPv4Address"
+          }
+        }
+      ]
+    },
+    "IPv6Address": {
+      "title": "IPv6 address",
+      "description": "One IPv6 address, written as `2001:db8::1/64` or as a mapping with `ip` and `prefix_length`. Quote it if it would otherwise start a YAML alias or flow mapping.",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[0-9A-Fa-f:]+(?:\\.\\d{1,3}){0,4}/(?:12[0-8]|1[01]\\d|[1-9]?\\d)$"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ip": {
+              "format": "ipv6",
+              "title": "Ip",
+              "type": "string"
+            },
+            "prefix_length": {
+              "maximum": 128,
+              "minimum": 0,
+              "title": "Prefix Length",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "ip",
+            "prefix_length"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "IPv6Config": {
+      "title": "IPv6 configuration",
+      "description": "The RFC 8344 `ip:ipv6` container. A bare list of addresses is shorthand for `{addresses: [...]}`.",
+      "anyOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "default": true,
+              "title": "Enabled",
+              "type": "boolean"
+            },
+            "forwarding": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Forwarding"
+            },
+            "mtu": {
+              "anyOf": [
+                {
+                  "maximum": 4294967295,
+                  "minimum": 1280,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Mtu"
+            },
+            "addresses": {
+              "items": {
+                "$ref": "#/$defs/IPv6Address"
+              },
+              "title": "Addresses",
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/IPv6Address"
+          }
+        }
+      ]
+    },
+    "Interface": {
+      "additionalProperties": false,
+      "description": "One entry of `spec.interfaces` (RFC 8343 `if:interface`).",
+      "properties": {
+        "name": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._/-]+$",
+          "title": "name",
+          "type": "string",
+          "description": "Interface name as the device itself spells it (`eth0`, `GigabitEthernet0/2`). Unique within the element (`NG-I001`), and the target of a cable endpoint.\n\nYANG: `/if:interfaces/if:interface/if:name`"
+        },
+        "type": {
+          "$ref": "#/$defs/InterfaceType",
+          "title": "type",
+          "description": "What kind of interface this is. Decides which other fields are allowed and whether a cable may terminate here (`NG-C009`).\n\nYANG: `…/if:type`"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "description",
+          "description": "Free text describing what the port is for.\n\nYANG: `…/if:description`"
+        },
+        "enabled": {
+          "default": true,
+          "title": "enabled",
+          "type": "boolean",
+          "description": "Intended administrative state. A disabled interface is exempt from `W101`.\n\nYANG: `…/if:enabled`"
+        },
+        "mac": {
+          "anyOf": [
+            {
+              "type": "string",
+              "title": "MAC address",
+              "description": "An EUI-48 address in colon (`00:1e:8c:00:10:01`), dash (`00-1E-8C-00-10-01`) or Cisco dotted (`001e.8c00.1001`) form, normalised to lower-case colon form on load. Quote it: an unquoted MAC can be read as a number by a YAML 1.1 parser.",
+              "pattern": "^[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}$|^[0-9A-Fa-f]{2}(?:-[0-9A-Fa-f]{2}){5}$|^[0-9A-Fa-f]{4}(?:\\.[0-9A-Fa-f]{4}){2}$"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "mac",
+          "description": "Hardware address, EUI-48. Accepted in colon, dash or Cisco dotted form and normalised to lower-case colon form. `if:phys-address` is `config false` in RFC 8343, so an exporter must not write it to a live datastore.\n\nYANG: `…/if:phys-address`"
+        },
+        "mtu": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 68,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "mtu",
+          "description": "Layer-2 MTU in bytes. Propagated to `ipv4.mtu` and `ipv6.mtu` when those are not set. RFC 8343 has no layer-2 MTU node."
+        },
+        "ipv4": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IPv4Config"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "ipv4",
+          "description": "IPv4 configuration. Absent means the interface has no IPv4 stack.\n\nYANG: `…/ip:ipv4`"
+        },
+        "ipv6": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IPv6Config"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "ipv6",
+          "description": "IPv6 configuration. Absent means the interface has no IPv6 stack.\n\nYANG: `…/ip:ipv6`"
+        },
+        "vlan": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VlanConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "vlan",
+          "description": "802.1Q bridge-port configuration. Absent means the port is not VLAN-aware; a host port facing an access port normally omits it.\n\nYANG: `…/dot1q:bridge-port`"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._/-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "parent",
+          "description": "The interface this one is stacked on. Required for `type: vlan`, forbidden otherwise (`NG-I002`).\n\nYANG: `…/if:lower-layer-if`"
+        },
+        "members": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._/-]+$",
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "members",
+          "description": "The interfaces aggregated by this one. Required for `type: lag` and `type: bridge`, forbidden otherwise (`NG-I003`).\n\nYANG: `…/if:lower-layer-if`"
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "Interface",
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "vlan"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "parent",
+              "vlan"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "parent"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "enum": [
+                  "lag",
+                  "bridge"
+                ]
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "then": {
+            "required": [
+              "members"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "members"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "InterfaceRef": {
+      "title": "Interface reference",
+      "description": "A reference to one port, written as `device:interface`. The device half may be fully qualified (`sites/berlin/rack1/sw1:eth0`) to pick one of several elements sharing a short name. The mapping form `{device: ..., interface: ...}` is equivalent.",
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*(?:/[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*)*:[A-Za-z0-9._/-]+$"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "device": {
+              "maxLength": 1024,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*(?:/[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*)*$",
+              "title": "Device",
+              "type": "string"
+            },
+            "interface": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._/-]+$",
+              "title": "Interface",
+              "type": "string"
+            }
+          },
+          "required": [
+            "device",
+            "interface"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "InterfaceType": {
+      "description": "§6.2.1 — the four core types plus the two extension types.",
+      "enum": [
+        "ethernet",
+        "wifi",
+        "loopback",
+        "bridge",
+        "vlan",
+        "lag"
+      ],
+      "title": "InterfaceType",
+      "type": "string"
+    },
+    "Medium": {
+      "description": "`spec.medium` (§7).",
+      "enum": [
+        "copper",
+        "fiber",
+        "wireless"
+      ],
+      "title": "Medium",
+      "type": "string"
+    },
+    "Metadata": {
+      "additionalProperties": false,
+      "description": "Identity and free-form annotation of an element.",
+      "properties": {
+        "name": {
+          "maxLength": 253,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
+          "title": "name",
+          "type": "string",
+          "description": "Element name, unique within its namespace across all kinds (`NG-N002`). The namespace is the directory the document was found in."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "description",
+          "description": "Free text, may be multi-line. Rendered as the node's tooltip in SVG output."
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "labels",
+          "type": "object",
+          "description": "Selector-friendly key/value pairs. Keys follow the Kubernetes label grammar; the `netgraph.dev/` prefix is reserved for the tool."
+        },
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "annotations",
+          "type": "object",
+          "description": "Per-element input to the tooling, not selectable. `netgraph/ignore` suppresses validation rules on this element."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "Metadata",
+      "type": "object"
+    },
+    "Router": {
+      "additionalProperties": false,
+      "description": "A layer-3 forwarder. Forwards by default (§6.1.1).",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "router",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. Forwards by default: `forwarding` is true/true."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/DeviceSpec",
+          "title": "spec",
+          "description": "The body of a `router` document."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "title": "Router",
+      "type": "object"
+    },
+    "Server": {
+      "additionalProperties": false,
+      "description": "An end host, drawn as a rack-mount server. Structurally a computer.",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "server",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. End host, drawn as a rack-mount server. Structurally identical to `computer`."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/DeviceSpec",
+          "title": "spec",
+          "description": "The body of a `server` document."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "title": "Server",
+      "type": "object"
+    },
+    "Switch": {
+      "additionalProperties": false,
+      "description": "A VLAN-aware layer-2 bridge.",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "switch",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. VLAN-aware bridge. Layer-2 by default: `forwarding` is false/false."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/DeviceSpec",
+          "title": "spec",
+          "description": "The body of a `switch` document."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "title": "Switch",
+      "type": "object"
+    },
+    "UpstreamPort": {
+      "additionalProperties": false,
+      "description": "`spec.upstream` — the host-facing port of an adapter (§8.1).",
+      "properties": {
+        "name": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._/-]+$",
+          "title": "name",
+          "type": "string",
+          "description": "Name of the host-side port. Shares the interface namespace of the adapter (`NG-X004`) and may be named by a cable endpoint.\n\nYANG: `/if:interfaces/if:interface/if:name`"
+        },
+        "type": {
+          "$ref": "#/$defs/UpstreamType",
+          "title": "type",
+          "description": "The host bus. `usb` and `usb-c` export as `ianaift:usb`; everything else as `ianaift:other`, because IANA registers no Thunderbolt or PCIe identity.\n\nYANG: `…/if:type`"
+        },
+        "speed": {
+          "anyOf": [
+            {
+              "title": "Bit rate",
+              "description": "A link rate, either a whole number of bit/s or `<number><unit>` with unit `bps`, `kbps`, `Mbps`, `Gbps` or `Tbps` (`1Gbps`). Stored in bit/s.",
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "string",
+                  "pattern": "^\\d+(?:\\.\\d+)?\\s*(?:[bB][pP][sS]|[kK][bB][pP][sS]|[mM][bB][pP][sS]|[gG][bB][pP][sS]|[tT][bB][pP][sS])$"
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "speed",
+          "description": "Host-bus rate, e.g. `5Gbps` for USB 3.0. Written as bit/s or with a unit suffix.\n\nYANG: `…/if:speed`"
+        },
+        "attached_to": {
+          "anyOf": [
+            {
+              "maxLength": 1024,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*(?:/[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "attached_to",
+          "description": "The host the adapter is plugged into. A bare device name, never a `device:interface` reference (`NG-X001`). This is what joins the adapter to the graph when no cable does."
+        }
+      },
+      "required": [
+        "name",
+        "type"
+      ],
+      "title": "UpstreamPort",
+      "type": "object"
+    },
+    "UpstreamType": {
+      "description": "`spec.upstream.type` — the host-side bus (§8.1).",
+      "enum": [
+        "usb",
+        "usb-c",
+        "thunderbolt",
+        "pcie",
+        "m2",
+        "sfp",
+        "internal"
+      ],
+      "title": "UpstreamType",
+      "type": "string"
+    },
+    "VlanConfig": {
+      "additionalProperties": false,
+      "description": "`interfaces[].vlan` — the 802.1Q bridge-port configuration (§6.2.4).",
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/VlanMode",
+          "title": "mode",
+          "description": "Access or trunk. 802.1Q has neither concept; netgraph expands the mode into a PVID, an acceptable-frame filter and VLAN membership (see docs/yang-mapping.md)."
+        },
+        "access_vlan": {
+          "anyOf": [
+            {
+              "maximum": 4094,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "access_vlan",
+          "description": "The VLAN an access port belongs to, and the encapsulation VID of a `type: vlan` sub-interface. Required in access mode — it defaults to 1 — and forbidden in trunk mode (`NG-V002`).\n\nYANG: `…/dot1q:bridge-port/dot1q:pvid`"
+        },
+        "trunk_vlans": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VlanSet"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "trunk_vlans",
+          "description": "The tagged VLAN set of a trunk port. Required in trunk mode, forbidden in access mode.\n\nYANG: `…/dot1q:vlan/dot1q:egress-ports (tagged)`"
+        },
+        "native_vlan": {
+          "anyOf": [
+            {
+              "maximum": 4094,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "native_vlan",
+          "description": "The untagged VLAN on a trunk. Trunk mode only (`NG-V003`); it is implicitly a member of the port's VLAN set.\n\nYANG: `…/dot1q:bridge-port/dot1q:pvid`"
+        },
+        "ingress_filtering": {
+          "default": true,
+          "title": "ingress_filtering",
+          "type": "boolean",
+          "description": "Drop frames tagged with a VLAN the port is not a member of.\n\nYANG: `…/dot1q:bridge-port/dot1q:enable-ingress-filtering`"
+        },
+        "acceptable_frames": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AcceptableFrames"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "acceptable_frames",
+          "description": "Which frames the port admits. Derived from `mode` and `native_vlan` when not stated.\n\nYANG: `…/dot1q:bridge-port/dot1q:acceptable-frame`"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "title": "VlanConfig",
+      "type": "object",
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "access"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "allOf": [
+              {
+                "not": {
+                  "required": [
+                    "trunk_vlans"
+                  ]
+                }
+              },
+              {
+                "not": {
+                  "required": [
+                    "native_vlan"
+                  ]
+                }
+              }
+            ]
+          },
+          "else": {
+            "required": [
+              "trunk_vlans"
+            ],
+            "not": {
+              "required": [
+                "access_vlan"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "VlanDefinition": {
+      "additionalProperties": false,
+      "description": "One entry of `spec.vlans` — the device VLAN database (§6.4).",
+      "properties": {
+        "id": {
+          "maximum": 4094,
+          "minimum": 1,
+          "title": "id",
+          "type": "integer",
+          "description": "VLAN identifier. Unique within the device (`NG-V001`).\n\nYANG: `…/dot1q:bridge-vlan/dot1q:vlan/dot1q:vid`"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 32,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "name",
+          "description": "Human name of the VLAN. 802.1Q caps it at 32 characters.\n\nYANG: `…/dot1q:bridge-vlan/dot1q:vlan/dot1q:name`"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "description",
+          "description": "Free text. netgraph-only; 802.1Q has no such node."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "VlanDefinition",
+      "type": "object"
+    },
+    "VlanMode": {
+      "description": "§6.2.4 — operational port vocabulary, translated in §9.3.",
+      "enum": [
+        "access",
+        "trunk"
+      ],
+      "title": "VlanMode",
+      "type": "string"
+    },
+    "VlanSet": {
+      "title": "VLAN set",
+      "description": "A set of VLAN ids: a single id (`10`), a list (`[10, 20]`), a comma-separated string with ranges (`\"10,20,100-110\"`), or the keywords `all` (1-4094) and `none`. Normalised to the coalesced string form on load.",
+      "anyOf": [
+        {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4094
+        },
+        {
+          "type": "string",
+          "pattern": "^\\s*(?:[aA][lL][lL]|[nN][oO][nN][eE]|\\d{1,4}(?:\\s*-\\s*\\d{1,4})?)\\s*(?:,\\s*(?:[aA][lL][lL]|[nN][oO][nN][eE]|\\d{1,4}(?:\\s*-\\s*\\d{1,4})?)\\s*)*$"
+        },
+        {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4094
+              },
+              {
+                "type": "string",
+                "pattern": "^\\s*(?:[aA][lL][lL]|[nN][oO][nN][eE]|\\d{1,4}(?:\\s*-\\s*\\d{1,4})?)\\s*(?:,\\s*(?:[aA][lL][lL]|[nN][oO][nN][eE]|\\d{1,4}(?:\\s*-\\s*\\d{1,4})?)\\s*)*$"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

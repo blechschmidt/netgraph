@@ -1,0 +1,110 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-north-core-dist
+  description: Routed fibre uplink, core to distribution
+  labels:
+    site: north
+    medium: fiber
+spec:
+  endpoints:
+    - rtr-north-core-01:xe-0/0/0
+    - sw-north-dist-01:Ethernet52/1
+  medium: fiber
+  speed: 10Gbps
+  category: om4
+  connector: lc
+  length_m: 12
+  label: F-101
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-north-dist-acc01
+  description: VLAN trunk over fibre, distribution to access 01
+  labels:
+    site: north
+    medium: fiber
+spec:
+  endpoints:
+    - sw-north-dist-01:Ethernet49/1
+    - sw-north-acc-01:TenGigabitEthernet1/1/1
+  medium: fiber
+  speed: 10Gbps
+  category: om4
+  connector: lc
+  length_m: 45
+  label: F-102
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-north-dist-acc02
+  description: VLAN trunk over fibre, distribution to access 02
+  labels:
+    site: north
+    medium: fiber
+spec:
+  endpoints:
+    - sw-north-dist-01:Ethernet50/1
+    - sw-north-acc-02:TenGigabitEthernet1/1/1
+  medium: fiber
+  speed: 10Gbps
+  category: om4
+  connector: lc
+  length_m: 78
+  label: F-103
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-north-acc01-pc01
+  labels:
+    site: north
+    medium: copper
+spec:
+  endpoints:
+    - sw-north-acc-01:GigabitEthernet1/0/1
+    - pc-north-01:eno1
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+  length_m: 22
+  label: C-101
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-north-acc01-srv01
+  labels:
+    site: north
+    medium: copper
+spec:
+  endpoints:
+    - sw-north-acc-01:GigabitEthernet1/0/2
+    - srv-north-01:eth0
+  medium: copper
+  speed: 1Gbps
+  category: cat6a
+  connector: rj45
+  length_m: 6
+  label: C-102
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-north-acc02-pc02
+  labels:
+    site: north
+    medium: copper
+spec:
+  endpoints:
+    - sw-north-acc-02:GigabitEthernet1/0/1
+    - pc-north-02:eno1
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+  length_m: 18
+  label: C-103

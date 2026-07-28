@@ -1,0 +1,588 @@
+graph netgraph {
+  graph [
+    rankdir=TB,
+    splines=true,
+    overlap=false,
+    nodesep=0.5,
+    ranksep=0.7,
+    fontname="Helvetica,Arial,sans-serif",
+    fontsize=12,
+    label="Campus, layer 3",
+    labelloc=t,
+    fontsize=16,
+  ];
+  node [fontname="Helvetica,Arial,sans-serif", fontsize=10, style=filled, penwidth=1.2];
+  edge [fontname="Helvetica,Arial,sans-serif", fontsize=8];
+
+  subgraph cluster_0 {
+    label="sites/north/access";
+    style=rounded;
+    color="#9ca3af";
+    fontcolor="#4b5563";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+    "sites/north/access/sw-north-acc-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="Access switch 01, North campus. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-north-acc-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan99</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 99</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/2</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 20</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/3</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">TenGigabitEthernet1/1/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
+      </TABLE>
+    >];
+    "sites/north/access/sw-north-acc-02" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="Access switch 02, North campus - second floor riser.", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-north-acc-02</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan99</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 99</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/2</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 20</TD></TR>
+        <TR><TD ALIGN="LEFT">TenGigabitEthernet1/1/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_1 {
+    label="sites/north/core";
+    style=rounded;
+    color="#9ca3af";
+    fontcolor="#4b5563";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+    "sites/north/core/rtr-north-core-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="Layer-3 core router for the North campus. It routes between the campus VLANs\n(whose gateways sit on sw-north-dist-01) and carries the two backbone\nfibres of the inter-site ring.\n", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-north-core-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_2 {
+    label="sites/north/distribution";
+    style=rounded;
+    color="#9ca3af";
+    fontcolor="#4b5563";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+    "sites/north/distribution/sw-north-dist-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="Distribution switch for the North campus. It aggregates the access-layer\ntrunks, hosts the SVI gateway for every campus VLAN, and reaches the core\nrouter over a routed (untagged) fibre uplink.\n", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-north-dist-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan10</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan20</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 20</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan99</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 99</TD></TR>
+        <TR><TD ALIGN="LEFT">Ethernet49/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
+        <TR><TD ALIGN="LEFT">Ethernet50/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_3 {
+    label="sites/north/hosts";
+    style=rounded;
+    color="#9ca3af";
+    fontcolor="#4b5563";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+    "sites/north/hosts/pc-north-01" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="Staff workstation, North campus floor 1", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pc-north-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+      </TABLE>
+    >];
+    "sites/north/hosts/srv-north-01" [shape=cylinder, fillcolor="#eae2f5", color="#7c3aed", tooltip="Teaching-lab application server, North campus", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>srv-north-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[server]</TD></TR>
+      </TABLE>
+    >];
+    "sites/north/hosts/pc-north-02" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="Staff workstation, North campus floor 2", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pc-north-02</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_4 {
+    label="sites/south/access";
+    style=rounded;
+    color="#9ca3af";
+    fontcolor="#4b5563";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+    "sites/south/access/sw-south-acc-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="Access switch 01, South campus. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-south-acc-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan99</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 99</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/2</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 20</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/3</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">TenGigabitEthernet1/1/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
+      </TABLE>
+    >];
+    "sites/south/access/sw-south-acc-02" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="Access switch 02, South campus - second floor riser.", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-south-acc-02</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan99</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 99</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/2</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 20</TD></TR>
+        <TR><TD ALIGN="LEFT">TenGigabitEthernet1/1/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_5 {
+    label="sites/south/core";
+    style=rounded;
+    color="#9ca3af";
+    fontcolor="#4b5563";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+    "sites/south/core/rtr-south-core-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="Layer-3 core router for the South campus. It routes between the campus VLANs\n(whose gateways sit on sw-south-dist-01) and carries the two backbone\nfibres of the inter-site ring.\n", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-south-core-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_6 {
+    label="sites/south/distribution";
+    style=rounded;
+    color="#9ca3af";
+    fontcolor="#4b5563";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+    "sites/south/distribution/sw-south-dist-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="Distribution switch for the South campus. It aggregates the access-layer\ntrunks, hosts the SVI gateway for every campus VLAN, and reaches the core\nrouter over a routed (untagged) fibre uplink.\n", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-south-dist-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan10</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan20</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 20</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan99</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 99</TD></TR>
+        <TR><TD ALIGN="LEFT">Ethernet49/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
+        <TR><TD ALIGN="LEFT">Ethernet50/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_7 {
+    label="sites/south/hosts";
+    style=rounded;
+    color="#9ca3af";
+    fontcolor="#4b5563";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+    "sites/south/hosts/pc-south-01" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="Staff workstation, South campus floor 1", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pc-south-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+      </TABLE>
+    >];
+    "sites/south/hosts/srv-south-01" [shape=cylinder, fillcolor="#eae2f5", color="#7c3aed", tooltip="Teaching-lab application server, South campus", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>srv-south-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[server]</TD></TR>
+      </TABLE>
+    >];
+    "sites/south/hosts/pc-south-02" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="Staff workstation, South campus floor 2", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pc-south-02</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_8 {
+    label="sites/west/access";
+    style=rounded;
+    color="#9ca3af";
+    fontcolor="#4b5563";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+    "sites/west/access/sw-west-acc-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="Access switch 01, West annexe. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-west-acc-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan99</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 99</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/2</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 20</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/3</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">TenGigabitEthernet1/1/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
+      </TABLE>
+    >];
+    "sites/west/access/sw-west-acc-02" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="Access switch 02, West annexe - second floor riser.", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-west-acc-02</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan99</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 99</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/2</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 20</TD></TR>
+        <TR><TD ALIGN="LEFT">TenGigabitEthernet1/1/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_9 {
+    label="sites/west/core";
+    style=rounded;
+    color="#9ca3af";
+    fontcolor="#4b5563";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+    "sites/west/core/rtr-west-core-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="Layer-3 core router for the West annexe. It routes between the campus VLANs\n(whose gateways sit on sw-west-dist-01) and carries the two backbone\nfibres of the inter-site ring.\n", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-west-core-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_10 {
+    label="sites/west/distribution";
+    style=rounded;
+    color="#9ca3af";
+    fontcolor="#4b5563";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+    "sites/west/distribution/sw-west-dist-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="Distribution switch for the West annexe. It aggregates the access-layer\ntrunks, hosts the SVI gateway for every campus VLAN, and reaches the core\nrouter over a routed (untagged) fibre uplink.\n", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-west-dist-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan10</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan20</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 20</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan99</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 99</TD></TR>
+        <TR><TD ALIGN="LEFT">Ethernet49/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
+        <TR><TD ALIGN="LEFT">Ethernet50/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  subgraph cluster_11 {
+    label="sites/west/hosts";
+    style=rounded;
+    color="#9ca3af";
+    fontcolor="#4b5563";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+    "sites/west/hosts/pc-west-01" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="Staff workstation, West annexe floor 1", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pc-west-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+      </TABLE>
+    >];
+    "sites/west/hosts/srv-west-01" [shape=cylinder, fillcolor="#eae2f5", color="#7c3aed", tooltip="Teaching-lab application server, West annexe", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>srv-west-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[server]</TD></TR>
+      </TABLE>
+    >];
+    "sites/west/hosts/pc-west-02" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="Staff workstation, West annexe floor 2", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pc-west-02</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  "subnet:10.1.0.0/30" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 10.1.0.0/30: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.1.0.0/30</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.1.10.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 10.1.10.0/24: 3 elements, 3 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.1.10.0/24</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 10</TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.1.20.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 10.1.20.0/24: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.1.20.0/24</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 20</TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.1.99.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 10.1.99.0/24: 3 elements, 3 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.1.99.0/24</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 99</TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.2.0.0/30" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 10.2.0.0/30: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.2.0.0/30</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.2.10.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 10.2.10.0/24: 3 elements, 3 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.2.10.0/24</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 10</TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.2.20.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 10.2.20.0/24: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.2.20.0/24</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 20</TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.2.99.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 10.2.99.0/24: 3 elements, 3 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.2.99.0/24</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 99</TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.3.0.0/30" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 10.3.0.0/30: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.3.0.0/30</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.3.10.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 10.3.10.0/24: 3 elements, 3 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.3.10.0/24</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 10</TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.3.20.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 10.3.20.0/24: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.3.20.0/24</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 20</TD></TR>
+    </TABLE>
+  >];
+  "subnet:10.3.99.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 10.3.99.0/24: 3 elements, 3 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.3.99.0/24</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 99</TD></TR>
+    </TABLE>
+  >];
+  "subnet:192.0.2.1/32" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 192.0.2.1/32: 1 element, 1 address", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>192.0.2.1/32</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:192.0.2.2/32" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 192.0.2.2/32: 1 element, 1 address", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>192.0.2.2/32</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:192.0.2.3/32" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 192.0.2.3/32: 1 element, 1 address", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>192.0.2.3/32</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:198.51.100.0/30" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 198.51.100.0/30: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>198.51.100.0/30</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:198.51.100.4/30" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 198.51.100.4/30: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>198.51.100.4/30</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:198.51.100.8/30" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 198.51.100.8/30: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>198.51.100.8/30</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8::1/128" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv6 subnet 2001:db8::1/128: 1 element, 1 address", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8::1/128</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8::2/128" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv6 subnet 2001:db8::2/128: 1 element, 1 address", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8::2/128</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8::3/128" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv6 subnet 2001:db8::3/128: 1 element, 1 address", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8::3/128</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:1::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv6 subnet 2001:db8:1::/64: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:1::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:1:10::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv6 subnet 2001:db8:1:10::/64: 3 elements, 3 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:1:10::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 10</TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:1:20::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv6 subnet 2001:db8:1:20::/64: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:1:20::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 20</TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:2::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv6 subnet 2001:db8:2::/64: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:2::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:2:10::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv6 subnet 2001:db8:2:10::/64: 3 elements, 3 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:2:10::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 10</TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:2:20::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv6 subnet 2001:db8:2:20::/64: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:2:20::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 20</TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:3::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv6 subnet 2001:db8:3::/64: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:3::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:3:10::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv6 subnet 2001:db8:3:10::/64: 3 elements, 3 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:3:10::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 10</TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:3:20::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv6 subnet 2001:db8:3:20::/64: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:3:20::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 20</TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:ff:1::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv6 subnet 2001:db8:ff:1::/64: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:ff:1::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:ff:2::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv6 subnet 2001:db8:ff:2::/64: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:ff:2::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
+    </TABLE>
+  >];
+  "subnet:2001:db8:ff:3::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv6 subnet 2001:db8:ff:3::/64: 2 elements, 2 addresses", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:ff:3::/64</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
+    </TABLE>
+  >];
+
+  "sites/north/access/sw-north-acc-01" -- "subnet:10.1.99.0/24" [color="#0f766e", style=solid, label="Vlan99\n10.1.99.11/24\nvlan 99", tooltip="sites/north/access/sw-north-acc-01:Vlan99 — 10.1.99.11/24 — vlans: 99"];
+  "sites/north/access/sw-north-acc-02" -- "subnet:10.1.99.0/24" [color="#0f766e", style=solid, label="Vlan99\n10.1.99.12/24\nvlan 99", tooltip="sites/north/access/sw-north-acc-02:Vlan99 — 10.1.99.12/24 — vlans: 99"];
+  "sites/north/core/rtr-north-core-01" -- "subnet:192.0.2.1/32" [color="#0f766e", style=solid, label="lo0\n192.0.2.1/32", tooltip="sites/north/core/rtr-north-core-01:lo0 — 192.0.2.1/32"];
+  "sites/north/core/rtr-north-core-01" -- "subnet:2001:db8::1/128" [color="#0f766e", style=solid, label="lo0\n2001:db8::1/128", tooltip="sites/north/core/rtr-north-core-01:lo0 — 2001:db8::1/128"];
+  "sites/north/core/rtr-north-core-01" -- "subnet:10.1.0.0/30" [color="#0f766e", style=solid, label="xe-0/0/0\n10.1.0.1/30", tooltip="sites/north/core/rtr-north-core-01:xe-0/0/0 — 10.1.0.1/30"];
+  "sites/north/core/rtr-north-core-01" -- "subnet:2001:db8:1::/64" [color="#0f766e", style=solid, label="xe-0/0/0\n2001:db8:1::1/64", tooltip="sites/north/core/rtr-north-core-01:xe-0/0/0 — 2001:db8:1::1/64"];
+  "sites/north/core/rtr-north-core-01" -- "subnet:198.51.100.0/30" [color="#0f766e", style=solid, label="xe-0/0/1\n198.51.100.1/30", tooltip="sites/north/core/rtr-north-core-01:xe-0/0/1 — 198.51.100.1/30"];
+  "sites/north/core/rtr-north-core-01" -- "subnet:2001:db8:ff:1::/64" [color="#0f766e", style=solid, label="xe-0/0/1\n2001:db8:ff:1::1/64", tooltip="sites/north/core/rtr-north-core-01:xe-0/0/1 — 2001:db8:ff:1::1/64"];
+  "sites/north/core/rtr-north-core-01" -- "subnet:198.51.100.8/30" [color="#0f766e", style=solid, label="xe-0/0/2\n198.51.100.10/30", tooltip="sites/north/core/rtr-north-core-01:xe-0/0/2 — 198.51.100.10/30"];
+  "sites/north/core/rtr-north-core-01" -- "subnet:2001:db8:ff:3::/64" [color="#0f766e", style=solid, label="xe-0/0/2\n2001:db8:ff:3::2/64", tooltip="sites/north/core/rtr-north-core-01:xe-0/0/2 — 2001:db8:ff:3::2/64"];
+  "sites/north/distribution/sw-north-dist-01" -- "subnet:10.1.10.0/24" [color="#0f766e", style=solid, label="Vlan10\n10.1.10.1/24\nvlan 10", tooltip="sites/north/distribution/sw-north-dist-01:Vlan10 — 10.1.10.1/24 — vlans: 10"];
+  "sites/north/distribution/sw-north-dist-01" -- "subnet:2001:db8:1:10::/64" [color="#0f766e", style=solid, label="Vlan10\n2001:db8:1:10::1/64\nvlan 10", tooltip="sites/north/distribution/sw-north-dist-01:Vlan10 — 2001:db8:1:10::1/64 — vlans: 10"];
+  "sites/north/distribution/sw-north-dist-01" -- "subnet:10.1.20.0/24" [color="#0f766e", style=solid, label="Vlan20\n10.1.20.1/24\nvlan 20", tooltip="sites/north/distribution/sw-north-dist-01:Vlan20 — 10.1.20.1/24 — vlans: 20"];
+  "sites/north/distribution/sw-north-dist-01" -- "subnet:2001:db8:1:20::/64" [color="#0f766e", style=solid, label="Vlan20\n2001:db8:1:20::1/64\nvlan 20", tooltip="sites/north/distribution/sw-north-dist-01:Vlan20 — 2001:db8:1:20::1/64 — vlans: 20"];
+  "sites/north/distribution/sw-north-dist-01" -- "subnet:10.1.99.0/24" [color="#0f766e", style=solid, label="Vlan99\n10.1.99.1/24\nvlan 99", tooltip="sites/north/distribution/sw-north-dist-01:Vlan99 — 10.1.99.1/24 — vlans: 99"];
+  "sites/north/distribution/sw-north-dist-01" -- "subnet:10.1.0.0/30" [color="#0f766e", style=solid, label="Ethernet52/1\n10.1.0.2/30", tooltip="sites/north/distribution/sw-north-dist-01:Ethernet52/1 — 10.1.0.2/30"];
+  "sites/north/distribution/sw-north-dist-01" -- "subnet:2001:db8:1::/64" [color="#0f766e", style=solid, label="Ethernet52/1\n2001:db8:1::2/64", tooltip="sites/north/distribution/sw-north-dist-01:Ethernet52/1 — 2001:db8:1::2/64"];
+  "sites/north/hosts/pc-north-01" -- "subnet:10.1.10.0/24" [color="#0f766e", style=solid, label="eno1\n10.1.10.51/24", tooltip="sites/north/hosts/pc-north-01:eno1 — 10.1.10.51/24"];
+  "sites/north/hosts/pc-north-01" -- "subnet:2001:db8:1:10::/64" [color="#0f766e", style=solid, label="eno1\n2001:db8:1:10::51/64", tooltip="sites/north/hosts/pc-north-01:eno1 — 2001:db8:1:10::51/64"];
+  "sites/north/hosts/srv-north-01" -- "subnet:10.1.20.0/24" [color="#0f766e", style=solid, label="eth0\n10.1.20.11/24", tooltip="sites/north/hosts/srv-north-01:eth0 — 10.1.20.11/24"];
+  "sites/north/hosts/srv-north-01" -- "subnet:2001:db8:1:20::/64" [color="#0f766e", style=solid, label="eth0\n2001:db8:1:20::11/64", tooltip="sites/north/hosts/srv-north-01:eth0 — 2001:db8:1:20::11/64"];
+  "sites/north/hosts/pc-north-02" -- "subnet:10.1.10.0/24" [color="#0f766e", style=solid, label="eno1\n10.1.10.52/24", tooltip="sites/north/hosts/pc-north-02:eno1 — 10.1.10.52/24"];
+  "sites/north/hosts/pc-north-02" -- "subnet:2001:db8:1:10::/64" [color="#0f766e", style=solid, label="eno1\n2001:db8:1:10::52/64", tooltip="sites/north/hosts/pc-north-02:eno1 — 2001:db8:1:10::52/64"];
+  "sites/south/access/sw-south-acc-01" -- "subnet:10.2.99.0/24" [color="#0f766e", style=solid, label="Vlan99\n10.2.99.11/24\nvlan 99", tooltip="sites/south/access/sw-south-acc-01:Vlan99 — 10.2.99.11/24 — vlans: 99"];
+  "sites/south/access/sw-south-acc-02" -- "subnet:10.2.99.0/24" [color="#0f766e", style=solid, label="Vlan99\n10.2.99.12/24\nvlan 99", tooltip="sites/south/access/sw-south-acc-02:Vlan99 — 10.2.99.12/24 — vlans: 99"];
+  "sites/south/core/rtr-south-core-01" -- "subnet:192.0.2.2/32" [color="#0f766e", style=solid, label="lo0\n192.0.2.2/32", tooltip="sites/south/core/rtr-south-core-01:lo0 — 192.0.2.2/32"];
+  "sites/south/core/rtr-south-core-01" -- "subnet:2001:db8::2/128" [color="#0f766e", style=solid, label="lo0\n2001:db8::2/128", tooltip="sites/south/core/rtr-south-core-01:lo0 — 2001:db8::2/128"];
+  "sites/south/core/rtr-south-core-01" -- "subnet:10.2.0.0/30" [color="#0f766e", style=solid, label="xe-0/0/0\n10.2.0.1/30", tooltip="sites/south/core/rtr-south-core-01:xe-0/0/0 — 10.2.0.1/30"];
+  "sites/south/core/rtr-south-core-01" -- "subnet:2001:db8:2::/64" [color="#0f766e", style=solid, label="xe-0/0/0\n2001:db8:2::1/64", tooltip="sites/south/core/rtr-south-core-01:xe-0/0/0 — 2001:db8:2::1/64"];
+  "sites/south/core/rtr-south-core-01" -- "subnet:198.51.100.4/30" [color="#0f766e", style=solid, label="xe-0/0/1\n198.51.100.5/30", tooltip="sites/south/core/rtr-south-core-01:xe-0/0/1 — 198.51.100.5/30"];
+  "sites/south/core/rtr-south-core-01" -- "subnet:2001:db8:ff:2::/64" [color="#0f766e", style=solid, label="xe-0/0/1\n2001:db8:ff:2::1/64", tooltip="sites/south/core/rtr-south-core-01:xe-0/0/1 — 2001:db8:ff:2::1/64"];
+  "sites/south/core/rtr-south-core-01" -- "subnet:198.51.100.0/30" [color="#0f766e", style=solid, label="xe-0/0/2\n198.51.100.2/30", tooltip="sites/south/core/rtr-south-core-01:xe-0/0/2 — 198.51.100.2/30"];
+  "sites/south/core/rtr-south-core-01" -- "subnet:2001:db8:ff:1::/64" [color="#0f766e", style=solid, label="xe-0/0/2\n2001:db8:ff:1::2/64", tooltip="sites/south/core/rtr-south-core-01:xe-0/0/2 — 2001:db8:ff:1::2/64"];
+  "sites/south/distribution/sw-south-dist-01" -- "subnet:10.2.10.0/24" [color="#0f766e", style=solid, label="Vlan10\n10.2.10.1/24\nvlan 10", tooltip="sites/south/distribution/sw-south-dist-01:Vlan10 — 10.2.10.1/24 — vlans: 10"];
+  "sites/south/distribution/sw-south-dist-01" -- "subnet:2001:db8:2:10::/64" [color="#0f766e", style=solid, label="Vlan10\n2001:db8:2:10::1/64\nvlan 10", tooltip="sites/south/distribution/sw-south-dist-01:Vlan10 — 2001:db8:2:10::1/64 — vlans: 10"];
+  "sites/south/distribution/sw-south-dist-01" -- "subnet:10.2.20.0/24" [color="#0f766e", style=solid, label="Vlan20\n10.2.20.1/24\nvlan 20", tooltip="sites/south/distribution/sw-south-dist-01:Vlan20 — 10.2.20.1/24 — vlans: 20"];
+  "sites/south/distribution/sw-south-dist-01" -- "subnet:2001:db8:2:20::/64" [color="#0f766e", style=solid, label="Vlan20\n2001:db8:2:20::1/64\nvlan 20", tooltip="sites/south/distribution/sw-south-dist-01:Vlan20 — 2001:db8:2:20::1/64 — vlans: 20"];
+  "sites/south/distribution/sw-south-dist-01" -- "subnet:10.2.99.0/24" [color="#0f766e", style=solid, label="Vlan99\n10.2.99.1/24\nvlan 99", tooltip="sites/south/distribution/sw-south-dist-01:Vlan99 — 10.2.99.1/24 — vlans: 99"];
+  "sites/south/distribution/sw-south-dist-01" -- "subnet:10.2.0.0/30" [color="#0f766e", style=solid, label="Ethernet52/1\n10.2.0.2/30", tooltip="sites/south/distribution/sw-south-dist-01:Ethernet52/1 — 10.2.0.2/30"];
+  "sites/south/distribution/sw-south-dist-01" -- "subnet:2001:db8:2::/64" [color="#0f766e", style=solid, label="Ethernet52/1\n2001:db8:2::2/64", tooltip="sites/south/distribution/sw-south-dist-01:Ethernet52/1 — 2001:db8:2::2/64"];
+  "sites/south/hosts/pc-south-01" -- "subnet:10.2.10.0/24" [color="#0f766e", style=solid, label="eno1\n10.2.10.51/24", tooltip="sites/south/hosts/pc-south-01:eno1 — 10.2.10.51/24"];
+  "sites/south/hosts/pc-south-01" -- "subnet:2001:db8:2:10::/64" [color="#0f766e", style=solid, label="eno1\n2001:db8:2:10::51/64", tooltip="sites/south/hosts/pc-south-01:eno1 — 2001:db8:2:10::51/64"];
+  "sites/south/hosts/srv-south-01" -- "subnet:10.2.20.0/24" [color="#0f766e", style=solid, label="eth0\n10.2.20.11/24", tooltip="sites/south/hosts/srv-south-01:eth0 — 10.2.20.11/24"];
+  "sites/south/hosts/srv-south-01" -- "subnet:2001:db8:2:20::/64" [color="#0f766e", style=solid, label="eth0\n2001:db8:2:20::11/64", tooltip="sites/south/hosts/srv-south-01:eth0 — 2001:db8:2:20::11/64"];
+  "sites/south/hosts/pc-south-02" -- "subnet:10.2.10.0/24" [color="#0f766e", style=solid, label="eno1\n10.2.10.52/24", tooltip="sites/south/hosts/pc-south-02:eno1 — 10.2.10.52/24"];
+  "sites/south/hosts/pc-south-02" -- "subnet:2001:db8:2:10::/64" [color="#0f766e", style=solid, label="eno1\n2001:db8:2:10::52/64", tooltip="sites/south/hosts/pc-south-02:eno1 — 2001:db8:2:10::52/64"];
+  "sites/west/access/sw-west-acc-01" -- "subnet:10.3.99.0/24" [color="#0f766e", style=solid, label="Vlan99\n10.3.99.11/24\nvlan 99", tooltip="sites/west/access/sw-west-acc-01:Vlan99 — 10.3.99.11/24 — vlans: 99"];
+  "sites/west/access/sw-west-acc-02" -- "subnet:10.3.99.0/24" [color="#0f766e", style=solid, label="Vlan99\n10.3.99.12/24\nvlan 99", tooltip="sites/west/access/sw-west-acc-02:Vlan99 — 10.3.99.12/24 — vlans: 99"];
+  "sites/west/core/rtr-west-core-01" -- "subnet:192.0.2.3/32" [color="#0f766e", style=solid, label="lo0\n192.0.2.3/32", tooltip="sites/west/core/rtr-west-core-01:lo0 — 192.0.2.3/32"];
+  "sites/west/core/rtr-west-core-01" -- "subnet:2001:db8::3/128" [color="#0f766e", style=solid, label="lo0\n2001:db8::3/128", tooltip="sites/west/core/rtr-west-core-01:lo0 — 2001:db8::3/128"];
+  "sites/west/core/rtr-west-core-01" -- "subnet:10.3.0.0/30" [color="#0f766e", style=solid, label="xe-0/0/0\n10.3.0.1/30", tooltip="sites/west/core/rtr-west-core-01:xe-0/0/0 — 10.3.0.1/30"];
+  "sites/west/core/rtr-west-core-01" -- "subnet:2001:db8:3::/64" [color="#0f766e", style=solid, label="xe-0/0/0\n2001:db8:3::1/64", tooltip="sites/west/core/rtr-west-core-01:xe-0/0/0 — 2001:db8:3::1/64"];
+  "sites/west/core/rtr-west-core-01" -- "subnet:198.51.100.8/30" [color="#0f766e", style=solid, label="xe-0/0/1\n198.51.100.9/30", tooltip="sites/west/core/rtr-west-core-01:xe-0/0/1 — 198.51.100.9/30"];
+  "sites/west/core/rtr-west-core-01" -- "subnet:2001:db8:ff:3::/64" [color="#0f766e", style=solid, label="xe-0/0/1\n2001:db8:ff:3::1/64", tooltip="sites/west/core/rtr-west-core-01:xe-0/0/1 — 2001:db8:ff:3::1/64"];
+  "sites/west/core/rtr-west-core-01" -- "subnet:198.51.100.4/30" [color="#0f766e", style=solid, label="xe-0/0/2\n198.51.100.6/30", tooltip="sites/west/core/rtr-west-core-01:xe-0/0/2 — 198.51.100.6/30"];
+  "sites/west/core/rtr-west-core-01" -- "subnet:2001:db8:ff:2::/64" [color="#0f766e", style=solid, label="xe-0/0/2\n2001:db8:ff:2::2/64", tooltip="sites/west/core/rtr-west-core-01:xe-0/0/2 — 2001:db8:ff:2::2/64"];
+  "sites/west/distribution/sw-west-dist-01" -- "subnet:10.3.10.0/24" [color="#0f766e", style=solid, label="Vlan10\n10.3.10.1/24\nvlan 10", tooltip="sites/west/distribution/sw-west-dist-01:Vlan10 — 10.3.10.1/24 — vlans: 10"];
+  "sites/west/distribution/sw-west-dist-01" -- "subnet:2001:db8:3:10::/64" [color="#0f766e", style=solid, label="Vlan10\n2001:db8:3:10::1/64\nvlan 10", tooltip="sites/west/distribution/sw-west-dist-01:Vlan10 — 2001:db8:3:10::1/64 — vlans: 10"];
+  "sites/west/distribution/sw-west-dist-01" -- "subnet:10.3.20.0/24" [color="#0f766e", style=solid, label="Vlan20\n10.3.20.1/24\nvlan 20", tooltip="sites/west/distribution/sw-west-dist-01:Vlan20 — 10.3.20.1/24 — vlans: 20"];
+  "sites/west/distribution/sw-west-dist-01" -- "subnet:2001:db8:3:20::/64" [color="#0f766e", style=solid, label="Vlan20\n2001:db8:3:20::1/64\nvlan 20", tooltip="sites/west/distribution/sw-west-dist-01:Vlan20 — 2001:db8:3:20::1/64 — vlans: 20"];
+  "sites/west/distribution/sw-west-dist-01" -- "subnet:10.3.99.0/24" [color="#0f766e", style=solid, label="Vlan99\n10.3.99.1/24\nvlan 99", tooltip="sites/west/distribution/sw-west-dist-01:Vlan99 — 10.3.99.1/24 — vlans: 99"];
+  "sites/west/distribution/sw-west-dist-01" -- "subnet:10.3.0.0/30" [color="#0f766e", style=solid, label="Ethernet52/1\n10.3.0.2/30", tooltip="sites/west/distribution/sw-west-dist-01:Ethernet52/1 — 10.3.0.2/30"];
+  "sites/west/distribution/sw-west-dist-01" -- "subnet:2001:db8:3::/64" [color="#0f766e", style=solid, label="Ethernet52/1\n2001:db8:3::2/64", tooltip="sites/west/distribution/sw-west-dist-01:Ethernet52/1 — 2001:db8:3::2/64"];
+  "sites/west/hosts/pc-west-01" -- "subnet:10.3.10.0/24" [color="#0f766e", style=solid, label="eno1\n10.3.10.51/24", tooltip="sites/west/hosts/pc-west-01:eno1 — 10.3.10.51/24"];
+  "sites/west/hosts/pc-west-01" -- "subnet:2001:db8:3:10::/64" [color="#0f766e", style=solid, label="eno1\n2001:db8:3:10::51/64", tooltip="sites/west/hosts/pc-west-01:eno1 — 2001:db8:3:10::51/64"];
+  "sites/west/hosts/srv-west-01" -- "subnet:10.3.20.0/24" [color="#0f766e", style=solid, label="eth0\n10.3.20.11/24", tooltip="sites/west/hosts/srv-west-01:eth0 — 10.3.20.11/24"];
+  "sites/west/hosts/srv-west-01" -- "subnet:2001:db8:3:20::/64" [color="#0f766e", style=solid, label="eth0\n2001:db8:3:20::11/64", tooltip="sites/west/hosts/srv-west-01:eth0 — 2001:db8:3:20::11/64"];
+  "sites/west/hosts/pc-west-02" -- "subnet:10.3.10.0/24" [color="#0f766e", style=solid, label="eno1\n10.3.10.52/24", tooltip="sites/west/hosts/pc-west-02:eno1 — 10.3.10.52/24"];
+  "sites/west/hosts/pc-west-02" -- "subnet:2001:db8:3:10::/64" [color="#0f766e", style=solid, label="eno1\n2001:db8:3:10::52/64", tooltip="sites/west/hosts/pc-west-02:eno1 — 2001:db8:3:10::52/64"];
+}

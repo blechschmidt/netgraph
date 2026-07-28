@@ -1,0 +1,51 @@
+# E007 (NG-I004) - interface stacking contains a cycle.
+#
+# 'vlan-a' is a sub-interface of 'vlan-b' and 'vlan-b' is a sub-interface of
+# 'vlan-a'. Each document is legal on its own: NG-I002 only rejects an interface
+# that is its own parent, so nothing shorter than the whole element sees it.
+# Both encapsulate VLAN 10, so E009 (the VID the parent carries) stays quiet.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+    - name: vlan-a
+      type: vlan
+      parent: vlan-b
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: vlan-b
+      type: vlan
+      parent: vlan-a
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-b:eth0
+  medium: copper

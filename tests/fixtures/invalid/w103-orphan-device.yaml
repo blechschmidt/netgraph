@@ -1,0 +1,17 @@
+# W103 (NG-C016) - a device terminates no cable and hosts no adapter.
+#
+# The inventory declares exactly one device and no cable at all, so 'pc-a' is
+# drawn as an isolated node. Its address sits in a point-to-point prefix, which
+# W105 exempts, so the lone device is reported once rather than twice.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      enabled: false
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]

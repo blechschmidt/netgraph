@@ -1,0 +1,596 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkGraph",
+  "layer": "l3",
+  "nodes": [
+    {
+      "id": "hosts/adp-usb-eth",
+      "type": "element",
+      "name": "adp-usb-eth",
+      "kind": "adapter",
+      "namespace": "hosts",
+      "description": "USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the\nlaptop - there is deliberately no cable between the two (NG-X005).\n",
+      "labels": {
+        "asset": "A-0001",
+        "site": "home"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "enx001122334455",
+          "type": "ethernet",
+          "description": "Dongle Ethernet port",
+          "mac": "00:11:22:33:44:55",
+          "mtu": 1500,
+          "addresses": [
+            "192.168.10.30/24",
+            "2001:db8:10::30/64"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hosts/pc-desk",
+      "type": "element",
+      "name": "pc-desk",
+      "kind": "computer",
+      "namespace": "hosts",
+      "description": "Desktop workstation in the study",
+      "labels": {
+        "owner": "sam",
+        "role": "workstation",
+        "site": "home"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback",
+          "addresses": [
+            "127.0.0.1/8",
+            "::1/128"
+          ]
+        },
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "description": "Onboard gigabit port",
+          "mac": "3c:97:0e:20:01:01",
+          "mtu": 1500,
+          "addresses": [
+            "192.168.10.20/24",
+            "2001:db8:10::20/64"
+          ]
+        },
+        {
+          "name": "wlp1s0",
+          "type": "wifi",
+          "enabled": false,
+          "description": "Disabled - the desk is wired",
+          "mac": "3c:97:0e:20:01:02"
+        }
+      ]
+    },
+    {
+      "id": "hosts/srv-nas",
+      "type": "element",
+      "name": "srv-nas",
+      "kind": "server",
+      "namespace": "hosts",
+      "description": "Backup and media server",
+      "labels": {
+        "env": "prod",
+        "role": "storage",
+        "site": "home"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback",
+          "addresses": [
+            "127.0.0.1/8",
+            "::1/128"
+          ]
+        },
+        {
+          "name": "eth0",
+          "type": "ethernet",
+          "mac": "00:11:32:40:01:01",
+          "mtu": 1500,
+          "addresses": [
+            "192.168.10.10/24",
+            "2001:db8:10::10/64"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "routers/rtr-home",
+      "type": "element",
+      "name": "rtr-home",
+      "kind": "router",
+      "namespace": "routers",
+      "description": "Home edge router. Terminates the ISP hand-off on wan0 and is the default\ngateway for the single home VLAN (10).\n",
+      "labels": {
+        "env": "prod",
+        "role": "edge",
+        "site": "home"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "lo0",
+          "type": "loopback",
+          "description": "Router ID and management target",
+          "addresses": [
+            "192.0.2.1/32",
+            "2001:db8::1/128"
+          ]
+        },
+        {
+          "name": "wan0",
+          "type": "ethernet",
+          "description": "ISP hand-off",
+          "mac": "00:1e:8c:00:10:01",
+          "mtu": 1500,
+          "addresses": [
+            "203.0.113.2/30"
+          ]
+        },
+        {
+          "name": "lan0",
+          "type": "ethernet",
+          "description": "Downlink to sw-home",
+          "mac": "00:1e:8c:00:10:02",
+          "mtu": 1500,
+          "addresses": [
+            "192.168.10.1/24",
+            "2001:db8:10::1/64"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "switches/sw-home",
+      "type": "element",
+      "name": "sw-home",
+      "kind": "switch",
+      "namespace": "switches",
+      "description": "Eight-port desktop switch in the hallway cabinet",
+      "labels": {
+        "role": "access",
+        "site": "home"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "In-band management address of the switch",
+          "addresses": [
+            "192.168.10.2/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "port1",
+          "type": "ethernet",
+          "description": "Uplink to rtr-home",
+          "mac": "00:22:07:aa:00:01",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "port2",
+          "type": "ethernet",
+          "description": "Desk - pc-desk",
+          "mac": "00:22:07:aa:00:02",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "port3",
+          "type": "ethernet",
+          "description": "NAS",
+          "mac": "00:22:07:aa:00:03",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "port4",
+          "type": "ethernet",
+          "description": "Patch to the desk, used by the laptop dongle",
+          "mac": "00:22:07:aa:00:04",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "port5",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Spare",
+          "mac": "00:22:07:aa:00:05",
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "subnet:192.0.2.1/32",
+      "type": "subnet",
+      "name": "192.0.2.1/32",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "192.0.2.1/32",
+        "family": "ipv4",
+        "addresses": [
+          "192.0.2.1/32"
+        ],
+        "elements": [
+          "routers/rtr-home"
+        ]
+      },
+      "vlans": [],
+      "interfaces": []
+    },
+    {
+      "id": "subnet:192.168.10.0/24",
+      "type": "subnet",
+      "name": "192.168.10.0/24",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "192.168.10.0/24",
+        "family": "ipv4",
+        "addresses": [
+          "192.168.10.30/24",
+          "192.168.10.20/24",
+          "192.168.10.10/24",
+          "192.168.10.1/24",
+          "192.168.10.2/24"
+        ],
+        "elements": [
+          "hosts/adp-usb-eth",
+          "hosts/pc-desk",
+          "hosts/srv-nas",
+          "routers/rtr-home",
+          "switches/sw-home"
+        ]
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": []
+    },
+    {
+      "id": "subnet:203.0.113.0/30",
+      "type": "subnet",
+      "name": "203.0.113.0/30",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "203.0.113.0/30",
+        "family": "ipv4",
+        "addresses": [
+          "203.0.113.2/30"
+        ],
+        "elements": [
+          "routers/rtr-home"
+        ]
+      },
+      "vlans": [],
+      "interfaces": []
+    },
+    {
+      "id": "subnet:2001:db8::1/128",
+      "type": "subnet",
+      "name": "2001:db8::1/128",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8::1/128",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8::1/128"
+        ],
+        "elements": [
+          "routers/rtr-home"
+        ]
+      },
+      "vlans": [],
+      "interfaces": []
+    },
+    {
+      "id": "subnet:2001:db8:10::/64",
+      "type": "subnet",
+      "name": "2001:db8:10::/64",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "2001:db8:10::/64",
+        "family": "ipv6",
+        "addresses": [
+          "2001:db8:10::30/64",
+          "2001:db8:10::20/64",
+          "2001:db8:10::10/64",
+          "2001:db8:10::1/64"
+        ],
+        "elements": [
+          "hosts/adp-usb-eth",
+          "hosts/pc-desk",
+          "hosts/srv-nas",
+          "routers/rtr-home"
+        ]
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "hosts/adp-usb-eth:enx001122334455#192.168.10.0/24",
+      "kind": "subnet",
+      "endpoints": [
+        {
+          "node": "hosts/adp-usb-eth",
+          "interface": "enx001122334455"
+        },
+        {
+          "node": "subnet:192.168.10.0/24"
+        }
+      ],
+      "addresses": [
+        "192.168.10.30/24"
+      ],
+      "vlans": []
+    },
+    {
+      "id": "hosts/adp-usb-eth:enx001122334455#2001:db8:10::/64",
+      "kind": "subnet",
+      "endpoints": [
+        {
+          "node": "hosts/adp-usb-eth",
+          "interface": "enx001122334455"
+        },
+        {
+          "node": "subnet:2001:db8:10::/64"
+        }
+      ],
+      "addresses": [
+        "2001:db8:10::30/64"
+      ],
+      "vlans": []
+    },
+    {
+      "id": "hosts/pc-desk:eno1#192.168.10.0/24",
+      "kind": "subnet",
+      "endpoints": [
+        {
+          "node": "hosts/pc-desk",
+          "interface": "eno1"
+        },
+        {
+          "node": "subnet:192.168.10.0/24"
+        }
+      ],
+      "addresses": [
+        "192.168.10.20/24"
+      ],
+      "vlans": []
+    },
+    {
+      "id": "hosts/pc-desk:eno1#2001:db8:10::/64",
+      "kind": "subnet",
+      "endpoints": [
+        {
+          "node": "hosts/pc-desk",
+          "interface": "eno1"
+        },
+        {
+          "node": "subnet:2001:db8:10::/64"
+        }
+      ],
+      "addresses": [
+        "2001:db8:10::20/64"
+      ],
+      "vlans": []
+    },
+    {
+      "id": "hosts/srv-nas:eth0#192.168.10.0/24",
+      "kind": "subnet",
+      "endpoints": [
+        {
+          "node": "hosts/srv-nas",
+          "interface": "eth0"
+        },
+        {
+          "node": "subnet:192.168.10.0/24"
+        }
+      ],
+      "addresses": [
+        "192.168.10.10/24"
+      ],
+      "vlans": []
+    },
+    {
+      "id": "hosts/srv-nas:eth0#2001:db8:10::/64",
+      "kind": "subnet",
+      "endpoints": [
+        {
+          "node": "hosts/srv-nas",
+          "interface": "eth0"
+        },
+        {
+          "node": "subnet:2001:db8:10::/64"
+        }
+      ],
+      "addresses": [
+        "2001:db8:10::10/64"
+      ],
+      "vlans": []
+    },
+    {
+      "id": "routers/rtr-home:lo0#192.0.2.1/32",
+      "kind": "subnet",
+      "endpoints": [
+        {
+          "node": "routers/rtr-home",
+          "interface": "lo0"
+        },
+        {
+          "node": "subnet:192.0.2.1/32"
+        }
+      ],
+      "addresses": [
+        "192.0.2.1/32"
+      ],
+      "vlans": []
+    },
+    {
+      "id": "routers/rtr-home:lo0#2001:db8::1/128",
+      "kind": "subnet",
+      "endpoints": [
+        {
+          "node": "routers/rtr-home",
+          "interface": "lo0"
+        },
+        {
+          "node": "subnet:2001:db8::1/128"
+        }
+      ],
+      "addresses": [
+        "2001:db8::1/128"
+      ],
+      "vlans": []
+    },
+    {
+      "id": "routers/rtr-home:wan0#203.0.113.0/30",
+      "kind": "subnet",
+      "endpoints": [
+        {
+          "node": "routers/rtr-home",
+          "interface": "wan0"
+        },
+        {
+          "node": "subnet:203.0.113.0/30"
+        }
+      ],
+      "addresses": [
+        "203.0.113.2/30"
+      ],
+      "vlans": []
+    },
+    {
+      "id": "routers/rtr-home:lan0#192.168.10.0/24",
+      "kind": "subnet",
+      "endpoints": [
+        {
+          "node": "routers/rtr-home",
+          "interface": "lan0"
+        },
+        {
+          "node": "subnet:192.168.10.0/24"
+        }
+      ],
+      "addresses": [
+        "192.168.10.1/24"
+      ],
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "routers/rtr-home:lan0#2001:db8:10::/64",
+      "kind": "subnet",
+      "endpoints": [
+        {
+          "node": "routers/rtr-home",
+          "interface": "lan0"
+        },
+        {
+          "node": "subnet:2001:db8:10::/64"
+        }
+      ],
+      "addresses": [
+        "2001:db8:10::1/64"
+      ],
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "switches/sw-home:Vlan10#192.168.10.0/24",
+      "kind": "subnet",
+      "endpoints": [
+        {
+          "node": "switches/sw-home",
+          "interface": "Vlan10"
+        },
+        {
+          "node": "subnet:192.168.10.0/24"
+        }
+      ],
+      "addresses": [
+        "192.168.10.2/24"
+      ],
+      "vlans": [
+        10
+      ]
+    }
+  ],
+  "title": "Home lab, layer 3"
+}

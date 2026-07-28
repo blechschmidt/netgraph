@@ -1,0 +1,42 @@
+# W112 (NG-A007) - a routed loopback carries more than a host route.
+#
+# 192.0.2.1/30 claims four addresses that exist on no wire. The prefix is a
+# point-to-point one so that W105, which would otherwise report a subnet with a
+# single member, leaves the loopback alone.
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: lo0
+      type: loopback
+      ipv4:
+        addresses: [192.0.2.1/30]
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-b:eth0
+  medium: copper

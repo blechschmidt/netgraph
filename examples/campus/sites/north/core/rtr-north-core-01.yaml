@@ -1,0 +1,57 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-north-core-01
+  description: |
+    Layer-3 core router for the North campus. It routes between the campus VLANs
+    (whose gateways sit on sw-north-dist-01) and carries the two backbone
+    fibres of the inter-site ring.
+  labels:
+    site: north
+    role: core
+    env: prod
+spec:
+  vendor: Juniper
+  model: MX204
+  location: Building A, Hauptstrasse 1 / MER / U12
+  forwarding:
+    ipv4: true
+    ipv6: true
+  interfaces:
+    - name: lo0
+      type: loopback
+      description: Router ID, IGP and management target
+      ipv4:
+        addresses: [192.0.2.1/32]
+      ipv6:
+        addresses: [2001:db8::1/128]
+
+    - name: xe-0/0/0
+      type: ethernet
+      description: Routed fibre downlink to sw-north-dist-01
+      mac: 00:05:86:01:c0:00
+      mtu: 9000
+      ipv4:
+        addresses: [10.1.0.1/30]
+      ipv6:
+        addresses: [2001:db8:1::1/64]
+
+    - name: xe-0/0/1
+      type: ethernet
+      description: Backbone fibre to rtr-south-core-01
+      mac: 00:05:86:01:c0:01
+      mtu: 9000
+      ipv4:
+        addresses: [198.51.100.1/30]
+      ipv6:
+        addresses: [2001:db8:ff:1::1/64]
+
+    - name: xe-0/0/2
+      type: ethernet
+      description: Backbone fibre to rtr-west-core-01
+      mac: 00:05:86:01:c0:02
+      mtu: 9000
+      ipv4:
+        addresses: [198.51.100.10/30]
+      ipv6:
+        addresses: [2001:db8:ff:3::2/64]

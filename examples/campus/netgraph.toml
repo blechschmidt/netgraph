@@ -1,0 +1,18 @@
+# Per-inventory configuration (docs/schema.md §10.10).
+#
+# This inventory validates clean, so every value below is the default and the
+# file exists only to show where the knobs are. Deleting it changes nothing.
+
+[validate]
+# Promote every surviving warning to an error. Worth turning on in CI once an
+# inventory is clean, so it stays clean.
+strict = false
+
+# Rules never to report at all. Accepts short ids ("W103") and the NG-* ids of
+# docs/schema.md §10 ("NG-C016") interchangeably. An unknown id here is an
+# error: a suppression that silently matches nothing is worse than a failed run.
+ignore = []
+
+# Re-grade a rule rather than silencing it outright.
+[validate.severity]
+# E004 = "warning"

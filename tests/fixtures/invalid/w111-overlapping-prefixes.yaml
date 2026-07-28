@@ -1,0 +1,43 @@
+# W111 (NG-A006) - two interfaces of one device sit in the same prefix.
+#
+# 'eth0' and 'eth1' are both in 10.0.0.0/24, so nothing in the routing table
+# says which of them a packet for that subnet should leave by.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/24]
+    - name: eth1
+      type: ethernet
+      enabled: false
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.3/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-b:eth0
+  medium: copper

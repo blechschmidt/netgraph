@@ -1,0 +1,39 @@
+# W115 (NG-V007) - every VLAN is trunked to a host.
+#
+# 'trunk_vlans: all' expands to 1-4094. Between switches that is ordinary;
+# pointed at a workstation it hands the whole VLAN estate to a machine that
+# needs one of them.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  interfaces:
+    - name: GigabitEthernet0/1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: trunk
+        trunk_vlans: all
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - sw-a:GigabitEthernet0/1
+    - pc-b:eth0
+  medium: copper

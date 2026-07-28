@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="56" viewBox="0 0 72 56" role="img" aria-label="Server">
+  <title>Server</title>
+  <g stroke="#7c3aed" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M50 14 L58 8 V44 L50 50 Z" fill="#d0c1ee"/>
+    <path d="M20 14 L28 8 H58 L50 14 Z" fill="#d0c1ee"/>
+    <rect x="20" y="14" width="30" height="36" fill="#ebe3f7"/>
+    <path d="M25 21 H45 M25 28 H45 M25 35 H45" stroke-width="3"/>
+    <circle cx="27" cy="44" r="1.6" fill="#7c3aed"/>
+  </g>
+</svg>

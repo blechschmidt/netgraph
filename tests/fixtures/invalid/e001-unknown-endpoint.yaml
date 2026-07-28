@@ -1,0 +1,27 @@
+# E001 (NG-C002) - a cable endpoint names a device that is not declared.
+#
+# 'pc-ghost' exists nowhere in this inventory. 'pc-a' is still counted as
+# cabled, so W103 does not pile onto the same mistake. The address sits in a
+# point-to-point prefix, which W105 exempts: the peer that would fill it is the
+# very device this cable fails to resolve.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-dangling
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-ghost:eth0
+  medium: copper

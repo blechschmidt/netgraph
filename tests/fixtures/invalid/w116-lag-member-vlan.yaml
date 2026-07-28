@@ -1,0 +1,52 @@
+# W116 (NG-V008) - a LAG member's 'vlan' block contradicts the aggregate's.
+#
+# 'eth0' says access VLAN 20 while 'bond0' says access VLAN 10. Section 10.6
+# resolves the link through the aggregate, so the member's block is documented
+# but never honoured.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 20
+    - name: eth1
+      type: ethernet
+      enabled: false
+      mtu: 1500
+    - name: bond0
+      type: lag
+      members: [eth0, eth1]
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+      ipv4:
+        addresses: [10.0.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-b:eth0
+  medium: copper

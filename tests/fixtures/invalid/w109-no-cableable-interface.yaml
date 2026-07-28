@@ -1,0 +1,54 @@
+# W109 (NG-I012) - a device declares no ethernet, wifi or lag interface.
+#
+# 'pc-a' owns nothing but a loopback, so no cable can ever reach it. It escapes
+# W103 because the adapter's 'attached_to' is itself a graph edge (schema
+# section 8.2) - which is what makes the missing port, rather than the missing
+# cable, the thing worth saying.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: lo
+      type: loopback
+      ipv4:
+        addresses: [127.0.0.1/8]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: adapter
+metadata:
+  name: adp-usb-eth
+spec:
+  upstream:
+    name: usb0
+    type: usb
+    attached_to: pc-a
+  interfaces:
+    - name: enx0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - adp-usb-eth:enx0
+    - pc-b:eth0
+  medium: copper

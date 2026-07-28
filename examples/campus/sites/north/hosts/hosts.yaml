@@ -1,0 +1,89 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-north-01
+  description: Staff workstation, North campus floor 1
+  labels:
+    site: north
+    role: workstation
+    env: prod
+spec:
+  vendor: Dell
+  model: OptiPlex 7010
+  location: Building A, Hauptstrasse 1 / floor 1
+  interfaces:
+    - name: lo
+      type: loopback
+      ipv4:
+        addresses: [127.0.0.1/8]
+      ipv6:
+        addresses: ["::1/128"]
+
+    - name: eno1
+      type: ethernet
+      mac: b4:96:91:01:10:01
+      mtu: 1500
+      ipv4:
+        addresses: [10.1.10.51/24]
+      ipv6:
+        addresses: [2001:db8:1:10::51/64]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-north-01
+  description: Teaching-lab application server, North campus
+  labels:
+    site: north
+    role: application
+    env: prod
+spec:
+  vendor: HPE
+  model: ProLiant DL360 Gen11
+  location: Building A, Hauptstrasse 1 / MER / U4
+  interfaces:
+    - name: lo
+      type: loopback
+      ipv4:
+        addresses: [127.0.0.1/8]
+      ipv6:
+        addresses: ["::1/128"]
+
+    - name: eth0
+      type: ethernet
+      mac: 3c:d9:2b:01:20:01
+      mtu: 1500
+      ipv4:
+        addresses: [10.1.20.11/24]
+      ipv6:
+        addresses: [2001:db8:1:20::11/64]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-north-02
+  description: Staff workstation, North campus floor 2
+  labels:
+    site: north
+    role: workstation
+    env: prod
+spec:
+  vendor: Lenovo
+  model: ThinkCentre M70q
+  location: Building A, Hauptstrasse 1 / floor 2
+  interfaces:
+    - name: lo
+      type: loopback
+      ipv4:
+        addresses: [127.0.0.1/8]
+      ipv6:
+        addresses: ["::1/128"]
+
+    - name: eno1
+      type: ethernet
+      mac: e8:6a:64:01:11:01
+      mtu: 1500
+      ipv4:
+        addresses: [10.1.10.52/24]
+      ipv6:
+        addresses: [2001:db8:1:10::52/64]

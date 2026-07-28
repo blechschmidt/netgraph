@@ -1,0 +1,55 @@
+# E008 (NG-I005) - one port is a member of two aggregates.
+#
+# 'eth1' is listed by both 'bond0' and 'bond1'. A physical port belongs to one
+# aggregate; whichever LACP session wins, the other bond is short a lane.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+    - name: eth1
+      type: ethernet
+      enabled: false
+      mtu: 1500
+    - name: bond0
+      type: lag
+      members: [eth0, eth1]
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+      ipv4:
+        addresses: [10.0.0.1/30]
+    - name: bond1
+      type: lag
+      members: [eth1]
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-b:eth0
+  medium: copper

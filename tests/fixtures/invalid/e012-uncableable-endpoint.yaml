@@ -1,0 +1,40 @@
+# E012 (NG-C009) - a cable terminates on an interface that has no socket.
+#
+# The cable lands on 'pc-a:lo', a software loopback. 'eth0' is the port it was
+# meant for and is marked spare, which keeps W101 and I002 quiet about it.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: lo
+      type: loopback
+      ipv4:
+        addresses: [192.0.2.1/32]
+    - name: eth0
+      type: ethernet
+      enabled: false
+      mtu: 1500
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:lo
+    - pc-b:eth0
+  medium: copper

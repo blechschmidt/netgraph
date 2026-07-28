@@ -1,0 +1,42 @@
+# W118 (NG-C008) - the cable and one of its endpoints disagree about speed.
+#
+# The dongle's USB upstream port is 5Gbps; the cable claims 1Gbps. Section 9.4
+# projects the cable's speed onto both ends, so the two cannot both hold.
+apiVersion: netgraph.dev/v1alpha1
+kind: adapter
+metadata:
+  name: adp-a
+spec:
+  form_factor: media-converter
+  upstream:
+    name: usb0
+    type: usb
+    speed: 5Gbps
+  interfaces:
+    - name: en0
+      type: ethernet
+      enabled: false
+      mtu: 1500
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - adp-a:usb0
+    - pc-b:eth0
+  medium: copper
+  speed: 1Gbps

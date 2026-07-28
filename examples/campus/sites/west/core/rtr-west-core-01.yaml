@@ -1,0 +1,57 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-west-core-01
+  description: |
+    Layer-3 core router for the West annexe. It routes between the campus VLANs
+    (whose gateways sit on sw-west-dist-01) and carries the two backbone
+    fibres of the inter-site ring.
+  labels:
+    site: west
+    role: core
+    env: prod
+spec:
+  vendor: Juniper
+  model: MX204
+  location: Building F, Weststrasse 9 / MER / U12
+  forwarding:
+    ipv4: true
+    ipv6: true
+  interfaces:
+    - name: lo0
+      type: loopback
+      description: Router ID, IGP and management target
+      ipv4:
+        addresses: [192.0.2.3/32]
+      ipv6:
+        addresses: [2001:db8::3/128]
+
+    - name: xe-0/0/0
+      type: ethernet
+      description: Routed fibre downlink to sw-west-dist-01
+      mac: 00:05:86:03:c0:00
+      mtu: 9000
+      ipv4:
+        addresses: [10.3.0.1/30]
+      ipv6:
+        addresses: [2001:db8:3::1/64]
+
+    - name: xe-0/0/1
+      type: ethernet
+      description: Backbone fibre to rtr-north-core-01
+      mac: 00:05:86:03:c0:01
+      mtu: 9000
+      ipv4:
+        addresses: [198.51.100.9/30]
+      ipv6:
+        addresses: [2001:db8:ff:3::1/64]
+
+    - name: xe-0/0/2
+      type: ethernet
+      description: Backbone fibre to rtr-south-core-01
+      mac: 00:05:86:03:c0:02
+      mtu: 9000
+      ipv4:
+        addresses: [198.51.100.6/30]
+      ipv6:
+        addresses: [2001:db8:ff:2::2/64]

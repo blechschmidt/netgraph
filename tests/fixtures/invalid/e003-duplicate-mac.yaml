@@ -1,0 +1,39 @@
+# E003 (NG-I008) - two interfaces share one MAC address.
+#
+# The two ports are on different devices and are not a stacking pair, so the
+# exemption for a LAG/member or parent/sub-interface pair does not apply.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mac: 00:1e:8c:00:00:01
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mac: 00:1e:8c:00:00:01
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-b:eth0
+  medium: copper

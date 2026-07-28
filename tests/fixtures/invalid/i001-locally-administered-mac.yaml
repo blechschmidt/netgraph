@@ -1,0 +1,39 @@
+# I001 (NG-I010) - a locally administered MAC address.
+#
+# Bit 1 of the first octet of 02:00:00:00:00:01 is set, so the address was
+# assigned by hand rather than drawn from a vendor OUI. Legal and often
+# deliberate - hence info - but no OUI lookup will identify the port.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mac: 02:00:00:00:00:01
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-b:eth0
+  medium: copper

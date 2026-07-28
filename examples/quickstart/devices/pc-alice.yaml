@@ -1,0 +1,13 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-alice
+  labels: {site: office}
+spec:
+  interfaces:
+    - name: eno1
+      type: ethernet
+      mac: 00:1e:8c:bb:00:01
+      mtu: 1500
+      ipv4:
+        addresses: [192.168.10.20/24]

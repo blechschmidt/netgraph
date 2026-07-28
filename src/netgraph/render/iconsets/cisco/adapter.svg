@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="56" viewBox="0 0 72 56" role="img" aria-label="Adapter">
+  <title>Adapter</title>
+  <g stroke="#ea580c" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M6 23 H17 V33 H6 Z" fill="#f8d9b6"/>
+    <rect x="16" y="18" width="32" height="20" rx="4" fill="#fdefe1"/>
+    <path d="M48 22 H57 V26 H62 V30 H57 V34 H48 Z" fill="#f8d9b6"/>
+    <path d="M24 24 V32 M32 24 V32 M40 24 V32" stroke-width="2"/>
+  </g>
+</svg>

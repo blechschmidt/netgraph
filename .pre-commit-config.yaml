@@ -1,0 +1,40 @@
+# Local mirror of the lint gates in .github/workflows/ci.yml.
+#
+#   pip install pre-commit && pre-commit install
+#
+# The hook revisions are pinned; ``pre-commit autoupdate`` moves them. Keep the
+# ruff rev in step with the ``ruff`` pin in pyproject.toml's dev extra, or the
+# hook and CI can disagree about what "formatted" means.
+minimum_pre_commit_version: "3.5.0"
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.0
+    hooks:
+      # Two deliberate differences from CI, neither of which changes the verdict:
+      #
+      # 1. --fix repairs in place, because locally that is more useful than a
+      #    report. CI runs plain ``ruff check`` and just fails.
+      # 2. types_or adds ``markdown``. These hooks default to Python files only,
+      #    but CI runs ``ruff check .`` / ``ruff format --check .``, and ruff
+      #    also handles Python code blocks embedded in Markdown (README.md,
+      #    docs/schema.md). Without it a doc snippet passes here, then fails CI.
+      #
+      # Everything else comes from [tool.ruff] in pyproject.toml, so the rule
+      # set, line length and excludes cannot drift between the two.
+      - id: ruff-check
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi, jupyter, markdown]
+      - id: ruff-format
+        types_or: [python, pyi, jupyter, markdown]
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # A YAML syntax error in an inventory surfaces as a loader failure well
+      # after the commit; parse the examples up front instead.
+      - id: check-yaml
+        name: check examples YAML syntax
+        files: ^examples/.*\.ya?ml$
+        # examples/*/cables/links.yaml and friends are multi-document.
+        args: [--allow-multiple-documents]

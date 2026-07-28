@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="56" viewBox="0 0 72 56" role="img" aria-label="Hub">
+  <title>Hub</title>
+  <g stroke="#a16207" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M4 33 H68 V41 A2 2 0 0 1 66 43 H6 A2 2 0 0 1 4 41 Z" fill="#e6d3a6"/>
+    <path d="M17 15 H55 L68 33 H4 Z" fill="#f6ecd8"/>
+  </g>
+  <g fill="#a16207" stroke="none">
+    <path d="M18 20.1 42 20.1 42 17.7 48 21.5 42 25.3 42 22.9 18 22.9 Z"/>
+    <path d="M23 28.1 47 28.1 47 25.7 53 29.5 47 33.3 47 30.9 23 30.9 Z"/>
+  </g>
+</svg>

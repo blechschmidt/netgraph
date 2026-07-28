@@ -1,0 +1,40 @@
+# W114 (NG-V006) - the native VLAN is missing from 'trunk_vlans'.
+#
+# VLAN 20 is carried untagged on the port whether or not it is listed, so the
+# document reads as one VLAN narrower than the port actually is. Only 'sw-a' is
+# a trunk, so only one end can report it.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  interfaces:
+    - name: GigabitEthernet0/1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: trunk
+        trunk_vlans: [10]
+        native_vlan: 20
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - sw-a:GigabitEthernet0/1
+    - pc-b:eth0
+  medium: copper

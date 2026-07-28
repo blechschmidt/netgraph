@@ -1,0 +1,67 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-bb-north-south
+  description: |
+    Single-mode backbone fibre, north campus to south campus. The three
+    backbone links form a ring, so any one of them can fail without
+    partitioning the campus.
+  labels:
+    role: backbone
+    medium: fiber
+spec:
+  endpoints:
+    - rtr-north-core-01:xe-0/0/1
+    - rtr-south-core-01:xe-0/0/2
+  medium: fiber
+  speed: 10Gbps
+  category: os2
+  connector: lc
+  length_m: 4200
+  label: BB-NS
+
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-bb-south-west
+  description: |
+    Single-mode backbone fibre, south campus to west campus. The three
+    backbone links form a ring, so any one of them can fail without
+    partitioning the campus.
+  labels:
+    role: backbone
+    medium: fiber
+spec:
+  endpoints:
+    - rtr-south-core-01:xe-0/0/1
+    - rtr-west-core-01:xe-0/0/2
+  medium: fiber
+  speed: 10Gbps
+  category: os2
+  connector: lc
+  length_m: 4200
+  label: BB-SW
+
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-bb-west-north
+  description: |
+    Single-mode backbone fibre, west campus to north campus. The three
+    backbone links form a ring, so any one of them can fail without
+    partitioning the campus.
+  labels:
+    role: backbone
+    medium: fiber
+spec:
+  endpoints:
+    - rtr-west-core-01:xe-0/0/1
+    - rtr-north-core-01:xe-0/0/2
+  medium: fiber
+  speed: 10Gbps
+  category: os2
+  connector: lc
+  length_m: 4200
+  label: BB-WN

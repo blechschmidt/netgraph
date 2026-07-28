@@ -1,0 +1,1389 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkGraph",
+  "layer": "l1",
+  "nodes": [
+    {
+      "id": "sites/north/access/sw-north-acc-01",
+      "type": "element",
+      "name": "sw-north-acc-01",
+      "kind": "switch",
+      "namespace": "sites/north/access",
+      "description": "Access switch 01, North campus. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "north"
+      },
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "In-band management"
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "Desk - pc-north-01",
+          "mac": "00:1b:0d:01:a1:01",
+          "mtu": 1500
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "description": "Teaching lab - srv-north-01",
+          "mac": "00:1b:0d:01:a1:02",
+          "mtu": 1500
+        },
+        {
+          "name": "GigabitEthernet1/0/3",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Spare desk port",
+          "mac": "00:1b:0d:01:a1:03"
+        },
+        {
+          "name": "TenGigabitEthernet1/1/1",
+          "type": "ethernet",
+          "description": "Fibre trunk uplink to sw-north-dist-01",
+          "mac": "00:1b:0d:01:a1:11",
+          "mtu": 9000
+        }
+      ]
+    },
+    {
+      "id": "sites/north/access/sw-north-acc-02",
+      "type": "element",
+      "name": "sw-north-acc-02",
+      "kind": "switch",
+      "namespace": "sites/north/access",
+      "description": "Access switch 02, North campus - second floor riser.",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "north"
+      },
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "In-band management"
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "Desk - pc-north-02",
+          "mac": "00:1b:0d:01:a2:01",
+          "mtu": 1500
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Spare lab port",
+          "mac": "00:1b:0d:01:a2:02"
+        },
+        {
+          "name": "TenGigabitEthernet1/1/1",
+          "type": "ethernet",
+          "description": "Fibre trunk uplink to sw-north-dist-01",
+          "mac": "00:1b:0d:01:a2:11",
+          "mtu": 9000
+        }
+      ]
+    },
+    {
+      "id": "sites/north/core/rtr-north-core-01",
+      "type": "element",
+      "name": "rtr-north-core-01",
+      "kind": "router",
+      "namespace": "sites/north/core",
+      "description": "Layer-3 core router for the North campus. It routes between the campus VLANs\n(whose gateways sit on sw-north-dist-01) and carries the two backbone\nfibres of the inter-site ring.\n",
+      "labels": {
+        "env": "prod",
+        "role": "core",
+        "site": "north"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "lo0",
+          "type": "loopback",
+          "description": "Router ID, IGP and management target"
+        },
+        {
+          "name": "xe-0/0/0",
+          "type": "ethernet",
+          "description": "Routed fibre downlink to sw-north-dist-01",
+          "mac": "00:05:86:01:c0:00",
+          "mtu": 9000
+        },
+        {
+          "name": "xe-0/0/1",
+          "type": "ethernet",
+          "description": "Backbone fibre to rtr-south-core-01",
+          "mac": "00:05:86:01:c0:01",
+          "mtu": 9000
+        },
+        {
+          "name": "xe-0/0/2",
+          "type": "ethernet",
+          "description": "Backbone fibre to rtr-west-core-01",
+          "mac": "00:05:86:01:c0:02",
+          "mtu": 9000
+        }
+      ]
+    },
+    {
+      "id": "sites/north/distribution/sw-north-dist-01",
+      "type": "element",
+      "name": "sw-north-dist-01",
+      "kind": "switch",
+      "namespace": "sites/north/distribution",
+      "description": "Distribution switch for the North campus. It aggregates the access-layer\ntrunks, hosts the SVI gateway for every campus VLAN, and reaches the core\nrouter over a routed (untagged) fibre uplink.\n",
+      "labels": {
+        "env": "prod",
+        "role": "distribution",
+        "site": "north"
+      },
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance carrying the access-layer trunks"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "Staff gateway"
+        },
+        {
+          "name": "Vlan20",
+          "type": "vlan",
+          "description": "Teaching-lab gateway"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "Management gateway"
+        },
+        {
+          "name": "Ethernet49/1",
+          "type": "ethernet",
+          "description": "Fibre trunk to sw-north-acc-01",
+          "mac": "00:1c:73:01:d0:01",
+          "mtu": 9000
+        },
+        {
+          "name": "Ethernet50/1",
+          "type": "ethernet",
+          "description": "Fibre trunk to sw-north-acc-02",
+          "mac": "00:1c:73:01:d0:02",
+          "mtu": 9000
+        },
+        {
+          "name": "Ethernet52/1",
+          "type": "ethernet",
+          "description": "Routed fibre uplink to rtr-north-core-01. No 'vlan' block: this port\nis a layer-3 interface, not a bridge port.\n",
+          "mac": "00:1c:73:01:d0:04",
+          "mtu": 9000
+        }
+      ]
+    },
+    {
+      "id": "sites/north/hosts/pc-north-01",
+      "type": "element",
+      "name": "pc-north-01",
+      "kind": "computer",
+      "namespace": "sites/north/hosts",
+      "description": "Staff workstation, North campus floor 1",
+      "labels": {
+        "env": "prod",
+        "role": "workstation",
+        "site": "north"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback"
+        },
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "mac": "b4:96:91:01:10:01",
+          "mtu": 1500
+        }
+      ]
+    },
+    {
+      "id": "sites/north/hosts/srv-north-01",
+      "type": "element",
+      "name": "srv-north-01",
+      "kind": "server",
+      "namespace": "sites/north/hosts",
+      "description": "Teaching-lab application server, North campus",
+      "labels": {
+        "env": "prod",
+        "role": "application",
+        "site": "north"
+      },
+      "vlans": [
+        20
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback"
+        },
+        {
+          "name": "eth0",
+          "type": "ethernet",
+          "mac": "3c:d9:2b:01:20:01",
+          "mtu": 1500
+        }
+      ]
+    },
+    {
+      "id": "sites/north/hosts/pc-north-02",
+      "type": "element",
+      "name": "pc-north-02",
+      "kind": "computer",
+      "namespace": "sites/north/hosts",
+      "description": "Staff workstation, North campus floor 2",
+      "labels": {
+        "env": "prod",
+        "role": "workstation",
+        "site": "north"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback"
+        },
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "mac": "e8:6a:64:01:11:01",
+          "mtu": 1500
+        }
+      ]
+    },
+    {
+      "id": "sites/south/access/sw-south-acc-01",
+      "type": "element",
+      "name": "sw-south-acc-01",
+      "kind": "switch",
+      "namespace": "sites/south/access",
+      "description": "Access switch 01, South campus. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "south"
+      },
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "In-band management"
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "Desk - pc-south-01",
+          "mac": "00:1b:0d:02:a1:01",
+          "mtu": 1500
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "description": "Teaching lab - srv-south-01",
+          "mac": "00:1b:0d:02:a1:02",
+          "mtu": 1500
+        },
+        {
+          "name": "GigabitEthernet1/0/3",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Spare desk port",
+          "mac": "00:1b:0d:02:a1:03"
+        },
+        {
+          "name": "TenGigabitEthernet1/1/1",
+          "type": "ethernet",
+          "description": "Fibre trunk uplink to sw-south-dist-01",
+          "mac": "00:1b:0d:02:a1:11",
+          "mtu": 9000
+        }
+      ]
+    },
+    {
+      "id": "sites/south/access/sw-south-acc-02",
+      "type": "element",
+      "name": "sw-south-acc-02",
+      "kind": "switch",
+      "namespace": "sites/south/access",
+      "description": "Access switch 02, South campus - second floor riser.",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "south"
+      },
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "In-band management"
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "Desk - pc-south-02",
+          "mac": "00:1b:0d:02:a2:01",
+          "mtu": 1500
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Spare lab port",
+          "mac": "00:1b:0d:02:a2:02"
+        },
+        {
+          "name": "TenGigabitEthernet1/1/1",
+          "type": "ethernet",
+          "description": "Fibre trunk uplink to sw-south-dist-01",
+          "mac": "00:1b:0d:02:a2:11",
+          "mtu": 9000
+        }
+      ]
+    },
+    {
+      "id": "sites/south/core/rtr-south-core-01",
+      "type": "element",
+      "name": "rtr-south-core-01",
+      "kind": "router",
+      "namespace": "sites/south/core",
+      "description": "Layer-3 core router for the South campus. It routes between the campus VLANs\n(whose gateways sit on sw-south-dist-01) and carries the two backbone\nfibres of the inter-site ring.\n",
+      "labels": {
+        "env": "prod",
+        "role": "core",
+        "site": "south"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "lo0",
+          "type": "loopback",
+          "description": "Router ID, IGP and management target"
+        },
+        {
+          "name": "xe-0/0/0",
+          "type": "ethernet",
+          "description": "Routed fibre downlink to sw-south-dist-01",
+          "mac": "00:05:86:02:c0:00",
+          "mtu": 9000
+        },
+        {
+          "name": "xe-0/0/1",
+          "type": "ethernet",
+          "description": "Backbone fibre to rtr-west-core-01",
+          "mac": "00:05:86:02:c0:01",
+          "mtu": 9000
+        },
+        {
+          "name": "xe-0/0/2",
+          "type": "ethernet",
+          "description": "Backbone fibre to rtr-north-core-01",
+          "mac": "00:05:86:02:c0:02",
+          "mtu": 9000
+        }
+      ]
+    },
+    {
+      "id": "sites/south/distribution/sw-south-dist-01",
+      "type": "element",
+      "name": "sw-south-dist-01",
+      "kind": "switch",
+      "namespace": "sites/south/distribution",
+      "description": "Distribution switch for the South campus. It aggregates the access-layer\ntrunks, hosts the SVI gateway for every campus VLAN, and reaches the core\nrouter over a routed (untagged) fibre uplink.\n",
+      "labels": {
+        "env": "prod",
+        "role": "distribution",
+        "site": "south"
+      },
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance carrying the access-layer trunks"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "Staff gateway"
+        },
+        {
+          "name": "Vlan20",
+          "type": "vlan",
+          "description": "Teaching-lab gateway"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "Management gateway"
+        },
+        {
+          "name": "Ethernet49/1",
+          "type": "ethernet",
+          "description": "Fibre trunk to sw-south-acc-01",
+          "mac": "00:1c:73:02:d0:01",
+          "mtu": 9000
+        },
+        {
+          "name": "Ethernet50/1",
+          "type": "ethernet",
+          "description": "Fibre trunk to sw-south-acc-02",
+          "mac": "00:1c:73:02:d0:02",
+          "mtu": 9000
+        },
+        {
+          "name": "Ethernet52/1",
+          "type": "ethernet",
+          "description": "Routed fibre uplink to rtr-south-core-01. No 'vlan' block: this port\nis a layer-3 interface, not a bridge port.\n",
+          "mac": "00:1c:73:02:d0:04",
+          "mtu": 9000
+        }
+      ]
+    },
+    {
+      "id": "sites/south/hosts/pc-south-01",
+      "type": "element",
+      "name": "pc-south-01",
+      "kind": "computer",
+      "namespace": "sites/south/hosts",
+      "description": "Staff workstation, South campus floor 1",
+      "labels": {
+        "env": "prod",
+        "role": "workstation",
+        "site": "south"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback"
+        },
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "mac": "b4:96:91:02:10:01",
+          "mtu": 1500
+        }
+      ]
+    },
+    {
+      "id": "sites/south/hosts/srv-south-01",
+      "type": "element",
+      "name": "srv-south-01",
+      "kind": "server",
+      "namespace": "sites/south/hosts",
+      "description": "Teaching-lab application server, South campus",
+      "labels": {
+        "env": "prod",
+        "role": "application",
+        "site": "south"
+      },
+      "vlans": [
+        20
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback"
+        },
+        {
+          "name": "eth0",
+          "type": "ethernet",
+          "mac": "3c:d9:2b:02:20:01",
+          "mtu": 1500
+        }
+      ]
+    },
+    {
+      "id": "sites/south/hosts/pc-south-02",
+      "type": "element",
+      "name": "pc-south-02",
+      "kind": "computer",
+      "namespace": "sites/south/hosts",
+      "description": "Staff workstation, South campus floor 2",
+      "labels": {
+        "env": "prod",
+        "role": "workstation",
+        "site": "south"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback"
+        },
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "mac": "e8:6a:64:02:11:01",
+          "mtu": 1500
+        }
+      ]
+    },
+    {
+      "id": "sites/west/access/sw-west-acc-01",
+      "type": "element",
+      "name": "sw-west-acc-01",
+      "kind": "switch",
+      "namespace": "sites/west/access",
+      "description": "Access switch 01, West annexe. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "west"
+      },
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "In-band management"
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "Desk - pc-west-01",
+          "mac": "00:1b:0d:03:a1:01",
+          "mtu": 1500
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "description": "Teaching lab - srv-west-01",
+          "mac": "00:1b:0d:03:a1:02",
+          "mtu": 1500
+        },
+        {
+          "name": "GigabitEthernet1/0/3",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Spare desk port",
+          "mac": "00:1b:0d:03:a1:03"
+        },
+        {
+          "name": "TenGigabitEthernet1/1/1",
+          "type": "ethernet",
+          "description": "Fibre trunk uplink to sw-west-dist-01",
+          "mac": "00:1b:0d:03:a1:11",
+          "mtu": 9000
+        }
+      ]
+    },
+    {
+      "id": "sites/west/access/sw-west-acc-02",
+      "type": "element",
+      "name": "sw-west-acc-02",
+      "kind": "switch",
+      "namespace": "sites/west/access",
+      "description": "Access switch 02, West annexe - second floor riser.",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "west"
+      },
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "In-band management"
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "Desk - pc-west-02",
+          "mac": "00:1b:0d:03:a2:01",
+          "mtu": 1500
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Spare lab port",
+          "mac": "00:1b:0d:03:a2:02"
+        },
+        {
+          "name": "TenGigabitEthernet1/1/1",
+          "type": "ethernet",
+          "description": "Fibre trunk uplink to sw-west-dist-01",
+          "mac": "00:1b:0d:03:a2:11",
+          "mtu": 9000
+        }
+      ]
+    },
+    {
+      "id": "sites/west/core/rtr-west-core-01",
+      "type": "element",
+      "name": "rtr-west-core-01",
+      "kind": "router",
+      "namespace": "sites/west/core",
+      "description": "Layer-3 core router for the West annexe. It routes between the campus VLANs\n(whose gateways sit on sw-west-dist-01) and carries the two backbone\nfibres of the inter-site ring.\n",
+      "labels": {
+        "env": "prod",
+        "role": "core",
+        "site": "west"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "lo0",
+          "type": "loopback",
+          "description": "Router ID, IGP and management target"
+        },
+        {
+          "name": "xe-0/0/0",
+          "type": "ethernet",
+          "description": "Routed fibre downlink to sw-west-dist-01",
+          "mac": "00:05:86:03:c0:00",
+          "mtu": 9000
+        },
+        {
+          "name": "xe-0/0/1",
+          "type": "ethernet",
+          "description": "Backbone fibre to rtr-north-core-01",
+          "mac": "00:05:86:03:c0:01",
+          "mtu": 9000
+        },
+        {
+          "name": "xe-0/0/2",
+          "type": "ethernet",
+          "description": "Backbone fibre to rtr-south-core-01",
+          "mac": "00:05:86:03:c0:02",
+          "mtu": 9000
+        }
+      ]
+    },
+    {
+      "id": "sites/west/distribution/sw-west-dist-01",
+      "type": "element",
+      "name": "sw-west-dist-01",
+      "kind": "switch",
+      "namespace": "sites/west/distribution",
+      "description": "Distribution switch for the West annexe. It aggregates the access-layer\ntrunks, hosts the SVI gateway for every campus VLAN, and reaches the core\nrouter over a routed (untagged) fibre uplink.\n",
+      "labels": {
+        "env": "prod",
+        "role": "distribution",
+        "site": "west"
+      },
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance carrying the access-layer trunks"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "Staff gateway"
+        },
+        {
+          "name": "Vlan20",
+          "type": "vlan",
+          "description": "Teaching-lab gateway"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "Management gateway"
+        },
+        {
+          "name": "Ethernet49/1",
+          "type": "ethernet",
+          "description": "Fibre trunk to sw-west-acc-01",
+          "mac": "00:1c:73:03:d0:01",
+          "mtu": 9000
+        },
+        {
+          "name": "Ethernet50/1",
+          "type": "ethernet",
+          "description": "Fibre trunk to sw-west-acc-02",
+          "mac": "00:1c:73:03:d0:02",
+          "mtu": 9000
+        },
+        {
+          "name": "Ethernet52/1",
+          "type": "ethernet",
+          "description": "Routed fibre uplink to rtr-west-core-01. No 'vlan' block: this port\nis a layer-3 interface, not a bridge port.\n",
+          "mac": "00:1c:73:03:d0:04",
+          "mtu": 9000
+        }
+      ]
+    },
+    {
+      "id": "sites/west/hosts/pc-west-01",
+      "type": "element",
+      "name": "pc-west-01",
+      "kind": "computer",
+      "namespace": "sites/west/hosts",
+      "description": "Staff workstation, West annexe floor 1",
+      "labels": {
+        "env": "prod",
+        "role": "workstation",
+        "site": "west"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback"
+        },
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "mac": "b4:96:91:03:10:01",
+          "mtu": 1500
+        }
+      ]
+    },
+    {
+      "id": "sites/west/hosts/srv-west-01",
+      "type": "element",
+      "name": "srv-west-01",
+      "kind": "server",
+      "namespace": "sites/west/hosts",
+      "description": "Teaching-lab application server, West annexe",
+      "labels": {
+        "env": "prod",
+        "role": "application",
+        "site": "west"
+      },
+      "vlans": [
+        20
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback"
+        },
+        {
+          "name": "eth0",
+          "type": "ethernet",
+          "mac": "3c:d9:2b:03:20:01",
+          "mtu": 1500
+        }
+      ]
+    },
+    {
+      "id": "sites/west/hosts/pc-west-02",
+      "type": "element",
+      "name": "pc-west-02",
+      "kind": "computer",
+      "namespace": "sites/west/hosts",
+      "description": "Staff workstation, West annexe floor 2",
+      "labels": {
+        "env": "prod",
+        "role": "workstation",
+        "site": "west"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback"
+        },
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "mac": "e8:6a:64:03:11:01",
+          "mtu": 1500
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "backbone/cbl-bb-north-south",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/north/core/rtr-north-core-01",
+          "interface": "xe-0/0/1"
+        },
+        {
+          "node": "sites/south/core/rtr-south-core-01",
+          "interface": "xe-0/0/2"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "label": "BB-NS",
+      "lengthM": 4200.0,
+      "vlans": []
+    },
+    {
+      "id": "backbone/cbl-bb-south-west",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/south/core/rtr-south-core-01",
+          "interface": "xe-0/0/1"
+        },
+        {
+          "node": "sites/west/core/rtr-west-core-01",
+          "interface": "xe-0/0/2"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "label": "BB-SW",
+      "lengthM": 4200.0,
+      "vlans": []
+    },
+    {
+      "id": "backbone/cbl-bb-west-north",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/north/core/rtr-north-core-01",
+          "interface": "xe-0/0/2"
+        },
+        {
+          "node": "sites/west/core/rtr-west-core-01",
+          "interface": "xe-0/0/1"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "label": "BB-WN",
+      "lengthM": 4200.0,
+      "vlans": []
+    },
+    {
+      "id": "sites/north/cables/cbl-north-core-dist",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/north/core/rtr-north-core-01",
+          "interface": "xe-0/0/0"
+        },
+        {
+          "node": "sites/north/distribution/sw-north-dist-01",
+          "interface": "Ethernet52/1"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "label": "F-101",
+      "lengthM": 12.0,
+      "vlans": []
+    },
+    {
+      "id": "sites/north/cables/cbl-north-dist-acc01",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/north/access/sw-north-acc-01",
+          "interface": "TenGigabitEthernet1/1/1"
+        },
+        {
+          "node": "sites/north/distribution/sw-north-dist-01",
+          "interface": "Ethernet49/1"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "label": "F-102",
+      "lengthM": 45.0,
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ]
+    },
+    {
+      "id": "sites/north/cables/cbl-north-dist-acc02",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/north/access/sw-north-acc-02",
+          "interface": "TenGigabitEthernet1/1/1"
+        },
+        {
+          "node": "sites/north/distribution/sw-north-dist-01",
+          "interface": "Ethernet50/1"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "label": "F-103",
+      "lengthM": 78.0,
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ]
+    },
+    {
+      "id": "sites/north/cables/cbl-north-acc01-pc01",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/north/hosts/pc-north-01",
+          "interface": "eno1"
+        },
+        {
+          "node": "sites/north/access/sw-north-acc-01",
+          "interface": "GigabitEthernet1/0/1"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "C-101",
+      "lengthM": 22.0,
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "sites/north/cables/cbl-north-acc01-srv01",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/north/hosts/srv-north-01",
+          "interface": "eth0"
+        },
+        {
+          "node": "sites/north/access/sw-north-acc-01",
+          "interface": "GigabitEthernet1/0/2"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "C-102",
+      "lengthM": 6.0,
+      "vlans": [
+        20
+      ]
+    },
+    {
+      "id": "sites/north/cables/cbl-north-acc02-pc02",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/north/hosts/pc-north-02",
+          "interface": "eno1"
+        },
+        {
+          "node": "sites/north/access/sw-north-acc-02",
+          "interface": "GigabitEthernet1/0/1"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "C-103",
+      "lengthM": 18.0,
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "sites/south/cables/cbl-south-core-dist",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/south/core/rtr-south-core-01",
+          "interface": "xe-0/0/0"
+        },
+        {
+          "node": "sites/south/distribution/sw-south-dist-01",
+          "interface": "Ethernet52/1"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "label": "F-201",
+      "lengthM": 12.0,
+      "vlans": []
+    },
+    {
+      "id": "sites/south/cables/cbl-south-dist-acc01",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/south/access/sw-south-acc-01",
+          "interface": "TenGigabitEthernet1/1/1"
+        },
+        {
+          "node": "sites/south/distribution/sw-south-dist-01",
+          "interface": "Ethernet49/1"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "label": "F-202",
+      "lengthM": 45.0,
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ]
+    },
+    {
+      "id": "sites/south/cables/cbl-south-dist-acc02",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/south/access/sw-south-acc-02",
+          "interface": "TenGigabitEthernet1/1/1"
+        },
+        {
+          "node": "sites/south/distribution/sw-south-dist-01",
+          "interface": "Ethernet50/1"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "label": "F-203",
+      "lengthM": 78.0,
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ]
+    },
+    {
+      "id": "sites/south/cables/cbl-south-acc01-pc01",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/south/hosts/pc-south-01",
+          "interface": "eno1"
+        },
+        {
+          "node": "sites/south/access/sw-south-acc-01",
+          "interface": "GigabitEthernet1/0/1"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "C-201",
+      "lengthM": 22.0,
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "sites/south/cables/cbl-south-acc01-srv01",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/south/hosts/srv-south-01",
+          "interface": "eth0"
+        },
+        {
+          "node": "sites/south/access/sw-south-acc-01",
+          "interface": "GigabitEthernet1/0/2"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "C-202",
+      "lengthM": 6.0,
+      "vlans": [
+        20
+      ]
+    },
+    {
+      "id": "sites/south/cables/cbl-south-acc02-pc02",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/south/hosts/pc-south-02",
+          "interface": "eno1"
+        },
+        {
+          "node": "sites/south/access/sw-south-acc-02",
+          "interface": "GigabitEthernet1/0/1"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "C-203",
+      "lengthM": 18.0,
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "sites/west/cables/cbl-west-core-dist",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/west/core/rtr-west-core-01",
+          "interface": "xe-0/0/0"
+        },
+        {
+          "node": "sites/west/distribution/sw-west-dist-01",
+          "interface": "Ethernet52/1"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "label": "F-301",
+      "lengthM": 12.0,
+      "vlans": []
+    },
+    {
+      "id": "sites/west/cables/cbl-west-dist-acc01",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/west/access/sw-west-acc-01",
+          "interface": "TenGigabitEthernet1/1/1"
+        },
+        {
+          "node": "sites/west/distribution/sw-west-dist-01",
+          "interface": "Ethernet49/1"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "label": "F-302",
+      "lengthM": 45.0,
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ]
+    },
+    {
+      "id": "sites/west/cables/cbl-west-dist-acc02",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/west/access/sw-west-acc-02",
+          "interface": "TenGigabitEthernet1/1/1"
+        },
+        {
+          "node": "sites/west/distribution/sw-west-dist-01",
+          "interface": "Ethernet50/1"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "label": "F-303",
+      "lengthM": 78.0,
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ]
+    },
+    {
+      "id": "sites/west/cables/cbl-west-acc01-pc01",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/west/hosts/pc-west-01",
+          "interface": "eno1"
+        },
+        {
+          "node": "sites/west/access/sw-west-acc-01",
+          "interface": "GigabitEthernet1/0/1"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "C-301",
+      "lengthM": 22.0,
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "sites/west/cables/cbl-west-acc01-srv01",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/west/hosts/srv-west-01",
+          "interface": "eth0"
+        },
+        {
+          "node": "sites/west/access/sw-west-acc-01",
+          "interface": "GigabitEthernet1/0/2"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "C-302",
+      "lengthM": 6.0,
+      "vlans": [
+        20
+      ]
+    },
+    {
+      "id": "sites/west/cables/cbl-west-acc02-pc02",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/west/hosts/pc-west-02",
+          "interface": "eno1"
+        },
+        {
+          "node": "sites/west/access/sw-west-acc-02",
+          "interface": "GigabitEthernet1/0/1"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "C-303",
+      "lengthM": 18.0,
+      "vlans": [
+        10
+      ]
+    }
+  ]
+}

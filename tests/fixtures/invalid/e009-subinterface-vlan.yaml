@@ -1,0 +1,47 @@
+# E009 (NG-V005) - a sub-interface encapsulates a VLAN its parent does not carry.
+#
+# 'eth0.20' expects tagged VLAN 20, but 'eth0' trunks only VLAN 10, so no frame
+# for the sub-interface can ever arrive.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: trunk
+        trunk_vlans: [10]
+    - name: eth0.20
+      type: vlan
+      parent: eth0
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 20
+      ipv4:
+        addresses: [10.0.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-b:eth0
+  medium: copper

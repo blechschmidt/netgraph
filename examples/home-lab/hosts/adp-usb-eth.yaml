@@ -1,0 +1,32 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: adapter
+metadata:
+  name: adp-usb-eth
+  description: |
+    USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the
+    laptop - there is deliberately no cable between the two (NG-X005).
+  labels:
+    site: home
+    asset: "A-0001"
+spec:
+  vendor: Anker
+  model: A83130A1
+  serial: "AK2231007744"
+  form_factor: usb-ethernet
+  passthrough: true
+  ports: 1
+  upstream:
+    name: usb0
+    type: usb
+    speed: 5Gbps
+    attached_to: laptop
+  interfaces:
+    - name: enx001122334455
+      type: ethernet
+      description: Dongle Ethernet port
+      mac: 00:11:22:33:44:55
+      mtu: 1500
+      ipv4:
+        addresses: [192.168.10.30/24]
+      ipv6:
+        addresses: [2001:db8:10::30/64]

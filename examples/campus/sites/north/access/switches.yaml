@@ -1,0 +1,158 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-north-acc-01
+  description: |
+    Access switch 01, North campus. Layer-2 only: the ports are untagged access
+    ports, and the switch's own management address lives on the Vlan99 SVI
+    rather than on a port (NG-V009).
+  labels:
+    site: north
+    role: access
+    env: prod
+spec:
+  vendor: Cisco
+  model: C9200L-48P
+  location: Building A, Hauptstrasse 1 / floor 1 / IDF-1
+  bridge:
+    name: br0
+    type: customer-vlan-bridge
+    address: 00:1b:0d:01:a1:ff
+  vlans:
+    - id: 10
+      name: staff
+    - id: 20
+      name: lab
+    - id: 30
+      name: voice
+    - id: 99
+      name: mgmt
+  interfaces:
+    - name: br0
+      type: bridge
+      description: Switching instance
+      members:
+        - GigabitEthernet1/0/1
+        - GigabitEthernet1/0/2
+        - GigabitEthernet1/0/3
+        - TenGigabitEthernet1/1/1
+
+    - name: Vlan99
+      type: vlan
+      parent: br0
+      description: In-band management
+      vlan:
+        mode: access
+        access_vlan: 99
+      ipv4:
+        addresses: [10.1.99.11/24]
+
+    - name: GigabitEthernet1/0/1
+      type: ethernet
+      description: Desk - pc-north-01
+      mac: 00:1b:0d:01:a1:01
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+
+    - name: GigabitEthernet1/0/2
+      type: ethernet
+      description: Teaching lab - srv-north-01
+      mac: 00:1b:0d:01:a1:02
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 20
+
+    - name: GigabitEthernet1/0/3
+      type: ethernet
+      description: Spare desk port
+      enabled: false
+      mac: 00:1b:0d:01:a1:03
+      vlan:
+        mode: access
+        access_vlan: 10
+
+    - name: TenGigabitEthernet1/1/1
+      type: ethernet
+      description: Fibre trunk uplink to sw-north-dist-01
+      mac: 00:1b:0d:01:a1:11
+      mtu: 9000
+      vlan:
+        mode: trunk
+        trunk_vlans: [1, 10, 20, 30, 99]
+        native_vlan: 1
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-north-acc-02
+  description: Access switch 02, North campus - second floor riser.
+  labels:
+    site: north
+    role: access
+    env: prod
+spec:
+  vendor: Cisco
+  model: C9200L-24P
+  location: Building A, Hauptstrasse 1 / floor 2 / IDF-2
+  bridge:
+    name: br0
+    type: customer-vlan-bridge
+    address: 00:1b:0d:01:a2:ff
+  vlans:
+    - id: 10
+      name: staff
+    - id: 20
+      name: lab
+    - id: 30
+      name: voice
+    - id: 99
+      name: mgmt
+  interfaces:
+    - name: br0
+      type: bridge
+      description: Switching instance
+      members:
+        - GigabitEthernet1/0/1
+        - GigabitEthernet1/0/2
+        - TenGigabitEthernet1/1/1
+
+    - name: Vlan99
+      type: vlan
+      parent: br0
+      description: In-band management
+      vlan:
+        mode: access
+        access_vlan: 99
+      ipv4:
+        addresses: [10.1.99.12/24]
+
+    - name: GigabitEthernet1/0/1
+      type: ethernet
+      description: Desk - pc-north-02
+      mac: 00:1b:0d:01:a2:01
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+
+    - name: GigabitEthernet1/0/2
+      type: ethernet
+      description: Spare lab port
+      enabled: false
+      mac: 00:1b:0d:01:a2:02
+      vlan:
+        mode: access
+        access_vlan: 20
+
+    - name: TenGigabitEthernet1/1/1
+      type: ethernet
+      description: Fibre trunk uplink to sw-north-dist-01
+      mac: 00:1b:0d:01:a2:11
+      mtu: 9000
+      vlan:
+        mode: trunk
+        trunk_vlans: [1, 10, 20, 30, 99]
+        native_vlan: 1

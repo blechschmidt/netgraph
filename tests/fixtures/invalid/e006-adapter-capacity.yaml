@@ -1,0 +1,29 @@
+# E006 (NG-X008) - an adapter declares more downstream interfaces than ports.
+#
+# The hardware has one port; the document describes two. Each address sits in its
+# own point-to-point prefix: W105 exempts those, and W111 has no overlap to find.
+apiVersion: netgraph.dev/v1alpha1
+kind: adapter
+metadata:
+  name: adp-a
+spec:
+  form_factor: usb-ethernet
+  ports: 1
+  upstream:
+    name: usb0
+    type: usb
+  interfaces:
+    - name: en0
+      type: ethernet
+      enabled: false
+      mac: 00:1e:8c:00:00:01
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+    - name: en1
+      type: ethernet
+      enabled: false
+      mac: 00:1e:8c:00:00:02
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.5/30]

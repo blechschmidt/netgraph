@@ -1,0 +1,110 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-west-core-dist
+  description: Routed fibre uplink, core to distribution
+  labels:
+    site: west
+    medium: fiber
+spec:
+  endpoints:
+    - rtr-west-core-01:xe-0/0/0
+    - sw-west-dist-01:Ethernet52/1
+  medium: fiber
+  speed: 10Gbps
+  category: om4
+  connector: lc
+  length_m: 12
+  label: F-301
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-west-dist-acc01
+  description: VLAN trunk over fibre, distribution to access 01
+  labels:
+    site: west
+    medium: fiber
+spec:
+  endpoints:
+    - sw-west-dist-01:Ethernet49/1
+    - sw-west-acc-01:TenGigabitEthernet1/1/1
+  medium: fiber
+  speed: 10Gbps
+  category: om4
+  connector: lc
+  length_m: 45
+  label: F-302
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-west-dist-acc02
+  description: VLAN trunk over fibre, distribution to access 02
+  labels:
+    site: west
+    medium: fiber
+spec:
+  endpoints:
+    - sw-west-dist-01:Ethernet50/1
+    - sw-west-acc-02:TenGigabitEthernet1/1/1
+  medium: fiber
+  speed: 10Gbps
+  category: om4
+  connector: lc
+  length_m: 78
+  label: F-303
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-west-acc01-pc01
+  labels:
+    site: west
+    medium: copper
+spec:
+  endpoints:
+    - sw-west-acc-01:GigabitEthernet1/0/1
+    - pc-west-01:eno1
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+  length_m: 22
+  label: C-301
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-west-acc01-srv01
+  labels:
+    site: west
+    medium: copper
+spec:
+  endpoints:
+    - sw-west-acc-01:GigabitEthernet1/0/2
+    - srv-west-01:eth0
+  medium: copper
+  speed: 1Gbps
+  category: cat6a
+  connector: rj45
+  length_m: 6
+  label: C-302
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-west-acc02-pc02
+  labels:
+    site: west
+    medium: copper
+spec:
+  endpoints:
+    - sw-west-acc-02:GigabitEthernet1/0/1
+    - pc-west-02:eno1
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+  length_m: 18
+  label: C-303

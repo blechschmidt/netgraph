@@ -1,0 +1,43 @@
+# I002 (NG-C015) - an enabled interface terminates no cable.
+#
+# 'pc-a:eth1' is up and addressed but nothing is patched into it. Either the
+# port is spare - say 'enabled: false' and the note goes away - or a cable
+# document is missing. Both prefixes are /30, which W105 and W111 leave alone.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+    - name: eth1
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.1.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-b:eth0
+  medium: copper
