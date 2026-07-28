@@ -106,6 +106,39 @@ class AcceptableFrames(str, Enum):
 # --------------------------------------------------------------------------- #
 
 
+def _plain_address(text: str, family: int) -> dict[str, Any] | None:
+    """``10.0.0.1/24`` → ``{"ip": IPv4Address('10.0.0.1'), "prefix_length": 24}``.
+
+    A hand-rolled fast path for the one spelling almost every address in a real
+    inventory uses: a literal address of the expected family, a ``/``, and a
+    decimal prefix length. It exists because the general path is expensive
+    three times over — :func:`ipaddress.ip_interface` guesses the family by
+    trying IPv4 and then IPv6, it builds a whole network object to recover a
+    number the document already stated, and rendering the address back to a
+    string only makes pydantic parse it a second time.
+
+    ``None`` means "not this shape", and is not a verdict on the value: the
+    caller falls back to :func:`ipaddress.ip_interface`, which owns every
+    diagnostic this function must not invent. Anything the fast path *does*
+    return is exactly what the general path would have returned, with the
+    address left as the object ``ipaddress`` just built instead of its string
+    form — pydantic validates the two to the same value.
+    """
+    address, separator, prefix = text.partition("/")
+    # ``isascii`` matters: ``ipaddress`` rejects non-ASCII digits, ``isdigit``
+    # alone accepts them, and ``int`` would then quietly convert one.
+    if not separator or not prefix.isascii() or not prefix.isdigit():
+        return None
+    length = int(prefix)
+    if length > (32 if family == 4 else 128):
+        return None
+    try:
+        ip = ipaddress.IPv4Address(address) if family == 4 else ipaddress.IPv6Address(address)
+    except ValueError:
+        return None
+    return {"ip": ip, "prefix_length": length}
+
+
 def _split_address_shorthand(value: Any, family: int) -> Any:
     """Expand the ``10.10.10.1/24`` shorthand into ``{ip, prefix_length}``."""
     if not isinstance(value, str):
@@ -120,6 +153,9 @@ def _split_address_shorthand(value: Any, family: int) -> Any:
             f"{echo_value(value)} is missing a prefix length; write it as "
             f"{'10.0.0.1/24' if family == 4 else '2001:db8::1/64'} or as a mapping"
         )
+    plain = _plain_address(text, family)
+    if plain is not None:
+        return plain
     try:
         interface = ipaddress.ip_interface(text)
     except ValueError as exc:
@@ -310,10 +346,16 @@ class IPv6Config(_AddressFamily):
 
 
 def _check_unique_addresses(addresses: list[Any]) -> None:
-    """``NG-A002``: ``ip`` is the RFC 8344 list key, so it must be unique."""
-    seen: set[str] = set()
+    """``NG-A002``: ``ip`` is the RFC 8344 list key, so it must be unique.
+
+    Compared as :mod:`ipaddress` objects rather than as strings: within one
+    family that is the same equivalence — both are normalised by then — and it
+    avoids rendering every address of every interface back to text purely to
+    hash it.
+    """
+    seen: set[ipaddress.IPv4Address | ipaddress.IPv6Address] = set()
     for entry in addresses:
-        key = str(entry.ip)
+        key = entry.ip
         if key in seen:
             raise ValueError(f"duplicate address {key}")
         seen.add(key)

@@ -200,6 +200,37 @@ def test_distinct_keys_that_merely_look_alike_are_kept(base: type[NodeLoader]) -
     assert load(base, "1: int\n'1': str\n") == [{1: "int", "1": "str"}]
 
 
+#: Pairs that must be rejected as one key written twice. The duplicate check
+#: reads a plain string key straight off the node -- that is its fast path --
+#: and constructs anything else, so both branches need a case here, including
+#: values that are equal only *after* construction (``1`` and ``01``, ``'1'``
+#: and ``!!str 1``, an explicitly tagged string and a plain one).
+EQUAL_KEY_PAIRS = [
+    pytest.param("kind: a\nkind: b\n", "'kind'", id="plain-strings"),
+    pytest.param("'kind': a\nkind: b\n", "'kind'", id="quoted-and-plain"),
+    pytest.param("!!str kind: a\nkind: b\n", "'kind'", id="tagged-and-plain"),
+    pytest.param("1: a\n01: b\n", "1", id="int-spellings"),
+    pytest.param("true: a\nTrue: b\n", "True", id="booleans"),
+    pytest.param("1.5: a\n1.50: b\n", "1.5", id="floats"),
+    pytest.param("~: a\nnull: b\n", "None", id="nulls"),
+    pytest.param("? [1, 2]\n: a\n? [1, 2]\n: b\n", "", id="sequence-keys"),
+]
+
+
+@pytest.mark.parametrize(("text", "echoed"), EQUAL_KEY_PAIRS)
+def test_keys_equal_after_construction_are_duplicates(
+    base: type[NodeLoader], text: str, echoed: str
+) -> None:
+    """A key is a duplicate of another when their *constructed values* are equal."""
+    if not echoed:
+        # An unhashable key is refused by PyYAML itself, before the check runs.
+        with pytest.raises(yaml.constructor.ConstructorError, match="unhashable"):
+            load(base, text)
+        return
+    with pytest.raises(yaml.constructor.ConstructorError, match=f"duplicate key {echoed}"):
+        load(base, text)
+
+
 # --------------------------------------------------------------------------- #
 # Guarantee 3: no tag can construct a Python object
 # --------------------------------------------------------------------------- #

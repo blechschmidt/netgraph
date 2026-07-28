@@ -17,8 +17,10 @@ is unusual but should not hit the interpreter's recursion limit.
 
 from __future__ import annotations
 
+import gc
 import os
 from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
@@ -96,9 +98,42 @@ def load_tree(root: Path) -> Inventory:
             reported through :attr:`Inventory.errors` instead.
     """
     inventory = Inventory(root=root)
-    for entry in iter_inventory_files(root, errors=inventory.errors):
-        _load_file(entry, inventory)
+    with _deferred_gc():
+        for entry in iter_inventory_files(root, errors=inventory.errors):
+            _load_file(entry, inventory)
     return inventory
+
+
+@contextmanager
+def _deferred_gc() -> Iterator[None]:
+    """Hold the cyclic collector off for the duration of one load.
+
+    Loading is the worst possible shape for a generational collector: it
+    allocates millions of short-lived objects — YAML node trees and the
+    mappings they construct, thrown away one document at a time — while the set
+    of *live* objects, the elements themselves, only grows. Every collection is
+    therefore a full walk of an ever-larger graph that is almost entirely
+    reachable, and there are hundreds of them. On the 1056-device benchmark
+    tree that is 86 ms of a 483 ms load, about 18 %.
+
+    Nothing here needs collecting: the garbage is node trees, dicts, lists and
+    strings, none of which can form a reference cycle, so plain reference
+    counting frees it the moment it goes out of scope — which is why peak RSS
+    is unchanged (measured: 64 MB either way). The collector is only being
+    asked not to keep looking for cycles that are not there.
+
+    The state is captured and restored, so a caller that had already disabled
+    the collector keeps it disabled, and an exception mid-walk does not leave
+    it off.
+    """
+    enabled = gc.isenabled()
+    if enabled:
+        gc.disable()
+    try:
+        yield
+    finally:
+        if enabled:
+            gc.enable()
 
 
 def iter_inventory_files(

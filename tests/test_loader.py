@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import os
 from pathlib import Path, PurePosixPath
 
@@ -27,7 +28,7 @@ from netgraph.loader import (
     short_name,
 )
 from netgraph.loader.ignore import compile_rules, parse_ignore_file
-from netgraph.loader.tree import _errors_from, _load_file
+from netgraph.loader.tree import _deferred_gc, _errors_from, _load_file
 from netgraph.models import Adapter, Cable, Switch, parse_document
 
 API_VERSION = "netgraph.dev/v1alpha1"
@@ -879,3 +880,41 @@ def test_root_that_is_neither_a_directory_nor_a_file_is_rejected(tmp_path: Path)
 
     with pytest.raises(LoaderError, match="not a directory"):
         load_tree(pipe)
+
+
+# --------------------------------------------------------------------------- #
+# The garbage collector is held off for the duration of a load
+# --------------------------------------------------------------------------- #
+#
+# ``_deferred_gc`` is a pure optimisation (see its docstring), so the property
+# to pin is that it leaves the interpreter exactly as it found it: a load must
+# never be the reason the collector is on, or off, afterwards.
+
+
+def test_loading_restores_the_collectors_state(tmp_path: Path) -> None:
+    root = tmp_path / "inv"
+    write(root, "sw.yaml", switch("sw1"))
+
+    assert gc.isenabled()
+    assert list(load_tree(root).elements) == ["sw1"]
+    assert gc.isenabled()
+
+
+def test_a_caller_that_had_disabled_the_collector_keeps_it_disabled(tmp_path: Path) -> None:
+    root = tmp_path / "inv"
+    write(root, "sw.yaml", switch("sw1"))
+
+    gc.disable()
+    try:
+        load_tree(root)
+        assert not gc.isenabled()
+    finally:
+        gc.enable()
+
+
+def test_the_collector_is_off_inside_the_block_and_restored_after_a_failure() -> None:
+    with pytest.raises(RuntimeError, match="boom"), _deferred_gc():
+        assert not gc.isenabled()
+        raise RuntimeError("boom")
+
+    assert gc.isenabled()

@@ -35,6 +35,7 @@ from netgraph.models import (
     parse_bitrate,
     parse_document,
 )
+from netgraph.models import interface as interface_module
 from netgraph.models.interface import AcceptableFrames, InterfaceType, VlanMode
 
 API_VERSION = "netgraph.dev/v1alpha1"
@@ -318,6 +319,98 @@ def test_address_family_mismatch_is_rejected() -> None:
 def test_zone_indices_are_rejected() -> None:
     with pytest.raises(ValueError, match="zone"):
         IPv6Address.model_validate("fe80::1%eth0/64")
+
+
+# --------------------------------------------------------------------------- #
+# The address fast path
+# --------------------------------------------------------------------------- #
+#
+# ``_plain_address`` short-circuits ``ipaddress.ip_interface`` for the one
+# spelling nearly every address in an inventory uses. It is an optimisation, so
+# the property that matters is not what it does but that it is *invisible*: for
+# every value, accepted or rejected, the model must reach exactly the same
+# outcome with it as without it. The tests below assert that by running each
+# spelling twice -- once normally, once with the fast path forced to decline --
+# and comparing the results.
+
+#: Spellings chosen to land on both sides of every branch of the fast path:
+#: prefix lengths that are and are not plain decimals, netmasks, out-of-range
+#: lengths, the wrong family, and malformed addresses.
+ADDRESS_SPELLINGS: list[tuple[int, str]] = [
+    (4, "10.10.10.1/24"),
+    (4, "10.0.0.1/32"),
+    (4, "0.0.0.0/0"),
+    # A leading zero is still a decimal prefix length, not an octal one.
+    (4, "10.0.0.1/024"),
+    # The RFC 8344 netmask spelling, contiguous and not.
+    (4, "10.0.0.1/255.255.255.0"),
+    (4, "10.0.0.1/255.0.255.0"),
+    (4, "10.0.0.1/33"),
+    (4, "10.0.0.1/-1"),
+    (4, "10.0.0.1/"),
+    (4, "10.0.0.1/24/32"),
+    # Arabic-Indic digits: ``str.isdigit`` accepts them and ``int`` converts
+    # them, but ``ipaddress`` does not -- hence the ``isascii`` guard.
+    (4, "10.0.0.1/٢٤"),
+    (4, "10.0.0.256/24"),
+    (4, "10.0.0.1 /24"),
+    (4, "2001:db8::1/64"),
+    (4, "not an address/24"),
+    (6, "2001:db8::1/64"),
+    (6, "2001:0DB8:0000:0000:0000:0000:0000:0001/64"),
+    (6, "::/0"),
+    (6, "::1/128"),
+    (6, "2001:db8::1/0064"),
+    (6, "2001:db8::1/129"),
+    (6, "2001:db8::1/255.255.255.0"),
+    (6, "2001:db8::g/64"),
+    (6, "10.0.0.1/24"),
+]
+
+
+def address_outcome(family: int, text: str) -> tuple[str, str]:
+    """Validate ``text`` as an address of ``family``; report value or error."""
+    model = IPv4Address if family == 4 else IPv6Address
+    try:
+        parsed = model.model_validate(text)
+    except ValueError as exc:  # pydantic's ValidationError is a ValueError
+        return ("error", str(exc))
+    return ("ok", f"{parsed.ip}/{parsed.prefix_length}")
+
+
+@pytest.mark.parametrize(
+    ("family", "text"),
+    ADDRESS_SPELLINGS,
+    ids=[f"v{family}-{text}" for family, text in ADDRESS_SPELLINGS],
+)
+def test_the_address_fast_path_is_invisible(
+    family: int, text: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every spelling validates identically with and without the fast path."""
+    with_fast_path = address_outcome(family, text)
+    monkeypatch.setattr(interface_module, "_plain_address", lambda text, family: None, raising=True)
+    assert address_outcome(family, text) == with_fast_path
+
+
+def test_the_address_fast_path_is_actually_taken() -> None:
+    """Otherwise the equivalence test above would be comparing one path to itself."""
+    assert interface_module._plain_address("10.0.0.1/24", 4) == {
+        "ip": ipaddress.IPv4Address("10.0.0.1"),
+        "prefix_length": 24,
+    }
+    assert interface_module._plain_address("2001:db8::1/64", 6) == {
+        "ip": ipaddress.IPv6Address("2001:db8::1"),
+        "prefix_length": 64,
+    }
+
+    # And the general path is not reached at all for the common spelling.
+    def refuse(_: object) -> None:
+        raise AssertionError("ipaddress.ip_interface was called on the fast path")
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(ipaddress, "ip_interface", refuse)
+        assert str(IPv4Address.model_validate("10.0.0.1/24")) == "10.0.0.1/24"
+        assert str(IPv6Address.model_validate("2001:db8::1/64")) == "2001:db8::1/64"
 
 
 def test_bare_address_list_shorthand() -> None:

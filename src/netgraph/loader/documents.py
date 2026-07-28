@@ -47,6 +47,7 @@ __all__ = [
     "LOADER_ENV_VAR",
     "LOADER_MODES",
     "MERGE_TAG",
+    "STR_TAG",
     "NodeLoader",
     "PureStrictSafeLoader",
     "RawDocument",
@@ -59,6 +60,7 @@ __all__ = [
 
 BOOL_TAG: Final = "tag:yaml.org,2002:bool"
 MERGE_TAG: Final = "tag:yaml.org,2002:merge"
+STR_TAG: Final = "tag:yaml.org,2002:str"
 
 #: Environment variable selecting the parser; see the module docstring.
 LOADER_ENV_VAR: Final = "NETGRAPH_YAML_LOADER"
@@ -165,7 +167,15 @@ class _StrictLoaderMixin(SafeConstructor):
             if key_node.tag == MERGE_TAG:
                 continue
             try:
-                key = self.construct_object(key_node, deep=True)
+                # Nearly every key in an inventory is a plain string scalar,
+                # whose constructed value *is* ``node.value`` -- PyYAML's
+                # ``construct_yaml_str`` returns it unchanged. Taking it
+                # directly saves a call per key on the hottest loop in the
+                # loader; anything else goes through the constructor.
+                if type(key_node) is yaml.ScalarNode and key_node.tag == STR_TAG:
+                    key = key_node.value
+                else:
+                    key = self.construct_object(key_node, deep=True)
                 if key in seen:
                     raise ConstructorError(
                         "while constructing a mapping",
@@ -174,7 +184,10 @@ class _StrictLoaderMixin(SafeConstructor):
                         key_node.start_mark,
                     )
                 seen.add(key)
-            except TypeError:  # pragma: no cover - unhashable keys are rejected later
+            except TypeError:
+                # An unhashable key -- a sequence or a mapping. PyYAML refuses
+                # it a moment later with its own diagnostic; there is nothing
+                # useful to say about it here.
                 continue
 
 

@@ -57,6 +57,10 @@ End to end, including interpreter start, on the same tree:
 
 Peak RSS is 57–65 MB either way: libyaml buys time, not memory.
 
+Entry 5 is that further pass. It found the guess above only partly right — the
+model validation was 27 % of the load, not the majority — and closes the
+remaining 1.4× on `load_tree` anyway.
+
 ### How the guarantees are held
 
 `tests/test_yaml_loader.py` parametrises every guarantee over both bases and
@@ -223,6 +227,199 @@ inside the document. Cut the graph down with --namespace, --kind or
 The limit is inclusive, and both sides of it are tested: 500 edges renders in
 silence, 501 warns. `-f dot` and `-f json` never warn, because neither has a
 ceiling to warn about.
+
+---
+
+## 5. ~~`load_tree` is still the bottleneck after libyaml~~ — fixed, 1.41×
+
+**Status:** closed 2026-07-28. Entry 1 named the next target; this is the pass
+that took it, and the first thing it found was that the target was misnamed.
+
+### What the profile actually said
+
+Entry 1 predicted that pydantic model validation was what was left. It was not
+the majority of it. Timing the stages of `load_tree` separately on the same
+1056-device tree, through libyaml:
+
+| Inside `load_tree` | Before |
+|---|---|
+| libyaml compose (C) | 150 ms |
+| PyYAML's Python constructor | 130 ms |
+| pydantic + netgraph model validators | 162 ms |
+| cyclic garbage collection | 86 ms |
+| loader bookkeeping, file reads | ~60 ms |
+
+So model validation was **27 %** of the load, not 74 %, and the second largest
+item — 18 % of it — was not netgraph's code at all but the garbage collector.
+Three changes came out of that, in descending order of what they were worth.
+
+**The collector is held off for the duration of a load** (`_deferred_gc` in
+`loader/tree.py`, **86 ms**). Loading is the worst possible shape for a
+generational collector: millions of short-lived objects — node trees and the
+mappings built from them, discarded one document at a time — while the *live*
+set, the elements, only grows. Every collection is a full walk of an
+ever-larger graph that is almost entirely reachable, and there are hundreds of
+them. None of that garbage can form a cycle, so reference counting frees it
+without help, which is why peak RSS is unchanged (measured: 64 MB either way).
+The previous state is captured and restored, so a caller that had already
+disabled the collector keeps it disabled and an exception mid-walk does not
+leave it off.
+
+**An address is parsed once instead of three times** (`_plain_address` in
+`models/interface.py`, **72 ms**, cutting the model layer from 162 ms to 90 ms).
+`10.0.0.1/24` went through `ipaddress.ip_interface`, which guesses the family by
+trying IPv4 and then IPv6 and builds a whole network object to recover a number
+the document had just stated; the result was then rendered back to a string, and
+pydantic parsed that string a second time. The fast path recognises the one
+spelling almost every address uses — a literal address of the expected family
+and a decimal prefix length — and hands pydantic the object `ipaddress` already
+built. It returns `None` for anything else, and the general path, which owns
+every diagnostic, runs unchanged. `_check_unique_addresses` likewise compares
+`ipaddress` objects rather than rendering each address back to text to hash it.
+
+**A plain string key is not constructed twice** (`_reject_duplicate_keys` in
+`loader/documents.py`, **16 ms**, visible as the parse step's own 294 → 278 ms).
+The duplicate-key check ran PyYAML's constructor over every key of every
+mapping, and `construct_mapping` then ran it again. For a scalar node tagged
+`!!str` the constructed value *is* `node.value`, so it is read directly;
+anything else — an int key, a bool, a sequence — still goes through the
+constructor, which is what keeps `1` and `'1'` distinct and `1` and `01` the
+same key.
+
+### Measured
+
+Same harness, same tree, same machine as entry 1's table: `tools/bench_pipeline.py`
+defaults, **1056 devices in 2106 documents across 138 files, 1.2 MB of YAML**.
+Both columns were re-measured here rather than copied, so they are comparable
+with each other; they are *not* comparable with entry 1's absolute numbers,
+which came off a different machine (this one is about twice as slow on
+`validate`). Median of five.
+
+Through libyaml:
+
+| Stage | Before | After | Speed-up |
+|---|---|---|---|
+| `load_tree` | 592 ms | 421 ms | **1.41×** |
+| `validate` | 235 ms | 240 ms | — |
+| `build_graph` | 43 ms | 43 ms | — |
+| `render` (dot / mermaid / json) | 30 / 4.4 / 44 ms | 32 / 4.6 / 46 ms | — |
+| **total** | **949 ms** | **786 ms** | **1.21×** |
+
+Through the pure-Python parser:
+
+| Stage | Before | After | Speed-up |
+|---|---|---|---|
+| `load_tree` | 2487 ms | 2333 ms | 1.07× |
+| `validate` | 242 ms | 234 ms | — |
+| `build_graph` | 45 ms | 43 ms | — |
+| `render` (dot / mermaid / json) | 32 / 4.7 / 44 ms | 30 / 4.5 / 46 ms | — |
+| **total** | **2854 ms** | **2691 ms** | **1.06×** |
+
+The fallback path gains almost nothing, and that is not a disappointment but
+arithmetic: its parser is 8× slower, so it spends 2.2 s of a 2.3 s load inside
+PyYAML, where none of these three changes reach. The parse step itself:
+
+| Parse only, 2106 documents | Before | After |
+|---|---|---|
+| pure Python | 2169 ms | 2174 ms |
+| libyaml | 294 ms | 278 ms |
+
+End to end, including interpreter start:
+
+| Command | libyaml before | libyaml after | pure Python before | pure Python after |
+|---|---|---|---|---|
+| `netgraph validate` | 1.06 s | 0.94 s | 3.00 s | 2.91 s |
+| `netgraph render -f dot` | 1.15 s | 1.03 s | 3.14 s | 2.95 s |
+| `netgraph render -f svg` | 1.82 s | 1.71 s | 3.88 s | 3.66 s |
+
+Peak RSS is 60–69 MB before and 60–68 MB after: as with entry 1, the win is
+time, not memory.
+
+`load_tree` is now **54 %** of the pipeline through libyaml, down from 62 %, and
+`validate` — untouched here — has become the second cost at 30 %. That is where
+a third pass would go.
+
+### The regression guard
+
+`tests/test_performance.py` fails if the load gives this back. It generates a
+scaled-down tree with the same harness (80 devices, 158 documents), then times
+two things in the same process, interleaved, best of four: the raw parse over
+the tree, and `load_tree` over it. The assertion is on the **ratio**, because a
+wall-clock ceiling on a shared CI runner would have to be so generous it caught
+nothing, whereas machine speed cancels out of `full / floor`.
+
+| Parser | Before this entry | Today | Threshold |
+|---|---|---|---|
+| libyaml | 1.78–1.79 | 1.52–1.53 | 1.70 |
+| pure Python | 1.16 | 1.10–1.12 | 1.25 |
+
+The libyaml row was checked in both directions: it passes on this commit and
+fails on its parent, quoting 1.79. The margin is real but not generous — 11 %
+of headroom above today, 5 % below a full revert — which is the price of a
+guard sharp enough to notice anything. The pure-Python row is honestly weaker:
+with a parse 8× slower in the denominator the model layer would have to roughly
+triple before it moved that far, so it would *not* catch a revert of this entry.
+It is kept so that a catastrophic regression is not invisible on the fallback
+path. Should the threshold ever need raising for a platform rather than for a
+regression, raising it here and recording it in this entry is the intended fix,
+not deleting the test.
+
+### Measured and rejected
+
+Four candidates were profiled and not taken. Recorded with their numbers so the
+next pass does not re-derive them.
+
+- **A bounded cache for repeated scalar values.** Worth **1.6 ms of 62 ms**
+  (2.6 %) on the document-parsing stage, for process-global mutable state. The
+  premise does not hold on the values that matter: 2100 of the 2142 MAC
+  addresses in the tree are distinct, so a MAC cache is pure overhead. Label
+  keys do repeat — 5 distinct keys across 2106 documents — but checking one is
+  already only a `rpartition` and two regex matches. Bit rates repeat hardest
+  (2 distinct values across 1050 cables) and `parse_bitrate` does not appear in
+  the profile at all.
+- **Loosening the model config.** `revalidate_instances` is already `never`, so
+  there is no redundant re-validation of submodels to remove. `validate_default`
+  is the one setting that costs something — turning it off is worth **5 ms of
+  62 ms**, under 1 % of a load — and it is on deliberately, so that a default
+  that stops matching its own field is caught. Not a trade worth making.
+- **Overriding PyYAML's implicit-tag resolver.** `Resolver.resolve` is called
+  once per scalar (118 800 times on this tree) and allocates a list on every
+  call to concatenate a wildcard table that is always empty. A replacement that
+  avoids it, verified to produce byte-identical node trees over the whole tree,
+  is worth **5 ms of 271 ms** — 2 %, for a reimplementation of a PyYAML core
+  method that every diagnostic's line numbers depend on.
+- **Parsing files in parallel.** Prototyped with four forked workers on this
+  four-core machine, with the pool already warm, no diagnostic ordering and no
+  error handling: **427 ms → 300 ms**, 1.42×. That is the optimistic bound and
+  it is not attractive. Handing the parsed elements back costs 58 ms to pickle
+  and **162 ms to unpickle in the parent** — serial work that no number of
+  workers reduces, and already more than half the total. Add pool start-up
+  (which dominates on a small inventory, the common case), `spawn` instead of
+  `fork` off Linux, and the machinery to keep diagnostics deterministically
+  ordered, and it buys a fraction of a factor for a large amount of new failure
+  surface.
+
+### What did not change
+
+Every diagnostic. The three changes are on paths that are only reached when a
+value is *accepted*: the fast address path declines and defers to
+`ipaddress.ip_interface` for anything it does not recognise, the duplicate-key
+fast path only reads a value PyYAML would have constructed identically, and
+deferring the collector cannot alter a result at all. That is asserted rather
+than argued: `test_the_address_fast_path_is_invisible` runs 24 address
+spellings — netmasks, out-of-range prefixes, non-ASCII digits, the wrong
+family, malformed literals — twice, once with the fast path forced to decline,
+and requires the accepted value or the error text to be identical; and
+`test_keys_equal_after_construction_are_duplicates` pins the key pairs that must
+still collide after construction. The full suite, the golden fixtures and both
+parser paths are otherwise untouched.
+
+Checked once more from the outside, at the level a user sees: the DOT, Mermaid
+and JSON renderings, the `validate` report and the subnet listing of every
+inventory under `examples/` and of the 1056-device benchmark tree, plus the
+diagnostics of all 41 documents in `tests/fixtures/invalid/`, are **byte-for-byte
+identical** before and after — and identical again through the pure-Python
+parser.
 
 ---
 
