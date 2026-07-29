@@ -35,7 +35,7 @@ INVALID_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "invalid"
 EXAMPLE_SHAPES: dict[str, dict[str, int]] = {
     "quickstart": {"devices": 3, "cables": 2, "adapters": 0, "tunnels": 0},
     "home-lab": {"devices": 5, "cables": 4, "adapters": 1, "tunnels": 0},
-    "campus": {"devices": 21, "cables": 21, "adapters": 0, "tunnels": 0},
+    "campus": {"devices": 22, "cables": 22, "adapters": 0, "tunnels": 0},
     "overlay": {"devices": 7, "cables": 6, "adapters": 0, "tunnels": 5},
 }
 
@@ -144,8 +144,9 @@ def test_the_campus_trunks_access_to_distribution() -> None:
 def test_the_campus_backbone_and_uplinks_run_over_fibre() -> None:
     inventory = load_example("campus")
     fibre = {fqn for fqn, cable in inventory.cables.items() if cable.spec.medium.value == "fiber"}
-    # Three backbone links plus, per site, one core uplink and two access trunks.
-    assert len(fibre) == 12
+    # Three backbone links plus, per site, one core uplink and two access trunks,
+    # plus the third North access trunk on the templated switch.
+    assert len(fibre) == 13
     assert {
         "backbone/cbl-bb-north-south",
         "backbone/cbl-bb-south-west",

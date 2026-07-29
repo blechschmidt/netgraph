@@ -1,4 +1,4 @@
-# Per-inventory configuration (docs/schema.md §10.10).
+# Per-inventory configuration (docs/schema.md §10.11).
 #
 # This inventory validates clean, so every value below is the default and the
 # file exists only to show where the knobs are. Deleting it changes nothing.

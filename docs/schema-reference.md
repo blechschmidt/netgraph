@@ -31,6 +31,7 @@ the field maps to, with `…` standing for
 | `cable` | [CableSpec](#spec--cable) | An undirected link between exactly two interfaces. Owns no interfaces. |
 | `adapter` | [AdapterSpec](#spec--adapter) | Presents interfaces over a non-network host port. |
 | `tunnel` | [TunnelSpec](#spec--tunnel) | An undirected logical link between two or more `tunnel` interfaces. Owns no interfaces; `over` nests it inside another tunnel. |
+| `template` | partial [DeviceSpec](#spec--switch-router-hub-computer-server) | A named partial device spec, merged into every device that names it in `spec.from`. Not an element: never drawn, never listed, never validated on its own. |
 
 ## Document envelope
 
@@ -70,6 +71,9 @@ The five device kinds share one spec shape. They differ in which fields they per
 | `bridge` | [BridgeConfig](#specbridge) | no | *unset* | The 802.1Q bridge component this device implements. Absent means the device is not a bridge. | `/dot1q:bridges/dot1q:bridge` |
 | `vlans` | [VlanDefinition](#specvlans) list | no | `[]` | The device VLAN database: which VLANs exist on this device, and what they are called. | `…/dot1q:bridge-vlan/dot1q:vlan` |
 | `forwarding` | [Forwarding](#specforwarding) | no | *unset* | Device-wide default for per-interface IP forwarding. Defaults to true/true on a `router` and false/false on every other kind; a `hub` must not declare it. | — |
+| `from` | element reference | no | *unset* | Names a `kind: template` document whose partial spec is merged underneath this one. Consumed by the loader: it is gone before validation, the graph or any renderer sees the device. `interfaces` is required only when `from` is absent. | — |
+
+* `from` merges a template underneath the device: the device's own keys win, `interfaces` merge by `name`, and every other list the device declares replaces the template's outright. See §6.6 of [`schema.md`](schema.md).
 
 ## `spec.forwarding`
 
@@ -117,7 +121,10 @@ One entry per port or logical interface. Used by both devices and adapters.
 | `vlan` | [VlanConfig](#specinterfacesvlan) | no | *unset* | 802.1Q bridge-port configuration. Absent means the port is not VLAN-aware; a host port facing an access port normally omits it. | `…/dot1q:bridge-port` |
 | `parent` | interface name | no | *unset* | The interface this one is stacked on. Required for `type: vlan`, forbidden otherwise (`NG-I002`). | `…/if:lower-layer-if` |
 | `members` | interface name list | no | *unset* | The interfaces aggregated by this one. Required for `type: lag` and `type: bridge`, forbidden otherwise (`NG-I003`). | `…/if:lower-layer-if` |
+| `range` | string | no | *unset* | Declares many interfaces at once instead of `name`, by bracket expansion over one or more numeric spans (`GigabitEthernet1/0/[1-48]`). Consumed by the loader: the entry is replaced by the interfaces it expands to before anything else sees the document. Exactly one of `name` and `range` is written. | — |
 
+* `range` expands as an odometer, the rightmost span varying fastest, and the width of a span's low bound is its zero padding (`[01-12]` yields `01`…`12`). In `description`, `{}` and `%d` stand for the last span and `{0}`, `{1}`, … for a span by position. See §6.2.5 of [`schema.md`](schema.md).
+* Inside a `spec` that declares `from`, an entry may state only `name` and the fields it overrides; the template supplies `type` and the rest.
 * `type: vlan` requires `parent` and a `vlan` block in access mode carrying the encapsulation VID.
 * `type: lag` and `type: bridge` require `members`, which must be non-empty, free of duplicates, and must not name the interface itself.
 * An interface carrying IPv6 addresses must have an MTU of at least 1280 (`NG-I011`).

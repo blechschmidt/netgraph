@@ -37,6 +37,7 @@ spec:
       members:
         - Ethernet49/1
         - Ethernet50/1
+        - Ethernet51/1
 
     - name: Vlan10
       type: vlan
@@ -86,6 +87,16 @@ spec:
       type: ethernet
       description: Fibre trunk to sw-north-acc-02
       mac: 00:1c:73:01:d0:02
+      mtu: 9000
+      vlan:
+        mode: trunk
+        trunk_vlans: [1, 10, 20, 30, 99]
+        native_vlan: 1
+
+    - name: Ethernet51/1
+      type: ethernet
+      description: Fibre trunk to sw-north-acc-03
+      mac: 00:1c:73:01:d0:03
       mtu: 9000
       vlan:
         mode: trunk

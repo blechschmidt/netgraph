@@ -1261,7 +1261,7 @@ def _check_multicast_mac(ctx: _Context) -> Iterator[_Draft]:
     Bit 0 of the first octet marks a group address (IEEE 802-2014 §8.2). A group
     address can be a frame's *destination* but never its source, so no interface
     can own one. Graded an error rather than §10.2's warning, on the precedent of
-    ``E003``/``E004`` (§10.9): unlike a duplicate address, which VRRP makes
+    ``E003``/``E004`` (§10.10): unlike a duplicate address, which VRRP makes
     legitimate, there is no configuration in which this is what was meant — it is
     a mistyped octet.
     """
@@ -2184,7 +2184,7 @@ def _check_attachment_is_a_host(ctx: _Context) -> Iterator[_Draft]:
 
 
 # --------------------------------------------------------------------------- #
-# Tunnels (§10.9)
+# Tunnels (§10.10)
 # --------------------------------------------------------------------------- #
 
 

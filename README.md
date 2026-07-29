@@ -271,6 +271,72 @@ The finished inventory is checked in as
 renders it on every run — so if you got a different answer than this page
 promised, that is a bug in netgraph rather than in your typing.
 
+## Declaring a 48-port switch without typing it 48 times
+
+A real access layer is dozens of near-identical documents, each of which is
+dozens of near-identical ports. Two mechanisms remove the repetition without
+weakening any check: both are applied by the loader before validation, so the
+validator, the graph and every renderer still see plain interfaces and plain
+devices.
+
+**Interface ranges** (`docs/schema.md` §6.2.5). One entry may declare `range`
+instead of `name`:
+
+```yaml
+interfaces:
+  - range: GigabitEthernet1/0/[1-48]
+    type: ethernet
+    description: Access port {}          # {} and %d are the port number
+    enabled: false
+    vlan: {mode: access, access_vlan: 10}
+```
+
+Several spans expand as an odometer, rightmost fastest — `ge-[0-1]/0/[0-3]`
+yields `ge-0/0/0` … `ge-1/0/3` — and the width of a span's low bound is its
+zero padding, so `[01-12]` yields `01` … `12`. A document expands to at most
+4096 interfaces; `eth[1-99999999]` is a diagnostic, not an out-of-memory kill.
+
+**Device templates** (`docs/schema.md` §6.6). A `kind: template` document is a
+named partial device `spec`; a device merges it in with `spec.from`:
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-north-acc-03
+spec:
+  from: templates/c9200l-48p
+  bridge: {address: '00:1b:0d:01:a3:ff'}
+  interfaces:
+    - name: Vlan99
+      ipv4: [10.1.99.13/24]
+```
+
+Nine lines instead of two hundred, and
+[`examples/campus`](examples/campus/sites/north/access/switches.yaml) has that
+switch next to two written out longhand so the two can be compared. The merge
+rules are stated exactly in §6.6.1 and are worth knowing in full, but in short:
+the device's own keys win, mappings merge key by key, `interfaces` merge by
+`name`, and every other list the device declares replaces the template's
+outright.
+
+Templates are not elements — they never appear in a graph, in `netgraph list`,
+or in validation output. The one place a template does surface is as the source
+location of a field it contributed: a value the template got wrong is reported
+against the template's file and line, with a note naming the device that
+inherited it, so fifty devices do not report fifty copies of one mistake.
+
+```text
+templates/access-switch.yaml#0:52  NG-I011  spec.interfaces[2].mtu: mtu 1000 is below
+  the IPv6 minimum of 1280 but the interface carries IPv6 addresses (inherited by
+  'sw-north-acc-03' through 'spec.from: templates/c9200l-48p')
+```
+
+The file and the line are the template's; the note says who tripped over it.
+
+Use `netgraph show NAME --raw` to read a device as written and
+`netgraph show NAME` to read it merged.
+
 ## CLI reference
 
 ```
@@ -756,11 +822,19 @@ candidates.
 | Option | Default | Effect |
 |---|---|---|
 | `-F, --output-format` | `yaml` | `yaml` or `json`. |
+| `--raw`, `--no-expand` | off | Print the document as written instead: an interface `range` still a range, a `spec.from` still a reference. |
 
 Use it to see what a shorthand expanded to: `10.0.0.1/24` becomes `{ip,
 prefix_length}`, an access port gains its derived
 `acceptable_frames: admit-only-untagged-and-priority-tagged`, and a router's
 interfaces gain the `forwarding` it inherited from the device.
+
+`--raw` is the other half of the same question. Diff the two and you have read
+the merge:
+
+```bash
+diff <(netgraph show sw-north-acc-03 --raw) <(netgraph show sw-north-acc-03)
+```
 
 ### `netgraph rules`
 
@@ -776,7 +850,7 @@ pydantic models the loader uses. Needs no inventory.
 | Option | Default | Effect |
 |---|---|---|
 | `--all` | on | One schema covering every kind, discriminated on `kind`. |
-| `-k, --kind KIND` | | Emit the schema for a single kind instead. Mutually exclusive with `--all`. |
+| `-k, --kind KIND` | | Emit the schema for a single kind instead — including `template`. Mutually exclusive with `--all`. |
 | `-o, --output FILE` | stdout | Write to a file instead of stdout. |
 
 Point an editor at it and a typo'd key is underlined as you type rather than
@@ -948,7 +1022,7 @@ suppressions:
 |---|---|---|
 | [`examples/quickstart`](examples/quickstart) | 3 devices, 2 cables | The walkthrough above, checked in so it stays executable. |
 | [`examples/home-lab`](examples/home-lab) | 5 devices, 1 adapter, 4 cables | Router, switch, two computers, a server and a USB-to-Ethernet adapter on a single VLAN. |
-| [`examples/campus`](examples/campus) | 21 devices, 21 cables | Nested namespaces across three sites, layer-3 core routers in a fibre backbone ring, and VLAN trunks from access to distribution. |
+| [`examples/campus`](examples/campus) | 22 devices, 22 cables | Nested namespaces across three sites, layer-3 core routers in a fibre backbone ring, VLAN trunks from access to distribution, and one access switch declared from a [template](examples/campus/templates/access-switch.yaml). |
 
 ```bash
 netgraph -i examples/campus validate
@@ -1016,7 +1090,7 @@ drawn.
 
 ```
 docs/               specification, generated reference, rule and YANG guides
-examples/           two runnable inventories, also used as golden fixtures
+examples/           four runnable inventories, also used as golden fixtures
 schema/             the generated JSON Schema, for editors and CI
 tools/              doc and schema generators (checked for drift by the tests),
                     the icon rasteriser, plus the pipeline benchmark harness
@@ -1034,6 +1108,10 @@ src/netgraph/
 ├── validate.py     semantic validation engine
 ├── models/         pydantic models for every element kind
 ├── loader/         recursive YAML inventory loader
+│   ├── tree.py     the walk, and the two-phase build templates make necessary
+│   ├── ranges.py   bracket expansion of interfaces[].range
+│   ├── templates.py  the template registry and the spec merge
+│   └── provenance.py  which file and line each field of a rewritten document came from
 ├── render/         graph construction and output renderers
 │   ├── graph.py    inventory -> nodes, edges, VLAN membership, subnets; filtering
 │   ├── dot.py      Graphviz DOT, and the SVG/PNG/PDF it produces

@@ -58,6 +58,25 @@ spec:
 apiVersion: netgraph.dev/v1alpha1
 kind: cable
 metadata:
+  name: cbl-north-dist-acc03
+  description: VLAN trunk over fibre, distribution to access 03
+  labels:
+    site: north
+    medium: fiber
+spec:
+  endpoints:
+    - sw-north-dist-01:Ethernet51/1
+    - sw-north-acc-03:TenGigabitEthernet1/1/1
+  medium: fiber
+  speed: 10Gbps
+  category: om4
+  connector: lc
+  length_m: 96
+  label: F-104
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
   name: cbl-north-acc01-pc01
   labels:
     site: north

@@ -224,7 +224,11 @@ def test_diagnostics_never_pollute_the_diagram(runner: CliRunner) -> None:
     [
         ("--kind", "router", {"rtr-north-core-01", "rtr-south-core-01", "rtr-west-core-01"}),
         ("--namespace", "sites/north/hosts", {"pc-north-01", "pc-north-02", "srv-north-01"}),
-        ("--name", "sw-north-acc-*", {"sw-north-acc-01", "sw-north-acc-02"}),
+        (
+            "--name",
+            "sw-north-acc-*",
+            {"sw-north-acc-01", "sw-north-acc-02", "sw-north-acc-03"},
+        ),
     ],
 )
 def test_a_filter_narrows_the_rendered_graph(

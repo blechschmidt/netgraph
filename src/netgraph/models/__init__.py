@@ -30,6 +30,7 @@ from netgraph.models.adapter import (
 from netgraph.models.base import NetgraphModel
 from netgraph.models.cable import Cable, CableSpec, Duplex, InterfaceRef, Medium
 from netgraph.models.device import (
+    DEVICE_KINDS,
     BridgeConfig,
     BridgeType,
     Computer,
@@ -47,8 +48,9 @@ from netgraph.models.document import (
     Element,
     element_model_for,
     parse_document,
+    parse_template,
 )
-from netgraph.models.element import KINDS, ElementBase
+from netgraph.models.element import DOCUMENT_KINDS, KINDS, TEMPLATE_KIND, ElementBase
 from netgraph.models.interface import (
     AGGREGATE_TYPES,
     CABLEABLE_TYPES,
@@ -70,6 +72,7 @@ from netgraph.models.scalars import (
     normalise_mac,
     parse_bitrate,
 )
+from netgraph.models.template import INHERIT_KEY, TEMPLATE_SPEC_KEYS, Template
 from netgraph.models.tunnel import (
     MAX_VNI,
     Tunnel,
@@ -85,10 +88,15 @@ __all__ = [
     "AGGREGATE_TYPES",
     "API_VERSION",
     "CABLEABLE_TYPES",
+    "DEVICE_KINDS",
+    "DOCUMENT_KINDS",
     "ELEMENT_MODELS",
+    "INHERIT_KEY",
     "KINDS",
     "MAX_VNI",
     "RESERVED_LABEL_PREFIX",
+    "TEMPLATE_KIND",
+    "TEMPLATE_SPEC_KEYS",
     "AcceptableFrames",
     "Adapter",
     "AdapterSpec",
@@ -119,6 +127,7 @@ __all__ = [
     "SchemaIssue",
     "Server",
     "Switch",
+    "Template",
     "Tunnel",
     "TunnelAuth",
     "TunnelMode",
@@ -136,4 +145,5 @@ __all__ = [
     "normalise_mac",
     "parse_bitrate",
     "parse_document",
+    "parse_template",
 ]

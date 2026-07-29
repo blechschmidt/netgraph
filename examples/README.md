@@ -10,7 +10,7 @@ fails the test suite.
 |---|---|---|
 | [`quickstart/`](quickstart/) | 3 devices, 2 cables | The walkthrough in the project README, checked in so it stays executable: a router, a switch and a computer in one VLAN. |
 | [`home-lab/`](home-lab/) | 5 devices, 1 adapter, 4 cables | The smallest realistic topology: one router, one switch, two computers, a server, and a USB-to-Ethernet adapter on a single VLAN. |
-| [`campus/`](campus/) | 21 devices, 21 cables | Nested namespaces across three sites, layer-3 core routers in a backbone ring, VLAN trunks between access and distribution switches, and fibre uplinks. |
+| [`campus/`](campus/) | 22 devices, 22 cables, 1 template | Nested namespaces across three sites, layer-3 core routers in a backbone ring, VLAN trunks between access and distribution switches, fibre uplinks, and one access switch declared from a `kind: template` document instead of by hand. |
 | [`overlay/`](overlay/) | 7 devices, 6 cables, 5 tunnels | WireGuard, IPsec, OpenVPN, VXLAN and GRE over one WAN — including VXLAN and GRE nested inside the IPsec tunnel, and a three-ended mesh. |
 
 ```console

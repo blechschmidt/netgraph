@@ -20,7 +20,8 @@ from netgraph.models.adapter import Adapter
 from netgraph.models.cable import Cable
 from netgraph.models.device import Computer, Hub, Router, Server, Switch
 from netgraph.models.diagnostics import decode_field_error
-from netgraph.models.element import KINDS, ElementBase
+from netgraph.models.element import DOCUMENT_KINDS, KINDS, ElementBase
+from netgraph.models.template import Template
 from netgraph.models.tunnel import Tunnel
 
 __all__ = [
@@ -28,6 +29,7 @@ __all__ = [
     "Element",
     "element_model_for",
     "parse_document",
+    "parse_template",
 ]
 
 #: Every concrete element model, in the order kinds are listed in §3.
@@ -49,6 +51,7 @@ Element = Annotated[
 ]
 
 _ELEMENT_ADAPTER: Final[TypeAdapter[Element]] = TypeAdapter(Element)
+_TEMPLATE_ADAPTER: Final[TypeAdapter[Template]] = TypeAdapter(Template)
 
 #: pydantic error types that map onto a schema rule of §10.
 _RULE_BY_ERROR_TYPE: Final[dict[str, str]] = {
@@ -108,6 +111,37 @@ def parse_document(document: Any, *, source: str | None = None) -> Element:
         raise SchemaError(issues=_issues_from(exc), source=source) from exc
 
 
+def parse_template(document: Any, *, source: str | None = None) -> Template:
+    """Parse one ``kind: template`` document (§6.6).
+
+    Only the envelope and the *shape* of ``spec`` are checked; the partial spec
+    itself is validated on each device that merges it, where its fields finally
+    have a context that says what they must satisfy. See
+    :mod:`netgraph.models.template`.
+
+    Raises:
+        SchemaError: The document is not a mapping, or does not match the
+            template envelope.
+    """
+    if not isinstance(document, Mapping):
+        raise SchemaError(
+            issues=[
+                SchemaIssue(
+                    message=(
+                        "a document must be a mapping with the keys apiVersion, kind, "
+                        f"metadata and spec, got {type(document).__name__}"
+                    ),
+                    rule="NG-D001",
+                )
+            ],
+            source=source,
+        )
+    try:
+        return _TEMPLATE_ADAPTER.validate_python(dict(document))
+    except PydanticValidationError as exc:
+        raise SchemaError(issues=_issues_from(exc), source=source) from exc
+
+
 def _reject_unknown_kind(document: Mapping[str, Any], *, source: str | None) -> None:
     """Produce a helpful ``NG-D003`` before pydantic reports a union-tag error."""
     kind = document.get("kind")
@@ -116,7 +150,7 @@ def _reject_unknown_kind(document: Mapping[str, Any], *, source: str | None) -> 
             issues=[
                 SchemaIssue(
                     path=("kind",),
-                    message=f"'kind' is required; expected one of {', '.join(KINDS)}",
+                    message=f"'kind' is required; expected one of {', '.join(DOCUMENT_KINDS)}",
                     rule="NG-D001",
                 )
             ],
@@ -127,7 +161,10 @@ def _reject_unknown_kind(document: Mapping[str, Any], *, source: str | None) -> 
             issues=[
                 SchemaIssue(
                     path=("kind",),
-                    message=f"unknown kind {echo_value(kind)}; expected one of {', '.join(KINDS)}",
+                    message=(
+                        f"unknown kind {echo_value(kind)}; expected one of "
+                        f"{', '.join(DOCUMENT_KINDS)}"
+                    ),
                     rule="NG-D003",
                 )
             ],

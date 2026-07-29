@@ -85,7 +85,7 @@ does not, the column reads `load` and the message carries the field path
 |---|---|---|
 | `NG-D001` | The document is a mapping carrying `apiVersion`, `kind`, `metadata` and `spec`. | Anything else is not a netgraph document; guessing at its intent would be worse than refusing it. |
 | `NG-D002` | `apiVersion` is a version this build understands (`netgraph.dev/v1alpha1`). | A document written for a later schema may mean something different by the same keys. |
-| `NG-D003` | `kind` is one of the seven defined kinds, lower-case. | `kind` selects the shape of `spec`; an unknown kind has no shape to check against. |
+| `NG-D003` | `kind` is one of the eight element kinds or `template`, lower-case. | `kind` selects the shape of `spec`; an unknown kind has no shape to check against. |
 | `NG-D004` | `spec` matches the shape required by `kind`. | The whole point of declaring the kind. |
 | `NG-D005` | No unknown keys anywhere in the document. | The one failure mode this tool exists to prevent: a misspelt `mtu:`/`mut:` that was silently ignored would produce a diagram that disagrees with the file. |
 | `NG-N001` | `metadata.name` matches the name grammar. | Names end up as graph node ids and as the left half of every `device:interface` reference. |
@@ -142,6 +142,32 @@ stack, so declaring any of those would describe hardware that is not a hub.
 | `NG-X001` | `upstream.attached_to` is a bare element name, never a `device:interface` reference. | An adapter plugs into a *host*, not into one of its network ports; the name grammar rejects the colon. |
 | `NG-X003` | Every downstream interface is `type: ethernet`, `wifi` or `lag`. | An adapter presents physical ports; loopbacks and SVIs belong to the host's own stack. |
 | `NG-X004` | `upstream.name` does not collide with any downstream `interfaces[].name`. | Both are reachable as `adapter:port`, so a collision makes the cable endpoint ambiguous. |
+
+### Ranges and templates
+
+Checked while the document is rewritten into the shape the models validate:
+`interfaces[].range` is expanded and `spec.from` is merged (schema §6.2.5,
+§6.6). Because the rewrite happens before parsing, these are reported by every
+command that loads an inventory, and they cannot be suppressed either.
+
+A diagnostic on a field a template supplied names the **template's** file and
+line, with a note saying which device inherited it. That is the point of the
+feature: fifty devices sharing one template do not report fifty copies of its
+one mistake.
+
+| ID | Rule | Why it matters |
+|---|---|---|
+| `NG-R001` | An interface entry declares exactly one of `name` and `range`. | Both would leave it unclear whether the entry is one interface or forty-eight. |
+| `NG-R002` | `range` carries one to four well-formed, non-inverted `[low-high]` spans and no stray bracket. | A silently ignored bracket would produce an interface literally named `eth[0-47]`. |
+| `NG-R003` | A document expands to at most 4096 interfaces. | `eth[1-99999999]` is a typo, and the answer to a typo is a diagnostic rather than an out-of-memory kill. |
+| `NG-R004` | An expanded name collides with nothing else on the element. | Two ports answering to one name make every cable endpoint naming it ambiguous. Both source locations are quoted. |
+| `NG-R005` | Every `{...}` in a range `description` is empty or names a span the range declares, and braces are paired. | `{1}` on a one-span range is a mistake worth catching; a lone brace is almost always one too. |
+| `NG-M001` | `spec.from` names exactly one `kind: template` document. | A reference that resolves to nothing, or to two things, cannot be merged. |
+| `NG-M002` | Template names are unique within their namespace. | Same reason as `NG-N002`, in the separate index templates live in. |
+| `NG-M003` | Template inheritance through `from` is acyclic. | A cycle has no far end to start merging from. |
+| `NG-M004` | A device only inherits from a template that itself resolved. | The template's own errors are reported once, against the template; the device says only that it cannot use it. |
+| `NG-M005` | A `template` document's `spec` is a mapping of device-spec keys. | It is a partial device spec; a key no device has could never be merged into one. |
+| `NG-M006` | `spec.from` appears only on the five device kinds. | A cable has no device spec for a template to contribute to. |
 
 ## Pass 3 — semantics
 
@@ -339,7 +365,7 @@ Bit 0 of a MAC's first octet — the least-significant bit, so an odd first octe
 source, so no interface can have one. It is always a mistyped or misread octet.
 
 Graded an **error**, where §10.2 of [the schema](schema.md) proposes a warning.
-This follows the precedent of `E003` and `E004` (§10.9): those are re-graded
+This follows the precedent of `E003` and `E004` (§10.10): those are re-graded
 because a typo is likelier than a deliberate VRRP design, and this one has not
 even got the deliberate design — there is no configuration in which a multicast
 source address is what was meant.
@@ -1167,7 +1193,7 @@ is worse than no diagram.
 where noted below. The ids are permanent whatever happens to the rules.
 
 Three of the implemented rules are graded more harshly than §10.2 and §10.3
-suggest, following §10.9:
+suggest, following §10.10:
 
 * `E003` (`NG-I008`) and `E004` (`NG-A004`) are errors rather than warnings,
   because a duplicate address is far more often a copy-paste mistake than a

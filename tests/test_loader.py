@@ -28,7 +28,7 @@ from netgraph.loader import (
     short_name,
 )
 from netgraph.loader.ignore import compile_rules, parse_ignore_file
-from netgraph.loader.tree import _deferred_gc, _errors_from, _load_file
+from netgraph.loader.tree import _Builder, _deferred_gc, _load_file, _schema_errors
 from netgraph.models import Adapter, Cable, Switch, parse_document
 
 API_VERSION = "netgraph.dev/v1alpha1"
@@ -831,7 +831,7 @@ def test_a_file_that_disappears_is_reported(tmp_path: Path) -> None:
     inventory = Inventory(root=tmp_path)
     entry = InventoryFile(path=tmp_path / "gone.yaml", relative=PurePosixPath("gone.yaml"))
 
-    _load_file(entry, inventory)
+    _load_file(entry, _Builder(inventory))
 
     (error,) = inventory.errors
     assert "cannot read file" in error.message
@@ -841,9 +841,7 @@ def test_a_file_that_disappears_is_reported(tmp_path: Path) -> None:
 def test_a_schema_error_without_issues_still_yields_one_record() -> None:
     document = RawDocument(data={}, path=Path("x.yaml"), relative=PurePosixPath("x.yaml"), index=0)
 
-    (error,) = _errors_from(
-        SchemaError("something went wrong"), document=document, relative="x.yaml"
-    )
+    (error,) = _schema_errors(SchemaError("something went wrong"), document)
 
     assert error.message == "something went wrong"
     assert error.field_path == ()

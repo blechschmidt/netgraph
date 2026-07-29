@@ -154,6 +154,14 @@ every element. It is **not** a user-writable field; anything the user puts under
 a reserved provenance key is rejected. Diagnostics quote it as
 `sites/hq/switches/sw-access-01.yaml#0:17`.
 
+Provenance is tracked **per field**, not merely per document, and it survives
+the two rewrites the loader performs before validation: interface range
+expansion (§6.2.5) and template merging (§6.6). A value a template supplied is
+reported against the template's file and line, with a note naming the device
+that inherited it; a value the device overrode is reported against the device.
+`netgraph show --raw` prints a document as written, unexpanded and unmerged,
+next to the resolved output the same command prints without it.
+
 ### 2.5 Suggested layout
 
 ```text
@@ -196,9 +204,13 @@ spec:
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
 | `apiVersion` | string | M | — | MUST be `netgraph.dev/v1alpha1` for this revision. See §12. |
-| `kind` | enum | M | — | One of `switch`, `router`, `hub`, `computer`, `server`, `cable`, `adapter`, `tunnel`. Lower-case; other spellings are rejected. |
+| `kind` | enum | M | — | One of `switch`, `router`, `hub`, `computer`, `server`, `cable`, `adapter`, `tunnel`, `template`. Lower-case; other spellings are rejected. |
 | `metadata` | mapping | M | — | §3.1 |
-| `spec` | mapping | M | — | Shape depends on `kind`: §6 (devices), §7 (cable), §8 (adapter), §14 (tunnel). |
+| `spec` | mapping | M | — | Shape depends on `kind`: §6 (devices), §7 (cable), §8 (adapter), §14 (tunnel), §6.6 (template). |
+
+The first eight kinds are **elements**: each becomes a node or an edge of the
+graph. `template` is the ninth kind and is not an element — it declares a
+reusable partial device `spec` and is merged away by the loader (§6.6).
 
 ### 3.1 `metadata`
 
@@ -215,7 +227,7 @@ Labels drive filtering (`netgraph render --select site=hq`) and grouping
 
 Annotations are the opposite: they are read by the tool, not by the user. The
 one this revision defines is `netgraph/ignore`, which suppresses validation
-rules on the element carrying it (§10.10):
+rules on the element carrying it (§10.11):
 
 ```yaml
 metadata:
@@ -314,7 +326,8 @@ filtering.
 | `model` | string | O | `null` | e.g. `C9300-48P`. |
 | `serial` | string | O | `null` | Asset tracking; never rendered by default. |
 | `location` | string | O | `null` | Human-readable, e.g. `HQ / G-01 / U12`. |
-| `interfaces` | list[Interface] | M | — | §6.2. MUST contain at least one entry. |
+| `interfaces` | list[Interface] | C | — | §6.2. MUST contain at least one entry. Required unless `from` supplies them. |
+| `from` | element-ref | O | — | §6.6. Names a `kind: template` document whose partial spec is merged underneath this one. |
 | `bridge` | Bridge | O | `null` | §6.3. Permitted on `switch`, `router`, `computer`, `server`. |
 | `vlans` | list[VlanDef] | O | `[]` | §6.4. VLAN database. Same permission set as `bridge`. |
 | `forwarding` | mapping | O | see §6.1.1 | `{ipv4: boolean, ipv6: boolean}`. |
@@ -333,8 +346,9 @@ free of boilerplate.
 
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
-| `name` | ifname | M | — | Unique per device (`NG-I001`). |
-| `type` | enum | M | — | §6.2.1. |
+| `name` | ifname | C | — | Unique per device (`NG-I001`). Exactly one of `name` and `range` is written. |
+| `range` | range | C | — | §6.2.5. Declares many interfaces at once; the entry is replaced by its expansion before validation. |
+| `type` | enum | M | — | §6.2.1. Optional only in an entry that overrides a template's interface of the same name (§6.6). |
 | `description` | string | O | `null` | → `if:description`. |
 | `enabled` | boolean | O | `true` | Intended admin state → `if:enabled`. |
 | `mac` | mac | O | `null` | → `if:phys-address` (`config false` in RFC 8343; see §9.1). |
@@ -430,6 +444,72 @@ ipv6: [2001:db8:10::1/64]         # bare list       → {addresses: [...]}
 the exact translation into `dot1q:bridge-port` leaves plus VLAN registration
 entries — read it before assuming a vendor-specific meaning.
 
+#### 6.2.5 `range` — declaring many interfaces at once
+
+A 48-port access switch is 48 near-identical `interfaces` entries. Writing them
+out by hand is the single largest obstacle to describing a real access layer, so
+an entry MAY declare `range` instead of `name`:
+
+```yaml
+interfaces:
+  - range: GigabitEthernet1/0/[1-48]
+    type: ethernet
+    description: Access port {}
+    enabled: false
+    mtu: 1500
+    vlan: {mode: access, access_vlan: 10}
+```
+
+The entry above **is** forty-eight entries. Expansion happens in the loader,
+immediately after the document is parsed and before any model validation, so
+everything downstream — `netgraph validate`, the graph, every renderer,
+`netgraph show`, an editor driven by the JSON Schema — sees an ordinary list of
+interfaces and needs no notion of a range at all. A range never appears in
+rendered output, and `netgraph show` without `--raw` prints the expansion.
+
+**Grammar.** A range is a string of interface-name characters (§4.1) with one or
+more spans `[low-high]` embedded in it. Both bounds are decimal, inclusive, and
+`low` MUST NOT exceed `high`. At most four spans per range.
+
+**Ordering.** Several spans expand as an odometer: the rightmost span varies
+fastest. `ge-[0-1]/0/[0-3]` yields `ge-0/0/0`, `ge-0/0/1`, `ge-0/0/2`,
+`ge-0/0/3`, `ge-1/0/0`, … The expansion lands where the entry stood, so the
+interfaces around it keep their relative order.
+
+**Zero padding.** The width of the *low* bound is the width of every value the
+span produces. `[01-12]` yields `01` … `12`; `[1-12]` yields `1` … `12`. A high
+bound needing more digits simply uses them: `[01-100]` ends at `100`.
+
+**Per-index `description`.** Inside `description`, `{}` and `%d` stand for the
+value of the last (fastest-varying) span, and `{0}`, `{1}`, … for a span by
+position, left to right. `{{`, `}}` and `%%` are the literal characters; a lone
+brace is an error rather than literal text, because it is almost always a typo.
+A `%` that does not begin `%d` or `%%` is left alone — a description is prose
+and may well say "50% utilised". No other field is substituted into.
+
+```yaml
+  - range: ge-[0-1]/0/[0-3]
+    type: ethernet
+    description: Slot {0}, port {1}      # "Slot 0, port 3", …
+```
+
+**Bounds.** One document expands to at most **4096** interfaces in total.
+`eth[1-99999999]` is a typo, and the answer to a typo is a diagnostic
+(`NG-R003`), not an out-of-memory kill.
+
+**Collisions.** An expanded name that another entry of the same element already
+claims — an explicit `name`, or the expansion of another range — is `NG-R004`,
+and the diagnostic quotes both source locations. Two *explicitly* named
+duplicates remain `NG-I001`.
+
+| ID | Sev. | Rule |
+|---|---|---|
+| `NG-R001` | error | An interface entry declares exactly one of `name` and `range`. |
+| `NG-R002` | error | `range` is a string carrying between one and four well-formed, non-inverted `[low-high]` spans and no stray bracket. |
+| `NG-R003` | error | Expanding a document's ranges produces at most 4096 interfaces. |
+| `NG-R004` | error | An expanded interface name does not collide with another interface of the same element. |
+| `NG-R005` | error | Every `{...}` placeholder in a range `description` is empty or names a span the range declares, and every brace is paired. |
+
 ### 6.3 `bridge`
 
 Declares the 802.1Q bridge component that the device's switching ports belong
@@ -466,6 +546,124 @@ an undeclared VLAN (`NG-V004`, a warning).
 A hub is a layer-1 repeater: it has no MAC table, no VLAN awareness and no IP
 stack, so those fields are errors rather than warnings. `interfaces[].mac` is
 accepted on a hub (some managed hubs have one) but ignored by the renderer.
+
+### 6.6 `template` — reusable partial device specs
+
+Fifty switches wired into the same access layer differ in three fields and agree
+in two hundred. A `kind: template` document declares the two hundred once:
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: template
+metadata:
+  name: c9200l-48p
+spec:
+  vendor: Cisco
+  model: C9200L-48P
+  bridge: {name: br0, type: customer-vlan-bridge}
+  vlans:
+    - {id: 10, name: staff}
+    - {id: 99, name: mgmt}
+  interfaces:
+    - range: GigabitEthernet1/0/[1-48]
+      type: ethernet
+      description: Access port {}
+      enabled: false
+      vlan: {mode: access, access_vlan: 10}
+    - name: Vlan99
+      type: vlan
+      parent: br0
+      vlan: {mode: access, access_vlan: 99}
+```
+
+A device then names it in `spec.from`:
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-acc-07
+spec:
+  from: templates/c9200l-48p
+  interfaces:
+    - name: Vlan99
+      ipv4: [10.1.99.17/24]
+```
+
+`spec.from` uses the ordinary reference grammar of §4.1 and resolves by the
+ordinary rules of §2.2 — the device's own namespace first, then each ancestor,
+then the whole inventory if the short name is unique — so a template may live
+anywhere, including a `templates/` directory next to the sites that use it.
+Templates are indexed *separately* from elements: a template and a switch may
+share a name, because no field ever accepts both.
+
+A template MAY itself declare `from`. The chain is resolved from the far end
+inwards, so the device always merges against one fully-resolved spec. A cycle is
+`NG-M003`.
+
+`from` is only meaningful where `spec` is a device spec, so it is accepted on
+`switch`, `router`, `hub`, `computer` and `server` and rejected elsewhere
+(`NG-M006`).
+
+#### 6.6.1 Merge rules
+
+The merge is between the device's `spec` and the template's `spec`, and nothing
+else: `metadata` is the device's own, so a template contributes no name, no
+description, no labels and no annotations. `from` itself is consumed and never
+appears in the merged spec.
+
+Within `spec`, exactly four rules apply, in this order:
+
+1. **A key only the template declares is inherited.** `vendor`, `model`, the
+   VLAN database — whatever the device is silent about.
+2. **A key both declare, whose two values are both mappings, merges
+   recursively** by these same rules. This is what lets a device write
+   `bridge: {address: 00:1b:0d:01:a3:ff}` and keep the template's `bridge.name`
+   and `bridge.type`.
+3. **`interfaces` merges by interface `name`.** The result is the template's
+   interfaces, in the template's order, each merged (by rule 2) with the
+   device's entry of the same name where there is one; followed by the device's
+   remaining interfaces, in the device's order. Ranges on both sides are
+   expanded *before* the match, so a device may override one port out of
+   forty-eight by naming it.
+4. **Anything else the device declares wins wholesale.** A scalar replaces a
+   scalar. A list that is not `interfaces` — `vlans`, `members`, `addresses`,
+   `trunk_vlans` — is *replaced*, not concatenated and not merged element by
+   element. netgraph has a key for interfaces and for nothing else, and a merge
+   rule that only holds sometimes is worse than a rule that never does. A device
+   that wants the template's VLAN database plus one more VLAN restates the list.
+
+An interface entry that overrides a template's is a *partial* entry: it states
+`name` and the fields it changes, and may omit `type` and everything else. Only
+inside a `spec` that declares `from` is that legal; elsewhere `type` is
+mandatory as usual.
+
+#### 6.6.2 Templates are not elements
+
+A template never appears in a graph, never appears in `netgraph list`, and is
+never validated on its own. It has no interfaces to cable, no address to place
+in a subnet, and no node to draw. The only place it surfaces at all is as the
+**source location of a field it contributed**: a value the template got wrong is
+reported against the template's file and line, with a note naming the device
+that inherited it, rather than against the fiftieth device that used it.
+
+That is also why a template's `spec` is checked only for shape — that it is a
+mapping of device-spec keys — and not field by field. A `vlan` block is legal on
+a switch and illegal on a hub, and a template does not know which it will be
+merged into. Deep checking happens on each merged device, where the value
+finally has a context that says what it must satisfy.
+
+Use `netgraph show <name> --raw` to see a device as written and `netgraph show
+<name>` to see it merged. The pair is how a merge is inspected.
+
+| ID | Sev. | Rule |
+|---|---|---|
+| `NG-M001` | error | `spec.from` names exactly one `kind: template` document, resolved by §2.2. |
+| `NG-M002` | error | Template names are unique within their namespace; the diagnostic names both source locations. |
+| `NG-M003` | error | Template inheritance through `from` is acyclic. |
+| `NG-M004` | error | A device only inherits from a template that resolved; a template rejected for its own reasons is reported once, against itself. |
+| `NG-M005` | error | A `template` document's `spec` is a mapping whose keys are device-spec keys (plus `from`). |
+| `NG-M006` | error | `spec.from` appears only on the five device kinds. |
 
 ---
 
@@ -751,11 +949,11 @@ IDs are permanent: once assigned, an ID is never reused for a different rule.
 Severity `error` fails the run (exit code 4, `ValidationError`); `warning` and
 `info` are reported but rendering proceeds. `netgraph validate --strict`
 promotes every warning to an error. Individual rules can be re-graded or
-silenced per inventory (§10.10).
+silenced per inventory (§10.11).
 
 The semantic validator also prints a short id (`E002`, `W103`) alongside the
 `NG-*` id; the two vocabularies are interchangeable everywhere a rule can be
-named. §10.9 maps them.
+named. §10.10 maps them.
 
 ### 10.1 Document and naming
 
@@ -763,7 +961,7 @@ named. §10.9 maps them.
 |---|---|---|
 | `NG-D001` | error | The document is a mapping with the four envelope keys; `apiVersion`, `kind`, `metadata`, `spec` are all present. |
 | `NG-D002` | error | `apiVersion` is a recognised version string. |
-| `NG-D003` | error | `kind` is one of the eight defined kinds, lower-case. |
+| `NG-D003` | error | `kind` is one of the eight element kinds or `template`, lower-case. |
 | `NG-D004` | error | `spec` matches the shape required by `kind`. |
 | `NG-D005` | error | No unknown keys anywhere in the document. |
 | `NG-N001` | error | `metadata.name` matches the name grammar (§4.1). |
@@ -867,7 +1065,28 @@ triggers `NG-V008` (warning) unless it matches the master exactly.
 | `NG-X007` | warning | `attached_to` points at a `hub` or `switch`. Adapters attach to hosts; a media converter between switches should be modelled with `passthrough: false` and cables on both sides. |
 | `NG-X008` | error | An adapter declares more entries in `interfaces` than `spec.ports` says the hardware has. Not checked when `ports` is absent. |
 
-### 10.9 Rule identifiers
+### 10.9 Ranges and templates
+
+Loader rules: they are checked while the document is being rewritten into the
+shape the models validate, so they are reported by every command that loads an
+inventory rather than by `netgraph validate` alone, and they have no short-id
+alias. §6.2.5 and §6.6 state them in context.
+
+| ID | Sev. | Rule |
+|---|---|---|
+| `NG-R001` | error | An interface entry declares exactly one of `name` and `range`. |
+| `NG-R002` | error | `range` is a string carrying between one and four well-formed, non-inverted `[low-high]` spans and no stray bracket. |
+| `NG-R003` | error | Expanding a document's ranges produces at most 4096 interfaces. |
+| `NG-R004` | error | An expanded interface name does not collide with another interface of the same element; the diagnostic names both source locations. |
+| `NG-R005` | error | Every `{...}` placeholder in a range `description` is empty or names a span the range declares, and every brace is paired. |
+| `NG-M001` | error | `spec.from` names exactly one `kind: template` document, resolved by §2.2. |
+| `NG-M002` | error | Template names are unique within their namespace; the diagnostic names both source locations. |
+| `NG-M003` | error | Template inheritance through `from` is acyclic. |
+| `NG-M004` | error | A device only inherits from a template that resolved; a template rejected for its own reasons is reported once, against itself. |
+| `NG-M005` | error | A `template` document's `spec` is a mapping whose keys are device-spec keys (plus `from`). |
+| `NG-M006` | error | `spec.from` appears only on the five device kinds. |
+
+### 10.10 Rule identifiers
 
 The semantic validator (`netgraph.validate`) reports the cross-document rules —
 and the per-element judgements that a single document cannot settle — under
@@ -938,9 +1157,9 @@ Three rules are graded more harshly here than in the tables above: `E003`
 (`NG-I008`), `E004` (`NG-A004`) and `E010` (`NG-I009`). The first two because a
 duplicate address is far more often a copy-paste mistake than a deliberate VRRP
 or anycast design; the third because a multicast source address is not a design
-at all. Re-grade them per inventory (§10.10) where the exception is real.
+at all. Re-grade them per inventory (§10.11) where the exception is real.
 
-### 10.10 Suppressing a rule
+### 10.11 Suppressing a rule
 
 Two mechanisms, both additive; a rule is silenced if either applies.
 
@@ -1947,7 +2166,7 @@ their absence:
 * **Wireless detail**: SSIDs, bands, channels, and BSS-to-SSID mapping.
 * **Per-inventory configuration** beyond validation: `netgraph.toml` at the
   inventory root already carries rule suppression and severity overrides
-  (§10.10); default labels and renderer settings are still deferred.
+  (§10.11); default labels and renderer settings are still deferred.
 * **Templating**: reusable device profiles (`kind: profile`) to remove
   repetition across identically-configured switches.
 
@@ -1983,9 +2202,17 @@ models.
 | Value grammars: MAC, bit rate, VLAN set, CIDR, names | yes | yes |
 | Rules within one object: `native_vlan` on an access port, `members` on an `ethernet` port | yes | yes |
 | Anything that needs a second document: a cable endpoint resolving, name uniqueness, an address matching its subnet | **no** | yes |
+| Loader rewrites: `interfaces[].range` and `spec.from` | shape only | yes |
 
 The schema is the fast, local half. It is not a substitute for
 `netgraph validate`, and CI should keep running the latter.
+
+`range` and `from` (§6.2.5, §6.6) are consumed by the loader, so the schema
+describes their *shape* — the bracket grammar, the reference grammar, that an
+interface declares one of `name` and `range`, that a `spec` omitting
+`interfaces` must inherit them — but cannot say whether a range collides, whether
+it fits inside the 4096-interface bound, or whether the template exists. Those
+need the tree.
 
 ### 13.2 Per-file modeline
 

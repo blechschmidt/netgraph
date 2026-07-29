@@ -13,19 +13,28 @@ Implements the discovery rules of ``docs/schema.md`` §2.1:
 
 The walk itself is iterative: an inventory nested a thousand directories deep
 is unusual but should not hit the interpreter's recursion limit.
+
+Building the elements is two-phase, and templates (§6.6) are why. A device may
+name a template declared in a file that sorts after it, so a document carrying
+``spec.from`` cannot be turned into an element as it is read. Deferring those
+documents to the end of the walk would reorder the inventory, and load order is
+what makes every rendering deterministic — so :class:`_Builder` keeps one *slot*
+per document, in document order, and fills the deferred ones before anything is
+indexed. An inventory written with templates therefore renders byte for byte
+like the same inventory written out longhand.
 """
 
 from __future__ import annotations
 
 import gc
 import os
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import Final
+from typing import Any, Final
 
-from netgraph.errors import LoaderError, SchemaError
+from netgraph.errors import LoaderError, SchemaError, SchemaIssue
 from netgraph.loader.documents import (
     RawDocument,
     YamlSyntaxError,
@@ -34,7 +43,9 @@ from netgraph.loader.documents import (
 )
 from netgraph.loader.ignore import IGNORE_FILE_NAME, IgnoreStack, parse_ignore_file
 from netgraph.loader.inventory import Inventory, LoadError, SourceLocation, qualify
-from netgraph.models import parse_document
+from netgraph.loader.provenance import FieldPath, Provenance, Site
+from netgraph.loader.templates import INHERIT_KEY, TemplateRegistry, resolved_spec
+from netgraph.models import DEVICE_KINDS, TEMPLATE_KIND, Element, parse_document, parse_template
 
 __all__ = [
     "STREAM_NAME",
@@ -111,9 +122,11 @@ def load_tree(root: Path) -> Inventory:
             reported through :attr:`Inventory.errors` instead.
     """
     inventory = Inventory(root=root)
+    builder = _Builder(inventory)
     with _deferred_gc():
         for entry in iter_inventory_files(root, errors=inventory.errors):
-            _load_file(entry, inventory)
+            _load_file(entry, builder)
+        builder.finish()
     return inventory
 
 
@@ -147,9 +160,10 @@ def load_stream(text: str, *, name: str = STREAM_NAME) -> Inventory:
     """
     entry = InventoryFile(path=Path(name), relative=PurePosixPath(name))
     inventory = Inventory(root=Path(name))
+    builder = _Builder(inventory)
     try:
         for document in parse_documents(text, path=entry.path, relative=entry.relative):
-            _add_document(document, entry=entry, inventory=inventory)
+            builder.feed(document, entry=entry)
     except YamlSyntaxError as exc:
         inventory.record(
             LoadError(
@@ -160,6 +174,7 @@ def load_stream(text: str, *, name: str = STREAM_NAME) -> Inventory:
                 column=exc.column,
             )
         )
+    builder.finish()
     return inventory
 
 
@@ -412,14 +427,14 @@ def _is_yaml_name(name: str) -> bool:
 # -- parsing --------------------------------------------------------------
 
 
-def _load_file(entry: InventoryFile, inventory: Inventory) -> None:
-    """Parse one file and add every document it holds to ``inventory``."""
+def _load_file(entry: InventoryFile, builder: _Builder) -> None:
+    """Parse one file and hand every document it holds to ``builder``."""
     relative = entry.relative.as_posix()
     try:
         for document in read_documents(entry.path, relative=entry.relative):
-            _add_document(document, entry=entry, inventory=inventory)
+            builder.feed(document, entry=entry)
     except YamlSyntaxError as exc:
-        inventory.record(
+        builder.inventory.record(
             LoadError(
                 message=str(exc),
                 path=entry.path,
@@ -429,7 +444,7 @@ def _load_file(entry: InventoryFile, inventory: Inventory) -> None:
             )
         )
     except OSError as exc:
-        inventory.record(
+        builder.inventory.record(
             LoadError(
                 message=f"cannot read file: {exc.strerror or exc}",
                 path=entry.path,
@@ -438,70 +453,298 @@ def _load_file(entry: InventoryFile, inventory: Inventory) -> None:
         )
 
 
-def _add_document(document: RawDocument, *, entry: InventoryFile, inventory: Inventory) -> None:
-    """Validate one document and index it, or record why that failed."""
-    if document.data is None:  # NG-L004: an empty document is not an error.
-        return
+# --------------------------------------------------------------------------- #
+# Building elements out of documents
+# --------------------------------------------------------------------------- #
 
-    relative = entry.relative.as_posix()
-    try:
-        element = parse_document(document.data, source=document.source)
-    except SchemaError as exc:
-        for error in _errors_from(exc, document=document, relative=relative):
-            inventory.record(error)
-        return
 
-    source = SourceLocation(
-        path=entry.path,
-        relative=relative,
-        index=document.index,
-        line=document.line,
+@dataclass(frozen=True, slots=True)
+class _Ready:
+    """A document that is already an element and only needs indexing."""
+
+    element: Element
+    source: SourceLocation
+    namespace: str
+
+
+@dataclass(frozen=True, slots=True)
+class _Rejected:
+    """A document that failed, with the diagnostics it produced."""
+
+    errors: tuple[LoadError, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _Deferred:
+    """A device that names a template and cannot be built until the walk ends."""
+
+    document: RawDocument
+    entry: InventoryFile
+    reference: Any
+
+
+_Slot = _Ready | _Rejected | _Deferred
+
+
+@dataclass(eq=False)
+class _Builder:
+    """Turns a stream of parsed documents into a populated :class:`Inventory`.
+
+    Templates (§6.6) make loading two-phase: a device may name a template
+    declared in a file that sorts after it, so a document carrying ``spec.from``
+    cannot be built as it is read. Rather than defer such documents to the end —
+    which would reorder the inventory, and with it every rendered diagram — the
+    builder keeps one *slot* per document, in document order, and fills the
+    deferred ones in :meth:`finish` before anything is indexed. The result is
+    byte-identical to the same inventory written out longhand.
+
+    Only the deferred documents keep their YAML node tree alive; everything else
+    is validated during the walk and drops it, which is what keeps the memory
+    profile of a template-free inventory exactly what it was.
+    """
+
+    inventory: Inventory
+    templates: TemplateRegistry = field(default_factory=TemplateRegistry)
+    _slots: list[_Slot] = field(default_factory=list)
+
+    # -- phase one: the walk ---------------------------------------------
+
+    def feed(self, document: RawDocument, *, entry: InventoryFile) -> None:
+        """Take one parsed document."""
+        if document.data is None:  # NG-L004: an empty document is not an error.
+            return
+        if _kind_of(document.data) == TEMPLATE_KIND:
+            self._add_template(document, entry)
+            return
+
+        reference = _inherit_reference(document.data)
+        if reference is None:
+            self._slots.append(self._build(document, entry))
+        elif _kind_of(document.data) in DEVICE_KINDS:
+            self._slots.append(_Deferred(document=document, entry=entry, reference=reference))
+        else:
+            self._slots.append(
+                _rejected(  # NG-M006
+                    document,
+                    path=("spec", INHERIT_KEY),
+                    message=(
+                        "'from' inherits a device template and is only supported by "
+                        f"{', '.join(DEVICE_KINDS)}"
+                    ),
+                    rule="NG-M006",
+                )
+            )
+
+    def _add_template(self, document: RawDocument, entry: InventoryFile) -> None:
+        """Register a ``kind: template`` document, or record why it is unusable."""
+        try:
+            template = parse_template(document.data, source=document.source)
+        except SchemaError as exc:
+            for error in _schema_errors(exc, document):
+                self.inventory.record(error)
+            return
+        if self.templates.add(template, document=document, namespace=entry.namespace) is None:
+            fqn = qualify(entry.namespace, template.metadata.name)
+            first = self.templates.source_of(fqn)
+            where = f" (first declared at {Site(first, ())})" if first is not None else ""
+            self.inventory.record(
+                _error_at(
+                    Site(document, ("metadata", "name")),
+                    SchemaIssue(
+                        path=("metadata", "name"),
+                        message=(
+                            f"duplicate template name {fqn!r}{where}; this document is ignored"
+                        ),
+                        rule="NG-M002",
+                    ),
+                )
+            )
+
+    # -- phase two: indexing ---------------------------------------------
+
+    def finish(self) -> None:
+        """Resolve the templates, build the deferred devices, index everything."""
+        for document, issue in self.templates.resolve_all():
+            self.inventory.record(_error_at(Site(document, issue.path), issue))
+
+        for slot in self._slots:
+            built = self._build_inherited(slot) if isinstance(slot, _Deferred) else slot
+            if isinstance(built, _Rejected):
+                for error in built.errors:
+                    self.inventory.record(error)
+                continue
+            assert isinstance(built, _Ready)
+            self._index(built)
+        self._slots.clear()
+
+    def _index(self, slot: _Ready) -> None:
+        fqn = self.inventory.add(slot.element, namespace=slot.namespace, source=slot.source)
+        if fqn is not None:
+            return
+        name = slot.element.metadata.name
+        qualified = qualify(slot.namespace, name)
+        first = self.inventory.source_of(qualified)
+        where = f" (first declared at {first})" if first is not None else ""
+        self.inventory.record(
+            LoadError(
+                message=f"duplicate element name {qualified!r}{where}; this document is ignored",
+                path=slot.source.path,
+                relative=slot.source.relative,
+                line=slot.source.line,
+                index=slot.source.index,
+                field_path=("metadata", "name"),
+                rule="NG-N002",
+            )
+        )
+
+    # -- document -> element ---------------------------------------------
+
+    def _build(self, document: RawDocument, entry: InventoryFile) -> _Slot:
+        """Expand ranges and validate one document that inherits nothing."""
+        data, provenance, issues = _expanded(document)
+        if issues:
+            return _Rejected(errors=tuple(_located(issues, provenance)))
+        return self._validate(data, document=document, entry=entry, provenance=provenance)
+
+    def _build_inherited(self, slot: _Deferred) -> _Slot:
+        """Merge the named template underneath one device, then validate it."""
+        document = slot.document
+        data = document.data
+        spec = data.get("spec") if isinstance(data, Mapping) else None
+        assert isinstance(spec, Mapping)  # _inherit_reference found 'from' inside it
+
+        merged, provenance, issues, template_fqn = self.templates.merge_into(
+            spec,
+            reference=slot.reference,
+            namespace=slot.entry.namespace,
+            provenance=Provenance(base=document),
+        )
+        if issues:
+            return _Rejected(errors=tuple(_located(issues, provenance)))
+        return self._validate(
+            {**data, "spec": merged},
+            document=document,
+            entry=slot.entry,
+            provenance=provenance,
+            note=_inherited_note(data, template_fqn),
+        )
+
+    def _validate(
+        self,
+        data: Any,
+        *,
+        document: RawDocument,
+        entry: InventoryFile,
+        provenance: Provenance,
+        note: str = "",
+    ) -> _Slot:
+        try:
+            element = parse_document(data, source=document.source)
+        except SchemaError as exc:
+            if not exc.issues:
+                return _Rejected(errors=(_whole_document_error(exc, document),))
+            return _Rejected(errors=tuple(_located(exc.issues, provenance, note=note)))
+        return _Ready(
+            element=element,
+            source=SourceLocation(
+                path=entry.path,
+                relative=entry.relative.as_posix(),
+                index=document.index,
+                line=document.line,
+            ),
+            namespace=entry.namespace,
+        )
+
+
+def _rejected(document: RawDocument, *, path: FieldPath, message: str, rule: str) -> _Rejected:
+    """A slot holding one diagnostic located in the document as it was written."""
+    return _Rejected(
+        errors=(
+            _error_at(Site(document, path), SchemaIssue(path=path, message=message, rule=rule)),
+        )
     )
-    fqn = inventory.add(element, namespace=entry.namespace, source=source)
-    if fqn is None:
-        _record_duplicate(element.metadata.name, entry=entry, source=source, inventory=inventory)
 
 
-def _errors_from(
-    error: SchemaError, *, document: RawDocument, relative: str
+def _kind_of(data: Any) -> Any:
+    return data.get("kind") if isinstance(data, Mapping) else None
+
+
+def _inherit_reference(data: Any) -> Any:
+    """``spec.from``, or ``None`` when the document does not inherit."""
+    if not isinstance(data, Mapping):
+        return None
+    spec = data.get("spec")
+    if not isinstance(spec, Mapping):
+        return None
+    return spec.get(INHERIT_KEY)
+
+
+def _inherited_note(data: Any, template_fqn: str | None) -> str:
+    """The clause appended to a diagnostic that lands in a template's file."""
+    if template_fqn is None:  # pragma: no cover - a merge that succeeded has one
+        return ""
+    metadata = data.get("metadata") if isinstance(data, Mapping) else None
+    name = metadata.get("name") if isinstance(metadata, Mapping) else None
+    who = f"{name!r}" if isinstance(name, str) else "a device"
+    return f" (inherited by {who} through 'spec.from: {template_fqn}')"
+
+
+def _expanded(document: RawDocument) -> tuple[Any, Provenance, list[SchemaIssue]]:
+    """Expand the interface ranges of one document, if it declares any."""
+    provenance = Provenance(base=document)
+    data = document.data
+    spec = data.get("spec") if isinstance(data, Mapping) else None
+    if not isinstance(spec, Mapping):
+        return data, provenance, []
+    body, provenance, issues = resolved_spec(spec, provenance=provenance)
+    if issues:
+        return data, provenance, issues
+    if body is spec:
+        return data, provenance, []
+    return {**data, "spec": body}, provenance, []
+
+
+def _located(
+    issues: Iterator[SchemaIssue] | tuple[SchemaIssue, ...] | list[SchemaIssue],
+    provenance: Provenance,
+    *,
+    note: str = "",
 ) -> Iterator[LoadError]:
-    """One :class:`LoadError` per schema issue, each located as precisely as possible."""
+    """One :class:`LoadError` per issue, pointed at the file that wrote the field."""
+    for issue in issues:
+        site = provenance.locate(issue.path)
+        inherited = site.document is not provenance.base
+        yield _error_at(site, issue, note=note if inherited else "")
+
+
+def _error_at(site: Site, issue: SchemaIssue, *, note: str = "") -> LoadError:
+    """A :class:`LoadError` for one issue at one resolved location."""
+    return LoadError(
+        message=f"{issue.message}{note}",
+        path=site.file,
+        relative=site.relative,
+        line=site.line,
+        index=site.index,
+        field_path=site.path,
+        rule=issue.rule,
+    )
+
+
+def _schema_errors(error: SchemaError, document: RawDocument) -> Iterator[LoadError]:
+    """Locate the issues of a :class:`SchemaError` within one unrewritten document."""
     if not error.issues:
-        yield LoadError(
-            message=str(error),
-            path=document.path,
-            relative=relative,
-            line=document.line,
-            index=document.index,
-        )
+        yield _whole_document_error(error, document)
         return
-    for issue in error.issues:
-        yield LoadError.from_issue(
-            issue,
-            path=document.path,
-            relative=relative,
-            index=document.index,
-            line=document.line_for(issue.path),
-        )
+    yield from _located(error.issues, Provenance(base=document))
 
 
-def _record_duplicate(
-    name: str, *, entry: InventoryFile, source: SourceLocation, inventory: Inventory
-) -> None:
-    """``NG-N002`` — the name is taken; keep the first declaration and say where."""
-    fqn = qualify(entry.namespace, name)
-    first = inventory.source_of(fqn)
-    where = f" (first declared at {first})" if first is not None else ""
-    inventory.record(
-        LoadError(
-            message=f"duplicate element name {fqn!r}{where}; this document is ignored",
-            path=source.path,
-            relative=source.relative,
-            line=source.line,
-            index=source.index,
-            field_path=("metadata", "name"),
-            rule="NG-N002",
-        )
+def _whole_document_error(error: SchemaError, document: RawDocument) -> LoadError:
+    return LoadError(
+        message=str(error),
+        path=document.path,
+        relative=document.relative.as_posix(),
+        line=document.line,
+        index=document.index,
     )
 
 

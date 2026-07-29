@@ -34,7 +34,7 @@ import click
 from click.shell_completion import CompletionItem, get_completion_class
 
 from netgraph.errors import NetgraphError
-from netgraph.models import KINDS
+from netgraph.models import DOCUMENT_KINDS
 from netgraph.models.fielddocs import KIND_NOTES
 from netgraph.render import RENDERERS, Layer
 from netgraph.rules import RULES, WILDCARD
@@ -109,7 +109,9 @@ def complete_kind(
     filter (which cannot select a cable, there being no cable node in a graph)
     and ``--kind`` on ``schema`` (which can) stay correct without two lists.
     """
-    return _items(((kind, _kind_help(kind)) for kind in _accepted(param, KINDS)), incomplete)
+    return _items(
+        ((kind, _kind_help(kind)) for kind in _accepted(param, DOCUMENT_KINDS)), incomplete
+    )
 
 
 def _kind_help(kind: str) -> str:

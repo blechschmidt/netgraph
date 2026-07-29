@@ -30,7 +30,7 @@ from typing import Final
 REPO_ROOT: Final = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from netgraph.models import KINDS  # noqa: E402
+from netgraph.models import DOCUMENT_KINDS  # noqa: E402
 from netgraph.schema import build_schema  # noqa: E402
 
 OUTPUT: Final = REPO_ROOT / "schema" / "netgraph.schema.json"
@@ -51,7 +51,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "-k",
         "--kind",
-        choices=KINDS,
+        choices=DOCUMENT_KINDS,
         default=None,
         help="Emit the schema for a single kind. Implies writing to stdout.",
     )

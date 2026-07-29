@@ -19,6 +19,7 @@ from netgraph.models.interface import Interface, InterfaceList, InterfaceType
 from netgraph.models.scalars import Boolean, ElementName, MacAddress, VlanId
 
 __all__ = [
+    "DEVICE_KINDS",
     "BridgeConfig",
     "BridgeType",
     "Computer",
@@ -312,3 +313,8 @@ class Server(Device):
 
     kind: Literal["server"] = "server"
     default_glyph: ClassVar[str] = "server"
+
+
+#: The kinds whose ``spec`` is a :class:`DeviceSpec`, and therefore the kinds a
+#: ``template`` can be merged into (§6.6). In the order §3 lists them.
+DEVICE_KINDS: tuple[str, ...] = ("switch", "router", "hub", "computer", "server")

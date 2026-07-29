@@ -1,0 +1,114 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: template
+metadata:
+  name: c9200l-48p
+  description: |
+    A Cisco Catalyst 9200L-48P as this campus deploys it: forty-eight access
+    ports in the staff VLAN, a fibre trunk to the distribution layer, and an
+    in-band management SVI on Vlan99.
+
+    Everything here is identical on every access switch of that model. A switch
+    document supplies only what is not — its location, its bridge address, its
+    management address, and whichever ports are actually patched. See
+    sites/north/access/switches.yaml for one written against this template.
+
+    This document is a template, not an element: it is never drawn, never
+    listed, and never validated on its own (docs/schema.md §6.6).
+spec:
+  vendor: Cisco
+  model: C9200L-48P
+  bridge:
+    name: br0
+    type: customer-vlan-bridge
+  vlans:
+    - id: 10
+      name: staff
+    - id: 20
+      name: lab
+    - id: 30
+      name: voice
+    - id: 99
+      name: mgmt
+  interfaces:
+    - name: br0
+      type: bridge
+      description: Switching instance
+      members:
+        - GigabitEthernet1/0/1
+        - GigabitEthernet1/0/2
+        - GigabitEthernet1/0/3
+        - GigabitEthernet1/0/4
+        - GigabitEthernet1/0/5
+        - GigabitEthernet1/0/6
+        - GigabitEthernet1/0/7
+        - GigabitEthernet1/0/8
+        - GigabitEthernet1/0/9
+        - GigabitEthernet1/0/10
+        - GigabitEthernet1/0/11
+        - GigabitEthernet1/0/12
+        - GigabitEthernet1/0/13
+        - GigabitEthernet1/0/14
+        - GigabitEthernet1/0/15
+        - GigabitEthernet1/0/16
+        - GigabitEthernet1/0/17
+        - GigabitEthernet1/0/18
+        - GigabitEthernet1/0/19
+        - GigabitEthernet1/0/20
+        - GigabitEthernet1/0/21
+        - GigabitEthernet1/0/22
+        - GigabitEthernet1/0/23
+        - GigabitEthernet1/0/24
+        - GigabitEthernet1/0/25
+        - GigabitEthernet1/0/26
+        - GigabitEthernet1/0/27
+        - GigabitEthernet1/0/28
+        - GigabitEthernet1/0/29
+        - GigabitEthernet1/0/30
+        - GigabitEthernet1/0/31
+        - GigabitEthernet1/0/32
+        - GigabitEthernet1/0/33
+        - GigabitEthernet1/0/34
+        - GigabitEthernet1/0/35
+        - GigabitEthernet1/0/36
+        - GigabitEthernet1/0/37
+        - GigabitEthernet1/0/38
+        - GigabitEthernet1/0/39
+        - GigabitEthernet1/0/40
+        - GigabitEthernet1/0/41
+        - GigabitEthernet1/0/42
+        - GigabitEthernet1/0/43
+        - GigabitEthernet1/0/44
+        - GigabitEthernet1/0/45
+        - GigabitEthernet1/0/46
+        - GigabitEthernet1/0/47
+        - GigabitEthernet1/0/48
+        - TenGigabitEthernet1/1/1
+
+    - name: Vlan99
+      type: vlan
+      parent: br0
+      description: In-band management
+      vlan:
+        mode: access
+        access_vlan: 99
+
+    # One entry, forty-eight ports (docs/schema.md §6.2.5). '{}' substitutes
+    # the current port number into the description. The ports ship
+    # administratively down; a switch enables the ones it has patched.
+    - range: GigabitEthernet1/0/[1-48]
+      type: ethernet
+      description: Access port {} - staff
+      enabled: false
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+
+    - name: TenGigabitEthernet1/1/1
+      type: ethernet
+      description: Fibre trunk uplink to the distribution layer
+      mtu: 9000
+      vlan:
+        mode: trunk
+        trunk_vlans: [1, 10, 20, 30, 99]
+        native_vlan: 1

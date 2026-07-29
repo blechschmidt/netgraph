@@ -35,7 +35,7 @@ from netgraph import schema as schema_module
 from netgraph.cli import cli
 from netgraph.errors import SchemaError
 from netgraph.loader.documents import read_documents
-from netgraph.models import KINDS, fielddocs, parse_document
+from netgraph.models import DOCUMENT_KINDS, KINDS, fielddocs, parse_document
 from netgraph.schema import SCHEMA_DIALECT, UnknownKindError, build_schema, schema_id
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -57,7 +57,7 @@ def validator() -> jsonschema.Draft202012Validator:
 
 @pytest.fixture(scope="module")
 def per_kind() -> dict[str, jsonschema.Draft202012Validator]:
-    return {kind: jsonschema.Draft202012Validator(build_schema(kind)) for kind in KINDS}
+    return {kind: jsonschema.Draft202012Validator(build_schema(kind)) for kind in DOCUMENT_KINDS}
 
 
 def example_documents() -> list[tuple[str, dict[str, Any]]]:
@@ -132,7 +132,7 @@ def test_kind_is_required_in_every_branch() -> None:
 
 def test_field_descriptions_are_carried_over() -> None:
     """The point of the exercise: hover text in the editor."""
-    interface = build_schema()["$defs"]["Interface"]["properties"]
+    interface = build_schema()["$defs"]["PartialInterface"]["properties"]
     assert interface["mac"]["title"] == "mac"
     assert "EUI-48" in interface["mac"]["description"]
     # The YANG path travels with the description, and Markdown, not RST.

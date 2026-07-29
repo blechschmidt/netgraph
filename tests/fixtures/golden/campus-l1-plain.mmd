@@ -1,53 +1,55 @@
 flowchart TB
     n0["sw-north-acc-01<br/>[switch]"]
     n1["sw-north-acc-02<br/>[switch]"]
-    n2(["rtr-north-core-01<br/>[router]"])
-    n3["sw-north-dist-01<br/>[switch]"]
-    n4[/"pc-north-01<br/>[computer]"/]
-    n5[("srv-north-01<br/>[server]")]
-    n6[/"pc-north-02<br/>[computer]"/]
-    n7["sw-south-acc-01<br/>[switch]"]
-    n8["sw-south-acc-02<br/>[switch]"]
-    n9(["rtr-south-core-01<br/>[router]"])
-    n10["sw-south-dist-01<br/>[switch]"]
-    n11[/"pc-south-01<br/>[computer]"/]
-    n12[("srv-south-01<br/>[server]")]
-    n13[/"pc-south-02<br/>[computer]"/]
-    n14["sw-west-acc-01<br/>[switch]"]
-    n15["sw-west-acc-02<br/>[switch]"]
-    n16(["rtr-west-core-01<br/>[router]"])
-    n17["sw-west-dist-01<br/>[switch]"]
-    n18[/"pc-west-01<br/>[computer]"/]
-    n19[("srv-west-01<br/>[server]")]
-    n20[/"pc-west-02<br/>[computer]"/]
+    n2["sw-north-acc-03<br/>[switch]"]
+    n3(["rtr-north-core-01<br/>[router]"])
+    n4["sw-north-dist-01<br/>[switch]"]
+    n5[/"pc-north-01<br/>[computer]"/]
+    n6[("srv-north-01<br/>[server]")]
+    n7[/"pc-north-02<br/>[computer]"/]
+    n8["sw-south-acc-01<br/>[switch]"]
+    n9["sw-south-acc-02<br/>[switch]"]
+    n10(["rtr-south-core-01<br/>[router]"])
+    n11["sw-south-dist-01<br/>[switch]"]
+    n12[/"pc-south-01<br/>[computer]"/]
+    n13[("srv-south-01<br/>[server]")]
+    n14[/"pc-south-02<br/>[computer]"/]
+    n15["sw-west-acc-01<br/>[switch]"]
+    n16["sw-west-acc-02<br/>[switch]"]
+    n17(["rtr-west-core-01<br/>[router]"])
+    n18["sw-west-dist-01<br/>[switch]"]
+    n19[/"pc-west-01<br/>[computer]"/]
+    n20[("srv-west-01<br/>[server]")]
+    n21[/"pc-west-02<br/>[computer]"/]
 
-    n2 == "xe-0/0/1 ↔ xe-0/0/2 · BB-NS · fiber · 10Gbps" === n9
-    n9 == "xe-0/0/1 ↔ xe-0/0/2 · BB-SW · fiber · 10Gbps" === n16
-    n2 == "xe-0/0/2 ↔ xe-0/0/1 · BB-WN · fiber · 10Gbps" === n16
-    n2 == "xe-0/0/0 ↔ Ethernet52/1 · F-101 · fiber · 10Gbps" === n3
-    n0 == "TenGigabitEthernet1/1/1 ↔ Ethernet49/1 · F-102 · fiber · 10Gbps" === n3
-    n1 == "TenGigabitEthernet1/1/1 ↔ Ethernet50/1 · F-103 · fiber · 10Gbps" === n3
-    n4 -- "eno1 ↔ GigabitEthernet1/0/1 · C-101 · 1Gbps" --- n0
-    n5 -- "eth0 ↔ GigabitEthernet1/0/2 · C-102 · 1Gbps" --- n0
-    n6 -- "eno1 ↔ GigabitEthernet1/0/1 · C-103 · 1Gbps" --- n1
-    n9 == "xe-0/0/0 ↔ Ethernet52/1 · F-201 · fiber · 10Gbps" === n10
-    n7 == "TenGigabitEthernet1/1/1 ↔ Ethernet49/1 · F-202 · fiber · 10Gbps" === n10
-    n8 == "TenGigabitEthernet1/1/1 ↔ Ethernet50/1 · F-203 · fiber · 10Gbps" === n10
-    n11 -- "eno1 ↔ GigabitEthernet1/0/1 · C-201 · 1Gbps" --- n7
-    n12 -- "eth0 ↔ GigabitEthernet1/0/2 · C-202 · 1Gbps" --- n7
-    n13 -- "eno1 ↔ GigabitEthernet1/0/1 · C-203 · 1Gbps" --- n8
-    n16 == "xe-0/0/0 ↔ Ethernet52/1 · F-301 · fiber · 10Gbps" === n17
-    n14 == "TenGigabitEthernet1/1/1 ↔ Ethernet49/1 · F-302 · fiber · 10Gbps" === n17
-    n15 == "TenGigabitEthernet1/1/1 ↔ Ethernet50/1 · F-303 · fiber · 10Gbps" === n17
-    n18 -- "eno1 ↔ GigabitEthernet1/0/1 · C-301 · 1Gbps" --- n14
-    n19 -- "eth0 ↔ GigabitEthernet1/0/2 · C-302 · 1Gbps" --- n14
-    n20 -- "eno1 ↔ GigabitEthernet1/0/1 · C-303 · 1Gbps" --- n15
+    n3 == "xe-0/0/1 ↔ xe-0/0/2 · BB-NS · fiber · 10Gbps" === n10
+    n10 == "xe-0/0/1 ↔ xe-0/0/2 · BB-SW · fiber · 10Gbps" === n17
+    n3 == "xe-0/0/2 ↔ xe-0/0/1 · BB-WN · fiber · 10Gbps" === n17
+    n3 == "xe-0/0/0 ↔ Ethernet52/1 · F-101 · fiber · 10Gbps" === n4
+    n0 == "TenGigabitEthernet1/1/1 ↔ Ethernet49/1 · F-102 · fiber · 10Gbps" === n4
+    n1 == "TenGigabitEthernet1/1/1 ↔ Ethernet50/1 · F-103 · fiber · 10Gbps" === n4
+    n2 == "TenGigabitEthernet1/1/1 ↔ Ethernet51/1 · F-104 · fiber · 10Gbps" === n4
+    n5 -- "eno1 ↔ GigabitEthernet1/0/1 · C-101 · 1Gbps" --- n0
+    n6 -- "eth0 ↔ GigabitEthernet1/0/2 · C-102 · 1Gbps" --- n0
+    n7 -- "eno1 ↔ GigabitEthernet1/0/1 · C-103 · 1Gbps" --- n1
+    n10 == "xe-0/0/0 ↔ Ethernet52/1 · F-201 · fiber · 10Gbps" === n11
+    n8 == "TenGigabitEthernet1/1/1 ↔ Ethernet49/1 · F-202 · fiber · 10Gbps" === n11
+    n9 == "TenGigabitEthernet1/1/1 ↔ Ethernet50/1 · F-203 · fiber · 10Gbps" === n11
+    n12 -- "eno1 ↔ GigabitEthernet1/0/1 · C-201 · 1Gbps" --- n8
+    n13 -- "eth0 ↔ GigabitEthernet1/0/2 · C-202 · 1Gbps" --- n8
+    n14 -- "eno1 ↔ GigabitEthernet1/0/1 · C-203 · 1Gbps" --- n9
+    n17 == "xe-0/0/0 ↔ Ethernet52/1 · F-301 · fiber · 10Gbps" === n18
+    n15 == "TenGigabitEthernet1/1/1 ↔ Ethernet49/1 · F-302 · fiber · 10Gbps" === n18
+    n16 == "TenGigabitEthernet1/1/1 ↔ Ethernet50/1 · F-303 · fiber · 10Gbps" === n18
+    n19 -- "eno1 ↔ GigabitEthernet1/0/1 · C-301 · 1Gbps" --- n15
+    n20 -- "eth0 ↔ GigabitEthernet1/0/2 · C-302 · 1Gbps" --- n15
+    n21 -- "eno1 ↔ GigabitEthernet1/0/1 · C-303 · 1Gbps" --- n16
 
     classDef computer fill:#f5f5f5,stroke:#6b7280,stroke-width:1px
     classDef router fill:#dbe9f6,stroke:#2563eb,stroke-width:1px
     classDef server fill:#eae2f5,stroke:#7c3aed,stroke-width:1px
     classDef switch fill:#dcf0dc,stroke:#16a34a,stroke-width:1px
-    class n4,n6,n11,n13,n18,n20 computer
-    class n2,n9,n16 router
-    class n5,n12,n19 server
-    class n0,n1,n3,n7,n8,n10,n14,n15,n17 switch
+    class n5,n7,n12,n14,n19,n21 computer
+    class n3,n10,n17 router
+    class n6,n13,n20 server
+    class n0,n1,n2,n4,n8,n9,n11,n15,n16,n18 switch

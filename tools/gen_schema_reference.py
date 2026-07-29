@@ -75,6 +75,7 @@ from netgraph.models import (  # noqa: E402
     VlanSet,
 )
 from netgraph.models.document import ELEMENT_MODELS  # noqa: E402
+from netgraph.models.element import TEMPLATE_KIND  # noqa: E402
 from netgraph.models.fielddocs import (  # noqa: E402
     DOCUMENTED_MODELS,
     FIELD_DOCS,
@@ -100,6 +101,10 @@ class Section:
     lead: str
     #: Anything that a field table cannot express: shorthands, cross-field rules.
     notes: tuple[str, ...] = ()
+    #: Rows for keys the loader consumes before the models see them, and which
+    #: therefore have no ``model_fields`` entry to be read off. Each is a
+    #: rendered ``| ... |`` table row, appended after the generated ones.
+    extra_rows: tuple[str, ...] = ()
 
 
 SECTIONS: Final[tuple[Section, ...]] = (
@@ -126,6 +131,17 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "The five device kinds share one spec shape. They differ in which fields they permit "
         "(a `hub` rejects `bridge`, `vlans`, `forwarding` and all layer-3 configuration) and in "
         "the default value of `forwarding`.",
+        extra_rows=(
+            "| `from` | element reference | no | *unset* | Names a `kind: template` document "
+            "whose partial spec is merged underneath this one. Consumed by the loader: it is "
+            "gone before validation, the graph or any renderer sees the device. `interfaces` is "
+            "required only when `from` is absent. | — |",
+        ),
+        notes=(
+            "`from` merges a template underneath the device: the device's own keys win, "
+            "`interfaces` merge by `name`, and every other list the device declares replaces "
+            "the template's outright. See §6.6 of [`schema.md`](schema.md).",
+        ),
     ),
     Section(
         Forwarding,
@@ -148,7 +164,20 @@ SECTIONS: Final[tuple[Section, ...]] = (
         Interface,
         "`spec.interfaces[]`",
         "One entry per port or logical interface. Used by both devices and adapters.",
+        extra_rows=(
+            "| `range` | string | no | *unset* | Declares many interfaces at once instead of "
+            "`name`, by bracket expansion over one or more numeric spans "
+            "(`GigabitEthernet1/0/[1-48]`). Consumed by the loader: the entry is replaced by "
+            "the interfaces it expands to before anything else sees the document. Exactly one "
+            "of `name` and `range` is written. | — |",
+        ),
         notes=(
+            "`range` expands as an odometer, the rightmost span varying fastest, and the width "
+            "of a span's low bound is its zero padding (`[01-12]` yields `01`…`12`). In "
+            "`description`, `{}` and `%d` stand for the last span and `{0}`, `{1}`, … for a "
+            "span by position. See §6.2.5 of [`schema.md`](schema.md).",
+            "Inside a `spec` that declares `from`, an entry may state only `name` and the "
+            "fields it overrides; the template supplies `type` and the rest.",
             "`type: vlan` requires `parent` and a `vlan` block in access mode carrying the "
             "encapsulation VID.",
             "`type: lag` and `type: bridge` require `members`, which must be non-empty, free of "
@@ -533,6 +562,10 @@ def _kind_table() -> Iterator[str]:
         anchor = _MODEL_ANCHORS.get(spec)
         link = f"[{spec.__name__}]({anchor})" if anchor else spec.__name__
         yield f"| `{kind}` | {link} | {KIND_NOTES[kind]} |"
+    yield (
+        f"| `{TEMPLATE_KIND}` | partial "
+        f"[DeviceSpec]({_MODEL_ANCHORS[DeviceSpec]}) | {KIND_NOTES[TEMPLATE_KIND]} |"
+    )
 
 
 def _enum_tables() -> Iterator[str]:
@@ -599,6 +632,7 @@ def build() -> str:
         lines.append("| Field | Type | Required | Default | Description | YANG |")
         lines.append("|---|---|---|---|---|---|")
         lines.extend(_field_rows(section))
+        lines.extend(section.extra_rows)
         lines.append("")
         for note in section.notes:
             lines.append(f"* {note}")

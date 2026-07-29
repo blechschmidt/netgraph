@@ -1,6 +1,6 @@
 # campus
 
-Three sites, 21 devices, 21 cables. A classic three-tier campus: layer-3 core
+Three sites, 22 devices, 22 cables. A classic three-tier campus: layer-3 core
 routers joined in a fibre backbone ring, layer-3 distribution switches carrying
 the VLAN gateways, and layer-2 access switches trunking up to them.
 
@@ -8,20 +8,21 @@ the VLAN gateways, and layer-2 access switches trunking up to them.
 campus/
 ├── netgraph.toml                       # per-inventory configuration (all defaults)
 ├── backbone/cables.yaml                # the three inter-site fibres
+├── templates/access-switch.yaml        # a 48-port access switch, declared once
 └── sites/
     ├── north/
     │   ├── core/rtr-north-core-01.yaml
     │   ├── distribution/sw-north-dist-01.yaml
-    │   ├── access/switches.yaml        # two documents
+    │   ├── access/switches.yaml        # three documents; the third uses the template
     │   ├── hosts/hosts.yaml            # three documents
-    │   └── cables/links.yaml           # six documents
-    ├── south/                          # same shape
-    └── west/                           # same shape
+    │   └── cables/links.yaml           # seven documents
+    ├── south/                          # same shape, two access switches
+    └── west/                           # same shape, two access switches
 ```
 
-The three sites are structurally identical, which makes the inventory a useful
-diff target: anything that differs between `sites/north` and `sites/south`
-beyond the site index is a mistake.
+The three sites are structurally identical apart from `sw-north-acc-03`, which
+makes the inventory a useful diff target: anything else that differs between
+`sites/north` and `sites/south` beyond the site index is a mistake.
 
 ## Namespaces
 
@@ -82,6 +83,44 @@ netgraph -i examples/campus list subnets
 netgraph -i examples/campus render --layer l3 --namespace sites/north -f svg -o north-l3.svg
 ```
 
+## One switch declared from a template
+
+`sw-north-acc-01` and `sw-north-acc-02` are written out in full: every port,
+every VLAN, every trunk. `sw-north-acc-03`, in the same file, is nine lines,
+because it inherits [`templates/access-switch.yaml`](templates/access-switch.yaml)
+through `spec.from`:
+
+```yaml
+spec:
+  from: templates/c9200l-48p
+  location: Building A, Hauptstrasse 1 / floor 3 / IDF-3
+  bridge:
+    address: 00:1b:0d:01:a3:ff
+  interfaces:
+    - name: Vlan99
+      ipv4:
+        addresses: [10.1.99.13/24]
+    - name: TenGigabitEthernet1/1/1
+      mac: 00:1b:0d:01:a3:11
+```
+
+The template supplies the vendor and model, the VLAN database, the bridge, the
+management SVI, the fibre uplink, and — through one `range` entry — all
+forty-eight access ports, each with its own numbered description. The switch
+supplies only what is particular to it: where it is, its bridge address, its
+management address, and the MAC of its uplink. Interfaces merge by name, so
+naming `Vlan99` adds an address to the template's SVI rather than replacing it.
+
+The template lives in the `templates/` namespace and is reached from
+`sites/north/access` by the ordinary reference rules (§2.2). It is **not** an
+element: it does not appear in `netgraph list devices`, in any diagram, or in
+validation output. Read the merge either way round:
+
+```bash
+netgraph -i examples/campus show sw-north-acc-03 --raw   # as written
+netgraph -i examples/campus show sw-north-acc-03         # as merged
+```
+
 ## Details worth copying
 
 * **The distribution switch is a layer-3 switch**, not a bridge: it declares
@@ -101,6 +140,10 @@ netgraph -i examples/campus render --layer l3 --namespace sites/north -f svg -o 
   those ports whether or not it is written down, so writing it down is what
   makes the document and the port agree — `W114` (`NG-V006`) is the rule that
   says so.
+* **The templated switch's spare ports are `enabled: false`.** The template
+  ships all forty-eight that way and a switch enables the ones it has patched,
+  which is both what the hardware does and what keeps `I002` (`NG-C015`) quiet
+  for a port nobody has run a cable to yet.
 * **MAC addresses come from real vendor OUIs.** A locally administered address
   (`02:…`) is legal, and `I001` (`NG-I010`) reports it as information because no
   OUI lookup can trace one back to hardware.

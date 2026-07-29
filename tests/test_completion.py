@@ -27,7 +27,7 @@ from netgraph.completion import _inventory_path as inventory_path
 from netgraph.completion import _items as items
 from netgraph.completion import _load_elements as load_elements
 from netgraph.errors import NetgraphError
-from netgraph.models import KINDS
+from netgraph.models import DOCUMENT_KINDS, KINDS
 from netgraph.render import FORMATS
 from netgraph.rules import RULE_IDS
 
@@ -138,8 +138,8 @@ def test_a_filter_completes_the_kinds_that_are_nodes() -> None:
     assert all(item.help for item in items)
 
 
-def test_the_schema_command_completes_every_kind_including_cable() -> None:
-    assert values(["schema", "--kind"]) == list(KINDS)
+def test_the_schema_command_completes_every_kind_including_cable_and_template() -> None:
+    assert values(["schema", "--kind"]) == list(DOCUMENT_KINDS)
 
 
 def test_a_prefix_narrows_the_candidates() -> None:
@@ -259,7 +259,7 @@ def test_a_context_without_an_inventory_option_falls_back_to_the_cwd(
 
 def test_a_kind_option_that_declares_no_choices_offers_every_kind() -> None:
     offered = complete_kind(click.Context(cli), click.Option(["--kind"]), "")
-    assert [item.value for item in offered] == list(KINDS)
+    assert [item.value for item in offered] == list(DOCUMENT_KINDS)
 
 
 def test_a_candidate_is_offered_once_however_often_it_is_produced() -> None:

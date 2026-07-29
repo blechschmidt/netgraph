@@ -43,6 +43,21 @@ graph netgraph {
         <TR><TD ALIGN="LEFT">TenGigabitEthernet1/1/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
       </TABLE>
     >];
+    "sites/north/access/sw-north-acc-03" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="Access switch 03, North campus - third floor riser.", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-north-acc-03</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan99</TD><TD ALIGN="LEFT">10.1.99.13/24</TD><TD ALIGN="LEFT">vlan 99</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/2</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/3</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/4</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/5</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/6</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/7</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">(+42 more interfaces)</TD></TR>
+      </TABLE>
+    >];
   }
 
   subgraph cluster_1 {
@@ -82,6 +97,7 @@ graph netgraph {
         <TR><TD ALIGN="LEFT">Vlan99</TD><TD ALIGN="LEFT">10.1.99.1/24</TD><TD ALIGN="LEFT">vlan 99</TD></TR>
         <TR><TD ALIGN="LEFT">Ethernet49/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
         <TR><TD ALIGN="LEFT">Ethernet50/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
+        <TR><TD ALIGN="LEFT">Ethernet51/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
         <TR><TD ALIGN="LEFT">Ethernet52/1</TD><TD ALIGN="LEFT">10.1.0.2/30, 2001:db8:1::2/64</TD><TD ALIGN="LEFT"></TD></TR>
       </TABLE>
     >];
@@ -332,6 +348,7 @@ graph netgraph {
   "sites/north/core/rtr-north-core-01" -- "sites/north/distribution/sw-north-dist-01" [color="#d97706", style=bold, penwidth=2.5, label="xe-0/0/0 -- Ethernet52/1", tooltip="cable: cbl-north-core-dist, medium: fiber, speed: 10Gbps, length: 12 m"];
   "sites/north/access/sw-north-acc-01" -- "sites/north/distribution/sw-north-dist-01" [color="#d97706", style=bold, penwidth=2.5, label="TenGigabitEthernet1/1/1 -- Ethernet49/1\nvlan 1,10,20,30,99", tooltip="cable: cbl-north-dist-acc01, medium: fiber, speed: 10Gbps, length: 45 m, vlans: 1,10,20,30,99"];
   "sites/north/access/sw-north-acc-02" -- "sites/north/distribution/sw-north-dist-01" [color="#d97706", style=bold, penwidth=2.5, label="TenGigabitEthernet1/1/1 -- Ethernet50/1\nvlan 1,10,20,30,99", tooltip="cable: cbl-north-dist-acc02, medium: fiber, speed: 10Gbps, length: 78 m, vlans: 1,10,20,30,99"];
+  "sites/north/access/sw-north-acc-03" -- "sites/north/distribution/sw-north-dist-01" [color="#d97706", style=bold, penwidth=2.5, label="TenGigabitEthernet1/1/1 -- Ethernet51/1\nvlan 1,10,20,30,99", tooltip="cable: cbl-north-dist-acc03, medium: fiber, speed: 10Gbps, length: 96 m, vlans: 1,10,20,30,99"];
   "sites/north/hosts/pc-north-01" -- "sites/north/access/sw-north-acc-01" [color="#4a4a4a", style=solid, penwidth=1.5, label="eno1 -- GigabitEthernet1/0/1\nvlan 10", tooltip="cable: cbl-north-acc01-pc01, medium: copper, speed: 1Gbps, length: 22 m, vlans: 10"];
   "sites/north/hosts/srv-north-01" -- "sites/north/access/sw-north-acc-01" [color="#4a4a4a", style=solid, penwidth=1.5, label="eth0 -- GigabitEthernet1/0/2\nvlan 20", tooltip="cable: cbl-north-acc01-srv01, medium: copper, speed: 1Gbps, length: 6 m, vlans: 20"];
   "sites/north/hosts/pc-north-02" -- "sites/north/access/sw-north-acc-02" [color="#4a4a4a", style=solid, penwidth=1.5, label="eno1 -- GigabitEthernet1/0/1\nvlan 10", tooltip="cable: cbl-north-acc02-pc02, medium: copper, speed: 1Gbps, length: 18 m, vlans: 10"];

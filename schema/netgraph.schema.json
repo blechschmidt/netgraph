@@ -19,6 +19,7 @@
       "router": "#/$defs/Router",
       "server": "#/$defs/Server",
       "switch": "#/$defs/Switch",
+      "template": "#/$defs/Template",
       "tunnel": "#/$defs/Tunnel"
     },
     "propertyName": "kind"
@@ -47,6 +48,9 @@
     },
     {
       "$ref": "#/$defs/Tunnel"
+    },
+    {
+      "$ref": "#/$defs/Template"
     }
   ],
   "$defs": {
@@ -503,7 +507,7 @@
         },
         "interfaces": {
           "items": {
-            "$ref": "#/$defs/Interface"
+            "$ref": "#/$defs/PartialInterface"
           },
           "minItems": 1,
           "title": "interfaces",
@@ -543,13 +547,53 @@
           "default": null,
           "title": "forwarding",
           "description": "Device-wide default for per-interface IP forwarding. Defaults to true/true on a `router` and false/false on every other kind; a `hub` must not declare it."
+        },
+        "from": {
+          "type": "string",
+          "title": "from",
+          "description": "Names a `kind: template` document whose partial spec is merged underneath this one. The device's own keys win; `interfaces` merge by `name`; any other list the device declares replaces the template's outright. Resolved with the ordinary reference rules, so a template may live in another namespace (`templates/c9200l-48p`).",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*(?:/[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*)*$"
         }
       },
-      "required": [
-        "interfaces"
-      ],
+      "required": [],
       "title": "DeviceSpec",
-      "type": "object"
+      "type": "object",
+      "allOf": [
+        {
+          "anyOf": [
+            {
+              "required": [
+                "interfaces"
+              ]
+            },
+            {
+              "required": [
+                "from"
+              ]
+            }
+          ]
+        },
+        {
+          "if": {
+            "not": {
+              "required": [
+                "from"
+              ]
+            }
+          },
+          "then": {
+            "properties": {
+              "interfaces": {
+                "items": {
+                  "$ref": "#/$defs/Interface"
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "Duplex": {
       "description": "`spec.duplex` (§7).",
@@ -810,153 +854,12 @@
       ]
     },
     "Interface": {
-      "additionalProperties": false,
+      "$ref": "#/$defs/PartialInterface",
+      "title": "Interface",
       "description": "One entry of `spec.interfaces` (RFC 8343 `if:interface`).",
-      "properties": {
-        "name": {
-          "maxLength": 64,
-          "minLength": 1,
-          "pattern": "^[A-Za-z0-9._/-]+$",
-          "title": "name",
-          "type": "string",
-          "description": "Interface name as the device itself spells it (`eth0`, `GigabitEthernet0/2`). Unique within the element (`NG-I001`), and the target of a cable endpoint.\n\nYANG: `/if:interfaces/if:interface/if:name`"
-        },
-        "type": {
-          "$ref": "#/$defs/InterfaceType",
-          "title": "type",
-          "description": "What kind of interface this is. Decides which other fields are allowed and whether a cable may terminate here (`NG-C009`).\n\nYANG: `…/if:type`"
-        },
-        "description": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "description",
-          "description": "Free text describing what the port is for.\n\nYANG: `…/if:description`"
-        },
-        "enabled": {
-          "default": true,
-          "title": "enabled",
-          "type": "boolean",
-          "description": "Intended administrative state. A disabled interface is exempt from `W101`.\n\nYANG: `…/if:enabled`"
-        },
-        "mac": {
-          "anyOf": [
-            {
-              "type": "string",
-              "title": "MAC address",
-              "description": "An EUI-48 address in colon (`00:1e:8c:00:10:01`), dash (`00-1E-8C-00-10-01`) or Cisco dotted (`001e.8c00.1001`) form, normalised to lower-case colon form on load. Quote it: an unquoted MAC can be read as a number by a YAML 1.1 parser.",
-              "pattern": "^[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}$|^[0-9A-Fa-f]{2}(?:-[0-9A-Fa-f]{2}){5}$|^[0-9A-Fa-f]{4}(?:\\.[0-9A-Fa-f]{4}){2}$"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "mac",
-          "description": "Hardware address, EUI-48. Accepted in colon, dash or Cisco dotted form and normalised to lower-case colon form. `if:phys-address` is `config false` in RFC 8343, so an exporter must not write it to a live datastore.\n\nYANG: `…/if:phys-address`"
-        },
-        "mtu": {
-          "anyOf": [
-            {
-              "maximum": 65535,
-              "minimum": 68,
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "mtu",
-          "description": "Layer-2 MTU in bytes. Propagated to `ipv4.mtu` and `ipv6.mtu` when those are not set. RFC 8343 has no layer-2 MTU node."
-        },
-        "ipv4": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/IPv4Config"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "ipv4",
-          "description": "IPv4 configuration. Absent means the interface has no IPv4 stack.\n\nYANG: `…/ip:ipv4`"
-        },
-        "ipv6": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/IPv6Config"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "ipv6",
-          "description": "IPv6 configuration. Absent means the interface has no IPv6 stack.\n\nYANG: `…/ip:ipv6`"
-        },
-        "vlan": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/VlanConfig"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "vlan",
-          "description": "802.1Q bridge-port configuration. Absent means the port is not VLAN-aware; a host port facing an access port normally omits it.\n\nYANG: `…/dot1q:bridge-port`"
-        },
-        "parent": {
-          "anyOf": [
-            {
-              "maxLength": 64,
-              "minLength": 1,
-              "pattern": "^[A-Za-z0-9._/-]+$",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "parent",
-          "description": "The interface this one is stacked on. Required for `type: vlan`, forbidden otherwise (`NG-I002`).\n\nYANG: `…/if:lower-layer-if`"
-        },
-        "members": {
-          "anyOf": [
-            {
-              "items": {
-                "maxLength": 64,
-                "minLength": 1,
-                "pattern": "^[A-Za-z0-9._/-]+$",
-                "type": "string"
-              },
-              "type": "array"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "members",
-          "description": "The interfaces aggregated by this one. Required for `type: lag` and `type: bridge`, forbidden otherwise (`NG-I003`).\n\nYANG: `…/if:lower-layer-if`"
-        }
-      },
       "required": [
-        "name",
         "type"
       ],
-      "title": "Interface",
-      "type": "object",
       "allOf": [
         {
           "if": {
@@ -1131,6 +1034,175 @@
       "title": "Metadata",
       "type": "object"
     },
+    "PartialInterface": {
+      "additionalProperties": false,
+      "description": "One interface, with only its identity required. This is the shape an entry takes inside a `spec` that inherits a template: the device restates the `name` and the handful of fields it overrides, and the template supplies the rest. Everywhere else `type` is required too — see `Interface`.",
+      "properties": {
+        "name": {
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9._/-]+$",
+          "title": "name",
+          "type": "string",
+          "description": "Interface name as the device itself spells it (`eth0`, `GigabitEthernet0/2`). Unique within the element (`NG-I001`), and the target of a cable endpoint.\n\nYANG: `/if:interfaces/if:interface/if:name`"
+        },
+        "type": {
+          "$ref": "#/$defs/InterfaceType",
+          "title": "type",
+          "description": "What kind of interface this is. Decides which other fields are allowed and whether a cable may terminate here (`NG-C009`).\n\nYANG: `…/if:type`"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "description",
+          "description": "Free text describing what the port is for.\n\nYANG: `…/if:description`"
+        },
+        "enabled": {
+          "default": true,
+          "title": "enabled",
+          "type": "boolean",
+          "description": "Intended administrative state. A disabled interface is exempt from `W101`.\n\nYANG: `…/if:enabled`"
+        },
+        "mac": {
+          "anyOf": [
+            {
+              "type": "string",
+              "title": "MAC address",
+              "description": "An EUI-48 address in colon (`00:1e:8c:00:10:01`), dash (`00-1E-8C-00-10-01`) or Cisco dotted (`001e.8c00.1001`) form, normalised to lower-case colon form on load. Quote it: an unquoted MAC can be read as a number by a YAML 1.1 parser.",
+              "pattern": "^[0-9A-Fa-f]{2}(?::[0-9A-Fa-f]{2}){5}$|^[0-9A-Fa-f]{2}(?:-[0-9A-Fa-f]{2}){5}$|^[0-9A-Fa-f]{4}(?:\\.[0-9A-Fa-f]{4}){2}$"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "mac",
+          "description": "Hardware address, EUI-48. Accepted in colon, dash or Cisco dotted form and normalised to lower-case colon form. `if:phys-address` is `config false` in RFC 8343, so an exporter must not write it to a live datastore.\n\nYANG: `…/if:phys-address`"
+        },
+        "mtu": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 68,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "mtu",
+          "description": "Layer-2 MTU in bytes. Propagated to `ipv4.mtu` and `ipv6.mtu` when those are not set. RFC 8343 has no layer-2 MTU node."
+        },
+        "ipv4": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IPv4Config"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "ipv4",
+          "description": "IPv4 configuration. Absent means the interface has no IPv4 stack.\n\nYANG: `…/ip:ipv4`"
+        },
+        "ipv6": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IPv6Config"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "ipv6",
+          "description": "IPv6 configuration. Absent means the interface has no IPv6 stack.\n\nYANG: `…/ip:ipv6`"
+        },
+        "vlan": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VlanConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "vlan",
+          "description": "802.1Q bridge-port configuration. Absent means the port is not VLAN-aware; a host port facing an access port normally omits it.\n\nYANG: `…/dot1q:bridge-port`"
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._/-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "parent",
+          "description": "The interface this one is stacked on. Required for `type: vlan`, forbidden otherwise (`NG-I002`).\n\nYANG: `…/if:lower-layer-if`"
+        },
+        "members": {
+          "anyOf": [
+            {
+              "items": {
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9._/-]+$",
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "members",
+          "description": "The interfaces aggregated by this one. Required for `type: lag` and `type: bridge`, forbidden otherwise (`NG-I003`).\n\nYANG: `…/if:lower-layer-if`"
+        },
+        "range": {
+          "type": "string",
+          "title": "range",
+          "description": "Declares many interfaces at once instead of `name`, by bracket expansion over one or more numeric spans: `GigabitEthernet1/0/[1-48]`, `ge-[0-1]/0/[0-3]`. Several spans expand as an odometer, rightmost fastest; the width of the low bound is the zero padding (`[01-12]` yields `01`…`12`). In `description`, `{}` and `%d` stand for the last span and `{0}`, `{1}`, … for a span by position. The loader expands the entry before anything else sees the document, so a range never reaches validation, the graph or a renderer.",
+          "minLength": 1,
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9._/-]*\\[\\d+-\\d+\\](?:[A-Za-z0-9._/-]*\\[\\d+-\\d+\\])*[A-Za-z0-9._/-]*$"
+        }
+      },
+      "title": "PartialInterface",
+      "type": "object",
+      "allOf": [
+        {
+          "oneOf": [
+            {
+              "required": [
+                "name"
+              ]
+            },
+            {
+              "required": [
+                "range"
+              ]
+            }
+          ]
+        }
+      ]
+    },
     "Router": {
       "additionalProperties": false,
       "description": "A layer-3 forwarder. Forwards by default (§6.1.1).",
@@ -1237,6 +1309,153 @@
         "spec"
       ],
       "title": "Switch",
+      "type": "object"
+    },
+    "Template": {
+      "additionalProperties": false,
+      "description": "A named partial device spec. A template declares no element: it is never drawn, never listed and never validated on its own. It exists to be merged into the devices that name it in `spec.from`, and the only place it surfaces is as the source location of a field it contributed.",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "template",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. A named partial device spec, merged into every device that names it in `spec.from`. Not an element: never drawn, never listed, never validated on its own."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/TemplateSpec",
+          "title": "spec",
+          "description": "The body of a `template` document."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "title": "Template",
+      "type": "object"
+    },
+    "TemplateSpec": {
+      "additionalProperties": false,
+      "description": "A partial device spec. Every key of a device `spec` is allowed and none is required: what the template does not say, the device using it says. `interfaces` is where the leverage is — one `range` entry is a whole line card.",
+      "properties": {
+        "vendor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "vendor",
+          "description": "Hardware vendor, free text. Documentation only."
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "model",
+          "description": "Hardware model designation, free text."
+        },
+        "serial": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "serial",
+          "description": "Serial or asset number, free text."
+        },
+        "location": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "location",
+          "description": "Physical location, free text (site, room, rack unit)."
+        },
+        "interfaces": {
+          "items": {
+            "$ref": "#/$defs/PartialInterface"
+          },
+          "minItems": 1,
+          "title": "interfaces",
+          "type": "array",
+          "description": "Every port and logical interface the device owns. At least one is required.\n\nYANG: `/if:interfaces/if:interface`"
+        },
+        "bridge": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BridgeConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "bridge",
+          "description": "The 802.1Q bridge component this device implements. Absent means the device is not a bridge.\n\nYANG: `/dot1q:bridges/dot1q:bridge`"
+        },
+        "vlans": {
+          "items": {
+            "$ref": "#/$defs/VlanDefinition"
+          },
+          "title": "vlans",
+          "type": "array",
+          "description": "The device VLAN database: which VLANs exist on this device, and what they are called.\n\nYANG: `…/dot1q:bridge-vlan/dot1q:vlan`"
+        },
+        "forwarding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Forwarding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "forwarding",
+          "description": "Device-wide default for per-interface IP forwarding. Defaults to true/true on a `router` and false/false on every other kind; a `hub` must not declare it."
+        },
+        "from": {
+          "type": "string",
+          "title": "from",
+          "description": "Names a `kind: template` document whose partial spec is merged underneath this one. The device's own keys win; `interfaces` merge by `name`; any other list the device declares replaces the template's outright. Resolved with the ordinary reference rules, so a template may live in another namespace (`templates/c9200l-48p`).",
+          "minLength": 1,
+          "maxLength": 1024,
+          "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*(?:/[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*)*$"
+        }
+      },
+      "title": "TemplateSpec",
       "type": "object"
     },
     "Tunnel": {

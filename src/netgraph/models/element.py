@@ -10,12 +10,19 @@ from netgraph.models.base import NetgraphModel
 from netgraph.models.metadata import Metadata
 from netgraph.models.scalars import API_VERSION, ApiVersion
 
-__all__ = ["DEFAULT_API_VERSION", "KINDS", "ElementBase"]
+__all__ = [
+    "DEFAULT_API_VERSION",
+    "DOCUMENT_KINDS",
+    "KINDS",
+    "TEMPLATE_KIND",
+    "ElementBase",
+]
 
 #: Re-exported for callers that build documents programmatically.
 DEFAULT_API_VERSION = API_VERSION
 
-#: The eight kinds defined by ``netgraph.dev/v1alpha1`` (§3).
+#: The eight *element* kinds defined by ``netgraph.dev/v1alpha1`` (§3). Each one
+#: becomes a node or an edge of the graph.
 KINDS: tuple[str, ...] = (
     "switch",
     "router",
@@ -26,6 +33,14 @@ KINDS: tuple[str, ...] = (
     "adapter",
     "tunnel",
 )
+
+#: The ninth kind (§6.6). A template declares no element: it is a named partial
+#: device ``spec`` that the loader merges into the devices naming it in
+#: ``spec.from``, and it is gone by the time anything downstream sees the tree.
+TEMPLATE_KIND: str = "template"
+
+#: Every ``kind`` a document may declare, elements and templates alike.
+DOCUMENT_KINDS: tuple[str, ...] = (*KINDS, TEMPLATE_KIND)
 
 
 class ElementBase(NetgraphModel):

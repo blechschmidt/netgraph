@@ -57,7 +57,7 @@ import threading
 import webbrowser
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Final, TypeVar
 
 import click
@@ -84,8 +84,9 @@ from netgraph.loader import (
     LoadError,
     iter_inventory_files,
     load_tree,
+    read_documents,
 )
-from netgraph.models import KINDS, Element, format_bitrate
+from netgraph.models import DOCUMENT_KINDS, Element, format_bitrate
 from netgraph.render import (
     FORMATS,
     RENDERERS,
@@ -1423,13 +1424,24 @@ _LISTINGS: Final[dict[str, Any]] = {
     show_default=True,
     help="Serialisation of the resolved document.",
 )
+@click.option(
+    "--raw",
+    "--no-expand",
+    "raw",
+    is_flag=True,
+    help="Print the document as written: ranges unexpanded, 'from' unmerged.",
+)
 @click.pass_obj
-def show_command(app: AppContext, name: str, output_format: str) -> None:
+def show_command(app: AppContext, name: str, output_format: str, raw: bool) -> None:
     """Print the fully resolved configuration of one element.
 
     NAME is a fully-qualified name (``sites/hq/sw1``) or a short name that is
     unique in the inventory. Defaults are materialised and values normalised, so
     the output is what netgraph actually works with rather than what was typed.
+
+    ``--raw`` (``--no-expand``) prints the document exactly as it stands in the
+    file instead: an ``interfaces[].range`` still a range, a ``spec.from`` still
+    a reference. Diffing the two outputs is how a template merge is inspected.
     """
     console = app.console()
     inventory = app.load()
@@ -1439,8 +1451,39 @@ def show_command(app: AppContext, name: str, output_format: str) -> None:
     source = inventory.source_of(fqn)
     app.log(f"{fqn} declared in {source}" if source else f"{fqn}", level=1)
 
-    document = element.model_dump(mode="json", by_alias=True, exclude_none=True)
+    if raw:
+        document = _as_written(inventory, fqn)
+    else:
+        document = element.model_dump(mode="json", by_alias=True, exclude_none=True)
     console.print(_serialise(document, output_format).rstrip("\n"))
+
+
+def _as_written(inventory: Inventory, fqn: str) -> Any:
+    """Re-read one element's document from disk, without any loader rewriting.
+
+    The inventory keeps elements, not the text they came from — holding every
+    parsed document alive for the sake of a command that prints one of them
+    would cost every other command memory. So the one file is read again. Only
+    the requested document is returned, so a syntax error introduced elsewhere
+    in the same file since the load cannot be silently absorbed either: it is
+    raised, exactly as ``netgraph validate`` would raise it.
+
+    Raises:
+        click.BadParameter: The element has no source on disk.
+    """
+    source = inventory.source_of(fqn)
+    if source is None:  # pragma: no cover - every indexed element has a source
+        raise click.BadParameter(
+            f"{fqn!r} was not loaded from a file, so there is nothing to show raw",
+            param_hint="'--raw'",
+        )
+    for document in read_documents(source.path, relative=PurePosixPath(source.relative)):
+        if document.index == source.index:
+            return document.data
+    raise click.BadParameter(  # pragma: no cover - the file changed under us
+        f"{source.relative} no longer holds a document {source.index}; reload the inventory",
+        param_hint="'--raw'",
+    )
 
 
 def _resolve_element(inventory: Inventory, name: str) -> tuple[str, Element]:
@@ -1492,10 +1535,10 @@ def rules_command(app: AppContext) -> None:
 @click.option(
     "-k",
     "--kind",
-    type=click.Choice(KINDS),
+    type=click.Choice(DOCUMENT_KINDS),
     default=None,
     shell_complete=complete_kind,
-    help="Emit the schema for a single element kind instead of all of them.",
+    help="Emit the schema for a single document kind instead of all of them.",
 )
 @click.option(
     "--all",

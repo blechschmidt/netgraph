@@ -97,6 +97,8 @@ KIND_NOTES: Final[dict[str, str]] = {
     "adapter": "Presents interfaces over a non-network host port.",
     "tunnel": "An undirected logical link between two or more `tunnel` interfaces. Owns no "
     "interfaces; `over` nests it inside another tunnel.",
+    "template": "A named partial device spec, merged into every device that names it in "
+    "`spec.from`. Not an element: never drawn, never listed, never validated on its own.",
 }
 
 #: One entry per ``(model name, field name)``. Checked for exact coverage.

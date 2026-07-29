@@ -400,7 +400,7 @@ def test_a_name_filter_matches_globs_on_short_and_qualified_names(campus: Invent
     graph = build_graph(campus)
     assert {node.name for node in filter_graph(graph, FilterSpec(names=("sw-*-acc-*",)))} == {
         f"sw-{site}-acc-{index}" for site in ("north", "south", "west") for index in ("01", "02")
-    }
+    } | {"sw-north-acc-03"}
     by_path = set(filter_graph(graph, FilterSpec(names=("sites/north/hosts/*",))).nodes)
     assert by_path == {fqn for fqn in graph.nodes if fqn.startswith("sites/north/hosts/")}
     assert by_path, "the campus example declares hosts in that namespace"

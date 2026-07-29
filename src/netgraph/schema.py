@@ -33,13 +33,15 @@ interface carrying IPv6 has an MTU of at least 1280. Those stay with
 
 from __future__ import annotations
 
+import copy
 import re
 from typing import Any, Final
 
 from pydantic import TypeAdapter
 
+from netgraph.models.device import Switch
 from netgraph.models.document import ELEMENT_MODELS, Element, element_model_for
-from netgraph.models.element import KINDS, ElementBase
+from netgraph.models.element import DOCUMENT_KINDS, TEMPLATE_KIND, ElementBase
 from netgraph.models.fielddocs import (
     DOCUMENTED_MODELS,
     FIELD_DOCS,
@@ -53,10 +55,12 @@ from netgraph.models.scalars import (
     ELEMENT_REF_PATTERN,
     IFNAME_PATTERN,
     MAC_PATTERNS,
+    MAX_ELEMENT_REF_LENGTH,
     MAX_VLAN_ID,
     MIN_VLAN_ID,
     VLAN_SET_PATTERN,
 )
+from netgraph.models.template import INHERIT_KEY
 
 __all__ = [
     "SCHEMA_DIALECT",
@@ -85,6 +89,12 @@ class UnknownKindError(ValueError):
 def schema_id(kind: str | None = None) -> str:
     """The ``$id`` of the schema for ``kind``, or of the all-kinds schema."""
     return f"{_SCHEMA_BASE_URI}/{SCHEMA_VERSION}/{kind or 'element'}.json"
+
+
+#: Name of the ``$defs`` entry for a ``kind: template`` document, and for the
+#: partial device spec it carries.
+_TEMPLATE_DEF: Final = "Template"
+_TEMPLATE_SPEC_DEF: Final = "TemplateSpec"
 
 
 # --------------------------------------------------------------------------- #
@@ -315,6 +325,202 @@ _CONDITIONALS: Final[dict[str, list[dict[str, Any]]]] = {
 
 
 # --------------------------------------------------------------------------- #
+# Loader sugar the models never see
+# --------------------------------------------------------------------------- #
+
+#: ``interfaces[].range``: interface-name characters interleaved with at least
+#: one ``[low-high]`` span. Built from :data:`IFNAME_PATTERN` so the literal part
+#: of a range is exactly what a name may hold.
+_IFNAME_CHARS: Final = _unanchor(IFNAME_PATTERN).removesuffix("+")
+_SPAN: Final = r"\[\d+-\d+\]"
+_RANGE_PATTERN: Final = f"^{_IFNAME_CHARS}*{_SPAN}(?:{_IFNAME_CHARS}*{_SPAN})*{_IFNAME_CHARS}*$"
+
+_RANGE_SCHEMA: Final[dict[str, Any]] = {
+    "type": "string",
+    "title": "range",
+    "description": (
+        "Declares many interfaces at once instead of `name`, by bracket "
+        "expansion over one or more numeric spans: `GigabitEthernet1/0/[1-48]`, "
+        "`ge-[0-1]/0/[0-3]`. Several spans expand as an odometer, rightmost "
+        "fastest; the width of the low bound is the zero padding "
+        "(`[01-12]` yields `01`…`12`). In `description`, `{}` and `%d` stand "
+        "for the last span and `{0}`, `{1}`, … for a span by position. The "
+        "loader expands the entry before anything else sees the document, so a "
+        "range never reaches validation, the graph or a renderer."
+    ),
+    "minLength": 1,
+    "maxLength": 256,
+    "pattern": _RANGE_PATTERN,
+}
+
+_INHERIT_SCHEMA: Final[dict[str, Any]] = {
+    "type": "string",
+    "title": INHERIT_KEY,
+    "description": (
+        "Names a `kind: template` document whose partial spec is merged "
+        "underneath this one. The device's own keys win; `interfaces` merge by "
+        "`name`; any other list the device declares replaces the template's "
+        "outright. Resolved with the ordinary reference rules, so a template "
+        "may live in another namespace (`templates/c9200l-48p`)."
+    ),
+    "minLength": 1,
+    "maxLength": MAX_ELEMENT_REF_LENGTH,
+    "pattern": ELEMENT_REF_PATTERN,
+}
+
+_TEMPLATE_SPEC_DESCRIPTION: Final = (
+    "A partial device spec. Every key of a device `spec` is allowed and none is "
+    "required: what the template does not say, the device using it says. "
+    "`interfaces` is where the leverage is — one `range` entry is a whole "
+    "line card."
+)
+
+#: Name of the ``$defs`` entry holding the interface *fields*, with nothing
+#: required beyond a name. See :func:`_split_interface`.
+_PARTIAL_INTERFACE_DEF: Final = "PartialInterface"
+
+_PARTIAL_INTERFACE_DESCRIPTION: Final = (
+    "One interface, with only its identity required. This is the shape an entry "
+    "takes inside a `spec` that inherits a template: the device restates the "
+    "`name` and the handful of fields it overrides, and the template supplies "
+    "the rest. Everywhere else `type` is required too — see `Interface`."
+)
+
+
+def _apply_loader_sugar(definitions: dict[str, Any], *, kind: str | None, strict: bool) -> None:
+    """Add the two keys the loader consumes before the models are reached.
+
+    ``interfaces[].range`` and ``spec.from`` are expanded and merged away in
+    :mod:`netgraph.loader`, so pydantic has never heard of either and cannot
+    describe them. An editor has, though — they are exactly the keys someone is
+    typing when they most want completion — so they are grafted on here, with
+    the same conditionals the loader enforces: an interface declares one of
+    ``name`` or ``range``; a device spec that omits ``interfaces`` must inherit
+    them; and an interface entry may be a partial override only inside a spec
+    that has something to override.
+    """
+    if not _split_interface(definitions) and strict:
+        raise RuntimeError("netgraph.schema: no definition Interface to add 'range' to")
+
+    device_spec = definitions.get("DeviceSpec")
+    if device_spec is None:
+        if strict:
+            raise RuntimeError(f"netgraph.schema: no definition DeviceSpec to add {INHERIT_KEY!r}")
+        return
+
+    device_spec["properties"][INHERIT_KEY] = dict(_INHERIT_SCHEMA)
+    interfaces = device_spec["properties"].get("interfaces")
+    if interfaces is not None:
+        interfaces["items"] = {"$ref": f"#/$defs/{_PARTIAL_INTERFACE_DEF}"}
+
+    if kind is None or kind == TEMPLATE_KIND:
+        # Snapshot before the requirements below: a template requires nothing.
+        definitions[_TEMPLATE_SPEC_DEF] = _template_spec(device_spec)
+
+    device_spec["required"] = [
+        key for key in device_spec.get("required", ()) if key != "interfaces"
+    ]
+    device_spec.setdefault("allOf", []).extend(
+        (
+            {"anyOf": [{"required": ["interfaces"]}, {"required": [INHERIT_KEY]}]},
+            # Without a template underneath, there is nothing for a partial
+            # entry to be partial *of*, so every interface must be complete.
+            {
+                "if": {"not": {"required": [INHERIT_KEY]}},
+                "then": {"properties": {"interfaces": {"items": {"$ref": "#/$defs/Interface"}}}},
+            },
+        )
+    )
+    if kind is None or kind == TEMPLATE_KIND:
+        definitions[_TEMPLATE_DEF] = _template_document(definitions)
+
+
+def _split_interface(definitions: dict[str, Any]) -> bool:
+    """Split ``Interface`` into a field list and the requirements on top of it.
+
+    A device that inherits a template writes an interface entry naming only what
+    it overrides — ``{name: Vlan99, ipv4: [10.1.99.13/24]}`` — which is a legal
+    document but not a legal :class:`~netgraph.models.interface.Interface`. The
+    generated definition is therefore renamed to ``PartialInterface`` and keeps
+    the properties, ``additionalProperties: false`` and the "name or range" rule;
+    ``Interface`` becomes a reference to it that adds back the required ``type``
+    and the cross-field conditionals that only make sense once ``type`` is
+    known. Nothing is duplicated, and neither shape can drift from the other.
+
+    Returns:
+        False when this schema has no ``Interface`` to split (a single-kind
+        schema for ``cable``, say), which is not an error there.
+    """
+    generated = definitions.get("Interface")
+    if generated is None:
+        return False
+
+    # ``_apply_conditionals`` put these here; they all test ``type``.
+    conditionals = generated.pop("allOf", [])
+    description = generated.get("description", "")
+
+    generated["properties"]["range"] = dict(_RANGE_SCHEMA)
+    generated["title"] = _PARTIAL_INTERFACE_DEF
+    generated["description"] = _PARTIAL_INTERFACE_DESCRIPTION
+    generated.pop("required", None)
+    generated["allOf"] = [{"oneOf": [{"required": ["name"]}, {"required": ["range"]}]}]
+
+    definitions[_PARTIAL_INTERFACE_DEF] = generated
+    definitions["Interface"] = {
+        "$ref": f"#/$defs/{_PARTIAL_INTERFACE_DEF}",
+        "title": "Interface",
+        "description": description,
+        "required": ["type"],
+        **({"allOf": conditionals} if conditionals else {}),
+    }
+    return True
+
+
+def _template_spec(device_spec: dict[str, Any]) -> dict[str, Any]:
+    """``TemplateSpec``: a ``DeviceSpec`` with nothing required."""
+    spec = copy.deepcopy(device_spec)
+    spec.pop("required", None)
+    spec["title"] = _TEMPLATE_SPEC_DEF
+    spec["description"] = _TEMPLATE_SPEC_DESCRIPTION
+    return spec
+
+
+def _template_document(definitions: dict[str, Any]) -> dict[str, Any]:
+    """The ``kind: template`` envelope, borrowing a device's own ``apiVersion``."""
+    donor = definitions.get(Switch.__name__, {}).get("properties", {})
+    api_version = copy.deepcopy(donor.get("apiVersion", {"const": API_VERSION, "type": "string"}))
+    metadata = copy.deepcopy(donor.get("metadata", {"$ref": "#/$defs/Metadata"}))
+    return {
+        "additionalProperties": False,
+        "description": (
+            "A named partial device spec. A template declares no element: it is "
+            "never drawn, never listed and never validated on its own. It exists "
+            "to be merged into the devices that name it in `spec.from`, and the "
+            "only place it surfaces is as the source location of a field it "
+            "contributed."
+        ),
+        "properties": {
+            "apiVersion": api_version,
+            "kind": {
+                "const": TEMPLATE_KIND,
+                "title": "kind",
+                "type": "string",
+                "description": f"Selects the shape of `spec`. {KIND_NOTES[TEMPLATE_KIND]}",
+            },
+            "metadata": metadata,
+            "spec": {
+                "$ref": f"#/$defs/{_TEMPLATE_SPEC_DEF}",
+                "title": "spec",
+                "description": "The body of a `template` document.",
+            },
+        },
+        "required": ["apiVersion", "kind", "metadata", "spec"],
+        "title": _TEMPLATE_DEF,
+        "type": "object",
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Assembly
 # --------------------------------------------------------------------------- #
 
@@ -323,15 +529,16 @@ def build_schema(kind: str | None = None) -> dict[str, Any]:
     """Build the JSON Schema for one ``kind``, or for every kind at once.
 
     Args:
-        kind: An element kind (``switch``, ``cable``, ...). ``None`` produces
-            the discriminated union keyed on ``kind``, which covers every
-            document in an inventory tree with one schema.
+        kind: A document kind (``switch``, ``cable``, ``template``, ...).
+            ``None`` produces the discriminated union keyed on ``kind``, which
+            covers every document in an inventory tree with one schema.
 
     Returns:
         A JSON-serialisable JSON Schema 2020-12 document.
 
     Raises:
-        UnknownKindError: ``kind`` is not one of :data:`~netgraph.models.KINDS`.
+        UnknownKindError: ``kind`` is not one of
+            :data:`~netgraph.models.DOCUMENT_KINDS`.
         RuntimeError: The models and this module have drifted apart — a
             definition named in :data:`_SHORTHANDS` or in
             :data:`~netgraph.models.fielddocs.FIELD_DOCS` no longer exists.
@@ -344,6 +551,18 @@ def build_schema(kind: str | None = None) -> dict[str, Any]:
     _apply_conditionals(definitions, strict=strict)
     _document(definitions)
     _require_kind(definitions)
+    _apply_loader_sugar(definitions, kind=kind, strict=strict)
+
+    if kind == TEMPLATE_KIND:
+        # The carrier model was only ever there to pull DeviceSpec and its
+        # dependencies into ``$defs``; the document being described is the
+        # template envelope built above. Dropping it strands DeviceSpec and
+        # Interface, which nothing in a template schema refers to.
+        definitions.pop(Switch.__name__, None)
+        root = definitions.pop(_TEMPLATE_DEF)
+        definitions = _reachable(root, definitions)
+    elif kind is None:
+        _register_template_branch(root)
 
     return _envelope(root, definitions, kind)
 
@@ -359,15 +578,51 @@ def _generate(kind: str | None) -> tuple[dict[str, Any], dict[str, Any], bool]:
         root = TypeAdapter(Element).json_schema(mode="validation", by_alias=True)
         return root, dict(root.pop("$defs", {})), True
 
-    model = element_model_for(kind)
+    # A template has no model of its own to generate from: it is a device spec
+    # with nothing required. Any device kind pulls in the same ``$defs``, so one
+    # stands in as the carrier and is dropped again once they are collected.
+    model = Switch if kind == TEMPLATE_KIND else element_model_for(kind)
     if model is None:
-        raise UnknownKindError(f"unknown kind {kind!r}; expected one of {', '.join(KINDS)}")
+        raise UnknownKindError(
+            f"unknown kind {kind!r}; expected one of {', '.join(DOCUMENT_KINDS)}"
+        )
     root = model.model_json_schema(mode="validation", by_alias=True)
     definitions = dict(root.pop("$defs", {}))
     # The requested model is inlined at the root rather than put in ``$defs``;
     # naming it here lets every pass below treat both shapes identically.
     definitions[model.__name__] = root
     return root, definitions, False
+
+
+def _reachable(root: dict[str, Any], definitions: dict[str, Any]) -> dict[str, Any]:
+    """The subset of ``definitions`` some ``$ref`` from ``root`` can reach."""
+    kept: dict[str, Any] = {}
+    queue: list[Any] = [root]
+    while queue:
+        node = queue.pop()
+        if isinstance(node, dict):
+            reference = node.get("$ref")
+            if isinstance(reference, str):
+                name = reference.rpartition("/")[2]
+                if name in definitions and name not in kept:
+                    kept[name] = definitions[name]
+                    queue.append(definitions[name])
+            queue.extend(node.values())
+        elif isinstance(node, list):
+            queue.extend(node)
+    return kept
+
+
+def _register_template_branch(root: dict[str, Any]) -> None:
+    """Add ``template`` to the union the all-kinds schema discriminates on."""
+    branches: list[dict[str, Any]] = root.setdefault("oneOf", [])
+    branches.append({"$ref": f"#/$defs/{_TEMPLATE_DEF}"})
+    discriminator = root.get("discriminator")
+    if discriminator is None:  # pragma: no cover - pydantic always emits one
+        return
+    mapping: dict[str, str] = discriminator["mapping"]
+    mapping[TEMPLATE_KIND] = f"#/$defs/{_TEMPLATE_DEF}"
+    discriminator["mapping"] = dict(sorted(mapping.items()))
 
 
 def _apply(

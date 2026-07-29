@@ -43,6 +43,21 @@ graph netgraph {
         <TR><TD ALIGN="LEFT">TenGigabitEthernet1/1/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
       </TABLE>
     >];
+    "sites/north/access/sw-north-acc-03" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="Access switch 03, North campus - third floor riser.", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-north-acc-03</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">Vlan99</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 99</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/2</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/3</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/4</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/5</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/6</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD ALIGN="LEFT">GigabitEthernet1/0/7</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">(+42 more interfaces)</TD></TR>
+      </TABLE>
+    >];
   }
 
   subgraph cluster_1 {
@@ -78,6 +93,7 @@ graph netgraph {
         <TR><TD ALIGN="LEFT">Vlan99</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 99</TD></TR>
         <TR><TD ALIGN="LEFT">Ethernet49/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
         <TR><TD ALIGN="LEFT">Ethernet50/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
+        <TR><TD ALIGN="LEFT">Ethernet51/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
       </TABLE>
     >];
   }
@@ -322,7 +338,7 @@ graph netgraph {
       <TR><TD COLSPAN="3" ALIGN="CENTER">vlan 20</TD></TR>
     </TABLE>
   >];
-  "subnet:10.1.99.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 10.1.99.0/24: 3 elements, 3 addresses", label=<
+  "subnet:10.1.99.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="ipv4 subnet 10.1.99.0/24: 4 elements, 4 addresses", label=<
     <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
       <TR><TD COLSPAN="3" ALIGN="CENTER"><B>10.1.99.0/24</B></TD></TR>
       <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
@@ -518,6 +534,7 @@ graph netgraph {
 
   "sites/north/access/sw-north-acc-01" -- "subnet:10.1.99.0/24" [color="#0f766e", style=solid, label="Vlan99\n10.1.99.11/24\nvlan 99", tooltip="sites/north/access/sw-north-acc-01:Vlan99 — 10.1.99.11/24 — vlans: 99"];
   "sites/north/access/sw-north-acc-02" -- "subnet:10.1.99.0/24" [color="#0f766e", style=solid, label="Vlan99\n10.1.99.12/24\nvlan 99", tooltip="sites/north/access/sw-north-acc-02:Vlan99 — 10.1.99.12/24 — vlans: 99"];
+  "sites/north/access/sw-north-acc-03" -- "subnet:10.1.99.0/24" [color="#0f766e", style=solid, label="Vlan99\n10.1.99.13/24\nvlan 99", tooltip="sites/north/access/sw-north-acc-03:Vlan99 — 10.1.99.13/24 — vlans: 99"];
   "sites/north/core/rtr-north-core-01" -- "subnet:192.0.2.1/32" [color="#0f766e", style=solid, label="lo0\n192.0.2.1/32", tooltip="sites/north/core/rtr-north-core-01:lo0 — 192.0.2.1/32"];
   "sites/north/core/rtr-north-core-01" -- "subnet:2001:db8::1/128" [color="#0f766e", style=solid, label="lo0\n2001:db8::1/128", tooltip="sites/north/core/rtr-north-core-01:lo0 — 2001:db8::1/128"];
   "sites/north/core/rtr-north-core-01" -- "subnet:10.1.0.0/30" [color="#0f766e", style=solid, label="xe-0/0/0\n10.1.0.1/30", tooltip="sites/north/core/rtr-north-core-01:xe-0/0/0 — 10.1.0.1/30"];

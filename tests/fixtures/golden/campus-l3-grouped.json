@@ -185,6 +185,688 @@
       ]
     },
     {
+      "id": "sites/north/access/sw-north-acc-03",
+      "type": "element",
+      "name": "sw-north-acc-03",
+      "kind": "switch",
+      "namespace": "sites/north/access",
+      "description": "Access switch 03, North campus - third floor riser.",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "north"
+      },
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "In-band management",
+          "addresses": [
+            "10.1.99.13/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              99
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 1 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 2 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/3",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 3 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/4",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 4 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/5",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 5 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/6",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 6 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/7",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 7 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/8",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 8 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/9",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 9 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/10",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 10 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/11",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 11 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/12",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 12 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/13",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 13 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/14",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 14 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/15",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 15 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/16",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 16 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/17",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 17 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/18",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 18 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/19",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 19 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/20",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 20 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/21",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 21 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/22",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 22 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/23",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 23 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/24",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 24 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/25",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 25 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/26",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 26 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/27",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 27 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/28",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 28 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/29",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 29 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/30",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 30 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/31",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 31 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/32",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 32 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/33",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 33 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/34",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 34 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/35",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 35 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/36",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 36 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/37",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 37 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/38",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 38 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/39",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 39 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/40",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 40 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/41",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 41 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/42",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 42 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/43",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 43 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/44",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 44 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/45",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 45 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/46",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 46 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/47",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 47 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/48",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 48 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "TenGigabitEthernet1/1/1",
+          "type": "ethernet",
+          "description": "Fibre trunk uplink to the distribution layer",
+          "mac": "00:1b:0d:01:a3:11",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "sites/north/core/rtr-north-core-01",
       "type": "element",
       "name": "rtr-north-core-01",
@@ -333,6 +1015,23 @@
           "type": "ethernet",
           "description": "Fibre trunk to sw-north-acc-02",
           "mac": "00:1c:73:01:d0:02",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        },
+        {
+          "name": "Ethernet51/1",
+          "type": "ethernet",
+          "description": "Fibre trunk to sw-north-acc-03",
+          "mac": "00:1c:73:01:d0:03",
           "mtu": 9000,
           "vlan": {
             "mode": "trunk",
@@ -1473,11 +2172,13 @@
         "addresses": [
           "10.1.99.11/24",
           "10.1.99.12/24",
+          "10.1.99.13/24",
           "10.1.99.1/24"
         ],
         "elements": [
           "sites/north/access/sw-north-acc-01",
           "sites/north/access/sw-north-acc-02",
+          "sites/north/access/sw-north-acc-03",
           "sites/north/distribution/sw-north-dist-01"
         ]
       },
@@ -2156,6 +2857,25 @@
       ],
       "addresses": [
         "10.1.99.12/24"
+      ],
+      "vlans": [
+        99
+      ]
+    },
+    {
+      "id": "sites/north/access/sw-north-acc-03:Vlan99#10.1.99.0/24",
+      "kind": "subnet",
+      "endpoints": [
+        {
+          "node": "sites/north/access/sw-north-acc-03",
+          "interface": "Vlan99"
+        },
+        {
+          "node": "subnet:10.1.99.0/24"
+        }
+      ],
+      "addresses": [
+        "10.1.99.13/24"
       ],
       "vlans": [
         99
