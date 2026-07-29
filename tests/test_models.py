@@ -1137,6 +1137,51 @@ def test_address_helpers() -> None:
     assert str(v4) == "10.0.0.1/8"
 
 
+def test_network_is_what_ip_interface_would_have_derived() -> None:
+    """The cached, directly-built prefix is the one the round trip produced.
+
+    ``network`` used to be ``ipaddress.ip_interface(...).network``, rebuilt on
+    every access. It is now a :func:`functools.cached_property` that constructs
+    the network from the address's integer form, which skips the interface
+    object and the ``str`` round trip :mod:`ipaddress` pays when handed an
+    address object back (entry 7 of ``docs/follow-ups.md``). This pins the two
+    against each other over every prefix length of both families, which is what
+    makes that change invisible rather than merely plausible.
+    """
+    for text, width in (("10.11.12.13", 32), ("2001:db8:1234:5678:9abc:def0:1234:5678", 128)):
+        model = IPv4Address if width == 32 else IPv6Address
+        for prefix_length in range(width + 1):
+            address = model.model_validate(f"{text}/{prefix_length}")
+            expected = ipaddress.ip_interface(f"{text}/{prefix_length}").network
+            assert address.network == expected
+            assert str(address.network) == str(expected)
+            # Cached: the second read is the same object, not merely an equal one.
+            assert address.network is address.network
+
+
+def test_caching_the_prefix_leaves_the_model_itself_untouched() -> None:
+    """Reading ``network`` must not change equality, dumps or the JSON Schema.
+
+    ``cached_property`` writes into the instance ``__dict__``, which is also
+    where pydantic keeps field values, so that is the one way this change could
+    leak out of the model.
+    """
+    address = IPv4Address.model_validate("10.0.0.1/24")
+    twin = IPv4Address.model_validate("10.0.0.1/24")
+    dumped = address.model_dump()
+    as_json = address.model_dump_json()
+    schema = IPv4Address.model_json_schema()
+
+    assert address.network == ipaddress.IPv4Network("10.0.0.0/24")
+
+    assert address == twin
+    assert address.model_dump() == dumped
+    assert address.model_dump_json() == as_json
+    assert IPv4Address.model_json_schema() == schema
+    assert "network" not in dumped
+    assert address.model_fields_set == {"ip", "prefix_length"}
+
+
 def test_vlan_set_helpers() -> None:
     empty = VlanSet()
     assert not empty

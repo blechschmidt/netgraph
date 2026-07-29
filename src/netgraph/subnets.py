@@ -180,8 +180,11 @@ def subnets_of(inventory: Inventory) -> tuple[Subnet, ...]:
         addresses are excluded, so a prefix appears only if something is
         addressed in it.
     """
-    members: dict[str, list[AddressPlacement]] = {}
-    networks: dict[str, IPNetwork] = {}
+    # Keyed by the network *object* rather than by its text: equal prefixes
+    # compare and hash equal, so the grouping is the same one string keys give,
+    # but a prefix is rendered once instead of once per address in it. On a tree
+    # with 2100 addresses in 90 prefixes that is 90 renderings, not 2100.
+    members: dict[IPNetwork, list[AddressPlacement]] = {}
 
     for fqn, element in inventory.elements.items():
         # ``interface_owners`` would put every adapter after every device;
@@ -195,24 +198,25 @@ def subnets_of(inventory: Inventory) -> tuple[Subnet, ...]:
             for address in interface.addresses():
                 if not is_routable_address(address):
                     continue
-                network = address.network
-                prefix = str(network)
-                networks.setdefault(prefix, network)
-                members.setdefault(prefix, []).append(
+                # ``str(address)`` is ``f"{ip}/{prefix_length}"``, so rendering
+                # the address a second time would render the same IPv6 literal
+                # twice -- compression and all -- for one placement.
+                ip_text = str(address.ip)
+                members.setdefault(address.network, []).append(
                     AddressPlacement(
                         element=fqn,
                         interface=interface.name,
                         index=index,
-                        address=str(address),
-                        ip=str(address.ip),
+                        address=f"{ip_text}/{address.prefix_length}",
+                        ip=ip_text,
                         vlans=vlans,
                         scope=scope,
                     )
                 )
 
     subnets = [
-        Subnet(prefix=prefix, network=networks[prefix], members=tuple(placements))
-        for prefix, placements in members.items()
+        Subnet(prefix=str(network), network=network, members=tuple(placements))
+        for network, placements in members.items()
     ]
     subnets.sort(key=lambda subnet: subnet.sort_key)
     return tuple(subnets)

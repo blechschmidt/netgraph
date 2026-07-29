@@ -1150,6 +1150,14 @@ python tools/gen_json_schema.py          # regenerate schema/netgraph.schema.jso
 # generate a 1000-device inventory and time every stage over it; --compare-loaders
 # additionally times the parse step through both YAML parsers
 python tools/bench_pipeline.py --compare-loaders
+
+# break the cost of `validate` down by rule over the same tree
+python tools/profile_validate.py --top 10
+
+# capture every command's output over every inventory in the repository, on both
+# YAML parser paths, so a refactor can be shown to have changed none of them
+tools/snapshot_outputs.sh /tmp/before && tools/snapshot_outputs.sh /tmp/after
+diff -r /tmp/before /tmp/after
 ```
 
 `docs/schema-reference.md` and `schema/netgraph.schema.json` are both generated

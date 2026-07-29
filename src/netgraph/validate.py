@@ -50,6 +50,7 @@ cable is enough to silence a finding about that cable.
 
 from __future__ import annotations
 
+import ipaddress
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final, TypeAlias
@@ -130,6 +131,12 @@ _NOT_A_HOST_TYPES: Final = (Hub, Switch)
 #: One port cabled into a hub's collision domain (``NG-H005``): the element that
 #: owns it, the port as ``element:interface``, and the prefixes it is in.
 _HubPeer: TypeAlias = tuple[str, str, frozenset["IPNetwork"]]
+
+#: What ``E004`` groups an address by: the address, its prefix and its broadcast
+#: domain, as the objects the model layer already built rather than their text.
+_AddressKey: TypeAlias = tuple[
+    "ipaddress.IPv4Address | ipaddress.IPv6Address", "IPNetwork", int | None
+]
 
 
 # --------------------------------------------------------------------------- #
@@ -369,6 +376,10 @@ class _Context:
     #: Devices and adapters in load order (cables own no interfaces).
     owners: Mapping[str, InterfaceOwner]
     endpoints: tuple[_Endpoint, ...]
+    #: Each cable with its two endpoints, in load order. Ten rules read the
+    #: endpoints two at a time; grouping them here rather than in a helper is
+    #: what the rest of this class is for.
+    endpoint_pairs: tuple[tuple[str, _Endpoint, _Endpoint], ...]
     #: Every adapter that declares an ``attached_to``, in load order.
     attachments: tuple[_Attachment, ...]
     #: Every tunnel endpoint, in load order (§14).
@@ -451,6 +462,18 @@ def _build_context(inventory: Inventory) -> _Context:
         if isinstance(element, _OWNER_TYPES)
     }
 
+    # Built before anything resolves a reference, because that is what a
+    # reference resolves *through*: ``Device.interface`` is a linear scan of
+    # ``spec.interfaces``, which on a 48-port switch is 48 string comparisons
+    # per cable end. ``NG-I001`` makes interface names unique within an element,
+    # so the map and the scan cannot disagree.
+    by_name: dict[str, dict[str, Interface]] = {}
+    for fqn, owner in owners.items():
+        names: dict[str, Interface] = {}
+        for interface in owner.interfaces:
+            names.setdefault(interface.name, interface)
+        by_name[fqn] = names
+
     endpoints: list[_Endpoint] = []
     terminations: dict[tuple[str, str], list[_Endpoint]] = {}
     connected: set[str] = set()
@@ -458,7 +481,9 @@ def _build_context(inventory: Inventory) -> _Context:
     for cable_fqn, cable in inventory.cables.items():
         namespace = namespace_of(cable_fqn)
         for index, ref in enumerate(cable.endpoints):
-            endpoint = _resolve_endpoint(inventory, cable_fqn, cable, ref, index, namespace)
+            endpoint = _resolve_endpoint(
+                inventory, cable_fqn, cable, ref, index, namespace, by_name
+            )
             endpoints.append(endpoint)
             owner_fqn = endpoint.owner_fqn
             if owner_fqn is None:
@@ -497,7 +522,7 @@ def _build_context(inventory: Inventory) -> _Context:
     for tunnel_fqn, tunnel in inventory.tunnels.items():
         namespace = namespace_of(tunnel_fqn)
         for index, ref in enumerate(tunnel.endpoints):
-            end = _resolve_tunnel_end(inventory, tunnel_fqn, tunnel, ref, index, namespace)
+            end = _resolve_tunnel_end(inventory, tunnel_fqn, tunnel, ref, index, namespace, by_name)
             tunnel_ends.append(end)
             if end.resolved and end.owner_fqn is not None:
                 tunnel_ports.setdefault((end.owner_fqn, ref.interface), []).append(tunnel_fqn)
@@ -511,6 +536,7 @@ def _build_context(inventory: Inventory) -> _Context:
         inventory=inventory,
         owners=owners,
         endpoints=tuple(endpoints),
+        endpoint_pairs=_pair_endpoints(endpoints),
         attachments=tuple(attachments),
         tunnel_ends=tuple(tunnel_ends),
         encapsulations=tuple(encapsulations),
@@ -519,10 +545,7 @@ def _build_context(inventory: Inventory) -> _Context:
         connected=frozenset(connected),
         lag_masters={fqn: _lag_masters(owner) for fqn, owner in owners.items()},
         stacking_groups={fqn: _stacking_groups(owner) for fqn, owner in owners.items()},
-        by_name={
-            fqn: {interface.name: interface for interface in owner.interfaces}
-            for fqn, owner in owners.items()
-        },
+        by_name=by_name,
         aggregated_by={fqn: _aggregated_by(owner) for fqn, owner in owners.items()},
         suppressions=_collect_suppressions(inventory),
         subnets=subnets_of(inventory),
@@ -536,6 +559,7 @@ def _resolve_endpoint(
     ref: InterfaceRef,
     index: int,
     namespace: str,
+    by_name: Mapping[str, Mapping[str, Interface]],
 ) -> _Endpoint:
     """Resolve one ``device:interface`` reference (§4.2)."""
     resolution = inventory.lookup(ref.device, namespace=namespace)
@@ -558,6 +582,7 @@ def _resolve_endpoint(
         )
 
     is_upstream = isinstance(element, Adapter) and ref.interface == element.upstream.name
+    names = by_name.get(resolution.fqn or "", {})
     return _Endpoint(
         cable_fqn=cable_fqn,
         cable=cable,
@@ -565,7 +590,7 @@ def _resolve_endpoint(
         index=index,
         owner_fqn=resolution.fqn,
         owner=element,
-        interface=None if is_upstream else element.interface(ref.interface),
+        interface=None if is_upstream else names.get(ref.interface),
         is_upstream=is_upstream,
     )
 
@@ -577,6 +602,7 @@ def _resolve_tunnel_end(
     ref: InterfaceRef,
     index: int,
     namespace: str,
+    by_name: Mapping[str, Mapping[str, Interface]],
 ) -> _TunnelEnd:
     """Resolve one endpoint of a tunnel (§4.2, §14.3)."""
     resolution = inventory.lookup(ref.device, namespace=namespace)
@@ -604,7 +630,7 @@ def _resolve_tunnel_end(
         index=index,
         owner_fqn=resolution.fqn,
         owner=element,
-        interface=element.interface(ref.interface),
+        interface=by_name.get(resolution.fqn or "", {}).get(ref.interface),
     )
 
 
@@ -802,7 +828,11 @@ def _check_duplicate_mac(ctx: _Context) -> Iterator[_Draft]:
 
 def _check_duplicate_ip(ctx: _Context) -> Iterator[_Draft]:
     """E004 — one IP address is assigned twice inside a subnet and VLAN."""
-    groups: dict[tuple[str, str, int | None], list[tuple[str, Interface]]] = {}
+    # Grouped on the :mod:`ipaddress` objects rather than on their text: they
+    # compare and hash exactly as their spellings do, so the groups are the
+    # same, and the only two that are ever rendered are the ones a finding
+    # names. Nearly every address in a healthy inventory is alone in its group.
+    groups: dict[_AddressKey, list[tuple[str, Interface]]] = {}
     for fqn, owner in ctx.owners.items():
         for interface in owner.interfaces:
             scope = interface.vlan.pvid if interface.vlan is not None else None
@@ -813,8 +843,7 @@ def _check_duplicate_ip(ctx: _Context) -> Iterator[_Draft]:
                 # than in conflict.
                 if address.ip.is_loopback:
                     continue
-                key = (str(address.ip), str(address.network), scope)
-                groups.setdefault(key, []).append((fqn, interface))
+                groups.setdefault((address.ip, address.network, scope), []).append((fqn, interface))
 
     for (ip, network, scope), entries in groups.items():
         if len(entries) < 2:
@@ -1337,13 +1366,34 @@ def _check_reserved_address(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _reserved_role(address: IPv4Address | IPv6Address) -> str | None:
-    """Name the reserved role ``address`` occupies in its own prefix, if any."""
-    network = address.network
-    if network.num_addresses <= 2:
+    """Name the reserved role ``address`` occupies in its own prefix, if any.
+
+    Asked of the address's host bits rather than of an :mod:`ipaddress` network
+    object, which is the same question with a very different cost. The three
+    facts the network form needs — ``num_addresses``, ``network_address`` and
+    ``broadcast_address`` — each build further address objects per *address*
+    rather than per prefix, and this rule is the only one in the module that
+    would ask them of a loopback address, so it was materialising 2000 prefixes
+    nothing else in the run ever looks at (entry 7 of ``docs/follow-ups.md``).
+
+    The arithmetic is the definition, not an approximation of it: a prefix holds
+    at most two addresses exactly when it has at most one host bit, the network
+    address is exactly the one whose host bits are all zero, and the IPv4
+    directed broadcast is exactly the one whose host bits are all one.
+    ``test_reserved_role_agrees_with_ipaddress`` pins that against the network
+    form over every prefix length of both families.
+    """
+    width = 32 if isinstance(address, IPv4Address) else 128
+    host_bits = width - address.prefix_length
+    # /31 and /32, /127 and /128: RFC 3021 and RFC 6164 give both addresses of a
+    # point-to-point link to its two ends, so neither is reserved.
+    if host_bits <= 1:
         return None
-    if address.ip == network.network_address:
-        return "subnet-router anycast address" if network.version == 6 else "network address"
-    if network.version == 4 and address.ip == network.broadcast_address:
+    host_mask = (1 << host_bits) - 1
+    host_part = int(address.ip) & host_mask
+    if host_part == 0:
+        return "network address" if width == 32 else "subnet-router anycast address"
+    if width == 32 and host_part == host_mask:
         return "broadcast address"
     return None
 
@@ -1418,7 +1468,10 @@ def _check_loopback_prefix(ctx: _Context) -> Iterator[_Draft]:
             if interface.type is not InterfaceType.LOOPBACK:
                 continue
             for address in interface.addresses():
-                host_length = 32 if address.network.version == 4 else 128
+                # The family is the model's own type; asking the prefix for its
+                # version would build one, and for the host-scoped loopbacks this
+                # rule then discards nothing else in the run needs (entry 7).
+                host_length = 32 if isinstance(address, IPv4Address) else 128
                 if address.prefix_length == host_length or address.ip.is_loopback:
                     continue
                 yield _Draft(
@@ -1675,7 +1728,7 @@ def _check_self_link(ctx: _Context) -> Iterator[_Draft]:
     undrawn. ``E002`` already reports the degenerate case where both ends name
     the *same port*, so this rule stays quiet there rather than doubling it.
     """
-    for cable_fqn, first, second in _endpoint_pairs(ctx):
+    for cable_fqn, first, second in ctx.endpoint_pairs:
         if first.owner_fqn is None or first.owner_fqn != second.owner_fqn:
             continue
         if first.ref.interface == second.ref.interface:
@@ -1863,7 +1916,7 @@ def _topology_links(ctx: _Context) -> Iterator[tuple[str, str]]:
     reference, and treating the link as absent would split the topology over a
     typo.
     """
-    for _, first, second in _endpoint_pairs(ctx):
+    for _, first, second in ctx.endpoint_pairs:
         if first.owner_fqn is not None and second.owner_fqn is not None:
             yield first.owner_fqn, second.owner_fqn
     for attachment in ctx.attachments:
@@ -1988,7 +2041,7 @@ def _hub_domains(ctx: _Context) -> Iterator[tuple[tuple[str, ...], list[_HubPeer
     hub_set = set(hub_fqns)
     links: list[tuple[str, str]] = [
         (first.owner_fqn, second.owner_fqn)
-        for _, first, second in _endpoint_pairs(ctx)
+        for _, first, second in ctx.endpoint_pairs
         if first.owner_fqn is not None
         and second.owner_fqn is not None
         and first.owner_fqn in hub_set
@@ -2571,24 +2624,27 @@ _RULES_BY_ID: Final[Mapping[str, Rule]] = {rule.id: rule for rule in RULES}
 # --------------------------------------------------------------------------- #
 
 
-def _endpoint_pairs(ctx: _Context) -> Iterator[tuple[str, _Endpoint, _Endpoint]]:
-    """Yield each cable with its two endpoints, resolved or not.
+def _pair_endpoints(
+    endpoints: Sequence[_Endpoint],
+) -> tuple[tuple[str, _Endpoint, _Endpoint], ...]:
+    """Group resolved endpoints by the cable they belong to, in load order.
 
     ``NG-C001`` guarantees the pair at schema time; the guard is here so a
     document that somehow escaped it cannot make a rule raise.
     """
     by_cable: dict[str, list[_Endpoint]] = {}
-    for endpoint in ctx.endpoints:
+    for endpoint in endpoints:
         by_cable.setdefault(endpoint.cable_fqn, []).append(endpoint)
-    for cable_fqn, endpoints in by_cable.items():
-        if len(endpoints) != 2:  # pragma: no cover - NG-C001 guarantees the pair
-            continue
-        yield cable_fqn, endpoints[0], endpoints[1]
+    return tuple(
+        (cable_fqn, pair[0], pair[1])
+        for cable_fqn, pair in by_cable.items()
+        if len(pair) == 2  # NG-C001 guarantees it; a stray document must not raise
+    )
 
 
 def _linked_endpoints(ctx: _Context) -> Iterator[tuple[str, _Endpoint, _Endpoint]]:
     """Yield each cable whose two endpoints both resolve, with those endpoints."""
-    for cable_fqn, first, second in _endpoint_pairs(ctx):
+    for cable_fqn, first, second in ctx.endpoint_pairs:
         if first.resolved and second.resolved:
             yield cable_fqn, first, second
 

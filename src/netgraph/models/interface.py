@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import ipaddress
 from enum import Enum
+from functools import cached_property
 from typing import Annotated, Any, Final
 
 from pydantic import Field, field_validator, model_validator
@@ -228,10 +229,24 @@ class IPv4Address(NetgraphModel):
         """The address as an :mod:`ipaddress` interface object."""
         return ipaddress.IPv4Interface((self.ip, self.prefix_length))
 
-    @property
+    @cached_property
     def network(self) -> ipaddress.IPv4Network:
-        """The prefix this address sits in."""
-        return self.interface.network
+        """The prefix this address sits in.
+
+        Cached, and built without the intermediate
+        :class:`ipaddress.IPv4Interface` — which constructs exactly this network
+        internally and then throws the rest away. Five validation rules and the
+        layer-3 graph each ask an address for its prefix, so an uncached
+        property re-derived it once per consumer; see entry 7 of
+        ``docs/follow-ups.md``. The value is a pure function of two fields that
+        never change after validation, so caching it cannot alter a result.
+
+        The integer form of :attr:`ip` is handed over rather than the object:
+        :mod:`ipaddress` re-parses an address object it is given back out of
+        ``str(address)``, and the integer is the state that object already
+        holds.
+        """
+        return ipaddress.IPv4Network((int(self.ip), self.prefix_length), strict=False)
 
     @property
     def netmask(self) -> ipaddress.IPv4Address:
@@ -285,10 +300,16 @@ class IPv6Address(NetgraphModel):
         """The address as an :mod:`ipaddress` interface object."""
         return ipaddress.IPv6Interface((self.ip, self.prefix_length))
 
-    @property
+    @cached_property
     def network(self) -> ipaddress.IPv6Network:
-        """The prefix this address sits in."""
-        return self.interface.network
+        """The prefix this address sits in.
+
+        Cached and built directly, for the reason given on
+        :attr:`IPv4Address.network`. IPv6 gains most: the round trip through
+        ``str`` that the address-object form pays is a full RFC 5952
+        compression and re-parse.
+        """
+        return ipaddress.IPv6Network((int(self.ip), self.prefix_length), strict=False)
 
     def __str__(self) -> str:
         return f"{self.ip}/{self.prefix_length}"

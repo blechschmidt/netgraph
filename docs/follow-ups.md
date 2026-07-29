@@ -337,7 +337,8 @@ time, not memory.
 
 `load_tree` is now **54 %** of the pipeline through libyaml, down from 62 %, and
 `validate` — untouched here — has become the second cost at 30 %. That is where
-a third pass would go.
+a third pass would go. Entry 7 is that pass; it found the guess above right for
+once, and cut `validate` by 3.1×.
 
 ### The regression guard
 
@@ -456,13 +457,11 @@ so nothing fails, and a theme that *does* ship `tunnel.svg` already works.
 
 ---
 
-## 7. `validate` is the second cost in the pipeline — profiled
+## 7. ~~`validate` is the second cost in the pipeline~~ — fixed, 3.1×
 
-**Status:** open, being worked on (2026-07-29). Entry 5 named this target: with
-`load_tree` at 54 % of the pipeline, `validate` is second at 30 %, and neither
-of the two prior passes touched it. This entry is that third pass. The profile
-below was taken **before any change**, so the "measured and rejected" section
-this entry will grow can be checked against it.
+**Status:** closed 2026-07-29. Entry 5 named this target: with `load_tree` at
+54 % of the pipeline, `validate` was second at 30 %, and neither of the two
+prior passes had touched it. This is that third pass.
 
 ### The harness
 
@@ -472,40 +471,291 @@ files, 1.2 MB of YAML**, through libyaml. It breaks the cost down **by rule**
 rather than by function, because `validate` is a fixed list of checks over one
 prepared context: a function-level profile spreads a rule's cost over the
 helpers it shares with a dozen others (`_linked_endpoints`, `_q`, `_join`) and
-hides which *rule* is worth attacking. Each check is timed end to end over one
-shared context, including the engine work its drafts cause — the suppression
-test, the `Finding` construction, the source lookup — since that work exists
-only because the rule yielded something. `_build_context` is charged to no rule
-and broken down separately. Minimum of seven runs.
+hides which *rule* is worth attacking. Each check is timed end to end, including
+the engine work its drafts cause — the suppression test, the `Finding`
+construction, the source lookup — since that work exists only because the rule
+yielded something. `_build_context` is charged to no rule.
 
-### Before
+Every pass is **cold**: the inventory is reloaded before each sample and the
+rules are timed once each, in report order, exactly as `validate` runs them.
+That distinction did not exist before this entry and does now, which is the
+first thing to say about the numbers below. Minimum of nine passes.
 
-`validate` over the benchmark tree: **220–229 ms**, 2143 findings.
+### What the profile said
 
-| Item | Before | Share |
+`validate` over the benchmark tree, before any change: **236.6 ms**, 2143
+findings. Both columns come from the same harness on the same machine.
+
+| Item | Before | After | |
+|---|---|---|---|
+| `_build_context` | 68.2 ms | 42.0 ms | 1.6× |
+| `W110` reserved address | 49.7 ms | 2.7 ms | **18×** |
+| `E004` duplicate IP | 34.5 ms | 4.9 ms | **7.0×** |
+| `W111` overlapping prefixes | 27.5 ms | 4.0 ms | **6.9×** |
+| `W112` loopback prefix | 20.2 ms | 1.4 ms | **14×** |
+| `I001` locally administered MAC | 6.4 ms | 6.3 ms | — |
+| `E007` stacking cycle | 2.3 ms | 2.0 ms | — |
+| `E003` duplicate MAC | 2.2 ms | 2.0 ms | — |
+| `E008` member is aggregated | 1.8 ms | 1.8 ms | — |
+| `W101` unaddressed interface | 1.8 ms | 1.5 ms | — |
+| `I002` uncabled interface | 1.6 ms | 1.4 ms | — |
+| the other 41 rules, summed | 15.7 ms | 11.9 ms | — |
+| **`validate`, whole** | **236.6 ms** | **76.9 ms** | **3.08×** |
+
+Four rules were 56 % of `validate` on their own, and with `_build_context` the
+same five items were 85 %. Every one of the five walks addresses, and `I001` —
+the only rule in the table that reports anything at all, 2100 findings — was
+2.7 %. So the cost was not in reporting; it was in deriving. Specifically, it
+was in deriving **the same `ipaddress` prefix over and over**.
+
+### The four changes
+
+In descending order of what they were worth. Reverting each file on its own,
+cold `validate` over the benchmark tree, minimum of five fresh processes:
+
+| Reverted on its own | Cold `validate` | That file is worth |
 |---|---|---|
-| `_build_context` — `subnets_of` | 42–43 ms | 19 % |
-| `_build_context` — endpoint resolution | 7.6 ms | 3 % |
-| `_build_context` — per-owner maps | 3.8 ms | 2 % |
-| `_build_context` — suppressions | 0.4 ms | — |
-| **`_build_context` total** | **60–62 ms** | **27 %** |
-| `W110` reserved address | 49–50 ms | 22 % |
-| `E004` duplicate IP | 33.5 ms | 15 % |
-| `W111` overlapping prefixes | 26–27 ms | 12 % |
-| `W112` loopback prefix | 19–21 ms | 9 % |
-| `I001` locally administered MAC | 6.1 ms | 3 % |
-| `E007` stacking cycle | 1.9 ms | 1 % |
-| `E008` member is aggregated | 1.7 ms | 1 % |
-| `W101` unaddressed interface | 1.4 ms | 1 % |
-| the other 43 rules, summed | 14 ms | 6 % |
-| engine + final sort (residual) | 7–14 ms | 3–6 % |
+| nothing — this commit | 86.6 ms | — |
+| `models/interface.py` | 151.8 ms | 65 ms |
+| `validate.py` | 140.8 ms | 54 ms |
+| `subnets.py` | 96.3 ms | 10 ms |
+| all three | 235.1 ms | 149 ms |
 
-Four rules are 58 % of `validate` on their own, and with `subnets_of` the same
-five items are **77 %**. Every one of the five walks addresses, and `I001` — the
-only rule in the table that actually reports anything, 2100 findings — is 3 %.
-So the cost is not in reporting; it is in deriving.
+The three do not add to the whole (65 + 54 + 10 = 129, not 149) and cannot: the
+rule changes only avoid *building* a prefix while the model is not caching them,
+and the model cache only avoids *rebuilding* one while the rules still ask for
+it. Each number above is what that file is worth given the other two.
 
+**An address derives its prefix once** (`IPv4Address.network` and
+`IPv6Address.network` in `models/interface.py`, **65 ms**). Both
+were plain properties reading `self.interface.network`, so every one of the five
+consumers that asks an address which prefix it is in rebuilt one. They are now
+`functools.cached_property`. Two smaller things came with it: the intermediate
+`ipaddress.IPv4Interface` is skipped, since it constructs exactly this network
+internally and discards the rest (3.5 µs against 6.4 µs on this machine); and
+the *integer* form of the address is handed over rather than the object, because
+`ipaddress` re-parses an address object it is given back out of `str(address)` —
+a full RFC 5952 compression and re-parse for IPv6, which is why v6 gains most
+(6.6 µs → 1.4 µs). The value is a pure function of two fields that are never
+written after validation, which is what makes caching it invisible.
 
+**`W110` asks the address, not a network object** (`_reserved_role`,
+49.7 → 2.7 ms). It needed three facts — `num_addresses`, `network_address`,
+`broadcast_address` — and each of those builds *further* address objects, per
+address rather than per prefix. It now computes them from the address's host
+bits, which is the definition rather than an approximation: a prefix holds at
+most two addresses exactly when it has at most one host bit, the network address
+is the one whose host bits are all zero, the IPv4 directed broadcast the one
+whose host bits are all one. The change matters more than the arithmetic
+suggests, because W110 was the **only** rule in the module that asked a loopback
+address for its prefix: nothing else in a run looks at `127.0.0.1/8` or `::1/128`
+that way, so it was materialising 2000 prefixes for nobody. `W112` had the same
+shape in miniature — it read `address.network.version`, which is the model's own
+type — and is fixed the same way (20.2 → 1.4 ms).
+
+**Two maps are derived once instead of per consumer** (`_build_context`,
+68.2 → 42.0 ms). `subnets_of` keyed its grouping by `str(network)` and rendered
+every placement's address twice; it now keys by the network object — which
+compares and hashes exactly as its spelling does, so the grouping is the same —
+and renders a prefix once per prefix rather than once per address in it, 90
+renderings on this tree instead of 2106. `_resolve_endpoint` and
+`_resolve_tunnel_end` called `Device.interface(name)`, a linear scan of
+`spec.interfaces`, when `_build_context` was already building the
+name-to-interface map two rules later; the map is now built first and the
+resolvers read it. `NG-I001` makes interface names unique within an element, so
+the map and the scan cannot disagree.
+
+**`E004` groups on objects and renders only what it reports** (34.5 → 4.9 ms).
+Its key was `(str(address.ip), str(address.network), scope)`; it is now the
+`ipaddress` objects themselves. Nearly every address in a healthy inventory is
+alone in its group, so the two spellings that used to be computed for all 4122
+addresses are now computed for the handful a finding actually names. The same
+motivation put `_pair_endpoints` in the context: ten rules read the endpoints
+two at a time and each was rebuilding the by-cable grouping.
+
+### Measured
+
+Same harness, same tree, same machine as entry 5: `tools/bench_pipeline.py`
+defaults, **1056 devices in 2106 documents across 138 files, 1.2 MB of YAML**,
+median of three. Both columns were re-measured here rather than copied.
+
+One row of that table needs a caveat this entry created. The harness loads once
+and then times each stage three times over that one inventory, so its `validate`
+row is now the *second and third* run — and since an address caches its prefix
+on first use, those are cheaper than the run a user pays for. The first run over
+a freshly loaded tree is given its own row, and it is the honest one.
+
+Three before/after rounds were run alternately rather than one column and then
+the other, so that a machine drifting under load cannot be mistaken for a
+result; the ranges below are across those rounds.
+
+Through libyaml:
+
+| Stage | Before | After | Speed-up |
+|---|---|---|---|
+| `load_tree` | 425–437 ms | 431–434 ms | — |
+| `validate` (harness, 2nd/3rd run) | 236–244 ms | 74–85 ms | 3.0× |
+| `validate` (first run, fresh tree) | 263–280 ms | 111–115 ms | **2.4×** |
+| `build_graph` | 43.5–44.6 ms | 42–47 ms | — |
+| `render` (dot / mermaid / json) | 32 / 4.6 / 50 ms | 32 / 4.7 / 51 ms | — |
+
+Through the pure-Python parser:
+
+| Stage | Before | After | Speed-up |
+|---|---|---|---|
+| `load_tree` | 2336–2363 ms | 2334–2365 ms | — |
+| `validate` | 265 ms | 72–93 ms | 3.2× |
+| `build_graph` | 43 ms | 45 ms | — |
+| `render` (dot / mermaid / json) | 31 / 4.4 / 49 ms | 33 / 4.8 / 51 ms | — |
+
+`validate` is parser-independent, as it should be: it runs on an inventory that
+is already in memory. So unlike entries 1 and 5, this pass helps the fallback
+path exactly as much as the fast one — which is most of what it is worth on the
+pure-Python path, where the load still dwarfs everything.
+
+End to end, including interpreter start, best of three:
+
+| Command | libyaml before | libyaml after | pure Python before | pure Python after |
+|---|---|---|---|---|
+| `netgraph validate` | 0.95–0.96 s | 0.80–0.81 s | 2.90–2.91 s | 2.73–2.78 s |
+| `netgraph render -f dot` | 0.96–0.97 s | 0.80–0.81 s | 2.91 s | 2.70–2.75 s |
+
+There is no `render -f svg` row: the benchmark tree reports 42 `E009` errors, so
+`render` stops before it reaches Graphviz and would measure the same work as the
+`-f dot` row.
+
+Peak RSS is 63.0–63.4 MB before and 63.7–64.0 MB after — **about 0.6 MB more**,
+and that is the price of the cache rather than noise: roughly 2100
+`IPv4Network` and `IPv6Network` objects are now held for the life of the process
+instead of being built and dropped. Unlike entries 1 and 5, this one is not free
+in memory. It is a good trade at this size and would still be at ten times it.
+
+### The regression guard
+
+`tests/test_performance.py` gains a second guard, alongside the load one and
+built the same way: a ratio against a cheap in-process floor, best of four, so
+that machine speed cancels and a shared CI runner cannot fail it spuriously.
+
+The floor for `validate` is not the parse — a loaded inventory has already paid
+that — but a **plain walk over every interface and every address**, repeated
+eight times per sample. Five rules are statements about addresses, so none of
+them can cost less than one such walk; `validate / floor` is how many walks'
+worth of work the rule set does on top. One walk is a tenth of a millisecond on
+the guard's 80-device tree, small enough that the timer's own noise moves the
+ratio by several per cent, which is why the floor is eight of them. Because both
+halves run on an inventory that is already in memory, the parser does not enter
+either, and one threshold covers both paths rather than entry 5's two.
+
+Each round loads the tree afresh. That is new and it matters: a second
+`validate` over one inventory no longer does the work the first one did, so a
+warm measurement would flatter every change in this area — including a partial
+revert of this entry.
+
+| | Before this entry | Today | Threshold |
+|---|---|---|---|
+| `validate` / floor | 21.5–22.0 | 6.9–7.2 | 8.5 |
+
+Checked in both directions, and per file, which is the honest way to state what
+a guard covers:
+
+| Reverted | Ratio | Caught |
+|---|---|---|
+| all of entry 7 | 21.0 | yes |
+| `models/interface.py` only | 13.6 | yes |
+| `validate.py` only | 8.9 | yes |
+| `subnets.py` only | 7.5 | **no** |
+
+So it catches a full revert with 2.5× to spare and each of the two large pieces
+on its own, and it does **not** catch the `subnets.py` piece, which is worth
+about 9 % of `validate` — under the 17 % of headroom the threshold leaves above
+today's worst sample. Buying that last piece would mean a threshold within 4 %
+of the measured spread, which on a shared runner buys flakiness rather than
+coverage. As with entry 5: if this ever needs raising for a platform rather than
+for a regression, raise it and record it here, do not delete the test.
+
+### Measured and rejected
+
+Four candidates were profiled and not taken, with their numbers, so a fourth
+pass does not re-derive them. All shares are of the 76.9 ms `validate` this
+entry ends at, which is the point — each of these was worth attacking at
+236.6 ms and is not worth it now.
+
+- **One shared address index in `_Context`, replacing five walks.** `W110`,
+  `W111`, `W112`, `E004` and `subnets_of` each walk owners × interfaces ×
+  addresses. One such walk costs **1.07 ms**, so all five are about **5.4 ms,
+  7 %** — and `subnets_of` could not read the index anyway: it is a public
+  function the renderer and `list subnets` call with an `Inventory` and no
+  validation context, which is deliberate, since a subnet in a diagram and a
+  subnet in a finding must be the same object. 7 % to couple four rules to one
+  derived table and still not close the fifth.
+- **A shared cache of prefix objects across addresses in one prefix.** The 2106
+  routable addresses on this tree sit in **90 distinct prefixes**, so the
+  dedup rate is excellent: building them costs **3.59 ms**, and with a cache
+  **0.97 ms**. That is **2.6 ms, 3.4 %**, for process-global mutable state —
+  the same trade entry 5 rejected for scalar values at 2.6 %, and it is no more
+  attractive here. The per-instance `cached_property` gets the large win
+  (once per address instead of once per consumer) with no shared state at all;
+  this would only get the remainder (once per prefix instead of once per
+  address).
+- **Merging the 17 per-owner scans into one pass.** Seventeen rules open with
+  `for fqn, owner in ctx.owners.items()`. A bare walk of owners × interfaces is
+  **0.24 ms**, so all seventeen are about **4.1 ms, 5.3 %**. Taking it would
+  fuse seventeen independent, individually readable rules — each currently a
+  straight loop with its own docstring explaining one idea — into a single loop
+  with seventeen branches. That is the largest readability cost available in
+  this module, for 5 %.
+- **Caching `Interface.addresses()`.** It builds two tuples and concatenates
+  them on every call: **0.74 ms** for one pass over every interface, about
+  **3.7 ms, 4.8 %** across the five that make one. Rejected on a different
+  ground from the others: `network` is safe to cache because it derives from two
+  fields nothing writes after validation, whereas `addresses()` derives from
+  `interface.ipv4` and `interface.ipv6`, which `resolve_address_family_defaults`
+  *does* write to after the model is constructed. It does not touch the address
+  lists today — but a cache whose safety depends on that staying true is a
+  different kind of object from one whose safety is structural.
+
+Two things are worth recording as **not** candidates. `I001` is 6.3 ms and
+produces 2100 findings, which is 3 µs per finding for the message, the source
+lookup and the `Finding` itself; that is the cost of the output, not of
+deriving it. And the remaining 41 rules together are 11.9 ms, so no single rule
+left is worth more than about 2 ms.
+
+### What did not change
+
+Every diagnostic. Each of the four changes is on a path where the result is
+determined by data the change does not touch: `network` is a pure function of
+two immutable fields, `_reserved_role`'s arithmetic is the definition of the
+two boundaries it tests, grouping on an `ipaddress` object partitions exactly as
+grouping on its spelling does, and the interface-by-name map answers what a
+linear scan of the same list answers.
+
+That is asserted rather than argued.
+`test_reserved_role_agrees_with_ipaddress` runs the old network-based
+formulation as an oracle against the new one over 950 addresses — every prefix
+length of both families, at the network address, the all-ones host part, one
+either side of each, and two interior positions — and requires the answers to
+be identical, having first checked that the oracle actually fires all three of
+its roles on that sweep.
+`test_network_is_what_ip_interface_would_have_derived` pins the cached prefix
+against `ipaddress.ip_interface(...).network` for every prefix length of both
+families, and `test_caching_the_prefix_leaves_the_model_itself_untouched` pins
+the one way a `cached_property` could leak out of a pydantic model — it writes
+into the instance `__dict__`, which is where field values live — by requiring
+equality, `model_dump`, `model_dump_json`, `model_fields_set` and the JSON
+Schema to be unchanged after the prefix is read.
+
+Checked once more from the outside, at the level a user sees. The `validate`
+report, `validate --strict`, `list devices`, `list cables`, `list tunnels`,
+`list vlans`, `list subnets`, and the DOT, Mermaid and JSON renderings of all
+three layers — stdout and stderr separately — for **every inventory under
+`examples/`, all 51 fixtures in `tests/fixtures/invalid/`, and the 1056-device
+benchmark tree**, on **both YAML parser paths**: 3584 captured files,
+**byte-for-byte identical** before and after. `tools/snapshot_outputs.sh` is the
+harness, committed so the next pass can repeat it.
+
+---
+
+## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.
 

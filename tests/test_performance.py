@@ -1,8 +1,9 @@
-"""A regression guard on the cost of loading an inventory.
+"""Regression guards on the cost of loading and of validating an inventory.
 
 ``load_tree`` is the stage every command pays for, and two rounds of work have
-gone into it (entries 1 and 5 of ``docs/follow-ups.md``). This file stops that
-work from being given back unnoticed.
+gone into it (entries 1 and 5 of ``docs/follow-ups.md``); ``validate`` is the
+second cost, and entry 7 is the round that went into that. This file stops
+either from being given back unnoticed.
 
 **What is measured, and why it is a ratio.** A wall-clock ceiling in
 milliseconds would be worthless here: a shared CI runner varies by more between
@@ -46,7 +47,48 @@ moved as far as its threshold, so this row would *not* catch a revert of entry
 5. It is kept because a catastrophic regression should not be invisible on the
 fallback path, not because it is sharp.
 
-If this test starts failing on a platform without a code change behind it, the
+**The same technique for** ``validate``. The floor there is not the parse — a
+loaded inventory has already paid that — but a **plain walk over every interface
+and every address**, which is the smallest pass any rule about addresses could
+make. ``validate / walk`` is then how many walks' worth of work the whole rule
+set does. Because the inventory is already in memory, the parser in use does not
+enter either half, so one threshold covers both paths.
+
+The walk is repeated ``FLOOR_WALKS`` times per sample. One walk is a tenth of a
+millisecond on the guard's tree, which is small enough that the timer's own
+noise moves the ratio by several per cent; eight of them cost enough to measure
+cleanly, and the ratio only has to be compared with itself.
+
+==============  ===============  ==========  =========
+Measured        Before entry 7   Today       Threshold
+==============  ===============  ==========  =========
+validate/floor  21.5-22.0        6.9-7.2     8.5
+==============  ===============  ==========  =========
+
+That guard is timed on a **freshly loaded** inventory each round, which matters
+since entry 7: ``IPv4Address.network`` is now cached on the model, so a second
+``validate`` over one inventory no longer does the work the first one did, and a
+warm measurement would flatter every change in this area.
+
+What it catches, measured by reverting each file of entry 7 on its own:
+
+======================  =====  ========
+Reverted                Ratio  Caught?
+======================  =====  ========
+all of entry 7          21.6   yes
+``models/interface.py``  13.7  yes
+``validate.py``           9.1  yes
+``subnets.py``            7.5  no
+======================  =====  ========
+
+So the guard is honest rather than complete: it catches a full revert with
+2.5x to spare and each of the two large pieces on its own, and it does *not*
+catch the ``subnets.py`` piece, which is worth about 9 % of ``validate`` — under
+the 17 % of headroom the threshold leaves above today's worst sample. Buying
+that last piece would mean a threshold within 4 % of the measured spread, which
+on a shared runner buys flakiness rather than coverage.
+
+If either test starts failing on a platform without a code change behind it, the
 right fix is to raise the number here *and say so in* ``docs/follow-ups.md`` —
 not to delete the guard.
 """
@@ -62,9 +104,11 @@ from types import ModuleType
 
 import pytest
 
-from netgraph.loader import load_tree
+from netgraph.loader import Inventory, load_tree
 from netgraph.loader.documents import HAVE_LIBYAML, StrictSafeLoader, read_documents
 from netgraph.loader.tree import InventoryFile, iter_inventory_files
+from netgraph.models import Adapter, Device
+from netgraph.validate import validate
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HARNESS = REPO_ROOT / "tools" / "bench_pipeline.py"
@@ -73,6 +117,13 @@ HARNESS = REPO_ROOT / "tools" / "bench_pipeline.py"
 #: See the module docstring for where the numbers come from.
 MAX_LOAD_RATIO_LIBYAML = 1.70
 MAX_LOAD_RATIO_PURE_PYTHON = 1.25
+
+#: ``validate / address-walk floor`` ceiling. Parser-independent: both halves
+#: run over an inventory that is already in memory. See the module docstring.
+MAX_VALIDATE_RATIO = 8.5
+
+#: Walks per floor sample. One is too short to time cleanly; see the docstring.
+FLOOR_WALKS = 8
 
 #: How many rounds the two halves are timed for. The *minimum* of each is
 #: taken, not the mean: a timing sample is bounded below by the real cost and
@@ -146,6 +197,27 @@ def parse_floor(files: list[InventoryFile]) -> None:
             pass
 
 
+def address_walk_floor(inventory: Inventory) -> int:
+    """Visit every interface and every address ``FLOOR_WALKS`` times over, and
+    derive nothing.
+
+    The floor for ``validate``: five of its rules are statements about
+    addresses, so none of them can cost less than one of these passes, and
+    anything the ratio measures above the floor is work netgraph chose to do.
+    Deliberately touches no :mod:`ipaddress` object — a floor that warmed the
+    caches entry 7 added would move whenever they did.
+    """
+    seen = 0
+    for _ in range(FLOOR_WALKS):
+        for element in inventory.elements.values():
+            if not isinstance(element, (Device, Adapter)):
+                continue
+            for interface in element.interfaces:
+                for address in interface.addresses():
+                    seen += address.prefix_length
+    return seen
+
+
 def test_the_generated_tree_is_the_shape_the_guard_assumes(benchmark_tree: Path) -> None:
     """A guard on a tree that silently shrank to nothing would pass forever."""
     inventory = load_tree(benchmark_tree)
@@ -184,4 +256,36 @@ def test_loading_costs_no_more_than_its_budget_above_the_parse(benchmark_tree: P
         f"an optimisation from docs/follow-ups.md was undone, or new per-document work "
         f"was added to the loader or the models. Profile with 'python tools/bench_pipeline.py' "
         f"before changing this threshold."
+    )
+
+
+def test_validating_costs_no_more_than_its_budget_above_an_address_walk(
+    benchmark_tree: Path,
+) -> None:
+    """``validate`` stays within its documented multiple of the walk floor."""
+    # Warm the lazily-built pydantic validators and the page cache before
+    # anything is timed, exactly as the load guard does.
+    for _ in range(2):
+        address_walk_floor(load_tree(benchmark_tree))
+
+    floors: list[float] = []
+    fulls: list[float] = []
+    for _ in range(SAMPLES):
+        # A fresh inventory per round: entry 7 caches each address's prefix on
+        # the model, so the second validate over one inventory is not the
+        # measurement anybody's `netgraph validate` pays for. The walk is timed
+        # first because it is the half that must stay cold-independent.
+        inventory = load_tree(benchmark_tree)
+        floors.append(milliseconds(lambda tree=inventory: address_walk_floor(tree)))
+        fulls.append(milliseconds(lambda tree=inventory: validate(tree)))
+
+    floor, full = min(floors), min(fulls)
+    ratio = full / floor
+
+    assert ratio <= MAX_VALIDATE_RATIO, (
+        f"validate is {ratio:.2f}x the address-walk floor "
+        f"({full:.1f} ms against {floor:.1f} ms), over the budget of "
+        f"{MAX_VALIDATE_RATIO:.1f}x. Either an optimisation from entry 7 of "
+        f"docs/follow-ups.md was undone, or a rule grew per-address work. Profile with "
+        f"'python tools/profile_validate.py' before changing this threshold."
     )

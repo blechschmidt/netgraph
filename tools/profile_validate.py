@@ -16,18 +16,22 @@ the helpers it shares with a dozen others (``_linked_endpoints``, ``_q``,
 ``_join``) and hides which *rule* is worth attacking. Each check here is timed
 end to end, including the engine work its drafts cause -- the suppression test,
 the ``Finding`` construction and the source lookup -- because that work only
-exists because the rule yielded something.
+exists because the rule yielded something. ``_build_context`` is charged to no
+rule and reported separately.
 
-``_build_context`` is timed separately and broken down into its own parts: it is
-charged to no rule, and on a clean inventory it is usually the largest single
-item.
+**Every pass is cold.** The inventory is reloaded before each sample and the
+rules are timed once each, in report order, exactly as ``validate`` runs them.
+That matters since entry 7 of ``docs/follow-ups.md``: an address caches its
+prefix on first use, so the *first* rule to look at an address pays for it and a
+second ``validate`` over one inventory is not the run anybody's ``netgraph
+validate`` pays for. A warm profile would move that cost between rules and
+flatter the total. The reported figure per item is the minimum over the samples.
 """
 
 from __future__ import annotations
 
 import argparse
 import shutil
-import statistics
 import sys
 import tempfile
 import time
@@ -44,7 +48,6 @@ from netgraph.config import ValidationConfig  # noqa: E402
 from netgraph.loader import load_tree  # noqa: E402
 from netgraph.loader.documents import HAVE_LIBYAML, StrictSafeLoader  # noqa: E402
 from netgraph.loader.inventory import Inventory  # noqa: E402
-from netgraph.subnets import subnets_of  # noqa: E402
 from netgraph.validate import Finding, validate  # noqa: E402
 
 sys.path.insert(0, str(REPO_ROOT / "tools"))
@@ -68,94 +71,62 @@ def best(call: Callable[[], T], *, repeat: int) -> tuple[T, float]:
     return result, min(samples)
 
 
-def time_rules(inventory: Inventory, *, repeat: int) -> list[tuple[str, float, int]]:
-    """Time every check in ``_CHECKS`` over one prepared context.
+def one_cold_pass(inventory: Inventory) -> tuple[float, list[tuple[str, float, int]]]:
+    """One full ``validate`` over a freshly loaded inventory, timed per rule.
 
-    Returns ``(rule id, milliseconds, findings)`` in report order. The context is
-    built once and shared, exactly as ``validate`` shares it, so a rule is not
-    charged for work the engine already did for every other rule.
+    Returns the cost of ``_build_context`` and, per rule in report order, its
+    cost and the number of findings it produced.
     """
     settings = ValidationConfig()
-    context = validate_module._build_context(inventory)
-    rows: list[tuple[str, float, int]] = []
 
+    start = time.perf_counter()
+    context = validate_module._build_context(inventory)
+    context_ms = (time.perf_counter() - start) * 1000
+
+    rows: list[tuple[str, float, int]] = []
     for rule_id, check in validate_module._CHECKS:
         rule = validate_module._RULES_BY_ID[rule_id]
         severity = settings.severity_for(rule_id, rule.severity)
 
-        def run(check: Callable[..., Iterator[object]] = check, rule_id: str = rule_id) -> int:
-            found = 0
-            for draft in check(context):  # type: ignore[arg-type]
-                if context.is_suppressed(rule_id, draft.elements):  # type: ignore[attr-defined]
-                    continue
-                Finding(
-                    rule=rule_id,
-                    severity=severity,
-                    message=draft.message,  # type: ignore[attr-defined]
-                    source=context.source_of(
-                        draft.elements[0] if draft.elements else None  # type: ignore[attr-defined]
-                    ),
-                    elements=draft.elements,  # type: ignore[attr-defined]
-                    field_path=draft.field_path,  # type: ignore[attr-defined]
-                )
-                found += 1
-            return found
+        start = time.perf_counter()
+        found = 0
+        for draft in check(context):
+            if context.is_suppressed(rule_id, draft.elements):
+                continue
+            Finding(
+                rule=rule_id,
+                severity=severity,
+                message=draft.message,
+                source=context.source_of(draft.elements[0] if draft.elements else None),
+                elements=draft.elements,
+                field_path=draft.field_path,
+            )
+            found += 1
+        rows.append((rule_id, (time.perf_counter() - start) * 1000, found))
 
-        count, milliseconds = best(run, repeat=repeat)
-        rows.append((rule_id, milliseconds, count))
-    return rows
+    return context_ms, rows
 
 
-def time_context(inventory: Inventory, *, repeat: int) -> list[tuple[str, float]]:
-    """Break ``_build_context`` into the parts a change could attack separately."""
-    owners = {
-        fqn: element
-        for fqn, element in inventory.elements.items()
-        if isinstance(element, validate_module._OWNER_TYPES)
-    }
+def cold_profile(root: Path, *, repeat: int) -> tuple[float, list[tuple[str, float, int]]]:
+    """``repeat`` cold passes; the minimum of each item across them."""
+    context_samples: list[float] = []
+    rule_samples: dict[str, list[float]] = {}
+    counts: dict[str, int] = {}
+    order: list[str] = []
 
-    def whole() -> object:
-        return validate_module._build_context(inventory)
+    for _ in range(repeat):
+        context_ms, rows = one_cold_pass(load_tree(root))
+        context_samples.append(context_ms)
+        for rule_id, milliseconds, found in rows:
+            if rule_id not in rule_samples:
+                rule_samples[rule_id] = []
+                order.append(rule_id)
+            rule_samples[rule_id].append(milliseconds)
+            counts[rule_id] = found
 
-    def subnets() -> object:
-        return subnets_of(inventory)
-
-    def suppressions() -> object:
-        return validate_module._collect_suppressions(inventory)
-
-    def per_owner_maps() -> object:
-        return (
-            {fqn: validate_module._lag_masters(owner) for fqn, owner in owners.items()},
-            {fqn: validate_module._stacking_groups(owner) for fqn, owner in owners.items()},
-            {
-                fqn: {interface.name: interface for interface in owner.interfaces}
-                for fqn, owner in owners.items()
-            },
-            {fqn: validate_module._aggregated_by(owner) for fqn, owner in owners.items()},
-        )
-
-    def endpoints() -> object:
-        from netgraph.loader.inventory import namespace_of
-
-        out = []
-        for cable_fqn, cable in inventory.cables.items():
-            namespace = namespace_of(cable_fqn)
-            for index, ref in enumerate(cable.endpoints):
-                out.append(
-                    validate_module._resolve_endpoint(
-                        inventory, cable_fqn, cable, ref, index, namespace
-                    )
-                )
-        return out
-
-    parts = [
-        ("_build_context (whole)", whole),
-        ("  subnets_of", subnets),
-        ("  endpoint resolution", endpoints),
-        ("  per-owner maps", per_owner_maps),
-        ("  suppressions", suppressions),
+    return min(context_samples), [
+        (rule_id, min(rule_samples[rule_id]), counts[rule_id]) for rule_id in order
     ]
-    return [(label, best(call, repeat=repeat)[1]) for label, call in parts]
 
 
 def report(root: Path, *, repeat: int, top: int | None) -> None:
@@ -167,35 +138,48 @@ def report(root: Path, *, repeat: int, top: int | None) -> None:
         print(f"!! {len(inventory.errors)} load errors, first: {inventory.errors[0]}")
     print(f"           {len(inventory)} elements, {len(inventory.devices)} devices")
 
-    findings, whole_ms = best(lambda: validate(inventory), repeat=repeat)
-    print(f"\nvalidate (whole)              {whole_ms:8.1f} ms   {len(findings)} findings")
+    def cold_validate() -> float:
+        """One ``validate`` over a tree loaded outside the clock."""
+        fresh = load_tree(root)
+        start = time.perf_counter()
+        validate(fresh)
+        return (time.perf_counter() - start) * 1000
 
-    print("\n-- context --------------------------------------------------")
-    context_rows = time_context(inventory, repeat=repeat)
-    for label, milliseconds in context_rows:
-        print(f"{label:<30}{milliseconds:8.1f} ms")
-    context_ms = context_rows[0][1]
+    # Cold, and reloaded per sample: see the module docstring.
+    cold_ms = min(cold_validate() for _ in range(repeat))
+    _, warm_ms = best(lambda: validate(inventory), repeat=repeat)
+    print(f"\nvalidate (cold, per sample)   {cold_ms:8.1f} ms")
+    print(f"validate (warm, same tree)    {warm_ms:8.1f} ms")
 
-    print("\n-- per rule -------------------------------------------------")
-    rows = time_rules(inventory, repeat=repeat)
+    context_ms, rows = cold_profile(root, repeat=repeat)
     ranked = sorted(rows, key=lambda row: -row[1])
     shown = ranked[:top] if top else ranked
     rules_ms = sum(row[1] for row in rows)
+
+    print("\n-- per rule (cold) ------------------------------------------")
+    print(f"{'_build_context':<8}{context_ms:8.1f} ms  {100 * context_ms / cold_ms:5.1f}%")
     for rule_id, milliseconds, count in shown:
-        share = 100 * milliseconds / whole_ms if whole_ms else 0
+        share = 100 * milliseconds / cold_ms if cold_ms else 0
         print(f"{rule_id:<8}{milliseconds:8.1f} ms  {share:5.1f}%  {count:5d} findings")
     if top and len(ranked) > top:
         rest = sum(row[1] for row in ranked[top:])
-        print(f"{'(rest)':<8}{rest:8.1f} ms  {100 * rest / whole_ms:5.1f}%  "
-              f"{len(ranked) - top} rules")
+        print(
+            f"{'(rest)':<8}{rest:8.1f} ms  {100 * rest / cold_ms:5.1f}%  {len(ranked) - top} rules"
+        )
 
     print("\n-- totals ---------------------------------------------------")
-    print(f"{'context':<30}{context_ms:8.1f} ms  {100 * context_ms / whole_ms:5.1f}%")
-    print(f"{'rules':<30}{rules_ms:8.1f} ms  {100 * rules_ms / whole_ms:5.1f}%")
     accounted = context_ms + rules_ms
-    print(f"{'engine + sort (residual)':<30}{whole_ms - accounted:8.1f} ms  "
-          f"{100 * (whole_ms - accounted) / whole_ms:5.1f}%")
-    print(f"{'median of samples':<30}{statistics.median([whole_ms]):8.1f} ms")
+    print(f"{'context':<30}{context_ms:8.1f} ms  {100 * context_ms / cold_ms:5.1f}%")
+    print(f"{'rules':<30}{rules_ms:8.1f} ms  {100 * rules_ms / cold_ms:5.1f}%")
+    # Each figure above is a minimum over independent samples, and minima do not
+    # add up: the remainder is the engine and the final sort plus whatever the
+    # per-item minima happened not to land in the same pass. It goes negative
+    # once the per-item costs are small, which is a property of the statistic
+    # rather than a measurement to read.
+    print(
+        f"{'engine, sort and slack':<30}{cold_ms - accounted:8.1f} ms  "
+        f"{100 * (cold_ms - accounted) / cold_ms:5.1f}%"
+    )
 
 
 def _inventory_root(args: argparse.Namespace) -> Iterator[Path]:
@@ -221,7 +205,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--sites", type=int, default=default.sites)
     parser.add_argument("--racks", type=int, default=default.racks_per_site)
     parser.add_argument("--hosts", type=int, default=default.hosts_per_rack)
-    parser.add_argument("--repeat", type=int, default=5, help="samples per item (minimum wins)")
+    parser.add_argument("--repeat", type=int, default=5, help="cold passes (minimum wins)")
     parser.add_argument("--top", type=int, default=None, help="only the N most expensive rules")
     parser.add_argument("--keep", help="write the tree here and leave it behind")
     parser.add_argument("--inventory", help="profile an existing tree instead of generating one")

@@ -17,7 +17,7 @@ from netgraph.config import (
 )
 from netgraph.errors import ConfigurationError
 from netgraph.loader import Inventory, load_tree
-from netgraph.models import API_VERSION
+from netgraph.models import API_VERSION, IPv4Address, IPv6Address
 from netgraph.rules import (
     RULE_IDS,
     RULES,
@@ -29,6 +29,7 @@ from netgraph.rules import (
 )
 from netgraph.validate import (
     Finding,
+    _reserved_role,
     errors_only,
     has_errors,
     summarise,
@@ -1645,6 +1646,63 @@ def test_w110_exempts_host_and_point_to_point_prefixes(tmp_path: Path, address: 
         net=doc("computer", "pc1", {"interfaces": [eth("eth0", mtu=1500, **_family(address))]}),
     )
     assert only(validate(inventory), "W110") == []
+
+
+def _reserved_role_via_ipaddress(address: IPv4Address | IPv6Address) -> str | None:
+    """``_reserved_role`` as it read before entry 7 of ``docs/follow-ups.md``.
+
+    The rule used to ask an :mod:`ipaddress` network object three questions;
+    it now computes the same answer from the address's host bits, because the
+    network form materialised a prefix per address for a rule that almost never
+    reports anything. This is the original, kept here as the oracle.
+    """
+    network = address.network
+    if network.num_addresses <= 2:
+        return None
+    if address.ip == network.network_address:
+        return "subnet-router anycast address" if network.version == 6 else "network address"
+    if network.version == 4 and address.ip == network.broadcast_address:
+        return "broadcast address"
+    return None
+
+
+def _sweep_addresses() -> list[IPv4Address | IPv6Address]:
+    """Every prefix length of both families, at the host positions that matter.
+
+    For each prefix length: the network address itself, the all-ones host part,
+    one either side of each, and an interior address -- so the two boundaries
+    the rule is about are hit exactly and missed by one in both directions.
+    """
+    swept: list[IPv4Address | IPv6Address] = []
+    for width, base, model in ((32, 0x0A000000, IPv4Address), (128, 0x20010DB8 << 96, IPv6Address)):
+        for prefix_length in range(width + 1):
+            host_bits = width - prefix_length
+            span = 1 << host_bits
+            network = base & ~(span - 1) & ((1 << width) - 1)
+            offsets = {0, 1, span - 1, span - 2, span // 2, span // 3}
+            for offset in sorted(offset for offset in offsets if 0 <= offset < span):
+                swept.append(
+                    model(ip=network + offset, prefix_length=prefix_length)  # type: ignore[arg-type]
+                )
+    return swept
+
+
+def test_reserved_role_agrees_with_ipaddress() -> None:
+    """W110's arithmetic form answers exactly what the network form answered."""
+    swept = _sweep_addresses()
+    roles = [_reserved_role_via_ipaddress(address) for address in swept]
+
+    # A sweep on which the oracle never fires would pass whatever the rule did.
+    assert len(swept) > 500
+    assert set(roles) == {
+        None,
+        "network address",
+        "broadcast address",
+        "subnet-router anycast address",
+    }
+
+    for address, expected in zip(swept, roles, strict=True):
+        assert _reserved_role(address) == expected, address
 
 
 # --------------------------------------------------------------------------- #
