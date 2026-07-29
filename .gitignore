@@ -48,3 +48,8 @@ junit.xml
 
 # Rendered graph output
 /out/
+
+# The compose environment: a copy of .env.example naming paths, ids and ports on
+# one machine. docker-compose.yml has a default for every variable it reads, so
+# the file is a convenience and never a requirement -- see docs/docker.md.
+/.env

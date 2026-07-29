@@ -117,13 +117,15 @@ Pass `--no-cov` for those runs:
 pytest tests/test_render.py --no-cov
 ```
 
-CI also has three jobs beyond `test`: `discover-examples` and `validate-examples`
+CI also has four jobs beyond `test`: `discover-examples` and `validate-examples`
 run the composite action, the SARIF upload and the annotation format over every
 inventory under `examples/` (so a broken integration breaks here rather than in
-somebody else's pipeline), and `render-examples` installs netgraph **without** the
+somebody else's pipeline), `render-examples` installs netgraph **without** the
 dev extras and renders every example to SVG, checking that a plain
-`pip install netgraph` can draw the documented inventories. See
-[docs/ci.md](docs/ci.md).
+`pip install netgraph` can draw the documented inventories, and `docker` builds
+the image and drives all three services of `docker-compose.yml` — the CLI, the
+editor and the live preview — because a compose file that parses is not a compose
+file that works. See [docs/ci.md](docs/ci.md) and [docs/docker.md](docs/docker.md).
 
 ## pre-commit
 

@@ -100,6 +100,13 @@ include = [
     "/.github",
     "/.pre-commit-hooks.yaml",
     "/.pre-commit-config.yaml",
+    # tests/test_docker.py asserts these against the CLI the way
+    # tests/test_integrations.py does the hooks, so they are here for the same
+    # reason as everything above.
+    "/Dockerfile",
+    "/docker-compose.yml",
+    "/.dockerignore",
+    "/.env.example",
     "/README.md",
     "/LICENSE",
 ]

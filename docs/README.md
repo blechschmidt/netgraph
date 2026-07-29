@@ -21,6 +21,7 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
 | gate a pull request on the inventory validating | [ci.md](ci.md) |
 | bootstrap an inventory from a network that already exists | [importing.md](importing.md) |
 | stop retyping the same flags | [configuration.md](configuration.md) |
+| run it without installing Python or Graphviz | [docker.md](docker.md) |
 | turn the inventory into hosts files, DNS zones, Ansible or Prometheus | [export.md](export.md) |
 | look up a command's flags | [commands/](commands/README.md) |
 | see how an inventory maps onto RFC 8343, RFC 8344 and 802.1Q | [yang-mapping.md](yang-mapping.md) |
@@ -56,6 +57,9 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
   each drops, and how names are folded.
 * **[configuration.md](configuration.md)** — `netgraph.toml`: per-inventory render
   defaults, named profiles, precedence, and how to see what resolved.
+* **[docker.md](docker.md)** — the image and the compose file: the CLI, the live preview and
+  the browser editor in a container, what they mount, what they publish, and who owns the
+  files they write.
 
 ### Reference — look things up
 

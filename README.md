@@ -58,6 +58,14 @@ skip the install. Full instructions, including the editor setup that gives you
 completion and inline errors, are in
 [`docs/getting-started.md`](docs/getting-started.md).
 
+Or install nothing at all. [`docker-compose.yml`](docker-compose.yml) runs the CLI, the
+live preview and the browser editor out of a container that already has Graphviz in it:
+
+<!-- norun: needs a Docker daemon -->
+```bash
+docker compose run --rm netgraph validate    # see docs/docker.md
+```
+
 ## Quickstart
 
 Four commands. `init` writes a small, valid inventory; edit it into your own network.
@@ -228,6 +236,7 @@ over the whole set. The pages a new reader wants first:
 | [`docs/schema.md`](docs/schema.md) | The normative specification, if you want the reasoning as well as the rules. |
 | [`docs/ci.md`](docs/ci.md) | Making a pull request fail when the inventory stops adding up. |
 | [`docs/configuration.md`](docs/configuration.md) | `netgraph.toml`, so you type the flags once instead of every time. |
+| [`docs/docker.md`](docs/docker.md) | The image and the compose file: the CLI, the preview and the editor in a container. |
 
 ## Examples
 

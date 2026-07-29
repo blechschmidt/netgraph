@@ -1,0 +1,19 @@
+# The build context, by allowlist.
+#
+# ``Dockerfile`` builds a wheel from four paths and nothing else, so everything
+# is excluded first and those four are let back in. An allowlist rather than a
+# list of exclusions because the failure modes point opposite ways: a forgotten
+# exclusion silently ships a virtualenv, a private inventory or a .git history
+# into the build context, while a forgotten inclusion fails the build loudly.
+*
+
+!pyproject.toml
+!README.md
+!LICENSE
+!src
+
+# Nothing under src/ that is not source: a stale __pycache__ from the host would
+# be copied in and shadow the code it was compiled from if the interpreters ever
+# disagreed, and .pyc files are rebuilt by pip anyway.
+src/**/__pycache__
+src/**/*.py[cod]

@@ -409,3 +409,180 @@ jobs:
           path: out/
           if-no-files-found: warn
           retention-days: 14
+
+  # ``docker-compose.yml`` and ``Dockerfile`` are asserted against the CLI by
+  # tests/test_docker.py -- that every service names a real command with real
+  # flags, that the published ports are the ones the servers bind, that every
+  # variable has a default. What that cannot do is prove the thing runs: a
+  # compose file that parses is not a compose file that works, and the image is
+  # built by Docker rather than by pytest. So this job builds it and drives all
+  # three services for real.
+  docker:
+    name: docker compose
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Show what Docker is available
+        run: |
+          set -euo pipefail
+          docker version
+          docker compose version
+
+      # Catches an interpolation with no default, an unknown key or a broken
+      # anchor before spending a build on it.
+      - name: Check the compose file resolves
+        run: |
+          set -euo pipefail
+          docker compose config --quiet
+          docker compose config --services | sort
+
+      - name: Build the image
+        run: |
+          set -euo pipefail
+          docker compose build
+          docker image ls netgraph:local
+
+      # The inventory the services read is a copy, not the checkout: the CLI
+      # service mounts it read-write and this job writes a render into it, which
+      # must not be able to dirty the tree the rest of CI is looking at.
+      - name: Copy an example inventory out of the checkout
+        run: |
+          set -euo pipefail
+          cp -r examples/home-lab "${RUNNER_TEMP}/inventory"
+          ls -la "${RUNNER_TEMP}/inventory"
+
+      - name: Run the CLI through the container
+        env:
+          NETGRAPH_INVENTORY: ${{ runner.temp }}/inventory
+        run: |
+          set -euo pipefail
+          # Files the container writes have to land owned by whoever asked for
+          # them; the render below is checked for exactly that.
+          NETGRAPH_UID="$(id -u)" NETGRAPH_GID="$(id -g)" \
+            docker compose run --rm netgraph validate --strict
+          docker compose run --rm netgraph list devices
+          NETGRAPH_UID="$(id -u)" NETGRAPH_GID="$(id -g)" \
+            docker compose run --rm netgraph render --layer l2 -f svg -o topology.svg
+
+          svg="${NETGRAPH_INVENTORY}/topology.svg"
+          if [ ! -s "$svg" ]; then
+            echo "::error::the container reported a render but ${svg} is empty or absent"
+            exit 1
+          fi
+          if ! grep -q '<svg' "$svg"; then
+            echo "::error::${svg} does not contain an <svg> element"
+            exit 1
+          fi
+          # A file owned by root here is the daily annoyance the ``user:`` key in
+          # the compose file exists to prevent, so it is a failure and not a note.
+          owner="$(stat -c '%u:%g' "$svg")"
+          if [ "$owner" != "$(id -u):$(id -g)" ]; then
+            echo "::error::${svg} is owned by ${owner}, not by $(id -u):$(id -g)"
+            exit 1
+          fi
+          echo "ok: $(wc -c <"$svg") bytes, owned by ${owner}"
+
+      - name: Start the two servers
+        env:
+          NETGRAPH_INVENTORY: ${{ runner.temp }}/inventory
+        run: |
+          set -euo pipefail
+          docker compose up --detach web watch
+          docker compose ps
+
+      # The health checks are declared in the compose file; waiting for them is
+      # also what proves they are correct, since a check that polls a route the
+      # server does not answer never reports healthy.
+      - name: Wait for both health checks
+        run: |
+          set -euo pipefail
+          for service in web watch; do
+            container="netgraph-${service}-1"
+            for attempt in $(seq 1 30); do
+              state="$(docker inspect --format '{{.State.Health.Status}}' "$container")"
+              if [ "$state" = "healthy" ]; then
+                echo "${service}: healthy after ${attempt} attempt(s)"
+                break
+              fi
+              if [ "$state" = "unhealthy" ] || [ "$attempt" -eq 30 ]; then
+                echo "::error::${service} is ${state}"
+                exit 1
+              fi
+              sleep 2
+            done
+          done
+
+      - name: Fetch a page from each server
+        run: |
+          set -euo pipefail
+          # The editor's own page, which carries the document stream.
+          curl --fail --silent --show-error http://127.0.0.1:8081/ >web.html
+          grep -q "netgraph" web.html
+
+          # The preview's status document. ``ok`` means the mounted tree loaded,
+          # validated and rendered inside the container.
+          curl --fail --silent --show-error http://127.0.0.1:8080/status.json >status.json
+          cat status.json
+          python -c '
+          import json
+          status = json.load(open("status.json", encoding="utf-8"))
+          if status["status"] != "ok":
+              raise SystemExit(f"::error::the preview reports {status!r}")
+          if not status["hasPayload"]:
+              raise SystemExit("::error::the preview served no diagram")
+          '
+
+          # And the diagram itself, which is what a browser would ask for next.
+          curl --fail --silent --show-error http://127.0.0.1:8080/render.svg >render.svg
+          grep -q "<svg" render.svg
+
+      # The point of the whole service: a file changes on the host and the
+      # container notices. This is the step that would fail if a bind mount
+      # stopped delivering filesystem events on the runner.
+      - name: Change a file and watch it re-render
+        env:
+          NETGRAPH_INVENTORY: ${{ runner.temp }}/inventory
+        run: |
+          set -euo pipefail
+          before="$(curl --fail --silent http://127.0.0.1:8080/status.json |
+            python -c 'import json,sys; print(json.load(sys.stdin)["revision"])')"
+
+          printf '\n# touched by CI to trigger a re-render\n' \
+            >>"${NETGRAPH_INVENTORY}/switches/sw-home.yaml"
+
+          for attempt in $(seq 1 20); do
+            after="$(curl --fail --silent http://127.0.0.1:8080/status.json |
+              python -c 'import json,sys; print(json.load(sys.stdin)["revision"])')"
+            if [ "$after" -gt "$before" ]; then
+              echo "re-rendered: revision ${before} -> ${after}"
+              exit 0
+            fi
+            sleep 1
+          done
+
+          echo "::error::the watcher never re-rendered (revision stayed at ${before})"
+          docker compose logs watch
+          exit 1
+
+      - name: Show the container logs
+        if: ${{ !cancelled() }}
+        run: docker compose logs --timestamps
+
+      # ``down`` rather than leaving it to the runner, because the time it takes
+      # is itself a check: netgraph is PID 1 in there, and without ``init: true``
+      # a SIGTERM it ignores would cost the full ten-second grace period.
+      - name: Stop everything
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          start="$(date +%s)"
+          docker compose down --remove-orphans --timeout 10
+          elapsed=$(( $(date +%s) - start ))
+          echo "stopped in ${elapsed}s"
+          if [ "$elapsed" -ge 10 ]; then
+            echo "::error::the containers had to be killed; is 'init: true' still set?"
+            exit 1
+          fi
