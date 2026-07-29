@@ -765,43 +765,343 @@ harness, committed so the next pass can repeat it.
 
 ---
 
-## 8. An HTML page grows with the number of views, not only with the network
+## 8. ~~An HTML page grows with the number of views~~ — fixed, 1.4× to 2.2×
 
-**Status:** open. `-f html` is usable at the sizes netgraph is usable at; the
-growth is worth knowing about before someone points it at a campus with every
-layer switched on.
+**Status:** closed 2026-07-29. A view now costs its drawing and nothing else,
+and a drawing costs 29 % fewer bytes than it did — 59 % fewer with `--icons`.
 
-The page embeds one *laid-out drawing per view* — each `--layer` given, with and
-without the addresses and the VLAN annotations — because a browser cannot lay a
-graph out and a toggle that re-flowed the diagram would need one. Identical
-drawings are stored once, so an inventory with no VLANs pays nothing for the
-VLAN toggle, but a network where all four combinations differ pays for all four.
+The original entry recorded the growth and named two possible fixes: a flag that
+embeds fewer views, and storing the drawings as diffs against a base layout.
+Neither was taken, because measuring first said the bytes were somewhere else
+entirely. What follows is where they actually were.
 
-### Measured
+### The harness
 
-Rendered with the defaults (`--show-ips`, `--show-vlans`), against the same
-inventory rendered as a plain SVG:
+`tools/bench_html.py`, committed alongside `tools/bench_pipeline.py` and using
+its generator, so a size here is comparable with a size there. It renders a
+matrix of inventories × layer stacks and reports five numbers per page, chosen
+because they fail in different ways: **bytes** (what a mail attachment costs),
+**gzip** (what a static host costs), **dom** (elements the browser builds),
+**paint** (first paint of the default view) and **switch** (median of ten layer
+switches, each timed through a forced layout of the drawing that just became
+visible, so the figure is work rather than the next vsync).
 
-| Inventory | Layers | `-f svg` | `-f html` |
+The two timing columns need a browser. `--browser` drives Chromium through
+`playwright-core`, which is deliberately *not* a dependency of this project: the
+byte columns are the ones the entry turns on, and they need nothing but Python
+and Graphviz. Both were taken here on Chrome for Testing 149, second pass over the list,
+so no page is paying for a cold browser.
+
+### Measured, before
+
+Every page rendered with the defaults (`--show-ips`, `--show-vlans`), so each
+layer contributes up to four drawings. `generated/N` is `bench_pipeline`'s tree
+at the stated size.
+
+| Page | Views | Bytes | gzip | DOM | Paint | Switch |
+|---|---|---|---|---|---|---|
+| `home-lab` l1 | 4 | 86,388 | 19,287 | 344 | 25–37 ms | — |
+| `home-lab` l1+l2 | 8 | 124,485 | 22,160 | 602 | 26–30 ms | 1.7 ms |
+| `home-lab` l1+l2+l3 | 12 | 190,346 | 29,967 | 1,001 | 28–32 ms | 1.8 ms |
+| `campus` l1 | 4 | 267,326 | 36,315 | 1,437 | 38–44 ms | — |
+| `campus` l1+l2 | 8 | 462,503 | 55,725 | 2,587 | 46–52 ms | 7.3 ms |
+| `campus` l1+l2+l3 | 12 | 879,890 | 104,712 | 4,876 | 67–76 ms | 9.5 ms |
+| generated/1 site l1+l2+l3 | 12 | 301,049 | 37,055 | 1,629 | 35–41 ms | 2.6 ms |
+| generated/3 sites l1 | 4 | 509,146 | 52,914 | 2,938 | 58–61 ms | — |
+| generated/3 sites l1+l2 | 8 | 937,695 | 87,822 | 5,529 | 98–108 ms | 14 ms |
+| generated/3 sites l1+l2+l3 | 12 | 1,584,584 | 158,483 | 9,140 | 108–120 ms | 14.1 ms |
+
+The same matrix with `--icons cisco`, which is where the growth was worst:
+
+| Page | Views | Bytes | gzip | DOM |
+|---|---|---|---|---|
+| `home-lab` l1+l2+l3 | 12 | 245,475 | 29,758 | 953 |
+| `campus` l1+l2+l3 | 12 | 1,115,352 | 100,253 | 4,480 |
+| generated/3 sites l1+l2+l3 | 12 | 2,205,617 | 171,501 | 8,816 |
+
+Marginal cost of one more view, taken as `(12-view page − 4-view page) / 8`:
+
+| Inventory | Plain | `--icons cisco` |
+|---|---|---|
+| `home-lab` | 12,995 | 17,783 |
+| `campus` | 76,570 | 98,336 |
+| generated/1 site | 22,542 | 31,809 |
+| generated/3 sites | 134,430 | 187,506 |
+
+### Where the bytes were
+
+`--breakdown` splits a page into the parts that scale differently. On
+`campus l1+l2+l3`, 879,890 bytes:
+
+| Part | Bytes | Share |
+|---|---|---|
+| drawings | 604,544 | 69 % |
+| records | 229,797 | 26 % |
+| the client and the style sheet | 41,069 | 5 % |
+
+So the first thing the split said is that the original entry's own summary was
+wrong in a way that mattered: the fixed cost is ~40 kB *and* a quarter of the
+page was records, which grew per **layer** and had nothing to do with the
+drawings at all. Then, inside each of the two large parts:
+
+**The drawings were 36 % repeated font attributes.** Graphviz states
+`font-family`, `font-size` and `text-anchor` on every `<text>` element it emits
+— 2,660 of them across these twelve drawings, carrying one distinct
+`font-family` and two distinct values of each of the other two. That is
+**217,664 bytes** of `campus l1+l2+l3`, more than the whole record block.
+
+**With `--icons`, the artwork was 37 % of the drawings.** A theme reaches a
+rendering as a `data:` URI per *node*, and a page draws every node once per
+view: 396 occurrences on `campus l1+l2+l3`, **313,464 bytes**, of which
+**3,994 bytes were distinct**. A duplication factor of 78.
+
+**The records were duplicated per layer.** `l1` and `l2` draw the same elements,
+and their record blocks were byte-identical: 55,577 bytes each. Across all three
+layers, splitting each record into its `links` cross-reference and everything
+else showed that the *everything else* is identical wherever an id repeats,
+without exception — 149,224 bytes of record body reduce to **81,026 bytes** of
+distinct bodies, with 68,396 bytes of genuinely per-layer links.
+
+What the split also said is what *not* to do. Deflating the drawings
+individually gives 604,544 → 79,762 bytes, and deflating them as one stream
+gives 73,635 — an 8 % gain from cross-drawing sharing against a 7.6× gain from
+sharing *within* a drawing. So the redundancy the original entry proposed to
+attack, between views, is the small half; the redundancy inside one view is the
+large one, and it can be removed as plain markup rather than as a compressed
+blob a client has to unpack.
+
+### The three changes
+
+In descending order of what they are worth. Measured by disabling one at a time
+and re-rendering `campus l1+l2+l3`:
+
+| Reverted on its own | Plain | `--icons cisco` | Costs |
 |---|---|---|---|
-| `examples/home-lab` (6 nodes) | l1 | 20 kB | 86 kB |
-| `examples/campus` (22 nodes) | l2 | 102 kB | 240 kB |
-| `examples/campus` | l1, l2, l3 | 109 kB | 880 kB |
+| nothing — this commit | 624,237 | 539,500 | — |
+| the icon library | 624,237 | 859,699 | +320,199 with icons |
+| the font hoisting | 800,483 | 715,746 | +176,246 |
+| the record pool | 706,471 | 621,734 | +82,234 |
+| all three | 882,717 | 1,118,179 | |
 
-The fixed cost is ~40 kB: the client, the style sheet and the records. The rest
-is drawings, and the count is `layers × up to 4`. Everything compresses well —
-an SVG is repetitive text — so a page served with `Content-Encoding: gzip` costs
-a fraction of the figures above; a page *emailed* costs all of it.
+Each row is this commit with one change disabled, so it isolates that change;
+none of them reproduces the old page exactly, because the client and the layer
+index grew slightly and stay grown in every row.
 
-### What a fix would do
+**Each icon is stored once for the whole page** (`IconLibrary` in
+`render/fragment.py`, **320 kB on `campus l1+l2+l3`**, and nothing at all on a
+page without `--icons`). Every inline picture becomes a `<symbol>` in one
+`<defs>` the page holds once, and every node that drew it becomes a `<use>`
+naming that symbol and keeping the box Graphviz computed for it. A symbol
+carries no viewport of its own, so the `<use>`'s width and height are the
+viewport and the `<image>` inside fills it with the fit the original asked for
+— which is why the pair draws what the single `<image>` drew. Two nodes share a
+symbol when both would have written the same bytes fitted the same way, and not
+otherwise. The consequence is worth stating plainly: `--icons` now usually makes
+a page *smaller*, because a glyph replaces the polygon-and-polylines a shape was
+drawn with, and it is paid for once.
 
-Not "render fewer views": the toggles are the reason the format exists. The
-honest options are (a) a flag that narrows which views are embedded, for
-publishing a large network where only the default matters, and (b) storing the
-drawings once as a diff against the first, which trades bytes for client code
-and would need measuring before it earns its place. Neither is worth doing until
-somebody has a network where the file size actually gets in the way — this is
-recorded so that the first person who does has the numbers.
+**Each inherited font property is stated once per drawing**
+(`_hoist_text_attributes`, **176 kB**). These are inherited properties, so the
+dominant value moves to the drawing's root and is deleted from every `<text>`
+that named it; the minority keep theirs, where it overrides what they now
+inherit. The soundness condition is the interesting part: an attribute can only
+move if **every** `<text>` carries it, because one that carried none would start
+inheriting a value it never had. `font-weight` is exactly that case — Graphviz
+writes it on the bold device name and on nothing else — so it is checked per
+attribute and per drawing rather than from a list of names known to be safe, and
+`font-weight` is in fact never hoisted.
+
+**Each record is stored once for the whole page** (`_Pool` in `render/html.py`,
+**82 kB**). The page carries two content-addressed pools — `records` and `links`
+— and each layer holds a pair of indices per element id, `-1` in the second
+position meaning "this record has no `links`", which is every edge. Keying on
+the serialised form rather than on the element id is deliberate: it needs no
+assumption about what a layer may and may not change, and two records that
+differ in any way end up as two entries. `page.js` puts the two back together
+once per layer, the first time that layer is shown.
+
+The three do not add to the whole, and cannot: the icon library and the font
+hoisting both shrink the same drawings, and a byte removed by one is not there
+for the other to remove.
+
+### Measured, after
+
+Same harness, same machine, same inventories.
+
+| Page | Views | Bytes | gzip | DOM | Paint | Switch |
+|---|---|---|---|---|---|---|
+| `home-lab` l1 | 4 | 77,590 | 19,738 | 344 | 30 ms | — |
+| `home-lab` l1+l2 | 8 | 98,203 | 22,301 | 602 | 27 ms | 1.6 ms |
+| `home-lab` l1+l2+l3 | 12 | 148,661 | 30,044 | 1,001 | 37 ms | 1.7 ms |
+| `campus` l1 | 4 | 212,468 | 35,298 | 1,437 | 37 ms | — |
+| `campus` l1+l2 | 8 | 308,116 | 49,305 | 2,587 | 46 ms | 7.2 ms |
+| `campus` l1+l2+l3 | 12 | 624,237 | 95,199 | 4,876 | 63 ms | 9.4 ms |
+| generated/1 site l1+l2+l3 | 12 | 224,659 | 36,792 | 1,629 | 34 ms | 2.7 ms |
+| generated/3 sites l1 | 4 | 400,506 | 52,825 | 2,938 | 51 ms | — |
+| generated/3 sites l1+l2 | 8 | 618,408 | 81,911 | 5,529 | 62 ms | 14.1 ms |
+| generated/3 sites l1+l2+l3 | 12 | 1,109,191 | 146,755 | 9,140 | 107 ms | 14.2 ms |
+
+With `--icons cisco`:
+
+| Page | Views | Bytes | gzip | DOM |
+|---|---|---|---|---|
+| `home-lab` l1+l2+l3 | 12 | 139,263 | 28,648 | 967 |
+| `campus` l1+l2+l3 | 12 | 539,500 | 79,883 | 4,492 |
+| generated/3 sites l1+l2+l3 | 12 | 1,020,217 | 130,178 | 8,826 |
+
+Side by side, on the twelve-view pages, which is the shape the entry was opened
+about:
+
+| Page | Before | After | |
+|---|---|---|---|
+| `home-lab` | 190,346 | 148,661 | 1.28× |
+| `campus` | 879,890 | 624,237 | 1.41× |
+| generated/3 sites | 1,584,584 | 1,109,191 | 1.43× |
+| `home-lab` `--icons` | 245,475 | 139,263 | **1.76×** |
+| `campus` `--icons` | 1,115,352 | 539,500 | **2.07×** |
+| generated/3 sites `--icons` | 2,205,617 | 1,020,217 | **2.16×** |
+
+And the number the entry is really about — one more view:
+
+| Inventory | Before | After | | Before, icons | After, icons | |
+|---|---|---|---|---|---|---|
+| `home-lab` | 12,995 | 8,884 | 1.46× | 17,783 | 7,544 | 2.36× |
+| `campus` | 76,570 | 51,471 | 1.49× | 98,336 | 42,928 | 2.29× |
+| generated/1 site | 22,542 | 15,009 | 1.50× | 31,809 | 13,486 | 2.36× |
+| generated/3 sites | 134,430 | 88,586 | 1.52× | 187,506 | 80,151 | 2.34× |
+
+Three columns did **not** move, and saying so is the honest half of the result.
+
+**gzip barely improves**: `campus l1+l2+l3` goes 104,712 → 95,199, 1.10×,
+against 1.41× uncompressed, and on the small pages it goes very slightly *up*
+(`home-lab l1`: 19,287 → 19,738) because the client grew by ~1.8 kB and there is
+now less redundancy left for deflate to earn its keep on. That is arithmetic
+rather than disappointment: this pass removed by construction most of what
+deflate was removing anyway. A page **served** with `Content-Encoding: gzip` was
+never the problem; a page **emailed** was, and that is the column that moved.
+
+**DOM node count is unchanged**, to the element. A `<use>` is an element where
+an `<image>` was, an attribute moved is not an element, and a pooled record is
+not in the DOM at all. Nothing here reduces the number of shapes a browser
+builds, because the shapes are the drawing.
+
+**Paint and switch track the bytes loosely and are dominated by the layout.**
+First paint on `campus l1+l2+l3` goes 67–76 ms to 63 ms and on generated/3 sites
+108–120 ms to 107 ms; a switch is unchanged at 9.4 ms and 14.2 ms, which is what
+it should be — switching is unhiding a drawing the browser already built, and
+this pass did not change how many elements that drawing has.
+
+### The regression guard
+
+`tests/test_html.py::test_an_extra_view_costs_its_drawing_and_little_else`,
+parametrised over no icons and `--icons cisco`. It renders `campus` twice, once
+holding l1 and once holding l1 and l2, and compares them. l1 and l2 draw *the
+same elements* — the second is the first annotated with VLANs — so the second
+page must differ from the first by the four drawings it gained and by as little
+else as possible.
+
+Three bounds, because the three payloads fail differently and no one number
+catches all of them. The first two are ratios, so they describe the shape of the
+output rather than a Graphviz release; the third is a byte count, which is what
+it takes to notice a payload that grew *inside* a drawing, since such a payload
+inflates any denominator taken from the drawings and hides itself there.
+
+| | today | icons | fonts | records | all | max |
+|---|---|---|---|---|---|---|
+| page / drawing bytes | 1.03 | 1.03 | 1.02 | 1.61 | 1.41 | 1.10 |
+| …with `--icons cisco` | 1.04 | 1.02 | 1.02 | 1.78 | 1.28 | 1.10 |
+| record block, 2 layers / 1 | 1.04 | 1.04 | 1.04 | 2.00 | 2.00 | 1.15 |
+| bytes per element per view | 543 | 543 | 806 | 848 | 1110 | 650 |
+| …with `--icons cisco` | 428 | 893 | 690 | 732 | 1459 | 650 |
+
+The middle columns are each change disabled on its own, so the table says which
+row catches which revert: every one of the three is over a threshold in at least
+one row, and a full revert is over four of the five. The headroom above today's
+worst figure is 20 %, which is tighter than any of the timing guards in entries
+5 and 7 would dare be and can afford to be — these are byte counts of a
+deterministic renderer with no run-to-run spread at all. What can move them is a
+Graphviz release that lays a diagram out differently; if one ever does, raise
+the threshold there and record the new number here, do not delete the test.
+
+Two sharper guards sit next to it, because a ratio is a blunt instrument for a
+property that can be stated exactly.
+`test_the_font_attributes_are_stated_once_and_still_resolve_the_same` requires a
+drawing to hold exactly one `font-family`, and
+`test_an_icon_is_stored_once_however_many_views_draw_it` requires the count of
+`data:` URIs in a three-layer page to equal the number of *distinct* icons in
+it — 5 on `campus`, where it was 396.
+
+### What did not change
+
+The picture, and the page's behaviour around it.
+
+**The picture is identical, and that is checked against a browser rather than
+argued.** `campus l1+l2+l3` rendered before and after this entry, opened in
+Chromium and screenshotted, is **byte-identical** without icons — the font
+hoisting is invisible, as inheritance says it must be. With `--icons` it is
+identical to within **215 subpixels of 3,780,000, at a maximum intensity
+difference of 8/255**, all of them on icon edges: a `<use>` establishes a nested
+viewport and the rasteriser rounds inside it slightly differently. That is
+antialiasing, it is confined to the artwork, and it is recorded here rather than
+rounded away.
+
+**The interactive behaviour is identical**, checked the same way: a script drove
+both pages through selecting a node, reading the detail panel, hovering for the
+card, searching, dimming a namespace, switching layers and selecting a node at
+the new one, both toggles, `/`, `f` and an arrow key, and finally re-opening the
+page at an element's deep link. Every observation matched between the two, with
+no console error on either, and the only difference in the whole transcript is
+that the new page has 22 `<use>` elements where the old one had none — all 22
+resolving to a box with a non-zero width, which is the check that they actually
+found their symbols.
+
+**The Content-Security-Policy is unchanged in kind and stricter in nothing.**
+Still `default-src 'none'; img-src data:` with a hash per inline block, no
+`'unsafe-inline'`, no `'unsafe-eval'`, no `style=` attribute anywhere and no
+markup assigned from data: the drawings are still server-rendered elements in
+the document, not a blob the client unpacks. The only new references a page
+holds are `#`-fragments from a `<use>` to a `<symbol>` in the same document,
+which fetch nothing;
+`test_every_same_document_reference_names_something_the_page_holds` requires
+each of them to name an id the page actually has.
+
+**The records themselves are unchanged.** A record is still the `-f json` export
+plus an element id and a links cross-reference — only *where it is stored*
+changed — so `detail.js`, `netgraph web` and the `-f json` exporter are
+untouched by this entry.
+
+Three test expectations changed, each because it was asserting the old storage
+rather than the property it was named for:
+`test_the_records_are_the_json_export_keyed_by_element_id` and
+`test_a_hostile_description_stays_inside_the_record_block` now read the pools
+(through one shared `records_of` helper that is the client's own four lines of
+reassembly), and `test_the_prepared_svg_scales_with_its_box` now looks for
+`width=` on the root element rather than anywhere in the document, since a
+hoisted symbol legitimately fills its box with one. `docs/home-lab.html` is
+re-rendered: 192,066 → 149,847 bytes.
+
+### What is deliberately not done
+
+**Deltas between views.** The original entry proposed them and the measurement
+argued against: the four variants of one layer differ in *layout*, not in
+labelling — hiding the addresses shrinks every box, which moves every
+coordinate — so a delta between two of them is nearly the whole drawing. The
+8 % that deflating all twelve as one stream buys over deflating them separately
+is the honest ceiling on what any cross-view sharing was worth here.
+
+**Compressing the drawings into the page.** `DecompressionStream` would take
+`campus l1+l2+l3`'s drawings from 428 kB to 69 kB deflated, 93 kB once base64 makes it embeddable, which is a
+larger win than everything above. It is not taken, and the reason is the
+Content-Security-Policy posture rather than the browser support: the drawings
+would arrive as text and be turned into elements by the client, which is exactly
+the "no markup is ever assigned from data" property the page is built on and the
+policy exists to keep honest. Trading that for bytes is a different decision
+from the ones in this entry, and not one to make silently.
+
+**A flag that embeds fewer views.** Also proposed by the original entry, also
+not taken — for the reason it gave itself: the toggles are why the format
+exists. With a view now costing its drawing and nothing else, the case for a
+flag that removes one is weaker than it was, not stronger.
 
 ---
 

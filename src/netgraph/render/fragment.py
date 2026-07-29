@@ -27,17 +27,40 @@ this is defence in depth rather than a fix for a known hole: an SVG built from
 user-supplied text is spliced into a document, which is exactly the situation
 where "the generator is careful" should not be the only thing standing between
 the two.
+
+Saying each thing once
+----------------------
+
+A page holds a drawing per view, so anything a drawing repeats is repeated
+again by every view of it. Two payloads dominated the measurement behind entry 8
+of ``docs/follow-ups.md``, and the parse tree this module already builds is
+where both are cheapest to remove:
+
+* **the font attributes.** Graphviz states ``font-family``, ``font-size`` and
+  ``text-anchor`` on every ``<text>`` element it emits — 36 % of the bytes of a
+  campus drawing. They are *inherited* properties, so stating the dominant value
+  once on the root and dropping it from the elements that agree renders exactly
+  the same picture (:func:`_hoist_text_attributes`);
+* **the icons.** ``--icons`` embeds each picture as a ``data:`` URI on every
+  node that uses it, in every drawing: 313 kB of a campus page for 4 kB of
+  distinct artwork. Each becomes a ``<symbol>`` in one shared
+  :class:`IconLibrary` and a ``<use>`` at each site.
+
+Both are transformations of the markup and not of the picture. That is asserted
+rather than argued — ``tests/test_html.py`` renders the same inventory with and
+without them and requires the drawn geometry to be identical.
 """
 
 from __future__ import annotations
 
 import re
+from collections import Counter
 from typing import Final
 from xml.etree import ElementTree
 
 from netgraph.errors import RenderError
 
-__all__ = ["SVG_NAMESPACE", "XLINK_NAMESPACE", "fragment"]
+__all__ = ["SVG_NAMESPACE", "XLINK_NAMESPACE", "IconLibrary", "fragment"]
 
 SVG_NAMESPACE: Final = "http://www.w3.org/2000/svg"
 XLINK_NAMESPACE: Final = "http://www.w3.org/1999/xlink"
@@ -102,6 +125,110 @@ _URL_REFERENCE: Final = re.compile(r"url\(#([^)\s]+)\)")
 #: it becomes part of an XML ``id``.
 _SAFE_PREFIX: Final = re.compile(r"[A-Za-z][A-Za-z0-9_.-]*")
 
+#: The element Graphviz draws a label with, and the one it draws an
+#: ``--icons`` picture with.
+_TEXT_TAG: Final = f"{{{SVG_NAMESPACE}}}text"
+_IMAGE_TAG: Final = f"{{{SVG_NAMESPACE}}}image"
+
+#: What a shared picture is stored as and referred to by.
+_SYMBOL_TAG: Final = f"{{{SVG_NAMESPACE}}}symbol"
+_DEFS_TAG: Final = f"{{{SVG_NAMESPACE}}}defs"
+_SVG_TAG: Final = f"{{{SVG_NAMESPACE}}}svg"
+_USE_TAG: Final = f"{{{SVG_NAMESPACE}}}use"
+
+#: Inherited text properties Graphviz states on every ``<text>`` element rather
+#: than once on the document. Hoisting them is only sound when *every* text
+#: carries the attribute: one that carries none would otherwise start
+#: inheriting a value it never had, so the check is per attribute and per
+#: drawing rather than a list of values known to be safe.
+_INHERITED_TEXT: Final[tuple[str, ...]] = (
+    "font-family",
+    "font-size",
+    "text-anchor",
+    "font-weight",
+)
+
+#: Geometry copied from an inline picture onto the ``<use>`` that replaces it.
+#: ``preserveAspectRatio`` deliberately stays behind, on the ``<image>`` inside
+#: the symbol, because it is a property of the picture rather than of the box
+#: it is drawn in — and two nodes drawing the same file the same way is exactly
+#: what makes them shareable.
+_IMAGE_GEOMETRY: Final[tuple[str, ...]] = ("x", "y", "width", "height")
+
+
+class IconLibrary:
+    """The pictures a set of drawings share, each stored once.
+
+    An ``--icons`` theme reaches a rendering as a ``data:`` URI per *node*, and
+    a page draws every node once per view, so the same few kilobytes of artwork
+    can be spelled out hundreds of times. A library collects them: each distinct
+    picture becomes one ``<symbol>``, and every site that drew it becomes a
+    ``<use>`` naming that symbol.
+
+    One library is shared across every drawing of a page (see
+    :mod:`netgraph.render.html`), which is what makes the icon payload a
+    property of the *theme* rather than of the view count. A caller with a
+    single drawing can let :func:`fragment` make its own, in which case the
+    symbols are written into that drawing.
+
+    The identity of a picture is its data and how it is fitted into its box:
+    two nodes share a symbol when both would have drawn the same bytes the same
+    way, and not otherwise.
+    """
+
+    def __init__(self, prefix: str = "ng-icon") -> None:
+        self._prefix = prefix
+        self._symbols: dict[tuple[str, str], str] = {}
+
+    def reference(self, href: str, fit: str) -> str:
+        """The id of the symbol drawing ``href`` fitted with ``fit``."""
+        key = (href, fit)
+        name = self._symbols.get(key)
+        if name is None:
+            name = f"{self._prefix}-{len(self._symbols) + 1}"
+            self._symbols[key] = name
+        return name
+
+    def defs(self) -> ElementTree.Element | None:
+        """The ``<defs>`` holding every symbol, or ``None`` when there are none.
+
+        A symbol carries no viewport of its own: a ``<use>`` referring to one
+        supplies the width and height, the ``<image>`` inside fills that box,
+        and the fit the original picture asked for decides how. So the pair
+        draws exactly what the single ``<image>`` drew, at every site.
+        """
+        if not self._symbols:
+            return None
+        defs = ElementTree.Element(_DEFS_TAG)
+        for (href, fit), name in self._symbols.items():
+            symbol = ElementTree.SubElement(defs, _SYMBOL_TAG, {"id": name})
+            attributes = {
+                f"{{{XLINK_NAMESPACE}}}href": href,
+                "width": "100%",
+                "height": "100%",
+            }
+            if fit:
+                attributes["preserveAspectRatio"] = fit
+            ElementTree.SubElement(symbol, _IMAGE_TAG, attributes)
+        return defs
+
+    def markup(self) -> str:
+        """The library as a standalone ``<svg>`` to place once in a page.
+
+        Zero-sized and out of the accessibility tree: nothing inside ``<defs>``
+        is drawn, and the element exists only so that a ``<use>`` elsewhere in
+        the document has something to name.
+        """
+        defs = self.defs()
+        if defs is None:
+            return ""
+        root = ElementTree.Element(
+            _SVG_TAG,
+            {"class": "ng-defs", "width": "0", "height": "0", "aria-hidden": "true"},
+        )
+        root.append(defs)
+        return ElementTree.tostring(root, encoding="unicode")
+
 
 def fragment(
     payload: bytes,
@@ -109,6 +236,7 @@ def fragment(
     tooltips: bool = False,
     links: bool = False,
     prefix: str = "",
+    icons: IconLibrary | None = None,
 ) -> str:
     """Return ``payload`` as an ``<svg>`` fragment safe to embed in a page.
 
@@ -120,6 +248,10 @@ def fragment(
             embedder that must not let a diagram navigate the page around it.
         prefix: Prepended to every ``id`` in the document, with internal
             references rewritten to match. Empty leaves the ids alone.
+        icons: Where the inline pictures are hoisted to. Pass one shared
+            library when several drawings go into one document, so the artwork
+            is stored once for all of them; the default gives this drawing its
+            own, written into the drawing.
 
     Returns:
         The serialised ``<svg>`` element, without the XML declaration.
@@ -138,7 +270,7 @@ def fragment(
         root = ElementTree.fromstring(payload)
     except ElementTree.ParseError as exc:
         raise RenderError(f"Graphviz produced SVG that could not be parsed: {exc}") from exc
-    if root.tag != f"{{{SVG_NAMESPACE}}}svg":
+    if root.tag != _SVG_TAG:
         raise RenderError(f"expected an SVG document, got {root.tag!r}")
 
     for attribute in _ROOT_SIZE_ATTRIBUTES:
@@ -156,6 +288,16 @@ def fragment(
         _unwrap_anchors(root)
     if prefix:
         _prefix_ids(root, prefix)
+    _hoist_text_attributes(root)
+    # After the prefixing, because a symbol id belongs to the document rather
+    # than to one drawing of it: a shared library is named by every view.
+    local = icons is None
+    library = IconLibrary() if icons is None else icons
+    _hoist_icons(root, library)
+    if local:
+        defs = library.defs()
+        if defs is not None:
+            root.insert(0, defs)
     return ElementTree.tostring(root, encoding="unicode")
 
 
@@ -227,6 +369,65 @@ def _is_safe_reference(value: str, *, links: bool, anchor: bool) -> bool:
     if value.startswith("#"):
         return not anchor
     return links and value.lower().startswith(_LINK_SCHEMES)
+
+
+def _hoist_text_attributes(root: ElementTree.Element) -> None:
+    """State each inherited text property once instead of once per label.
+
+    Only an attribute *every* ``<text>`` carries can move: an element that
+    stated none would begin inheriting the hoisted value, which is a change to
+    the picture and not to the markup. Among those, the value that appears most
+    often goes to the root and is deleted from the elements that named it; the
+    minority keep theirs, where it overrides what they now inherit. Graphviz
+    emits these on ``<text>`` and nowhere else, so nothing else in the drawing
+    can be affected by a value arriving from above.
+    """
+    texts = [element for element in root.iter() if element.tag == _TEXT_TAG]
+    if not texts:
+        return
+    for name in _INHERITED_TEXT:
+        values = [element.get(name) for element in texts]
+        if any(value is None for value in values):
+            continue
+        common, _ = Counter(values).most_common(1)[0]
+        root.set(name, str(common))
+        for element in texts:
+            if element.get(name) == common:
+                del element.attrib[name]
+
+
+def _hoist_icons(root: ElementTree.Element, library: IconLibrary) -> None:
+    """Replace every inline picture with a reference to one shared copy.
+
+    The ``<use>`` keeps the box the ``<image>`` was drawn in — the same ``x``,
+    ``y``, ``width`` and ``height`` Graphviz computed — and the picture itself
+    moves into the library. An ``<image>`` whose reference is not an inline
+    picture is left alone: it is not artwork this renderer put there, and
+    sharing something it does not recognise would be a guess.
+    """
+    for parent in list(root.iter()):
+        for index, child in enumerate(parent):
+            if child.tag != _IMAGE_TAG:
+                continue
+            href = next(
+                (child.get(name) for name in sorted(_REFERENCE_ATTRIBUTES) if child.get(name)),
+                None,
+            )
+            if href is None or not href.startswith(_INLINE_IMAGE_PREFIX):
+                continue
+            name = library.reference(href, child.get("preserveAspectRatio", ""))
+            reference = ElementTree.Element(
+                _USE_TAG,
+                {
+                    f"{{{XLINK_NAMESPACE}}}href": f"#{name}",
+                    **{
+                        attribute: value
+                        for attribute in _IMAGE_GEOMETRY
+                        if (value := child.get(attribute)) is not None
+                    },
+                },
+            )
+            parent[index] = reference
 
 
 def _prefix_ids(root: ElementTree.Element, prefix: str) -> None:

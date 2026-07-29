@@ -12,10 +12,13 @@
  *     when the address and VLAN annotations can be turned off -- switching is
  *     showing a different one, never a re-layout, because a browser cannot lay
  *     a graph out and this page carries no layout engine;
- *   - a <script type="application/json"> holding one record per drawn element,
- *     keyed by the id the shape carries (--element-ids). That is the same
- *     structure `netgraph render -f json` exports and the same one the web
- *     preview's info boxes use.
+ *   - a <script type="application/json"> holding one record per drawn element.
+ *     A record is the same structure `netgraph render -f json` exports and the
+ *     same one the web preview's info boxes use. It is stored in two pools --
+ *     `records` and `links` -- with each layer holding a pair of indices per
+ *     element id, so that a device drawn at three layers is written once and
+ *     not three times; `records()` below puts the two back together, once per
+ *     layer, the first time that layer is asked for.
  *
  * Everything below is reading those two and moving classes around. No markup
  * is ever assigned -- no innerHTML, no document.write, no new Function -- so
@@ -72,6 +75,12 @@
   var prefix = "";
   /** Lazily built per layer: element id -> lower-cased searchable text. */
   var indexes = {};
+  /** Lazily built per layer: element id -> record, put back together from the
+   *  two pools the page carries. A record is written once for the whole page
+   *  even when several layers draw the same device; only its `links` -- which
+   *  edges reach it, which is precisely what a layer decides -- is stored per
+   *  layer. See "a view costs its drawing, and nothing else" in html.py. */
+  var assembled = {};
 
   /* ----------------------------------------------------------------- data */
 
@@ -80,7 +89,26 @@
   }
 
   function records() {
-    return layer().elements;
+    if (!assembled[state.layer]) {
+      var built = {};
+      var elements = layer().elements;
+      Object.keys(elements).forEach(function (id) {
+        var where = elements[id];
+        var record = data.records[where[0]];
+        if (where[1] < 0) {
+          built[id] = record;
+          return;
+        }
+        // A shallow copy, so that two layers drawing one device each get their
+        // own `links` and neither writes over the record they share.
+        var merged = {};
+        Object.keys(record).forEach(function (key) { merged[key] = record[key]; });
+        merged.links = data.links[where[1]];
+        built[id] = merged;
+      });
+      assembled[state.layer] = built;
+    }
+    return assembled[state.layer];
   }
 
   function recordOf(id) {

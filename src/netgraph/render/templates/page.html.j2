@@ -8,13 +8,15 @@
   device name, a namespace, a title, a description. An inventory can hold
   anything at all, and none of it may become markup.
 
-  Four values are *already* complete documents and are passed as Markup so that
+  Five values are *already* complete documents and are passed as Markup so that
   autoescape leaves them alone: ``style`` and ``script`` (files in the package,
-  written by hand and holding no inventory text), ``view.svg`` (parsed,
-  sanitised and re-serialised by ``netgraph.render.fragment``) and ``data``
-  (JSON, with ``<``, ``>`` and ``&`` escaped as ``\uXXXX`` so that nothing in
-  it can close the script element it sits in — see ``html._script_json``).
-  Everything else in this file is a bare interpolation on purpose.
+  written by hand and holding no inventory text), ``view.svg`` and ``icons``
+  (both parsed, sanitised and re-serialised by ``netgraph.render.fragment``;
+  ``icons`` is the shared ``<defs>`` the drawings' ``<use>`` elements name, and
+  is empty unless ``--icons`` was given) and ``data`` (JSON, with ``<``, ``>``
+  and ``&`` escaped as ``\uXXXX`` so that nothing in it can close the script
+  element it sits in — see ``html._script_json``). Everything else in this
+  file is a bare interpolation on purpose.
 
   The Content-Security-Policy is a hash of the two inline blocks, computed in
   ``html.py`` from the exact bytes written here. Change how ``style`` or
@@ -74,6 +76,9 @@
   <div id="ng-stage" class="stage" tabindex="0" role="group"
     aria-label="Network diagram. Drag to pan, scroll to zoom, arrow keys to move; search to find an element.">
     <div id="ng-viewport" class="viewport">
+{% if icons %}
+      {{ icons }}
+{% endif %}
 {% for view in views %}
       <div class="view" data-view="{{ view.id }}"{% if not view.first %} hidden{% endif %}>{{ view.svg }}</div>
 {% endfor %}

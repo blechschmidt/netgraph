@@ -60,6 +60,35 @@ means the page holds no drawing that prints them and no record that carries
 them, because "do not print the addresses" has to mean all of the printing or
 the flag is a trap. On means the page opens with them and can turn them off.
 
+A view costs its drawing, and nothing else
+------------------------------------------
+
+A drawing is irreducible — it is a layout, and only Graphviz can produce one —
+so a page must grow with the views it holds. What it must *not* do is grow with
+them in anything else, and entry 8 of ``docs/follow-ups.md`` measured three
+places where it did. Two are in the drawings and are fixed in
+:mod:`netgraph.render.fragment`: the repeated font attributes and the repeated
+``--icons`` payload, which is now one shared :class:`~netgraph.render.fragment.IconLibrary`
+per page. The third is here.
+
+The records used to be written once **per layer**, and a device's record does
+not depend on the layer it is drawn at — only the ``links`` cross-reference
+does, since which cables are drawn is exactly what a layer decides. So the page
+carries two pools and an index into them:
+
+.. code-block:: javascript
+
+    {"records": [ … ],                  // one entry per distinct record
+     "links":   [ … ],                  // one entry per distinct link list
+     "layers": [{"elements": {"<element id>": [recordIndex, linksIndex]}}]}
+
+``linksIndex`` is ``-1`` for a record that has no ``links`` at all, which is
+every edge. A consumer rebuilds what it used to read by looking both up and
+putting the links back on the record; ``page.js`` does exactly that, once per
+layer, the first time that layer is shown. Nothing about a record itself
+changed — it is still the ``-f json`` export plus an element id — so
+``detail.js`` and ``netgraph web`` are untouched by this.
+
 Determinism
 -----------
 
@@ -87,7 +116,7 @@ from netgraph.errors import RenderError
 from netgraph.models import API_VERSION
 from netgraph.render.details import build_details, printable
 from netgraph.render.dot import to_image
-from netgraph.render.fragment import fragment
+from netgraph.render.fragment import IconLibrary, fragment
 from netgraph.render.graph import Graph, Layer
 from netgraph.render.ids import element_ids
 from netgraph.render.options import RenderOptions
@@ -148,6 +177,8 @@ def html_document(graphs: Sequence[Graph], options: RenderOptions | None = None)
     views: list[dict[str, Any]] = []
     layers: list[dict[str, Any]] = []
     namespaces: set[str] = set()
+    pool = _Pool()
+    library = IconLibrary()
 
     for graph in graphs:
         identity = element_ids(graph)
@@ -159,7 +190,7 @@ def html_document(graphs: Sequence[Graph], options: RenderOptions | None = None)
             "nodes": len(graph.nodes),
             "edges": len(graph.edges),
             "views": [],
-            "elements": _clean(details),
+            "elements": {element: pool.add(record) for element, record in details.items()},
         }
         if graph.dangling:
             # Only reachable behind --force; a reader must be able to tell that
@@ -190,6 +221,9 @@ def html_document(graphs: Sequence[Graph], options: RenderOptions | None = None)
                                 tooltips=False,
                                 links=opts.link_template is not None,
                                 prefix=view,
+                                # One library for the whole page: an icon theme
+                                # is a fixed cost, not a per-view one.
+                                icons=library,
                             )
                         ),
                     }
@@ -212,6 +246,8 @@ def html_document(graphs: Sequence[Graph], options: RenderOptions | None = None)
                 "tooltips": opts.tooltips,
                 "links": opts.link_template is not None,
             },
+            "records": pool.records,
+            "links": pool.links,
             "layers": layers,
         }
     )
@@ -225,6 +261,7 @@ def html_document(graphs: Sequence[Graph], options: RenderOptions | None = None)
             style=Markup(style),
             script=Markup(script),
             data=Markup(data),
+            icons=Markup(library.markup()),
             views=views,
             layers=layers,
             namespaces=sorted(namespaces),
@@ -258,6 +295,60 @@ def _variants(options: RenderOptions) -> tuple[tuple[bool, bool], ...]:
 # --------------------------------------------------------------------------- #
 # The records
 # --------------------------------------------------------------------------- #
+
+#: The cross-reference a node record carries and an edge record does not: which
+#: edges terminate on it, at the layer being drawn. It is the one part of a
+#: record that a layer decides, so it is the one part stored per layer.
+_LINKS: Final = "links"
+
+#: What ``elements`` holds instead of a links index when a record has no
+#: ``links`` key at all.
+NO_LINKS: Final = -1
+
+
+class _Pool:
+    """Distinct records and link lists, each stored once for the whole page.
+
+    The same device is drawn at every layer it appears in, and its record is
+    the same text every time — the ``links`` list is the exception, because a
+    layer decides which edges exist. Splitting the two apart and storing each
+    by content makes both a function of the *network* rather than of the layer
+    count; see the module docstring for the shape a consumer reads.
+
+    Keying on the serialised form rather than on an element id is deliberate:
+    it needs no assumption about what a layer may and may not change, and two
+    records that differ in any way at all end up as two entries.
+    """
+
+    def __init__(self) -> None:
+        self.records: list[Any] = []
+        self.links: list[Any] = []
+        self._records: dict[str, int] = {}
+        self._links: dict[str, int] = {}
+
+    def add(self, record: Mapping[str, Any]) -> tuple[int, int]:
+        """Store ``record``, returning where its two halves went."""
+        cleaned = _clean(dict(record))
+        links = cleaned.pop(_LINKS, None)
+        return (
+            _intern(self.records, self._records, cleaned),
+            NO_LINKS if links is None else _intern(self.links, self._links, links),
+        )
+
+
+def _intern(values: list[Any], seen: dict[str, int], value: Any) -> int:
+    """The index of ``value`` in ``values``, appending it the first time.
+
+    Two values are the same when they serialise the same way, which for these
+    is exactly when the page would have written the same bytes twice.
+    """
+    key = json.dumps(value, ensure_ascii=False, sort_keys=False, separators=(",", ":"))
+    index = seen.get(key)
+    if index is None:
+        index = len(values)
+        seen[key] = index
+        values.append(value)
+    return index
 
 
 def _clean(value: Any) -> Any:

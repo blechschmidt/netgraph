@@ -782,11 +782,11 @@ def test_a_hostile_description_stays_inside_the_record_block(tmp_path: Path) -> 
     assert "\\u003c/script\\u003e" in raw.group(1)
 
     # …and JSON.parse gives the reader's page the characters back, unchanged
-    # but for what cannot be printed at all.
-    records = json.loads(raw.group(1))["layers"][0]["elements"]
-    descriptions = [
-        record.get("description") for record in records.values() if record.get("description")
-    ]
+    # but for what cannot be printed at all. The records sit in one pool for
+    # the whole page — see ``html.py`` — so that is where the description is;
+    # a layer's own index holds nothing but integers.
+    records = json.loads(raw.group(1))["records"]
+    descriptions = [record.get("description") for record in records if record.get("description")]
     assert descriptions, "the description reaches the records"
     for description in descriptions:
         assert '<script>alert("x")</script>' in description

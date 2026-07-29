@@ -338,10 +338,14 @@ MINIMAL_SVG = (
 
 def test_the_prepared_svg_scales_with_its_box() -> None:
     prepared = prepare(MINIMAL_SVG)
-    assert "width=" not in prepared
-    assert "height=" not in prepared
-    assert 'viewBox="0 0 10 20"' in prepared
-    assert "preserveAspectRatio" in prepared
+    # On the *root element*, which is what decides how big the picture is
+    # drawn. Further down there may well be a width: a hoisted icon symbol
+    # fills the box its <use> gives it with one.
+    root = prepared[: prepared.index(">") + 1]
+    assert "width=" not in root
+    assert "height=" not in root
+    assert 'viewBox="0 0 10 20"' in root
+    assert "preserveAspectRatio" in root
 
 
 def test_the_prepared_svg_cannot_execute_or_navigate() -> None:

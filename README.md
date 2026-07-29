@@ -954,7 +954,7 @@ netgraph render -f html --layer l1 --layer l2 --layer l3 \
 ```
 
 [**docs/home-lab.html**](docs/home-lab.html) is that command's output, committed:
-the home-lab inventory at all three layers, 187 kB, no server. GitHub shows an
+the home-lab inventory at all three layers, 146 kB, no server. GitHub shows an
 `.html` file as source, so download it — or open it from a Pages site — to see
 the page itself.
 
@@ -1004,8 +1004,12 @@ Two consequences of there being no layout engine in a browser are worth knowing:
   view — each layer, with and without the addresses and the VLANs — and shows
   the one you asked for. Identical drawings are stored once, so an inventory
   with no VLANs pays nothing for the VLAN toggle. That is also the size: expect
-  roughly 40 kB of client plus a drawing per view, or ~190 kB for the
-  three-layer example above.
+  roughly 43 kB of client plus a drawing per view, or ~146 kB for the
+  three-layer example above. A view costs its drawing and essentially nothing
+  else — the records are stored once for the whole page however many layers
+  draw an element, and an `--icons` theme is stored once however many nodes and
+  views use it, so turning icons on usually makes a page *smaller* rather than
+  larger. `tools/bench_html.py` is the harness those numbers come from.
 * **`--no-show-ips` and `--no-show-vlans` are a ceiling, not a starting state.**
   Turning one off means the page holds no drawing that prints it *and* no record
   that carries it, so a published page cannot be talked into giving up an

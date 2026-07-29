@@ -126,6 +126,25 @@ def data_of(source: str) -> dict[str, Any]:
     return parsed
 
 
+def records_of(source: str, layer: int = 0) -> dict[str, Any]:
+    """The records of one layer, assembled the way the page's own client does.
+
+    A page stores each distinct record once for the whole document and each
+    distinct link list once, and a layer holds a pair of indices into the two
+    pools per element id — see "a view costs its drawing, and nothing else" in
+    ``html.py``. This is the reassembly, kept in one place so that every
+    assertion below reads a record rather than a pair of integers, and so that
+    the pools have to agree with the index for any of them to pass.
+    """
+    data = data_of(source)
+    assembled: dict[str, Any] = {}
+    for element, (record, links) in data["layers"][layer]["elements"].items():
+        assembled[element] = dict(data["records"][record])
+        if links >= 0:
+            assembled[element]["links"] = data["links"][links]
+    return assembled
+
+
 def blocks(source: str, tag: str) -> list[str]:
     """The raw text of every ``tag`` element, as the browser would hash it."""
     return re.findall(rf"<{tag}[^>]*>(.*?)</{tag}>", source, re.S)
@@ -184,7 +203,7 @@ def test_the_records_are_the_json_export_keyed_by_element_id(graph: Graph, page:
     assert [layer["layer"] for layer in data["layers"]] == ["l2"]
 
     identity = element_ids(graph)
-    elements = data["layers"][0]["elements"]
+    elements = records_of(page)
     assert set(elements) == {*identity.nodes.values(), *identity.edges}
 
     switch = elements[identity.nodes["switches/sw-home"]]
@@ -291,7 +310,7 @@ def test_an_option_that_is_off_has_no_drawing_that_prints_it(graph: Graph) -> No
     assert parse(page).tags.count("svg") == 1
     # …and the records carry no address either, so a published page cannot be
     # made to give one up by editing its JSON.
-    for record in data_of(page)["layers"][0]["elements"].values():
+    for record in records_of(page).values():
         for port in record.get("interfaces", []):
             assert "addresses" not in port
     assert "10.0.10.1" not in page
@@ -334,6 +353,245 @@ def test_native_tooltips_are_left_out(page: str) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Saying each thing once
+# --------------------------------------------------------------------------- #
+#
+# A page holds a drawing per view, so anything a *drawing* repeats is repeated
+# again by every view of it, and anything a *layer* repeats is repeated by every
+# layer. Entry 8 of docs/follow-ups.md measured three such payloads and removed
+# them; what follows pins each one, and then pins the property they were removed
+# for — that a view costs its drawing and nothing else.
+
+
+SVG_NS = "http://www.w3.org/2000/svg"
+XLINK_NS = "http://www.w3.org/1999/xlink"
+
+
+def effective_text_properties(source: str) -> list[dict[str, str | None]]:
+    """For every ``<text>`` in ``source``, the properties it actually draws with.
+
+    Inherited, which is the whole point: an attribute stated on an ancestor and
+    one stated on the element itself produce the same picture, so a check that
+    the hoisting changed nothing has to compare what the browser would resolve
+    rather than what the markup says.
+    """
+    from xml.etree import ElementTree
+
+    names = ("font-family", "font-size", "text-anchor", "font-weight", "fill")
+    found: list[dict[str, str | None]] = []
+
+    def walk(element: ElementTree.Element, inherited: dict[str, str | None]) -> None:
+        here = dict(inherited)
+        for name in names:
+            if element.get(name) is not None:
+                here[name] = element.get(name)
+        if element.tag == f"{{{SVG_NS}}}text":
+            found.append({**here, "text": "".join(element.itertext())})
+        for child in element:
+            walk(child, here)
+
+    walk(ElementTree.fromstring(source), dict.fromkeys(names))
+    return found
+
+
+@requires_dot
+def test_the_font_attributes_are_stated_once_and_still_resolve_the_same(graph: Graph) -> None:
+    """Graphviz writes them on every label; the drawing states them on itself."""
+    from netgraph.render.dot import to_image
+    from netgraph.render.fragment import fragment
+
+    payload = to_image(graph, RenderOptions(element_ids=True, tooltips=False), format="svg")
+    before = payload.decode("utf-8")
+    after = fragment(payload)
+
+    # The markup got shorter, and it got shorter by *saying the same thing*:
+    # every label resolves to exactly the properties it resolved to before.
+    assert before.count('font-family="') > 10
+    assert after.count('font-family="') == 1
+    assert effective_text_properties(after) == effective_text_properties(before)
+
+
+@requires_dot
+def test_hoisting_only_moves_an_attribute_every_label_carries(graph: Graph) -> None:
+    """A label that stated none must not start inheriting one.
+
+    ``font-weight`` is the case that matters: Graphviz writes it on the bold
+    device name and on nothing else, so hoisting the majority value would
+    silently embolden — or unbolden — every other label on the page.
+    """
+    from netgraph.render.dot import to_image
+    from netgraph.render.fragment import fragment
+
+    payload = to_image(graph, RenderOptions(element_ids=True, tooltips=False), format="svg")
+    assert b'font-weight="bold"' in payload, "the fixture has to exercise the case"
+    root = fragment(payload)[: fragment(payload).index(">") + 1]
+    assert "font-weight" not in root
+    assert 'font-family="Helvetica,Arial,sans-serif"' in root
+
+
+@requires_dot
+def test_an_icon_is_stored_once_however_many_views_draw_it(home_lab: Inventory) -> None:
+    """``--icons`` is a fixed cost of the theme, not a cost per node per view."""
+    from netgraph.render.icons import icon_theme
+
+    options = RenderOptions(icons=icon_theme("cisco"))
+    graphs = [build_graph(home_lab, layer=layer) for layer in (Layer.L1, Layer.L2, Layer.L3)]
+    page = html_document(graphs, options)
+
+    uris = re.findall(r'href="(data:image/[^"]*)"', page)
+    assert uris, "the theme reached the page"
+    assert len(uris) == len(set(uris)), "an icon is spelled out more than once"
+    # …and every drawing that wants one names it rather than repeating it.
+    uses = re.findall(r'<use [^>]*xlink:href="#(ng-icon-\d+)"', page)
+    assert len(uses) > len(uris), "the nodes draw more icons than the page holds copies of"
+    assert set(uses) <= set(re.findall(r'<symbol id="(ng-icon-\d+)"', page))
+
+
+def test_a_picture_that_is_not_an_inlined_icon_is_left_where_it_is() -> None:
+    """Only artwork this renderer inlined is shared; anything else is a guess."""
+    from netgraph.render.fragment import fragment
+
+    payload = (
+        b'<svg xmlns="http://www.w3.org/2000/svg" '
+        b'xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1 1">'
+        b'<image xlink:href="https://pictures.invalid/a.png" width="4" height="4"/>'
+        b'<image width="4" height="4"/>'
+        b'<image xlink:href="data:image/png;base64,AAA" width="4" height="4"/>'
+        b"</svg>"
+    )
+    out = fragment(payload, links=True)
+    assert out.count("<image") == 3, "the two it does not recognise stay images"
+    assert "https://pictures.invalid/a.png" in out
+    assert out.count("<use") == 1, "and the one it does becomes a reference"
+    assert out.count("data:image/png;base64,AAA") == 1
+
+
+@requires_dot
+def test_every_same_document_reference_names_something_the_page_holds(home_lab: Inventory) -> None:
+    """A `#`-reference fetches nothing — but it must not point at nothing either."""
+    from netgraph.render.icons import icon_theme
+
+    graphs = [build_graph(home_lab, layer=layer) for layer in (Layer.L1, Layer.L2)]
+    page = html_document(graphs, RenderOptions(icons=icon_theme("cisco")))
+    ids = set(parse(page).ids())
+    references = re.findall(r'(?:xlink:)?href="#([^"]+)"', page)
+    assert references
+    assert set(references) <= ids, sorted(set(references) - ids)
+
+
+@requires_dot
+def test_a_record_is_stored_once_however_many_layers_draw_it(home_lab: Inventory) -> None:
+    """A device is the same device at l1 and at l2; only its links differ."""
+    graphs = [build_graph(home_lab, layer=layer) for layer in (Layer.L1, Layer.L2)]
+    data = data_of(html_document(graphs))
+
+    serialised = [json.dumps(record, sort_keys=True) for record in data["records"]]
+    assert len(serialised) == len(set(serialised)), "the record pool holds a duplicate"
+    links = [json.dumps(entry, sort_keys=True) for entry in data["links"]]
+    assert len(links) == len(set(links)), "the links pool holds a duplicate"
+
+    first, second = (layer["elements"] for layer in data["layers"])
+    shared = set(first) & set(second)
+    assert shared, "the two layers draw the same devices"
+    assert all(first[element][0] == second[element][0] for element in shared), (
+        "the same element at two layers points at two copies of one record"
+    )
+    # An edge has no links cross-reference at all, and says so rather than
+    # carrying an empty list of its own.
+    edges = [element for element in first if element.startswith("edge-")]
+    assert edges and all(first[element][1] == -1 for element in edges)
+
+
+# --------------------------------------------------------------------------- #
+# The size guard
+# --------------------------------------------------------------------------- #
+#
+# The property entry 8 bought, pinned so that it is held rather than merely
+# achieved once. l1 and l2 draw *the same elements* — the second is the first
+# annotated with VLANs — so a page holding both must differ from a page holding
+# only l1 by the four drawings it gained, and by as little else as possible.
+#
+# Three bounds, because the three payloads entry 8 removed fail differently and
+# no single number catches all of them. The first two are ratios, which say
+# something about the shape of the output rather than about a Graphviz release;
+# the third is a byte count, which is what it takes to notice a payload that
+# grew *inside* a drawing, since such a payload inflates any denominator taken
+# from the drawings themselves. Every figure below is from campus at the commit
+# that closed entry 8; the "reverted" columns were measured by disabling one
+# change at a time, and are why each threshold is where it is.
+#
+#   |                            | today | icons | fonts | records | all  | max  |
+#   |----------------------------|-------|-------|-------|---------|------|------|
+#   | page / drawing bytes       | 1.03  | 1.03  | 1.02  | 1.61    | 1.41 | 1.10 |
+#   | …with --icons cisco        | 1.04  | 1.02  | 1.02  | 1.78    | 1.28 | 1.10 |
+#   | record block, 2 layers / 1 | 1.04  | 1.04  | 1.04  | 2.00    | 2.00 | 1.15 |
+#   | bytes per element per view | 543   | 543   | 806   | 848     | 1110 | 650  |
+#   | …with --icons cisco        | 428   | 893   | 690   | 732     | 1459 | 650  |
+#
+# Every column is caught by at least one row: the pooled records by the first
+# three, the two hoists by the last two — which is why the last two exist, since
+# a payload that grows inside a drawing inflates the denominator of a ratio
+# taken from the drawings and hides itself there.
+#
+# The headroom above today's worst figure is 20 %. That is tighter than a timing
+# guard would dare be and it can afford to be: these are byte counts of a
+# deterministic renderer, with no run-to-run spread at all. What can move them
+# is a Graphviz release that lays a diagram out differently — and if one ever
+# does, raise the threshold here and record the new number in entry 8 rather
+# than deleting the test.
+
+#: What an extra view may cost beyond the drawings it adds.
+MARGINAL_VIEW_BUDGET = 1.10
+
+#: What a second layer of the same elements may cost in records.
+MARGINAL_RECORD_BUDGET = 1.15
+
+#: What one view of one element may cost, in bytes of page.
+MARGINAL_BYTES_PER_ELEMENT = 650
+
+
+def page_and_drawings(source: str) -> tuple[int, int, int]:
+    """``(page bytes, drawing bytes, record block bytes)`` of one page."""
+    drawings = sum(len(block) for block in re.findall(r"(<svg\b.*?</svg>)", source, re.S))
+    data = re.search(
+        rf'<script id="{DATA_ELEMENT_ID}" type="application/json">(.*?)</script>', source, re.S
+    )
+    assert data is not None
+    return len(source), drawings, len(data.group(1))
+
+
+@requires_dot
+@pytest.mark.parametrize("theme", [None, "cisco"], ids=["no-icons", "cisco"])
+def test_an_extra_view_costs_its_drawing_and_little_else(theme: str | None) -> None:
+    from netgraph.render.icons import icon_theme
+
+    inventory = load_tree(EXAMPLES / "campus")
+    options = RenderOptions(icons=icon_theme(theme))
+    one = build_graph(inventory, layer=Layer.L1)
+    two = build_graph(inventory, layer=Layer.L2)
+    assert set(one.nodes) == set(two.nodes), "the comparison only means anything if they match"
+
+    small, small_svg, small_data = page_and_drawings(html_document([one], options))
+    large, large_svg, large_data = page_and_drawings(html_document([one, two], options))
+    added = views_of(html_document([one, two], options), layer=1)
+
+    ratio = (large - small) / (large_svg - small_svg)
+    assert ratio <= MARGINAL_VIEW_BUDGET, (
+        f"an extra view cost {ratio:.2f}x the drawings it added, over {MARGINAL_VIEW_BUDGET}"
+    )
+    records = large_data / small_data
+    assert records <= MARGINAL_RECORD_BUDGET, (
+        f"a second layer of the same elements cost {records:.2f}x the records, "
+        f"over {MARGINAL_RECORD_BUDGET}"
+    )
+    elements = len(one.nodes) + len(one.edges)
+    each = (large - small) / len(added) / elements
+    assert each <= MARGINAL_BYTES_PER_ELEMENT, (
+        f"a view costs {each:.0f} bytes per element, over {MARGINAL_BYTES_PER_ELEMENT}"
+    )
+
+
+# --------------------------------------------------------------------------- #
 # Layers
 # --------------------------------------------------------------------------- #
 
@@ -353,7 +611,7 @@ def test_several_layers_become_a_switcher(layered: str) -> None:
     assert "ng-layer" in document.ids()
     assert document.tags.count("option") >= 3
     # Layer 3 draws prefixes the physical view has no node for.
-    assert any(record["type"] == "subnet" for record in data["layers"][2]["elements"].values())
+    assert any(record["type"] == "subnet" for record in records_of(layered, 2).values())
 
 
 @requires_dot
@@ -738,7 +996,7 @@ def test_the_committed_example_is_a_page_of_this_shape() -> None:
     data = data_of(page)
     assert data["kind"] == PAGE_KIND
     assert [layer["layer"] for layer in data["layers"]] == ["l1", "l2", "l3"]
-    assert data["layers"][0]["elements"], "the example carries its records"
+    assert data["records"] and data["layers"][0]["elements"], "the example carries its records"
 
     document = parse(page)
     ids = document.ids()
