@@ -2268,6 +2268,7 @@ Everything above describes what a document may contain. A JSON Schema says the
 same thing in a form an editor can act on, so a misspelt key is underlined as
 you type it rather than discovered by the next `netgraph validate`.
 
+<!-- norun: the first line redirects, and the last writes a schema file into the reader's directory -->
 ```console
 $ netgraph schema > netgraph.schema.json          # every kind, in one schema
 $ netgraph schema --kind cable                    # just one kind
@@ -2358,6 +2359,7 @@ mapping to it — completion then offers only the fields that belong there, and 
 `kind: switch` document in `cables/` is an error rather than a valid file in the
 wrong place:
 
+<!-- norun: writes a schema file into the reader's directory -->
 ```console
 $ netgraph schema -k cable -o schema/netgraph-cable.schema.json
 ```

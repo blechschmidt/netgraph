@@ -14,8 +14,14 @@ fails the test suite.
 | [`overlay/`](overlay/) | 7 devices, 6 cables, 5 tunnels | WireGuard, IPsec, OpenVPN, VXLAN and GRE over one WAN — including VXLAN and GRE nested inside the IPsec tunnel, and a three-ended mesh. |
 | [`patch-room/`](patch-room/) | 4 devices, 2 patch panels, 7 cables | Two racks and a structured-cabling plant: every server link crosses two patch panels, and every element records where it is bolted. Draw it with `--layer physical` for the cabling record, `--layer l1` for the spliced topology, and `--layer rack` for the elevations. |
 
+<!-- run: -->
 ```console
 $ netgraph -i examples/home-lab validate
+no problems found
+```
+
+<!-- norun: writes campus.svg into the reader's directory -->
+```console
 $ netgraph -i examples/campus render -o campus.svg
 ```
 

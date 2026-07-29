@@ -261,6 +261,7 @@ the line every diagnostic points at.
 
 ## Modes
 
+<!-- norun: the first four lines rewrite or gate the reader's own tree, and the last is a shell pipeline -->
 ```console
 $ netgraph fmt                       # rewrite the inventory -i points at
 $ netgraph fmt inventory devices/    # rewrite these paths
@@ -278,6 +279,7 @@ as `gofmt -w`.
 **`--check`** is the CI mode. It writes nothing, lists the files that are not
 canonical on stdout, one per line, and exits 1 if there are any:
 
+<!-- norun: CI gates the committed examples/ tree on --check, so this failure listing cannot be reproduced from it -->
 ```console
 $ netgraph fmt --check examples
 examples/campus/sites/north/hosts/hosts.yaml
@@ -291,6 +293,7 @@ $EDITOR` opens the files and nothing else.
 **`--diff`** writes nothing and prints a unified diff. Paths below the working
 directory get git's `a/`/`b/` prefixes, so the output is a patch:
 
+<!-- norun: a shell pipeline into git apply -->
 ```console
 $ netgraph fmt --diff examples | git apply -R    # or just read it
 ```
@@ -303,6 +306,7 @@ not apply — a stream is not a file and has no ignore rules — and neither doe
 in-place rewriting, so this is the mode an editor's "format buffer" command
 wants:
 
+<!-- norun: redirects both ways, over paths in the reader's directory -->
 ```console
 $ netgraph fmt --stdin < devices/sw.yaml > devices/sw.formatted.yaml
 ```
@@ -312,8 +316,8 @@ $ netgraph fmt --stdin < devices/sw.yaml > devices/sw.formatted.yaml
 ## Which files are formatted
 
 Exactly the files the loader would read, and no others. `fmt` walks a folder
-with the same discovery [`validate`](../README.md#netgraph-validate) and
-[`render`](../README.md#netgraph-render) use, so all of `docs/schema.md` §2.1
+with the same discovery [`validate`](commands/validate.md) and
+[`render`](commands/render.md) use, so all of `docs/schema.md` §2.1
 applies unchanged:
 
 - only `*.yaml` and `*.yml`, compared case-insensitively (`NG-L001`);

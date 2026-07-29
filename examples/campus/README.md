@@ -78,8 +78,19 @@ That plan is what the layer-3 view draws: 33 prefixes, each joined to the
 elements addressed in it, with the three backbone `/30`s as the only subnets
 that span two sites.
 
+<!-- run: -->
+```console
+$ netgraph -i examples/campus list subnets
+SUBNET              IP  ADDRESSES  ELEMENTS  VLANS
+------------------  --  ---------  --------  -----
+10.1.0.0/30          4          2         2  -
+10.1.10.0/24         4          3         3  10
+...
+2001:db8:ff:3::/64   6          2         2  -
+```
+
+<!-- norun: writes an SVG into the reader's directory -->
 ```bash
-netgraph -i examples/campus list subnets
 netgraph -i examples/campus render --layer l3 --namespace sites/north -f svg -o north-l3.svg
 ```
 
@@ -116,6 +127,7 @@ The template lives in the `templates/` namespace and is reached from
 element: it does not appear in `netgraph list devices`, in any diagram, or in
 validation output. Read the merge either way round:
 
+<!-- norun: both lines carry a trailing shell comment, and each prints a document of its own -->
 ```bash
 netgraph -i examples/campus show sw-north-acc-03 --raw   # as written
 netgraph -i examples/campus show sw-north-acc-03         # as merged

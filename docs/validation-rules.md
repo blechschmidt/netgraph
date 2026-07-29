@@ -17,6 +17,7 @@ network is the exception.
 Every problem is printed as `location  rule  message`, grouped by severity,
 most severe first:
 
+<!-- norun: 'inventory' is an illustrative tree, and the findings are two rules shown together -->
 ```console
 $ netgraph -i inventory validate
 errors (1):
@@ -772,7 +773,7 @@ splits a subnet into halves that cannot reach each other while every individual
 document still looks right. The other reading is just as useful — the neighbour
 exists but was never written down, so the diagram is missing a device. Only the
 layer-3 view can show this at all, which is why the rule arrived with it; see
-[`--layer l3`](../README.md#layers-physical-l1-l2-l3-overlay-and-rack).
+[`--layer l3`](rendering.md#layers-one-inventory-six-questions).
 
 **Suppress with** `W105` / `NG-A008`, or an annotation on the element holding
 the address. A deliberately sparse management prefix, and a link whose peer is
@@ -1379,10 +1380,10 @@ Four mechanisms, all additive. A finding is silenced if any of them applies.
 Only the forty-one [pass 3](#pass-3--semantics) rules can be suppressed; naming a
 schema rule is a usage error:
 
+<!-- run: rc=2 -->
 ```console
 $ netgraph validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, …, I001,
-an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 Every mechanism accepts both spellings of an id — `W102` and `NG-C010` select
@@ -1390,6 +1391,7 @@ the same rule — plus the wildcards `*`, `all` and `any`.
 
 ### 1. On the command line
 
+<!-- norun: flag forms with trailing shell comments, and neither line names an inventory -->
 ```bash
 netgraph validate --disable W103 --disable NG-C010   # repeatable
 netgraph validate --strict                           # warnings become errors

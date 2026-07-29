@@ -1,7 +1,7 @@
 # quickstart
 
 The three-device inventory built step by step in the
-[project README](../../README.md#quickstart). It is checked in so that the
+[getting-started guide](../../docs/getting-started.md). It is checked in so that the
 walkthrough is executable rather than aspirational: the test suite loads it,
 validates it and renders it on every run, and `docs/images/quickstart.svg` in
 the README is produced from it.
@@ -46,7 +46,13 @@ quickstart/
   `netgraph/ignore` annotation on `rtr-gw` says that is deliberate, which is
   what an exception should look like.
 
+<!-- run: -->
+```console
+$ netgraph -i examples/quickstart validate
+no problems found
+```
+
+<!-- norun: writes an SVG into the reader's directory -->
 ```bash
-netgraph -i examples/quickstart validate
 netgraph -i examples/quickstart render -f svg -o topology.svg
 ```

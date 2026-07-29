@@ -1190,16 +1190,16 @@ def test_goldens_are_free_of_machine_specific_paths() -> None:
             assert "/root/" not in text
 
 
-def test_the_readme_path_example_is_what_netgraph_produces() -> None:
-    """The worked example in the quickstart, traced rather than typed.
+def test_the_documented_path_example_is_what_netgraph_produces() -> None:
+    """The worked example in the tutorial, traced rather than typed.
 
-    A sample of output in a README is a promise about the tool, and the only
+    A sample of output in a document is a promise about the tool, and the only
     kind of promise that survives a refactor is one a test makes.
     """
-    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    block = readme.partition("<!-- path-example -->")[2]
+    guide = (REPO_ROOT / "docs" / "getting-started.md").read_text(encoding="utf-8")
+    block = guide.partition("<!-- path-example -->")[2]
     documented = block.partition("$ netgraph path pc-alice rtr-gw\n")[2].partition("```")[0]
-    assert documented, "the path example is missing from the README"
+    assert documented, "the path example is missing from docs/getting-started.md"
 
     produced = render_trace(trace(load_tree(EXAMPLES / "quickstart"), "pc-alice", "rtr-gw"), "text")
     assert produced == documented

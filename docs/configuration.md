@@ -139,6 +139,7 @@ layer = "l3"
 max-addresses = 8
 ```
 
+<!-- norun: needs the netgraph.toml above, and both lines write a diagram into the reader's directory -->
 ```console
 $ netgraph render --profile poster -o docs/campus.html
 $ netgraph render --profile review -f svg -o review.svg
@@ -152,6 +153,7 @@ diagram indistinguishable from the one you wanted.
 A profile name may hold letters, digits, `-`, `_` and `.`, and must start with a
 letter or a digit. Shell completion offers the names of the current inventory:
 
+<!-- norun: a shell completion, which needs the completion hook and a terminal to press TAB in -->
 ```console
 $ netgraph render --profile <TAB>
 poster   -- sets layer, format, title
@@ -176,6 +178,7 @@ still beats the file:
 depth = 3
 ```
 
+<!-- norun: needs the netgraph.toml above, and the element name is illustrative -->
 ```console
 $ netgraph render --neighbors-of sw-core                 # depth 3, from the file
 $ netgraph render --neighbors-of sw-core --depth 1       # depth 1, from the flag
@@ -196,6 +199,7 @@ empty.
 `netgraph config show [COMMAND]` prints the settings a bare invocation of that
 command resolves to, with the place each value came from:
 
+<!-- norun: the transcript is of the netgraph.toml above; no committed inventory declares these profiles -->
 ```console
 $ netgraph config show render --profile review
 validation
@@ -229,6 +233,7 @@ To see a *particular* invocation resolved — flags included — add `--show-con
 to the command itself. It prints the same table and exits without loading the
 inventory or drawing anything:
 
+<!-- norun: needs the 'poster' profile of the netgraph.toml above -->
 ```console
 $ netgraph render --profile poster --title "Q3 review" --show-config
 ...
@@ -284,6 +289,7 @@ which is neither `true` nor `false`. Setting it to `false` turns even that off.
 An unknown key inside a known table is an error, not a silent no-op, and the
 message names the file, the key, and the likely spelling:
 
+<!-- norun: the transcript is of a netgraph.toml with a misspelt key, at an illustrative path -->
 ```console
 $ netgraph render
 error: /net/inventory/netgraph.toml: unknown key(s) in [render]: show_ips; did you mean 'show-ips'?
@@ -304,4 +310,4 @@ table is how a newer feature arrives.
 
 Every failure here exits with status 2, the usage-error status, because an
 unusable configuration file is a problem with the invocation rather than with
-the network. See [the exit codes](../README.md#exit-codes).
+the network. See [the exit codes](commands/README.md#exit-codes).

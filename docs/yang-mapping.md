@@ -362,6 +362,7 @@ rules keep it honest:
    `bridge.name` and `acceptable_frames`. `netgraph show NAME` prints exactly
    what an exporter would see.
 
+<!-- norun: pipes into an exporter the reader writes, over an illustrative inventory -->
 ```bash
 netgraph -i inventory show sw-access-01 -F json | your-exporter
 ```

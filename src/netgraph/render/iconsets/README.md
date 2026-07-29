@@ -32,6 +32,7 @@ Cisco's published icon library is copyrighted by Cisco and is not redistributed
 here. If you have that library and would rather use it, you do not need this
 theme — point `--icons` at a directory of your own:
 
+<!-- norun: copies the reader's own icon library and writes an SVG into their directory -->
 ```bash
 mkdir cisco-official
 cp .../Router.png cisco-official/router.png     # name each file for its kind

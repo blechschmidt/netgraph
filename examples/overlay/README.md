@@ -5,10 +5,10 @@ one physical topology. It is the example for [`docs/schema.md` §14](../../docs/
 what a `tunnel` document looks like, what nesting one inside another means, and
 what the diagram does with both.
 
+<!-- run: -->
 ```console
 $ netgraph -i examples/overlay validate
 no problems found
-
 $ netgraph -i examples/overlay list tunnels
 NAME                STACK             VNI  ENCRYPTED  ENDS  ENDPOINTS
 ------------------  ----------------  ---  ---------  ----  ----------------------------------------------
@@ -62,6 +62,7 @@ there is nowhere to put the key, deliberately ([§14.2](../../docs/schema.md#142
 
 ## The four views
 
+<!-- norun: each line writes an SVG into the reader's directory, and each carries a trailing shell comment -->
 ```console
 $ netgraph -i examples/overlay render -o l1.svg                    # physical, tunnels dashed over it
 $ netgraph -i examples/overlay render --layer l2 -o l2.svg         # VLAN 100 across the VXLAN

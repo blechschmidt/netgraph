@@ -991,7 +991,9 @@ def test_the_committed_example_is_a_page_of_this_shape() -> None:
     would make the suite fail on a machine with a different one rather than on
     a change worth noticing.
     """
-    assert EXAMPLE_PAGE.is_file(), "docs/home-lab.html is missing; see the README for the command"
+    assert EXAMPLE_PAGE.is_file(), (
+        "docs/home-lab.html is missing; docs/rendering.md has the command that writes it"
+    )
     page = EXAMPLE_PAGE.read_text(encoding="utf-8")
     data = data_of(page)
     assert data["kind"] == PAGE_KIND

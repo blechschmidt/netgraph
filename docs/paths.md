@@ -59,15 +59,14 @@ log line or a packet capture actually carries.
 
 Every failure names what it could have meant instead:
 
+<!-- run: rc=2 -->
 ```console
 $ netgraph -i examples/campus path pc-north-01 pc-north-99
-Error: Invalid value for 'SRC' / 'DST': no element named 'pc-north-99' in this
-inventory (destination argument). Run 'netgraph list devices' to see what is
-declared.
-
+...
+Error: Invalid value for 'SRC' / 'DST': no element named 'pc-north-99' in this inventory (destination argument). Run 'netgraph list devices' to see what is declared.
 $ netgraph -i examples/home-lab path pc-desk:eth9 srv-nas
-Error: Invalid value for 'SRC' / 'DST': 'hosts/pc-desk' has no interface 'eth9'
-(source argument). It has: lo, eno1, wlp1s0.
+...
+Error: Invalid value for 'SRC' / 'DST': 'hosts/pc-desk' has no interface 'eth9' (source argument). It has: lo, eno1, wlp1s0.
 ```
 
 An address configured on two interfaces is refused rather than guessed at — that
@@ -127,7 +126,7 @@ for a routed path:
 ```
 
 Now two elements are one hop apart when they hold an address in the same prefix
-— the same grouping [`netgraph list subnets`](../README.md#netgraph-list) prints
+— the same grouping [`netgraph list subnets`](commands/list.md) prints
 and `render --layer l3` draws, so the three cannot disagree. An element **in the
 middle** of a route is only crossed when it forwards, which is what
 `spec.forwarding` says: true for a `router` by default (§6.1.1), true for a
@@ -208,6 +207,7 @@ cable segments in the order the run crosses them.
 
 ### Two hosts on one VLAN — a switched path
 
+<!-- run: -->
 ```console
 $ netgraph -i examples/home-lab path laptop srv-nas
 hosts/laptop -> hosts/srv-nas: 1 path
@@ -237,6 +237,7 @@ interface, because §8.1 says an attachment has none to name.
 
 ### Two hosts in different VLANs — a routed path
 
+<!-- run: -->
 ```console
 $ netgraph -i examples/campus path 10.1.10.51 10.1.20.11
 sites/north/hosts/pc-north-01:eno1 -> sites/north/hosts/srv-north-01:eth0: 1 path
@@ -252,7 +253,7 @@ path 1 of 1 · 2 hops · ipv4
    2  sites/north/distribution/sw-north-dist-01  [switch]
       in  Vlan10                10.1.10.1/24
       out Vlan20                10.1.20.1/24
-      ->  subnet 10.1.20.0/24  10.1.20.11/24
+      ->  subnet 10.1.20.0/24  10.1.20.1/24 -> 10.1.20.11/24
    3  sites/north/hosts/srv-north-01  [server]
       in  eth0                  10.1.20.11/24
 ```
@@ -264,10 +265,11 @@ alone will not give you.
 
 ### Across a campus, and the redundant pair
 
+<!-- run: -->
 ```console
 $ netgraph -i examples/campus path pc-north-01 pc-south-01 --all
 sites/north/hosts/pc-north-01 -> sites/south/hosts/pc-south-01: 2 paths
-  …
+  ...
 
 path 1 of 2 · 5 hops · ipv4
    1  sites/north/hosts/pc-north-01  [computer]
@@ -282,16 +284,16 @@ path 1 of 2 · 5 hops · ipv4
       out xe-0/0/1              198.51.100.1/30
       ->  subnet 198.51.100.0/30  198.51.100.1/30 -> 198.51.100.2/30
    4  sites/south/core/rtr-south-core-01  [router]
-      …
+      ...
 
 path 2 of 2 · 6 hops · ipv4
-   …
+   ...
    3  sites/north/core/rtr-north-core-01  [router]
       in  xe-0/0/0              10.1.0.1/30
       out xe-0/0/2              198.51.100.10/30
       ->  subnet 198.51.100.8/30  198.51.100.10/30 -> 198.51.100.9/30
    4  sites/west/core/rtr-west-core-01  [router]
-      …
+      ...
 ```
 
 The campus backbone is a three-site ring, so north reaches south directly or the
@@ -300,6 +302,7 @@ a line saying the rest exist.
 
 ### A stretched VLAN over a nested tunnel
 
+<!-- run: -->
 ```console
 $ netgraph -i examples/overlay path rtr-hq rtr-branch-b --vlan 100
 sites/hq/rtr-hq -> sites/branch-b/rtr-branch-b: 1 path
@@ -323,9 +326,10 @@ does, so nothing is warned about.
 
 ### The overlay beats the underlay
 
+<!-- run: -->
 ```console
 $ netgraph -i examples/overlay path pc-branch-a srv-hq
-…
+...
 path 1 of 8 · 3 hops · ipv4
    1  sites/branch-a/pc-branch-a  [computer]
       out enp3s0                10.20.0.10/24
@@ -374,9 +378,10 @@ reported, never silently:
 **None.** No path is an *answer*, not an error. It comes back with the layers
 that were searched and how far each one got, so the break is locatable:
 
+<!-- run: rc=1 -->
 ```console
 $ netgraph -i examples/campus path pc-north-01 sw-north-acc-01:GigabitEthernet1/0/3
-…
+...
 no path from sites/north/hosts/pc-north-01 to sites/north/access/sw-north-acc-01 within 16 hops.
   layer 2: reached 2 elements; the furthest was sites/north/access/sw-north-acc-01 at 1 hop
   layer 3: reached 22 elements; the furthest was sites/south/access/sw-south-acc-01 at 5 hops
@@ -400,6 +405,7 @@ straight into CI:
 
 ## Drawing the answer: `--highlight`
 
+<!-- norun: writes an SVG into the reader's directory -->
 ```bash
 netgraph -i examples/campus path pc-north-01 pc-south-01 --highlight -f svg -o path.svg
 ```
@@ -427,7 +433,7 @@ which is the thing `--neighbors-of` cannot show you.
   fork of it.
 - `-f` and `-o` describe that diagram, so both require `--highlight`. Without
   `-o` the diagram goes to stdout and the hop-by-hop report moves to stderr,
-  which is the same split [`netgraph render`](../README.md#netgraph-render)
+  which is the same split [`netgraph render`](commands/render.md)
   uses.
 
 An element's own kind colour survives on the path — a highlighted switch still
@@ -436,8 +442,10 @@ see which of the roads not taken was fibre.
 
 ## JSON output
 
+<!-- run: rc=0 -->
 ```console
 $ netgraph -i examples/campus path -F json 10.1.10.51 10.1.20.11
+...
 ```
 
 ```json
@@ -532,7 +540,7 @@ layer's search reached:
 
 Within one `apiVersion` these keys are only added, never renamed or removed, and
 an absent optional key means "not configured" rather than "unknown" — the same
-contract [`render -f json`](../README.md#netgraph-render) makes.
+contract [`render -f json`](commands/render.md) makes.
 
 ## Options
 
@@ -548,7 +556,7 @@ contract [`render -f json`](../README.md#netgraph-render) makes.
 | `--strict` | off | Treat warnings as errors when validating the inventory first. |
 | `--force` | off | Trace even when validation failed. The path may not match the files. |
 
-Plus every display option [`netgraph render`](../README.md#netgraph-render)
+Plus every display option [`netgraph render`](commands/render.md)
 takes, which apply to the `--highlight` diagram.
 
 Validation runs before the trace and errors refuse it, for the same reason they
@@ -587,7 +595,7 @@ modelling gap from a real break.
 
 ---
 
-**See also:** [`netgraph render --layer l3`](../README.md#layers-physical-l1-l2-l3-overlay-and-rack)
+**See also:** [`netgraph render --layer l3`](rendering.md#layers-one-inventory-six-questions)
 for the routed graph this walks, [`docs/schema.md` §14](schema.md) for how a
 tunnel is declared, and
 [`docs/validation-rules.md`](validation-rules.md) for the checks that run before

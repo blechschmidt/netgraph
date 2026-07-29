@@ -5,8 +5,10 @@ in [`docs/validation-rules.md`](validation-rules.md), prints what it found and
 exits non-zero when anything is an error — so the shortest useful pipeline is
 one line:
 
+<!-- run: cwd=examples/quickstart -->
 ```console
-$ netgraph --inventory inventory validate --strict
+$ netgraph --inventory . validate --strict
+no problems found
 ```
 
 This page covers the rest: the machine-readable output formats, the composite
@@ -54,6 +56,7 @@ workflow command alike.
 
 `--strict` and `--disable` behave exactly as they do for `text`:
 
+<!-- norun: redirects stdout into a file in the reader's directory -->
 ```console
 $ netgraph -i inventory validate -F sarif --strict --disable W105 --disable I002 > netgraph.sarif
 ```
@@ -69,10 +72,11 @@ $ netgraph -i inventory validate -F sarif --strict --disable W105 --disable I002
 
 A structured document is written for `0` and `1`. It is *not* written for the
 rest: those are failures to run the check, not results of it. The full table is
-in the [README](../README.md#exit-codes).
+in the [command reference](commands/README.md#exit-codes).
 
 ## The JSON envelope
 
+<!-- norun: the envelope below is from an inventory with a broken cable, at an illustrative path -->
 ```console
 $ netgraph -q -i inventory validate -F json
 ```
@@ -136,6 +140,7 @@ which is the line that has to change. `file` moves with it.
 
 Counting warnings by rule, for a dashboard:
 
+<!-- norun: a shell pipeline into jq -->
 ```console
 $ netgraph -q -i inventory validate -F json \
     | jq -r '.findings | group_by(.rule) | map({rule: .[0].rule, n: length}) | .[] | "\(.n)\t\(.rule)"'

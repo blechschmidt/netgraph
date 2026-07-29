@@ -120,6 +120,7 @@ order. What blocks it is one level up: `InterfaceRef.device` is typed
 The inconsistency is visible from the CLI, which resolves the very same string
 happily, because it calls `lookup` directly:
 
+<!-- norun: the element name is illustrative and the second line is a comment, not a command -->
 ```console
 $ netgraph show sites/hq/sw1        # works
 $ # the same name in a cable endpoint  -> schema error

@@ -1,6 +1,6 @@
 # Address-space health with `netgraph ipam`
 
-[`netgraph list subnets`](../README.md#netgraph-list) enumerates the prefixes an
+[`netgraph list subnets`](commands/list.md) enumerates the prefixes an
 inventory happens to contain. It does not say whether the address plan is
 *healthy*. `netgraph ipam` answers the three questions that come next:
 
@@ -35,8 +35,9 @@ different stories.
 
 With no options, `netgraph ipam` prints one row per derived prefix:
 
+<!-- run: -->
 ```console
-$ netgraph ipam -i examples/campus --family ipv4
+$ netgraph -i examples/campus ipam --family ipv4
 PREFIX           IP  VLANS  HOSTS  USED  FREE    UTIL  DEVICES
 ---------------  --  -----  -----  ----  ----  ------  -------
 10.1.0.0/30       4  -          2     2     0  100.0%        2
@@ -46,7 +47,8 @@ PREFIX           IP  VLANS  HOSTS  USED  FREE    UTIL  DEVICES
 10.2.0.0/30       4  -          2     2     0  100.0%        2
 ...
 192.0.2.1/32      4  -          1     1     0  100.0%        1
-198.51.100.0/30   4  -          2     2     0  100.0%        2
+...
+198.51.100.8/30   4  -          2     2     0  100.0%        2
 
 conflicts
 no problems found
@@ -98,9 +100,9 @@ slot either way. The fight itself is reported as a
 `--free PREFIX` subtracts what is allocated from a prefix and prints the holes
 as the fewest CIDR blocks that cover them:
 
+<!-- run: -->
 ```console
-$ netgraph ipam -i examples/campus --free 10.1.0.0/22
-free space in 10.1.0.0/22: 8 block(s), 1 allocation(s) already carved out
+$ netgraph -i examples/campus ipam --free 10.1.0.0/22
 BLOCK          IP  HOSTS
 -------------  --  -----
 10.1.0.4/30     4      2
@@ -111,6 +113,7 @@ BLOCK          IP  HOSTS
 10.1.0.128/25   4    126
 10.1.1.0/24     4    254
 10.1.2.0/23     4    510
+free space in 10.1.0.0/22: 8 block(s), 1 allocation(s) already carved out
 ```
 
 Allocation happens **a subnet at a time**: a prefix nested inside `PREFIX`
@@ -135,14 +138,13 @@ out. `PREFIX` may be written with host bits set — `--free 10.1.0.1/22` means t
 `--next-free` is the operation an engineer actually performs when adding a
 device. It prints one prefix and nothing else, so it composes:
 
+<!-- run: -->
 ```console
-$ netgraph ipam -i examples/campus --next-free 10.1.0.0/16
+$ netgraph -i examples/campus ipam --next-free 10.1.0.0/16
 10.1.1.0/24
-
-$ netgraph ipam -i examples/campus --next-free 10.1.10.0/23 --size /26
+$ netgraph -i examples/campus ipam --next-free 10.1.10.0/23 --size /26
 10.1.11.0/26
-
-$ netgraph ipam -i examples/campus --next-free 2001:db8:1::/48
+$ netgraph -i examples/campus ipam --next-free 2001:db8:1::/48
 2001:db8:1:1::/64
 ```
 
@@ -157,8 +159,9 @@ return immediately.
 
 When there is no room, the command says so on stderr and exits 1:
 
+<!-- run: rc=1 -->
 ```console
-$ netgraph ipam -i examples/campus --next-free 10.1.10.0/24 --size 8
+$ netgraph -i examples/campus ipam --next-free 10.1.10.0/24 --size 8
 error: no free /8 inside 10.1.10.0/24; run 'netgraph ipam --free 10.1.10.0/24' to see what is left
 ```
 
@@ -169,8 +172,9 @@ error: no free /8 inside 10.1.10.0/24; run 'netgraph ipam --free 10.1.10.0/24' t
 `--aggregate` collapses sibling prefixes that between them fill their supernet,
 so a large inventory produces a summary rather than a wall of `/24`s:
 
+<!-- run: -->
 ```console
-$ netgraph ipam -i examples/campus --aggregate --family ipv6
+$ netgraph -i examples/campus ipam --aggregate --family ipv6
 PREFIX              IP  VLANS  HOSTS  USED  FREE    UTIL  DEVICES  PARTS
 ------------------  --  -----  -----  ----  ----  ------  -------  -----
 2001:db8::1/128      6  -          1     1     0  100.0%        1      -
@@ -178,6 +182,9 @@ PREFIX              IP  VLANS  HOSTS  USED  FREE    UTIL  DEVICES  PARTS
 2001:db8:1::/64      6  -       2^64     2  2^64   <0.1%        2      -
 ...
 2001:db8:ff:2::/63   6  -       2^65     4  2^65   <0.1%        4      2
+
+conflicts
+no problems found
 ```
 
 `PARTS` is how many declared prefixes the row stands for. Two prefixes are
@@ -223,8 +230,9 @@ design. Reproducing that distinction here would have meant a second
 implementation that could disagree with the first, so the two existing rules are
 called instead.
 
+<!-- run: -->
 ```console
-$ netgraph ipam -i tests/fixtures/invalid/w131-nested-prefix-other-domain.yaml
+$ netgraph -i tests/fixtures/invalid/w131-nested-prefix-other-domain.yaml ipam
 PREFIX       IP  VLANS  HOSTS  USED   FREE   UTIL  DEVICES
 -----------  --  -----  -----  ----  -----  -----  -------
 10.0.0.0/16   4  10     65534     2  65532  <0.1%        2
@@ -232,8 +240,7 @@ PREFIX       IP  VLANS  HOSTS  USED   FREE   UTIL  DEVICES
 
 conflicts
 warnings (1):
-  w131-...yaml#3:73  W131  subnet '10.0.5.0/24' sits inside '10.0.0.0/16', but the two
-                           are used in different broadcast domains: ...
+  w131-nested-prefix-other-domain.yaml#3:73  W131  subnet '10.0.5.0/24' sits inside '10.0.0.0/16', but the two are used in different broadcast domains: '10.0.5.0/24' in VLAN 20 and '10.0.0.0/16' in VLAN 10. Hosts in '10.0.0.0/16' treat every address of '10.0.5.0/24' as on-link, so they will ARP for it instead of routing to it.
 
 1 warning
 ```
@@ -285,8 +292,9 @@ not in `ietf-ip`. See [§6.2.3 of the schema](schema.md#623-ipv4--ipv6).
 
 **JSON** carries both halves of the default report in one document:
 
+<!-- norun: a jq pipeline -->
 ```console
-$ netgraph ipam -i examples/campus -F json | jq '.subnets[0], (.conflicts|length)'
+$ netgraph -i examples/campus ipam -F json | jq '.subnets[0], (.conflicts|length)'
 {
   "prefix": "10.1.0.0/30",
   "family": "ipv4",
@@ -311,16 +319,19 @@ Conflict entries have the same shape as the `findings` array of
 utilisation rows — the half a spreadsheet or an `awk` script wants — and notes
 on stderr how many conflicts were left out:
 
+<!-- run: -->
 ```console
-$ netgraph ipam -i examples/campus -F csv --family ipv6 | head -2
+$ netgraph -i examples/campus ipam -F csv --family ipv6
 prefix,family,vlans,capacity,assigned,free,utilisation,devices
 2001:db8::1/128,ipv6,,1,1,0,1.000000,1
+...
 ```
 
 For the conflicts as CSV, ask for them on their own:
 
+<!-- run: -->
 ```console
-$ netgraph ipam -i examples/campus --conflicts -F csv
+$ netgraph -i examples/campus ipam --conflicts -F csv
 rule,alias,severity,element,file,message
 ```
 

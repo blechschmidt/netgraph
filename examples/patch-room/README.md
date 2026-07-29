@@ -39,6 +39,7 @@ touched. The four patch leads either side of them are what an operator changes.
 
 A patch panel is not a hop, so the same seven cables have two honest readings.
 
+<!-- norun: writes an SVG into the reader's directory -->
 ```console
 $ netgraph -i examples/patch-room render --layer physical -o cabling.svg
 ```
@@ -47,6 +48,7 @@ draws six nodes and seven edges: the panels are there and each segment is its
 own line. This is the cabling record — what a technician standing in the room
 would find.
 
+<!-- norun: writes an SVG into the reader's directory -->
 ```console
 $ netgraph -i examples/patch-room render --layer l1 -o topology.svg
 ```
@@ -64,8 +66,10 @@ a panel free to model — adding one to a correct inventory changes no layer but
 `netgraph path` uses the spliced reading and still names the panels, because
 "which position is this run in?" is the first question when the link is down:
 
+<!-- run: -->
 ```console
 $ netgraph -i examples/patch-room path sw-core-01 srv-app-01
+...
    1  network/sw-core-01  [switch]
       out GigabitEthernet1/0/7
       ->  cable cbl-sw-pp07  (copper, 1Gbps, P-007A, 21m)  vlan 10  [via pp-r1-a front/7-rear/7, pp-r2-a rear/7-front/7]
@@ -75,6 +79,7 @@ $ netgraph -i examples/patch-room path sw-core-01 srv-app-01
 
 ## The elevations
 
+<!-- norun: writes an SVG into the reader's directory -->
 ```console
 $ netgraph -i examples/patch-room render --layer rack -o racks.svg
 ```
