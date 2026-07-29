@@ -608,8 +608,13 @@ def test_a_head_request_carries_the_headers_but_no_body(
 
 
 def test_writing_is_not_offered(preview: tuple[PreviewServer, LiveRender]) -> None:
+    # 405 rather than 501: the preview understands POST -- ``netgraph web``,
+    # which shares this handler base, renders what a browser posts to it -- and
+    # says which methods it will answer instead.
     server, _ = preview
-    assert get(server, "/", method="POST")[0] == 501
+    status, headers, _ = get(server, "/", method="POST")
+    assert status == 405
+    assert headers["Allow"] == "GET, HEAD"
 
 
 def test_every_response_carries_the_hardening_headers(

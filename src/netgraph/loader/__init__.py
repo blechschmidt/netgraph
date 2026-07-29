@@ -34,6 +34,7 @@ from netgraph.loader.documents import (
     StrictSafeLoader,
     YamlSyntaxError,
     libyaml_loader,
+    parse_documents,
     read_documents,
     select_loader,
 )
@@ -54,9 +55,11 @@ from netgraph.loader.inventory import (
     short_name,
 )
 from netgraph.loader.tree import (
+    STREAM_NAME,
     YAML_SUFFIXES,
     InventoryFile,
     iter_inventory_files,
+    load_stream,
     load_tree,
 )
 
@@ -64,6 +67,7 @@ __all__ = [
     "HAVE_LIBYAML",
     "IGNORE_FILE_NAME",
     "LOADER_ENV_VAR",
+    "STREAM_NAME",
     "YAML_SUFFIXES",
     "IgnoreRule",
     "IgnoreRuleSet",
@@ -80,8 +84,10 @@ __all__ = [
     "YamlSyntaxError",
     "iter_inventory_files",
     "libyaml_loader",
+    "load_stream",
     "load_tree",
     "namespace_of",
+    "parse_documents",
     "parse_ignore_file",
     "qualify",
     "read_documents",

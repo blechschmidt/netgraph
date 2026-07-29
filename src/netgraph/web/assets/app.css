@@ -1,0 +1,302 @@
+/* netgraph web interface.
+ *
+ * Two panes and a floating info box. The palette follows the diagram's own
+ * encoding -- green for what is fine, red for an error, amber for a warning --
+ * so the status pill and a finding in the list mean the same thing as the
+ * colours in the picture next to them.
+ */
+
+:root {
+  color-scheme: light dark;
+  --edge: rgba(128, 128, 128, .35);
+  --ok: #1a7f37;
+  --error: #cf222e;
+  --warning: #9a6700;
+  --info: #0969da;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --pane: 40%;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  font: 13px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: Canvas;
+  color: CanvasText;
+  overflow: hidden;
+}
+
+/* ---------------------------------------------------------------- header */
+
+header {
+  display: flex;
+  gap: .6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: .45rem .7rem;
+  border-bottom: 1px solid var(--edge);
+}
+
+header h1 {
+  font: 600 14px/1 var(--mono);
+  margin: 0;
+  letter-spacing: .02em;
+}
+
+.spacer { flex: 1 1 auto; }
+
+.pill {
+  font: 600 11px/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: .28rem .5rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+
+.pill.ok { color: var(--ok); }
+.pill.invalid, .pill.failed { color: var(--error); }
+.pill.pending, .pill.rendering { color: var(--warning); }
+
+.summary { font-family: var(--mono); opacity: .75; }
+
+.field, .check {
+  display: inline-flex;
+  gap: .35rem;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  opacity: .9;
+}
+
+select, input[type="text"], button {
+  font: inherit;
+  font-family: var(--mono);
+  color: inherit;
+  background: Canvas;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  padding: .2rem .35rem;
+}
+
+button { cursor: pointer; }
+button:hover { border-color: currentColor; }
+button.ghost { border-color: transparent; opacity: .8; }
+
+/* ----------------------------------------------------------------- panes */
+
+main {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pane.editor { flex: 0 0 var(--pane); border-right: 1px solid var(--edge); }
+.pane.diagram { flex: 1 1 auto; }
+
+.pane-head {
+  display: flex;
+  gap: .5rem;
+  align-items: baseline;
+  padding: .35rem .7rem;
+  border-bottom: 1px solid var(--edge);
+  font: 600 11px/1.6 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  opacity: .8;
+}
+
+.pane-head .hint {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: .7;
+}
+
+.problems-head { border-top: 1px solid var(--edge); }
+
+#source {
+  flex: 1 1 auto;
+  min-height: 0;
+  resize: none;
+  border: 0;
+  outline: 0;
+  padding: .6rem .7rem;
+  font: 12px/1.55 var(--mono);
+  tab-size: 2;
+  background: Canvas;
+  color: CanvasText;
+}
+
+.splitter {
+  flex: 0 0 5px;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.splitter:hover, .splitter:focus-visible { background: var(--edge); }
+
+/* ------------------------------------------------------------- problems */
+
+.problems {
+  flex: 0 0 28%;
+  overflow: auto;
+  padding: .3rem 0;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.problem {
+  display: grid;
+  grid-template-columns: 4.5rem 10rem 4.5rem 1fr;
+  gap: .5rem;
+  padding: .18rem .7rem;
+  align-items: start;
+}
+
+/* Every problem carries a line, and clicking one puts the cursor on it. */
+.problem.locatable { cursor: pointer; }
+.problem:hover { background: color-mix(in srgb, CanvasText 6%, transparent); }
+.problem .severity { font-weight: 700; }
+.problem.error .severity, .problem.error .rule { color: var(--error); }
+.problem.warning .severity, .problem.warning .rule { color: var(--warning); }
+.problem.info .severity, .problem.info .rule { color: var(--info); }
+.problem .where { opacity: .7; overflow-wrap: anywhere; }
+
+.empty { opacity: .55; padding: .6rem .7rem; margin: 0; }
+
+/* -------------------------------------------------------------- diagram */
+
+.canvas {
+  position: relative;
+  flex: 1 1 auto;
+  overflow: hidden;
+  cursor: grab;
+  background:
+    radial-gradient(circle at 1px 1px, var(--edge) 1px, transparent 0) 0 0 / 22px 22px;
+}
+
+.canvas.panning { cursor: grabbing; }
+
+.viewport {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+.viewport svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The hit area of a node is its shape; of an edge, its stroke -- which is a
+ * couple of pixels wide, so the pointer needs help finding it. */
+.viewport svg g.edge path { stroke-linecap: round; }
+.viewport svg g.edge { pointer-events: visibleStroke; }
+.viewport svg g.node, .viewport svg g.edge { cursor: pointer; }
+
+.viewport svg g.hot { filter: drop-shadow(0 0 3px currentColor); }
+.viewport svg g.hot > * { stroke-width: 2.4; }
+.viewport svg g.faded { opacity: .28; }
+
+/* ------------------------------------------------------------- info box */
+
+.info {
+  position: fixed;
+  z-index: 10;
+  max-width: min(34rem, 46vw);
+  max-height: 70vh;
+  overflow: auto;
+  padding: .55rem .7rem .65rem;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: Canvas;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .28);
+  font-family: var(--mono);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.info.pinned { pointer-events: auto; }
+
+.info h2 {
+  font: 600 13px/1.3 var(--mono);
+  margin: 0;
+  display: flex;
+  gap: .4rem;
+  align-items: baseline;
+}
+
+.info h2 .kind {
+  font-weight: 400;
+  opacity: .65;
+  text-transform: lowercase;
+}
+
+.info .pinhint { float: right; font-weight: 400; opacity: .55; font-size: 11px; }
+/* A table is allowed to be wider than the box and scroll: breaking "ethernet"
+ * across two lines to save a few pixels costs more than the scrollbar does. */
+.info section { margin-top: .5rem; overflow-x: auto; }
+.info h3 {
+  font: 600 10px/1.6 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  opacity: .6;
+  margin: 0 0 .15rem;
+}
+
+.info dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: .05rem .6rem;
+  margin: 0;
+}
+
+.info dt { opacity: .6; }
+.info dd { margin: 0; overflow-wrap: anywhere; }
+
+.info table { border-collapse: collapse; width: 100%; }
+.info th {
+  text-align: left;
+  font: 600 10px/1.6 var(--mono);
+  opacity: .55;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding-right: .6rem;
+}
+.info td {
+  vertical-align: top;
+  padding: .05rem .6rem .05rem 0;
+  white-space: nowrap;
+}
+.info tr.off td { opacity: .5; text-decoration: line-through solid; }
+.info .tag {
+  display: inline-block;
+  padding: 0 .3rem;
+  margin-right: .2rem;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  font-size: 11px;
+}
+.info .note { opacity: .65; }
+
+@media (max-width: 720px) {
+  main { flex-direction: column; }
+  .pane.editor { flex: 0 0 45%; border-right: 0; border-bottom: 1px solid var(--edge); }
+  .splitter { display: none; }
+}

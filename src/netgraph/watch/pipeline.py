@@ -48,6 +48,7 @@ __all__ = [
     "RenderRequest",
     "Snapshot",
     "Status",
+    "flatten_problems",
     "run_cycle",
     "write_atomically",
 ]
@@ -184,7 +185,7 @@ def run_cycle(request: RenderRequest) -> CycleResult:
         )
         inventory = load_tree(request.inventory)
         findings = run_validation(inventory, settings)
-        problems = _problems(inventory.errors, findings)
+        problems = flatten_problems(inventory.errors, findings)
 
         if _is_rejected(inventory, findings) and not request.force:
             return CycleResult(
@@ -223,8 +224,14 @@ def _is_rejected(inventory: Inventory, findings: Iterable[Finding]) -> bool:
     return bool(inventory.errors) or any(finding.severity.is_fatal for finding in findings)
 
 
-def _problems(errors: Sequence[LoadError], findings: Sequence[Finding]) -> tuple[Problem, ...]:
-    """Flatten load errors and findings, most severe first, load order within."""
+def flatten_problems(
+    errors: Sequence[LoadError], findings: Sequence[Finding]
+) -> tuple[Problem, ...]:
+    """Flatten load errors and findings, most severe first, load order within.
+
+    Shared with :mod:`netgraph.web.preview`: two front ends listing the same
+    inventory's problems in two different orders would be a bug in one of them.
+    """
     flattened = [Problem.from_load_error(error) for error in errors]
     flattened.extend(Problem.from_finding(finding) for finding in findings)
     return tuple(sorted(flattened, key=lambda problem: problem.severity.rank))

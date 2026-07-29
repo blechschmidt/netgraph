@@ -18,6 +18,11 @@ One contract per command:
     ``render`` on a loop, driven by the filesystem, optionally with a local
     preview served over HTTP. Whatever ``render`` would refuse, ``watch``
     reports without discarding the last diagram that did render.
+``web``
+    The same pipeline behind an interactive page: a YAML document stream in a
+    text area, the diagram beside it, and an info box on every node and link.
+    It edits a *stream*, not a tree, which is what lets it work on text that was
+    never a folder — a paste, a pipe, a snippet from a ticket.
 ``list``
     Tabular inventory summaries for humans, with ``--output-format json|yaml``
     for everything else.
@@ -46,7 +51,10 @@ status line every few seconds is commentary by any measure.
 from __future__ import annotations
 
 import json
+import shutil
 import sys
+import threading
+import webbrowser
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -70,7 +78,13 @@ from netgraph.completion import (
 from netgraph.config import Config, load_config
 from netgraph.console import Align, Console
 from netgraph.errors import NetgraphError, RenderError, format_path
-from netgraph.loader import Inventory, LoadError, load_tree
+from netgraph.loader import (
+    YAML_SUFFIXES,
+    Inventory,
+    LoadError,
+    iter_inventory_files,
+    load_tree,
+)
 from netgraph.models import KINDS, Element, format_bitrate
 from netgraph.render import (
     FORMATS,
@@ -90,6 +104,7 @@ from netgraph.render import (
     supports_icons,
     theme_choices,
 )
+from netgraph.render.dot import DOT_EXECUTABLE
 from netgraph.rules import RULES, Severity
 from netgraph.scaffold import SCHEMA_FILE_NAME, build_scaffold, write_scaffold
 from netgraph.schema import build_schema
@@ -110,6 +125,8 @@ from netgraph.watch import (
     file_changes,
     run_watch,
 )
+from netgraph.web import DEFAULT_PORT as WEB_PORT
+from netgraph.web import WebServer
 
 __all__ = ["cli", "main"]
 
@@ -960,6 +977,178 @@ _STATUS_COLOUR: Final[dict[Status, str]] = {
     Status.INVALID: "red",
     Status.FAILED: "red",
 }
+
+
+# --------------------------------------------------------------------------- #
+# web
+# --------------------------------------------------------------------------- #
+
+
+@cli.command("web")
+@click.argument(
+    "source",
+    required=False,
+    type=click.Path(exists=True, dir_okay=True, readable=True, path_type=Path),
+)
+@click.option(
+    "--host",
+    default=DEFAULT_HOST,
+    show_default=True,
+    metavar="ADDRESS",
+    help=(
+        "Address to bind. The default keeps the interface on this machine; "
+        "an inventory describes internal topology, so publishing it is an explicit act."
+    ),
+)
+@click.option(
+    "--port",
+    type=click.IntRange(0, 65535),
+    default=WEB_PORT,
+    show_default=True,
+    help="Port to bind. 0 lets the operating system choose one.",
+)
+@click.option(
+    "--open/--no-open",
+    "open_browser",
+    default=True,
+    show_default=True,
+    help="Open the interface in the default browser once it is listening.",
+)
+@click.option(
+    "--icons",
+    callback=_resolve_icons,
+    default=None,
+    metavar="THEME|DIR",
+    help=(
+        "Draw each element as an icon instead of a plain shape. "
+        f"Built in: {', '.join(theme_choices())}. Chosen here rather than in the browser, "
+        "because it names a directory on this machine."
+    ),
+)
+@click.pass_obj
+def web_command(
+    app: AppContext,
+    source: Path | None,
+    host: str,
+    port: int,
+    open_browser: bool,
+    icons: IconTheme | None,
+) -> None:
+    """Edit a YAML document stream in a browser and see it drawn as you type.
+
+    The page holds the stream in a text area and the diagram beside it. Every
+    edit is parsed, validated and rendered exactly as `netgraph render` would,
+    and hovering a node or a link opens an info box with the detail the picture
+    has no room for: every interface, its addresses and VLANs, and what it is
+    cabled to.
+
+    SOURCE seeds the editor. It may be a file or a folder, whose documents are
+    concatenated into one stream; `-` reads the stream from standard input, as
+    does a pipe. With no SOURCE the editor opens on the same example topology
+    `netgraph init` writes.
+
+    Note that a stream has no folders and therefore no namespaces: every element
+    seeded from a tree lands in the root namespace.
+
+    Press Ctrl-C to stop.
+    """
+    console = app.console(err=True)
+
+    text = _web_source(console, source)
+    exposure = describe_exposure(host, subject="the web interface")
+    if exposure is not None:
+        console.warn(exposure)
+    if shutil.which(DOT_EXECUTABLE) is None:
+        console.warn(
+            f"the Graphviz {DOT_EXECUTABLE!r} executable was not found on PATH; the page "
+            "will load but every render will report that it cannot draw anything"
+        )
+
+    server = WebServer.create(
+        source=text,
+        icons=icons,
+        host=host,
+        port=port,
+        log=lambda message: app.log(f"web: {message}", level=2),
+        on_render=lambda preview: app.log(
+            f"{preview.status}: {preview.message} ({preview.duration * 1000:.0f} ms)", level=1
+        ),
+    ).start()
+    console.info(f"editing at {server.url}; press Ctrl-C to stop")
+    if open_browser:
+        _open_browser(app, server.url)
+
+    try:
+        threading.Event().wait()
+    except KeyboardInterrupt:
+        # Ctrl-C is how this command is meant to end, not a failure.
+        pass
+    finally:
+        server.stop()
+    console.info("web interface stopped")
+
+
+def _web_source(console: Console, source: Path | None) -> str:
+    """The document stream the editor opens with.
+
+    A pipe wins over everything: ``netgraph render -f dot | ...`` taught users
+    that netgraph reads stdin when it is not a terminal, and a stream is what
+    this command edits.
+
+    Raises:
+        LoaderError: A seed folder cannot be walked.
+    """
+    if source is None and not _is_a_terminal(sys.stdin):
+        return sys.stdin.read()
+    if source is None:
+        return _example_stream()
+    if str(source) == "-":  # pragma: no cover - click resolves '-' to a path first
+        return sys.stdin.read()
+    if source.is_file():
+        return source.read_text(encoding="utf-8-sig")
+
+    files = iter_inventory_files(source)
+    if any(entry.namespace for entry in files):
+        console.warn(
+            "a document stream has no folders: every element from a nested one is seeded "
+            "into the root namespace, and two elements that shared a name in different "
+            "folders now collide"
+        )
+    documents = [
+        f"# {entry.relative.as_posix()}\n{entry.path.read_text(encoding='utf-8-sig').lstrip()}"
+        for entry in files
+    ]
+    return "\n---\n".join(documents) if documents else _example_stream()
+
+
+def _example_stream() -> str:
+    """The starter topology, as one stream.
+
+    The same documents ``netgraph init`` writes, so the first thing a reader of
+    either sees is the same network — without the schema modeline, which points
+    at a file the browser has no way to fetch.
+    """
+    scaffold = build_scaffold(schema=False)
+    documents = [
+        body for path, body in scaffold.files.items() if path.lower().endswith(YAML_SUFFIXES)
+    ]
+    return "\n---\n".join(documents)
+
+
+def _open_browser(app: AppContext, url: str) -> None:
+    """Ask the desktop to open ``url``, and say so rather than failing if it cannot.
+
+    There is no browser on a server, in a container or over a bare SSH session,
+    and none of those is a reason for this command to stop: the URL has already
+    been printed and a tunnel is a normal way to reach it.
+    """
+    try:
+        opened = webbrowser.open(url)
+    except Exception as exc:  # pragma: no cover - platform-specific failure
+        app.log(f"could not open a browser: {exc}", level=1)
+        return
+    if not opened:
+        app.log("no browser could be opened; the address above still works", level=1)
 
 
 # --------------------------------------------------------------------------- #

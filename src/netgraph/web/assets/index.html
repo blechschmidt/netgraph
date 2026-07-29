@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>netgraph</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<header>
+  <h1>netgraph</h1>
+  <span id="status" class="pill pending">waiting</span>
+  <span id="summary" class="summary"></span>
+  <span class="spacer"></span>
+  <label class="field">
+    layer
+    <select id="layer">
+      <option value="l1">l1 — physical</option>
+      <option value="l2">l2 — VLANs</option>
+      <option value="l3">l3 — IP subnets</option>
+    </select>
+  </label>
+  <label class="field" title="Keep only elements participating in these VLANs, e.g. 10,20">
+    vlan
+    <input id="vlans" type="text" inputmode="numeric" placeholder="all" size="7">
+  </label>
+  <label class="check"><input id="show-ips" type="checkbox" checked> IPs</label>
+  <label class="check"><input id="show-vlans" type="checkbox" checked> VLANs</label>
+  <label class="check"><input id="group" type="checkbox"> group</label>
+  <label class="check" title="Report warnings as errors"><input id="strict" type="checkbox"> strict</label>
+  <button id="render" type="button">Render</button>
+</header>
+
+<main>
+  <section class="pane editor">
+    <div class="pane-head">
+      <span>YAML document stream</span>
+      <span class="hint">one or more documents, separated by <code>---</code></span>
+    </div>
+    <textarea id="source" spellcheck="false" autocomplete="off" autocapitalize="off"
+      aria-label="YAML document stream"></textarea>
+    <div class="pane-head problems-head">
+      <span>problems</span>
+      <span id="problem-counts" class="hint"></span>
+      <span class="spacer"></span>
+      <span class="hint">click one to jump to its line</span>
+    </div>
+    <div id="problems" class="problems"><p class="empty">nothing to report</p></div>
+  </section>
+
+  <div id="splitter" class="splitter" role="separator" aria-orientation="vertical"
+    aria-label="Resize the editor" tabindex="0"></div>
+
+  <section class="pane diagram">
+    <div class="pane-head">
+      <span>diagram</span>
+      <span class="hint">hover a node or a link for details &middot; drag to pan &middot; scroll to zoom</span>
+      <span class="spacer"></span>
+      <button id="fit" type="button" class="ghost">Fit</button>
+    </div>
+    <div id="canvas" class="canvas">
+      <div id="viewport" class="viewport"></div>
+      <p id="placeholder" class="empty">nothing rendered yet</p>
+    </div>
+  </section>
+</main>
+
+<aside id="info" class="info" hidden aria-live="polite"></aside>
+<script src="/app.js"></script>
+</body>
+</html>

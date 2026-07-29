@@ -54,6 +54,7 @@ __all__ = [
     "StrictSafeLoader",
     "YamlSyntaxError",
     "libyaml_loader",
+    "parse_documents",
     "read_documents",
     "select_loader",
 ]
@@ -349,7 +350,30 @@ def read_documents(path: Path, *, relative: PurePosixPath) -> Generator[RawDocum
             f"file is not valid UTF-8: {exc.reason}",
             path=path,
         ) from exc
+    yield from parse_documents(text, path=path, relative=relative)
 
+
+def parse_documents(
+    text: str, *, path: Path, relative: PurePosixPath
+) -> Generator[RawDocument, None, None]:
+    """Parse every document in ``text``, exactly as :func:`read_documents` does.
+
+    The two differ only in where the bytes came from, which is what lets a
+    document stream that was never a file -- pasted into the web interface,
+    piped in on stdin -- be loaded under the same rules, with the same
+    strictness and the same line numbers.
+
+    Args:
+        text: The whole YAML stream, already decoded.
+        path: The name the stream is reported under. It is used for
+            diagnostics only and is never opened, so a caller with nothing on
+            disk may pass a stand-in.
+        relative: The same name relative to the inventory root.
+
+    Raises:
+        YamlSyntaxError: The stream is not well-formed YAML, uses an
+            unsupported tag, or repeats a mapping key.
+    """
     # Constructing the loader can itself fail: the pure-Python ``Reader`` scans
     # the whole string for unprintable characters up front, where libyaml only
     # trips over one when it reaches it. Translating here keeps the two paths

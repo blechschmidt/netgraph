@@ -23,14 +23,27 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from typing import Final
 
 from netgraph.errors import LoaderError, SchemaError
-from netgraph.loader.documents import RawDocument, YamlSyntaxError, read_documents
+from netgraph.loader.documents import (
+    RawDocument,
+    YamlSyntaxError,
+    parse_documents,
+    read_documents,
+)
 from netgraph.loader.ignore import IGNORE_FILE_NAME, IgnoreStack, parse_ignore_file
 from netgraph.loader.inventory import Inventory, LoadError, SourceLocation, qualify
 from netgraph.models import parse_document
 
-__all__ = ["YAML_SUFFIXES", "InventoryFile", "iter_inventory_files", "load_tree"]
+__all__ = [
+    "STREAM_NAME",
+    "YAML_SUFFIXES",
+    "InventoryFile",
+    "iter_inventory_files",
+    "load_stream",
+    "load_tree",
+]
 
 #: ``NG-L001`` — the suffixes a document may use, compared case-insensitively.
 YAML_SUFFIXES: tuple[str, ...] = (".yaml", ".yml")
@@ -101,6 +114,52 @@ def load_tree(root: Path) -> Inventory:
     with _deferred_gc():
         for entry in iter_inventory_files(root, errors=inventory.errors):
             _load_file(entry, inventory)
+    return inventory
+
+
+#: The file name a stream with no file of its own is reported under. It appears
+#: in every diagnostic the stream produces, so it is spelled like the path it
+#: stands in for rather than like a placeholder.
+STREAM_NAME: Final = "stream.yaml"
+
+
+def load_stream(text: str, *, name: str = STREAM_NAME) -> Inventory:
+    """Load a YAML document stream that never was a folder.
+
+    One stream is one file's worth of documents, so every element lands in the
+    root namespace and references resolve globally. Apart from that the rules
+    are the ones :func:`load_tree` applies -- the same strict parser, the same
+    schema validation, the same ``NG-N002`` duplicate check -- because the
+    interactive front ends exist to tell a user what ``netgraph validate``
+    would say about the very same text.
+
+    Loading is total here too: a syntax error or a rejected document is
+    recorded on :attr:`~netgraph.loader.inventory.Inventory.errors` and the
+    remaining documents are still loaded, which is what keeps a diagram on
+    screen while the document under the cursor is half typed.
+
+    Args:
+        text: The whole stream, ``---`` separators included.
+        name: File name to report problems under. Nothing is opened.
+
+    Returns:
+        The populated inventory, possibly holding errors.
+    """
+    entry = InventoryFile(path=Path(name), relative=PurePosixPath(name))
+    inventory = Inventory(root=Path(name))
+    try:
+        for document in parse_documents(text, path=entry.path, relative=entry.relative):
+            _add_document(document, entry=entry, inventory=inventory)
+    except YamlSyntaxError as exc:
+        inventory.record(
+            LoadError(
+                message=str(exc),
+                path=entry.path,
+                relative=name,
+                line=exc.line,
+                column=exc.column,
+            )
+        )
     return inventory
 
 

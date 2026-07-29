@@ -4,7 +4,10 @@ Declare your network — switches, routers, hubs, computers, servers, cables and
 adapters — in a folder tree of YAML files, then render it as a network graph.
 
 netgraph reads the tree, checks that the documents agree with each other, and
-draws the result as SVG, PNG, PDF, Graphviz DOT, Mermaid or JSON.
+draws the result as SVG, PNG, PDF, Graphviz DOT, Mermaid or JSON. It can also
+open the whole thing in a browser — `netgraph web` — where the YAML is edited
+on one side, drawn on the other, and every node and link answers a hover with
+its interfaces, addresses, VLANs and cabling.
 
 ![Layer-2 diagram of the home-lab example: a router, a switch, two computers, a server and a USB-to-Ethernet adapter, annotated with addresses and VLANs](docs/images/home-lab.svg)
 
@@ -607,6 +610,78 @@ netgraph watch --serve --layer l2 --vlan 10 --title vlan10
 netgraph watch --serve --host 0.0.0.0 --port 9000        # deliberate, and warned about
 ```
 
+### `netgraph web`
+
+Edit a YAML document stream in the browser and watch it being drawn, with an
+info box on every node and link.
+
+```
+netgraph web [SOURCE] [--host ADDRESS] [--port PORT] [--no-open] [--icons THEME|DIR]
+```
+
+```bash
+netgraph web                                  # opens on the netgraph init example
+netgraph web examples/home-lab                # seeded from a folder, flattened into one stream
+netgraph web devices/sw-office.yaml           # seeded from one file
+kubectl get cm topology -o jsonpath={..yaml} | netgraph web   # or from a pipe
+```
+
+![The netgraph web interface: the YAML document stream on the left, the rendered layer-2 diagram on the right, and the info box open on a switch showing its interfaces, addresses, VLANs and links](docs/images/web.png)
+
+<sub>Hovering `sw-home` in [`examples/home-lab`](examples/home-lab): every port,
+its addresses and VLAN mode, and what each one is cabled to.</sub>
+
+The page is two panes. On the left is the document stream — one or more
+documents separated by `---` — and the problems found in it; on the right is
+the diagram, which re-renders about half a second after you stop typing. The
+same load, validate and render the command line performs runs on every pass, so
+what the page reports is what `netgraph validate` would say about the same
+text.
+
+**Hovering a node or a link opens an info box** holding what the diagram has no
+room for: every interface with its type, MAC, MTU, addresses and VLAN mode;
+every link that terminates on the element, what it runs to and over which port;
+and, at layer 3, the prefix a subnet node stands for and who is addressed in
+it. Everything it shows is the same data `netgraph render -f json` exports —
+the records *are* that export — so the two cannot drift apart. The element
+under the pointer and everything it touches are lifted out of the diagram while
+the box is open; click to pin the box, click again or press `Esc` to let go.
+
+Beyond that: the layer, the VLAN filter and the display toggles are in the
+header and apply on the next render; the canvas pans with a drag and zooms with
+the wheel; clicking a problem puts the cursor on the line that caused it; and
+the splitter between the panes moves.
+
+**Broken text still draws.** `netgraph render` refuses an inventory with errors
+unless `--force`, because a diagram that disagrees with the files misinforms
+whoever is shown it. Here the diagram *is* the feedback and text being edited is
+wrong most of the time, so every problem is listed with its line and whatever
+resolved is drawn anyway.
+
+| Option | Default | Effect |
+|---|---|---|
+| `SOURCE` | the `netgraph init` example | Seed for the editor: a file, or a folder whose documents are concatenated. A pipe on stdin wins over both. |
+| `--host ADDRESS` | `127.0.0.1` | Address to bind. |
+| `--port PORT` | `8081` | Port to bind; `0` lets the operating system choose one. One above the `watch` preview's, so both can run at once. |
+| `--open` / `--no-open` | `--open` | Open the page in the default browser once the server is listening. |
+| `--icons THEME\|DIR` | none | Draw elements as icons, exactly as for `render`. Chosen here rather than in the browser, because it names a directory on this machine. |
+
+`netgraph.toml` is not read here either — a stream has no folder to look for
+one in — so the rules are the built-in defaults plus the `strict` toggle in the
+header.
+
+A stream has no folders and therefore **no namespaces**: every element seeded
+from a tree lands in the root namespace, and two elements that shared a short
+name in different folders will collide. Deep trees belong in
+`netgraph watch --serve`; this command is for a snippet, a paste or a file.
+
+The same restrictions apply as to the `watch` preview — loopback by default,
+a fixed set of routes, no request path ever turned into a file name, a `Host`
+header check — plus two of its own: a request body is capped at 1 MB, and the
+SVG is parsed and stripped of anything that could execute or navigate before it
+is put into the page. It is a development server: do not put it on a hostile
+network.
+
 ### `netgraph list`
 
 List what the inventory declares.
@@ -728,7 +803,7 @@ to each candidate; bash lists the values alone, as it does for everything.
 | 2 | Usage error, or an unusable `netgraph.toml`. |
 | 3 | The inventory could not be discovered or read at all. |
 | 5 | The rendering could not be produced (Graphviz missing, output not writable, binary format to a terminal). |
-| 6 | `watch --serve` could not bind its address. |
+| 6 | `watch --serve` or `web` could not bind its address. |
 | 130 | Interrupted. |
 | 141 | The downstream end of a pipe closed first. |
 
@@ -884,6 +959,29 @@ are collected on `inventory.errors`. `validate` never raises either — it
 returns findings and lets the caller decide. The package is typed
 (`py.typed`) and checked with `mypy --strict`.
 
+Text that never was a folder — a paste, a pipe, a snippet from a ticket — goes
+through `load_stream` instead, and `render_source` runs the whole of what
+`netgraph web` does per keystroke in one call:
+
+```python
+from netgraph.loader import load_stream
+from netgraph.render import Layer
+from netgraph.web import ViewOptions, render_source
+
+text = Path("topology.yaml").read_text()
+inventory = load_stream(text)  # same parser, same schema, same rules
+
+preview = render_source(text, ViewOptions(layer=Layer.L2))
+preview.svg  # an <svg> fragment, safe to embed, with an id on every element
+preview.details["n0"]  # the info-box record for the first node
+preview.problems  # load errors and findings, most severe first
+```
+
+`render_source` never raises for anything the text can be wrong about: a syntax
+error, a dangling cable and a filter that matches nothing all come back as a
+preview whose `status` and `problems` say so, with whatever resolved still
+drawn.
+
 ## Project layout
 
 ```
@@ -915,10 +1013,17 @@ src/netgraph/
 │   ├── mermaid.py  Mermaid flowchart exporter
 │   ├── jsonexport.py  canonical JSON graph export
 │   └── registry.py    one entry per output format; the CLI reads it, never a list of names
-└── watch/          live re-rendering (netgraph watch)
-    ├── pipeline.py one load -> validate -> render cycle, and its published state
-    ├── loop.py     what counts as a change, and what to do when one arrives
-    └── server.py   the loopback HTTP preview and its self-reloading page
+├── httpserve.py    what the two local servers promise: loopback, headers, host check
+├── watch/          live re-rendering (netgraph watch)
+│   ├── pipeline.py one load -> validate -> render cycle, and its published state
+│   ├── loop.py     what counts as a change, and what to do when one arrives
+│   └── server.py   the loopback HTTP preview and its self-reloading page
+└── web/            the interactive interface (netgraph web)
+    ├── preview.py  one parse -> validate -> render pass over a document stream
+    ├── details.py  the info-box records, keyed by the id each drawn element carries
+    ├── svgdoc.py   the Graphviz SVG made safe to embed in a live page
+    ├── server.py   five routes over all of it
+    └── assets/     the page, its style sheet and its dependency-free client
 ```
 
 ## Development

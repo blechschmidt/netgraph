@@ -75,6 +75,8 @@ from netgraph.render.options import RenderOptions
 __all__ = [
     "DOT_EXECUTABLE",
     "IMAGE_FORMATS",
+    "edge_element_id",
+    "node_element_id",
     "render_dot",
     "render_image",
     "to_dot",
@@ -196,6 +198,34 @@ class _Row:
     spans: bool = False
 
 
+def node_element_id(index: int) -> str:
+    """The ``id`` the ``index``-th node of a graph is drawn with.
+
+    Graphviz copies a node's ``id`` attribute into the element it emits, so
+    this is also the ``id`` on the ``<g class="node">`` of an SVG rendering —
+    which is what lets a front end map a shape under the cursor back onto the
+    node it stands for. Positions come from iterating
+    :attr:`~netgraph.render.graph.Graph.nodes`, which is ordered, so the same
+    graph always produces the same ids.
+
+    The identity is deliberately *not* the fully-qualified name: that may hold
+    characters an XML ``id`` may not, and a diagram published somewhere would
+    then carry the inventory's names in a second, unescaped place.
+    """
+    return f"n{index}"
+
+
+def edge_element_id(index: int) -> str:
+    """The ``id`` the ``index``-th edge of a graph is drawn with.
+
+    The counterpart of :func:`node_element_id`. Edges need one more than nodes
+    do: two elements may be joined by several cables, and an SVG edge names
+    only its endpoints, so without an id the parallel links are
+    indistinguishable.
+    """
+    return f"e{index}"
+
+
 @dataclass(frozen=True, slots=True)
 class _NodeView:
     id: str
@@ -210,6 +240,9 @@ class _NodeView:
     #: Icon file name, resolved against the document's ``imagepath``. ``None``
     #: when no theme is in use or the theme has no picture for this kind.
     image: str | None = None
+    #: ``id`` attribute to emit, or ``None`` to leave the node unidentified.
+    #: See :func:`node_element_id`.
+    element_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -221,6 +254,8 @@ class _EdgeView:
     tooltip: str
     penwidth: str | None = None
     label: str | None = None
+    #: ``id`` attribute to emit; see :func:`edge_element_id`.
+    element_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -237,7 +272,13 @@ class _GroupView:
 # --------------------------------------------------------------------------- #
 
 
-def to_dot(graph: Graph, options: RenderOptions | None = None, *, target: str = "dot") -> str:
+def to_dot(
+    graph: Graph,
+    options: RenderOptions | None = None,
+    *,
+    target: str = "dot",
+    element_ids: bool = False,
+) -> str:
     """Render ``graph`` as Graphviz DOT source.
 
     The graph is undirected (a cable has no direction, §7.1), so the output is a
@@ -247,14 +288,18 @@ def to_dot(graph: Graph, options: RenderOptions | None = None, *, target: str = 
         target: The output format this DOT is destined for. Only icon
             selection depends on it — see :func:`netgraph.render.icons.suffix_order`
             — and the default suits DOT written out for someone else to lay out.
+        element_ids: Give every node and edge an ``id`` attribute
+            (:func:`node_element_id`, :func:`edge_element_id`). Off by default,
+            because a hand-read DOT file is better without them; a front end
+            that has to find the node under a mouse pointer turns them on.
     """
     opts = options or RenderOptions()
     icons = _icon_files(graph, opts.icons, target=target)
     template = _environment().get_template(_TEMPLATE_NAME)
     return template.render(
         title=opts.title,
-        groups=_groups(graph, opts, icons),
-        edges=tuple(_edge_views(graph, opts)),
+        groups=_groups(graph, opts, icons, element_ids=element_ids),
+        edges=tuple(_edge_views(graph, opts, element_ids=element_ids)),
         imagepath=str(opts.icons.directory) if icons and opts.icons is not None else None,
         icon_width=_ICON_BOX[0],
         icon_height=_ICON_BOX[1],
@@ -274,11 +319,20 @@ def _icon_files(graph: Graph, theme: IconTheme | None, *, target: str) -> Mappin
     return theme.files(kinds, prefer=suffix_order(target))
 
 
-def to_image(graph: Graph, options: RenderOptions | None = None, *, format: str) -> bytes:
+def to_image(
+    graph: Graph,
+    options: RenderOptions | None = None,
+    *,
+    format: str,
+    element_ids: bool = False,
+) -> bytes:
     """Lay ``graph`` out by running Graphviz, and return the encoded image.
 
     Args:
         format: One of :data:`IMAGE_FORMATS`.
+        element_ids: Passed to :func:`to_dot`. Graphviz copies the ids into the
+            elements of an SVG rendering, so this is how a rendering becomes
+            addressable from a browser.
 
     Raises:
         RenderError: ``format`` is not an image format, the Graphviz ``dot``
@@ -297,7 +351,7 @@ def to_image(graph: Graph, options: RenderOptions | None = None, *, format: str)
             "or render with '--format dot' and convert the file separately."
         )
 
-    source = to_dot(graph, options, target=format)
+    source = to_dot(graph, options, target=format, element_ids=element_ids)
     theme = (options or RenderOptions()).icons
     icons = _icon_files(graph, theme, target=format)
     try:
@@ -454,7 +508,11 @@ def _dot_string(value: object) -> Markup:
 
 
 def _groups(
-    graph: Graph, options: RenderOptions, icons: Mapping[str, str]
+    graph: Graph,
+    options: RenderOptions,
+    icons: Mapping[str, str],
+    *,
+    element_ids: bool = False,
 ) -> tuple[_GroupView, ...]:
     """The node groups to draw: one per namespace, or a single loose group.
 
@@ -463,13 +521,22 @@ def _groups(
     namespace is never boxed either: drawing a frame labelled ``/`` around half
     the diagram helps nobody.
     """
+    # Identity is assigned from the graph's own node order, not from the order
+    # the nodes are drawn in: grouping by namespace reshuffles the second, and
+    # a consumer of the ids resolves them against the graph, not the picture.
+    ids = (
+        {fqn: node_element_id(index) for index, fqn in enumerate(graph.nodes)}
+        if element_ids
+        else {}
+    )
+
     if not options.group_by_namespace:
-        nodes = _node_views(graph.nodes.values(), options, graph.layer, icons)
+        nodes = _node_views(graph.nodes.values(), options, graph.layer, icons, ids)
         return (_GroupView(nodes=tuple(nodes)),)
 
     groups: list[_GroupView] = []
     for index, namespace in enumerate(graph.namespaces):
-        members = tuple(_node_views(graph.nodes_in(namespace), options, graph.layer, icons))
+        members = tuple(_node_views(graph.nodes_in(namespace), options, graph.layer, icons, ids))
         if namespace:
             groups.append(_GroupView(nodes=members, id=f"cluster_{index}", label=namespace))
         else:
@@ -482,6 +549,8 @@ def _node_views(
     options: RenderOptions,
     layer: Layer,
     icons: Mapping[str, str],
+    #: ``fqn -> id``; empty when the rendering carries no ids.
+    ids: Mapping[str, str],
 ) -> Iterator[_NodeView]:
     for node in nodes:
         shape, fill, stroke = _NODE_STYLE.get(node.kind, _DEFAULT_NODE_STYLE)
@@ -504,6 +573,7 @@ def _node_views(
             tooltip=_subnet_tooltip(subnet) if subnet is not None else node.description,
             rows=_node_rows(node, options, layer),
             image=image,
+            element_id=ids.get(node.fqn),
         )
 
 
@@ -563,8 +633,10 @@ def _node_rows(node: Node, options: RenderOptions, layer: Layer) -> tuple[_Row, 
 # --------------------------------------------------------------------------- #
 
 
-def _edge_views(graph: Graph, options: RenderOptions) -> Iterator[_EdgeView]:
-    for edge in graph.edges:
+def _edge_views(
+    graph: Graph, options: RenderOptions, *, element_ids: bool = False
+) -> Iterator[_EdgeView]:
+    for index, edge in enumerate(graph.edges):
         colour, style = _MEDIUM_STYLE.get(edge.medium, _DEFAULT_MEDIUM_STYLE)
         if edge.kind is EdgeKind.ATTACHMENT:
             colour, style = _ATTACHMENT_STYLE
@@ -578,6 +650,7 @@ def _edge_views(graph: Graph, options: RenderOptions) -> Iterator[_EdgeView]:
             penwidth=_penwidth(edge.speed),
             label=_edge_label(edge, graph.layer, options) or None,
             tooltip=_edge_tooltip(edge, options),
+            element_id=edge_element_id(index) if element_ids else None,
         )
 
 
