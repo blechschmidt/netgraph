@@ -1,7 +1,7 @@
 # netgraph
 
 Declare your network — switches, routers, hubs, computers, servers, cables,
-adapters and tunnels — in a folder tree of YAML files, then render it as a
+adapters, tunnels and patch panels — in a folder tree of YAML files, then render it as a
 network graph.
 
 netgraph reads the tree, checks that the documents agree with each other, and
@@ -671,7 +671,7 @@ from an inventory with a dangling cable is worse than no diagram.
 |---|---|---|
 | `-f, --format FORMAT` | `dot` | One of `dot`, `svg`, `html`, `png`, `pdf`, `mermaid`, `json`. `svg`, `html`, `png` and `pdf` need Graphviz; the other three do not. `html` is a self-contained interactive page — see [The interactive HTML page](#the-interactive-html-page). |
 | `-o, --output FILE` | stdout | Write to this file instead of stdout. Parent directories are created. Required for `png` and `pdf` when stdout is a terminal. |
-| `--layer l1\|l2\|l3\|overlay` | `l1` | Which view to draw — see [Layers](#layers-l1-l2-l3-and-overlay). `l1` is the physical topology, `l2` the same topology annotated with VLANs, `l3` the IP subnets and who is addressed in them, `overlay` the tunnels and what runs inside what. Repeatable for `-f html`, which draws each layer and puts a switcher over them; every other format holds one layer, and asking for two is a usage error. |
+| `--layer physical\|l1\|l2\|l3\|overlay\|rack` | `l1` | Which view to draw — see [Layers](#layers-physical-l1-l2-l3-overlay-and-rack). `l1` is the physical topology, `l2` the same topology annotated with VLANs, `l3` the IP subnets and who is addressed in them, `overlay` the tunnels and what runs inside what, `physical` the cabling record with its patch panels, `rack` a front elevation per rack. Repeatable for `-f html`, which draws each layer and puts a switcher over them; every other format holds one layer, and asking for two is a usage error. |
 | `--title TEXT` | none | Caption for the diagram. |
 | `--show-ips` / `--no-show-ips` | on | Print configured IP addresses on the nodes. |
 | `--show-vlans` / `--no-show-vlans` | on | Annotate nodes and links with VLAN membership. |
@@ -695,7 +695,7 @@ themselves.
 |---|---|---|
 | `--namespace NS` | yes | Elements in `NS` or in any namespace below it. |
 | `--vlan VID` | yes | Elements participating in that VLAN (1–4094). A host on an untagged access port counts as a member. |
-| `--kind KIND` | yes | Elements of that kind: `switch`, `router`, `hub`, `computer`, `server`, `adapter`. A cable is an edge and so is a tunnel, so neither is selectable; both follow whichever elements survive. |
+| `--kind KIND` | yes | Elements of that kind: `switch`, `router`, `hub`, `computer`, `server`, `adapter`, `patchpanel`. A cable is an edge and so is a tunnel, so neither is selectable; both follow whichever elements survive. |
 | `--name GLOB` | yes | Elements whose short **or** fully-qualified name matches the shell-style glob. |
 | `--neighbors-of NAME` | no | Only the neighbourhood of one element. An unknown name is a usage error, with suggestions. |
 | `--depth N` | no | How many hops `--neighbors-of` reaches. Default 1. |
@@ -835,8 +835,8 @@ edges and every filter behave exactly as they do without a theme, and a kind the
 theme has no picture for keeps its plain shape rather than disappearing.
 
 **`cisco`** ships with netgraph and covers every kind that becomes a node: the
-six hardware kinds, the subnet clouds of `--layer l3`, and the tunnel conduit of
-`--layer overlay`. The artwork is drawn in the topology idiom Cisco made the
+seven hardware kinds, the subnet clouds of `--layer l3`, and the tunnel conduit
+of `--layer overlay`. The artwork is drawn in the topology idiom Cisco made the
 industry convention and is netgraph's own, under the same MIT licence as the
 rest of the package — Cisco's published icon library is copyrighted and is not
 redistributed here.
@@ -854,7 +854,8 @@ picture but a box holding several, and the folder shape says that better.
 **A directory** works just as well, which is how you use that library, or any
 other set, if you have it. A theme is nothing but a directory of images named
 after the kinds they stand for — `router`, `switch`, `hub`, `computer`,
-`server`, `adapter`, `subnet` and `tunnel`, with an `.svg`, `.png`, `.jpg` or
+`server`, `adapter`, `patchpanel`, `subnet` and `tunnel`, with an `.svg`,
+`.png`, `.jpg` or
 `.gif` extension:
 
 ```bash
@@ -1119,16 +1120,51 @@ or as a cable.
 they control what a diagram prints; node and link VLAN membership is always
 exported, because it is topology rather than decoration.
 
-### Layers: l1, l2, l3 and overlay
+### Layers: physical, l1, l2, l3, overlay and rack
 
-One inventory, four questions. `--layer` picks which one the diagram answers.
+One inventory, six questions. `--layer` picks which one the diagram answers.
 
 | Layer | Nodes | Edges | Annotations | Reach for it when |
 |---|---|---|---|---|
-| `l1` | devices and adapters | one per cable, one per adapter attachment, one per tunnel | medium, link rate, cable label, length; encapsulation on a tunnel | You are standing at the rack. "Which port is this patched into, and with what?" |
+| `physical` | devices, adapters **and patch panels** | one per cable — every segment of a run, drawn separately | the same as `l1` | You are holding a patch lead. "Which position does this run occupy, and which are free?" |
+| `l1` | devices and adapters | one per cable, one per adapter attachment, one per tunnel; a run through a patch panel is **one** edge | medium, link rate, cable label, length; encapsulation on a tunnel | You are standing at the rack. "Which port is this patched into, and with what?" |
 | `l2` | the same | the same | VLAN membership per node and per link, port mode | "Is this host in VLAN 10 all the way to the gateway?" Broadcast domains, trunk pruning, a VLAN that stops one switch short. |
 | `l3` | the elements that hold a routable address, **plus one node per IP prefix** | one per address: element ↔ the subnet it is addressed in, labelled with the interface and the address | VLANs the prefix is reachable in | "Why can these two not reach each other?" The addressing plan, gateways, a subnet mask that is one bit off. |
 | `overlay` | the elements that terminate a tunnel, **plus one node per tunnel** | one per endpoint, plus one per `over` — this tunnel runs inside that one | encapsulation stack, VNI, MTU budget, what encrypts | "Is this traffic actually protected, and what carries it?" VPNs, VXLAN fabrics, a cleartext overlay somebody assumed was private. |
+| `rack` | one node per rack named by a `metadata.location` | none — a cable says nothing about where either end is bolted | a front elevation: one row per unit, occupied and empty alike | "How much room is left in that cabinet, and what is above the UPS?" |
+
+`physical` and `l1` are the same graph drawn twice too, and the difference
+between them is the patch panels. A `patchpanel` is a passive cross-connect: a
+run that goes switch → panel front → structured cabling → panel rear → server is
+three cables in the inventory and **one link** on the network, because nothing
+electrically can tell the panel is there. `physical` draws the cabling record
+— the panels and every segment; every other layer *splices* each run into the
+single edge it is, between the two active ports, carrying the sum of the segment
+lengths and the rate of the slowest one. The result is exactly the graph the
+same inventory would produce with the two devices cabled together directly,
+which is what makes a panel free to model.
+
+The splice is not a loss of information. `netgraph render -f json` exports a
+`patch` object naming the segments and the positions, `netgraph path` names the
+panels on the link line — as a pass-through, never as a hop, because a panel
+takes no decision — and an SVG tooltip lists the same record:
+
+```console
+$ netgraph -i examples/patch-room path sw-core-01 srv-app-01
+   1  network/sw-core-01  [switch]
+      out GigabitEthernet1/0/7
+      ->  cable cbl-sw-pp07  (copper, 1Gbps, P-007A, 21m)  vlan 10  [via pp-r1-a front/7-rear/7, pp-r2-a rear/7-front/7]
+   2  hosts/srv-app-01  [server]
+      in  eno1                  10.10.0.11/24
+```
+
+`rack` is not a topology at all. `metadata.location` records where an element is
+bolted — `site`, `room`, `rack`, the lowest unit it occupies (`position`) and
+how many it takes (`height`) — and `--layer rack` turns that into one front
+elevation per cabinet, units on the vertical axis, empty ones drawn so the free
+space is countable. Two things in the same unit are `E025`, and something that
+would stick out of the top is `E026`. Mermaid has no way to express a grid, so
+`-f mermaid --layer rack` is refused with an error naming the formats that can.
 
 `l1` and `l2` are the same graph drawn twice. `l3` is a **different graph**:
 cables do not appear, because two devices are adjacent at layer 3 when they
@@ -1497,7 +1533,7 @@ document literally says: a host on an untagged access port is listed as a member
 of that VLAN even though it declares none. Loopback and link-local prefixes are
 left out of `subnets`, since listing `127.0.0.0/8` once per machine would say
 nothing about the addressing plan. `subnets` is the same grouping
-[`--layer l3`](#layers-l1-l2-l3-and-overlay) draws, and `tunnels` the same
+[`--layer l3`](#layers-physical-l1-l2-l3-overlay-and-rack) draws, and `tunnels` the same
 resolution `--layer overlay` draws, so the tables and the diagrams can never
 disagree. The `ENCRYPTED` column reads `underlay` for a tunnel that encrypts
 nothing itself but runs inside one that does:

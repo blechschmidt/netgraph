@@ -1,0 +1,74 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-core-01
+  description: |
+    Core switch, rack r1. Its two server ports leave the rack through the
+    patch panel above it: nothing is cabled from here to rack r2 directly,
+    which is what a structured-cabling plant looks like.
+  location:
+    site: hq
+    room: mdf
+    rack: r1
+    position: 38
+    height: 1
+    rack_height: 42
+  labels:
+    site: hq
+    role: core
+    env: prod
+spec:
+  vendor: Cisco
+  model: C9300-24T
+  interfaces:
+    - name: br0
+      type: bridge
+      description: Switching instance
+      members:
+        - GigabitEthernet1/0/7
+        - GigabitEthernet1/0/8
+
+    - name: Vlan10
+      type: vlan
+      description: Server gateway on the switch, for in-band management
+      ipv4:
+        addresses: [10.10.0.2/24]
+      vlan:
+        mode: access
+        access_vlan: 10
+      parent: br0
+
+    - name: GigabitEthernet1/0/1
+      type: ethernet
+      description: |
+        Routed link to rtr-edge-01. No 'vlan' block: this port is a layer-3
+        interface, not a bridge port.
+      mac: '00:1b:0d:0a:00:01'
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+
+    - name: GigabitEthernet1/0/7
+      type: ethernet
+      description: srv-app-01, patched through pp-r1-a position 7
+      mac: '00:1b:0d:0a:00:07'
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+
+    - name: GigabitEthernet1/0/8
+      type: ethernet
+      description: srv-db-01, patched through pp-r1-a position 8
+      mac: '00:1b:0d:0a:00:08'
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+  bridge:
+    name: br0
+    type: customer-vlan-bridge
+    address: '00:1b:0d:0a:00:ff'
+  vlans:
+    - id: 10
+      name: servers

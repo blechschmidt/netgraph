@@ -25,13 +25,17 @@ each link derives the VLANs it carries from its two ends
 database and the links it terminates. ``netgraph render --vlan 10`` keeps the
 host attached to an access port in VLAN 10, which is what a reader means.
 
-The four layers
----------------
+The layers
+----------
 
-:class:`Layer` picks *which graph* is built, and only layers 3 and ``overlay``
-change what exists:
+:class:`Layer` picks *which graph* is built. ``physical``, ``l1`` and ``l2``
+share one topology; ``l3``, ``overlay`` and ``rack`` each build a different one:
 
-``l1``
+``physical``
+    Everything ``l1`` draws, plus the passive cross-connects: a patch panel is
+    a node and the two cable segments either side of it are two edges. This is
+    the cabling record — what a technician would find in the rack.
+``l1`
     The physical topology: one node per device and adapter, one edge per cable
     and per adapter attachment, annotated with medium, rate and cable labels.
     Tunnels are drawn too, as logical edges over that topology — a tunnel is a
@@ -58,6 +62,22 @@ change what exists:
     it terminates on and — this is why it is a node — to the tunnel it is
     encapsulated in. That edge is what makes ``VXLAN over IPsec`` drawable:
     nesting is a relation between two links, and a link cannot end on a link.
+``rack``
+    Not a topology at all: one node per rack named by a ``metadata.location``,
+    carrying the elevation of that rack — which unit each element occupies, and
+    which units are empty. There are no edges, because a cable between two
+    boxes says nothing about where the boxes are bolted.
+
+Splicing a patch panel
+----------------------
+
+A panel is electrically transparent, so the same inventory has two honest
+readings and :func:`build_graph` offers both. The *physical* one keeps the panel
+and its segments; every other layer replaces a run
+``switch → front/7 ⇄ rear/7 → server`` with the single edge ``switch → server``
+it is indistinguishable from. The spliced edge remembers what it crossed in
+:attr:`Edge.patch`, which is how ``netgraph path`` can name the panel as a
+pass-through without the panel being a hop.
 """
 
 from __future__ import annotations
@@ -72,14 +92,17 @@ from typing import TYPE_CHECKING, Final
 
 from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of, short_name
 from netgraph.models import (
+    PATCHPANEL_KIND,
     Adapter,
     Cable,
     Device,
     Interface,
+    PatchPanel,
     Tunnel,
     TunnelType,
     format_bitrate,
 )
+from netgraph.models.metadata import Location
 from netgraph.subnets import AddressPlacement, Subnet, is_routable_address, subnets_of
 
 if TYPE_CHECKING:  # pragma: no cover - imported for typing only
@@ -90,6 +113,9 @@ if TYPE_CHECKING:  # pragma: no cover - imported for typing only
     from netgraph.render.aggregate import AggregateView, BundleView
 
 __all__ = [
+    "PATCHPANEL_KIND",
+    "RACK_ID_PREFIX",
+    "RACK_KIND",
     "SUBNET_ID_PREFIX",
     "SUBNET_KIND",
     "TUNNEL_ID_PREFIX",
@@ -101,21 +127,30 @@ __all__ = [
     "Layer",
     "Node",
     "NodeType",
+    "PatchHop",
+    "PatchView",
     "PortView",
+    "RackSlot",
+    "RackView",
     "Subnet",
     "TunnelEnd",
     "TunnelView",
     "build_graph",
     "filter_graph",
     "is_routable_address",
+    "rack_elevations",
     "resolve_tunnels",
+    "splice_patch_panels",
 ]
 
 
 class Layer(str, Enum):
     """Which view of the network a rendering shows."""
 
+    #: Cabling: what is plugged into what, patch panels included.
+    PHYSICAL = "physical"
     #: Physical: what is plugged into what, with medium, speed and cable labels.
+    #: Passive cross-connects are spliced out; see the module docstring.
     L1 = "l1"
     #: Logical: the same topology annotated with VLAN membership and port mode.
     L2 = "l2"
@@ -124,9 +159,16 @@ class Layer(str, Enum):
     #: Encapsulation: tunnels as nodes, joined to their endpoints and to the
     #: tunnels they run inside (§14).
     OVERLAY = "overlay"
+    #: Placement: one node per rack, holding its front elevation (§3.2).
+    RACK = "rack"
 
     def __str__(self) -> str:
         return self.value
+
+    @property
+    def shows_panels(self) -> bool:
+        """Does this layer draw a passive cross-connect as a node of its own?"""
+        return self is Layer.PHYSICAL
 
 
 class NodeType(str, Enum):
@@ -145,6 +187,9 @@ class NodeType(str, Enum):
     #: A ``tunnel`` document drawn as a node rather than as an edge, because it
     #: joins more than two endpoints or because something is nested inside it.
     TUNNEL = "tunnel"
+    #: A rack named by a ``metadata.location``, holding its elevation. Derived:
+    #: no document declares a rack, the elements in it do.
+    RACK = "rack"
     #: A whole namespace, collapsed into one box by
     #: :func:`~netgraph.render.aggregate.collapse_namespaces`. It stands for
     #: elements the diagram no longer draws, so a consumer must be able to tell
@@ -155,9 +200,15 @@ class NodeType(str, Enum):
         return self.value
 
 
-#: ``kind`` reported for a subnet node. The eight element kinds of §3 are all
+#: ``kind`` reported for a subnet node. The nine element kinds of §3 are all
 #: taken, so this one cannot collide with a declared kind.
 SUBNET_KIND: Final = "subnet"
+
+#: ``kind`` reported for a rack node, and the prefix of its identity. The same
+#: reasoning as :data:`SUBNET_KIND` and :data:`SUBNET_ID_PREFIX`: no element
+#: kind is called ``rack``, and a colon keeps the id out of the name grammar.
+RACK_KIND: Final = "rack"
+RACK_ID_PREFIX: Final = "rack:"
 
 #: Prefix of a subnet node's identity, e.g. ``subnet:10.0.0.0/24``. A colon
 #: cannot occur in an element's fully-qualified name (§2 name grammar), so a
@@ -366,6 +417,129 @@ class TunnelView:
 
 
 @dataclass(frozen=True, slots=True)
+class PatchHop:
+    """One panel a spliced run crosses, and the coupler it crosses it by."""
+
+    #: Fully-qualified name of the patch panel.
+    panel: str
+    #: Port the run arrives on, e.g. ``front/7``.
+    ingress: str
+    #: The port that one is coupled to, e.g. ``rear/7``.
+    egress: str
+
+    @property
+    def name(self) -> str:
+        return short_name(self.panel)
+
+    def __str__(self) -> str:
+        return f"{self.panel}:{self.ingress} -> {self.egress}"
+
+
+@dataclass(frozen=True, slots=True)
+class PatchView:
+    """What one edge stands for when a run crosses one or more patch panels.
+
+    Set on the spliced edge only: the *physical* layer draws the segments
+    themselves, so there is nothing to record there. It carries the segments in
+    the order the run crosses them and the panels between them, which is what
+    lets a trace name the pass-through and a JSON export reproduce the patch
+    record.
+    """
+
+    #: Cable fully-qualified names, in the order the run crosses them.
+    segments: tuple[str, ...] = ()
+    #: The panels between them; always one fewer entry than :attr:`segments`.
+    hops: tuple[PatchHop, ...] = ()
+
+    @property
+    def panels(self) -> tuple[str, ...]:
+        """The panels crossed, in order, without repeats."""
+        return tuple(dict.fromkeys(hop.panel for hop in self.hops))
+
+    def describe(self) -> str:
+        """``pp-idf-a front/7-rear/7`` — the pass-throughs, for a report."""
+        return ", ".join(f"{hop.name} {hop.ingress}-{hop.egress}" for hop in self.hops)
+
+
+@dataclass(frozen=True, slots=True)
+class RackSlot:
+    """One element mounted in a rack, and the units it occupies."""
+
+    element: str
+    name: str
+    kind: str
+    #: Lowest unit occupied, counted from 1 at the bottom.
+    position: int
+    height: int = 1
+
+    @property
+    def units(self) -> range:
+        return range(self.position, self.position + self.height)
+
+    @property
+    def top(self) -> int:
+        return self.position + self.height - 1
+
+
+@dataclass(frozen=True, slots=True)
+class RackView:
+    """One rack and everything mounted in it, for the elevation (§3.2).
+
+    :attr:`height` is what the elements declared through
+    ``metadata.location.rack_height``; when none of them did, it is the top of
+    the highest thing in the rack, so an elevation is still drawable for an
+    inventory that records positions but never measured the cabinet.
+    """
+
+    #: ``(site, room, rack)`` — what makes two elements share a rack.
+    key: tuple[str, str, str]
+    #: How the rack is written out, e.g. ``hq / mdf / r1``.
+    label: str
+    height: int
+    #: The elements in it, lowest position first.
+    slots: tuple[RackSlot, ...] = ()
+    #: True when :attr:`height` was inferred rather than declared.
+    inferred_height: bool = False
+
+    @property
+    def id(self) -> str:
+        """The identity of this rack's node: ``rack:hq/mdf/r1``."""
+        return RACK_ID_PREFIX + "/".join(self.key)
+
+    @property
+    def site(self) -> str:
+        return self.key[0]
+
+    @property
+    def room(self) -> str:
+        return self.key[1]
+
+    @property
+    def name(self) -> str:
+        return self.key[2]
+
+    @property
+    def used_units(self) -> int:
+        return sum(slot.height for slot in self.slots)
+
+    def occupant(self, unit: int) -> RackSlot | None:
+        """What occupies ``unit``, or ``None`` when it is free."""
+        return next((slot for slot in self.slots if unit in slot.units), None)
+
+    def elevation(self) -> tuple[tuple[int, RackSlot | None], ...]:
+        """Every unit from the top down, with what occupies it.
+
+        Top down because that is how a person standing in front of a rack reads
+        it, and because it puts U1 at the bottom of the drawing where it is.
+        """
+        return tuple((unit, self.occupant(unit)) for unit in range(self.height, 0, -1))
+
+    def restricted_to(self, elements: Container[str]) -> RackView:
+        """The same rack with only the slots ``elements`` still holds."""
+        return replace(self, slots=tuple(slot for slot in self.slots if slot.element in elements))
+
+
+@dataclass(frozen=True, slots=True)
 class Node:
     """One drawable thing: an element, or — at layer 3 — an IP subnet.
 
@@ -384,7 +558,7 @@ class Node:
     kind: str
     namespace: str
     #: The declared element, or ``None`` for a derived node such as a subnet.
-    element: Device | Adapter | None = None
+    element: Device | Adapter | PatchPanel | None = None
     ports: tuple[PortView, ...] = ()
     #: Every VLAN this element participates in, links included. See the module
     #: docstring. For a subnet: every VLAN an interface addressed in it is in.
@@ -397,6 +571,8 @@ class Node:
     #: The collapsed namespace this node stands for; set exactly for an
     #: aggregate node (:mod:`netgraph.render.aggregate`).
     aggregate: AggregateView | None = None
+    #: The rack this node stands for; set exactly for a rack node.
+    rack: RackView | None = None
 
     @classmethod
     def for_tunnel(cls, view: TunnelView) -> Node:
@@ -415,6 +591,23 @@ class Node:
             vlans=frozenset(),
             type=NodeType.TUNNEL,
             tunnel=view,
+        )
+
+    @classmethod
+    def for_rack(cls, view: RackView) -> Node:
+        """The node standing for one rack and its elevation.
+
+        A rack holds whatever the inventory bolted into it, which may come from
+        several namespaces, so — like a subnet — it belongs to none of them and
+        reports the root.
+        """
+        return cls(
+            fqn=view.id,
+            name=view.label or view.name,
+            kind=RACK_KIND,
+            namespace="",
+            type=NodeType.RACK,
+            rack=view,
         )
 
     @classmethod
@@ -445,6 +638,11 @@ class Node:
         return self.type is NodeType.TUNNEL
 
     @property
+    def is_rack(self) -> bool:
+        """Does this node stand for a rack rather than for something in one?"""
+        return self.type is NodeType.RACK
+
+    @property
     def is_aggregate(self) -> bool:
         """Does this node stand for a whole namespace rather than one thing?"""
         return self.type is NodeType.AGGREGATE
@@ -455,7 +653,7 @@ class Node:
         return self.type is NodeType.ELEMENT
 
     @property
-    def _document(self) -> Device | Adapter | Tunnel | None:
+    def _document(self) -> Device | Adapter | PatchPanel | Tunnel | None:
         """The declared document behind the node, tunnels included."""
         if self.element is not None:
             return self.element
@@ -528,6 +726,10 @@ class Edge:
     #: into it (:mod:`netgraph.render.aggregate`). ``None`` on a link that is
     #: exactly itself.
     bundle: BundleView | None = None
+    #: The patch panels this edge was spliced through, when it stands for a run
+    #: of two or more cable segments (§15.2). ``None`` on a direct cable, which
+    #: is what makes the two tellable apart in an export.
+    patch: PatchView | None = None
 
     @property
     def name(self) -> str:
@@ -544,6 +746,11 @@ class Edge:
     @property
     def is_self_link(self) -> bool:
         return self.source == self.target
+
+    @property
+    def is_patched(self) -> bool:
+        """Does this edge run through at least one passive cross-connect?"""
+        return self.patch is not None
 
     @property
     def speed_text(self) -> str | None:
@@ -613,6 +820,11 @@ class Graph:
         return tuple(node for node in self.nodes.values() if node.is_tunnel)
 
     @property
+    def rack_nodes(self) -> tuple[Node, ...]:
+        """The rack nodes, in graph order; empty outside :attr:`Layer.RACK`."""
+        return tuple(node for node in self.nodes.values() if node.is_rack)
+
+    @property
     def aggregate_nodes(self) -> tuple[Node, ...]:
         """The collapsed-namespace nodes, in graph order; empty without ``--collapse``."""
         return tuple(node for node in self.nodes.values() if node.is_aggregate)
@@ -672,12 +884,16 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
 
     Args:
         inventory: A tree loaded by :func:`~netgraph.loader.load_tree`.
-        layer: ``l1`` and ``l2`` build the same physical graph and differ only in
-            the annotations a renderer draws from it (§8.2). ``l3`` builds the
-            routed graph instead: subnets become nodes, cables disappear, and
-            elements without a routable address drop out. ``overlay`` builds the
+        layer: ``physical``, ``l1`` and ``l2`` build the same topology and differ
+            in what is drawn from it (§8.2): ``physical`` keeps the patch panels
+            and their segments, the other two splice each run into one edge, and
+            ``l2`` annotates it with VLAN membership. ``l3`` builds the routed
+            graph instead: subnets become nodes, cables disappear, and elements
+            without a routable address drop out. ``overlay`` builds the
             encapsulation graph: tunnels become nodes, joined to their endpoints
-            and to the tunnels they run inside. See the module docstring.
+            and to the tunnels they run inside. ``rack`` builds no topology at
+            all — one node per rack, holding its elevation. See the module
+            docstring.
 
     Returns:
         A graph whose every edge references two nodes that exist. Cables and
@@ -688,11 +904,11 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         link.
     """
     # Iterate the full element map so nodes keep inventory load order rather
-    # than the devices-then-adapters order of ``interface_owners``.
-    owners: dict[str, Device | Adapter] = {
+    # than the devices-then-adapters order of ``cable_owners``.
+    owners: dict[str, Device | Adapter | PatchPanel] = {
         fqn: element
         for fqn, element in inventory.elements.items()
-        if isinstance(element, (Device, Adapter))
+        if isinstance(element, (Device, Adapter, PatchPanel))
     }
     ports = {
         fqn: tuple(PortView.of(interface) for interface in owner.interfaces)
@@ -705,6 +921,16 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
 
     tunnel_nodes, tunnel_edges = _tunnel_topology(tunnels, ports)
     edges += tunnel_edges
+
+    panels = inventory.patchpanels
+    if panels and not layer.shows_panels:
+        # Splice *before* membership is computed, so a host behind a panel is
+        # in the VLAN of the port at the far end of the run rather than in the
+        # nothing a panel port declares. That is also what makes a spliced
+        # graph identical to the directly-cabled one.
+        edges, splice_dangling = splice_patch_panels(edges, panels, owners)
+        dangling += splice_dangling
+
     node_vlans = _node_vlans(inventory, ports, edges)
 
     nodes = {
@@ -720,11 +946,17 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         for fqn, owner in owners.items()
     }
     nodes.update(tunnel_nodes)
+    if not layer.shows_panels and layer is not Layer.RACK:
+        # A panel that no cable reaches has no segments to splice, so removing
+        # the nodes is a separate step from removing the edges.
+        nodes = {fqn: node for fqn, node in nodes.items() if node.kind != PATCHPANEL_KIND}
 
     if layer is Layer.L3:
         nodes, edges = _routed_view(nodes, subnets_of(inventory))
     elif layer is Layer.OVERLAY:
         nodes, edges = _overlay_view(nodes, tunnels)
+    elif layer is Layer.RACK:
+        nodes, edges = _rack_view(inventory)
     return Graph(
         root=inventory.root,
         nodes=nodes,
@@ -733,6 +965,286 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         dangling=dangling,
         sources=dict(inventory.sources),
     )
+
+
+# --------------------------------------------------------------------------- #
+# Passive cross-connects
+# --------------------------------------------------------------------------- #
+
+
+def splice_patch_panels(
+    edges: Sequence[Edge],
+    panels: Mapping[str, PatchPanel],
+    owners: Mapping[str, Device | Adapter | PatchPanel],
+) -> tuple[tuple[Edge, ...], tuple[str, ...]]:
+    """Replace every run through a patch panel with the single edge it is (§15.2).
+
+    A panel is electrically transparent: a frame that enters ``front/7`` leaves
+    ``rear/7`` unchanged, so at every layer but ``physical`` the run
+    ``switch → front/7 ⇄ rear/7 → server`` *is* one link between the switch and
+    the server. Walking it rather than deleting the panel is what keeps the
+    result honest: the medium, the rate and the length of the run are properties
+    of all of its segments, and only the walk knows which segments those are.
+
+    The walk starts from a segment with at least one end on something active and
+    follows couplers until it reaches another. Runs are discovered in edge
+    order, so the direction of the resulting edge — and therefore the whole
+    output — is deterministic.
+
+    Args:
+        edges: Every edge of the physical graph, panel segments included.
+        panels: The patch panels, keyed by fully-qualified name.
+        owners: Everything a cable may terminate on, for VLAN derivation.
+
+    Returns:
+        The spliced edges in the original order, and one message per run that
+        does not arrive anywhere: a coupler with nothing patched on the far
+        side, a panel port cabled twice, or a loop of panels. The validator
+        reports each of those as well (``NG-P001``…``NG-P005``); the graph layer
+        drops the run because ``--force`` must still produce a picture.
+    """
+    touching = {edge.id for edge in edges if _panel_ends(edge, panels)}
+    if not touching:
+        return tuple(edges), ()
+
+    dangling: list[str] = []
+    # ``(panel, port)`` -> the one segment landing on it. A second cable on the
+    # same port is ``NG-P003``; the first one declared wins so the walk stays
+    # deterministic, and the loser is dropped rather than silently followed —
+    # splicing it too would reuse the segments beyond the panel and draw one
+    # run twice.
+    landings: dict[tuple[str, str], Edge] = {}
+    contested: set[str] = set()
+    for edge in edges:
+        for panel, port in _panel_ends(edge, panels):
+            existing = landings.setdefault((panel, port), edge)
+            if existing is not edge:
+                contested.add(edge.id)
+                dangling.append(
+                    f"{edge.id}: {panel}:{port} already terminates {existing.id}, so this "
+                    f"segment is not spliced into a run"
+                )
+
+    spliced: list[Edge] = []
+    consumed: set[str] = set()
+    for edge in edges:
+        if edge.id not in touching:
+            spliced.append(edge)
+            continue
+        if edge.id in consumed or edge.id in contested:
+            continue
+        start = _active_end(edge, panels)
+        if start is None:
+            # Panel to panel: it is the middle of some run, or of none. Either
+            # way it is not where a walk starts.
+            continue
+        run, problem = _walk_run(edge, start, panels, landings)
+        consumed.update(segment.id for segment in run.segments)
+        if problem is not None:
+            dangling.append(problem)
+            continue
+        spliced.append(_splice(run, owners))
+
+    for edge in edges:
+        if edge.id in touching and edge.id not in consumed and edge.id not in contested:
+            consumed.add(edge.id)
+            dangling.append(
+                f"{edge.id}: runs between patch panels only, so it reaches nothing that can "
+                f"send or receive; it is drawn at layer 'physical' alone"
+            )
+    return tuple(spliced), tuple(dangling)
+
+
+@dataclass(frozen=True, slots=True)
+class _Run:
+    """One walk from an active port through zero or more panels."""
+
+    segments: tuple[Edge, ...]
+    hops: tuple[PatchHop, ...] = ()
+    #: ``(element, port)`` at either end, in the order the walk found them.
+    source: tuple[str, str] = ("", "")
+    target: tuple[str, str] = ("", "")
+
+
+def _panel_ends(edge: Edge, panels: Mapping[str, PatchPanel]) -> tuple[tuple[str, str], ...]:
+    """The ``(panel, port)`` ends of ``edge``; empty when it touches no panel."""
+    if edge.kind is not EdgeKind.CABLE:
+        return ()
+    return tuple(
+        (element, port)
+        for element, port in ((edge.source, edge.source_port), (edge.target, edge.target_port))
+        if element in panels
+    )
+
+
+def _active_end(edge: Edge, panels: Mapping[str, PatchPanel]) -> tuple[str, str] | None:
+    """The end of ``edge`` that is not a panel, or ``None`` when both are."""
+    for element, port in ((edge.source, edge.source_port), (edge.target, edge.target_port)):
+        if element not in panels:
+            return (element, port)
+    return None
+
+
+def _other_end(edge: Edge, element: str, port: str) -> tuple[str, str]:
+    """The end of ``edge`` that is not ``(element, port)``."""
+    if (edge.source, edge.source_port) == (element, port):
+        return (edge.target, edge.target_port)
+    return (edge.source, edge.source_port)
+
+
+def _walk_run(
+    first: Edge,
+    start: tuple[str, str],
+    panels: Mapping[str, PatchPanel],
+    landings: Mapping[tuple[str, str], Edge],
+) -> tuple[_Run, str | None]:
+    """Follow ``first`` from ``start`` through the couplers it reaches.
+
+    Returns the run and, when it does not arrive at a second active port, the
+    reason — which is the same fact ``NG-P002`` or ``NG-P005`` reports about the
+    inventory, said about this one run.
+    """
+    segments: list[Edge] = [first]
+    hops: list[PatchHop] = []
+    current, arrival = first, _other_end(first, *start)
+    seen = {first.id}
+
+    while arrival[0] in panels:
+        panel_fqn, port = arrival
+        egress = panels[panel_fqn].opposite(port)
+        if egress is None:
+            return _Run(tuple(segments), tuple(hops), start, arrival), (
+                f"{current.id}: {panel_fqn}:{port} is coupled to nothing, so the run stops "
+                f"inside the panel"
+            )
+        hops.append(PatchHop(panel=panel_fqn, ingress=port, egress=egress))
+        following = landings.get((panel_fqn, egress))
+        if following is None:
+            return _Run(tuple(segments), tuple(hops), start, arrival), (
+                f"{current.id}: nothing is patched into {panel_fqn}:{egress}, so the run "
+                f"stops inside the panel"
+            )
+        if following.id in seen:  # pragma: no cover - a safety net, see below
+            # Unreachable while every position terminates at most one cable:
+            # the coupling is a bijection, so a walk over it cannot revisit a
+            # segment. Kept because "cannot" here rests on a dedupe two dozen
+            # lines above, and the cost of being wrong is a hang.
+            return _Run(tuple(segments), tuple(hops), start, arrival), (
+                f"{first.id}: the run loops back into {panel_fqn}:{egress}; a patch panel "
+                f"cannot be patched into itself"
+            )
+        seen.add(following.id)
+        segments.append(following)
+        current, arrival = following, _other_end(following, panel_fqn, egress)
+
+    return _Run(tuple(segments), tuple(hops), start, arrival), None
+
+
+def _splice(run: _Run, owners: Mapping[str, Device | Adapter | PatchPanel]) -> Edge:
+    """One edge standing for a whole run, with the attributes the run has.
+
+    The rate is the slowest segment (a run is no faster than its worst leg), the
+    length is the sum when every segment declares one, and the medium is what
+    all of them agree on. The identity is the first segment's, which is the one
+    a reader looking at the source end would name; :attr:`Edge.patch` carries
+    the rest.
+    """
+    first = run.segments[0]
+    if len(run.segments) == 1:
+        return first
+
+    source, source_port = run.source
+    target, target_port = run.target
+    speeds = [segment.speed for segment in run.segments if segment.speed is not None]
+    lengths = [segment.length_m for segment in run.segments]
+    media = {segment.medium for segment in run.segments}
+    return Edge(
+        id=first.id,
+        kind=EdgeKind.CABLE,
+        source=source,
+        target=target,
+        source_port=source_port,
+        target_port=target_port,
+        medium=media.pop() if len(media) == 1 else first.medium,
+        speed=min(speeds) if speeds else None,
+        label=next((segment.label for segment in run.segments if segment.label), None),
+        length_m=sum(lengths) if all(value is not None for value in lengths) else None,  # type: ignore[arg-type]
+        vlans=_link_vlans(owners[source], source_port, owners[target], target_port)
+        if source in owners and target in owners
+        else frozenset(),
+        cable=first.cable,
+        patch=PatchView(segments=tuple(segment.id for segment in run.segments), hops=run.hops),
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Placement
+# --------------------------------------------------------------------------- #
+
+
+def rack_elevations(inventory: Inventory) -> tuple[RackView, ...]:
+    """One :class:`RackView` per rack the inventory places anything in (§3.2).
+
+    Racks come out in first-seen order and their slots bottom-up, so an
+    elevation reads the way the inventory does and the way the cabinet does.
+    An element whose ``location`` names a rack but no ``position`` is left out:
+    it is in the room, and an elevation cannot say where.
+    """
+    placed: dict[tuple[str, str, str], list[RackSlot]] = {}
+    heights: dict[tuple[str, str, str], int] = {}
+    declared: dict[tuple[str, str, str], bool] = {}
+    labels: dict[tuple[str, str, str], str] = {}
+
+    for fqn, element in inventory.elements.items():
+        location: Location | None = element.metadata.location
+        if location is None:
+            continue
+        key = location.rack_key
+        if key is None:
+            continue
+        labels.setdefault(key, location.rack_label)
+        slots = placed.setdefault(key, [])
+        if location.rack_height is not None:
+            # ``NG-U003`` refuses two elements that disagree; the tallest wins
+            # here so a rendering under ``--force`` still holds everything.
+            heights[key] = max(heights.get(key, 0), location.rack_height)
+            declared[key] = True
+        if location.position is None:
+            continue
+        slots.append(
+            RackSlot(
+                element=fqn,
+                name=element.metadata.name,
+                kind=element.kind,
+                position=location.position,
+                height=location.height,
+            )
+        )
+
+    views: list[RackView] = []
+    for key, slots in placed.items():
+        ordered = tuple(sorted(slots, key=lambda slot: (slot.position, slot.element)))
+        tallest = max((slot.top for slot in ordered), default=1)
+        views.append(
+            RackView(
+                key=key,
+                label=labels[key],
+                height=max(heights.get(key, 0), tallest, 1),
+                slots=ordered,
+                inferred_height=not declared.get(key, False),
+            )
+        )
+    return tuple(views)
+
+
+def _rack_view(inventory: Inventory) -> tuple[dict[str, Node], tuple[Edge, ...]]:
+    """The placement graph: one node per rack, and no edges at all.
+
+    There are no edges on purpose. A rack elevation answers "where is this
+    bolted?", and a cable between two boxes is not an answer to that — drawing
+    one would put a line between two elevations that says nothing about either.
+    """
+    return {view.id: Node.for_rack(view) for view in rack_elevations(inventory)}, ()
 
 
 def _routed_view(
@@ -1016,10 +1528,17 @@ def _encapsulation_chain(
 
 
 def _build_edges(inventory: Inventory) -> tuple[tuple[Edge, ...], tuple[str, ...]]:
-    """Cables first (load order), then adapter attachments (§8.2)."""
+    """Cables first (load order), then adapter attachments (§8.2).
+
+    Cable endpoints resolve against :attr:`Inventory.cable_owners` rather than
+    :attr:`Inventory.interface_owners`, because a patch panel port terminates a
+    cable exactly as a device port does (§15.1). Adapter attachments still
+    resolve against the active elements: an adapter hangs off a host, and a
+    panel is not one (``NG-P004``).
+    """
     edges: list[Edge] = []
     dangling: list[str] = []
-    owners = inventory.interface_owners
+    owners = inventory.cable_owners
 
     for fqn, cable in inventory.cables.items():
         namespace = namespace_of(fqn)
@@ -1065,7 +1584,7 @@ def _build_edges(inventory: Inventory) -> tuple[tuple[Edge, ...], tuple[str, ...
         if host is None:
             continue
         host_fqn = inventory.resolve_fqn(host, namespace=namespace_of(fqn))
-        if host_fqn is None or host_fqn not in owners:
+        if host_fqn is None or host_fqn not in owners or host_fqn in inventory.patchpanels:
             dangling.append(f"{fqn}: upstream.attached_to names no known element: {host!r}")
             continue
         edges.append(
@@ -1097,9 +1616,9 @@ def _build_edges(inventory: Inventory) -> tuple[tuple[Edge, ...], tuple[str, ...
 
 
 def _link_vlans(
-    left_owner: Device | Adapter,
+    left_owner: Device | Adapter | PatchPanel,
     left_port: str,
-    right_owner: Device | Adapter,
+    right_owner: Device | Adapter | PatchPanel,
     right_port: str,
 ) -> frozenset[int]:
     """The VLANs a cable carries, from the configuration of its two ends.
@@ -1123,7 +1642,7 @@ def _link_vlans(
     return left & right or left | right
 
 
-def _port_vlans(owner: Device | Adapter, port: str) -> frozenset[int]:
+def _port_vlans(owner: Device | Adapter | PatchPanel, port: str) -> frozenset[int]:
     interface = owner.interface(port)
     if interface is None or interface.vlan is None:
         return frozenset()
@@ -1278,7 +1797,7 @@ def filter_graph(graph: Graph, spec: FilterSpec) -> Graph:
     if spec.vlans:
         kept &= {fqn for fqn in kept if graph.nodes[fqn].vlans & spec.vlans}
 
-    derived = _kept_derived(graph, kept, reachable=reachable, seed=seed)
+    derived = _kept_derived(graph, kept, spec=spec, reachable=reachable, seed=seed)
     nodes = {
         fqn: derived.get(fqn, node)
         for fqn, node in graph.nodes.items()
@@ -1304,14 +1823,24 @@ def filter_graph(graph: Graph, spec: FilterSpec) -> Graph:
 
 
 def _kept_derived(
-    graph: Graph, kept: Iterable[str], *, reachable: set[str] | None, seed: str | None
+    graph: Graph,
+    kept: Iterable[str],
+    *,
+    spec: FilterSpec,
+    reachable: set[str] | None,
+    seed: str | None,
 ) -> dict[str, Node]:
-    """The surviving subnet and tunnel nodes, narrowed to the members left.
+    """The surviving subnet, tunnel and rack nodes, narrowed to the members left.
 
     A prefix nobody selected still has is dropped, and so is a tunnel with no
     endpoint left: an empty box would claim a broadcast domain — or an overlay —
     the diagram no longer shows anything in. The one exception is a node named
     directly by ``--neighbors-of``, which is the thing the reader asked about.
+
+    A rack is the one derived node whose members are *not* nodes of the graph:
+    at :attr:`Layer.RACK` the elements are slots inside the cabinet rather than
+    boxes beside it, so ``kept`` says nothing about them and the predicates are
+    applied to the slots directly.
     """
     elements = set(kept)
     surviving: dict[str, Node] = {}
@@ -1330,7 +1859,32 @@ def _kept_derived(
             if not restricted.ends and fqn != seed:
                 continue
             surviving[fqn] = replace(node, tunnel=restricted)
+        elif node.rack is not None:
+            elevation = replace(
+                node.rack,
+                slots=tuple(slot for slot in node.rack.slots if _slot_selected(slot, spec)),
+            )
+            if not elevation.slots and fqn != seed:
+                continue
+            surviving[fqn] = replace(node, rack=elevation)
     return surviving
+
+
+def _slot_selected(slot: RackSlot, spec: FilterSpec) -> bool:
+    """Does ``spec`` select the element mounted in this slot?
+
+    Namespace, kind and name are answerable from the slot itself. A VLAN filter
+    is not — a slot records where a thing is bolted, not what it carries — and
+    is therefore ignored here rather than silently emptying every cabinet.
+    """
+    if spec.namespaces and not _in_namespaces(namespace_of(slot.element), spec.namespaces):
+        return False
+    if spec.kinds and slot.kind not in spec.kinds:
+        return False
+    return not spec.names or any(
+        fnmatchcase(slot.element, pattern) or fnmatchcase(slot.name, pattern)
+        for pattern in spec.names
+    )
 
 
 def _neighbourhood(graph: Graph, seed: str, depth: int) -> set[str]:

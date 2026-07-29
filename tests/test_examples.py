@@ -22,7 +22,7 @@ from pathlib import Path
 import pytest
 
 from netgraph.loader import Inventory, load_tree, namespace_of
-from netgraph.models import Adapter, Device
+from netgraph.models import Adapter, Device, PatchPanel
 from netgraph.rules import RULE_IDS
 from netgraph.validate import validate
 
@@ -37,6 +37,7 @@ EXAMPLE_SHAPES: dict[str, dict[str, int]] = {
     "home-lab": {"devices": 5, "cables": 4, "adapters": 1, "tunnels": 0},
     "campus": {"devices": 22, "cables": 22, "adapters": 0, "tunnels": 0},
     "overlay": {"devices": 7, "cables": 6, "adapters": 0, "tunnels": 5},
+    "patch-room": {"devices": 4, "cables": 7, "adapters": 0, "tunnels": 0, "patchpanels": 2},
 }
 
 #: ``e002-double-termination.yaml`` -> ``E002``.
@@ -64,6 +65,8 @@ def test_an_example_inventory_loads_without_errors(name: str) -> None:
     assert len(inventory.devices) == shape["devices"]
     assert len(inventory.cables) == shape["cables"]
     assert len(inventory.adapters) == shape["adapters"]
+    assert len(inventory.tunnels) == shape["tunnels"]
+    assert len(inventory.patchpanels) == shape.get("patchpanels", 0)
 
 
 @pytest.mark.parametrize("name", sorted(EXAMPLE_SHAPES))
@@ -81,7 +84,11 @@ def test_every_cable_endpoint_resolves(name: str) -> None:
         namespace = namespace_of(fqn)
         for ref in cable.endpoints:
             owner = inventory.resolve(ref.device, namespace=namespace)
-            assert isinstance(owner, (Device, Adapter)), f"{fqn}: {ref} names no cableable element"
+            # A patch-panel position terminates a cable exactly as a device
+            # port does (§15.1), so it is a legal endpoint too.
+            assert isinstance(owner, (Device, Adapter, PatchPanel)), (
+                f"{fqn}: {ref} names no cableable element"
+            )
             # interface_names() includes an adapter's upstream port, which is a
             # legal endpoint even though it is not in spec.interfaces.
             assert ref.interface in set(owner.interface_names()), f"{fqn}: {ref}"
@@ -252,11 +259,15 @@ def test_an_example_inventory_renders_to_svg(name: str) -> None:
 
     assert "<svg" in svg
     assert svg.rstrip().endswith("</svg>")
-    # One node per element that is neither a cable nor a tunnel; one edge per
-    # cable, per adapter attachment, and per leg of a tunnel.
+    # One node per element that is neither a cable nor a tunnel — a patch panel
+    # is one, because this helper draws the *physical* reading and a panel is
+    # where two cable segments meet. One edge per cable, per adapter
+    # attachment, and per leg of a tunnel.
     shape = EXAMPLE_SHAPES[name]
     legs = sum(len(tunnel.endpoints) - 1 for tunnel in inventory.tunnels.values())
-    assert svg.count('class="node"') == shape["devices"] + shape["adapters"]
+    assert svg.count('class="node"') == (
+        shape["devices"] + shape["adapters"] + shape.get("patchpanels", 0)
+    )
     assert svg.count('class="edge"') == shape["cables"] + shape["adapters"] + legs
     # Graphviz writes a hyphen as the character reference '&#45;'.
     text = html.unescape(svg)

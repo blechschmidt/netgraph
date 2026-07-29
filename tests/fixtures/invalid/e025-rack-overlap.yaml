@@ -1,0 +1,50 @@
+# E025 (NG-U001) - two elements are bolted into the same rack unit.
+#
+# 'sw-a' is 2U at U10, so it fills U10 and U11 - and 'sw-b' claims U11. One of
+# the two positions was copied from the other and never changed.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+  location:
+    site: hq
+    room: mdf
+    rack: r1
+    position: 10
+    height: 2
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-b
+  location:
+    site: hq
+    room: mdf
+    rack: r1
+    position: 11
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - sw-a:port1
+    - sw-b:port1
+  medium: copper

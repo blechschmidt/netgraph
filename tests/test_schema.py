@@ -35,7 +35,7 @@ from netgraph import schema as schema_module
 from netgraph.cli import cli
 from netgraph.errors import SchemaError
 from netgraph.loader.documents import read_documents
-from netgraph.models import DOCUMENT_KINDS, KINDS, fielddocs, parse_document
+from netgraph.models import DOCUMENT_KINDS, KINDS, element_model_for, fielddocs, parse_document
 from netgraph.schema import SCHEMA_DIALECT, UnknownKindError, build_schema, schema_id
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -122,10 +122,13 @@ def test_an_unknown_kind_is_refused() -> None:
 
 
 def test_kind_is_required_in_every_branch() -> None:
-    """Without it a document missing ``kind`` matches all seven branches at once."""
+    """Without it a document missing ``kind`` matches every branch at once."""
     schema = build_schema()
     for name in schema["discriminator"]["mapping"]:
-        definition = schema["$defs"][name.capitalize()]
+        model = element_model_for(name)
+        # ``template`` is the one branch with no element model behind it.
+        definition_name = model.__name__ if model is not None else name.capitalize()
+        definition = schema["$defs"][definition_name]
         assert "kind" in definition["required"]
         assert "default" not in definition["properties"]["kind"]
 

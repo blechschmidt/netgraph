@@ -1,0 +1,837 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkGraph",
+  "layer": "physical",
+  "nodes": [
+    {
+      "id": "hosts/srv-app-01",
+      "type": "element",
+      "name": "srv-app-01",
+      "kind": "server",
+      "namespace": "hosts",
+      "description": "Application server, rack r2. Patched through position 7.",
+      "labels": {
+        "env": "prod",
+        "role": "application",
+        "site": "hq"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback",
+          "addresses": [
+            "127.0.0.1/8"
+          ]
+        },
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "mac": "3c:d9:2b:0a:00:11",
+          "mtu": 1500,
+          "addresses": [
+            "10.10.0.11/24"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hosts/srv-db-01",
+      "type": "element",
+      "name": "srv-db-01",
+      "kind": "server",
+      "namespace": "hosts",
+      "description": "Database server, rack r2. Patched through position 8.",
+      "labels": {
+        "env": "prod",
+        "role": "database",
+        "site": "hq"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback",
+          "addresses": [
+            "127.0.0.1/8"
+          ]
+        },
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "mac": "3c:d9:2b:0a:00:12",
+          "mtu": 1500,
+          "addresses": [
+            "10.10.0.12/24"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "network/rtr-edge-01",
+      "type": "element",
+      "name": "rtr-edge-01",
+      "kind": "router",
+      "namespace": "network",
+      "description": "Edge router for the machine room. It routes between the server VLAN and\nthe outside world, and reaches the core switch over a routed (untagged)\ncopper link in the same rack — the one run in this inventory that does not\ncross a patch panel.\n",
+      "labels": {
+        "env": "prod",
+        "role": "edge",
+        "site": "hq"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "lo0",
+          "type": "loopback",
+          "description": "Router ID and management target",
+          "addresses": [
+            "192.0.2.1/32"
+          ]
+        },
+        {
+          "name": "ge-0/0/0",
+          "type": "ethernet",
+          "description": "Routed link to sw-core-01. No 'vlan' block: this port is a layer-3\ninterface, not a bridge port.\n",
+          "mac": "00:05:86:0a:00:00",
+          "mtu": 1500,
+          "addresses": [
+            "10.0.0.1/30"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "network/sw-core-01",
+      "type": "element",
+      "name": "sw-core-01",
+      "kind": "switch",
+      "namespace": "network",
+      "description": "Core switch, rack r1. Its two server ports leave the rack through the\npatch panel above it: nothing is cabled from here to rack r2 directly,\nwhich is what a structured-cabling plant looks like.\n",
+      "labels": {
+        "env": "prod",
+        "role": "core",
+        "site": "hq"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "Server gateway on the switch, for in-band management",
+          "addresses": [
+            "10.10.0.2/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "Routed link to rtr-edge-01. No 'vlan' block: this port is a layer-3\ninterface, not a bridge port.\n",
+          "mac": "00:1b:0d:0a:00:01",
+          "mtu": 1500,
+          "addresses": [
+            "10.0.0.2/30"
+          ]
+        },
+        {
+          "name": "GigabitEthernet1/0/7",
+          "type": "ethernet",
+          "description": "srv-app-01, patched through pp-r1-a position 7",
+          "mac": "00:1b:0d:0a:00:07",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/8",
+          "type": "ethernet",
+          "description": "srv-db-01, patched through pp-r1-a position 8",
+          "mac": "00:1b:0d:0a:00:08",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "panels/pp-r1-a",
+      "type": "element",
+      "name": "pp-r1-a",
+      "kind": "patchpanel",
+      "namespace": "panels",
+      "description": "24-position keystone panel at the top of rack r1. Its front positions face\nthe switch below it; its rear positions terminate the permanent cabling to\nrack r2. Positions 1 to 6 are spare, which is what a panel is for.\n",
+      "labels": {
+        "role": "cross-connect",
+        "site": "hq"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "front/1",
+          "type": "ethernet",
+          "description": "front position 1"
+        },
+        {
+          "name": "front/2",
+          "type": "ethernet",
+          "description": "front position 2"
+        },
+        {
+          "name": "front/3",
+          "type": "ethernet",
+          "description": "front position 3"
+        },
+        {
+          "name": "front/4",
+          "type": "ethernet",
+          "description": "front position 4"
+        },
+        {
+          "name": "front/5",
+          "type": "ethernet",
+          "description": "front position 5"
+        },
+        {
+          "name": "front/6",
+          "type": "ethernet",
+          "description": "front position 6"
+        },
+        {
+          "name": "front/7",
+          "type": "ethernet",
+          "description": "front position 7"
+        },
+        {
+          "name": "front/8",
+          "type": "ethernet",
+          "description": "front position 8"
+        },
+        {
+          "name": "front/9",
+          "type": "ethernet",
+          "description": "front position 9"
+        },
+        {
+          "name": "front/10",
+          "type": "ethernet",
+          "description": "front position 10"
+        },
+        {
+          "name": "front/11",
+          "type": "ethernet",
+          "description": "front position 11"
+        },
+        {
+          "name": "front/12",
+          "type": "ethernet",
+          "description": "front position 12"
+        },
+        {
+          "name": "front/13",
+          "type": "ethernet",
+          "description": "front position 13"
+        },
+        {
+          "name": "front/14",
+          "type": "ethernet",
+          "description": "front position 14"
+        },
+        {
+          "name": "front/15",
+          "type": "ethernet",
+          "description": "front position 15"
+        },
+        {
+          "name": "front/16",
+          "type": "ethernet",
+          "description": "front position 16"
+        },
+        {
+          "name": "front/17",
+          "type": "ethernet",
+          "description": "front position 17"
+        },
+        {
+          "name": "front/18",
+          "type": "ethernet",
+          "description": "front position 18"
+        },
+        {
+          "name": "front/19",
+          "type": "ethernet",
+          "description": "front position 19"
+        },
+        {
+          "name": "front/20",
+          "type": "ethernet",
+          "description": "front position 20"
+        },
+        {
+          "name": "front/21",
+          "type": "ethernet",
+          "description": "front position 21"
+        },
+        {
+          "name": "front/22",
+          "type": "ethernet",
+          "description": "front position 22"
+        },
+        {
+          "name": "front/23",
+          "type": "ethernet",
+          "description": "front position 23"
+        },
+        {
+          "name": "front/24",
+          "type": "ethernet",
+          "description": "front position 24"
+        },
+        {
+          "name": "rear/1",
+          "type": "ethernet",
+          "description": "rear position 1"
+        },
+        {
+          "name": "rear/2",
+          "type": "ethernet",
+          "description": "rear position 2"
+        },
+        {
+          "name": "rear/3",
+          "type": "ethernet",
+          "description": "rear position 3"
+        },
+        {
+          "name": "rear/4",
+          "type": "ethernet",
+          "description": "rear position 4"
+        },
+        {
+          "name": "rear/5",
+          "type": "ethernet",
+          "description": "rear position 5"
+        },
+        {
+          "name": "rear/6",
+          "type": "ethernet",
+          "description": "rear position 6"
+        },
+        {
+          "name": "rear/7",
+          "type": "ethernet",
+          "description": "rear position 7"
+        },
+        {
+          "name": "rear/8",
+          "type": "ethernet",
+          "description": "rear position 8"
+        },
+        {
+          "name": "rear/9",
+          "type": "ethernet",
+          "description": "rear position 9"
+        },
+        {
+          "name": "rear/10",
+          "type": "ethernet",
+          "description": "rear position 10"
+        },
+        {
+          "name": "rear/11",
+          "type": "ethernet",
+          "description": "rear position 11"
+        },
+        {
+          "name": "rear/12",
+          "type": "ethernet",
+          "description": "rear position 12"
+        },
+        {
+          "name": "rear/13",
+          "type": "ethernet",
+          "description": "rear position 13"
+        },
+        {
+          "name": "rear/14",
+          "type": "ethernet",
+          "description": "rear position 14"
+        },
+        {
+          "name": "rear/15",
+          "type": "ethernet",
+          "description": "rear position 15"
+        },
+        {
+          "name": "rear/16",
+          "type": "ethernet",
+          "description": "rear position 16"
+        },
+        {
+          "name": "rear/17",
+          "type": "ethernet",
+          "description": "rear position 17"
+        },
+        {
+          "name": "rear/18",
+          "type": "ethernet",
+          "description": "rear position 18"
+        },
+        {
+          "name": "rear/19",
+          "type": "ethernet",
+          "description": "rear position 19"
+        },
+        {
+          "name": "rear/20",
+          "type": "ethernet",
+          "description": "rear position 20"
+        },
+        {
+          "name": "rear/21",
+          "type": "ethernet",
+          "description": "rear position 21"
+        },
+        {
+          "name": "rear/22",
+          "type": "ethernet",
+          "description": "rear position 22"
+        },
+        {
+          "name": "rear/23",
+          "type": "ethernet",
+          "description": "rear position 23"
+        },
+        {
+          "name": "rear/24",
+          "type": "ethernet",
+          "description": "rear position 24"
+        }
+      ]
+    },
+    {
+      "id": "panels/pp-r2-a",
+      "type": "element",
+      "name": "pp-r2-a",
+      "kind": "patchpanel",
+      "namespace": "panels",
+      "description": "The other end of the same permanent cabling, at the top of rack r2. Each\nof its rear positions is tied to the matching position of pp-r1-a; the\nfront positions are what the servers below are patched into.\n",
+      "labels": {
+        "role": "cross-connect",
+        "site": "hq"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "front/1",
+          "type": "ethernet",
+          "description": "front position 1"
+        },
+        {
+          "name": "front/2",
+          "type": "ethernet",
+          "description": "front position 2"
+        },
+        {
+          "name": "front/3",
+          "type": "ethernet",
+          "description": "front position 3"
+        },
+        {
+          "name": "front/4",
+          "type": "ethernet",
+          "description": "front position 4"
+        },
+        {
+          "name": "front/5",
+          "type": "ethernet",
+          "description": "front position 5"
+        },
+        {
+          "name": "front/6",
+          "type": "ethernet",
+          "description": "front position 6"
+        },
+        {
+          "name": "front/7",
+          "type": "ethernet",
+          "description": "front position 7"
+        },
+        {
+          "name": "front/8",
+          "type": "ethernet",
+          "description": "front position 8"
+        },
+        {
+          "name": "front/9",
+          "type": "ethernet",
+          "description": "front position 9"
+        },
+        {
+          "name": "front/10",
+          "type": "ethernet",
+          "description": "front position 10"
+        },
+        {
+          "name": "front/11",
+          "type": "ethernet",
+          "description": "front position 11"
+        },
+        {
+          "name": "front/12",
+          "type": "ethernet",
+          "description": "front position 12"
+        },
+        {
+          "name": "front/13",
+          "type": "ethernet",
+          "description": "front position 13"
+        },
+        {
+          "name": "front/14",
+          "type": "ethernet",
+          "description": "front position 14"
+        },
+        {
+          "name": "front/15",
+          "type": "ethernet",
+          "description": "front position 15"
+        },
+        {
+          "name": "front/16",
+          "type": "ethernet",
+          "description": "front position 16"
+        },
+        {
+          "name": "front/17",
+          "type": "ethernet",
+          "description": "front position 17"
+        },
+        {
+          "name": "front/18",
+          "type": "ethernet",
+          "description": "front position 18"
+        },
+        {
+          "name": "front/19",
+          "type": "ethernet",
+          "description": "front position 19"
+        },
+        {
+          "name": "front/20",
+          "type": "ethernet",
+          "description": "front position 20"
+        },
+        {
+          "name": "front/21",
+          "type": "ethernet",
+          "description": "front position 21"
+        },
+        {
+          "name": "front/22",
+          "type": "ethernet",
+          "description": "front position 22"
+        },
+        {
+          "name": "front/23",
+          "type": "ethernet",
+          "description": "front position 23"
+        },
+        {
+          "name": "front/24",
+          "type": "ethernet",
+          "description": "front position 24"
+        },
+        {
+          "name": "rear/1",
+          "type": "ethernet",
+          "description": "rear position 1"
+        },
+        {
+          "name": "rear/2",
+          "type": "ethernet",
+          "description": "rear position 2"
+        },
+        {
+          "name": "rear/3",
+          "type": "ethernet",
+          "description": "rear position 3"
+        },
+        {
+          "name": "rear/4",
+          "type": "ethernet",
+          "description": "rear position 4"
+        },
+        {
+          "name": "rear/5",
+          "type": "ethernet",
+          "description": "rear position 5"
+        },
+        {
+          "name": "rear/6",
+          "type": "ethernet",
+          "description": "rear position 6"
+        },
+        {
+          "name": "rear/7",
+          "type": "ethernet",
+          "description": "rear position 7"
+        },
+        {
+          "name": "rear/8",
+          "type": "ethernet",
+          "description": "rear position 8"
+        },
+        {
+          "name": "rear/9",
+          "type": "ethernet",
+          "description": "rear position 9"
+        },
+        {
+          "name": "rear/10",
+          "type": "ethernet",
+          "description": "rear position 10"
+        },
+        {
+          "name": "rear/11",
+          "type": "ethernet",
+          "description": "rear position 11"
+        },
+        {
+          "name": "rear/12",
+          "type": "ethernet",
+          "description": "rear position 12"
+        },
+        {
+          "name": "rear/13",
+          "type": "ethernet",
+          "description": "rear position 13"
+        },
+        {
+          "name": "rear/14",
+          "type": "ethernet",
+          "description": "rear position 14"
+        },
+        {
+          "name": "rear/15",
+          "type": "ethernet",
+          "description": "rear position 15"
+        },
+        {
+          "name": "rear/16",
+          "type": "ethernet",
+          "description": "rear position 16"
+        },
+        {
+          "name": "rear/17",
+          "type": "ethernet",
+          "description": "rear position 17"
+        },
+        {
+          "name": "rear/18",
+          "type": "ethernet",
+          "description": "rear position 18"
+        },
+        {
+          "name": "rear/19",
+          "type": "ethernet",
+          "description": "rear position 19"
+        },
+        {
+          "name": "rear/20",
+          "type": "ethernet",
+          "description": "rear position 20"
+        },
+        {
+          "name": "rear/21",
+          "type": "ethernet",
+          "description": "rear position 21"
+        },
+        {
+          "name": "rear/22",
+          "type": "ethernet",
+          "description": "rear position 22"
+        },
+        {
+          "name": "rear/23",
+          "type": "ethernet",
+          "description": "rear position 23"
+        },
+        {
+          "name": "rear/24",
+          "type": "ethernet",
+          "description": "rear position 24"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "cables/cbl-rtr-sw",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "network/rtr-edge-01",
+          "interface": "ge-0/0/0"
+        },
+        {
+          "node": "network/sw-core-01",
+          "interface": "GigabitEthernet1/0/1"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "C-001",
+      "lengthM": 1.0,
+      "vlans": []
+    },
+    {
+      "id": "cables/cbl-sw-pp07",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "panels/pp-r1-a",
+          "interface": "front/7"
+        },
+        {
+          "node": "network/sw-core-01",
+          "interface": "GigabitEthernet1/0/7"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "P-007A",
+      "lengthM": 1.0,
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "cables/cbl-tie-07",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "panels/pp-r1-a",
+          "interface": "rear/7"
+        },
+        {
+          "node": "panels/pp-r2-a",
+          "interface": "rear/7"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "T-007",
+      "lengthM": 18.0,
+      "vlans": []
+    },
+    {
+      "id": "cables/cbl-pp-app07",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "panels/pp-r2-a",
+          "interface": "front/7"
+        },
+        {
+          "node": "hosts/srv-app-01",
+          "interface": "eno1"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "P-007B",
+      "lengthM": 2.0,
+      "vlans": []
+    },
+    {
+      "id": "cables/cbl-sw-pp08",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "panels/pp-r1-a",
+          "interface": "front/8"
+        },
+        {
+          "node": "network/sw-core-01",
+          "interface": "GigabitEthernet1/0/8"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "P-008A",
+      "lengthM": 1.0,
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "cables/cbl-tie-08",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "panels/pp-r1-a",
+          "interface": "rear/8"
+        },
+        {
+          "node": "panels/pp-r2-a",
+          "interface": "rear/8"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "T-008",
+      "lengthM": 18.0,
+      "vlans": []
+    },
+    {
+      "id": "cables/cbl-pp-db08",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "panels/pp-r2-a",
+          "interface": "front/8"
+        },
+        {
+          "node": "hosts/srv-db-01",
+          "interface": "eno1"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "P-008B",
+      "lengthM": 2.0,
+      "vlans": []
+    }
+  ],
+  "title": "Patch room, cabling"
+}

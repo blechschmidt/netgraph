@@ -1,0 +1,38 @@
+# E024 (NG-P005) - a run leaves a pair of panels and is patched back into them.
+#
+# 'cbl-front' joins the two front positions and 'cbl-rear' the two rear ones,
+# so the couplers close the circle: the run never reaches anything that can
+# send or receive.
+apiVersion: netgraph.dev/v1alpha1
+kind: patchpanel
+metadata:
+  name: pp-a
+spec:
+  ports: 1-2
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: patchpanel
+metadata:
+  name: pp-b
+spec:
+  ports: 1-2
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-front
+spec:
+  endpoints:
+    - pp-a:front/1
+    - pp-b:front/1
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-rear
+spec:
+  endpoints:
+    - pp-a:rear/1
+    - pp-b:rear/1
+  medium: copper

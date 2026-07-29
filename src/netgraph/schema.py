@@ -49,6 +49,7 @@ from netgraph.models.fielddocs import (
     NONE,
     check_coverage,
 )
+from netgraph.models.patchpanel import PORT_RANGE_PATTERN
 from netgraph.models.scalars import (
     API_VERSION,
     BITRATE_PATTERN,
@@ -252,6 +253,38 @@ def _widen_vlan_set(_definition: dict[str, Any]) -> dict[str, Any]:
     return dict(_VLAN_SET_SCHEMA)
 
 
+#: ``spec.ports`` of a patch panel (§15.1). The model normalises a count to the
+#: string form, so both spellings have to be describable here or an editor would
+#: flag ``ports: 24`` — the one people actually write.
+_PORT_RANGE_SCHEMA: Final[dict[str, Any]] = {
+    "title": "port range",
+    "description": (
+        "The positions a patch panel has: a count (`24`, meaning 1 to 24) or "
+        "comma-separated spans (`1-24`, `1-12,17-24`). Each position becomes a "
+        "`front/<n>` and a `rear/<n>` interface (`NG-P006`)."
+    ),
+    "anyOf": [
+        {"type": "integer", "minimum": 1},
+        {"type": "string", "pattern": PORT_RANGE_PATTERN},
+    ],
+}
+
+#: ``spec.couplers``. YAML reads ``{1: 24}`` as integer keys and values, and the
+#: model accepts both, so the schema has to as well.
+_COUPLERS_SCHEMA: Final[dict[str, Any]] = {
+    "title": "couplers",
+    "description": (
+        "Front position to rear position, for a panel that is not wired straight "
+        "through. Absent means the identity mapping (`NG-P007`)."
+    ),
+    "type": "object",
+    "propertyNames": {"pattern": r"^\d+$"},
+    "additionalProperties": {
+        "anyOf": [{"type": "string", "pattern": r"^\d+$"}, {"type": "integer", "minimum": 0}]
+    },
+}
+
+
 #: ``$defs`` entry → replacement, for every model that accepts a shorthand.
 #: Checked against the generated schema by :func:`_apply`, so renaming a model
 #: without updating this table is an error rather than a silent hole.
@@ -272,6 +305,8 @@ _SCALAR_PROPERTIES: Final[dict[tuple[str, str], dict[str, Any]]] = {
     ("BridgeConfig", "address"): _MAC_SCHEMA,
     ("CableSpec", "speed"): _BITRATE_SCHEMA,
     ("UpstreamPort", "speed"): _BITRATE_SCHEMA,
+    ("PatchPanelSpec", "ports"): _PORT_RANGE_SCHEMA,
+    ("PatchPanelSpec", "couplers"): _COUPLERS_SCHEMA,
 }
 
 

@@ -41,7 +41,7 @@ from types import MappingProxyType
 from typing import Final
 
 from netgraph.errors import RenderError
-from netgraph.render.graph import SUBNET_KIND, TUNNEL_KIND
+from netgraph.render.graph import PATCHPANEL_KIND, SUBNET_KIND, TUNNEL_KIND
 
 __all__ = [
     "BUNDLED_THEMES",
@@ -79,6 +79,7 @@ ICON_KINDS: Final[tuple[str, ...]] = (
     "computer",
     "server",
     "adapter",
+    PATCHPANEL_KIND,
     SUBNET_KIND,
     TUNNEL_KIND,
 )

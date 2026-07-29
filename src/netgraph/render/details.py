@@ -260,6 +260,9 @@ def _node_lines(record: Mapping[str, Any]) -> Iterator[str]:
     aggregate = record.get("aggregate")
     if isinstance(aggregate, Mapping):
         yield from _aggregate_lines(aggregate)
+    rack = record.get("rack")
+    if isinstance(rack, Mapping):
+        yield from _rack_lines(rack)
 
     vlans = record.get("vlans")
     if vlans:
@@ -278,6 +281,29 @@ def _subtitle(record: Mapping[str, Any]) -> str:
     if isinstance(record.get("aggregate"), Mapping):
         return "namespace"
     return plain_text(str(record.get("kind", "element")))
+
+
+def _rack_lines(rack: Mapping[str, Any]) -> Iterator[str]:
+    """A rack: how tall it is, how full it is, and what is bolted where.
+
+    The free space is stated as a number rather than left for the reader to
+    count off the elevation: "how much room is left in this cabinet?" is the
+    question a rack diagram is opened to answer.
+    """
+    height = int(rack.get("height", 0))
+    used = int(rack.get("usedUnits", 0))
+    inferred = " (inferred from its occupants)" if rack.get("heightInferred") else ""
+    yield f"{height}U rack{inferred}: {used}U used, {max(height - used, 0)}U free"
+    yield from _rows("mounted", rack.get("slots", ()), _slot_row)
+
+
+def _slot_row(slot: Mapping[str, Any]) -> str:
+    """``U10-U11  srv-app-01 (server, 2U)``."""
+    position = int(slot.get("position", 0))
+    span = int(slot.get("height", 1))
+    units = f"U{position}" if span == 1 else f"U{position}-U{position + span - 1}"
+    name = plain_text(str(slot.get("name", "")))
+    return f"{units}  {name} ({plain_text(str(slot.get('kind', '')))}, {span}U)"
 
 
 def _aggregate_lines(aggregate: Mapping[str, Any]) -> Iterator[str]:
@@ -384,6 +410,31 @@ def _bundled_row(link: Mapping[str, Any]) -> str:
     return "  ".join(parts)
 
 
+def _patch_lines(patch: Mapping[str, Any]) -> Iterator[str]:
+    """The cross-connects a spliced run passes through (§15.2).
+
+    The reader is looking at one line between two devices; what this says is
+    that the line is several cables and that these are the positions they
+    occupy — which is the patch record, and the thing somebody has to go and
+    look at when the link is down.
+    """
+    panels = list(patch.get("panels", ()))
+    segments = list(patch.get("segments", ()))
+    yield (
+        f"patched run: {count_text(len(segments), 'segment')} through "
+        + count_text(len(panels), "panel")
+    )
+    if panels:
+        yield "via: " + _listed(
+            f"{plain_text(str(hop.get('panel', '')))} "
+            f"{plain_text(str(hop.get('ingress', '')))}"
+            f"-{plain_text(str(hop.get('egress', '')))}"
+            for hop in panels
+        )
+    if segments:
+        yield "segments: " + _listed(plain_text(str(segment)) for segment in segments)
+
+
 def _edge_lines(record: Mapping[str, Any]) -> Iterator[str]:
     """An edge: what it is, what it joins, and what it carries."""
     kind = plain_text(str(record.get("kind", "link")))
@@ -394,6 +445,10 @@ def _edge_lines(record: Mapping[str, Any]) -> Iterator[str]:
     bundle = record.get("bundle")
     if isinstance(bundle, Mapping):
         yield from _bundle_lines(bundle)
+
+    patch = record.get("patch")
+    if isinstance(patch, Mapping):
+        yield from _patch_lines(patch)
 
     tunnel = record.get("tunnel")
     if isinstance(tunnel, Mapping):

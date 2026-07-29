@@ -62,6 +62,7 @@ from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of
 from netgraph.loader.provenance import Site
 from netgraph.models import (
     AGGREGATE_TYPES,
+    PATCHPANEL_KIND,
     Adapter,
     Cable,
     Computer,
@@ -75,12 +76,15 @@ from netgraph.models import (
     IPv4Address,
     IPv6Address,
     Medium,
+    PanelSide,
+    PatchPanel,
     Server,
     Switch,
     Tunnel,
     VlanConfig,
     VlanMode,
 )
+from netgraph.models.metadata import Location
 from netgraph.models.scalars import MAX_VLAN_ID, MIN_VLAN_ID, format_bitrate
 from netgraph.rules import RULES, WILDCARD, Rule, Severity, resolve_rule_id
 from netgraph.subnets import (
@@ -112,11 +116,19 @@ _TOKEN_SEPARATORS: Final = ",;"
 #: Longest list of names spelled out in a message before it is abbreviated.
 _MAX_LISTED: Final = 8
 
-#: Elements that own interfaces and can therefore terminate a cable (§4.2).
+#: *Active* elements that own interfaces: everything that can be configured
+#: (§4.2). A patch panel owns ports too, but configures nothing, so every rule
+#: about configuration reads :attr:`_Context.owners` and never sees one.
 InterfaceOwner: TypeAlias = Device | Adapter
 
 #: The same set as a tuple, for ``isinstance``.
 _OWNER_TYPES: Final = (Device, Adapter)
+
+#: Everything a *cable* may terminate on, panels included (§15.1).
+CableTarget: TypeAlias = Device | Adapter | PatchPanel
+
+#: The same set as a tuple, for ``isinstance``.
+_CABLE_TARGET_TYPES: Final = (Device, Adapter, PatchPanel)
 
 #: Elements a cable may reach that are end systems rather than network gear
 #: (``W115``). An adapter is one: it is a port of the host it hangs off.
@@ -260,9 +272,10 @@ class _Endpoint:
     ref: InterfaceRef
     #: Position within ``spec.endpoints`` (0 or 1), for the field path.
     index: int
-    #: The element the device part names, when it resolves to an interface owner.
+    #: The element the device part names, when it resolves to something a cable
+    #: may terminate on — a device, an adapter or a patch panel.
     owner_fqn: str | None = None
-    owner: InterfaceOwner | None = None
+    owner: CableTarget | None = None
     #: The interface the reference names; ``None`` for an unknown interface and
     #: for an adapter upstream port, which carries no L2/L3 configuration (§8.1).
     interface: Interface | None = None
@@ -277,6 +290,22 @@ class _Endpoint:
     def resolved(self) -> bool:
         """Does this endpoint name a real port on a real element?"""
         return self.owner_fqn is not None and (self.interface is not None or self.is_upstream)
+
+    @property
+    def panel(self) -> PatchPanel | None:
+        """The patch panel this endpoint lands on, or ``None`` (§15.1).
+
+        A panel port is an ordinary cable endpoint, so it goes through the same
+        resolution as every other one; what it is *not* is a place where any
+        configuration lives, which is why the rules that read a port's VLAN,
+        MTU or addresses ask this first.
+        """
+        return self.owner if isinstance(self.owner, PatchPanel) else None
+
+    @property
+    def active_owner(self) -> InterfaceOwner | None:
+        """The owner when it is an active element, never a patch panel."""
+        return self.owner if isinstance(self.owner, _OWNER_TYPES) else None
 
     @property
     def port(self) -> str:
@@ -388,6 +417,31 @@ class _Attachment:
 
 
 @dataclass(frozen=True, slots=True)
+class _Placement:
+    """One element's ``metadata.location``, resolved (§3.2).
+
+    Three rules read it — ``E025`` (do two things overlap), ``E026`` (does
+    anything stick out of the top) and ``E027`` (do two elements disagree about
+    how tall the rack is) — so the elements are grouped by rack once, here.
+    """
+
+    fqn: str
+    element: Element
+    location: Location
+
+    @property
+    def rack(self) -> tuple[str, str, str] | None:
+        return self.location.rack_key
+
+    @property
+    def field_path(self) -> tuple[str | int, ...]:
+        return ("metadata", "location")
+
+    def path(self, key: str) -> tuple[str | int, ...]:
+        return ("metadata", "location", key)
+
+
+@dataclass(frozen=True, slots=True)
 class _Context:
     """Everything the checks need, computed once.
 
@@ -412,8 +466,16 @@ class _Context:
     encapsulations: tuple[_Encapsulation, ...]
     #: ``(owner fqn, interface name)`` -> the tunnels terminating on it.
     tunnel_ports: Mapping[tuple[str, str], tuple[str, ...]]
-    #: ``(owner fqn, interface name)`` -> the endpoints landing on it, in load order.
+    #: ``(owner fqn, interface name)`` -> the endpoints landing on it, in load
+    #: order. Active elements only; a panel position lands in
+    #: :attr:`panel_terminations` so ``E002`` and ``E022`` cannot both fire.
     terminations: Mapping[tuple[str, str], tuple[_Endpoint, ...]]
+    #: The patch panels of the inventory, in load order (§15).
+    panels: Mapping[str, PatchPanel]
+    #: ``(panel fqn, position)`` -> the endpoints landing on it, in load order.
+    panel_terminations: Mapping[tuple[str, str], tuple[_Endpoint, ...]]
+    #: Every element that declares ``metadata.location``, in load order.
+    placements: tuple[_Placement, ...]
     #: Element fqns reachable through a cable or an adapter attachment.
     connected: frozenset[str]
     #: Per element: interface name -> the LAG that aggregates it (§10.6).
@@ -500,6 +562,7 @@ def _build_context(inventory: Inventory) -> _Context:
 
     endpoints: list[_Endpoint] = []
     terminations: dict[tuple[str, str], list[_Endpoint]] = {}
+    panel_terminations: dict[tuple[str, str], list[_Endpoint]] = {}
     connected: set[str] = set()
 
     for cable_fqn, cable in inventory.cables.items():
@@ -516,8 +579,10 @@ def _build_context(inventory: Inventory) -> _Context:
             # cabled: reporting it as an orphan on top of E001 would be two
             # findings for one mistake.
             connected.add(owner_fqn)
-            if endpoint.resolved:
-                terminations.setdefault((owner_fqn, ref.interface), []).append(endpoint)
+            if not endpoint.resolved:
+                continue
+            landing = panel_terminations if endpoint.panel is not None else terminations
+            landing.setdefault((owner_fqn, ref.interface), []).append(endpoint)
 
     attachments: list[_Attachment] = []
     for fqn, adapter in inventory.adapters.items():
@@ -566,6 +631,13 @@ def _build_context(inventory: Inventory) -> _Context:
         encapsulations=tuple(encapsulations),
         tunnel_ports={key: tuple(value) for key, value in tunnel_ports.items()},
         terminations={key: tuple(value) for key, value in terminations.items()},
+        panels=inventory.patchpanels,
+        panel_terminations={key: tuple(value) for key, value in panel_terminations.items()},
+        placements=tuple(
+            _Placement(fqn=fqn, element=element, location=element.metadata.location)
+            for fqn, element in inventory.elements.items()
+            if element.metadata.location is not None
+        ),
         connected=frozenset(connected),
         lag_masters={fqn: _lag_masters(owner) for fqn, owner in owners.items()},
         stacking_groups={fqn: _stacking_groups(owner) for fqn, owner in owners.items()},
@@ -596,13 +668,27 @@ def _resolve_endpoint(
             index=index,
             ambiguous=resolution.ambiguous,
         )
-    if not isinstance(element, _OWNER_TYPES):
+    if not isinstance(element, _CABLE_TARGET_TYPES):
         return _Endpoint(
             cable_fqn=cable_fqn,
             cable=cable,
             ref=ref,
             index=index,
             wrong_kind=element.kind,
+        )
+
+    if isinstance(element, PatchPanel):
+        # §15.1: a panel port is a cable endpoint like any other, but it is not
+        # in ``by_name`` — that index is built for the *active* elements, whose
+        # configuration the rules read.
+        return _Endpoint(
+            cable_fqn=cable_fqn,
+            cable=cable,
+            ref=ref,
+            index=index,
+            owner_fqn=resolution.fqn,
+            owner=element,
+            interface=element.interface(ref.interface),
         )
 
     is_upstream = isinstance(element, Adapter) and ref.interface == element.upstream.name
@@ -787,6 +873,10 @@ def _check_endpoint_references(ctx: _Context) -> Iterator[_Draft]:
                 elements,
                 endpoint.field_path,
             )
+        elif endpoint.panel is not None:
+            # A missing panel position is ``E021``, which can say what the
+            # positions of a 24-port panel are without listing 48 names.
+            continue
         elif not endpoint.resolved:
             known = _join(sorted(owner.interface_names()))
             yield _Draft(
@@ -2316,6 +2406,9 @@ def _check_attachment_target(ctx: _Context) -> Iterator[_Draft]:
                 elements,
                 attachment.field_path,
             )
+        elif isinstance(attachment.host, PatchPanel):
+            # ``E023`` reports every "a panel cannot do that" in one voice.
+            continue
         elif not isinstance(attachment.host, _OWNER_TYPES):
             yield _Draft(
                 f"{prefix} names {_q(attachment.ref)}, which is a {attachment.host.kind}; an "
@@ -2473,6 +2566,8 @@ def _check_tunnel_endpoints(ctx: _Context) -> Iterator[_Draft]:
                 elements,
                 end.field_path,
             )
+        elif end.wrong_kind == PATCHPANEL_KIND:
+            continue  # ``E023``: one voice for everything a panel cannot be.
         elif end.wrong_kind is not None:
             yield _Draft(
                 f"{prefix}: {_q(end.ref.device)} is a {end.wrong_kind}, which owns no interfaces",
@@ -2732,6 +2827,300 @@ def _check_nonstandard_port(ctx: _Context) -> Iterator[_Draft]:
         )
 
 
+# --------------------------------------------------------------------------- #
+# Patch panels (§10.12)
+# --------------------------------------------------------------------------- #
+
+
+def _check_panel_position(ctx: _Context) -> Iterator[_Draft]:
+    """E021 — a cable terminates on a position the panel does not have (``NG-P001``).
+
+    A panel's positions come from ``spec.ports``, so ``front/25`` on a 24-port
+    panel is not a typo the reader can see by looking at the panel document —
+    it is a typo they can only see next to the range. Naming the range in the
+    diagnostic is what makes the two comparable, and is why this is not the
+    generic ``E001``: listing 48 interface names would bury the one fact that
+    matters.
+    """
+    for endpoint in ctx.endpoints:
+        panel = endpoint.panel
+        if panel is None or endpoint.resolved:
+            continue
+        sides = " and ".join(f"{side}/<n>" for side in PanelSide)
+        yield _Draft(
+            f"cable {_q(endpoint.cable_fqn)} terminates on {_q(endpoint.port)}, but patch "
+            f"panel {_q(endpoint.owner_fqn or '')} has positions {panel.spec.ports} and its "
+            f"ports are named {sides}",
+            (endpoint.cable_fqn, endpoint.owner_fqn or endpoint.ref.device),
+            endpoint.field_path,
+        )
+
+
+def _check_panel_double_termination(ctx: _Context) -> Iterator[_Draft]:
+    """E022 — a panel position terminates more than one cable (``NG-P003``).
+
+    A coupler is a hole with one plug in it on each side. Two cables in one
+    position is a patch record that cannot be true, and it is worse than the
+    device-port case (``E002``) because a panel is invisible below
+    ``--layer physical``: the run would silently be spliced through whichever
+    cable happened to be declared first.
+    """
+    for (panel_fqn, position), endpoints in ctx.panel_terminations.items():
+        if len(endpoints) < 2:
+            continue
+        cables = list(dict.fromkeys(endpoint.cable_fqn for endpoint in endpoints))
+        port = f"{panel_fqn}:{position}"
+        if len(cables) == 1:
+            yield _Draft(
+                f"both endpoints of cable {_q(cables[0])} terminate on {_q(port)}; a cable "
+                f"joins two distinct positions",
+                (cables[0], panel_fqn),
+                ("spec", "endpoints"),
+            )
+        else:
+            yield _Draft(
+                f"patch-panel position {_q(port)} is terminated by {len(cables)} cables: "
+                f"{_join(cables)}. A coupler takes one plug per side.",
+                (*cables, panel_fqn),
+                ("spec", "endpoints"),
+            )
+
+
+def _check_panel_as_active_element(ctx: _Context) -> Iterator[_Draft]:
+    """E023 — a panel is named where an active element is required (``NG-P004``).
+
+    A panel has no bus to plug an adapter into and no operating system to
+    terminate a tunnel on. Both spellings are the same mistake — reading the
+    panel as the device on the other side of it — and both are worth a
+    diagnostic that says so, because the alternative is a diagram in which a
+    dongle hangs off a hole in a rack.
+    """
+    for attachment in ctx.attachments:
+        if not isinstance(attachment.host, PatchPanel):
+            continue
+        yield _Draft(
+            f"adapter {_q(attachment.adapter_fqn)}: upstream.attached_to names "
+            f"{_q(attachment.ref)}, which is a patch panel; a panel is passive and has no host "
+            f"bus. Cable the adapter to a panel position instead.",
+            (attachment.adapter_fqn, attachment.host_fqn or attachment.ref),
+            attachment.field_path,
+        )
+
+    for end in ctx.tunnel_ends:
+        if end.wrong_kind != PATCHPANEL_KIND:
+            continue
+        yield _Draft(
+            f"tunnel {_q(end.tunnel_fqn)} endpoint {end.ref}: {_q(end.ref.device)} is a patch "
+            f"panel; a tunnel terminates on a 'tunnel' interface of an active element, and a "
+            f"panel runs no software",
+            (end.tunnel_fqn,),
+            end.field_path,
+        )
+
+
+def _check_panel_loop(ctx: _Context) -> Iterator[_Draft]:
+    """E024 — a run leaves a panel and is patched back into it (``NG-P005``).
+
+    Follow a run through the couplers and it must reach an active port. A run
+    that arrives back at a segment it has already crossed never will: it is a
+    loop of copper between two holes, and at layer 2 it is a broadcast storm
+    waiting for someone to plug the last cable in. The graph layer drops such a
+    run rather than splicing it, so without this rule the only sign of it would
+    be a link that quietly is not drawn.
+    """
+    reported: set[frozenset[str]] = set()
+    for start in ctx.panel_terminations.values():
+        for endpoint in start:
+            loop = _patch_loop(endpoint, ctx)
+            if loop is None or frozenset(loop) in reported:
+                continue
+            reported.add(frozenset(loop))
+            yield _Draft(
+                f"the patch run through {_join(loop)} comes back into a position it has "
+                f"already crossed; a patch panel cannot be patched into itself",
+                tuple(loop),
+                ("spec", "endpoints"),
+            )
+
+
+def _patch_loop(start: _Endpoint, ctx: _Context) -> tuple[str, ...] | None:
+    """Walk the run ``start`` belongs to; return its cables when it loops.
+
+    ``None`` means the run terminates — on an active port, on an uncoupled
+    position, or on a coupler nothing is patched into. Only the third of those
+    is a problem, and it is ``W133``'s rather than this one's.
+    """
+    seen: list[str] = []
+    current: _Endpoint | None = start
+    while current is not None:
+        if current.cable_fqn in seen:
+            return tuple(seen[seen.index(current.cable_fqn) :])
+        seen.append(current.cable_fqn)
+        panel_fqn, panel = current.owner_fqn, current.panel
+        if panel is None or panel_fqn is None:
+            return None
+        far = _far_end(current, ctx)
+        if far is None or far.panel is None or far.owner_fqn is None:
+            return None
+        egress = far.panel.opposite(far.ref.interface)
+        if egress is None:
+            return None
+        following = ctx.panel_terminations.get((far.owner_fqn, egress))
+        current = following[0] if following else None
+    return None
+
+
+def _far_end(endpoint: _Endpoint, ctx: _Context) -> _Endpoint | None:
+    """The other endpoint of ``endpoint``'s cable, when it resolved."""
+    for candidate in ctx.endpoints:
+        if candidate.cable_fqn == endpoint.cable_fqn and candidate is not endpoint:
+            return candidate
+    return None
+
+
+def _check_dangling_patch(ctx: _Context) -> Iterator[_Draft]:
+    """W133 — a cabled position is coupled to one nothing is patched into (``NG-P002``).
+
+    Half a run. The cable exists, the coupler exists, and the far side of the
+    panel is empty — so the port at the near end is *not* connected to anything,
+    however much the inventory looks like it is. This is the single most common
+    real patch-record error: the run was pulled, the front was patched, and the
+    rear was left for later.
+
+    A warning rather than an error, because "left for later" is also a
+    legitimate state to record: the position is reserved, and the inventory is
+    telling the truth about a job that is half done.
+    """
+    for (panel_fqn, position), endpoints in ctx.panel_terminations.items():
+        panel = ctx.panels.get(panel_fqn)
+        if panel is None:
+            continue
+        egress = panel.opposite(position)
+        if egress is None or (panel_fqn, egress) in ctx.panel_terminations:
+            continue
+        cable = endpoints[0].cable_fqn
+        yield _Draft(
+            f"cable {_q(cable)} lands on {_q(f'{panel_fqn}:{position}')}, which is coupled to "
+            f"{_q(egress)}; nothing is patched into that position, so the run stops inside the "
+            f"panel and reaches nothing",
+            (cable, panel_fqn),
+            endpoints[0].field_path,
+        )
+
+
+# --------------------------------------------------------------------------- #
+# Physical placement (§10.13)
+# --------------------------------------------------------------------------- #
+
+
+def _by_rack(ctx: _Context) -> Iterator[tuple[tuple[str, str, str], tuple[_Placement, ...]]]:
+    """Every rack the inventory places something in, with its occupants."""
+    racks: dict[tuple[str, str, str], list[_Placement]] = {}
+    for placement in ctx.placements:
+        key = placement.rack
+        if key is not None:
+            racks.setdefault(key, []).append(placement)
+    for key, members in racks.items():
+        yield key, tuple(members)
+
+
+def _check_rack_overlap(ctx: _Context) -> Iterator[_Draft]:
+    """E025 — two elements occupy the same unit of one rack (``NG-U001``).
+
+    Two things cannot be bolted to the same four screw holes. In practice this
+    catches the position that was copied from the row above and never changed,
+    and the 2U server whose ``height`` was left at the default — both of which
+    produce an elevation that looks plausible and is off by one for everything
+    above it.
+    """
+    for key, members in _by_rack(ctx):
+        placed = [member for member in members if member.location.is_placed]
+        for index, first in enumerate(placed):
+            for second in placed[index + 1 :]:
+                overlap = sorted(set(first.location.units) & set(second.location.units))
+                if not overlap:
+                    continue
+                label = first.location.rack_label or "/".join(key)
+                yield _Draft(
+                    f"{_q(first.fqn)} and {_q(second.fqn)} both occupy "
+                    f"{_units_text(overlap)} of rack {_q(label)}: "
+                    f"{_span_text(first)} and {_span_text(second)}",
+                    (first.fqn, second.fqn),
+                    first.path("position"),
+                )
+
+
+def _check_rack_height(ctx: _Context) -> Iterator[_Draft]:
+    """E026 — an element extends past the top of its rack (``NG-U002``).
+
+    ``position`` is the *lowest* unit and ``height`` counts upwards, so a 4U
+    panel at U40 of a 42U cabinet ends at U43 and does not fit. The arithmetic
+    is exactly the part a person does wrong, which is the whole reason the
+    block is structured rather than free text.
+    """
+    for key, members in _by_rack(ctx):
+        declared = [
+            member.location.rack_height
+            for member in members
+            if member.location.rack_height is not None
+        ]
+        if not declared:
+            continue
+        height = max(declared)
+        for member in members:
+            top = member.location.top
+            if top is None or top <= height:
+                continue
+            label = member.location.rack_label or "/".join(key)
+            yield _Draft(
+                f"{_q(member.fqn)} is mounted at {_span_text(member)} of rack {_q(label)}, "
+                f"which is {height}U tall; it would extend {top - height}U past the top",
+                (member.fqn,),
+                member.path("position"),
+            )
+
+
+def _check_rack_height_agreement(ctx: _Context) -> Iterator[_Draft]:
+    """E027 — one rack is declared with two different heights (``NG-U003``).
+
+    A rack has one height. Two elements that disagree about it mean either that
+    one of them is in a different cabinet than its ``rack`` says, or that the
+    number was guessed — and until that is settled, ``E026`` has no bound it
+    can trust.
+    """
+    for key, members in _by_rack(ctx):
+        declared: dict[int, list[str]] = {}
+        for member in members:
+            if member.location.rack_height is not None:
+                declared.setdefault(member.location.rack_height, []).append(member.fqn)
+        if len(declared) < 2:
+            continue
+        label = members[0].location.rack_label or "/".join(key)
+        spelled = _join_plain(
+            [f"{height}U by {_join(sorted(names))}" for height, names in sorted(declared.items())]
+        )
+        anchor = next(member for member in members if member.location.rack_height is not None)
+        yield _Draft(
+            f"rack {_q(label)} is declared {spelled}; a rack has one height",
+            tuple(fqn for names in declared.values() for fqn in sorted(names)),
+            anchor.path("rack_height"),
+        )
+
+
+def _units_text(units: Sequence[int]) -> str:
+    """``U10`` or ``U10-U11``, for a span of rack units."""
+    if len(units) == 1:
+        return f"U{units[0]}"
+    return f"U{units[0]}-U{units[-1]}"
+
+
+def _span_text(placement: _Placement) -> str:
+    """``U10-U11 (2U)`` — where one element sits and how much it takes."""
+    location = placement.location
+    units = list(location.units)
+    return f"{_units_text(units)} ({location.height}U)" if units else "no position"
+
+
 #: Every check, paired with the rule it reports, in report order.
 _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("E001", _check_endpoint_references),
@@ -2754,6 +3143,13 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("E018", _check_encapsulation_target),
     ("E019", _check_encapsulation_cycle),
     ("E020", _check_gateway_on_link),
+    ("E021", _check_panel_position),
+    ("E022", _check_panel_double_termination),
+    ("E023", _check_panel_as_active_element),
+    ("E024", _check_panel_loop),
+    ("E025", _check_rack_overlap),
+    ("E026", _check_rack_height),
+    ("E027", _check_rack_height_agreement),
     ("W101", _check_unaddressed_interface),
     ("W102", _check_mtu_mismatch),
     ("W103", _check_orphan_device),
@@ -2786,6 +3182,7 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("W130", _check_prefix_domains),
     ("W131", _check_nested_prefix_domains),
     ("W132", _check_link_prefixes),
+    ("W133", _check_dangling_patch),
     ("I001", _check_local_mac),
     ("I002", _check_uncabled_interface),
     ("I003", _check_nonstandard_port),

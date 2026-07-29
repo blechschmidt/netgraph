@@ -1,0 +1,73 @@
+# E022 (NG-P003) - one panel position terminates two cables.
+#
+# Both 'cbl-one' and 'cbl-two' are patched into 'pp-a:front/1'. A coupler takes
+# one plug per side, so one of the two runs is a patch record that never
+# happened.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: port2
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-b
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: patchpanel
+metadata:
+  name: pp-a
+spec:
+  ports: 1-4
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-one
+spec:
+  endpoints:
+    - sw-a:port1
+    - pp-a:front/1
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-two
+spec:
+  endpoints:
+    - sw-a:port2
+    - pp-a:front/1
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-rear
+spec:
+  endpoints:
+    - sw-b:port1
+    - pp-a:rear/1
+  medium: copper

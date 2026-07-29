@@ -27,7 +27,7 @@ from typing import Any
 
 from netgraph.errors import compact_ids
 from netgraph.models import API_VERSION, format_bitrate
-from netgraph.render.graph import Layer, TunnelView
+from netgraph.render.graph import Layer, PatchView, TunnelView
 from netgraph.trace.model import Endpoint, Frontier, Link, TracedPath, TraceResult, Waypoint
 
 __all__ = ["PATH_KIND", "REPORT_FORMATS", "render_trace", "to_json", "to_text"]
@@ -168,9 +168,23 @@ def _link_text(link: Link) -> str:
         parts.append(" -> ".join(link.addresses) if link.addresses else link.subnet)
     if link.vlans:
         parts.append(f"vlan {compact_ids(link.vlans)}")
+    if link.patch is not None:
+        parts.append(_patch_text(link.patch))
     if link.tunnel is not None:
         parts.append(_tunnel_text(link.tunnel))
     return "  ".join(parts)
+
+
+def _patch_text(view: PatchView) -> str:
+    """The panels a run passes through, and the positions it uses (§15.2).
+
+    Written on the *link*, not as a hop of its own. A patch panel takes no
+    decision — it is a hole with a coupler behind it — so a line of its own in
+    the hop list would tell the reader that something happened there. What did
+    happen is that the run occupies these positions, which is what an operator
+    tracing a fault needs to know so they can go and look at them.
+    """
+    return f"[via {view.describe()}]"
 
 
 def _tunnel_text(view: TunnelView) -> str:
@@ -337,6 +351,14 @@ def _link(link: Link) -> dict[str, Any]:
     if link.addresses:
         payload["addresses"] = list(link.addresses)
     payload["vlans"] = sorted(link.vlans)
+    if link.patch is not None:
+        payload["patch"] = {
+            "segments": list(link.patch.segments),
+            "panels": [
+                {"panel": hop.panel, "ingress": hop.ingress, "egress": hop.egress}
+                for hop in link.patch.hops
+            ],
+        }
     if link.tunnel is not None:
         payload["tunnel"] = _tunnel(link.tunnel)
     return payload

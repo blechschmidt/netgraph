@@ -25,7 +25,7 @@ from pathlib import Path, PurePosixPath
 
 from netgraph.errors import SchemaIssue, format_path
 from netgraph.loader.provenance import Provenance, Site
-from netgraph.models import Adapter, Cable, Device, Element, Tunnel
+from netgraph.models import Adapter, Cable, Device, Element, PatchPanel, Tunnel
 
 __all__ = [
     "Inventory",
@@ -188,7 +188,7 @@ class Resolution:
 class Inventory:
     """Every element of a loaded tree, indexed by fully-qualified name.
 
-    The five element maps preserve load order (``NG-L005``), so iterating an
+    The six element maps preserve load order (``NG-L005``), so iterating an
     inventory is deterministic and renderers produce stable output.
     """
 
@@ -202,6 +202,8 @@ class Inventory:
     adapters: dict[str, Adapter] = field(default_factory=dict)
     #: The subset of :attr:`elements` that are tunnels (§14).
     tunnels: dict[str, Tunnel] = field(default_factory=dict)
+    #: The subset of :attr:`elements` that are patch panels (§15).
+    patchpanels: dict[str, PatchPanel] = field(default_factory=dict)
     #: Provenance of each element, keyed by fully-qualified name.
     sources: dict[str, SourceLocation] = field(default_factory=dict)
     #: Problems found while loading, in the order they were encountered.
@@ -233,6 +235,8 @@ class Inventory:
             self.adapters[fqn] = element
         elif isinstance(element, Tunnel):
             self.tunnels[fqn] = element
+        elif isinstance(element, PatchPanel):
+            self.patchpanels[fqn] = element
         elif isinstance(element, Device):
             self.devices[fqn] = element
 
@@ -304,8 +308,19 @@ class Inventory:
 
     @property
     def interface_owners(self) -> dict[str, Device | Adapter]:
-        """Elements that own interfaces and can therefore be cabled (§4.2)."""
+        """Active elements that own interfaces (§4.2).
+
+        A patch panel owns ports too, but it is passive: it configures nothing,
+        forwards nothing and decides nothing, so every rule and every view that
+        is about *configuration* wants this map rather than
+        :attr:`cable_owners`.
+        """
         return {**self.devices, **self.adapters}
+
+    @property
+    def cable_owners(self) -> dict[str, Device | Adapter | PatchPanel]:
+        """Everything a cable may terminate on: the above, plus patch panels (§15.1)."""
+        return {**self.devices, **self.adapters, **self.patchpanels}
 
     @property
     def has_errors(self) -> bool:
@@ -334,5 +349,6 @@ class Inventory:
             f"Inventory(root={str(self.root)!r}, elements={len(self.elements)}, "
             f"devices={len(self.devices)}, cables={len(self.cables)}, "
             f"adapters={len(self.adapters)}, tunnels={len(self.tunnels)}, "
+            f"patchpanels={len(self.patchpanels)}, "
             f"errors={len(self.errors)})"
         )

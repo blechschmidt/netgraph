@@ -36,7 +36,8 @@ from netgraph.models.interface import (
     IPv6Config,
     VlanConfig,
 )
-from netgraph.models.metadata import Metadata
+from netgraph.models.metadata import Location, Metadata
+from netgraph.models.patchpanel import PatchPanelSpec
 from netgraph.models.tunnel import TunnelSpec
 
 __all__ = [
@@ -68,6 +69,7 @@ class Doc:
 DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
     ElementBase,
     Metadata,
+    Location,
     DeviceSpec,
     Forwarding,
     BridgeConfig,
@@ -83,6 +85,7 @@ DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
     AdapterSpec,
     UpstreamPort,
     TunnelSpec,
+    PatchPanelSpec,
 )
 
 #: What distinguishes one ``kind`` from the next, one sentence each.
@@ -97,6 +100,8 @@ KIND_NOTES: Final[dict[str, str]] = {
     "adapter": "Presents interfaces over a non-network host port.",
     "tunnel": "An undirected logical link between two or more `tunnel` interfaces. Owns no "
     "interfaces; `over` nests it inside another tunnel.",
+    "patchpanel": "A passive cross-connect. Its `front/<n>` and `rear/<n>` ports are derived "
+    "from `ports`, and a coupler joins each front port to one rear port; it is not a hop.",
     "template": "A named partial device spec, merged into every device that names it in "
     "`spec.from`. Not an element: never drawn, never listed, never validated on its own.",
 }
@@ -121,6 +126,10 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("Metadata", "description"): Doc(
         "Free text, may be multi-line. Rendered as the node's tooltip in SVG output."
     ),
+    ("Metadata", "location"): Doc(
+        "Where the hardware physically is: site, room, rack and the rack units it occupies. "
+        "Drives `--layer rack` and the placement rules `NG-U001` to `NG-U004`."
+    ),
     ("Metadata", "labels"): Doc(
         "Selector-friendly key/value pairs. Keys follow the Kubernetes label grammar; the "
         "`netgraph.dev/` prefix is reserved for the tool."
@@ -128,6 +137,24 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("Metadata", "annotations"): Doc(
         "Per-element input to the tooling, not selectable. `netgraph/ignore` suppresses "
         "validation rules on this element."
+    ),
+    # -- location ----------------------------------------------------------
+    ("Location", "site"): Doc("Site the element is installed at, free text."),
+    ("Location", "room"): Doc("Room or floor within the site, free text."),
+    ("Location", "rack"): Doc(
+        "Rack identifier, unique within its room. Naming one is what puts the element on an "
+        "elevation; site, room and rack together identify the rack (`NG-U001`)."
+    ),
+    ("Location", "position"): Doc(
+        "Lowest rack unit the element occupies, counted from 1 at the bottom of the rack. "
+        "Requires `rack` (`NG-U004`)."
+    ),
+    ("Location", "height"): Doc(
+        "How many rack units the element occupies, upwards from `position`."
+    ),
+    ("Location", "rack_height"): Doc(
+        "How tall the rack itself is. Any element in the rack may declare it; two that "
+        "disagree are `NG-U003`, and nothing may extend past it (`NG-U002`)."
     ),
     # -- device spec -------------------------------------------------------
     ("DeviceSpec", "vendor"): Doc("Hardware vendor, free text. Documentation only."),
@@ -454,6 +481,23 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ),
     ("TunnelSpec", "label"): Doc(
         "Free-text identifier printed on the edge, as a cable's `label` is."
+    ),
+    # -- patch panel -------------------------------------------------------
+    ("PatchPanelSpec", "vendor"): Doc("Hardware vendor, free text. Documentation only."),
+    ("PatchPanelSpec", "model"): Doc("Hardware model designation, free text."),
+    ("PatchPanelSpec", "serial"): Doc("Serial or asset number, free text."),
+    ("PatchPanelSpec", "form_factor"): Doc(
+        "Descriptive: `keystone`, `fibre-lc`, `coupler`. Documentation only."
+    ),
+    ("PatchPanelSpec", "ports"): Doc(
+        "The positions the panel has, as a count (`24`) or as spans (`1-12,17-24`). Each one "
+        "becomes a `front/<n>` and a `rear/<n>` interface (`NG-P006`).",
+        "/if:interfaces/if:interface",
+    ),
+    ("PatchPanelSpec", "couplers"): Doc(
+        "Front position to rear position, for a panel that is not wired straight through. "
+        "Absent means the identity mapping (`NG-P007`).",
+        NONE,
     ),
 }
 

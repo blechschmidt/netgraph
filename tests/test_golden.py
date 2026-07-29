@@ -247,6 +247,39 @@ CASES = (
         fixture=True,
         formats=("dot", "json"),
     ),
+    Case(
+        # The cabling record: the patch panels are nodes and each segment of a
+        # run is an edge of its own. This is the only layer that draws them.
+        name="patch-room-physical",
+        example="patch-room",
+        layer=Layer.PHYSICAL,
+        options=RenderOptions(title="Patch room, cabling"),
+    ),
+    Case(
+        # The same inventory with every run spliced into the one link it
+        # electrically is. Held beside the case above so a change to the splice
+        # shows up as a diff between two files a reader can compare.
+        name="patch-room-l1",
+        example="patch-room",
+        layer=Layer.L1,
+        options=RenderOptions(title="Patch room, topology"),
+    ),
+    Case(
+        name="patch-room-l2",
+        example="patch-room",
+        layer=Layer.L2,
+        options=RenderOptions(),
+        formats=("dot", "json"),
+    ),
+    Case(
+        # The elevations. Mermaid cannot express a grid and is refused by the
+        # backend (``RenderError``), which is asserted separately.
+        name="patch-room-rack",
+        example="patch-room",
+        layer=Layer.RACK,
+        options=RenderOptions(title="Patch room, elevations"),
+        formats=("dot", "json"),
+    ),
 )
 
 #: The cases a Mermaid golden is kept for.
@@ -400,7 +433,10 @@ def test_the_json_golden_parses_and_carries_the_envelope(case: Case) -> None:
     assert payload["kind"] == GRAPH_KIND
     assert payload["layer"] == case.layer.value
     assert payload["nodes"], "a golden with no nodes would assert nothing"
-    assert payload["edges"], "a golden with no edges would assert nothing"
+    if case.layer is not Layer.RACK:
+        # An elevation has no edges by construction: a cable between two boxes
+        # says nothing about where either one is bolted.
+        assert payload["edges"], "a golden with no edges would assert nothing"
 
     # Every edge endpoint names a node the same document declares. This is the
     # invariant the exporter promises its consumers, checked on the artefact
@@ -421,11 +457,16 @@ def test_the_json_golden_parses_and_carries_the_envelope(case: Case) -> None:
 
     # Every node says which kind of thing it is, at every layer.
     types = {node["type"] for node in payload["nodes"]}
-    assert types <= {"element", "subnet", "tunnel", "aggregate"}
+    assert types <= {"element", "subnet", "tunnel", "aggregate", "rack"}
     if case.layer is Layer.L3:
         assert any(node["type"] == "subnet" for node in payload["nodes"])
     elif case.layer is Layer.OVERLAY:
         assert any(node["type"] == "tunnel" for node in payload["nodes"])
+    elif case.layer is Layer.RACK:
+        # An elevation holds racks and nothing else: the elements are inside
+        # them, as slots, rather than beside them as nodes.
+        assert types == {"rack"}
+        assert all(node["rack"]["slots"] for node in payload["nodes"])
     else:
         # Below the overlay layer a tunnel is an edge, unless it joins more than
         # two endpoints and has no line shape to take. A collapsed namespace is

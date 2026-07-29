@@ -60,8 +60,10 @@ from netgraph.models import (  # noqa: E402
     IPv4Config,
     IPv6Address,
     IPv6Config,
+    Location,
     Medium,
     Metadata,
+    PatchPanelSpec,
     TunnelAuth,
     TunnelMode,
     TunnelSpec,
@@ -124,6 +126,22 @@ SECTIONS: Final[tuple[Section, ...]] = (
         Metadata,
         "`metadata`",
         "Identity and free-form annotation, shared by every kind.",
+    ),
+    Section(
+        Location,
+        "`metadata.location`",
+        "Where the hardware physically is. Optional, and shared by every kind: a patch panel "
+        "is racked exactly as a server is.",
+        notes=(
+            "`position` is the **lowest** rack unit the element occupies and `height` how many "
+            "it takes, counting upwards; units are numbered from 1 at the bottom of the "
+            "cabinet, which is how a rack is labelled.",
+            "`site`, `room` and `rack` together identify a rack (`NG-U001`). Two elements that "
+            "name the same three share a cabinet and may not overlap; naming `position` or "
+            "`rack_height` without `rack` is `NG-U004`.",
+            "`netgraph render --layer rack` draws one front elevation per rack, empty units "
+            "included.",
+        ),
     ),
     Section(
         DeviceSpec,
@@ -270,6 +288,22 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "a loaded document states them explicitly.",
             "There is nowhere to put a key, a password or a certificate, and the fields people "
             "reach for are rejected by name (`NG-T010`). `auth` records the *method*.",
+        ),
+    ),
+    Section(
+        PatchPanelSpec,
+        "`spec` — patchpanel",
+        "A patch panel is a passive cross-connect: numbered positions on the front, the same "
+        "numbers on the rear, and a coupler joining each front position to one rear position.",
+        notes=(
+            "`ports` is the only required key. Each position it names becomes two interfaces, "
+            "`front/<n>` and `rear/<n>`, which a cable terminates on exactly as it terminates "
+            "on a device port (`NG-P001`).",
+            "A panel is not a hop. `netgraph render --layer physical` draws it and both cable "
+            "segments; every other layer splices the run into the single edge it electrically "
+            "is, between the two active ports.",
+            "`couplers` is only needed for a panel that is cross-wired. The default is the "
+            "identity mapping, which is what the numbering printed on a real panel promises.",
         ),
     ),
 )

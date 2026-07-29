@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="56" viewBox="0 0 72 56" role="img" aria-label="Patch panel">
+  <title>Patch panel</title>
+  <g stroke="#64748b" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M4 18 H68 V38 H4 Z" fill="#eef2f7"/>
+    <path d="M4 22 H10 M4 34 H10 M62 22 H68 M62 34 H68" fill="none"/>
+  </g>
+  <g fill="#64748b" stroke="none">
+    <path d="M15 24 H21 V32 H15 Z"/>
+    <path d="M24 24 H30 V32 H24 Z"/>
+    <path d="M33 24 H39 V32 H33 Z"/>
+    <path d="M42 24 H48 V32 H42 Z"/>
+    <path d="M51 24 H57 V32 H51 Z"/>
+  </g>
+</svg>

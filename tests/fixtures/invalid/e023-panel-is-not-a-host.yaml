@@ -1,0 +1,50 @@
+# E023 (NG-P004) - an adapter is plugged into a patch panel.
+#
+# A panel is passive: it has no host bus for a dongle to hang off. The run this
+# was meant to describe is a cable into one of the panel's positions.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: patchpanel
+metadata:
+  name: pp-a
+spec:
+  ports: 1-4
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: adapter
+metadata:
+  name: dongle
+spec:
+  upstream:
+    name: usb0
+    type: usb
+    attached_to: pp-a
+  interfaces:
+    - name: en0
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-dongle
+spec:
+  endpoints:
+    - dongle:en0
+    - sw-a:port1
+  medium: copper

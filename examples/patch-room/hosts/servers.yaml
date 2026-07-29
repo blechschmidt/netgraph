@@ -1,0 +1,65 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-app-01
+  description: Application server, rack r2. Patched through position 7.
+  location:
+    site: hq
+    room: mdf
+    rack: r2
+    position: 10
+    height: 2
+    rack_height: 42
+  labels:
+    site: hq
+    role: application
+    env: prod
+spec:
+  vendor: HPE
+  model: ProLiant DL380 Gen11
+  interfaces:
+    - name: lo
+      type: loopback
+      ipv4:
+        addresses: [127.0.0.1/8]
+
+    - name: eno1
+      type: ethernet
+      mac: '3c:d9:2b:0a:00:11'
+      mtu: 1500
+      ipv4:
+        addresses: [10.10.0.11/24]
+        gateway: 10.10.0.1
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-db-01
+  description: Database server, rack r2. Patched through position 8.
+  location:
+    site: hq
+    room: mdf
+    rack: r2
+    position: 12
+    height: 2
+    rack_height: 42
+  labels:
+    site: hq
+    role: database
+    env: prod
+spec:
+  vendor: HPE
+  model: ProLiant DL380 Gen11
+  interfaces:
+    - name: lo
+      type: loopback
+      ipv4:
+        addresses: [127.0.0.1/8]
+
+    - name: eno1
+      type: ethernet
+      mac: '3c:d9:2b:0a:00:12'
+      mtu: 1500
+      ipv4:
+        addresses: [10.10.0.12/24]
+        gateway: 10.10.0.1

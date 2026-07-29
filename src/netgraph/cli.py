@@ -142,9 +142,11 @@ from netgraph.render import (
     aggregate_graph,
     build_graph,
     collapse_targets,
+    draws_racks,
     filter_graph,
     icon_theme,
     is_binary_format,
+    rack_formats,
     render,
     render_layers,
     resolve_tunnels,
@@ -208,6 +210,7 @@ NODE_KINDS: Final[tuple[str, ...]] = (
     "computer",
     "server",
     "adapter",
+    "patchpanel",
 )
 
 #: Exit status when an inventory is rejected. The task of every command that
@@ -1037,8 +1040,9 @@ _LAYER_OPTION: Final[Callable[[Any], Any]] = click.option(
     shell_complete=complete_layer,
     help=(
         "l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets "
-        "and the elements addressed in them. Repeatable for -f html, which draws each layer "
-        "and puts a switcher over them."
+        "and the elements addressed in them; physical adds the patch panels l1 splices out; "
+        "rack draws a front elevation per rack. Repeatable for -f html, which draws each "
+        "layer and puts a switcher over them."
     ),
 )
 
@@ -1131,6 +1135,14 @@ def _layers(params: Mapping[str, Any], output_format: str) -> tuple[Layer, ...]:
             f"--layer was given {len(chosen)} times, but {output_format} output holds one "
             f"layer; render each one to its own file, or use a format that holds several "
             f"({holds})"
+        )
+    if Layer.RACK in chosen and not draws_racks(output_format):
+        # Caught here rather than in the backend so the reader gets a usage
+        # error naming the alternatives, before an inventory is even loaded.
+        raise click.UsageError(
+            f"--layer rack draws a front elevation — one row per rack unit, empty units "
+            f"included — and {output_format} output has no way to express one; render it as "
+            f"{', '.join(rack_formats())}"
         )
     return chosen
 
@@ -1266,6 +1278,11 @@ def _empty_graph_reason(layer: Layer, spec: FilterSpec) -> str:
         return (
             "nothing to draw in the overlay view: the inventory declares no tunnel. "
             "Render '--layer l1' for the physical topology, or add a 'tunnel' document"
+        )
+    if layer is Layer.RACK:
+        return (
+            "nothing to draw at layer rack: no element declares 'metadata.location' with a "
+            "'rack' and a 'position'. Add one to place it on an elevation"
         )
     # No filter and nothing at layer 1 means the tree itself is empty, which is
     # what a freshly scaffolded 'netgraph init --minimal' looks like.

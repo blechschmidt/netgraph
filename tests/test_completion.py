@@ -28,7 +28,7 @@ from netgraph.completion import _items as items
 from netgraph.completion import _load_elements as load_elements
 from netgraph.errors import NetgraphError
 from netgraph.models import DOCUMENT_KINDS, KINDS
-from netgraph.render import FORMATS
+from netgraph.render import FORMATS, Layer
 from netgraph.rules import RULE_IDS
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -135,10 +135,12 @@ def test_a_prefix_narrows_to_the_link_flag() -> None:
 
 def test_layers_come_from_the_enum_and_say_what_they_draw() -> None:
     items = complete(["render", "--layer"])
-    assert [item.value for item in items] == ["l1", "l2", "l3", "overlay"]
+    assert [item.value for item in items] == [layer.value for layer in Layer]
     described = {item.value: item.help or "" for item in items}
     assert "subnet" in described["l3"]
     assert "tunnel" in described["overlay"]
+    assert "panel" in described["physical"]
+    assert "rack" in described["rack"]
 
 
 def test_a_filter_completes_the_kinds_that_are_nodes() -> None:

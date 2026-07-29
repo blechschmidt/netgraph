@@ -519,6 +519,7 @@ def _l2_link(hop: _Hop, vlans: frozenset[int]) -> Link:
         length_m=edge.length_m,
         vlans=vlans,
         tunnel=edge.tunnel,
+        patch=edge.patch,
         graph_edges=hop.graph_edges,
         graph_nodes=hop.graph_nodes,
     )

@@ -10,6 +10,13 @@ fully-qualified name becomes a positional ``n0``, ``n1`` … id with the real na
 in the label. And Mermaid has no escape syntax inside labels, only HTML entities
 — :func:`_label` converts the handful of characters that would otherwise end the
 label early.
+
+A third constraint decides what this backend will *not* do. A Mermaid flowchart
+node is a caption: it has no rows, no columns and no way to say "these units are
+empty". A rack elevation is exactly those things, so ``--layer rack`` is
+refused here with a :class:`~netgraph.errors.RenderError` naming the formats
+that can draw one, rather than emitted as a box that quietly leaves out the
+free space — which is half of what an elevation is for.
 """
 
 from __future__ import annotations
@@ -17,8 +24,10 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator, Mapping
 from typing import Final
 
+from netgraph.errors import RenderError
 from netgraph.render.aggregate import AGGREGATE_KIND, AggregateView
 from netgraph.render.graph import (
+    PATCHPANEL_KIND,
     SUBNET_KIND,
     TUNNEL_KIND,
     Edge,
@@ -53,6 +62,9 @@ _NODE_SHAPE: Final[Mapping[str, tuple[str, str]]] = {
     "computer": ("[/", "/]"),
     "server": ("[(", ")]"),
     "adapter": (">", "]"),
+    # ``[/…\\]`` is taken by the aggregate, so a panel takes the one remaining
+    # neutral frame: a plain box in a grey that no active kind uses.
+    PATCHPANEL_KIND: ("[", "]"),
     SUBNET_KIND: ("(", ")"),
     # ``[[…]]`` is Mermaid's subroutine box: a thing the diagram delegates to,
     # which is what a tunnel is to the path underneath it.
@@ -72,6 +84,7 @@ _CLASS_STYLE: Final[Mapping[str, str]] = {
     "computer": "fill:#f5f5f5,stroke:#6b7280,stroke-width:1px",
     "server": "fill:#eae2f5,stroke:#7c3aed,stroke-width:1px",
     "adapter": "fill:#fdf0e3,stroke:#ea580c,stroke-width:1px,stroke-dasharray:4 3",
+    PATCHPANEL_KIND: "fill:#eef2f7,stroke:#64748b,stroke-width:1px",
     SUBNET_KIND: "fill:#e0f2f1,stroke:#0f766e,stroke-width:1px",
     TUNNEL_KIND: "fill:#ede9fe,stroke:#6d28d9,stroke-width:1px,stroke-dasharray:4 3",
     AGGREGATE_KIND: "fill:#e2e8f0,stroke:#475569,stroke-width:2px",
@@ -91,12 +104,36 @@ _LOGICAL_EDGE_KINDS: Final[frozenset[EdgeKind]] = frozenset(
 _INDENT: Final = "    "
 
 
+def _refuse_rack(graph: Graph) -> None:
+    """``--layer rack`` has no Mermaid form; say so, and say what does.
+
+    Raises:
+        RenderError: The graph was built for :attr:`Layer.RACK`.
+    """
+    if graph.layer is not Layer.RACK:
+        return
+    # Imported here: the registry imports this module to build itself, so
+    # asking it a question at module scope would close the loop.
+    from netgraph.render.registry import rack_formats
+
+    raise RenderError(
+        "mermaid cannot draw a rack elevation: a flowchart node is a caption, with no rows "
+        "to put the units in and no way to show an empty one. Render '--layer rack' as "
+        + ", ".join(rack_formats())
+        + ", or drop '--layer rack' to draw the topology instead"
+    )
+
+
 def to_mermaid(graph: Graph, options: RenderOptions | None = None) -> str:
     """Render ``graph`` as a Mermaid ``flowchart`` definition.
 
     The result is the bare definition, without the surrounding ```` ```mermaid ````
     fence, so it can be embedded in Markdown or fed to ``mmdc`` unchanged.
+
+    Raises:
+        RenderError: ``graph`` is a rack elevation. See the module docstring.
     """
+    _refuse_rack(graph)
     opts = options or RenderOptions()
     ids = _identifiers(graph)
 

@@ -1,0 +1,47 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: patchpanel
+metadata:
+  name: pp-r1-a
+  description: |
+    24-position keystone panel at the top of rack r1. Its front positions face
+    the switch below it; its rear positions terminate the permanent cabling to
+    rack r2. Positions 1 to 6 are spare, which is what a panel is for.
+  location:
+    site: hq
+    room: mdf
+    rack: r1
+    position: 42
+    height: 1
+    rack_height: 42
+  labels:
+    site: hq
+    role: cross-connect
+spec:
+  vendor: Panduit
+  model: CPPL24WBLY
+  form_factor: keystone
+  ports: 1-24
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: patchpanel
+metadata:
+  name: pp-r2-a
+  description: |
+    The other end of the same permanent cabling, at the top of rack r2. Each
+    of its rear positions is tied to the matching position of pp-r1-a; the
+    front positions are what the servers below are patched into.
+  location:
+    site: hq
+    room: mdf
+    rack: r2
+    position: 42
+    height: 1
+    rack_height: 42
+  labels:
+    site: hq
+    role: cross-connect
+spec:
+  vendor: Panduit
+  model: CPPL24WBLY
+  form_factor: keystone
+  ports: 1-24

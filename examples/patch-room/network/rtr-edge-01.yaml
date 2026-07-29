@@ -1,0 +1,39 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-edge-01
+  description: |
+    Edge router for the machine room. It routes between the server VLAN and
+    the outside world, and reaches the core switch over a routed (untagged)
+    copper link in the same rack — the one run in this inventory that does not
+    cross a patch panel.
+  location:
+    site: hq
+    room: mdf
+    rack: r1
+    position: 40
+    height: 1
+    rack_height: 42
+  labels:
+    site: hq
+    role: edge
+    env: prod
+spec:
+  vendor: Juniper
+  model: SRX345
+  interfaces:
+    - name: lo0
+      type: loopback
+      description: Router ID and management target
+      ipv4:
+        addresses: [192.0.2.1/32]
+
+    - name: ge-0/0/0
+      type: ethernet
+      description: |
+        Routed link to sw-core-01. No 'vlan' block: this port is a layer-3
+        interface, not a bridge port.
+      mac: '00:05:86:0a:00:00'
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]

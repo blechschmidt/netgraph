@@ -1,0 +1,142 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-rtr-sw
+  description: >-
+    Routed copper link inside rack r1. No panel: both ends are in the same
+    rack.
+  labels:
+    site: hq
+    medium: copper
+spec:
+  endpoints:
+    - rtr-edge-01:ge-0/0/0
+    - sw-core-01:GigabitEthernet1/0/1
+  medium: copper
+  speed: 1Gbps
+  length_m: 1
+  category: cat6
+  connector: rj45
+  label: C-001
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-sw-pp07
+  description: >-
+    Patch lead, switch to the front of pp-r1-a. First segment of the run to
+    srv-app-01.
+  labels:
+    site: hq
+    medium: copper
+spec:
+  endpoints:
+    - sw-core-01:GigabitEthernet1/0/7
+    - pp-r1-a:front/7
+  medium: copper
+  speed: 1Gbps
+  length_m: 1
+  category: cat6
+  connector: rj45
+  label: P-007A
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-tie-07
+  description: |
+    Permanent cabling between the two racks, rear to rear. Pulled once and
+    never touched again; the patch leads at either end are what changes.
+  labels:
+    site: hq
+    medium: copper
+    role: permanent
+spec:
+  endpoints:
+    - pp-r1-a:rear/7
+    - pp-r2-a:rear/7
+  medium: copper
+  speed: 1Gbps
+  length_m: 18
+  category: cat6a
+  connector: rj45
+  label: T-007
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-pp-app07
+  description: Patch lead, front of pp-r2-a to srv-app-01. Last segment of the run.
+  labels:
+    site: hq
+    medium: copper
+spec:
+  endpoints:
+    - pp-r2-a:front/7
+    - srv-app-01:eno1
+  medium: copper
+  speed: 1Gbps
+  length_m: 2
+  category: cat6
+  connector: rj45
+  label: P-007B
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-sw-pp08
+  description: >-
+    Patch lead, switch to the front of pp-r1-a. First segment of the run to
+    srv-db-01.
+  labels:
+    site: hq
+    medium: copper
+spec:
+  endpoints:
+    - sw-core-01:GigabitEthernet1/0/8
+    - pp-r1-a:front/8
+  medium: copper
+  speed: 1Gbps
+  length_m: 1
+  category: cat6
+  connector: rj45
+  label: P-008A
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-tie-08
+  description: Permanent cabling between the two racks, rear to rear.
+  labels:
+    site: hq
+    medium: copper
+    role: permanent
+spec:
+  endpoints:
+    - pp-r1-a:rear/8
+    - pp-r2-a:rear/8
+  medium: copper
+  speed: 1Gbps
+  length_m: 18
+  category: cat6a
+  connector: rj45
+  label: T-008
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-pp-db08
+  description: Patch lead, front of pp-r2-a to srv-db-01. Last segment of the run.
+  labels:
+    site: hq
+    medium: copper
+spec:
+  endpoints:
+    - pp-r2-a:front/8
+    - srv-db-01:eno1
+  medium: copper
+  speed: 1Gbps
+  length_m: 2
+  category: cat6
+  connector: rj45
+  label: P-008B

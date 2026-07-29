@@ -1,0 +1,286 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkGraph",
+  "layer": "l2",
+  "nodes": [
+    {
+      "id": "hosts/srv-app-01",
+      "type": "element",
+      "name": "srv-app-01",
+      "kind": "server",
+      "namespace": "hosts",
+      "description": "Application server, rack r2. Patched through position 7.",
+      "labels": {
+        "env": "prod",
+        "role": "application",
+        "site": "hq"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback",
+          "addresses": [
+            "127.0.0.1/8"
+          ]
+        },
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "mac": "3c:d9:2b:0a:00:11",
+          "mtu": 1500,
+          "addresses": [
+            "10.10.0.11/24"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hosts/srv-db-01",
+      "type": "element",
+      "name": "srv-db-01",
+      "kind": "server",
+      "namespace": "hosts",
+      "description": "Database server, rack r2. Patched through position 8.",
+      "labels": {
+        "env": "prod",
+        "role": "database",
+        "site": "hq"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback",
+          "addresses": [
+            "127.0.0.1/8"
+          ]
+        },
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "mac": "3c:d9:2b:0a:00:12",
+          "mtu": 1500,
+          "addresses": [
+            "10.10.0.12/24"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "network/rtr-edge-01",
+      "type": "element",
+      "name": "rtr-edge-01",
+      "kind": "router",
+      "namespace": "network",
+      "description": "Edge router for the machine room. It routes between the server VLAN and\nthe outside world, and reaches the core switch over a routed (untagged)\ncopper link in the same rack — the one run in this inventory that does not\ncross a patch panel.\n",
+      "labels": {
+        "env": "prod",
+        "role": "edge",
+        "site": "hq"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "lo0",
+          "type": "loopback",
+          "description": "Router ID and management target",
+          "addresses": [
+            "192.0.2.1/32"
+          ]
+        },
+        {
+          "name": "ge-0/0/0",
+          "type": "ethernet",
+          "description": "Routed link to sw-core-01. No 'vlan' block: this port is a layer-3\ninterface, not a bridge port.\n",
+          "mac": "00:05:86:0a:00:00",
+          "mtu": 1500,
+          "addresses": [
+            "10.0.0.1/30"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "network/sw-core-01",
+      "type": "element",
+      "name": "sw-core-01",
+      "kind": "switch",
+      "namespace": "network",
+      "description": "Core switch, rack r1. Its two server ports leave the rack through the\npatch panel above it: nothing is cabled from here to rack r2 directly,\nwhich is what a structured-cabling plant looks like.\n",
+      "labels": {
+        "env": "prod",
+        "role": "core",
+        "site": "hq"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "Server gateway on the switch, for in-band management",
+          "addresses": [
+            "10.10.0.2/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "Routed link to rtr-edge-01. No 'vlan' block: this port is a layer-3\ninterface, not a bridge port.\n",
+          "mac": "00:1b:0d:0a:00:01",
+          "mtu": 1500,
+          "addresses": [
+            "10.0.0.2/30"
+          ]
+        },
+        {
+          "name": "GigabitEthernet1/0/7",
+          "type": "ethernet",
+          "description": "srv-app-01, patched through pp-r1-a position 7",
+          "mac": "00:1b:0d:0a:00:07",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/8",
+          "type": "ethernet",
+          "description": "srv-db-01, patched through pp-r1-a position 8",
+          "mac": "00:1b:0d:0a:00:08",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "cables/cbl-rtr-sw",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "network/rtr-edge-01",
+          "interface": "ge-0/0/0"
+        },
+        {
+          "node": "network/sw-core-01",
+          "interface": "GigabitEthernet1/0/1"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "C-001",
+      "lengthM": 1.0,
+      "vlans": []
+    },
+    {
+      "id": "cables/cbl-sw-pp07",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "network/sw-core-01",
+          "interface": "GigabitEthernet1/0/7"
+        },
+        {
+          "node": "hosts/srv-app-01",
+          "interface": "eno1"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "P-007A",
+      "lengthM": 21.0,
+      "patch": {
+        "segments": [
+          "cables/cbl-sw-pp07",
+          "cables/cbl-tie-07",
+          "cables/cbl-pp-app07"
+        ],
+        "panels": [
+          {
+            "panel": "panels/pp-r1-a",
+            "ingress": "front/7",
+            "egress": "rear/7"
+          },
+          {
+            "panel": "panels/pp-r2-a",
+            "ingress": "rear/7",
+            "egress": "front/7"
+          }
+        ]
+      },
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "cables/cbl-sw-pp08",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "network/sw-core-01",
+          "interface": "GigabitEthernet1/0/8"
+        },
+        {
+          "node": "hosts/srv-db-01",
+          "interface": "eno1"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "P-008A",
+      "lengthM": 21.0,
+      "patch": {
+        "segments": [
+          "cables/cbl-sw-pp08",
+          "cables/cbl-tie-08",
+          "cables/cbl-pp-db08"
+        ],
+        "panels": [
+          {
+            "panel": "panels/pp-r1-a",
+            "ingress": "front/8",
+            "egress": "rear/8"
+          },
+          {
+            "panel": "panels/pp-r2-a",
+            "ingress": "rear/8",
+            "egress": "front/8"
+          }
+        ]
+      },
+      "vlans": [
+        10
+      ]
+    }
+  ]
+}

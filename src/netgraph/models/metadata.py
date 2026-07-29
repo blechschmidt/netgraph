@@ -5,13 +5,14 @@ from __future__ import annotations
 import re
 from typing import Final
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from netgraph.errors import echo_value
 from netgraph.models.base import NetgraphModel
-from netgraph.models.scalars import ElementName
+from netgraph.models.diagnostics import field_error
+from netgraph.models.scalars import ElementName, RackUnit, RackUnits
 
-__all__ = ["RESERVED_LABEL_PREFIX", "Metadata"]
+__all__ = ["RESERVED_LABEL_PREFIX", "Location", "Metadata"]
 
 #: Label prefix reserved for tool-generated labels (§3.1).
 RESERVED_LABEL_PREFIX: Final = "netgraph.dev/"
@@ -71,6 +72,82 @@ def _check_label_key(key: str) -> None:
     _check_key(key, kind="label")
 
 
+class Location(NetgraphModel):
+    """``metadata.location`` — where the hardware physically is (§3.2).
+
+    Free-text ``spec.location`` says it in prose, which is enough for a label
+    and useless for anything else: no tool can tell from ``"MDF, third rack,
+    near the top"`` whether two things collide. This block is the structured
+    form, and it is on ``metadata`` rather than on a ``spec`` because it is true
+    of every kind — a patch panel is racked exactly as a server is.
+
+    ``position`` is the *lowest* rack unit the element occupies and ``height``
+    how many it takes, so a 2U server at ``position: 10`` fills U10 and U11.
+    Units count from 1 at the bottom, which is how a cabinet is labelled.
+    """
+
+    site: str | None = None
+    room: str | None = None
+    #: Rack identifier, unique within its room. Naming one is what puts the
+    #: element on an elevation; without it the block is documentation only.
+    rack: str | None = None
+    #: Lowest rack unit the element occupies, counted from 1 at the bottom.
+    position: RackUnit | None = None
+    #: How many units it occupies, upwards from :attr:`position`.
+    height: RackUnits = 1
+    #: How tall the rack is. Declared by any element in it; ``NG-U003`` refuses
+    #: two elements that disagree, and the value bounds ``NG-U002``.
+    rack_height: RackUnits | None = None
+
+    @model_validator(mode="after")
+    def _check_rack(self) -> Location:
+        for key in ("position", "rack_height"):
+            if getattr(self, key) is not None and self.rack is None:
+                raise field_error(
+                    f"{key!r} places the element in a rack, so 'rack' must name which one",
+                    rule="NG-U004",
+                    path=(key,),
+                )
+        return self
+
+    @property
+    def rack_key(self) -> tuple[str, str, str] | None:
+        """Identity of the rack, or ``None`` when the element names none.
+
+        A rack name is unique within its room and a room within its site, so
+        the three together are what two elements have to share before they can
+        collide. An unset site or room is the empty string rather than a
+        wildcard: an inventory that names the rack of one element and the site,
+        room and rack of another has not said the two are in the same place.
+        """
+        if self.rack is None:
+            return None
+        return (self.site or "", self.room or "", self.rack)
+
+    @property
+    def rack_label(self) -> str:
+        """The rack as a reader would write it, e.g. ``hq / mdf / r1``."""
+        key = self.rack_key
+        return " / ".join(part for part in key if part) if key is not None else ""
+
+    @property
+    def units(self) -> range:
+        """The rack units this element occupies; empty when it is unplaced."""
+        if self.position is None:
+            return range(0)
+        return range(self.position, self.position + self.height)
+
+    @property
+    def top(self) -> int | None:
+        """The highest rack unit the element occupies, or ``None`` if unplaced."""
+        return None if self.position is None else self.position + self.height - 1
+
+    @property
+    def is_placed(self) -> bool:
+        """Does this element occupy a definite span of a definite rack?"""
+        return self.rack is not None and self.position is not None
+
+
 class Metadata(NetgraphModel):
     """Identity and free-form annotation of an element."""
 
@@ -78,6 +155,8 @@ class Metadata(NetgraphModel):
     name: ElementName
     #: Free text, may be multi-line. Rendered as a node tooltip.
     description: str | None = None
+    #: Where the hardware is: site, room, rack and the units it occupies (§3.2).
+    location: Location | None = None
     #: Selector-friendly key/value pairs driving ``--select`` and ``--group-by``.
     labels: dict[str, str] = Field(default_factory=dict)
     #: Non-selectable per-element input to the tooling. ``netgraph/ignore``

@@ -563,6 +563,136 @@ IPAM report calls this rule rather than re-deriving it.
 legitimate case is an unnumbered or point-to-point link whose peer address is
 deliberately outside the local prefix — rare enough to be worth annotating.
 
+#### `E021` — cable on a position the patch panel does not have
+
+*Alias: `NG-P001`. Severity: error.*
+
+A cable terminates on a patch-panel position that `spec.ports` does not
+declare, or on a port name that is not `front/<n>` or `rear/<n>`.
+
+**Why it matters.** A panel's positions are derived from a range rather than
+written out, so `front/25` on a 24-position panel is not a mistake anyone can
+see by looking at the panel document — it is only visible next to the range,
+which is what this diagnostic puts in front of the reader. The consequence is
+worse than a missing device port: because a panel is spliced out below
+`--layer physical`, the run simply disappears from the diagram and the switch
+port at the near end looks free.
+
+This is `E001`'s job everywhere else. It is separate here because listing the
+48 interface names of a 24-position panel would bury the one fact that matters,
+which is the range.
+
+**Suppress with** `E021` / `NG-P001`, or an annotation on the cable or the
+panel. There is no legitimate case: a plug goes in a hole that exists.
+
+#### `E022` — patch-panel position terminated twice
+
+*Alias: `NG-P003`. Severity: error.*
+
+Two cables are patched into the same position of one panel.
+
+**Why it matters.** A coupler takes one plug per side. This is the same
+impossibility `E002` reports about a device port, and it is worse here for the
+same reason `E021` is: the panel is invisible below `--layer physical`, so
+rather than an obviously overloaded port the reader gets a run silently spliced
+through whichever cable happened to be declared first, and a second run that
+vanishes.
+
+**Suppress with** `E022` / `NG-P003`, or an annotation on either cable or on
+the panel. No legitimate case exists.
+
+#### `E023` — patch panel where an active element is required
+
+*Alias: `NG-P004`. Severity: error.*
+
+An adapter's `upstream.attached_to`, or a tunnel endpoint, names a patch panel.
+
+**Why it matters.** A panel is passive. It has no host bus for a dongle to hang
+off and no operating system to terminate a WireGuard or IPsec tunnel on, so
+both spellings describe hardware that does not exist. Both come from the same
+misreading — treating the panel as the device on the other side of it — and the
+fix is the same: name the active element, and let the panel carry the cable
+segments between them.
+
+**Suppress with** `E023` / `NG-P004`, or an annotation on the adapter, the
+tunnel or the panel. No legitimate case exists; a media converter that looks
+like it wants this spelling is an `adapter` with `passthrough: false` (§8.2).
+
+#### `E024` — patch run loops back into its own panel
+
+*Alias: `NG-P005`. Severity: error.*
+
+Following a run through the couplers arrives back at a cable segment it has
+already crossed.
+
+**Why it matters.** A run has to reach something that can send or receive. One
+that closes on itself never will: it is a circle of copper between holes, and
+at layer 2 it is a broadcast storm waiting for the last cable to go in. The
+graph layer drops such a run rather than splicing it, so without this rule the
+only trace of it would be a link that quietly is not drawn.
+
+The usual cause is a rear-to-rear patch between two panels that were already
+joined front to front — the tie cable that was added twice, from each end.
+
+**Suppress with** `E024` / `NG-P005`, or an annotation on any cable in the run
+or on either panel. No legitimate case exists.
+
+#### `E025` — two elements occupy the same rack unit
+
+*Alias: `NG-U001`. Severity: error.*
+
+Two elements whose `metadata.location` names the same `site`, `room` and `rack`
+claim overlapping units.
+
+**Why it matters.** Two things cannot be bolted to the same four screw holes.
+In practice this catches the `position` copied from the row above and never
+changed, and the 2U server whose `height` was left at the default of 1 — both
+of which produce an elevation that looks plausible and is off by one for
+everything above the collision.
+
+`position` is the **lowest** unit an element occupies and `height` counts
+upwards, so a 2U device at `position: 10` fills U10 and U11.
+
+**Suppress with** `E025` / `NG-U001`, or an annotation on either element. The
+one case worth annotating is two half-width devices sharing a shelf, which the
+model has no way to express.
+
+#### `E026` — element mounted above the top of its rack
+
+*Alias: `NG-U002`. Severity: error.*
+
+An element's highest unit — `position + height - 1` — is above the
+`rack_height` declared for its rack.
+
+**Why it matters.** It does not fit. The arithmetic is exactly the part a
+person does by hand and gets wrong, which is the whole reason
+`metadata.location` is structured rather than free text: a 4U panel at U40 of a
+42U cabinet ends at U43.
+
+The rule is silent when no element in the rack declares `rack_height`: without
+a declared top there is no bound to check against, and inventing one from the
+tallest occupant would only ever agree with itself.
+
+**Suppress with** `E026` / `NG-U002`, or an annotation on the element. No
+legitimate case exists once the height is declared; if the cabinet really is
+taller, correct `rack_height`.
+
+#### `E027` — rack declared with two heights
+
+*Alias: `NG-U003`. Severity: error.*
+
+Two elements in one rack declare different values for
+`metadata.location.rack_height`.
+
+**Why it matters.** A rack has one height. Until the disagreement is settled
+`E026` has no bound it can trust, so a second, quieter error is hiding behind
+this one. The usual causes are a `rack` name reused in another room — in which
+case `site` or `room` is what is wrong, not the height — and a number that was
+guessed on one document and measured on another.
+
+**Suppress with** `E027` / `NG-U003`, or an annotation on any of the elements
+involved. No legitimate case exists.
+
 ### Warnings
 
 #### `W101` — interface neither routes nor switches
@@ -642,7 +772,7 @@ splits a subnet into halves that cannot reach each other while every individual
 document still looks right. The other reading is just as useful — the neighbour
 exists but was never written down, so the diagram is missing a device. Only the
 layer-3 view can show this at all, which is why the rule arrived with it; see
-[`--layer l3`](../README.md#layers-l1-l2-l3-and-overlay).
+[`--layer l3`](../README.md#layers-physical-l1-l2-l3-overlay-and-rack).
 
 **Suppress with** `W105` / `NG-A008`, or an annotation on the element holding
 the address. A deliberately sparse management prefix, and a link whose peer is
@@ -1154,6 +1284,29 @@ conflict.
 **Suppress with** `W132` / `NG-A012`, or an annotation on either element. The
 legitimate case is a link that is deliberately unnumbered on one side, or one
 whose peer is addressed by an ISP out of a range this inventory does not model.
+
+#### `W133` — patch run stops inside the panel
+
+*Alias: `NG-P002`. Severity: warning.*
+
+A patch-panel position terminates a cable, and the position its coupler leads
+to terminates none.
+
+**Why it matters.** Half a run. The cable was pulled, the front was patched,
+and the rear position was left for later — so the port at the near end is not
+connected to anything, however patched the inventory makes it look. This is the
+single most common real patch-record error, and the one a diagram cannot show
+you: below `--layer physical` the incomplete run is dropped, and the port
+simply appears unused.
+
+A warning rather than an error because "left for later" is also a legitimate
+state to record: the position is reserved, the cable exists, and the inventory
+is telling the truth about a job that is half done. Render `--layer physical`
+to see the segment that does exist.
+
+**Suppress with** `W133` / `NG-P002`, or an annotation on the cable or the
+panel. Annotating it is the right move for a position deliberately held for a
+run that is not yet needed.
 
 ### Info
 

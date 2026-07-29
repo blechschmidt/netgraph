@@ -13,14 +13,26 @@ the same inventory produce byte-identical output.
 Node types
 ----------
 
-Every node carries a ``type`` discriminator: ``element``, ``subnet``, ``tunnel``
-or ``aggregate``. Below layer 3 the first dominates; a layer-3 document mixes
+Every node carries a ``type`` discriminator: ``element``, ``subnet``, ``tunnel``,
+``rack`` or ``aggregate``. Below layer 3 the first dominates; a layer-3 document mixes
 element and subnet nodes and an ``overlay`` document mixes element and tunnel
 nodes, so a consumer must be able to tell a derived prefix or a tunnel from a
 declared device without guessing from the identifier. A ``subnet`` node adds a
 ``subnet`` object — the prefix, the family, the addresses inside it and the
 elements holding them — and a ``tunnel`` node adds a ``tunnel`` object; neither
-carries interfaces. An ``element`` node is exactly what it is at layer 1.
+carries interfaces. An ``element`` node is exactly what it is at layer 1. A
+``rack`` node — the whole of a ``--layer rack`` document — adds a ``rack``
+object holding the elevation: how tall the cabinet is, and which units each
+element occupies.
+
+Patch panels
+------------
+
+Below ``--layer physical`` a run through a patch panel is exported as the one
+edge it electrically is, with a ``patch`` object naming the cable segments and
+the panel positions it crosses (§15.2). A consumer that wants the segments
+themselves renders ``--layer physical``, where the panel is a node and each
+segment an edge of its own.
 
 Aggregates
 ----------
@@ -46,7 +58,17 @@ from typing import Any, Final
 
 from netgraph.models import API_VERSION
 from netgraph.render.aggregate import AggregateView, BundleView
-from netgraph.render.graph import Edge, EdgeKind, Graph, Node, PortView, Subnet, TunnelView
+from netgraph.render.graph import (
+    Edge,
+    EdgeKind,
+    Graph,
+    Node,
+    PatchView,
+    PortView,
+    RackView,
+    Subnet,
+    TunnelView,
+)
 from netgraph.render.options import RenderOptions
 
 __all__ = ["GRAPH_KIND", "graph_to_dict", "render_json", "to_json"]
@@ -132,6 +154,8 @@ def _node(node: Node, options: RenderOptions) -> dict[str, Any]:
         payload["tunnel"] = _tunnel(node.tunnel)
     if node.aggregate is not None:
         payload["aggregate"] = _aggregate(node.aggregate)
+    if node.rack is not None:
+        payload["rack"] = _rack(node.rack)
     payload["vlans"] = sorted(node.vlans)
     payload["interfaces"] = [_port(port, options) for port in node.ports]
     return payload
@@ -158,6 +182,49 @@ def _aggregate(view: AggregateView) -> dict[str, Any]:
         # The links the summary swallowed. Absent from ``edges`` by
         # construction, so a consumer counting cables needs them named.
         "internalLinks": list(view.internal_links),
+    }
+
+
+def _rack(view: RackView) -> dict[str, Any]:
+    """A rack node's elevation: the cabinet, and what is bolted where.
+
+    ``units`` is every unit from the bottom up, occupied or free, because the
+    free space is half of what an elevation says; ``slots`` is the same fact
+    keyed by element, for a consumer that wants to look one up rather than walk
+    the cabinet.
+    """
+    return {
+        "site": view.site,
+        "room": view.room,
+        "name": view.name,
+        "label": view.label,
+        "height": view.height,
+        "heightInferred": view.inferred_height,
+        "usedUnits": view.used_units,
+        "slots": [
+            {
+                "element": slot.element,
+                "name": slot.name,
+                "kind": slot.kind,
+                "position": slot.position,
+                "height": slot.height,
+            }
+            for slot in view.slots
+        ],
+        "units": [
+            {"unit": unit, "element": slot.element if slot is not None else None}
+            for unit, slot in reversed(view.elevation())
+        ],
+    }
+
+
+def _patch(view: PatchView) -> dict[str, Any]:
+    """The passive cross-connects one spliced edge runs through (§15.2)."""
+    return {
+        "segments": list(view.segments),
+        "panels": [
+            {"panel": hop.panel, "ingress": hop.ingress, "egress": hop.egress} for hop in view.hops
+        ],
     }
 
 
@@ -258,6 +325,8 @@ def _edge(edge: Edge) -> dict[str, Any]:
         payload["label"] = edge.label
     if edge.length_m is not None:
         payload["lengthM"] = edge.length_m
+    if edge.patch is not None:
+        payload["patch"] = _patch(edge.patch)
     if edge.bundle is not None:
         payload["bundle"] = _bundle(edge.bundle)
     payload["vlans"] = sorted(edge.vlans)

@@ -1,0 +1,431 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkGraph",
+  "layer": "rack",
+  "nodes": [
+    {
+      "id": "rack:hq/mdf/r2",
+      "type": "rack",
+      "name": "hq / mdf / r2",
+      "kind": "rack",
+      "namespace": "",
+      "rack": {
+        "site": "hq",
+        "room": "mdf",
+        "name": "r2",
+        "label": "hq / mdf / r2",
+        "height": 42,
+        "heightInferred": false,
+        "usedUnits": 5,
+        "slots": [
+          {
+            "element": "hosts/srv-app-01",
+            "name": "srv-app-01",
+            "kind": "server",
+            "position": 10,
+            "height": 2
+          },
+          {
+            "element": "hosts/srv-db-01",
+            "name": "srv-db-01",
+            "kind": "server",
+            "position": 12,
+            "height": 2
+          },
+          {
+            "element": "panels/pp-r2-a",
+            "name": "pp-r2-a",
+            "kind": "patchpanel",
+            "position": 42,
+            "height": 1
+          }
+        ],
+        "units": [
+          {
+            "unit": 1,
+            "element": null
+          },
+          {
+            "unit": 2,
+            "element": null
+          },
+          {
+            "unit": 3,
+            "element": null
+          },
+          {
+            "unit": 4,
+            "element": null
+          },
+          {
+            "unit": 5,
+            "element": null
+          },
+          {
+            "unit": 6,
+            "element": null
+          },
+          {
+            "unit": 7,
+            "element": null
+          },
+          {
+            "unit": 8,
+            "element": null
+          },
+          {
+            "unit": 9,
+            "element": null
+          },
+          {
+            "unit": 10,
+            "element": "hosts/srv-app-01"
+          },
+          {
+            "unit": 11,
+            "element": "hosts/srv-app-01"
+          },
+          {
+            "unit": 12,
+            "element": "hosts/srv-db-01"
+          },
+          {
+            "unit": 13,
+            "element": "hosts/srv-db-01"
+          },
+          {
+            "unit": 14,
+            "element": null
+          },
+          {
+            "unit": 15,
+            "element": null
+          },
+          {
+            "unit": 16,
+            "element": null
+          },
+          {
+            "unit": 17,
+            "element": null
+          },
+          {
+            "unit": 18,
+            "element": null
+          },
+          {
+            "unit": 19,
+            "element": null
+          },
+          {
+            "unit": 20,
+            "element": null
+          },
+          {
+            "unit": 21,
+            "element": null
+          },
+          {
+            "unit": 22,
+            "element": null
+          },
+          {
+            "unit": 23,
+            "element": null
+          },
+          {
+            "unit": 24,
+            "element": null
+          },
+          {
+            "unit": 25,
+            "element": null
+          },
+          {
+            "unit": 26,
+            "element": null
+          },
+          {
+            "unit": 27,
+            "element": null
+          },
+          {
+            "unit": 28,
+            "element": null
+          },
+          {
+            "unit": 29,
+            "element": null
+          },
+          {
+            "unit": 30,
+            "element": null
+          },
+          {
+            "unit": 31,
+            "element": null
+          },
+          {
+            "unit": 32,
+            "element": null
+          },
+          {
+            "unit": 33,
+            "element": null
+          },
+          {
+            "unit": 34,
+            "element": null
+          },
+          {
+            "unit": 35,
+            "element": null
+          },
+          {
+            "unit": 36,
+            "element": null
+          },
+          {
+            "unit": 37,
+            "element": null
+          },
+          {
+            "unit": 38,
+            "element": null
+          },
+          {
+            "unit": 39,
+            "element": null
+          },
+          {
+            "unit": 40,
+            "element": null
+          },
+          {
+            "unit": 41,
+            "element": null
+          },
+          {
+            "unit": 42,
+            "element": "panels/pp-r2-a"
+          }
+        ]
+      },
+      "vlans": [],
+      "interfaces": []
+    },
+    {
+      "id": "rack:hq/mdf/r1",
+      "type": "rack",
+      "name": "hq / mdf / r1",
+      "kind": "rack",
+      "namespace": "",
+      "rack": {
+        "site": "hq",
+        "room": "mdf",
+        "name": "r1",
+        "label": "hq / mdf / r1",
+        "height": 42,
+        "heightInferred": false,
+        "usedUnits": 3,
+        "slots": [
+          {
+            "element": "network/sw-core-01",
+            "name": "sw-core-01",
+            "kind": "switch",
+            "position": 38,
+            "height": 1
+          },
+          {
+            "element": "network/rtr-edge-01",
+            "name": "rtr-edge-01",
+            "kind": "router",
+            "position": 40,
+            "height": 1
+          },
+          {
+            "element": "panels/pp-r1-a",
+            "name": "pp-r1-a",
+            "kind": "patchpanel",
+            "position": 42,
+            "height": 1
+          }
+        ],
+        "units": [
+          {
+            "unit": 1,
+            "element": null
+          },
+          {
+            "unit": 2,
+            "element": null
+          },
+          {
+            "unit": 3,
+            "element": null
+          },
+          {
+            "unit": 4,
+            "element": null
+          },
+          {
+            "unit": 5,
+            "element": null
+          },
+          {
+            "unit": 6,
+            "element": null
+          },
+          {
+            "unit": 7,
+            "element": null
+          },
+          {
+            "unit": 8,
+            "element": null
+          },
+          {
+            "unit": 9,
+            "element": null
+          },
+          {
+            "unit": 10,
+            "element": null
+          },
+          {
+            "unit": 11,
+            "element": null
+          },
+          {
+            "unit": 12,
+            "element": null
+          },
+          {
+            "unit": 13,
+            "element": null
+          },
+          {
+            "unit": 14,
+            "element": null
+          },
+          {
+            "unit": 15,
+            "element": null
+          },
+          {
+            "unit": 16,
+            "element": null
+          },
+          {
+            "unit": 17,
+            "element": null
+          },
+          {
+            "unit": 18,
+            "element": null
+          },
+          {
+            "unit": 19,
+            "element": null
+          },
+          {
+            "unit": 20,
+            "element": null
+          },
+          {
+            "unit": 21,
+            "element": null
+          },
+          {
+            "unit": 22,
+            "element": null
+          },
+          {
+            "unit": 23,
+            "element": null
+          },
+          {
+            "unit": 24,
+            "element": null
+          },
+          {
+            "unit": 25,
+            "element": null
+          },
+          {
+            "unit": 26,
+            "element": null
+          },
+          {
+            "unit": 27,
+            "element": null
+          },
+          {
+            "unit": 28,
+            "element": null
+          },
+          {
+            "unit": 29,
+            "element": null
+          },
+          {
+            "unit": 30,
+            "element": null
+          },
+          {
+            "unit": 31,
+            "element": null
+          },
+          {
+            "unit": 32,
+            "element": null
+          },
+          {
+            "unit": 33,
+            "element": null
+          },
+          {
+            "unit": 34,
+            "element": null
+          },
+          {
+            "unit": 35,
+            "element": null
+          },
+          {
+            "unit": 36,
+            "element": null
+          },
+          {
+            "unit": 37,
+            "element": null
+          },
+          {
+            "unit": 38,
+            "element": "network/sw-core-01"
+          },
+          {
+            "unit": 39,
+            "element": null
+          },
+          {
+            "unit": 40,
+            "element": "network/rtr-edge-01"
+          },
+          {
+            "unit": 41,
+            "element": null
+          },
+          {
+            "unit": 42,
+            "element": "panels/pp-r1-a"
+          }
+        ]
+      },
+      "vlans": [],
+      "interfaces": []
+    }
+  ],
+  "edges": [],
+  "title": "Patch room, elevations"
+}

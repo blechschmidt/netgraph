@@ -28,7 +28,7 @@ from typing import Final
 
 from netgraph.errors import NetgraphError
 from netgraph.loader.inventory import short_name
-from netgraph.render.graph import Layer, TunnelView
+from netgraph.render.graph import Layer, PatchView, TunnelView
 from netgraph.render.highlight import Highlight
 
 __all__ = [
@@ -179,6 +179,11 @@ class Link:
     #: has one; so does a layer-3 hop whose two interfaces are the ends of one
     #: tunnel document, which is how an overlay shows up in a routed trace.
     tunnel: TunnelView | None = None
+    #: The passive cross-connects the link runs through, when it is a spliced
+    #: run rather than one cable (§15.2). Not a hop: a panel takes no decision
+    #: and appears nowhere in :attr:`TracedPath.waypoints`, so this is where a
+    #: report says the run went through it.
+    patch: PatchView | None = None
     #: :attr:`Edge.id <netgraph.render.graph.Edge.id>` of every edge of the
     #: rendered graph this link stands for, so ``--highlight`` can emphasise it
     #: without re-deriving the topology. A layer-3 hop is two of them (element
@@ -193,6 +198,11 @@ class Link:
     def name(self) -> str:
         """The short name of the cable, adapter or tunnel; the prefix as itself."""
         return self.id if self.kind == "subnet" else short_name(self.id.partition("#")[0])
+
+    @property
+    def is_pass_through(self) -> bool:
+        """Does this link cross at least one patch panel?"""
+        return self.patch is not None
 
     @property
     def is_cleartext_tunnel(self) -> bool:
@@ -246,6 +256,20 @@ class TracedPath:
         routes may also share their links while differing in the ports.
         """
         return (*self.elements, *(link.id for link in self.links))
+
+    @property
+    def panels(self) -> tuple[str, ...]:
+        """Every patch panel the route passes through, in order, without repeats.
+
+        Panels are not waypoints — a passive cross-connect takes no decision, so
+        putting one in the hop list would say the traffic was *handled* there.
+        They are a property of the links instead, which is what this collects.
+        """
+        seen: dict[str, None] = {}
+        for link in self.links:
+            for panel in link.patch.panels if link.patch is not None else ():
+                seen.setdefault(panel, None)
+        return tuple(seen)
 
     @property
     def tunnels(self) -> tuple[TunnelView, ...]:

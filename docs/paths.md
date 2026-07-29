@@ -28,6 +28,7 @@ netgraph path [OPTIONS] SRC DST
   - [Layer 2: the physical walk](#layer-2-the-physical-walk)
   - [Layer 3: the routed walk](#layer-3-the-routed-walk)
   - [Overlays](#overlays)
+  - [Patch panels](#patch-panels)
 - [Worked examples](#worked-examples)
 - [Several paths, and none](#several-paths-and-none)
 - [Drawing the answer: `--highlight`](#drawing-the-answer---highlight)
@@ -181,6 +182,27 @@ crosses the underlay in the clear (W127)
 That distinction matters. A cleartext VXLAN inside one data centre is fine; the
 same tunnel on the path between two branch offices is not, and only a trace can
 tell the two apart.
+
+### Patch panels
+
+A `patchpanel` ([`docs/schema.md`](schema.md) §15) is a passive cross-connect,
+so it is **not a hop**. The trace runs over the spliced graph, in which a run
+that crosses two panels is the one link it electrically is, and the panels
+appear on the link line rather than as waypoints of their own:
+
+```
+      ->  cable cbl-sw-pp07  (copper, 1Gbps, P-007A, 21m)  vlan 10  [via pp-r1-a front/7-rear/7, pp-r2-a rear/7-front/7]
+```
+
+That is the deliberate choice. Numbering a panel as hop 2 would tell the reader
+that something was handled there — a MAC learned, a VLAN checked, a decision
+taken — and nothing was. What did happen is that the run occupies these
+positions, which is the first thing anyone needs when the link is down and
+somebody has to walk to the rack. The rate on that line is the slowest segment
+and the length is the sum of all of them, because that is what the run is.
+
+The JSON form carries the same record as a `patch` object on the link, with the
+cable segments in the order the run crosses them.
 
 ## Worked examples
 
@@ -565,7 +587,7 @@ modelling gap from a real break.
 
 ---
 
-**See also:** [`netgraph render --layer l3`](../README.md#layers-l1-l2-l3-and-overlay)
+**See also:** [`netgraph render --layer l3`](../README.md#layers-physical-l1-l2-l3-overlay-and-rack)
 for the routed graph this walks, [`docs/schema.md` §14](schema.md) for how a
 tunnel is declared, and
 [`docs/validation-rules.md`](validation-rules.md) for the checks that run before

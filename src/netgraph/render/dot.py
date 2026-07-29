@@ -100,6 +100,8 @@ from netgraph.render.details import (
     printable,
 )
 from netgraph.render.graph import (
+    PATCHPANEL_KIND,
+    RACK_KIND,
     SUBNET_KIND,
     TUNNEL_KIND,
     Edge,
@@ -107,6 +109,7 @@ from netgraph.render.graph import (
     Graph,
     Layer,
     Node,
+    RackView,
     TunnelView,
 )
 from netgraph.render.highlight import Highlight
@@ -156,6 +159,10 @@ _NODE_STYLE: Final[Mapping[str, tuple[str, str, str]]] = {
     "computer": ("rectangle", "#f5f5f5", "#6b7280"),
     "server": ("cylinder", "#eae2f5", "#7c3aed"),
     "adapter": ("ellipse", "#fdf0e3", "#ea580c"),
+    # A patch panel is passive, so it gets the one shape that carries no
+    # direction and no processing: a plain rectangle, in a neutral slate that
+    # says "this is not a device" without borrowing another kind's colour.
+    PATCHPANEL_KIND: ("box", "#eef2f7", "#64748b"),
     SUBNET_KIND: ("box", "#e0f2f1", "#0f766e"),
     # A tunnel is not hardware either, but unlike a subnet it *is* declared, so
     # it keeps a shape of its own rather than borrowing a box.
@@ -166,6 +173,10 @@ _NODE_STYLE: Final[Mapping[str, tuple[str, str, str]]] = {
     # one no element kind uses, so a box that is not a device cannot be mistaken
     # for one at a glance.
     AGGREGATE_KIND: ("folder", "#e2e8f0", "#475569"),
+    # A rack is a cabinet, not a thing on the network. ``box3d`` is already the
+    # switch's, so the elevation gets a plain frame and earns its identity from
+    # the table inside it.
+    RACK_KIND: ("box", "#f8fafc", "#334155"),
 }
 _DEFAULT_NODE_STYLE: Final[tuple[str, str, str]] = ("box", "#f5f5f5", "#6b7280")
 
@@ -242,6 +253,10 @@ _MIN_PENWIDTH: Final = 1.0
 #: 48-port switch listing every port would push the topology off the page, and
 #: the ports that carry a cable are labelled on the edges anyway.
 _MAX_PORT_ROWS: Final = 8
+
+#: An empty rack unit, drawn rather than left blank so the reader can count the
+#: free space without measuring the gap between two boxes.
+_EMPTY_UNIT: Final = "·"
 
 #: Width and height, in points, of the cell an icon is drawn in. Every icon is
 #: scaled into the same box and keeps its aspect ratio, so a diagram cannot end
@@ -786,6 +801,9 @@ def _subtitle(node: Node) -> str:
         # Not "[namespace]": the reader needs to know at a glance that the box
         # is a stand-in, and the number is the one fact a shape cannot carry.
         return f"[namespace, {count_text(node.aggregate.size, 'element')}]"
+    if node.rack is not None:
+        used = f"{node.rack.used_units}/{node.rack.height}U used"
+        return f"[rack, {used}]" if not node.rack.inferred_height else f"[rack, {used}, inferred]"
     return f"[{node.kind}]"
 
 
@@ -803,6 +821,10 @@ def _node_style(node: Node) -> str | None:
         # §8.2: an adapter is hardware that may be collapsed into its host, so it
         # is drawn as a provisional part of the diagram.
         return "filled,dashed"
+    if node.is_rack:
+        # A cabinet, drawn as one: square corners and a heavier frame than the
+        # equipment inside it.
+        return "filled"
     return None
 
 
@@ -823,6 +845,9 @@ def _node_rows(node: Node, options: RenderOptions, layer: Layer) -> tuple[_Row, 
 
     if node.aggregate is not None:
         return _aggregate_rows(node.aggregate, options)
+
+    if node.rack is not None:
+        return _rack_rows(node.rack)
 
     # At layer 3 each address is printed on the edge that puts the element in a
     # subnet, which also says which interface holds it; repeating the list under
@@ -1023,6 +1048,34 @@ def _tunnel_label(view: TunnelView) -> list[str]:
         # rather than in the tooltip.
         parts.append("via encrypted underlay" if view.encrypted_by else "cleartext")
     return parts
+
+
+def _rack_rows(view: RackView) -> tuple[_Row, ...]:
+    """The elevation: one row per rack unit, from the top of the cabinet down.
+
+    Every unit gets a row, occupied or not, because the free space is half of
+    what an elevation is for. A multi-unit element appears on each unit it
+    fills — the row that starts it carries its name and kind, the ones above it
+    carry a continuation mark — which is how a reader counts what is left
+    without doing arithmetic. The rows are never truncated: an elevation with
+    the middle of the rack elided would be worse than none.
+    """
+    rows: list[_Row] = []
+    for unit, slot in view.elevation():
+        if slot is None:
+            rows.append(_Row(port=f"U{unit}", addresses=_EMPTY_UNIT, vlans=""))
+            continue
+        continuation = unit != slot.position
+        rows.append(
+            _Row(
+                port=f"U{unit}",
+                addresses=_inline(slot.name) if not continuation else "\u2502",
+                vlans=f"[{slot.kind}]"
+                if not continuation
+                else (f"{slot.height}U" if unit == slot.top else ""),
+            )
+        )
+    return tuple(rows)
 
 
 def _aggregate_rows(view: AggregateView, options: RenderOptions) -> tuple[_Row, ...]:

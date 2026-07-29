@@ -38,7 +38,9 @@ __all__ = [
     "RENDERERS",
     "Renderer",
     "content_security_policy_for",
+    "draws_racks",
     "media_type_for",
+    "rack_formats",
     "renderer_for",
     "supports_highlight",
     "supports_icons",
@@ -127,6 +129,14 @@ class Renderer:
     #: neither of which the default allows; every other format is inert data
     #: and needs nothing.
     csp: str | None = None
+    #: Can this backend express a rack elevation
+    #: (:attr:`~netgraph.render.graph.Layer.RACK`)? An elevation is a *grid* —
+    #: one row per rack unit, empty units included — rather than a topology, so
+    #: it needs a label vocabulary that can hold a table. Graphviz has one and
+    #: JSON is structure all the way down; a Mermaid flowchart node is a caption
+    #: with no rows, so it says so rather than emitting a box that silently
+    #: leaves out the empty units.
+    draws_racks: bool = True
     #: Can this backend draw part of the graph emphasised and the rest dimmed
     #: (:mod:`netgraph.render.highlight`)? Emphasis is *visual weight* — a bold
     #: outline, a dimmed fill — so it needs a backend that decides how things
@@ -187,6 +197,7 @@ def _text_renderer(
     supports_highlight: bool = False,
     to_document: DocumentBackend | None = None,
     csp: str | None = None,
+    draws_racks: bool = True,
 ) -> Renderer:
     """A text backend, with its UTF-8 encoding wired up once."""
 
@@ -207,6 +218,7 @@ def _text_renderer(
         supports_highlight=supports_highlight,
         to_document=to_document,
         csp=csp,
+        draws_racks=draws_racks,
     )
 
 
@@ -274,6 +286,7 @@ RENDERERS: Final[Mapping[str, Renderer]] = MappingProxyType(
                 "text/plain; charset=utf-8",
                 to_mermaid,
                 mermaid_advisories,
+                draws_racks=False,
             ),
             _text_renderer(
                 "json",
@@ -315,6 +328,21 @@ def supports_layers(format: str) -> bool:
     """
     renderer = RENDERERS.get(format)
     return renderer is not None and renderer.holds_layers
+
+
+def draws_racks(format: str) -> bool:
+    """Can ``format`` express a rack elevation (``--layer rack``)?
+
+    An unknown format answers ``False``, like its neighbours here: the render
+    call that follows is where a bad format name is reported.
+    """
+    renderer = RENDERERS.get(format)
+    return renderer is not None and renderer.draws_racks
+
+
+def rack_formats() -> tuple[str, ...]:
+    """The formats that can, in help-text order, for a diagnostic."""
+    return tuple(name for name, renderer in RENDERERS.items() if renderer.draws_racks)
 
 
 def content_security_policy_for(format: str) -> str | None:

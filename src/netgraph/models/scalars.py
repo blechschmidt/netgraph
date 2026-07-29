@@ -24,6 +24,7 @@ __all__ = [
     "IFNAME_PATTERN",
     "MAC_PATTERNS",
     "MAX_ELEMENT_REF_LENGTH",
+    "MAX_RACK_UNITS",
     "MAX_VLAN_ID",
     "MIN_VLAN_ID",
     "VLAN_SET_PATTERN",
@@ -41,6 +42,8 @@ __all__ = [
     "PortCount",
     "PrefixLengthV4",
     "PrefixLengthV6",
+    "RackUnit",
+    "RackUnits",
     "VlanId",
     "VlanSet",
     "format_bitrate",
@@ -124,6 +127,19 @@ VlanId = Annotated[int, Field(strict=True, ge=MIN_VLAN_ID, le=MAX_VLAN_ID)]
 #: A count of physical ports on a piece of hardware. Hardware with no port is
 #: not hardware anyone cables, so the lower bound is 1.
 PortCount = Annotated[int, Field(strict=True, ge=1)]
+
+#: Tallest rack anyone racks equipment into. A 58U cabinet is the largest
+#: standard product; the bound leaves room for an open frame and still refuses
+#: a position that is a typo rather than a shelf.
+MAX_RACK_UNITS: Final = 100
+
+#: A rack unit, counted from 1 at the *bottom* of the rack (§3.2). Bottom-up is
+#: how a rack is labelled and how an elevation is read, so a position means the
+#: same thing in the document and on the cabinet.
+RackUnit = Annotated[int, Field(strict=True, ge=1, le=MAX_RACK_UNITS)]
+
+#: A height in rack units. One is the smallest thing anyone mounts.
+RackUnits = Annotated[int, Field(strict=True, ge=1, le=MAX_RACK_UNITS)]
 
 #: Layer-2 MTU (``NG-I011``). The RFC 8344 IPv4 minimum is the lower bound; the
 #: upper bound is the ``uint16`` maximum of ``ip:ipv4/mtu``.

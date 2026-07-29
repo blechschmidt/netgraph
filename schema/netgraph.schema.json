@@ -16,6 +16,7 @@
       "cable": "#/$defs/Cable",
       "computer": "#/$defs/Computer",
       "hub": "#/$defs/Hub",
+      "patchpanel": "#/$defs/PatchPanel",
       "router": "#/$defs/Router",
       "server": "#/$defs/Server",
       "switch": "#/$defs/Switch",
@@ -48,6 +49,9 @@
     },
     {
       "$ref": "#/$defs/Tunnel"
+    },
+    {
+      "$ref": "#/$defs/PatchPanel"
     },
     {
       "$ref": "#/$defs/Template"
@@ -1002,6 +1006,91 @@
       "title": "InterfaceType",
       "type": "string"
     },
+    "Location": {
+      "additionalProperties": false,
+      "description": "`metadata.location` — where the hardware physically is (§3.2).\n\nFree-text `spec.location` says it in prose, which is enough for a label\nand useless for anything else: no tool can tell from `\"MDF, third rack,\nnear the top\"` whether two things collide. This block is the structured\nform, and it is on `metadata` rather than on a `spec` because it is true\nof every kind — a patch panel is racked exactly as a server is.\n\n`position` is the *lowest* rack unit the element occupies and `height`\nhow many it takes, so a 2U server at `position: 10` fills U10 and U11.\nUnits count from 1 at the bottom, which is how a cabinet is labelled.",
+      "properties": {
+        "site": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "site",
+          "description": "Site the element is installed at, free text."
+        },
+        "room": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "room",
+          "description": "Room or floor within the site, free text."
+        },
+        "rack": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "rack",
+          "description": "Rack identifier, unique within its room. Naming one is what puts the element on an elevation; site, room and rack together identify the rack (`NG-U001`)."
+        },
+        "position": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "position",
+          "description": "Lowest rack unit the element occupies, counted from 1 at the bottom of the rack. Requires `rack` (`NG-U004`)."
+        },
+        "height": {
+          "default": 1,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "height",
+          "type": "integer",
+          "description": "How many rack units the element occupies, upwards from `position`."
+        },
+        "rack_height": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "rack_height",
+          "description": "How tall the rack itself is. Any element in the rack may declare it; two that disagree are `NG-U003`, and nothing may extend past it (`NG-U002`)."
+        }
+      },
+      "title": "Location",
+      "type": "object"
+    },
     "Medium": {
       "description": "`spec.medium` (§7).",
       "enum": [
@@ -1036,6 +1125,19 @@
           "default": null,
           "title": "description",
           "description": "Free text, may be multi-line. Rendered as the node's tooltip in SVG output."
+        },
+        "location": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Location"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "location",
+          "description": "Where the hardware physically is: site, room, rack and the rack units it occupies. Drives `--layer rack` and the placement rules `NG-U001` to `NG-U004`."
         },
         "labels": {
           "additionalProperties": {
@@ -1228,6 +1330,149 @@
           ]
         }
       ]
+    },
+    "PatchPanel": {
+      "additionalProperties": false,
+      "description": "A passive cross-connect: front positions coupled to rear positions.",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "patchpanel",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. A passive cross-connect. Its `front/<n>` and `rear/<n>` ports are derived from `ports`, and a coupler joins each front port to one rear port; it is not a hop."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/PatchPanelSpec",
+          "title": "spec",
+          "description": "The body of a `patchpanel` document."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "title": "PatchPanel",
+      "type": "object"
+    },
+    "PatchPanelSpec": {
+      "additionalProperties": false,
+      "description": "`spec` of a `patchpanel` document (§15.1).",
+      "properties": {
+        "vendor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "vendor",
+          "description": "Hardware vendor, free text. Documentation only."
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "model",
+          "description": "Hardware model designation, free text."
+        },
+        "serial": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "serial",
+          "description": "Serial or asset number, free text."
+        },
+        "form_factor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "form_factor",
+          "description": "Descriptive: `keystone`, `fibre-lc`, `coupler`. Documentation only."
+        },
+        "ports": {
+          "title": "ports",
+          "description": "The positions the panel has, as a count (`24`) or as spans (`1-12,17-24`). Each one becomes a `front/<n>` and a `rear/<n>` interface (`NG-P006`).\n\nYANG: `/if:interfaces/if:interface`",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "string",
+              "pattern": "^\\d+(?:-\\d+)?(?:,\\d+(?:-\\d+)?)*$"
+            }
+          ]
+        },
+        "couplers": {
+          "anyOf": [
+            {
+              "title": "couplers",
+              "description": "Front position to rear position, for a panel that is not wired straight through. Absent means the identity mapping (`NG-P007`).",
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^\\d+$"
+              },
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                  },
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                ]
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "couplers",
+          "description": "Front position to rear position, for a panel that is not wired straight through. Absent means the identity mapping (`NG-P007`)."
+        }
+      },
+      "required": [
+        "ports"
+      ],
+      "title": "PatchPanelSpec",
+      "type": "object"
     },
     "Router": {
       "additionalProperties": false,

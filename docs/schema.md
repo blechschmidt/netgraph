@@ -50,6 +50,7 @@ expands §9 with the reasoning and with what is deliberately left uncovered.
 12. [Compatibility policy](#12-compatibility-policy)
 13. [Editor integration](#13-editor-integration)
 14. [Tunnels](#14-tunnels)
+15. [Patch panels](#15-patch-panels)
 
 ---
 
@@ -204,12 +205,12 @@ spec:
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
 | `apiVersion` | string | M | — | MUST be `netgraph.dev/v1alpha1` for this revision. See §12. |
-| `kind` | enum | M | — | One of `switch`, `router`, `hub`, `computer`, `server`, `cable`, `adapter`, `tunnel`, `template`. Lower-case; other spellings are rejected. |
+| `kind` | enum | M | — | One of `switch`, `router`, `hub`, `computer`, `server`, `cable`, `adapter`, `tunnel`, `patchpanel`, `template`. Lower-case; other spellings are rejected. |
 | `metadata` | mapping | M | — | §3.1 |
-| `spec` | mapping | M | — | Shape depends on `kind`: §6 (devices), §7 (cable), §8 (adapter), §14 (tunnel), §6.6 (template). |
+| `spec` | mapping | M | — | Shape depends on `kind`: §6 (devices), §7 (cable), §8 (adapter), §14 (tunnel), §15 (patchpanel), §6.6 (template). |
 
-The first eight kinds are **elements**: each becomes a node or an edge of the
-graph. `template` is the ninth kind and is not an element — it declares a
+The first nine kinds are **elements**: each becomes a node or an edge of the
+graph. `template` is the tenth kind and is not an element — it declares a
 reusable partial device `spec` and is merged away by the loader (§6.6).
 
 ### 3.1 `metadata`
@@ -218,6 +219,7 @@ reusable partial device `spec` and is merged away by the loader (§6.6).
 |---|---|---|---|---|
 | `name` | name | M | — | Unique within its namespace (§2.2, `NG-N002`). Grammar in §4.1. |
 | `description` | string | O | `null` | Free text, may be multi-line. Rendered as a node tooltip. |
+| `location` | mapping | O | `null` | Where the hardware physically is: §3.2. |
 | `labels` | map[string, string] | O | `{}` | Selector-friendly key/value pairs. Keys match `[a-z0-9]([-a-z0-9_.]*[a-z0-9])?` (≤63 chars) and MAY carry a DNS-style prefix (`example.com/tier`). Values ≤253 chars. The prefix `netgraph.dev/` is reserved for tool-generated labels. |
 | `annotations` | map[string, string] | O | `{}` | Per-element input to the tooling. Same key grammar as `labels`, but the `netgraph.dev/` prefix is permitted (annotations exist to carry tool keys) and values may be up to 4096 chars. Annotations are **not** selectable and never affect the graph. |
 
@@ -235,6 +237,48 @@ metadata:
   annotations:
     netgraph/ignore: "W103, E004"   # or "*" for every rule
 ```
+
+---
+
+### 3.2 `metadata.location`
+
+Where the hardware is. Optional, and available on every kind, because a patch
+panel is racked exactly as a server is.
+
+```yaml
+metadata:
+  name: srv-app-01
+  location:
+    site: hq
+    room: mdf
+    rack: r1
+    position: 10        # lowest rack unit occupied
+    height: 2           # rack units, upwards from `position`
+    rack_height: 42     # how tall the cabinet is
+```
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `site` | string | O | `null` | Free text. |
+| `room` | string | O | `null` | Room or floor within the site. Free text. |
+| `rack` | string | O | `null` | Rack identifier, unique within its room. Naming one is what puts the element on an elevation; without it the block is documentation only. |
+| `position` | integer | O | `null` | The **lowest** rack unit the element occupies, counted from 1 at the bottom. Requires `rack` (`NG-U004`). 1–100. |
+| `height` | integer | O | `1` | How many units it occupies, upwards from `position`. 1–100. |
+| `rack_height` | integer | O | `null` | How tall the rack is. Any element in it may declare this; two that disagree are `NG-U003`. Requires `rack` (`NG-U004`). 1–100. |
+
+#### Semantics
+
+* A rack is identified by `(site, room, rack)` together, so two elements are in
+  the same cabinet only when all three agree. An unset `site` or `room` is the
+  empty string, never a wildcard: an inventory that gives one element a full
+  address and another only a rack name has not said the two are in one place.
+* `position` is the lowest unit and `height` counts *up*, so a 2U server at
+  `position: 10` fills U10 and U11. Two elements whose spans intersect are
+  `NG-U001`; an element whose top exceeds `rack_height` is `NG-U002`.
+* An element that names a `rack` but no `position` is in the room and nowhere in
+  particular. It is not drawn on the elevation, and it collides with nothing.
+* `netgraph render --layer rack` draws one front elevation per rack, with empty
+  units shown. Free-text `spec.location` (§6.1) is unaffected and stays a label.
 
 ---
 
@@ -969,7 +1013,7 @@ named. §10.10 maps them.
 |---|---|---|
 | `NG-D001` | error | The document is a mapping with the four envelope keys; `apiVersion`, `kind`, `metadata`, `spec` are all present. |
 | `NG-D002` | error | `apiVersion` is a recognised version string. |
-| `NG-D003` | error | `kind` is one of the eight element kinds or `template`, lower-case. |
+| `NG-D003` | error | `kind` is one of the nine element kinds or `template`, lower-case. |
 | `NG-D004` | error | `spec` matches the shape required by `kind`. |
 | `NG-D005` | error | No unknown keys anywhere in the document. |
 | `NG-N001` | error | `metadata.name` matches the name grammar (§4.1). |
@@ -1209,6 +1253,32 @@ A finding names every element it involves, so annotating *either* end of a
 cable suppresses a finding about that cable. An unknown id in an annotation is
 ignored rather than fatal — inventory data must not be able to abort a run —
 and therefore simply fails to suppress anything.
+
+---
+
+### 10.12 Patch panels
+
+Numbered after §10.11 rather than beside the other rule tables: section numbers
+are append-only (§12), so a group added in a later revision lands at the end.
+
+| ID | Sev. | Rule |
+|---|---|---|
+| `NG-P001` | error | A cable endpoint on a patch panel names a position the panel declares, spelled `front/<n>` or `rear/<n>`. |
+| `NG-P002` | warning | A cabled panel position's coupled position also terminates a cable; a run that stops inside the panel reaches nothing. |
+| `NG-P003` | error | A panel position terminates at most one cable. |
+| `NG-P004` | error | A patch panel is not named where an active element is required: `upstream.attached_to` and a tunnel endpoint both need one. |
+| `NG-P005` | error | A patch run does not come back into a segment it has already crossed. |
+| `NG-P006` | error | `spec.ports` is a positive count or comma-separated spans, with no repeats and at most 1024 positions. |
+| `NG-P007` | error | Every position `spec.couplers` names is declared by `spec.ports`, and no two front positions share a rear one. |
+
+### 10.13 Physical placement
+
+| ID | Sev. | Rule |
+|---|---|---|
+| `NG-U001` | error | Two elements in one rack do not occupy overlapping units. |
+| `NG-U002` | error | No element extends past the declared `rack_height` of its rack. |
+| `NG-U003` | error | Every element in one rack declares the same `rack_height`. |
+| `NG-U004` | error | `position` and `rack_height` are only written alongside a `rack`. |
 
 ---
 
@@ -2477,3 +2547,123 @@ between two *links*, and a link cannot end on a link — which is exactly why
 Below that layer a point-to-point tunnel stays an edge, so `netgraph render`
 shows the VPNs over the physical topology without a box in the middle of each
 one. `netgraph list tunnels` prints the same resolution as a table.
+
+---
+
+## 15. Patch panels
+
+A `patchpanel` is a **passive cross-connect**: numbered positions on the front,
+the same numbers on the rear, and a fixed coupler joining each front position to
+one rear position. Nothing in it powers on, nothing in it makes a decision, and
+a frame that enters one side leaves the other unchanged.
+
+It is a separate kind because a real run almost never goes device to device. It
+goes switch port → panel front → structured cabling → panel rear → server port,
+and an inventory with no panel has to *lie* about that run by cabling the two
+devices together directly — losing the two things a patch record exists for:
+which position the run occupies, and which position is still free.
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: patchpanel
+metadata:
+  name: pp-mdf-a
+  location: {site: hq, room: mdf, rack: r1, position: 42, rack_height: 42}
+spec:
+  vendor: Panduit
+  model: CPPL24WBLY
+  form_factor: keystone
+  ports: 1-24
+```
+
+### 15.1 `spec`
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `vendor` | string | O | `null` | Free text. |
+| `model` | string | O | `null` | Free text. |
+| `serial` | string | O | `null` | Free text. |
+| `form_factor` | string | O | `null` | Descriptive: `keystone`, `fibre-lc`, `coupler`. |
+| `ports` | port range | M | — | The positions the panel has: a count (`24`, meaning 1 to 24) or comma-separated spans (`1-24`, `1-12,17-24`). At most 1024, no repeats (`NG-P006`). |
+| `couplers` | map[number, number] | O | `null` | Front position → rear position, for a panel that is not wired straight through. Absent means the identity mapping (`NG-P007`). |
+
+A panel owns **no `interfaces` key**. Its ports are derived from `ports`: every
+position `n` becomes an interface named `front/<n>` and one named `rear/<n>`, of
+`type: ethernet`, with no address, no VLAN and no MAC — a hole with a number.
+Writing 48 near-identical entries by hand is exactly the typing the interface
+ranges of §6.2.5 exist to avoid, and here there is nothing to vary.
+
+The zero padding of a span follows its *low* bound, as in §6.2.5: `01-12` yields
+`01 … 12` and `1-12` yields `1 … 12`.
+
+A cable terminates on a panel position exactly as on a device port (§4.2):
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata: {name: cbl-sw-pp-07}
+spec:
+  endpoints:
+    - sw-access-01:GigabitEthernet1/0/7
+    - pp-mdf-a:front/7
+  medium: copper
+  length_m: 3
+```
+
+### 15.2 Electrical transparency
+
+A panel is **not a hop**, so the same inventory has two honest readings and
+`build_graph` offers both.
+
+`netgraph render --layer physical`
+: The cabling record. The panel is a node and each cable segment is an edge of
+  its own, which is what a technician standing in the room would find.
+
+every other layer (`l1`, `l2`, `l3`, `overlay`)
+: The panel is **spliced out**. The run
+  `switch → front/7 ⇄ rear/7 → server` becomes the single edge
+  `switch → server` it is indistinguishable from, between the two active ports.
+
+Splicing walks the run rather than deleting the panel, because the properties of
+the run belong to all of its segments:
+
+| Attribute | Spliced value |
+|---|---|
+| `medium` | what every segment agrees on; the first segment's otherwise |
+| `speed` | the slowest segment — a run is no faster than its worst leg |
+| `length_m` | the sum, when every segment declares one; `null` otherwise |
+| `label` | the first segment that has one |
+| VLANs | derived from the two *active* ports, exactly as a direct cable would be |
+
+The result is that **a spliced graph is the graph the same inventory produces
+when the two devices are cabled together directly.** That equivalence is what
+makes the panel free to model: adding one to a correct inventory cannot change
+any layer but `physical`.
+
+The spliced edge remembers what it crossed. `netgraph render -f json` exports it
+as a `patch` object naming the segments and the positions, `netgraph path` names
+the panels on the link line — as a pass-through, never as a waypoint, because a
+panel takes no decision — and an SVG tooltip lists the same record.
+
+A run that does not arrive anywhere is not spliced. A coupler with nothing
+patched into its far side is `NG-P002`, a position with two cables is `NG-P003`,
+and a run that closes on itself is `NG-P005`; in each case the incomplete run is
+dropped from every spliced layer and stays visible at `--layer physical`.
+
+### 15.3 What a panel is not
+
+* **Not a host.** `upstream.attached_to` on an adapter and a tunnel endpoint
+  both require an active element (`NG-P004`). A media converter that looks like
+  it wants to be a panel is an `adapter` with `passthrough: false` (§8.2).
+* **Not a repeater.** A `hub` is active: it regenerates a signal and joins a
+  collision domain, so it *is* a node at every layer. A panel joins nothing; it
+  continues one link.
+* **Not configurable.** There is nowhere on a panel to put a VLAN, an address or
+  an MTU, which is why its ports are derived rather than declared.
+
+### 15.4 YANG mapping
+
+A patch panel has no YANG counterpart: RFC 8343 models interfaces of a *system*,
+and a panel is not one. Its derived positions are described here as
+`if:interface` entries of type `ianaift:ethernetCsmacd` for internal consistency
+only; nothing exports them, and `couplers` is netgraph's own.

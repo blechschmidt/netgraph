@@ -31,6 +31,7 @@ the field maps to, with `…` standing for
 | `cable` | [CableSpec](#spec--cable) | An undirected link between exactly two interfaces. Owns no interfaces. |
 | `adapter` | [AdapterSpec](#spec--adapter) | Presents interfaces over a non-network host port. |
 | `tunnel` | [TunnelSpec](#spec--tunnel) | An undirected logical link between two or more `tunnel` interfaces. Owns no interfaces; `over` nests it inside another tunnel. |
+| `patchpanel` | [PatchPanelSpec](#spec--patchpanel) | A passive cross-connect. Its `front/<n>` and `rear/<n>` ports are derived from `ports`, and a coupler joins each front port to one rear port; it is not a hop. |
 | `template` | partial [DeviceSpec](#spec--switch-router-hub-computer-server) | A named partial device spec, merged into every device that names it in `spec.from`. Not an element: never drawn, never listed, never validated on its own. |
 
 ## Document envelope
@@ -54,8 +55,26 @@ Identity and free-form annotation, shared by every kind.
 |---|---|---|---|---|---|
 | `name` | element name | **yes** | — | Element name, unique within its namespace across all kinds (`NG-N002`). The namespace is the directory the document was found in. | — |
 | `description` | string | no | *unset* | Free text, may be multi-line. Rendered as the node's tooltip in SVG output. | — |
+| `location` | [Location](#metadatalocation) | no | *unset* | Where the hardware physically is: site, room, rack and the rack units it occupies. Drives `--layer rack` and the placement rules `NG-U001` to `NG-U004`. | — |
 | `labels` | map string → string | no | `{}` | Selector-friendly key/value pairs. Keys follow the Kubernetes label grammar; the `netgraph.dev/` prefix is reserved for the tool. | — |
 | `annotations` | map string → string | no | `{}` | Per-element input to the tooling, not selectable. `netgraph/ignore` suppresses validation rules on this element. | — |
+
+## `metadata.location`
+
+Where the hardware physically is. Optional, and shared by every kind: a patch panel is racked exactly as a server is.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `site` | string | no | *unset* | Site the element is installed at, free text. | — |
+| `room` | string | no | *unset* | Room or floor within the site, free text. | — |
+| `rack` | string | no | *unset* | Rack identifier, unique within its room. Naming one is what puts the element on an elevation; site, room and rack together identify the rack (`NG-U001`). | — |
+| `position` | integer, 1–100 | no | *unset* | Lowest rack unit the element occupies, counted from 1 at the bottom of the rack. Requires `rack` (`NG-U004`). | — |
+| `height` | integer, 1–100 | no | `1` | How many rack units the element occupies, upwards from `position`. | — |
+| `rack_height` | integer, 1–100 | no | *unset* | How tall the rack itself is. Any element in the rack may declare it; two that disagree are `NG-U003`, and nothing may extend past it (`NG-U002`). | — |
+
+* `position` is the **lowest** rack unit the element occupies and `height` how many it takes, counting upwards; units are numbered from 1 at the bottom of the cabinet, which is how a rack is labelled.
+* `site`, `room` and `rack` together identify a rack (`NG-U001`). Two elements that name the same three share a cabinet and may not overlap; naming `position` or `rack_height` without `rack` is `NG-U004`.
+* `netgraph render --layer rack` draws one front elevation per rack, empty units included.
 
 ## `spec` — switch, router, hub, computer, server
 
@@ -268,6 +287,23 @@ A tunnel is an undirected logical link between two or more interfaces of `type: 
 * `over` nests one tunnel inside another: `vxlan` over `ipsec` is written by naming the IPsec tunnel there. The chain must not loop (`NG-T005`).
 * `type` supplies the defaults for `port`, `encrypted` and `mode`, and the encapsulation overhead `NG-T011` measures an MTU against. Materialised on load, so a loaded document states them explicitly.
 * There is nowhere to put a key, a password or a certificate, and the fields people reach for are rejected by name (`NG-T010`). `auth` records the *method*.
+
+## `spec` — patchpanel
+
+A patch panel is a passive cross-connect: numbered positions on the front, the same numbers on the rear, and a coupler joining each front position to one rear position.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `vendor` | string | no | *unset* | Hardware vendor, free text. Documentation only. | — |
+| `model` | string | no | *unset* | Hardware model designation, free text. | — |
+| `serial` | string | no | *unset* | Serial or asset number, free text. | — |
+| `form_factor` | string | no | *unset* | Descriptive: `keystone`, `fibre-lc`, `coupler`. Documentation only. | — |
+| `ports` | string, ≥ 1 character | **yes** | — | The positions the panel has, as a count (`24`) or as spans (`1-12,17-24`). Each one becomes a `front/<n>` and a `rear/<n>` interface (`NG-P006`). | `/if:interfaces/if:interface` |
+| `couplers` | map string → string | no | *unset* | Front position to rear position, for a panel that is not wired straight through. Absent means the identity mapping (`NG-P007`). | — |
+
+* `ports` is the only required key. Each position it names becomes two interfaces, `front/<n>` and `rear/<n>`, which a cable terminates on exactly as it terminates on a device port (`NG-P001`).
+* A panel is not a hop. `netgraph render --layer physical` draws it and both cable segments; every other layer splices the run into the single edge it electrically is, between the two active ports.
+* `couplers` is only needed for a panel that is cross-wired. The default is the identity mapping, which is what the numbering printed on a real panel promises.
 
 ## Enumerations
 
