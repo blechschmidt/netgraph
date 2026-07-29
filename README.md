@@ -76,6 +76,16 @@ netgraph validate
 netgraph render -f svg -o network.svg
 ```
 
+Already have a network? [`netgraph import`](#netgraph-import) builds the tree
+from output you collect on the devices themselves — LLDP neighbours, `ip -j addr
+show`, or the cabling list you already keep — so the first inventory is a diff
+away from correct rather than a weekend of typing:
+
+```bash
+lldpctl -f json > collected/"$(hostname -s)".lldp.json    # on each device
+netgraph import -o my-network collected/*.json
+```
+
 The rest of this section builds the same thing by hand, which is the part worth
 reading once.
 
@@ -343,8 +353,10 @@ Use `netgraph show NAME --raw` to read a device as written and
 netgraph [GLOBAL OPTIONS] COMMAND [OPTIONS] [ARGS]
 ```
 
-Running `netgraph` with no command prints the help. Every command loads the
-inventory named by the global `-i/--inventory` option.
+Running `netgraph` with no command prints the help. Every command that reads an
+inventory reads the one named by the global `-i/--inventory` option; `init` and
+`import`, which *write* one, take their target as an argument and as `-o`
+respectively.
 
 **Output discipline: data on stdout, commentary on stderr.** `render` writes
 the diagram to stdout when no `--output` is given, so its findings and progress
@@ -400,6 +412,157 @@ switch, a host and the two cables between them. `netgraph.toml` is written with
 every `[validate]` key commented out and explained, and the `.gitignore` keeps
 rendered diagrams — `*.svg`, `*.png`, `*.pdf`, `*.dot`, `*.mmd`, `/out/` — out
 of the history while leaving the generated schema in it.
+
+### `netgraph import`
+
+`init` is for a network you are about to build. `import` is for the one you
+already have: it turns machine-readable output collected from real devices into
+a starting inventory, so the first tree is a diff away from correct instead of a
+weekend of transcription.
+
+**No network access, ever.** netgraph opens no socket, reads no credential and
+runs nothing on a device. You run the collection command — the exact lines are
+[below](#collecting-the-input) — and hand netgraph what it printed, from a file
+or from a pipe. The command works fine on a laptop with no route to the network
+it is documenting.
+
+```console
+$ netgraph import -o net --exclude 'veth*' collected/*.json collected/patch-panel.csv
+4 notes about what was not imported:
+  srv-hyper.addr.json: 'lo' is the kernel loopback; it terminates no cable and holds only host-scope addresses, so it was not imported
+  srv-hyper.addr.json: 'wg0' is a wireguard tunnel; netgraph models a tunnel as its own document naming both ends (docs/schema.md §14) and 'ip' shows only this end, so it was not imported
+  ...
+
+wrote 9 files to net:
+  devices/ap-lobby.yaml
+  devices/pc-alice.yaml
+  ...
+  cables/links.yaml
+  schema/netgraph.schema.json
+
+imported 7 devices and 7 cables from 4 inputs
+
+warnings (15):
+  ...
+I002, W101, W105 are expected of an imported tree: a port whose neighbour was
+never captured terminates no cable, and a device only a neighbour named has no
+configuration of its own. Capture the missing hosts and re-run, or fill the gaps
+in by hand — they are not errors in what was imported.
+```
+
+The tree is written in the layout `init` produces — `devices/<name>.yaml`, one
+document per device, plus `cables/links.yaml` — with a `yaml-language-server`
+modeline on every file, so the result opens in an editor with completion already
+working.
+
+#### Collecting the input
+
+Run these on each device and keep the output in one directory, one file per
+host named after it. Nothing else is needed.
+
+| Dialect | What to run | What it gives |
+|---|---|---|
+| `lldp` | `lldpctl -f json > "$(hostname -s).lldp.json"`<br>or `lldpcli -f json show neighbors > …` | Both ends of every link with a neighbour: device names and the port pair, which is exactly a `cable`. Also the neighbour's kind, from its advertised system capabilities. |
+| `iproute` | `ip -j addr show > "$(hostname -s).addr.json"` | One host in full: interfaces, MAC addresses, MTUs, admin state, IPv4/IPv6 addresses, and — via `linkinfo` — bridges, bonds and VLAN sub-interfaces. `ip -j link show` also works and is a subset; pass both and they merge. |
+| `csv` | whatever produces `device,port,device,port` rows | The cabling you already have written down. Optional fifth and sixth columns are `medium` and `label`. A header row is detected and skipped. |
+
+On a Cisco or Juniper box `lldpctl` is not available, but the neighbours are:
+`show lldp neighbors detail` and its JSON forms are not read by this command —
+turn them into the four-column CSV instead, which is a one-line `awk` and is
+what the CSV dialect exists for.
+
+**Why CSV and not NetJSON.** NetJSON's `NetworkGraph` describes nodes and links,
+but a link has no notion of a *port*: its ends are node ids. Importing it would
+have to drop the interface pair — the one thing that makes a netgraph `cable` a
+cable rather than a line on a picture — or invent interface names to hang the
+link on, which is precisely what this command refuses to do. It would also cost
+several hundred lines of shape-guessing across the NetworkGraph,
+NetworkCollection and DeviceConfiguration variants. Four columns carry exactly
+what a cable needs, and where you do have NetJSON, one `jq` produces them:
+
+```console
+$ jq -r '.links[] | [.source, "?", .target, "?"] | @csv' topology.json > links.csv
+```
+
+(then replace the `?`s with the ports, which is the information NetJSON does not
+hold.)
+
+#### Naming the host a capture came from
+
+An `lldpctl` or `ip` capture describes one host and never says which. netgraph
+takes the name from the first of these that applies:
+
+1. `NAME=path` on the argument — `netgraph import sw-core=neighbors.json`;
+2. `--host NAME`, which applies to **every** input of that run, so
+   `--host pc1 link.json addr.json` means the obvious thing;
+3. the file name up to its first dot — `sw-core-01.lldp.json` → `sw-core-01`.
+
+A name that came from a file name is recorded as such in the generated
+document, because it is the one field the capture did not supply.
+
+| Option | Default | Effect |
+|---|---|---|
+| `[NAME=]INPUT...` | | Capture files, or `-` for standard input. Several may be given and they are merged into one inventory. |
+| `--from DIALECT` | `auto` | `lldp`, `iproute`, `csv`, or `auto` to sniff each input separately — an LLDP capture is a JSON object with an `lldp` key, an iproute capture is a JSON array of link records, and anything that is not JSON is the CSV. Sniffing is what makes `netgraph import collected/*` work on a directory holding all three. |
+| `--host NAME` | | The device every input was captured on. See above. |
+| `-o, --output DIR` | current directory | Inventory root to write the `devices/` and `cables/` tree into. |
+| `--dry-run` | off | Print the tree to stdout and write nothing. |
+| `--force` | off | Overwrite files already in the output tree. Without it every clash is named and nothing is touched. |
+| `--schema` / `--no-schema` | `--schema` | Point each document at `schema/netgraph.schema.json` with a modeline, writing the schema when the tree does not already hold one. |
+| `--exclude PATTERN` | none | Leave out interfaces whose name matches this glob. Applies to `iproute` captures, where `veth*` and `docker*` are rarely part of a physical topology. Repeatable. |
+
+#### What it will and will not write
+
+The generated YAML is meant to be edited and committed, not regenerated, so it
+is formatted for a reader: fields in the order of
+[`docs/schema.md`](docs/schema.md), a header explaining where the file came
+from, and a comment beside anything netgraph *concluded* rather than read.
+
+Nothing is invented. A field no capture covers is absent — there is no
+placeholder `vendor:`, no example address, no `description: TODO`. Where the
+kind of a device cannot be determined the document says `kind: computer` and
+says why, rather than promoting a box that happens to forward packets into a
+`router`:
+
+```yaml
+# inferred: nothing in the captured output states what this device is; 'computer'
+# is netgraph's neutral default — correct it by hand
+kind: computer
+```
+
+Four things are concluded rather than observed, and each is commented in place:
+
+* **A cable's `medium`.** The schema requires one and no capture reports it, so
+  every cable reads `copper` unless a CSV column said otherwise. Fix the fibre
+  runs before trusting an `l1` diagram.
+* **A device's kind, from LLDP capabilities.** A neighbour advertising `Bridge`
+  becomes a `switch`, `Router` a `router`, `Repeater` a `hub`.
+* **A trunk under a VLAN sub-interface.** `eno1.100` can only receive frames if
+  `eno1` carries VLAN 100 tagged, so the parent gets
+  `vlan: {mode: trunk, trunk_vlans: [100]}`. `ip` never reports a port's VLAN
+  set, so the list is a *minimum* — extend it.
+* **The VLAN database**, from the VLAN ids observed on the ports. Names and
+  descriptions are not reported by anything, so add those by hand.
+
+Four things are deliberately left out, each reported on stderr rather than
+dropped silently: the kernel loopback, link- and host-scope addresses
+(`fe80::`, `127.0.0.1` — facts about a running kernel, not configuration), the
+MAC a bridge, bond or VLAN sub-interface borrows from what is underneath it, and
+tunnel interfaces, since netgraph models a tunnel as its own document naming
+both ends ([`docs/schema.md`](docs/schema.md) §14) and `ip` shows only one end.
+
+#### The findings afterwards are expected
+
+An imported inventory is *partial* by construction: LLDP shows only the ports
+that have a neighbour, `ip` shows one host, and a device nobody captured exists
+only because a neighbour named it. `import` runs the validator over what it
+wrote and names the rules that follow from that — `I002` (a port terminates no
+cable), `W101` (an interface has no address), `W103`, `W105`, `W109`, `W113`,
+`W121` — as expected rather than wrong. They are the gaps to fill, by capturing
+the missing hosts and re-running, or by editing.
+
+Anything reported as an **error** is not expected, and `import` exits 1 when the
+tree it wrote does not validate.
 
 ### `netgraph validate`
 
@@ -1014,9 +1177,9 @@ to each candidate; bash lists the values alone, as it does for everything.
 | Code | Meaning |
 |---|---|
 | 0 | Success. |
-| 1 | The inventory was rejected: `validate` found errors, `render` refused to draw, or `init` refused to write into an occupied directory. |
+| 1 | The inventory was rejected: `validate` found errors, `render` refused to draw, `init` refused to write into an occupied directory, or `import` produced a tree that does not validate. |
 | 2 | Usage error, or an unusable `netgraph.toml`. |
-| 3 | The inventory could not be discovered or read at all. |
+| 3 | The inventory could not be discovered or read at all; or an `import` input was missing, unreadable or malformed, or would have clobbered an existing file without `--force`. |
 | 5 | The rendering could not be produced (Graphviz missing, output not writable, binary format to a terminal). |
 | 6 | `watch --serve` or `web` could not bind its address. |
 | 130 | Interrupted. |
@@ -1213,6 +1376,13 @@ src/netgraph/
 ├── errors.py       shared exception hierarchy
 ├── config.py       per-inventory settings (netgraph.toml)
 ├── scaffold.py     the starter inventory netgraph init writes
+├── importer/       netgraph import: a first inventory from live-network output
+│   ├── run.py      reading the inputs, sniffing each dialect, writing the tree
+│   ├── lldp.py     lldpctl/lldpcli neighbour records -> cables, both ends at once
+│   ├── iproute.py  ip -j link/addr -> one host's interfaces, bridges, bonds, VLANs
+│   ├── csvlinks.py device,port,device,port cabling rows (and why not NetJSON)
+│   ├── draft.py    the neutral inventory every reader appends to, and the dedup
+│   └── emit.py     commented YAML in docs/schema.md field order
 ├── rules.py        catalogue of validation rules and severities
 ├── schema.py       JSON Schema emitted for editors (netgraph schema)
 ├── subnets.py      IP prefixes derived from the configured addresses

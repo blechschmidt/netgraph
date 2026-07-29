@@ -1,0 +1,8 @@
+# Patch list exported from the rack spreadsheet.
+# device,port,device,port[,medium[,label]]
+device,port,peer,peer_port,medium,label
+sw-core-01,GigabitEthernet1/0/1,srv-hyper,eno1,copper,A-014
+sw-core-01,GigabitEthernet1/0/2,srv-hyper,eno2,copper,A-015
+
+sw-core-01,TenGigabitEthernet1/1/2,sw-edge-02,TenGigabitEthernet0/1,fiber
+sw-edge-02,GigabitEthernet0/9,printer-hp,eth0

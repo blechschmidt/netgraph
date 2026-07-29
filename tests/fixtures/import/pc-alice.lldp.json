@@ -1,0 +1,71 @@
+{
+  "lldp": {
+    "interface": [
+      {
+        "eno1": {
+          "via": "LLDP",
+          "rid": "1",
+          "age": "0 day, 00:14:07",
+          "chassis": {
+            "sw-core-01": {
+              "id": {
+                "type": "mac",
+                "value": "00:1e:8c:aa:00:01"
+              },
+              "descr": "Cisco IOS Software, C9300 Software, Version 17.6.4",
+              "mgmt-ip": "192.0.2.10",
+              "capability": [
+                {
+                  "type": "Bridge",
+                  "enabled": true
+                },
+                {
+                  "type": "Router",
+                  "enabled": false
+                }
+              ]
+            }
+          },
+          "port": {
+            "id": {
+              "type": "ifname",
+              "value": "GigabitEthernet1/0/7"
+            },
+            "descr": "desk: alice",
+            "ttl": "120"
+          }
+        }
+      },
+      {
+        "eno2": {
+          "via": "LLDP",
+          "rid": "2",
+          "age": "0 day, 00:02:11",
+          "chassis": {
+            "ap-lobby": {
+              "id": {
+                "type": "mac",
+                "value": "3c:ec:ef:11:22:33"
+              },
+              "descr": "UniFi AP",
+              "capability": [
+                {
+                  "type": "Wlan",
+                  "enabled": true
+                }
+              ]
+            }
+          },
+          "port": {
+            "id": {
+              "type": "mac",
+              "value": "3c:ec:ef:11:22:34"
+            },
+            "descr": "eth0",
+            "ttl": "120"
+          }
+        }
+      }
+    ]
+  }
+}

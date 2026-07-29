@@ -6,6 +6,11 @@ One contract per command:
     Write a starter inventory that already validates and renders, with the
     editor wired to the JSON Schema, so the first document is written with
     completion rather than from memory.
+``import``
+    The same starting point, for a network that already exists: turn output an
+    operator collected from live devices — ``lldpctl -f json``, ``ip -j addr
+    show``, a cabling CSV — into that tree. Nothing is fetched and no credential
+    is read; the command consumes what has already been printed.
 ``validate``
     Load, check, report. Exits non-zero when anything is an error, so it drops
     straight into CI.
@@ -76,14 +81,23 @@ from netgraph.completion import (
     complete_rule,
     completion_script,
 )
-from netgraph.config import Config, load_config
+from netgraph.config import Config, ValidationConfig, load_config
 from netgraph.console import Align, Console
 from netgraph.errors import NetgraphError, RenderError, format_path
+from netgraph.importer import (
+    DIALECTS,
+    Draft,
+    build_draft,
+    build_files,
+    read_inputs,
+    write_files,
+)
 from netgraph.loader import (
     YAML_SUFFIXES,
     Inventory,
     LoadError,
     iter_inventory_files,
+    load_stream,
     load_tree,
     read_documents,
 )
@@ -338,6 +352,204 @@ def _next_steps(path: Path, *, with_schema: bool) -> Iterator[str]:
             f"  each document points at {SCHEMA_FILE_NAME}; install a yaml-language-server "
             "(the VS Code YAML extension, nvim's yamlls) for completion and inline errors"
         )
+
+
+# --------------------------------------------------------------------------- #
+# import
+# --------------------------------------------------------------------------- #
+
+
+@cli.command("import")
+@click.argument("inputs", nargs=-1, metavar="[NAME=]INPUT...")
+@click.option(
+    "--from",
+    "dialect",
+    type=click.Choice(DIALECTS),
+    default="auto",
+    show_default=True,
+    help=(
+        "Input dialect. 'auto' sniffs each input on its own, so one run may mix all three: "
+        "lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', "
+        "csv is 'device,port,device,port' cabling rows."
+    ),
+)
+@click.option(
+    "--host",
+    metavar="NAME",
+    default=None,
+    help=(
+        "Device every input was captured on. An lldp or iproute capture never names its own "
+        "host. Without this the name comes from the file name, or from a 'NAME=path' argument."
+    ),
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(file_okay=False, writable=True, path_type=Path),
+    default=Path(),
+    show_default="current directory",
+    help="Inventory root to write the devices/ and cables/ tree into.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Print the tree to stdout and write nothing.",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Overwrite files that are already in the output tree. Without it they are refused.",
+)
+@click.option(
+    "--schema/--no-schema",
+    "with_schema",
+    default=True,
+    show_default=True,
+    help=(
+        f"Point each generated document at {SCHEMA_FILE_NAME} with a yaml-language-server "
+        "modeline, writing the schema when the tree does not already hold one."
+    ),
+)
+@click.option(
+    "--exclude",
+    "excluded",
+    multiple=True,
+    metavar="PATTERN",
+    help=(
+        "Leave out interfaces whose name matches this glob. Applies to 'iproute' captures, "
+        "where 'veth*' and 'docker*' are rarely part of a physical topology. Repeatable."
+    ),
+)
+@click.pass_obj
+def import_command(
+    app: AppContext,
+    inputs: tuple[str, ...],
+    dialect: str,
+    host: str | None,
+    output: Path,
+    dry_run: bool,
+    force: bool,
+    with_schema: bool,
+    excluded: tuple[str, ...],
+) -> None:
+    """Bootstrap an inventory from output collected on live devices.
+
+    Reads what an operator already ran — no host is contacted, no credential is
+    read — and writes a devices/ and cables/ tree in the layout 'netgraph init'
+    produces, commented so it is worth editing rather than regenerating. The
+    result is validated straight away; a partly-observed network legitimately
+    has findings, and they are the operator's to fill in.
+
+    \b
+    netgraph import --from lldp   -o net  captures/*.json
+    netgraph import --from iproute --host pc1 -o net  link.json addr.json
+    ip -j addr show | netgraph import --host pc1 -o net --dry-run -
+    """
+    tree_console = app.console()
+    report = tree_console.to_stderr() if dry_run else tree_console
+
+    entries = read_inputs(list(inputs), host=host)
+    app.log(f"read {_plural(len(entries), 'input')}", level=1)
+    draft = build_draft(entries, dialect=dialect, exclude=excluded)
+    files = build_files(draft, schema=with_schema)
+
+    _report_import_notes(report, draft)
+    if not files:
+        report.error(
+            "nothing was imported: no device or cable could be built from "
+            f"{_plural(len(entries), 'input')}"
+        )
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+    if dry_run:
+        for path, content in files.items():
+            tree_console.print(f"# ===== {path} =====")
+            tree_console.print(content.rstrip("\n"))
+            tree_console.print()
+        report.info(
+            f"dry run: {_plural(len(files), 'file')} would be written to {output}"
+            + (f", plus {SCHEMA_FILE_NAME}" if with_schema else "")
+        )
+        inventory = load_stream("\n---\n".join(files.values()))
+    else:
+        if with_schema and not (output / Path(*PurePosixPath(SCHEMA_FILE_NAME).parts)).exists():
+            files[SCHEMA_FILE_NAME] = (
+                json.dumps(build_schema(), indent=2, ensure_ascii=False) + "\n"
+            )
+        written = write_files(files, output, force=force)
+        report.info(f"wrote {_plural(len(written), 'file')} to {output}:")
+        for file in written:
+            report.info(f"  {_display_path(file, output)}")
+        inventory = load_tree(output)
+
+    report.info("")
+    report.info(
+        f"imported {_plural(len(draft.devices), 'device')} and "
+        f"{_plural(len(draft.cables), 'cable')} from {_plural(len(entries), 'input')}"
+    )
+    _report_import_validation(report, inventory, root=output)
+
+
+def _report_import_notes(console: Console, draft: Draft) -> None:
+    """Everything an input said that did not become a document.
+
+    Printed before the tree so that "why is this switch not here?" is answered
+    on the same screen as the answer to "what did I get?".
+    """
+    if not draft.notes:
+        return
+    console.info(f"{_plural(len(draft.notes), 'note')} about what was not imported:")
+    for note in draft.notes:
+        console.info(f"  {note}")
+    console.info("")
+
+
+def _report_import_validation(console: Console, inventory: Inventory, *, root: Path) -> None:
+    """Validate the generated tree and explain which findings are expected.
+
+    An imported inventory is a *partial* one by construction: LLDP shows only
+    the ports with a neighbour, ``ip`` shows only one host, and a device nobody
+    captured exists solely because a neighbour named it. The validator is right
+    to report the resulting gaps, and the operator has to be told that being
+    right is not the same as the import having gone wrong — otherwise the first
+    experience of the command is a screen of warnings that reads like failure.
+
+    The configuration read is the *output* tree's, not the one the working
+    directory happens to sit in: importing into a tree that already ignores a
+    rule should not produce a report contradicting its own ``netgraph.toml``.
+    Under ``--dry-run`` that directory may not exist yet, which is the one case
+    the defaults are used.
+    """
+    settings = load_config(root).validation if root.is_dir() else ValidationConfig()
+    findings = run_validation(inventory, settings)
+    console.info("")
+    _report_problems(console, inventory.errors, findings)
+
+    expected = sorted({finding.rule for finding in findings} & _EXPECTED_IMPORT_RULES)
+    if expected:
+        console.info("")
+        console.info(
+            f"{', '.join(expected)} are expected of an imported tree: a port whose neighbour "
+            "was never captured terminates no cable, and a device only a neighbour named has "
+            "no configuration of its own. Capture the missing hosts and re-run, or fill the "
+            "gaps in by hand — they are not errors in what was imported."
+        )
+    if inventory.errors or any(finding.severity.is_fatal for finding in findings):
+        console.error(
+            "the generated tree does not validate; the files were written so you can see "
+            "what went wrong, but check them before building on them"
+        )
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+
+#: Rules an incomplete capture legitimately trips. Naming them explicitly is
+#: what lets the report separate "expected, and yours to fill in" from "netgraph
+#: produced something wrong", instead of leaving the reader to guess.
+_EXPECTED_IMPORT_RULES: Final[frozenset[str]] = frozenset(
+    {"I002", "W101", "W103", "W105", "W109", "W113", "W121"}
+)
 
 
 # --------------------------------------------------------------------------- #
