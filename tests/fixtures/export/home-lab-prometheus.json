@@ -1,0 +1,67 @@
+[
+  {
+    "targets": [
+      "192.168.10.30"
+    ],
+    "labels": {
+      "instance": "adp-usb-eth.hosts",
+      "netgraph_element": "hosts/adp-usb-eth",
+      "netgraph_name": "adp-usb-eth",
+      "netgraph_namespace": "hosts",
+      "netgraph_kind": "adapter",
+      "netgraph_vendor": "Anker"
+    }
+  },
+  {
+    "targets": [
+      "192.168.10.20"
+    ],
+    "labels": {
+      "instance": "pc-desk.hosts",
+      "netgraph_element": "hosts/pc-desk",
+      "netgraph_name": "pc-desk",
+      "netgraph_namespace": "hosts",
+      "netgraph_kind": "computer",
+      "netgraph_vendor": "Dell"
+    }
+  },
+  {
+    "targets": [
+      "192.0.2.1"
+    ],
+    "labels": {
+      "instance": "rtr-home.routers",
+      "netgraph_element": "routers/rtr-home",
+      "netgraph_name": "rtr-home",
+      "netgraph_namespace": "routers",
+      "netgraph_kind": "router",
+      "netgraph_vendor": "MikroTik"
+    }
+  },
+  {
+    "targets": [
+      "192.168.10.10"
+    ],
+    "labels": {
+      "instance": "srv-nas.hosts",
+      "netgraph_element": "hosts/srv-nas",
+      "netgraph_name": "srv-nas",
+      "netgraph_namespace": "hosts",
+      "netgraph_kind": "server",
+      "netgraph_vendor": "Synology"
+    }
+  },
+  {
+    "targets": [
+      "192.168.10.2"
+    ],
+    "labels": {
+      "instance": "sw-home.switches",
+      "netgraph_element": "switches/sw-home",
+      "netgraph_name": "sw-home",
+      "netgraph_namespace": "switches",
+      "netgraph_kind": "switch",
+      "netgraph_vendor": "TP-Link"
+    }
+  }
+]

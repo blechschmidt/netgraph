@@ -1,0 +1,426 @@
+{
+  "_meta": {
+    "hostvars": {
+      "adp-usb-eth.hosts": {
+        "ansible_host": "192.168.10.30",
+        "netgraph_element": "hosts/adp-usb-eth",
+        "netgraph_name": "adp-usb-eth",
+        "netgraph_kind": "adapter",
+        "netgraph_namespace": "hosts",
+        "netgraph_description": "USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the\nlaptop - there is deliberately no cable between the two (NG-X005).\n",
+        "netgraph_vendor": "Anker",
+        "netgraph_model": "A83130A1",
+        "netgraph_serial": "AK2231007744",
+        "netgraph_labels": {
+          "asset": "A-0001",
+          "site": "home"
+        },
+        "netgraph_addresses": [
+          "192.168.10.30/24",
+          "2001:db8:10::30/64"
+        ],
+        "netgraph_interfaces": [
+          {
+            "name": "enx001122334455",
+            "type": "ethernet",
+            "enabled": true,
+            "description": "Dongle Ethernet port",
+            "mac": "00:11:22:33:44:55",
+            "mtu": 1500,
+            "addresses": [
+              "192.168.10.30/24",
+              "2001:db8:10::30/64"
+            ]
+          }
+        ],
+        "netgraph_vlan_ids": [
+          10
+        ]
+      },
+      "pc-desk.hosts": {
+        "ansible_host": "192.168.10.20",
+        "netgraph_element": "hosts/pc-desk",
+        "netgraph_name": "pc-desk",
+        "netgraph_kind": "computer",
+        "netgraph_namespace": "hosts",
+        "netgraph_description": "Desktop workstation in the study",
+        "netgraph_vendor": "Dell",
+        "netgraph_model": "OptiPlex 7010",
+        "netgraph_labels": {
+          "owner": "sam",
+          "role": "workstation",
+          "site": "home"
+        },
+        "netgraph_addresses": [
+          "192.168.10.20/24",
+          "2001:db8:10::20/64"
+        ],
+        "netgraph_interfaces": [
+          {
+            "name": "lo",
+            "type": "loopback",
+            "enabled": true,
+            "addresses": [
+              "127.0.0.1/8",
+              "::1/128"
+            ]
+          },
+          {
+            "name": "eno1",
+            "type": "ethernet",
+            "enabled": true,
+            "description": "Onboard gigabit port",
+            "mac": "3c:97:0e:20:01:01",
+            "mtu": 1500,
+            "addresses": [
+              "192.168.10.20/24",
+              "2001:db8:10::20/64"
+            ]
+          },
+          {
+            "name": "wlp1s0",
+            "type": "wifi",
+            "enabled": false,
+            "description": "Disabled - the desk is wired",
+            "mac": "3c:97:0e:20:01:02"
+          }
+        ],
+        "netgraph_vlan_ids": [
+          10
+        ]
+      },
+      "rtr-home.routers": {
+        "ansible_host": "192.0.2.1",
+        "netgraph_element": "routers/rtr-home",
+        "netgraph_name": "rtr-home",
+        "netgraph_kind": "router",
+        "netgraph_namespace": "routers",
+        "netgraph_description": "Home edge router. Terminates the ISP hand-off on wan0 and is the default\ngateway for the single home VLAN (10).\n",
+        "netgraph_vendor": "MikroTik",
+        "netgraph_model": "hEX S",
+        "netgraph_labels": {
+          "env": "prod",
+          "role": "edge",
+          "site": "home"
+        },
+        "netgraph_addresses": [
+          "192.0.2.1/32",
+          "192.168.10.1/24",
+          "203.0.113.2/30",
+          "2001:db8::1/128",
+          "2001:db8:10::1/64"
+        ],
+        "netgraph_interfaces": [
+          {
+            "name": "lo0",
+            "type": "loopback",
+            "enabled": true,
+            "description": "Router ID and management target",
+            "addresses": [
+              "192.0.2.1/32",
+              "2001:db8::1/128"
+            ]
+          },
+          {
+            "name": "wan0",
+            "type": "ethernet",
+            "enabled": true,
+            "description": "ISP hand-off",
+            "mac": "00:1e:8c:00:10:01",
+            "mtu": 1500,
+            "addresses": [
+              "203.0.113.2/30"
+            ]
+          },
+          {
+            "name": "lan0",
+            "type": "ethernet",
+            "enabled": true,
+            "description": "Downlink to sw-home",
+            "mac": "00:1e:8c:00:10:02",
+            "mtu": 1500,
+            "addresses": [
+              "192.168.10.1/24",
+              "2001:db8:10::1/64"
+            ],
+            "vlan_mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        ],
+        "netgraph_vlan_ids": [
+          10
+        ],
+        "netgraph_vlans": [
+          {
+            "id": 10,
+            "name": "home",
+            "description": "The one and only user VLAN"
+          }
+        ]
+      },
+      "srv-nas.hosts": {
+        "ansible_host": "192.168.10.10",
+        "netgraph_element": "hosts/srv-nas",
+        "netgraph_name": "srv-nas",
+        "netgraph_kind": "server",
+        "netgraph_namespace": "hosts",
+        "netgraph_description": "Backup and media server",
+        "netgraph_vendor": "Synology",
+        "netgraph_model": "DS923+",
+        "netgraph_labels": {
+          "env": "prod",
+          "role": "storage",
+          "site": "home"
+        },
+        "netgraph_addresses": [
+          "192.168.10.10/24",
+          "2001:db8:10::10/64"
+        ],
+        "netgraph_interfaces": [
+          {
+            "name": "lo",
+            "type": "loopback",
+            "enabled": true,
+            "addresses": [
+              "127.0.0.1/8",
+              "::1/128"
+            ]
+          },
+          {
+            "name": "eth0",
+            "type": "ethernet",
+            "enabled": true,
+            "mac": "00:11:32:40:01:01",
+            "mtu": 1500,
+            "addresses": [
+              "192.168.10.10/24",
+              "2001:db8:10::10/64"
+            ]
+          }
+        ],
+        "netgraph_vlan_ids": [
+          10
+        ]
+      },
+      "sw-home.switches": {
+        "ansible_host": "192.168.10.2",
+        "netgraph_element": "switches/sw-home",
+        "netgraph_name": "sw-home",
+        "netgraph_kind": "switch",
+        "netgraph_namespace": "switches",
+        "netgraph_description": "Eight-port desktop switch in the hallway cabinet",
+        "netgraph_vendor": "TP-Link",
+        "netgraph_model": "TL-SG108E",
+        "netgraph_labels": {
+          "role": "access",
+          "site": "home"
+        },
+        "netgraph_addresses": [
+          "192.168.10.2/24"
+        ],
+        "netgraph_interfaces": [
+          {
+            "name": "br0",
+            "type": "bridge",
+            "enabled": true,
+            "description": "Switching instance"
+          },
+          {
+            "name": "Vlan10",
+            "type": "vlan",
+            "enabled": true,
+            "description": "In-band management address of the switch",
+            "addresses": [
+              "192.168.10.2/24"
+            ],
+            "vlan_mode": "access",
+            "vlans": [
+              10
+            ]
+          },
+          {
+            "name": "port1",
+            "type": "ethernet",
+            "enabled": true,
+            "description": "Uplink to rtr-home",
+            "mac": "00:22:07:aa:00:01",
+            "mtu": 1500,
+            "vlan_mode": "access",
+            "vlans": [
+              10
+            ]
+          },
+          {
+            "name": "port2",
+            "type": "ethernet",
+            "enabled": true,
+            "description": "Desk - pc-desk",
+            "mac": "00:22:07:aa:00:02",
+            "mtu": 1500,
+            "vlan_mode": "access",
+            "vlans": [
+              10
+            ]
+          },
+          {
+            "name": "port3",
+            "type": "ethernet",
+            "enabled": true,
+            "description": "NAS",
+            "mac": "00:22:07:aa:00:03",
+            "mtu": 1500,
+            "vlan_mode": "access",
+            "vlans": [
+              10
+            ]
+          },
+          {
+            "name": "port4",
+            "type": "ethernet",
+            "enabled": true,
+            "description": "Patch to the desk, used by the laptop dongle",
+            "mac": "00:22:07:aa:00:04",
+            "mtu": 1500,
+            "vlan_mode": "access",
+            "vlans": [
+              10
+            ]
+          },
+          {
+            "name": "port5",
+            "type": "ethernet",
+            "enabled": false,
+            "description": "Spare",
+            "mac": "00:22:07:aa:00:05",
+            "vlan_mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        ],
+        "netgraph_vlan_ids": [
+          10
+        ],
+        "netgraph_vlans": [
+          {
+            "id": 10,
+            "name": "home"
+          }
+        ]
+      }
+    }
+  },
+  "all": {
+    "children": [
+      "kind_adapter",
+      "kind_computer",
+      "kind_router",
+      "kind_server",
+      "kind_switch",
+      "ns_hosts",
+      "ns_routers",
+      "ns_switches",
+      "role_access",
+      "role_edge",
+      "role_storage",
+      "role_workstation",
+      "vendor_anker",
+      "vendor_dell",
+      "vendor_mikrotik",
+      "vendor_synology",
+      "vendor_tp_link"
+    ],
+    "vars": {
+      "netgraph_generated_by": "netgraph <version>"
+    }
+  },
+  "kind_adapter": {
+    "hosts": [
+      "adp-usb-eth.hosts"
+    ]
+  },
+  "kind_computer": {
+    "hosts": [
+      "pc-desk.hosts"
+    ]
+  },
+  "kind_router": {
+    "hosts": [
+      "rtr-home.routers"
+    ]
+  },
+  "kind_server": {
+    "hosts": [
+      "srv-nas.hosts"
+    ]
+  },
+  "kind_switch": {
+    "hosts": [
+      "sw-home.switches"
+    ]
+  },
+  "ns_hosts": {
+    "hosts": [
+      "adp-usb-eth.hosts",
+      "pc-desk.hosts",
+      "srv-nas.hosts"
+    ]
+  },
+  "ns_routers": {
+    "hosts": [
+      "rtr-home.routers"
+    ]
+  },
+  "ns_switches": {
+    "hosts": [
+      "sw-home.switches"
+    ]
+  },
+  "role_access": {
+    "hosts": [
+      "sw-home.switches"
+    ]
+  },
+  "role_edge": {
+    "hosts": [
+      "rtr-home.routers"
+    ]
+  },
+  "role_storage": {
+    "hosts": [
+      "srv-nas.hosts"
+    ]
+  },
+  "role_workstation": {
+    "hosts": [
+      "pc-desk.hosts"
+    ]
+  },
+  "vendor_anker": {
+    "hosts": [
+      "adp-usb-eth.hosts"
+    ]
+  },
+  "vendor_dell": {
+    "hosts": [
+      "pc-desk.hosts"
+    ]
+  },
+  "vendor_mikrotik": {
+    "hosts": [
+      "rtr-home.routers"
+    ]
+  },
+  "vendor_synology": {
+    "hosts": [
+      "srv-nas.hosts"
+    ]
+  },
+  "vendor_tp_link": {
+    "hosts": [
+      "sw-home.switches"
+    ]
+  }
+}

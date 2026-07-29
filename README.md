@@ -1647,6 +1647,61 @@ prefix length, how free space and aggregation are computed, the JSON and CSV
 contracts, and why "overlapping but not nested" is a VLAN question rather than a
 question about bits.
 
+### `netgraph export`
+
+Turn the inventory into files other tools consume. Five deterministic,
+text-diffable emitters, driven by the same resolved inventory and the same graph
+a diagram is drawn from — so the file that draws the picture also writes the
+hosts file, the zone, the Ansible inventory, the monitoring targets and the
+cabling pull-list.
+
+```
+netgraph export FORMAT [-o FILE] [--manifest FILE]
+                [--namespace NS] [--vlan VID] [--kind KIND] [--name GLOB]
+                [--neighbors-of NAME] [--depth N]
+                [--strict] [--force]
+                [FORMAT OPTIONS]
+```
+
+| `FORMAT` | Artefact | What it cannot hold |
+|---|---|---|
+| `hosts` | An `/etc/hosts` fragment, one line per address | VLANs, cabling, hardware; loopback and link-local addresses are excluded on purpose |
+| `dns-zone` | RFC 1035 forward zone plus the reverse zones the prefixes imply | Everything but address records; only the qualified name is published |
+| `ansible-inventory` | Ansible's JSON inventory, grouped by namespace, kind, vendor and role | The topology — an inventory has no concept of a cable |
+| `prometheus-sd` | Prometheus `file_sd` targets with namespace/kind/vendor/site labels | Everything but one address and a few labels |
+| `cable-list` | A CSV or Markdown pull-list, one row per physical run | Adapter attachments, tunnels and addressing |
+
+```console
+$ netgraph -i examples/home-lab export hosts
+192.168.10.10    srv-nas.hosts srv-nas
+192.168.10.20    pc-desk.hosts pc-desk
+...
+
+$ netgraph -i examples/campus export dns-zone --origin example.com --zones forward -o db.example.com
+$ netgraph -i examples/campus export prometheus-sd --port 9100 -o targets.json
+$ netgraph -i examples/patch-room export cable-list --table-format markdown
+```
+
+The artefact goes to stdout (or `-o FILE`). A **JSON manifest of what was
+skipped and why** goes to stderr (or `--manifest FILE`), so nothing is dropped
+in silence:
+
+```console
+$ netgraph -i examples/home-lab export prometheus-sd -o targets.json 2> manifest.json
+$ jq -r '.skipped[] | "\(.subject)\t\(.reason)"' manifest.json
+hosts/pc-laptop	not-routable
+```
+
+Every filter `render` takes, `export` takes, and they mean the same thing.
+Reverse zones are regrouped from the prefixes [`netgraph ipam`](#netgraph-ipam)
+sizes rather than derived a second time, so a zone, a utilisation figure and a
+layer-3 diagram cannot tell three different stories.
+
+[`docs/export.md`](docs/export.md) has the full treatment: every column of the
+pull list, the SOA and zone options, the Ansible group and variable scheme, how
+inventory names are folded into each format's grammar, and exactly what each
+format drops.
+
 ### `netgraph show`
 
 Print the fully resolved configuration of one element — defaults materialised,
@@ -1950,6 +2005,7 @@ netgraph -i examples/campus render --namespace sites/north --layer l2 -f svg -o 
 | [`docs/format.md`](docs/format.md) | The canonical form `netgraph fmt` writes: layout, key order, quoting, and the two properties that make rewriting files safe. |
 | [`docs/paths.md`](docs/paths.md) | `netgraph path`: how the layer-2 and layer-3 traces decide, the JSON contract, and what is deliberately not modelled. |
 | [`docs/ipam.md`](docs/ipam.md) | `netgraph ipam`: how a prefix is sized, how free space is computed, and which existing rule each address-plan conflict is. |
+| [`docs/export.md`](docs/export.md) | `netgraph export`: the five artefacts, the skip manifest, how names are folded into each format's grammar, and what each format drops. |
 | [`docs/ci.md`](docs/ci.md) | Running `validate` in CI: the json/sarif/github output formats, the GitHub Action, the pre-commit hooks. |
 | [`docs/yang-mapping.md`](docs/yang-mapping.md) | The relationship to RFC 8343, RFC 8344 and IEEE 802.1Q — including what is deliberately not covered. |
 | [`docs/follow-ups.md`](docs/follow-ups.md) | Known gaps, deferred deliberately: what was measured, why it was left, and what a fix would have to do. |

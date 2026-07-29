@@ -3,6 +3,7 @@
 | Path | What it is |
 |---|---|
 | [`aggregate/`](aggregate/) | A clean two-site inventory whose east site declares a four-member `Port-channel1` with two spare cross-links beside it, and which is joined to the west site by two cables that only become parallel once the sites collapse. It exists to exercise `--bundle-links` and `--collapse`; it teaches nothing, which is why it is here and not in `examples/`. |
+| [`export/`](export/) | Committed `netgraph export` artefacts — one per format over the published examples. Regenerated the same way, and for the same reason: an exported hosts file, zone or pull list is only worth committing if it is byte-stable. |
 | [`golden/`](golden/) | Committed renderer snapshots. Regenerate with `pytest --regen-golden` and **review the diff**; a snapshot that rewrites itself asserts nothing. |
 | [`import/`](import/) | Captures of real tool output — `lldpctl -f json`, `ip -j addr`, cabling CSV — that `netgraph import` is driven with. |
 | [`invalid/`](invalid/) | One inventory per validation rule, each tripping exactly that rule. The file name is the rule id. |

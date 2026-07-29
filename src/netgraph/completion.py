@@ -19,7 +19,7 @@ completers below close that gap:
     ``netgraph.toml``, each described by the settings it overrides. A profile
     exists only in *this* tree, so this is the one option Click could never
     complete on its own.
-``--kind``, ``-f/--format``, ``--layer``
+``--kind``, ``-f/--format``, ``--layer``, ``export FORMAT``
     Static value spaces, but each candidate is offered *with its description*,
     which zsh and fish display next to it. ``click.Choice`` alone would list
     six bare words and make the user go and read ``--help``.
@@ -39,6 +39,7 @@ import click
 from click.shell_completion import CompletionItem, get_completion_class
 
 from netgraph.errors import NetgraphError, count_text
+from netgraph.export import EXPORTERS
 from netgraph.models import DOCUMENT_KINDS
 from netgraph.models.fielddocs import KIND_NOTES
 from netgraph.render import RENDERERS, Layer
@@ -48,6 +49,7 @@ __all__ = [
     "PROG_NAME",
     "SHELLS",
     "complete_element",
+    "complete_export_format",
     "complete_format",
     "complete_kind",
     "complete_layer",
@@ -135,6 +137,15 @@ def complete_format(
     """Output formats, described by the renderer registry itself."""
     return _items(
         ((name, renderer.description) for name, renderer in RENDERERS.items()), incomplete
+    )
+
+
+def complete_export_format(
+    ctx: click.Context, param: click.Parameter, incomplete: str
+) -> list[CompletionItem]:
+    """``netgraph export`` formats, described by the export registry itself."""
+    return _items(
+        ((name, exporter.description) for name, exporter in EXPORTERS.items()), incomplete
     )
 
 

@@ -36,6 +36,12 @@ One contract per command:
 ``list``
     Tabular inventory summaries for humans, with ``--output-format json|yaml``
     for everything else.
+``export``
+    The inventory as something other tools consume: an ``/etc/hosts`` fragment,
+    a DNS zone, an Ansible inventory, Prometheus targets, a cabling pull-list.
+    Each is deterministic and text-diffable, is scoped by the same filters a
+    render takes, and reports what it could not represent as a JSON manifest on
+    stderr rather than dropping it in silence.
 ``show``
     The fully resolved configuration of one element, defaults materialised.
 ``rules``
@@ -81,6 +87,7 @@ from netgraph import __version__
 from netgraph.completion import (
     SHELLS,
     complete_element,
+    complete_export_format,
     complete_format,
     complete_kind,
     complete_layer,
@@ -93,6 +100,17 @@ from netgraph.completion import (
 from netgraph.config import CONFIG_FILE_NAME, Config, ValidationConfig, load_config
 from netgraph.console import Align, Console
 from netgraph.errors import LoaderError, NetgraphError, RenderError, compact_ids, format_path
+from netgraph.export import (
+    EXPORTERS,
+    ExportContext,
+    ExportOptions,
+    ExportResult,
+    domain_name,
+    export,
+    is_assignable_label,
+    layers_for,
+)
+from netgraph.export import FORMATS as EXPORT_FORMATS
 from netgraph.importer import (
     DIALECTS,
     Draft,
@@ -1416,7 +1434,9 @@ def render_command(
     _report_icon_support(console, output_format, options)
     _report_interaction_support(ctx, console, output_format, options)
     payload = render_layers(graphs, output_format, options)
-    _write_output(console, payload, output=output, output_format=output_format)
+    _write_output(
+        payload, output=output, binary=is_binary_format(output_format), what=output_format
+    )
     drawn = ", ".join(str(layer) for layer in layers)
     console.info(
         f"rendered {sum(len(graph.nodes) for graph in graphs)} node(s) and "
@@ -1595,26 +1615,34 @@ def _report_collapse(console: Console, graph: Graph, spec: AggregateSpec) -> Non
 
 
 def _write_output(
-    console: Console, payload: bytes, *, output: Path | None, output_format: str
+    payload: bytes, *, output: Path | None, binary: bool = False, what: str = ""
 ) -> None:
-    """Write the rendering to a file, or to stdout when no file was named.
+    """Write an artefact to a file, or to stdout when no file was named.
+
+    Shared by ``render`` and ``export``, which differ only in whether the
+    payload can be binary: a PNG printed to a terminal is a wrecked session,
+    and everything :mod:`netgraph.export` emits is text by construction. The
+    caller says which it has rather than the function asking a renderer
+    registry, so a format that is not in that registry does not have to rely on
+    the registry answering "not binary" for things it has never heard of.
+
+    Args:
+        binary: Would this payload wreck a terminal? Only then is stdout
+            checked for being one.
+        what: The format name, for the error message when it is.
 
     Raises:
         RenderError: The destination cannot be written, or the format is binary
             and stdout is a terminal.
     """
     if output is not None:
-        try:
-            output.parent.mkdir(parents=True, exist_ok=True)
-            output.write_bytes(payload)
-        except OSError as exc:
-            raise RenderError(f"cannot write {output}: {exc.strerror or exc}") from exc
+        _write_file(payload, output)
         return
 
     stream = click.get_binary_stream("stdout")
-    if is_binary_format(output_format) and _is_a_terminal(stream):
+    if binary and _is_a_terminal(stream):
         raise RenderError(
-            f"refusing to write binary {output_format} data to the terminal; "
+            f"refusing to write binary {what} data to the terminal; "
             f"use '--output FILE' or redirect stdout"
         )
     try:
@@ -1624,6 +1652,23 @@ def _write_output(
         raise
     except OSError as exc:
         raise RenderError(f"cannot write to stdout: {exc.strerror or exc}") from exc
+
+
+def _write_file(payload: bytes, output: Path) -> None:
+    """Write ``payload`` to ``output``, creating the directories above it.
+
+    Shared by every command that takes ``--output``: a rendering, an exported
+    artefact and an export manifest all fail the same way when the destination
+    is unwritable, and should say so in the same words.
+
+    Raises:
+        RenderError: The destination cannot be written.
+    """
+    try:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(payload)
+    except OSError as exc:
+        raise RenderError(f"cannot write {output}: {exc.strerror or exc}") from exc
 
 
 def _is_a_terminal(stream: Any) -> bool:
@@ -1857,7 +1902,9 @@ def _write_highlight(
     options = _render_options(params, highlight=result.highlight(all_paths=all_paths))
     _report_icon_support(console, output_format, options)
     payload = render(graph, output_format, options)
-    _write_output(console, payload, output=output, output_format=output_format)
+    _write_output(
+        payload, output=output, binary=is_binary_format(output_format), what=output_format
+    )
     console.info(
         f"highlighted {_plural(len(result.selected(all_paths=all_paths)), 'path')} over "
         f"{_plural(len(graph.nodes), 'node')} at layer {layer}"
@@ -2932,6 +2979,370 @@ def _csv(headers: Sequence[str], rows: Iterable[Sequence[str]]) -> str:
     writer.writerow(headers)
     writer.writerows(rows)
     return buffer.getvalue().rstrip("\n")
+
+
+# --------------------------------------------------------------------------- #
+# export
+# --------------------------------------------------------------------------- #
+
+#: Which zones ``export dns-zone`` writes. ``all`` puts them in one document
+#: separated by banners, which is for reading and diffing; a nameserver loads
+#: one zone per file, so publishing means ``forward`` and ``reverse`` in turn.
+ZONE_SELECTIONS: Final[tuple[str, ...]] = ("all", "forward", "reverse")
+
+#: How ``export cable-list`` lays the pull list out. Same rows, same columns,
+#: same order — only the framing differs, so neither is the lossy one.
+TABLE_FORMATS: Final[tuple[str, ...]] = ("csv", "markdown")
+
+#: Which formats each format-specific option belongs to, and how the option is
+#: spelled. Everything not listed here — the filters, ``--strict``, ``--force``
+#: — applies to every format.
+#:
+#: The point of the table is :func:`_reject_irrelevant_export_options`: a flag
+#: that is silently ignored is worse than a usage error, because the operator
+#: believes they asked for something they did not get. Driving that check from
+#: one table rather than from a chain of conditionals is what stops a new
+#: option from being added without one.
+_EXPORT_OPTION_SCOPE: Final[dict[str, tuple[str, tuple[str, ...]]]] = {
+    "origin": ("--origin", ("dns-zone",)),
+    "ttl": ("--ttl", ("dns-zone",)),
+    "soa_mname": ("--soa-mname", ("dns-zone",)),
+    "soa_rname": ("--soa-rname", ("dns-zone",)),
+    "soa_serial": ("--serial", ("dns-zone",)),
+    "soa_refresh": ("--refresh", ("dns-zone",)),
+    "soa_retry": ("--retry", ("dns-zone",)),
+    "soa_expire": ("--expire", ("dns-zone",)),
+    "soa_minimum": ("--minimum", ("dns-zone",)),
+    "nameservers": ("--ns", ("dns-zone",)),
+    "zones": ("--zones", ("dns-zone",)),
+    "port": ("--port", ("prometheus-sd",)),
+    "labels": ("--label", ("prometheus-sd",)),
+    "table_format": ("--table-format", ("cable-list",)),
+}
+
+
+def _resolve_domain(ctx: click.Context, param: click.Parameter, value: str | None) -> str | None:
+    """Validate a domain name option and normalise it to its absolute form.
+
+    Done at parse time so ``--origin 'example .com'`` fails before an inventory
+    is loaded, with the flag named — rather than producing a zone file every
+    nameserver rejects and blaming the tool that wrote it.
+    """
+    if value is None:
+        return None
+    try:
+        return domain_name(value)
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), ctx=ctx, param=param) from None
+
+
+def _resolve_domains(
+    ctx: click.Context, param: click.Parameter, value: Sequence[str]
+) -> tuple[str, ...]:
+    """The repeatable form of :func:`_resolve_domain`, for ``--ns``."""
+    return tuple(dict.fromkeys(_resolve_domain(ctx, param, item) or "" for item in value))
+
+
+def _resolve_labels(
+    ctx: click.Context, param: click.Parameter, value: Sequence[str]
+) -> dict[str, str]:
+    """Parse ``--label KEY=VALUE`` into a mapping, refusing what it must.
+
+    Three things are refused, and the last two matter most. A name that is not a
+    Prometheus label name at all. A reserved ``__``-prefixed one, which would be
+    discarded after relabelling, leaving a target file that looks configured and
+    is not. And any label the emitter computes per element — ``instance`` and the
+    ``netgraph_`` namespace — because a *static* value for one of those would
+    give every target in the estate the same identity.
+    """
+    labels: dict[str, str] = {}
+    for item in value:
+        key, separator, text = item.partition("=")
+        if not separator:
+            raise click.BadParameter(
+                f"{item!r} is not 'KEY=VALUE'; write --label site=hq", ctx=ctx, param=param
+            )
+        if not is_assignable_label(key):
+            raise click.BadParameter(
+                f"{key!r} cannot be set here: a label is letters, digits and '_', not "
+                f"starting with a digit; the reserved '__' prefix, 'instance' and the "
+                f"'netgraph_' namespace are computed per element and would be overwritten "
+                f"for every target at once",
+                ctx=ctx,
+                param=param,
+            )
+        labels[key] = text
+    return dict(sorted(labels.items()))
+
+
+#: The SOA and zone parameters of ``export dns-zone``. The defaults are the
+#: conventional ones (RFC 1912 §2.2) rather than anything netgraph invents;
+#: what is *not* conventional is the serial, which is fixed rather than derived
+#: from the clock so that two exports of an unchanged inventory are identical.
+_DNS_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
+    click.option(
+        "--origin",
+        callback=_resolve_domain,
+        default=None,
+        metavar="NAME",
+        help="Zone origin, e.g. 'example.com'. Required by dns-zone.",
+    ),
+    click.option(
+        "--ttl",
+        type=click.IntRange(0),
+        default=3600,
+        show_default=True,
+        metavar="SECONDS",
+        help="$TTL of every zone written.",
+    ),
+    click.option(
+        "--soa-mname",
+        callback=_resolve_domain,
+        default=None,
+        metavar="NAME",
+        show_default="ns.<origin>",
+        help="Primary nameserver for the SOA record.",
+    ),
+    click.option(
+        "--soa-rname",
+        callback=_resolve_domain,
+        default=None,
+        metavar="NAME",
+        show_default="hostmaster.<origin>",
+        help="Responsible mailbox for the SOA record, in DNS form.",
+    ),
+    click.option(
+        "--serial",
+        "soa_serial",
+        type=click.IntRange(0, 2**32 - 1),
+        default=1,
+        show_default=True,
+        metavar="N",
+        help=(
+            "SOA serial. Fixed rather than derived from the clock, so that re-exporting "
+            "an unchanged inventory produces an unchanged file; bump it where you publish."
+        ),
+    ),
+    click.option("--refresh", "soa_refresh", type=click.IntRange(0), default=86400),
+    click.option("--retry", "soa_retry", type=click.IntRange(0), default=7200),
+    click.option("--expire", "soa_expire", type=click.IntRange(0), default=3600000),
+    click.option("--minimum", "soa_minimum", type=click.IntRange(0), default=3600),
+    click.option(
+        "--ns",
+        "nameservers",
+        multiple=True,
+        callback=_resolve_domains,
+        metavar="NAME",
+        show_default="the --soa-mname",
+        help="NS record at the zone apex. Repeatable.",
+    ),
+    click.option(
+        "--zones",
+        type=click.Choice(ZONE_SELECTIONS),
+        default="all",
+        show_default=True,
+        help=(
+            "Which zones to write. 'all' concatenates them into one document for reading; "
+            "a nameserver wants 'forward' and 'reverse' in separate files."
+        ),
+    ),
+)
+
+#: Everything the other two parameterised formats take.
+_TARGET_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
+    click.option(
+        "--port",
+        type=click.IntRange(1, 65535),
+        default=None,
+        metavar="PORT",
+        show_default="none, a bare address",
+        help="Port appended to every prometheus-sd target. IPv6 is bracketed automatically.",
+    ),
+    click.option(
+        "--label",
+        "labels",
+        multiple=True,
+        callback=_resolve_labels,
+        metavar="KEY=VALUE",
+        help="Static label merged into every prometheus-sd target. Repeatable.",
+    ),
+    click.option(
+        "--table-format",
+        type=click.Choice(TABLE_FORMATS),
+        default="csv",
+        show_default=True,
+        help="How cable-list is laid out. The rows and columns are the same either way.",
+    ),
+)
+
+
+def _export_flags(command: _Command) -> _Command:
+    """Apply every option ``export`` takes, in ``--help`` order."""
+    return _apply(
+        (*_FILTER_OPTIONS, *_DNS_OPTIONS, *_TARGET_OPTIONS, *_VALIDATION_OPTIONS), command
+    )
+
+
+def _describe_exports() -> str:
+    """One clause per registered exporter, generated from the registry.
+
+    The same reasoning as :func:`_describe_formats`: a format added to
+    :data:`~netgraph.export.EXPORTERS` documents itself here and cannot drift
+    out of step with what ``FORMAT`` accepts.
+    """
+    return (
+        "; ".join(f"{name}: {exporter.description}" for name, exporter in EXPORTERS.items()) + "."
+    )
+
+
+@cli.command("export", epilog=f"Formats -- {_describe_exports()}")
+@click.argument(
+    "export_format",
+    metavar="FORMAT",
+    type=click.Choice(EXPORT_FORMATS),
+    shell_complete=complete_export_format,
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
+    default=None,
+    help="Write the artefact to this file instead of stdout.",
+)
+@click.option(
+    "--manifest",
+    "manifest_path",
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
+    default=None,
+    help=(
+        "Write the JSON record of what was skipped to this file. "
+        "It goes to stderr when no file is named."
+    ),
+)
+@_export_flags
+@click.pass_context
+def export_command(
+    ctx: click.Context,
+    /,
+    export_format: str,
+    output: Path | None,
+    manifest_path: Path | None,
+    **_options: Any,
+) -> None:
+    """Turn the inventory into an operational artefact.
+
+    FORMAT is one of hosts, dns-zone, ansible-inventory, prometheus-sd or
+    cable-list. Every one of them is deterministic and text-diffable, is scoped
+    by the same filters a render takes, and is lossy in its own way — so what it
+    could not represent is reported as a JSON manifest on stderr rather than
+    dropped in silence.
+
+    Validation runs first, exactly as it does for a render: an artefact
+    generated from an inventory with a dangling cable would misrepresent the
+    network, so errors refuse the export unless --force is given.
+    """
+    app: AppContext = ctx.obj
+    params = ctx.params
+    # stdout carries the artefact, so every diagnostic and the manifest go to
+    # stderr unless a file was named for them.
+    console = app.console(err=True)
+
+    _reject_irrelevant_export_options(ctx, export_format)
+    options = _export_options(params, export_format)
+
+    inventory = app.load()
+    findings = _run_validation(app, inventory, strict=bool(params["strict"]))
+    if _is_rejected(inventory, findings):
+        _report_problems(console, inventory.errors, findings, commentary=True)
+        if not params["force"]:
+            console.error(
+                "refusing to export from an inventory with errors; fix them, or pass "
+                "--force to export anyway"
+            )
+            raise click.exceptions.Exit(EXIT_INVALID)
+        console.warn("exporting despite errors (--force): the artefact may not match the network")
+    elif findings:
+        _report_problems(console, (), findings, commentary=True)
+
+    spec = _filter_spec(params)
+    graphs = {
+        layer: _build_graph(app, inventory, layer=layer, spec=spec, console=console)
+        for layer in layers_for(export_format)
+    }
+    result = export(
+        export_format,
+        lambda recorder: ExportContext(
+            inventory=inventory, graphs=graphs, options=options, recorder=recorder
+        ),
+    )
+
+    _write_output(result.encode(), output=output)
+    _report_manifest(console, result, manifest_path=manifest_path)
+    console.info(
+        f"exported {export_format}: {result.manifest.summary()}"
+        + (f", written to {output}" if output is not None else "")
+    )
+
+
+def _reject_irrelevant_export_options(ctx: click.Context, export_format: str) -> None:
+    """Refuse a format-specific flag given to a format that has no use for it.
+
+    Raises:
+        click.UsageError: An option outside this format's scope was typed. Only
+            what the user actually typed is checked — every one of these has a
+            default, and refusing the defaults would refuse every invocation.
+    """
+    typed = _explicit(ctx)
+    for parameter, (option, formats) in _EXPORT_OPTION_SCOPE.items():
+        if parameter in typed and export_format not in formats:
+            applies = " or ".join(formats)
+            raise click.UsageError(f"{option} applies to '{applies}', not to '{export_format}'")
+    if export_format == "dns-zone" and not ctx.params.get("origin"):
+        raise click.UsageError(
+            "dns-zone needs --origin: a zone file has no meaning without the domain its "
+            "records hang under, e.g. --origin example.com"
+        )
+
+
+def _export_options(params: Mapping[str, Any], export_format: str) -> ExportOptions:
+    """Build the emitter options from the parsed command line."""
+    return ExportOptions(
+        origin=params["origin"] or "",
+        ttl=params["ttl"],
+        soa_mname=params["soa_mname"] or "",
+        soa_rname=params["soa_rname"] or "",
+        soa_serial=params["soa_serial"],
+        soa_refresh=params["soa_refresh"],
+        soa_retry=params["soa_retry"],
+        soa_expire=params["soa_expire"],
+        soa_minimum=params["soa_minimum"],
+        nameservers=tuple(params["nameservers"]),
+        zones=params["zones"],
+        port=params["port"],
+        labels=dict(params["labels"]),
+        table_format=params["table_format"],
+    )
+
+
+def _report_manifest(console: Console, result: ExportResult, *, manifest_path: Path | None) -> None:
+    """Emit the record of what the artefact could not hold.
+
+    To a file when one was named, and to stderr otherwise — never to stdout,
+    which belongs to the artefact. A clean export still produces a manifest: a
+    consumer parsing it must not have to distinguish "nothing was skipped" from
+    "the tool forgot to say".
+
+    The stderr copy is commentary and is therefore silenced by ``--quiet``, as
+    every other note this CLI writes is. ``--manifest FILE`` is not: a pipeline
+    that wants the record *and* wants the run quiet names a file for it, which
+    is written whatever the verbosity.
+    """
+    document = result.manifest.to_json()
+    if manifest_path is not None:
+        _write_file(document.encode("utf-8"), manifest_path)
+        console.info(f"manifest written to {manifest_path}")
+        return
+    console.info(document.rstrip("\n"))
 
 
 # --------------------------------------------------------------------------- #
