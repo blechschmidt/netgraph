@@ -16,13 +16,14 @@ graph netgraph {
 
   subgraph cluster_0 {
     label="sites/branch-a";
+    tooltip="namespace sites/branch-a\n1 element: 1 router";
     style=rounded;
     color="#9ca3af";
     fontcolor="#4b5563";
     fontsize=11;
     labeljust=l;
     margin=12;
-    "sites/branch-a/rtr-branch-a" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="Branch A edge router. Mesh member only.", label=<
+    "sites/branch-a/rtr-branch-a" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-branch-a [router]\nnamespace: sites/branch-a\nBranch A edge router. Mesh member only.\nlabels: role=edge, site=branch-a\ninterfaces (3):\n  ether1  ethernet  198.51.100.6/30\n  ether2  ethernet  10.20.0.1/24\n  wg0  tunnel  10.255.0.2/24\nlinks (1):\n  wg0 — tunnel:tunnels/wg-mesh  (tunnel, wireguard)", label=<
       <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
         <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-branch-a</B></TD></TR>
         <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
@@ -35,13 +36,14 @@ graph netgraph {
 
   subgraph cluster_1 {
     label="sites/branch-b";
+    tooltip="namespace sites/branch-b\n2 elements: 1 computer, 1 router\nvlans: 100";
     style=rounded;
     color="#9ca3af";
     fontcolor="#4b5563";
     fontsize=11;
     labeljust=l;
     margin=12;
-    "sites/branch-b/pc-branch-b" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="Administrator's workstation. Dials into HQ over OpenVPN.", label=<
+    "sites/branch-b/pc-branch-b" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="pc-branch-b [computer]\nnamespace: sites/branch-b\nAdministrator's workstation. Dials into HQ over OpenVPN.\nlabels: site=branch-b\ninterfaces (2):\n  enp3s0  ethernet  10.30.0.10/24\n  tun0  tunnel  10.253.0.10/24\nlinks (1):\n  tun0 — tunnel:tunnels/ovpn-admin  (tunnel, openvpn)", label=<
       <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
         <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pc-branch-b</B></TD></TR>
         <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
@@ -49,7 +51,7 @@ graph netgraph {
         <TR><TD ALIGN="LEFT">tun0</TD><TD ALIGN="LEFT">10.253.0.10/24</TD><TD ALIGN="LEFT"></TD></TR>
       </TABLE>
     >];
-    "sites/branch-b/rtr-branch-b" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="Branch B edge router. Mesh member, and the far end of the IPsec stack.", label=<
+    "sites/branch-b/rtr-branch-b" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-branch-b [router]\nnamespace: sites/branch-b\nBranch B edge router. Mesh member, and the far end of the IPsec stack.\nlabels: role=edge, site=branch-b\nvlans: 100\ninterfaces (6):\n  ether1  ethernet  198.51.100.10/30\n  ether2  ethernet  10.30.0.1/24\n  wg0  tunnel  10.255.0.3/24\n  ipsec0  tunnel  10.254.0.2/30\n  vxlan100  tunnel  vlan 100 (access)\n  gre1  tunnel  10.252.0.2/30\nlinks (4):\n  wg0 — tunnel:tunnels/wg-mesh  (tunnel, wireguard)\n  ipsec0 — tunnel:tunnels/ipsec-hq-b  (tunnel, ipsec)\n  vxlan100 — tunnel:tunnels/vx-100  (tunnel, vxlan over ipsec)\n  gre1 — tunnel:tunnels/gre-mgmt  (tunnel, gre over ipsec)", label=<
       <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
         <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-branch-b</B></TD></TR>
         <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
@@ -65,13 +67,14 @@ graph netgraph {
 
   subgraph cluster_2 {
     label="sites/hq";
+    tooltip="namespace sites/hq\n1 element: 1 router\nvlans: 100";
     style=rounded;
     color="#9ca3af";
     fontcolor="#4b5563";
     fontsize=11;
     labeljust=l;
     margin=12;
-    "sites/hq/rtr-hq" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="HQ edge router and overlay hub.", label=<
+    "sites/hq/rtr-hq" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-hq [router]\nnamespace: sites/hq\nHQ edge router and overlay hub.\nlabels: role=edge, site=hq\nvlans: 100\ninterfaces (7):\n  eth0  ethernet  198.51.100.2/30\n  eth1  ethernet  10.10.0.1/24\n  wg0  tunnel  10.255.0.1/24\n  ipsec0  tunnel  10.254.0.1/30\n  vxlan100  tunnel  vlan 100 (access)\n  gre1  tunnel  10.252.0.1/30\n  ovpn0  tunnel  10.253.0.1/24\nlinks (5):\n  wg0 — tunnel:tunnels/wg-mesh  (tunnel, wireguard)\n  ipsec0 — tunnel:tunnels/ipsec-hq-b  (tunnel, ipsec)\n  vxlan100 — tunnel:tunnels/vx-100  (tunnel, vxlan over ipsec)\n  gre1 — tunnel:tunnels/gre-mgmt  (tunnel, gre over ipsec)\n  ovpn0 — tunnel:tunnels/ovpn-admin  (tunnel, openvpn)", label=<
       <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
         <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-hq</B></TD></TR>
         <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
@@ -88,13 +91,14 @@ graph netgraph {
 
   subgraph cluster_3 {
     label="tunnels";
+    tooltip="namespace tunnels\n5 elements: 5 tunnels";
     style=rounded;
     color="#9ca3af";
     fontcolor="#4b5563";
     fontsize=11;
     labeljust=l;
     margin=12;
-    "tunnel:tunnels/wg-mesh" [shape=hexagon, fillcolor="#ede9fe", color="#6d28d9", style="filled,dashed", tooltip="tunnel: tunnels/wg-mesh, type: wireguard, transport: udp/51820, encrypted: chacha20-poly1305, auth: public-key, mtu: 1420 (overhead 80 B)", label=<
+    "tunnel:tunnels/wg-mesh" [shape=hexagon, fillcolor="#ede9fe", color="#6d28d9", style="filled,dashed", tooltip="wg-mesh [wireguard tunnel]\nnamespace: tunnels\nFull mesh between the three sites.\nlabels: role=transit\nstack: wireguard\ntransport udp/51820, encrypted: chacha20-poly1305, auth public-key, mtu 1420 (overhead 80 B)\nendpoints (3):\n  sites/branch-a/rtr-branch-a:wg0\n  sites/branch-b/rtr-branch-b:wg0\n  sites/hq/rtr-hq:wg0\nlinks (3):\n  sites/branch-a/rtr-branch-a:wg0  (tunnel, wireguard)\n  sites/branch-b/rtr-branch-b:wg0  (tunnel, wireguard)\n  sites/hq/rtr-hq:wg0  (tunnel, wireguard)", label=<
       <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
         <TR><TD COLSPAN="3" ALIGN="CENTER"><B>wg-mesh</B></TD></TR>
         <TR><TD COLSPAN="3" ALIGN="CENTER">[wireguard tunnel]</TD></TR>
@@ -104,7 +108,7 @@ graph netgraph {
         <TR><TD COLSPAN="3" ALIGN="CENTER">mtu 1420</TD></TR>
       </TABLE>
     >];
-    "tunnel:tunnels/ipsec-hq-b" [shape=hexagon, fillcolor="#ede9fe", color="#6d28d9", style="filled,dashed", tooltip="tunnel: tunnels/ipsec-hq-b, type: ipsec, mode: tunnel, transport: esp, encrypted: aes-256-gcm, auth: certificate, mtu: 1427 (overhead 73 B)", label=<
+    "tunnel:tunnels/ipsec-hq-b" [shape=hexagon, fillcolor="#ede9fe", color="#6d28d9", style="filled,dashed", tooltip="ipsec-hq-b [ipsec tunnel]\nnamespace: tunnels\nThe encrypted transport branch-b's overlays ride inside.\nlabels: role=transit\nstack: ipsec\nmode tunnel, transport esp, encrypted: aes-256-gcm, auth certificate, mtu 1427 (overhead 73 B)\nendpoints (2):\n  sites/branch-b/rtr-branch-b:ipsec0\n  sites/hq/rtr-hq:ipsec0\nlinks (4):\n  sites/branch-b/rtr-branch-b:ipsec0  (tunnel, ipsec)\n  sites/hq/rtr-hq:ipsec0  (tunnel, ipsec)\n  tunnel:tunnels/vx-100  (encapsulation, vxlan over ipsec)\n  tunnel:tunnels/gre-mgmt  (encapsulation, gre over ipsec)", label=<
       <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
         <TR><TD COLSPAN="3" ALIGN="CENTER"><B>ipsec-hq-b</B></TD></TR>
         <TR><TD COLSPAN="3" ALIGN="CENTER">[ipsec tunnel]</TD></TR>
@@ -113,7 +117,7 @@ graph netgraph {
         <TR><TD COLSPAN="3" ALIGN="CENTER">mtu 1427</TD></TR>
       </TABLE>
     >];
-    "tunnel:tunnels/vx-100" [shape=hexagon, fillcolor="#ede9fe", color="#6d28d9", style="filled,dashed", tooltip="tunnel: tunnels/vx-100, type: vxlan over ipsec, vni: 100, transport: udp/4789, cleartext, carried by tunnels/ipsec-hq-b, mtu: 1377 (overhead 123 B)", label=<
+    "tunnel:tunnels/vx-100" [shape=hexagon, fillcolor="#ede9fe", color="#6d28d9", style="filled,dashed", tooltip="vx-100 [vxlan tunnel]\nnamespace: tunnels\nVLAN 100 stretched from HQ to branch-b, inside the IPsec tunnel.\nstack: vxlan over ipsec\nvni 100, transport udp/4789, cleartext, carried by tunnels/ipsec-hq-b, mtu 1377 (overhead 123 B)\nendpoints (2):\n  sites/branch-b/rtr-branch-b:vxlan100\n  sites/hq/rtr-hq:vxlan100\nlinks (3):\n  sites/branch-b/rtr-branch-b:vxlan100  (tunnel, vxlan over ipsec)\n  sites/hq/rtr-hq:vxlan100  (tunnel, vxlan over ipsec)\n  tunnel:tunnels/ipsec-hq-b  (encapsulation, vxlan over ipsec)", label=<
       <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
         <TR><TD COLSPAN="3" ALIGN="CENTER"><B>vx-100</B></TD></TR>
         <TR><TD COLSPAN="3" ALIGN="CENTER">[vxlan tunnel]</TD></TR>
@@ -123,7 +127,7 @@ graph netgraph {
         <TR><TD COLSPAN="3" ALIGN="CENTER">mtu 1377</TD></TR>
       </TABLE>
     >];
-    "tunnel:tunnels/gre-mgmt" [shape=hexagon, fillcolor="#ede9fe", color="#6d28d9", style="filled,dashed", tooltip="tunnel: tunnels/gre-mgmt, type: gre over ipsec, transport: gre, cleartext, carried by tunnels/ipsec-hq-b, mtu: 1403 (overhead 97 B)", label=<
+    "tunnel:tunnels/gre-mgmt" [shape=hexagon, fillcolor="#ede9fe", color="#6d28d9", style="filled,dashed", tooltip="gre-mgmt [gre tunnel]\nnamespace: tunnels\nOut-of-band management, sharing the IPsec underlay with the VXLAN.\nstack: gre over ipsec\ntransport gre, cleartext, carried by tunnels/ipsec-hq-b, mtu 1403 (overhead 97 B)\nendpoints (2):\n  sites/branch-b/rtr-branch-b:gre1\n  sites/hq/rtr-hq:gre1\nlinks (3):\n  sites/branch-b/rtr-branch-b:gre1  (tunnel, gre over ipsec)\n  sites/hq/rtr-hq:gre1  (tunnel, gre over ipsec)\n  tunnel:tunnels/ipsec-hq-b  (encapsulation, gre over ipsec)", label=<
       <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
         <TR><TD COLSPAN="3" ALIGN="CENTER"><B>gre-mgmt</B></TD></TR>
         <TR><TD COLSPAN="3" ALIGN="CENTER">[gre tunnel]</TD></TR>
@@ -133,7 +137,7 @@ graph netgraph {
         <TR><TD COLSPAN="3" ALIGN="CENTER">mtu 1403</TD></TR>
       </TABLE>
     >];
-    "tunnel:tunnels/ovpn-admin" [shape=hexagon, fillcolor="#ede9fe", color="#6d28d9", style="filled,dashed", tooltip="tunnel: tunnels/ovpn-admin, type: openvpn, transport: udp/1194, encrypted: aes-256-gcm, auth: certificate, mtu: 1431 (overhead 69 B)", label=<
+    "tunnel:tunnels/ovpn-admin" [shape=hexagon, fillcolor="#ede9fe", color="#6d28d9", style="filled,dashed", tooltip="ovpn-admin [openvpn tunnel]\nnamespace: tunnels\nRemote access from the administrator's workstation to HQ.\nstack: openvpn\ntransport udp/1194, encrypted: aes-256-gcm, auth certificate, mtu 1431 (overhead 69 B)\nendpoints (2):\n  sites/branch-b/pc-branch-b:tun0\n  sites/hq/rtr-hq:ovpn0\nlinks (2):\n  sites/branch-b/pc-branch-b:tun0  (tunnel, openvpn)\n  sites/hq/rtr-hq:ovpn0  (tunnel, openvpn)", label=<
       <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
         <TR><TD COLSPAN="3" ALIGN="CENTER"><B>ovpn-admin</B></TD></TR>
         <TR><TD COLSPAN="3" ALIGN="CENTER">[openvpn tunnel]</TD></TR>
@@ -144,17 +148,17 @@ graph netgraph {
     >];
   }
 
-  "sites/branch-a/rtr-branch-a" -- "tunnel:tunnels/wg-mesh" [color="#6d28d9", style=dashed, label="wg0\nwireguard\nMESH", tooltip="tunnel: tunnels/wg-mesh, type: wireguard, transport: udp/51820, encrypted: chacha20-poly1305, auth: public-key, mtu: 1420 (overhead 80 B)"];
-  "sites/branch-b/rtr-branch-b" -- "tunnel:tunnels/wg-mesh" [color="#6d28d9", style=dashed, label="wg0\nwireguard\nMESH", tooltip="tunnel: tunnels/wg-mesh, type: wireguard, transport: udp/51820, encrypted: chacha20-poly1305, auth: public-key, mtu: 1420 (overhead 80 B)"];
-  "sites/hq/rtr-hq" -- "tunnel:tunnels/wg-mesh" [color="#6d28d9", style=dashed, label="wg0\nwireguard\nMESH", tooltip="tunnel: tunnels/wg-mesh, type: wireguard, transport: udp/51820, encrypted: chacha20-poly1305, auth: public-key, mtu: 1420 (overhead 80 B)"];
-  "sites/branch-b/rtr-branch-b" -- "tunnel:tunnels/ipsec-hq-b" [color="#6d28d9", style=dashed, label="ipsec0\nipsec", tooltip="tunnel: tunnels/ipsec-hq-b, type: ipsec, mode: tunnel, transport: esp, encrypted: aes-256-gcm, auth: certificate, mtu: 1427 (overhead 73 B)"];
-  "sites/hq/rtr-hq" -- "tunnel:tunnels/ipsec-hq-b" [color="#6d28d9", style=dashed, label="ipsec0\nipsec", tooltip="tunnel: tunnels/ipsec-hq-b, type: ipsec, mode: tunnel, transport: esp, encrypted: aes-256-gcm, auth: certificate, mtu: 1427 (overhead 73 B)"];
-  "sites/branch-b/rtr-branch-b" -- "tunnel:tunnels/vx-100" [color="#6d28d9", style=dashed, label="vxlan100\nvxlan over ipsec\nvni 100\nvia encrypted underlay", tooltip="tunnel: tunnels/vx-100, type: vxlan over ipsec, vni: 100, transport: udp/4789, cleartext, carried by tunnels/ipsec-hq-b, mtu: 1377 (overhead 123 B)"];
-  "sites/hq/rtr-hq" -- "tunnel:tunnels/vx-100" [color="#6d28d9", style=dashed, label="vxlan100\nvxlan over ipsec\nvni 100\nvia encrypted underlay", tooltip="tunnel: tunnels/vx-100, type: vxlan over ipsec, vni: 100, transport: udp/4789, cleartext, carried by tunnels/ipsec-hq-b, mtu: 1377 (overhead 123 B)"];
-  "tunnel:tunnels/vx-100" -- "tunnel:tunnels/ipsec-hq-b" [color="#8b5cf6", style=dotted, label="vxlan over", tooltip="tunnel: tunnels/vx-100, type: vxlan over ipsec, vni: 100, transport: udp/4789, cleartext, carried by tunnels/ipsec-hq-b, mtu: 1377 (overhead 123 B)"];
-  "sites/branch-b/rtr-branch-b" -- "tunnel:tunnels/gre-mgmt" [color="#6d28d9", style=dashed, label="gre1\ngre over ipsec\nvia encrypted underlay", tooltip="tunnel: tunnels/gre-mgmt, type: gre over ipsec, transport: gre, cleartext, carried by tunnels/ipsec-hq-b, mtu: 1403 (overhead 97 B)"];
-  "sites/hq/rtr-hq" -- "tunnel:tunnels/gre-mgmt" [color="#6d28d9", style=dashed, label="gre1\ngre over ipsec\nvia encrypted underlay", tooltip="tunnel: tunnels/gre-mgmt, type: gre over ipsec, transport: gre, cleartext, carried by tunnels/ipsec-hq-b, mtu: 1403 (overhead 97 B)"];
-  "tunnel:tunnels/gre-mgmt" -- "tunnel:tunnels/ipsec-hq-b" [color="#8b5cf6", style=dotted, label="gre over", tooltip="tunnel: tunnels/gre-mgmt, type: gre over ipsec, transport: gre, cleartext, carried by tunnels/ipsec-hq-b, mtu: 1403 (overhead 97 B)"];
-  "sites/branch-b/pc-branch-b" -- "tunnel:tunnels/ovpn-admin" [color="#6d28d9", style=dashed, label="tun0\nopenvpn", tooltip="tunnel: tunnels/ovpn-admin, type: openvpn, transport: udp/1194, encrypted: aes-256-gcm, auth: certificate, mtu: 1431 (overhead 69 B)"];
-  "sites/hq/rtr-hq" -- "tunnel:tunnels/ovpn-admin" [color="#6d28d9", style=dashed, label="ovpn0\nopenvpn", tooltip="tunnel: tunnels/ovpn-admin, type: openvpn, transport: udp/1194, encrypted: aes-256-gcm, auth: certificate, mtu: 1431 (overhead 69 B)"];
+  "sites/branch-a/rtr-branch-a" -- "tunnel:tunnels/wg-mesh" [color="#6d28d9", style=dashed, label="wg0\nwireguard\nMESH", tooltip="tunnel tunnels/wg-mesh#sites/branch-a/rtr-branch-a:wg0\nsites/branch-a/rtr-branch-a:wg0 — tunnel:tunnels/wg-mesh\nstack: wireguard\ntransport udp/51820, encrypted: chacha20-poly1305, auth public-key, mtu 1420 (overhead 80 B)\nendpoints (3):\n  sites/branch-a/rtr-branch-a:wg0\n  sites/branch-b/rtr-branch-b:wg0\n  sites/hq/rtr-hq:wg0"];
+  "sites/branch-b/rtr-branch-b" -- "tunnel:tunnels/wg-mesh" [color="#6d28d9", style=dashed, label="wg0\nwireguard\nMESH", tooltip="tunnel tunnels/wg-mesh#sites/branch-b/rtr-branch-b:wg0\nsites/branch-b/rtr-branch-b:wg0 — tunnel:tunnels/wg-mesh\nstack: wireguard\ntransport udp/51820, encrypted: chacha20-poly1305, auth public-key, mtu 1420 (overhead 80 B)\nendpoints (3):\n  sites/branch-a/rtr-branch-a:wg0\n  sites/branch-b/rtr-branch-b:wg0\n  sites/hq/rtr-hq:wg0"];
+  "sites/hq/rtr-hq" -- "tunnel:tunnels/wg-mesh" [color="#6d28d9", style=dashed, label="wg0\nwireguard\nMESH", tooltip="tunnel tunnels/wg-mesh#sites/hq/rtr-hq:wg0\nsites/hq/rtr-hq:wg0 — tunnel:tunnels/wg-mesh\nstack: wireguard\ntransport udp/51820, encrypted: chacha20-poly1305, auth public-key, mtu 1420 (overhead 80 B)\nendpoints (3):\n  sites/branch-a/rtr-branch-a:wg0\n  sites/branch-b/rtr-branch-b:wg0\n  sites/hq/rtr-hq:wg0"];
+  "sites/branch-b/rtr-branch-b" -- "tunnel:tunnels/ipsec-hq-b" [color="#6d28d9", style=dashed, label="ipsec0\nipsec", tooltip="tunnel tunnels/ipsec-hq-b#sites/branch-b/rtr-branch-b:ipsec0\nsites/branch-b/rtr-branch-b:ipsec0 — tunnel:tunnels/ipsec-hq-b\nstack: ipsec\nmode tunnel, transport esp, encrypted: aes-256-gcm, auth certificate, mtu 1427 (overhead 73 B)\nendpoints (2):\n  sites/branch-b/rtr-branch-b:ipsec0\n  sites/hq/rtr-hq:ipsec0"];
+  "sites/hq/rtr-hq" -- "tunnel:tunnels/ipsec-hq-b" [color="#6d28d9", style=dashed, label="ipsec0\nipsec", tooltip="tunnel tunnels/ipsec-hq-b#sites/hq/rtr-hq:ipsec0\nsites/hq/rtr-hq:ipsec0 — tunnel:tunnels/ipsec-hq-b\nstack: ipsec\nmode tunnel, transport esp, encrypted: aes-256-gcm, auth certificate, mtu 1427 (overhead 73 B)\nendpoints (2):\n  sites/branch-b/rtr-branch-b:ipsec0\n  sites/hq/rtr-hq:ipsec0"];
+  "sites/branch-b/rtr-branch-b" -- "tunnel:tunnels/vx-100" [color="#6d28d9", style=dashed, label="vxlan100\nvxlan over ipsec\nvni 100\nvia encrypted underlay", tooltip="tunnel tunnels/vx-100#sites/branch-b/rtr-branch-b:vxlan100\nsites/branch-b/rtr-branch-b:vxlan100 — tunnel:tunnels/vx-100\nstack: vxlan over ipsec\nvni 100, transport udp/4789, cleartext, carried by tunnels/ipsec-hq-b, mtu 1377 (overhead 123 B)\nendpoints (2):\n  sites/branch-b/rtr-branch-b:vxlan100\n  sites/hq/rtr-hq:vxlan100"];
+  "sites/hq/rtr-hq" -- "tunnel:tunnels/vx-100" [color="#6d28d9", style=dashed, label="vxlan100\nvxlan over ipsec\nvni 100\nvia encrypted underlay", tooltip="tunnel tunnels/vx-100#sites/hq/rtr-hq:vxlan100\nsites/hq/rtr-hq:vxlan100 — tunnel:tunnels/vx-100\nstack: vxlan over ipsec\nvni 100, transport udp/4789, cleartext, carried by tunnels/ipsec-hq-b, mtu 1377 (overhead 123 B)\nendpoints (2):\n  sites/branch-b/rtr-branch-b:vxlan100\n  sites/hq/rtr-hq:vxlan100"];
+  "tunnel:tunnels/vx-100" -- "tunnel:tunnels/ipsec-hq-b" [color="#8b5cf6", style=dotted, label="vxlan over", tooltip="encapsulation tunnels/vx-100#over\ntunnel:tunnels/vx-100 — tunnel:tunnels/ipsec-hq-b\nstack: vxlan over ipsec\nvni 100, transport udp/4789, cleartext, carried by tunnels/ipsec-hq-b, mtu 1377 (overhead 123 B)\nendpoints (2):\n  sites/branch-b/rtr-branch-b:vxlan100\n  sites/hq/rtr-hq:vxlan100"];
+  "sites/branch-b/rtr-branch-b" -- "tunnel:tunnels/gre-mgmt" [color="#6d28d9", style=dashed, label="gre1\ngre over ipsec\nvia encrypted underlay", tooltip="tunnel tunnels/gre-mgmt#sites/branch-b/rtr-branch-b:gre1\nsites/branch-b/rtr-branch-b:gre1 — tunnel:tunnels/gre-mgmt\nstack: gre over ipsec\ntransport gre, cleartext, carried by tunnels/ipsec-hq-b, mtu 1403 (overhead 97 B)\nendpoints (2):\n  sites/branch-b/rtr-branch-b:gre1\n  sites/hq/rtr-hq:gre1"];
+  "sites/hq/rtr-hq" -- "tunnel:tunnels/gre-mgmt" [color="#6d28d9", style=dashed, label="gre1\ngre over ipsec\nvia encrypted underlay", tooltip="tunnel tunnels/gre-mgmt#sites/hq/rtr-hq:gre1\nsites/hq/rtr-hq:gre1 — tunnel:tunnels/gre-mgmt\nstack: gre over ipsec\ntransport gre, cleartext, carried by tunnels/ipsec-hq-b, mtu 1403 (overhead 97 B)\nendpoints (2):\n  sites/branch-b/rtr-branch-b:gre1\n  sites/hq/rtr-hq:gre1"];
+  "tunnel:tunnels/gre-mgmt" -- "tunnel:tunnels/ipsec-hq-b" [color="#8b5cf6", style=dotted, label="gre over", tooltip="encapsulation tunnels/gre-mgmt#over\ntunnel:tunnels/gre-mgmt — tunnel:tunnels/ipsec-hq-b\nstack: gre over ipsec\ntransport gre, cleartext, carried by tunnels/ipsec-hq-b, mtu 1403 (overhead 97 B)\nendpoints (2):\n  sites/branch-b/rtr-branch-b:gre1\n  sites/hq/rtr-hq:gre1"];
+  "sites/branch-b/pc-branch-b" -- "tunnel:tunnels/ovpn-admin" [color="#6d28d9", style=dashed, label="tun0\nopenvpn", tooltip="tunnel tunnels/ovpn-admin#sites/branch-b/pc-branch-b:tun0\nsites/branch-b/pc-branch-b:tun0 — tunnel:tunnels/ovpn-admin\nstack: openvpn\ntransport udp/1194, encrypted: aes-256-gcm, auth certificate, mtu 1431 (overhead 69 B)\nendpoints (2):\n  sites/branch-b/pc-branch-b:tun0\n  sites/hq/rtr-hq:ovpn0"];
+  "sites/hq/rtr-hq" -- "tunnel:tunnels/ovpn-admin" [color="#6d28d9", style=dashed, label="ovpn0\nopenvpn", tooltip="tunnel tunnels/ovpn-admin#sites/hq/rtr-hq:ovpn0\nsites/hq/rtr-hq:ovpn0 — tunnel:tunnels/ovpn-admin\nstack: openvpn\ntransport udp/1194, encrypted: aes-256-gcm, auth certificate, mtu 1431 (overhead 69 B)\nendpoints (2):\n  sites/branch-b/pc-branch-b:tun0\n  sites/hq/rtr-hq:ovpn0"];
 }

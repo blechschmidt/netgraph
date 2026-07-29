@@ -70,7 +70,7 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Final
 
-from netgraph.loader.inventory import Inventory, namespace_of, short_name
+from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of, short_name
 from netgraph.models import (
     Adapter,
     Cable,
@@ -542,6 +542,17 @@ class Graph:
     layer: Layer = Layer.L1
     #: Cables dropped because an endpoint did not resolve, with the reason.
     dangling: tuple[str, ...] = ()
+    #: Where each declared element was written, keyed by fully-qualified name —
+    #: the whole inventory's, not only the part that survived a filter, because
+    #: an edge names a cable that is no longer a node. Derived nodes (a layer-3
+    #: prefix) have no entry: nobody wrote them. This is what
+    #: ``--link-template`` expands (:mod:`netgraph.render.links`); it is
+    #: deliberately not part of what a renderer *draws*.
+    sources: Mapping[str, SourceLocation] = field(default_factory=dict)
+
+    def source_of(self, fqn: str) -> SourceLocation | None:
+        """Where the element called ``fqn`` was declared, if it was declared."""
+        return self.sources.get(fqn)
 
     def __len__(self) -> int:
         return len(self.nodes)
@@ -679,7 +690,14 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         nodes, edges = _routed_view(nodes, subnets_of(inventory))
     elif layer is Layer.OVERLAY:
         nodes, edges = _overlay_view(nodes, tunnels)
-    return Graph(root=inventory.root, nodes=nodes, edges=edges, layer=layer, dangling=dangling)
+    return Graph(
+        root=inventory.root,
+        nodes=nodes,
+        edges=edges,
+        layer=layer,
+        dangling=dangling,
+        sources=dict(inventory.sources),
+    )
 
 
 def _routed_view(
@@ -1246,6 +1264,7 @@ def filter_graph(graph: Graph, spec: FilterSpec) -> Graph:
         edges=edges,
         layer=graph.layer,
         dangling=graph.dangling,
+        sources=graph.sources,
     )
 
 

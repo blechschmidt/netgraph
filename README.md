@@ -431,6 +431,9 @@ from an inventory with a dangling cable is worse than no diagram.
 | `--show-vlans` / `--no-show-vlans` | on | Annotate nodes and links with VLAN membership. |
 | `--group-by-namespace` | off | Draw each namespace as a visual group (a Graphviz cluster, a Mermaid subgraph). |
 | `--icons THEME\|DIR` | off | Draw each element as an icon instead of a plain shape — see [Icons](#icons). `cisco`, `none`, or a directory of your own. Graphviz formats only. |
+| `--tooltips` / `--no-tooltips` | on | Carry the full record of every element — interfaces, addresses, VLANs, cabling — as hover text. `dot` and `svg` only; see [Interactive SVG](#interactive-svg-tooltips-links-and-ids). |
+| `--link-template URL` | off | Link each element back to the YAML that declares it, e.g. `https://git.example.com/net/blob/main/{file}#L{line}`. `dot` and `svg` only. |
+| `--element-ids` | off | Give every node, edge and namespace a stable `id` derived from its name, so the diagram can be deep-linked and styled. `dot` and `svg` only. |
 | `--strict` | off | Treat warnings as errors, which then also refuse the render. |
 | `--force` | off | Render even when validation failed. The diagram may not match the files. |
 
@@ -528,6 +531,109 @@ Two details are worth knowing:
 
 `--icons` is ignored, with a warning, by `-f mermaid` and `-f json`: neither has
 a picture to put an icon in.
+
+#### Interactive SVG: tooltips, links and ids
+
+An SVG is the artefact that gets committed to a repository or dropped into a
+wiki, and it can carry more than the picture. Three attributes travel with it,
+none of which changes the drawing:
+
+```bash
+netgraph render -f svg --element-ids \
+    --link-template 'https://git.example.com/net/blob/main/{file}#L{line}' \
+    -o docs/topology.svg
+```
+
+| Flag | Honoured by | Ignored by | What it does |
+|---|---|---|---|
+| `--tooltips` (default on) | `svg`, `dot` | `png`, `pdf`, `mermaid`, `json` | Hover text on every node, edge and namespace box. |
+| `--link-template URL` | `svg`, `dot` | `png`, `pdf`, `mermaid`, `json` | Turns each element into a link to the document that declares it. |
+| `--element-ids` | `svg`, `dot` | `png`, `pdf`, `mermaid`, `json` | A stable `id` on every node, edge and cluster. |
+
+`-f dot` writes the attributes because a DOT file is the input to somebody
+else's `dot`; `-f svg` is where they reach a reader. `png` and `pdf` are
+pictures and drop them silently — netgraph warns when you asked for one of the
+three and picked a format that cannot carry it. `mermaid` and `json` have
+interaction models of their own and ignore all three.
+
+**Tooltips** are the same per-element records `netgraph web` shows in its info
+boxes, rendered as plain text — one builder, so a committed diagram and the live
+preview cannot disagree. Hovering the switch of the [quickstart](#quickstart)
+inventory gives:
+
+<!-- tooltip-example -->
+```
+sw-office [switch]
+namespace: devices
+labels: site=office
+vlans: 10
+interfaces (2):
+  port1  ethernet  vlan 10 (access)
+  port2  ethernet  vlan 10 (access)
+links (2):
+  port1 — devices/rtr-gw:lan0  (cable, copper, 1Gbps)  vlan 10
+  port2 — devices/pc-alice:eno1  (cable, copper, 1Gbps)  vlan 10
+```
+
+Every port, including the two the label had no room to annotate, and both
+cables — with the far end, its interface, the medium, the rate and the VLAN.
+
+They work in any browser with no JavaScript: netgraph puts the text in the SVG
+`<title>` element of each shape, which is the construct browsers have popped up
+since SVG 1.1. The text is bounded — long lists are counted off (`(+12 more)`)
+and the whole is clipped — so a tooltip never covers the diagram it explains.
+`--no-show-ips` and `--no-show-vlans` apply to the hover text as well as to the
+labels: "do not print the addresses" has to mean all of the printing.
+`--no-tooltips` removes the detail entirely, for a diagram published somewhere
+it should carry nothing the picture does not show.
+
+**`--link-template`** is a format string expanded per element. Five
+placeholders, and an unknown one is a usage error before the inventory is even
+loaded, rather than four hundred broken links in a committed file:
+
+| Placeholder | Expands to |
+|---|---|
+| `{file}` | Path of the declaring document, relative to the inventory root — `switches/sw-office.yaml`. |
+| `{line}` | 1-based line the document starts on. |
+| `{name}` | Fully-qualified name — `sites/hq/sw-core`. |
+| `{namespace}` | Namespace alone — `sites/hq`, empty at the root. |
+| `{kind}` | `switch`, `router`, `cable`, `tunnel`, … |
+
+Every substituted value is percent-encoded (`/` excepted, since a path is
+hierarchical), so nothing an inventory contains can escape the URL. A cable
+links to the line of the document that declares it, an adapter attachment to the
+adapter, a tunnel to the `tunnel` document. A layer-3 prefix node links nowhere:
+no file says `192.168.10.0/24`, and a link that 404s is worse than a shape that
+is not clickable. So does any element whose line the parser could not report,
+when the template asks for `{line}`.
+
+**`--element-ids`** derives an id from the fully-qualified name, so it survives
+someone adding a device to the file above it:
+
+```
+sites/hq/sw-core   →  id="node-sites_hq_sw-core"
+sites/hq/cbl-07    →  id="edge-sites_hq_cbl-07"
+sites/hq           →  id="cluster-sites_hq"
+```
+
+Anything outside `[A-Za-z0-9_.-]` becomes an underscore, because an XML `id`
+may not hold a `/` and because the ids of a published diagram are a second,
+unescaped copy of the inventory's names. Two names that reduce to the same slug
+get `-2`, `-3` suffixes in graph order. That makes a diagram addressable from
+outside:
+
+```html
+<a href="topology.svg#node-sites_hq_sw-core">the core switch</a>
+
+<style>
+  #node-sites_hq_sw-core polygon { stroke: #dc2626; stroke-width: 3; }
+</style>
+```
+
+One quirk worth knowing: Graphviz XML-escapes `-` as `&#45;` when it writes an
+`id`, so `grep id=\"node-sites_hq_sw-core\"` over the raw file finds nothing.
+Every XML parser, browser and stylesheet sees the id unescaped; only a text
+search does not.
 
 #### The JSON export
 
@@ -662,7 +768,10 @@ half-typed document never blanks the picture you are working from. Nothing ends
 the loop except Ctrl-C: a syntax error, a deleted root, a `--neighbors-of`
 target that no longer resolves are all statuses, not crashes.
 
-Every filter and display option of `netgraph render` applies here too, plus:
+Every filter and display option of `netgraph render` applies here too —
+`--tooltips`, `--link-template` and `--element-ids` included, which is what
+makes `watch -f svg -o topology.svg` keep an interactive diagram up to date —
+plus:
 
 | Option | Default | Effect |
 |---|---|---|
@@ -725,7 +834,9 @@ room for: every interface with its type, MAC, MTU, addresses and VLAN mode;
 every link that terminates on the element, what it runs to and over which port;
 and, at layer 3, the prefix a subnet node stands for and who is addressed in
 it. Everything it shows is the same data `netgraph render -f json` exports —
-the records *are* that export — so the two cannot drift apart. The element
+the records *are* that export — so the two cannot drift apart, and they are the
+same records a committed SVG carries as
+[tooltips](#interactive-svg-tooltips-links-and-ids). The element
 under the pointer and everything it touches are lifted out of the diagram while
 the box is open; click to pin the box, click again or press `Esc` to let go.
 
@@ -1115,6 +1226,9 @@ src/netgraph/
 ├── render/         graph construction and output renderers
 │   ├── graph.py    inventory -> nodes, edges, VLAN membership, subnets; filtering
 │   ├── dot.py      Graphviz DOT, and the SVG/PNG/PDF it produces
+│   ├── details.py  per-element hover records, and the text a tooltip shows
+│   ├── ids.py      the stable id each drawn node, edge and cluster carries
+│   ├── links.py    --link-template: a URL back to the document behind an element
 │   ├── icons.py    icon themes: a directory of images named after element kinds
 │   ├── iconsets/   the bundled themes; one directory each, SVG and PNG
 │   ├── templates/  the Jinja2 template the DOT document is laid out by
@@ -1128,7 +1242,6 @@ src/netgraph/
 │   └── server.py   the loopback HTTP preview and its self-reloading page
 └── web/            the interactive interface (netgraph web)
     ├── preview.py  one parse -> validate -> render pass over a document stream
-    ├── details.py  the info-box records, keyed by the id each drawn element carries
     ├── svgdoc.py   the Graphviz SVG made safe to embed in a live page
     ├── server.py   five routes over all of it
     └── assets/     the page, its style sheet and its dependency-free client

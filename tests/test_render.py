@@ -698,9 +698,9 @@ def test_an_interface_with_many_addresses_is_abbreviated(tmp_path: Path) -> None
     )
     inventory = load_tree(tmp_path)
     assert inventory.errors == []
-    block = _node_block(to_dot(build_graph(inventory), RenderOptions(max_addresses=2)), "srv")
-    assert "10.0.0.1/24, 10.0.0.2/24, (+4 more)" in block
-    assert "10.0.0.5/24" not in block
+    label = _node_label(to_dot(build_graph(inventory), RenderOptions(max_addresses=2)), "srv")
+    assert "10.0.0.1/24, 10.0.0.2/24, (+4 more)" in label
+    assert "10.0.0.5/24" not in label
 
 
 def test_a_run_of_vlans_is_drawn_as_a_range(tmp_path: Path) -> None:
@@ -920,6 +920,27 @@ def _outside_quoted_strings(line: str) -> str:
     return "".join(out)
 
 
+def test_a_tooltip_escapes_the_same_name_the_label_does(tmp_path: Path) -> None:
+    """The hover text is a second copy of the name, in the other escaping context.
+
+    A tooltip is a DOT quoted string, so it takes backslash escapes where the
+    record label takes entities. ``tests/test_interactive.py`` asserts the rest
+    of what a tooltip carries; this is the escaping, next to the label's.
+    """
+    source = render_dot(_hostile_graph(tmp_path))
+    tooltips = re.findall(r'\btooltip="((?:[^"\\]|\\.)*)"', source)
+    assert tooltips, "every node and edge carries one"
+
+    hostile = [text for text in tooltips if "quoted" in text]
+    assert hostile, "the hostile name reaches the tooltip"
+    for text in hostile:
+        # Quotes escaped, backslash doubled exactly once, no real newline.
+        assert r"\"quoted\"" in text
+        assert r"back\\slash" in text
+        assert r"back\\\slash" not in text
+        assert "\n" not in text
+
+
 def test_graphviz_parses_a_diagram_whose_device_names_carry_quotes_and_braces(
     tmp_path: Path,
 ) -> None:
@@ -968,15 +989,16 @@ def _html_hostile_graph(tmp_path: Path) -> Graph:
 def test_a_record_label_escapes_markup_rather_than_embedding_it(tmp_path: Path) -> None:
     """An inventory name must not be able to inject HTML-like label syntax."""
     source = to_dot(_html_hostile_graph(tmp_path))
+    label = _node_label(source, "srv")
 
     # The dangerous characters survive as entities, so the text is preserved …
-    assert "&lt;/TD&gt;&lt;/TR&gt;&lt;/TABLE&gt;" in source
-    assert "a&amp;b&#34;c" in source
+    assert "&lt;/TD&gt;&lt;/TR&gt;&lt;/TABLE&gt;" in label
+    assert "a&amp;b&#34;c" in label
     # … and never as markup: the label opens and closes exactly one table, and
     # the only <B> is the one this renderer emits for the node's own name.
-    assert source.count("<TABLE") == source.count("</TABLE>") == 1
-    assert source.count("<B>") == source.count("</B>") == 1
-    assert "<B>injected</B>" not in source
+    assert label.count("<TABLE") == label.count("</TABLE>") == 1
+    assert label.count("<B>") == label.count("</B>") == 1
+    assert "<B>injected</B>" not in label
     # The label terminator must not appear early either.
     assert source.count(">];") == 1
 
@@ -1018,12 +1040,12 @@ def test_show_flags_control_what_a_label_carries(home_lab: Inventory) -> None:
     assert "192.168.10.20/24" in full
     # Assert on the node's own record label, not merely on an edge tooltip:
     # both flags have to reach the interface rows.
-    stripped = _node_block(bare, "hosts/pc-desk")
-    detailed = _node_block(full, "hosts/pc-desk")
+    stripped = _node_label(bare, "hosts/pc-desk")
+    detailed = _node_label(full, "hosts/pc-desk")
     assert "192.168.10.20/24" not in stripped
     assert "192.168.10.20/24" in detailed
-    assert "vlan 10" not in _node_block(bare, "switches/sw-home")
-    assert "vlan 10" in _node_block(full, "switches/sw-home")
+    assert "vlan 10" not in _node_label(bare, "switches/sw-home")
+    assert "vlan 10" in _node_label(full, "switches/sw-home")
     # An interface row exists only when it has something to say.
     assert "eno1" not in stripped
     assert "eno1" in detailed
@@ -1075,8 +1097,7 @@ def test_at_layer_3_the_addresses_move_from_the_nodes_onto_the_edges(
     labels = _edge_labels(routed)
     assert any("192.168.10.20/24" in label for label in labels)
     # The node label of that host no longer repeats its address list.
-    host_line = next(line for line in routed.splitlines() if '"hosts/pc-desk" [' in line)
-    assert "192.168.10.20/24" not in host_line
+    assert "192.168.10.20/24" not in _node_label(routed, "hosts/pc-desk")
     assert "eno1" in routed, "the interface is drawn at the element end of the edge"
 
 
@@ -1090,6 +1111,25 @@ def _node_block(source: str, fqn: str) -> str:
     start = next(index for index, line in enumerate(lines) if line.strip().startswith(f'"{fqn}" ['))
     end = next(index for index in range(start, len(lines)) if lines[index].rstrip().endswith("];"))
     return "\n".join(lines[start : end + 1])
+
+
+def _node_label(source: str, fqn: str) -> str:
+    """The record label of ``fqn`` alone — what the diagram actually draws.
+
+    A node statement also carries a tooltip, and the tooltip deliberately says
+    more than the label does (:mod:`netgraph.render.details`). A test about what
+    is *drawn* has to look at the label, or it passes on the strength of hover
+    text nobody can see in a PNG.
+    """
+    block = _node_block(source, fqn)
+    return block.partition("label=<")[2]
+
+
+def _node_tooltip(source: str, fqn: str) -> str:
+    """The ``tooltip="..."`` of ``fqn``, still DOT-escaped."""
+    match = re.search(r'\btooltip="((?:[^"\\]|\\.)*)"', _node_block(source, fqn))
+    assert match is not None, f"{fqn} carries no tooltip"
+    return match.group(1)
 
 
 def test_dot_draws_a_subnet_in_its_own_shape_and_palette(home_lab: Inventory) -> None:

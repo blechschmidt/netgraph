@@ -10,11 +10,16 @@
   ``&gt;``, ``&#34;`` and ``&#39;`` and renders the literal characters, so an
   inventory name cannot close a ``<TD>`` or the label itself.
 
-  The other context is a DOT quoted string — node ids, tooltips, cluster and
-  edge labels. Those go through ``| dot_string``, which adds the surrounding
-  quotes *and* the backslash escapes and returns Markup so autoescape leaves it
-  alone. Forgetting the filter is a loud failure rather than a quiet hole: the
-  quotes go missing and Graphviz rejects the file.
+  The other context is a DOT quoted string — node ids, element ids, tooltips,
+  URLs, cluster and edge labels. Those go through ``| dot_string``, which adds
+  the surrounding quotes *and* the backslash escapes and returns Markup so
+  autoescape leaves it alone. Forgetting the filter is a loud failure rather
+  than a quiet hole: the quotes go missing and Graphviz rejects the file.
+
+  A URL is percent-encoded before it ever gets here
+  (``netgraph.render.links``), which is a different job from quoting it: the
+  encoding keeps the *URL* well formed, ``dot_string`` keeps the *document*
+  well formed, and both are needed.
 
   So: inside <TABLE> use ``{{ value }}``; everywhere else use
   ``{{ value | dot_string }}``. Never the other way round.
@@ -26,7 +31,7 @@
   string like any other.
 -#}
 {% macro node_block(node, pad) %}
-{{ pad }}{{ node.id | dot_string }} [{% if node.element_id %}id={{ node.element_id | dot_string }}, {% endif %}shape={{ node.shape }}, fillcolor="{{ node.fill }}", color="{{ node.stroke }}"{% if node.style is not none %}, style="{{ node.style }}"{% endif %}{% if node.tooltip %}, tooltip={{ node.tooltip | dot_string }}{% endif %}, label=<
+{{ pad }}{{ node.id | dot_string }} [{% if node.element_id %}id={{ node.element_id | dot_string }}, {% endif %}shape={{ node.shape }}, fillcolor="{{ node.fill }}", color="{{ node.stroke }}"{% if node.style is not none %}, style="{{ node.style }}"{% endif %}{% if node.tooltip %}, tooltip={{ node.tooltip | dot_string }}{% endif %}{% if node.url %}, URL={{ node.url | dot_string }}{% endif %}, label=<
 {{ pad }}  <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
 {% if node.image %}
 {{ pad }}    <TR><TD COLSPAN="3" FIXEDSIZE="TRUE" WIDTH="{{ icon_width }}" HEIGHT="{{ icon_height }}"><IMG SCALE="TRUE" SRC="{{ node.image }}"/></TD></TR>
@@ -67,7 +72,13 @@ graph netgraph {
 
 {% if group.id %}
   subgraph {{ group.id }} {
+{% if group.element_id %}
+    id={{ group.element_id | dot_string }};
+{% endif %}
     label={{ group.label | dot_string }};
+{% if group.tooltip %}
+    tooltip={{ group.tooltip | dot_string }};
+{% endif %}
     style=rounded;
     color="#9ca3af";
     fontcolor="#4b5563";
@@ -87,7 +98,7 @@ graph netgraph {
 {% if edges %}
 
 {% for edge in edges %}
-  {{ edge.source | dot_string }} -- {{ edge.target | dot_string }} [{% if edge.element_id %}id={{ edge.element_id | dot_string }}, {% endif %}color="{{ edge.color }}", style={{ edge.style }}{% if edge.penwidth %}, penwidth={{ edge.penwidth }}{% endif %}{% if edge.label %}, label={{ edge.label | dot_string }}{% endif %}, tooltip={{ edge.tooltip | dot_string }}];
+  {{ edge.source | dot_string }} -- {{ edge.target | dot_string }} [{% if edge.element_id %}id={{ edge.element_id | dot_string }}, {% endif %}color="{{ edge.color }}", style={{ edge.style }}{% if edge.penwidth %}, penwidth={{ edge.penwidth }}{% endif %}{% if edge.label %}, label={{ edge.label | dot_string }}{% endif %}{% if edge.tooltip %}, tooltip={{ edge.tooltip | dot_string }}{% endif %}{% if edge.url %}, URL={{ edge.url | dot_string }}{% endif %}];
 {% endfor %}
 {% endif %}
 }

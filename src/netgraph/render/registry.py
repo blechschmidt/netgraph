@@ -38,6 +38,7 @@ __all__ = [
     "media_type_for",
     "renderer_for",
     "supports_icons",
+    "supports_interaction",
 ]
 
 #: What an unregistered format is served as: a download, never something a
@@ -85,6 +86,11 @@ class Renderer:
     #: Can this backend draw an icon theme? Mermaid and JSON cannot, so a front
     #: end asks the registry rather than testing the format name itself.
     supports_icons: bool = False
+    #: Does this backend carry tooltips, links and element ids into its output?
+    #: True of ``dot``, which writes the attributes, and of ``svg``, which is
+    #: the one laid-out format with somewhere to put them: a PNG and a PDF are
+    #: pictures, and Mermaid and JSON have an interaction model of their own.
+    interactive: bool = False
 
     @property
     def is_text(self) -> bool:
@@ -117,6 +123,7 @@ def _text_renderer(
     advise: Advisor = no_advisories,
     *,
     supports_icons: bool = False,
+    interactive: bool = False,
 ) -> Renderer:
     """A text backend, with its UTF-8 encoding wired up once."""
 
@@ -133,10 +140,13 @@ def _text_renderer(
         to_text=backend,
         advise=advise,
         supports_icons=supports_icons,
+        interactive=interactive,
     )
 
 
-def _image_renderer(name: str, description: str, media_type: str, *, binary: bool) -> Renderer:
+def _image_renderer(
+    name: str, description: str, media_type: str, *, binary: bool, interactive: bool = False
+) -> Renderer:
     """A Graphviz image backend. ``to_image`` validates the format itself."""
     return Renderer(
         name=name,
@@ -146,6 +156,7 @@ def _image_renderer(name: str, description: str, media_type: str, *, binary: boo
         binary=binary,
         to_bytes=partial(to_image, format=name),
         supports_icons=True,
+        interactive=interactive,
     )
 
 
@@ -161,8 +172,15 @@ RENDERERS: Final[Mapping[str, Renderer]] = MappingProxyType(
                 "text/vnd.graphviz; charset=utf-8",
                 to_dot,
                 supports_icons=True,
+                interactive=True,
             ),
-            _image_renderer("svg", "SVG image, via Graphviz", "image/svg+xml", binary=False),
+            _image_renderer(
+                "svg",
+                "SVG image, via Graphviz",
+                "image/svg+xml",
+                binary=False,
+                interactive=True,
+            ),
             _image_renderer("png", "PNG image, via Graphviz", "image/png", binary=True),
             _image_renderer("pdf", "PDF document, via Graphviz", "application/pdf", binary=True),
             _text_renderer(
@@ -193,6 +211,17 @@ def supports_icons(format: str) -> bool:
     """
     renderer = RENDERERS.get(format)
     return renderer is not None and renderer.supports_icons
+
+
+def supports_interaction(format: str) -> bool:
+    """Would ``format`` carry tooltips, links and element ids into its output?
+
+    An unknown format answers ``False``, for the same reason
+    :func:`supports_icons` does: the render call that follows is where a bad
+    format name is reported.
+    """
+    renderer = RENDERERS.get(format)
+    return renderer is not None and renderer.interactive
 
 
 def renderer_for(format: str) -> Renderer:

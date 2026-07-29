@@ -12,10 +12,11 @@ Four pieces, each usable on its own:
     render`` pass over a string. It never raises for anything the text can be
     wrong about, and it draws what resolved even when the stream was rejected —
     while it is being typed, most of it is.
-:mod:`~netgraph.web.details`
+:mod:`netgraph.render.details`
     The info-box records, keyed by the id the drawn element carries. They are
     the JSON export, so what a hover says and what ``netgraph render -f json``
-    prints cannot drift apart.
+    prints cannot drift apart — and they live in the renderer rather than here
+    because ``netgraph render -f svg`` puts the same records in its tooltips.
 :mod:`~netgraph.web.svgdoc`
     Turning the Graphviz SVG into a fragment that can be embedded in a live
     page, with everything that could execute or navigate removed.
@@ -30,7 +31,7 @@ diagram, the records and the problems, and no HTTP is involved.
 
 from __future__ import annotations
 
-from netgraph.web.details import DETAIL_OPTIONS, build_details
+from netgraph.render.details import DETAIL_OPTIONS, build_details
 from netgraph.web.preview import (
     MAX_VLAN,
     Preview,

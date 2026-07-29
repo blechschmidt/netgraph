@@ -63,6 +63,7 @@ from typing import Any, Final, TypeVar
 import click
 import click.core
 import yaml
+from click.core import ParameterSource
 
 from netgraph import __version__
 from netgraph.completion import (
@@ -89,11 +90,13 @@ from netgraph.loader import (
 from netgraph.models import DOCUMENT_KINDS, Element, format_bitrate
 from netgraph.render import (
     FORMATS,
+    LINK_FIELDS,
     RENDERERS,
     FilterSpec,
     Graph,
     IconTheme,
     Layer,
+    LinkTemplate,
     RenderOptions,
     UnknownElementError,
     advisories_for,
@@ -104,6 +107,7 @@ from netgraph.render import (
     render,
     resolve_tunnels,
     supports_icons,
+    supports_interaction,
     theme_choices,
 )
 from netgraph.render.dot import DOT_EXECUTABLE
@@ -418,6 +422,24 @@ def _resolve_icons(
         raise click.BadParameter(str(exc), ctx=ctx, param=param) from exc
 
 
+def _resolve_link_template(
+    ctx: click.Context, param: click.Parameter, value: str | None
+) -> LinkTemplate | None:
+    """``--link-template``: a URL with ``{file}``, ``{line}`` … in it.
+
+    Validated in a callback, like ``--icons``, so a placeholder that does not
+    exist is reported as a usage error — with the known ones listed — before an
+    inventory is loaded and long before a diagram full of broken links is
+    written to a file.
+    """
+    if value is None:
+        return None
+    try:
+        return LinkTemplate.parse(value)
+    except RenderError as exc:
+        raise click.BadParameter(str(exc), ctx=ctx, param=param) from exc
+
+
 #: The filter and display options ``render`` and ``watch`` have in common,
 #: listed in the order they should appear in ``--help``. They are applied by
 #: :func:`_graph_options` rather than repeated on both commands: two copies of
@@ -507,6 +529,35 @@ _GRAPH_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
             "and the elements addressed in them."
         ),
     ),
+    click.option(
+        "--tooltips/--no-tooltips",
+        default=True,
+        show_default=True,
+        help=(
+            "Carry the full detail of each element — interfaces, addresses, VLANs, cabling — "
+            "as hover text. Reaches a reader in svg output; png and pdf have nowhere to put it."
+        ),
+    ),
+    click.option(
+        "--link-template",
+        callback=_resolve_link_template,
+        default=None,
+        metavar="URL",
+        help=(
+            "Link each element back to the YAML that declares it, e.g. "
+            "'https://git.example.com/net/blob/main/{file}#L{line}'. Placeholders: "
+            f"{', '.join('{' + field + '}' for field in LINK_FIELDS)}. dot and svg only."
+        ),
+    ),
+    click.option(
+        "--element-ids",
+        is_flag=True,
+        default=False,
+        help=(
+            "Give every node, edge and namespace a stable id derived from its name, so the "
+            "diagram can be deep-linked and styled from outside. dot and svg only."
+        ),
+    ),
     click.option("--title", default=None, metavar="TEXT", help="Caption for the diagram."),
     click.option("--strict", is_flag=True, default=False, help="Treat warnings as errors."),
     click.option(
@@ -564,6 +615,9 @@ def _render_options(params: Mapping[str, Any]) -> RenderOptions:
         group_by_namespace=params["group_by_namespace"],
         title=params["title"],
         icons=params["icons"],
+        tooltips=params["tooltips"],
+        link_template=params["link_template"],
+        element_ids=params["element_ids"],
     )
 
 
@@ -631,6 +685,7 @@ def render_command(
 
     options = _render_options(params)
     _report_icon_support(console, output_format, options)
+    _report_interaction_support(ctx, console, output_format, options)
     payload = render(graph, output_format, options)
     _write_output(console, payload, output=output, output_format=output_format)
     console.info(
@@ -689,6 +744,36 @@ def _report_icon_support(console: Console, output_format: str, options: RenderOp
     console.warn(
         f"--icons is ignored for {output_format} output, which has no picture to put an "
         f"icon in; the formats that draw icons are {drawn}"
+    )
+
+
+def _report_interaction_support(
+    ctx: click.Context, console: Console, output_format: str, options: RenderOptions
+) -> None:
+    """Say so when a diagram was asked to carry more than this format can.
+
+    Only what the user actually *typed* is reported. ``--tooltips`` is on by
+    default, so warning that a PNG has no tooltips on every raster render would
+    train the reader to ignore the warnings that matter.
+    """
+    if supports_interaction(output_format):
+        return
+    asked = [
+        option
+        for option, wanted, parameter in (
+            ("--tooltips", options.tooltips, "tooltips"),
+            ("--link-template", options.link_template is not None, "link_template"),
+            ("--element-ids", options.element_ids, "element_ids"),
+        )
+        if wanted and ctx.get_parameter_source(parameter) is ParameterSource.COMMANDLINE
+    ]
+    if not asked:
+        return
+    carried = ", ".join(name for name in FORMATS if supports_interaction(name))
+    console.warn(
+        f"{', '.join(asked)} {'is' if len(asked) == 1 else 'are'} ignored for {output_format} "
+        f"output, which carries no tooltips, links or element ids; "
+        f"the formats that do are {carried}"
     )
 
 
@@ -841,6 +926,7 @@ def watch_command(
 
     options = _render_options(params)
     _report_icon_support(console, output_format, options)
+    _report_interaction_support(ctx, console, output_format, options)
     request = RenderRequest(
         inventory=app.inventory,
         output_format=output_format,

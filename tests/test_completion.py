@@ -121,6 +121,18 @@ def test_watch_completes_the_same_formats() -> None:
     assert values(["watch", "--format"]) == list(FORMATS)
 
 
+@pytest.mark.parametrize("command", ["render", "watch"])
+def test_the_interaction_flags_are_offered_by_both_commands(command: str) -> None:
+    """``render`` and ``watch`` share one option set, so completion must agree."""
+    offered = values([command], "--")
+    for option in ("--tooltips", "--no-tooltips", "--link-template", "--element-ids"):
+        assert option in offered, f"{option} is missing from '{command}' completion"
+
+
+def test_a_prefix_narrows_to_the_link_flag() -> None:
+    assert values(["render"], "--link") == ["--link-template"]
+
+
 def test_layers_come_from_the_enum_and_say_what_they_draw() -> None:
     items = complete(["render", "--layer"])
     assert [item.value for item in items] == ["l1", "l2", "l3", "overlay"]

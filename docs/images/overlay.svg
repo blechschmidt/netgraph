@@ -11,29 +11,41 @@
 <polygon fill="white" stroke="transparent" points="-4,4 -4,-759.65 1296.54,-759.65 1296.54,4 -4,4"/>
 <text text-anchor="middle" x="646.27" y="-738.85" font-family="Helvetica,Arial,sans-serif" font-size="16.00">overlay — encapsulation</text>
 <g id="clust1" class="cluster">
-<title>cluster_0</title>
+<title>namespace sites/branch&#45;a&#10;1 element: 1 router</title>
+<g id="a_clust1"><a xlink:title="namespace sites/branch&#45;a&#10;1 element: 1 router">
 <path fill="none" stroke="#9ca3af" d="M1032.54,-479.65C1032.54,-479.65 1272.54,-479.65 1272.54,-479.65 1278.54,-479.65 1284.54,-485.65 1284.54,-491.65 1284.54,-491.65 1284.54,-657.65 1284.54,-657.65 1284.54,-663.65 1278.54,-669.65 1272.54,-669.65 1272.54,-669.65 1032.54,-669.65 1032.54,-669.65 1026.54,-669.65 1020.54,-663.65 1020.54,-657.65 1020.54,-657.65 1020.54,-491.65 1020.54,-491.65 1020.54,-485.65 1026.54,-479.65 1032.54,-479.65"/>
 <text text-anchor="middle" x="1062.54" y="-656.85" font-family="Helvetica,Arial,sans-serif" font-size="11.00" fill="#4b5563">sites/branch&#45;a</text>
+</a>
+</g>
 </g>
 <g id="clust2" class="cluster">
-<title>cluster_1</title>
+<title>namespace sites/branch&#45;b&#10;2 elements: 1 computer, 1 router&#10;vlans: 100</title>
+<g id="a_clust2"><a xlink:title="namespace sites/branch&#45;b&#10;2 elements: 1 computer, 1 router&#10;vlans: 100">
 <path fill="none" stroke="#9ca3af" d="M90.54,-440.65C90.54,-440.65 596.54,-440.65 596.54,-440.65 602.54,-440.65 608.54,-446.65 608.54,-452.65 608.54,-452.65 608.54,-696.65 608.54,-696.65 608.54,-702.65 602.54,-708.65 596.54,-708.65 596.54,-708.65 90.54,-708.65 90.54,-708.65 84.54,-708.65 78.54,-702.65 78.54,-696.65 78.54,-696.65 78.54,-452.65 78.54,-452.65 78.54,-446.65 84.54,-440.65 90.54,-440.65"/>
 <text text-anchor="middle" x="120.54" y="-695.85" font-family="Helvetica,Arial,sans-serif" font-size="11.00" fill="#4b5563">sites/branch&#45;b</text>
+</a>
+</g>
 </g>
 <g id="clust3" class="cluster">
-<title>cluster_2</title>
+<title>namespace sites/hq&#10;1 element: 1 router&#10;vlans: 100</title>
+<g id="a_clust3"><a xlink:title="namespace sites/hq&#10;1 element: 1 router&#10;vlans: 100">
 <path fill="none" stroke="#9ca3af" d="M658.54,-427.65C658.54,-427.65 996.54,-427.65 996.54,-427.65 1002.54,-427.65 1008.54,-433.65 1008.54,-439.65 1008.54,-439.65 1008.54,-709.65 1008.54,-709.65 1008.54,-715.65 1002.54,-721.65 996.54,-721.65 996.54,-721.65 658.54,-721.65 658.54,-721.65 652.54,-721.65 646.54,-715.65 646.54,-709.65 646.54,-709.65 646.54,-439.65 646.54,-439.65 646.54,-433.65 652.54,-427.65 658.54,-427.65"/>
 <text text-anchor="middle" x="673.04" y="-708.85" font-family="Helvetica,Arial,sans-serif" font-size="11.00" fill="#4b5563">sites/hq</text>
+</a>
+</g>
 </g>
 <g id="clust4" class="cluster">
-<title>cluster_3</title>
+<title>namespace tunnels&#10;5 elements: 5 tunnels</title>
+<g id="a_clust4"><a xlink:title="namespace tunnels&#10;5 elements: 5 tunnels">
 <path fill="none" stroke="#9ca3af" d="M70.54,-8C70.54,-8 1127.54,-8 1127.54,-8 1133.54,-8 1139.54,-14 1139.54,-20 1139.54,-20 1139.54,-358.65 1139.54,-358.65 1139.54,-364.65 1133.54,-370.65 1127.54,-370.65 1127.54,-370.65 70.54,-370.65 70.54,-370.65 64.54,-370.65 58.54,-364.65 58.54,-358.65 58.54,-358.65 58.54,-20 58.54,-20 58.54,-14 64.54,-8 70.54,-8"/>
 <text text-anchor="middle" x="84.04" y="-357.85" font-family="Helvetica,Arial,sans-serif" font-size="11.00" fill="#4b5563">tunnels</text>
+</a>
+</g>
 </g>
 <!-- sites/branch&#45;a/rtr&#45;branch&#45;a -->
 <g id="node1" class="node">
-<title>sites/branch&#45;a/rtr&#45;branch&#45;a</title>
-<g id="a_node1"><a xlink:title="Branch A edge router. Mesh member only.">
+<title>rtr&#45;branch&#45;a [router]&#10;namespace: sites/branch&#45;a&#10;Branch A edge router. Mesh member only.&#10;labels: role=edge, site=branch&#45;a&#10;interfaces (3):&#10; &#160;ether1 &#160;ethernet &#160;198.51.100.6/30&#10; &#160;ether2 &#160;ethernet &#160;10.20.0.1/24&#10; &#160;wg0 &#160;tunnel &#160;10.255.0.2/24&#10;links (1):&#10; &#160;wg0 — tunnel:tunnels/wg&#45;mesh &#160;(tunnel, wireguard)</title>
+<g id="a_node1"><a xlink:title="rtr&#45;branch&#45;a [router]&#10;namespace: sites/branch&#45;a&#10;Branch A edge router. Mesh member only.&#10;labels: role=edge, site=branch&#45;a&#10;interfaces (3):&#10; &#160;ether1 &#160;ethernet &#160;198.51.100.6/30&#10; &#160;ether2 &#160;ethernet &#160;10.20.0.1/24&#10; &#160;wg0 &#160;tunnel &#160;10.255.0.2/24&#10;links (1):&#10; &#160;wg0 — tunnel:tunnels/wg&#45;mesh &#160;(tunnel, wireguard)">
 <polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="1152.54,-637.65 1032.54,-564.65 1152.54,-491.65 1272.54,-564.65 1152.54,-637.65"/>
 <text text-anchor="start" x="1125.04" y="-588.65" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr&#45;branch&#45;a</text>
 <text text-anchor="start" x="1137.04" y="-574.65" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
@@ -48,8 +60,8 @@
 </g>
 <!-- tunnel:tunnels/wg&#45;mesh -->
 <g id="node5" class="node">
-<title>tunnel:tunnels/wg&#45;mesh</title>
-<g id="a_node5"><a xlink:title="tunnel: tunnels/wg&#45;mesh, type: wireguard, transport: udp/51820, encrypted: chacha20&#45;poly1305, auth: public&#45;key, mtu: 1420 (overhead 80 B)">
+<title>wg&#45;mesh [wireguard tunnel]&#10;namespace: tunnels&#10;Full mesh between the three sites.&#10;labels: role=transit&#10;stack: wireguard&#10;transport udp/51820, encrypted: chacha20&#45;poly1305, auth public&#45;key, mtu 1420 (overhead 80 B)&#10;endpoints (3):&#10; &#160;sites/branch&#45;a/rtr&#45;branch&#45;a:wg0&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:wg0&#10; &#160;sites/hq/rtr&#45;hq:wg0&#10;links (3):&#10; &#160;sites/branch&#45;a/rtr&#45;branch&#45;a:wg0 &#160;(tunnel, wireguard)&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:wg0 &#160;(tunnel, wireguard)&#10; &#160;sites/hq/rtr&#45;hq:wg0 &#160;(tunnel, wireguard)</title>
+<g id="a_node5"><a xlink:title="wg&#45;mesh [wireguard tunnel]&#10;namespace: tunnels&#10;Full mesh between the three sites.&#10;labels: role=transit&#10;stack: wireguard&#10;transport udp/51820, encrypted: chacha20&#45;poly1305, auth public&#45;key, mtu 1420 (overhead 80 B)&#10;endpoints (3):&#10; &#160;sites/branch&#45;a/rtr&#45;branch&#45;a:wg0&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:wg0&#10; &#160;sites/hq/rtr&#45;hq:wg0&#10;links (3):&#10; &#160;sites/branch&#45;a/rtr&#45;branch&#45;a:wg0 &#160;(tunnel, wireguard)&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:wg0 &#160;(tunnel, wireguard)&#10; &#160;sites/hq/rtr&#45;hq:wg0 &#160;(tunnel, wireguard)">
 <polygon fill="#ede9fe" stroke="#6d28d9" stroke-width="1.2" stroke-dasharray="5,2" points="1127.81,-268.43 1088.68,-338.87 1010.41,-338.87 971.28,-268.43 1010.41,-197.99 1088.68,-197.99 1127.81,-268.43"/>
 <text text-anchor="start" x="1028.04" y="-299.43" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">wg&#45;mesh</text>
 <text text-anchor="start" x="1010.54" y="-285.43" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[wireguard tunnel]</text>
@@ -65,8 +77,8 @@
 </g>
 <!-- sites/branch&#45;a/rtr&#45;branch&#45;a&#45;&#45;tunnel:tunnels/wg&#45;mesh -->
 <g id="edge1" class="edge">
-<title>sites/branch&#45;a/rtr&#45;branch&#45;a&#45;&#45;tunnel:tunnels/wg&#45;mesh</title>
-<g id="a_edge1"><a xlink:title="tunnel: tunnels/wg&#45;mesh, type: wireguard, transport: udp/51820, encrypted: chacha20&#45;poly1305, auth: public&#45;key, mtu: 1420 (overhead 80 B)">
+<title>tunnel tunnels/wg&#45;mesh#sites/branch&#45;a/rtr&#45;branch&#45;a:wg0&#10;sites/branch&#45;a/rtr&#45;branch&#45;a:wg0 — tunnel:tunnels/wg&#45;mesh&#10;stack: wireguard&#10;transport udp/51820, encrypted: chacha20&#45;poly1305, auth public&#45;key, mtu 1420 (overhead 80 B)&#10;endpoints (3):&#10; &#160;sites/branch&#45;a/rtr&#45;branch&#45;a:wg0&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:wg0&#10; &#160;sites/hq/rtr&#45;hq:wg0</title>
+<g id="a_edge1"><a xlink:title="tunnel tunnels/wg&#45;mesh#sites/branch&#45;a/rtr&#45;branch&#45;a:wg0&#10;sites/branch&#45;a/rtr&#45;branch&#45;a:wg0 — tunnel:tunnels/wg&#45;mesh&#10;stack: wireguard&#10;transport udp/51820, encrypted: chacha20&#45;poly1305, auth public&#45;key, mtu 1420 (overhead 80 B)&#10;endpoints (3):&#10; &#160;sites/branch&#45;a/rtr&#45;branch&#45;a:wg0&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:wg0&#10; &#160;sites/hq/rtr&#45;hq:wg0">
 <path fill="none" stroke="#6d28d9" stroke-dasharray="5,2" d="M1131.7,-504.11C1114.95,-456.25 1091.39,-388.96 1073.79,-338.69"/>
 </a>
 </g>
@@ -76,8 +88,8 @@
 </g>
 <!-- sites/branch&#45;b/pc&#45;branch&#45;b -->
 <g id="node2" class="node">
-<title>sites/branch&#45;b/pc&#45;branch&#45;b</title>
-<g id="a_node2"><a xlink:title="Administrator&#39;s workstation. Dials into HQ over OpenVPN.">
+<title>pc&#45;branch&#45;b [computer]&#10;namespace: sites/branch&#45;b&#10;Administrator&#39;s workstation. Dials into HQ over OpenVPN.&#10;labels: site=branch&#45;b&#10;interfaces (2):&#10; &#160;enp3s0 &#160;ethernet &#160;10.30.0.10/24&#10; &#160;tun0 &#160;tunnel &#160;10.253.0.10/24&#10;links (1):&#10; &#160;tun0 — tunnel:tunnels/ovpn&#45;admin &#160;(tunnel, openvpn)</title>
+<g id="a_node2"><a xlink:title="pc&#45;branch&#45;b [computer]&#10;namespace: sites/branch&#45;b&#10;Administrator&#39;s workstation. Dials into HQ over OpenVPN.&#10;labels: site=branch&#45;b&#10;interfaces (2):&#10; &#160;enp3s0 &#160;ethernet &#160;10.30.0.10/24&#10; &#160;tun0 &#160;tunnel &#160;10.253.0.10/24&#10;links (1):&#10; &#160;tun0 — tunnel:tunnels/ovpn&#45;admin &#160;(tunnel, openvpn)">
 <polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="596.04,-594.65 477.04,-594.65 477.04,-534.65 596.04,-534.65 596.04,-594.65"/>
 <text text-anchor="start" x="509.04" y="-582.65" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">pc&#45;branch&#45;b</text>
 <text text-anchor="start" x="513.54" y="-568.65" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
@@ -90,8 +102,8 @@
 </g>
 <!-- tunnel:tunnels/ovpn&#45;admin -->
 <g id="node9" class="node">
-<title>tunnel:tunnels/ovpn&#45;admin</title>
-<g id="a_node9"><a xlink:title="tunnel: tunnels/ovpn&#45;admin, type: openvpn, transport: udp/1194, encrypted: aes&#45;256&#45;gcm, auth: certificate, mtu: 1431 (overhead 69 B)">
+<title>ovpn&#45;admin [openvpn tunnel]&#10;namespace: tunnels&#10;Remote access from the administrator&#39;s workstation to HQ.&#10;stack: openvpn&#10;transport udp/1194, encrypted: aes&#45;256&#45;gcm, auth certificate, mtu 1431 (overhead 69 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/pc&#45;branch&#45;b:tun0&#10; &#160;sites/hq/rtr&#45;hq:ovpn0&#10;links (2):&#10; &#160;sites/branch&#45;b/pc&#45;branch&#45;b:tun0 &#160;(tunnel, openvpn)&#10; &#160;sites/hq/rtr&#45;hq:ovpn0 &#160;(tunnel, openvpn)</title>
+<g id="a_node9"><a xlink:title="ovpn&#45;admin [openvpn tunnel]&#10;namespace: tunnels&#10;Remote access from the administrator&#39;s workstation to HQ.&#10;stack: openvpn&#10;transport udp/1194, encrypted: aes&#45;256&#45;gcm, auth certificate, mtu 1431 (overhead 69 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/pc&#45;branch&#45;b:tun0&#10; &#160;sites/hq/rtr&#45;hq:ovpn0&#10;links (2):&#10; &#160;sites/branch&#45;b/pc&#45;branch&#45;b:tun0 &#160;(tunnel, openvpn)&#10; &#160;sites/hq/rtr&#45;hq:ovpn0 &#160;(tunnel, openvpn)">
 <polygon fill="#ede9fe" stroke="#6d28d9" stroke-width="1.2" stroke-dasharray="5,2" points="934.98,-268.43 893.76,-328.14 811.33,-328.14 770.11,-268.43 811.33,-208.72 893.76,-208.72 934.98,-268.43"/>
 <text text-anchor="start" x="825.04" y="-292.43" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">ovpn&#45;admin</text>
 <text text-anchor="start" x="816.54" y="-278.43" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[openvpn tunnel]</text>
@@ -105,8 +117,8 @@
 </g>
 <!-- sites/branch&#45;b/pc&#45;branch&#45;b&#45;&#45;tunnel:tunnels/ovpn&#45;admin -->
 <g id="edge12" class="edge">
-<title>sites/branch&#45;b/pc&#45;branch&#45;b&#45;&#45;tunnel:tunnels/ovpn&#45;admin</title>
-<g id="a_edge12"><a xlink:title="tunnel: tunnels/ovpn&#45;admin, type: openvpn, transport: udp/1194, encrypted: aes&#45;256&#45;gcm, auth: certificate, mtu: 1431 (overhead 69 B)">
+<title>tunnel tunnels/ovpn&#45;admin#sites/branch&#45;b/pc&#45;branch&#45;b:tun0&#10;sites/branch&#45;b/pc&#45;branch&#45;b:tun0 — tunnel:tunnels/ovpn&#45;admin&#10;stack: openvpn&#10;transport udp/1194, encrypted: aes&#45;256&#45;gcm, auth certificate, mtu 1431 (overhead 69 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/pc&#45;branch&#45;b:tun0&#10; &#160;sites/hq/rtr&#45;hq:ovpn0</title>
+<g id="a_edge12"><a xlink:title="tunnel tunnels/ovpn&#45;admin#sites/branch&#45;b/pc&#45;branch&#45;b:tun0&#10;sites/branch&#45;b/pc&#45;branch&#45;b:tun0 — tunnel:tunnels/ovpn&#45;admin&#10;stack: openvpn&#10;transport udp/1194, encrypted: aes&#45;256&#45;gcm, auth certificate, mtu 1431 (overhead 69 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/pc&#45;branch&#45;b:tun0&#10; &#160;sites/hq/rtr&#45;hq:ovpn0">
 <path fill="none" stroke="#6d28d9" stroke-dasharray="5,2" d="M524.72,-534.4C510.39,-493.58 492.74,-419.92 532.54,-378.65 549.52,-361.04 730.15,-380.48 752.54,-370.65 774.48,-361.01 794.15,-344.14 810.12,-326.91"/>
 </a>
 </g>
@@ -115,8 +127,8 @@
 </g>
 <!-- sites/branch&#45;b/rtr&#45;branch&#45;b -->
 <g id="node3" class="node">
-<title>sites/branch&#45;b/rtr&#45;branch&#45;b</title>
-<g id="a_node3"><a xlink:title="Branch B edge router. Mesh member, and the far end of the IPsec stack.">
+<title>rtr&#45;branch&#45;b [router]&#10;namespace: sites/branch&#45;b&#10;Branch B edge router. Mesh member, and the far end of the IPsec stack.&#10;labels: role=edge, site=branch&#45;b&#10;vlans: 100&#10;interfaces (6):&#10; &#160;ether1 &#160;ethernet &#160;198.51.100.10/30&#10; &#160;ether2 &#160;ethernet &#160;10.30.0.1/24&#10; &#160;wg0 &#160;tunnel &#160;10.255.0.3/24&#10; &#160;ipsec0 &#160;tunnel &#160;10.254.0.2/30&#10; &#160;vxlan100 &#160;tunnel &#160;vlan 100 (access)&#10; &#160;gre1 &#160;tunnel &#160;10.252.0.2/30&#10;links (4):&#10; &#160;wg0 — tunnel:tunnels/wg&#45;mesh &#160;(tunnel, wireguard)&#10; &#160;ipsec0 — tunnel:tunnels/ipsec&#45;hq&#45;b &#160;(tunnel, ipsec)&#10; &#160;vxlan100 — tunnel:tunnels/vx&#45;100 &#160;(tunnel, vxlan over ipsec)&#10; &#160;gre1 — tunnel:tunnels/gre&#45;mgmt &#160;(tunnel, gre over ipsec)</title>
+<g id="a_node3"><a xlink:title="rtr&#45;branch&#45;b [router]&#10;namespace: sites/branch&#45;b&#10;Branch B edge router. Mesh member, and the far end of the IPsec stack.&#10;labels: role=edge, site=branch&#45;b&#10;vlans: 100&#10;interfaces (6):&#10; &#160;ether1 &#160;ethernet &#160;198.51.100.10/30&#10; &#160;ether2 &#160;ethernet &#160;10.30.0.1/24&#10; &#160;wg0 &#160;tunnel &#160;10.255.0.3/24&#10; &#160;ipsec0 &#160;tunnel &#160;10.254.0.2/30&#10; &#160;vxlan100 &#160;tunnel &#160;vlan 100 (access)&#10; &#160;gre1 &#160;tunnel &#160;10.252.0.2/30&#10;links (4):&#10; &#160;wg0 — tunnel:tunnels/wg&#45;mesh &#160;(tunnel, wireguard)&#10; &#160;ipsec0 — tunnel:tunnels/ipsec&#45;hq&#45;b &#160;(tunnel, ipsec)&#10; &#160;vxlan100 — tunnel:tunnels/vx&#45;100 &#160;(tunnel, vxlan over ipsec)&#10; &#160;gre1 — tunnel:tunnels/gre&#45;mgmt &#160;(tunnel, gre over ipsec)">
 <polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="265.54,-676.65 90.54,-564.65 265.54,-452.65 440.54,-564.65 265.54,-676.65"/>
 <text text-anchor="start" x="238.54" y="-608.65" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr&#45;branch&#45;b</text>
 <text text-anchor="start" x="250.54" y="-594.65" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
@@ -137,8 +149,8 @@
 </g>
 <!-- sites/branch&#45;b/rtr&#45;branch&#45;b&#45;&#45;tunnel:tunnels/wg&#45;mesh -->
 <g id="edge2" class="edge">
-<title>sites/branch&#45;b/rtr&#45;branch&#45;b&#45;&#45;tunnel:tunnels/wg&#45;mesh</title>
-<g id="a_edge2"><a xlink:title="tunnel: tunnels/wg&#45;mesh, type: wireguard, transport: udp/51820, encrypted: chacha20&#45;poly1305, auth: public&#45;key, mtu: 1420 (overhead 80 B)">
+<title>tunnel tunnels/wg&#45;mesh#sites/branch&#45;b/rtr&#45;branch&#45;b:wg0&#10;sites/branch&#45;b/rtr&#45;branch&#45;b:wg0 — tunnel:tunnels/wg&#45;mesh&#10;stack: wireguard&#10;transport udp/51820, encrypted: chacha20&#45;poly1305, auth public&#45;key, mtu 1420 (overhead 80 B)&#10;endpoints (3):&#10; &#160;sites/branch&#45;a/rtr&#45;branch&#45;a:wg0&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:wg0&#10; &#160;sites/hq/rtr&#45;hq:wg0</title>
+<g id="a_edge2"><a xlink:title="tunnel tunnels/wg&#45;mesh#sites/branch&#45;b/rtr&#45;branch&#45;b:wg0&#10;sites/branch&#45;b/rtr&#45;branch&#45;b:wg0 — tunnel:tunnels/wg&#45;mesh&#10;stack: wireguard&#10;transport udp/51820, encrypted: chacha20&#45;poly1305, auth public&#45;key, mtu 1420 (overhead 80 B)&#10;endpoints (3):&#10; &#160;sites/branch&#45;a/rtr&#45;branch&#45;a:wg0&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:wg0&#10; &#160;sites/hq/rtr&#45;hq:wg0">
 <path fill="none" stroke="#6d28d9" stroke-dasharray="5,2" d="M337.32,-498.19C371.71,-471.03 415.05,-442.44 459.54,-427.65 548.78,-397.97 792.96,-443.28 882.54,-414.65 910.02,-405.86 911.6,-393.12 936.54,-378.65 943.42,-374.66 946.14,-375.36 952.54,-370.65 970.28,-357.58 987.59,-341.1 1002.57,-325.25"/>
 </a>
 </g>
@@ -148,8 +160,8 @@
 </g>
 <!-- tunnel:tunnels/ipsec&#45;hq&#45;b -->
 <g id="node6" class="node">
-<title>tunnel:tunnels/ipsec&#45;hq&#45;b</title>
-<g id="a_node6"><a xlink:title="tunnel: tunnels/ipsec&#45;hq&#45;b, type: ipsec, mode: tunnel, transport: esp, encrypted: aes&#45;256&#45;gcm, auth: certificate, mtu: 1427 (overhead 73 B)">
+<title>ipsec&#45;hq&#45;b [ipsec tunnel]&#10;namespace: tunnels&#10;The encrypted transport branch&#45;b&#39;s overlays ride inside.&#10;labels: role=transit&#10;stack: ipsec&#10;mode tunnel, transport esp, encrypted: aes&#45;256&#45;gcm, auth certificate, mtu 1427 (overhead 73 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:ipsec0&#10; &#160;sites/hq/rtr&#45;hq:ipsec0&#10;links (4):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:ipsec0 &#160;(tunnel, ipsec)&#10; &#160;sites/hq/rtr&#45;hq:ipsec0 &#160;(tunnel, ipsec)&#10; &#160;tunnel:tunnels/vx&#45;100 &#160;(encapsulation, vxlan over ipsec)&#10; &#160;tunnel:tunnels/gre&#45;mgmt &#160;(encapsulation, gre over ipsec)</title>
+<g id="a_node6"><a xlink:title="ipsec&#45;hq&#45;b [ipsec tunnel]&#10;namespace: tunnels&#10;The encrypted transport branch&#45;b&#39;s overlays ride inside.&#10;labels: role=transit&#10;stack: ipsec&#10;mode tunnel, transport esp, encrypted: aes&#45;256&#45;gcm, auth certificate, mtu 1427 (overhead 73 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:ipsec0&#10; &#160;sites/hq/rtr&#45;hq:ipsec0&#10;links (4):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:ipsec0 &#160;(tunnel, ipsec)&#10; &#160;sites/hq/rtr&#45;hq:ipsec0 &#160;(tunnel, ipsec)&#10; &#160;tunnel:tunnels/vx&#45;100 &#160;(encapsulation, vxlan over ipsec)&#10; &#160;tunnel:tunnels/gre&#45;mgmt &#160;(encapsulation, gre over ipsec)">
 <polygon fill="#ede9fe" stroke="#6d28d9" stroke-width="1.2" stroke-dasharray="5,2" points="469.98,-79.6 428.76,-139.31 346.33,-139.31 305.11,-79.6 346.33,-19.9 428.76,-19.9 469.98,-79.6"/>
 <text text-anchor="start" x="363.54" y="-103.6" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">ipsec&#45;hq&#45;b</text>
 <text text-anchor="start" x="358.54" y="-89.6" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipsec tunnel]</text>
@@ -163,8 +175,8 @@
 </g>
 <!-- sites/branch&#45;b/rtr&#45;branch&#45;b&#45;&#45;tunnel:tunnels/ipsec&#45;hq&#45;b -->
 <g id="edge4" class="edge">
-<title>sites/branch&#45;b/rtr&#45;branch&#45;b&#45;&#45;tunnel:tunnels/ipsec&#45;hq&#45;b</title>
-<g id="a_edge4"><a xlink:title="tunnel: tunnels/ipsec&#45;hq&#45;b, type: ipsec, mode: tunnel, transport: esp, encrypted: aes&#45;256&#45;gcm, auth: certificate, mtu: 1427 (overhead 73 B)">
+<title>tunnel tunnels/ipsec&#45;hq&#45;b#sites/branch&#45;b/rtr&#45;branch&#45;b:ipsec0&#10;sites/branch&#45;b/rtr&#45;branch&#45;b:ipsec0 — tunnel:tunnels/ipsec&#45;hq&#45;b&#10;stack: ipsec&#10;mode tunnel, transport esp, encrypted: aes&#45;256&#45;gcm, auth certificate, mtu 1427 (overhead 73 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:ipsec0&#10; &#160;sites/hq/rtr&#45;hq:ipsec0</title>
+<g id="a_edge4"><a xlink:title="tunnel tunnels/ipsec&#45;hq&#45;b#sites/branch&#45;b/rtr&#45;branch&#45;b:ipsec0&#10;sites/branch&#45;b/rtr&#45;branch&#45;b:ipsec0 — tunnel:tunnels/ipsec&#45;hq&#45;b&#10;stack: ipsec&#10;mode tunnel, transport esp, encrypted: aes&#45;256&#45;gcm, auth certificate, mtu 1427 (overhead 73 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:ipsec0&#10; &#160;sites/hq/rtr&#45;hq:ipsec0">
 <path fill="none" stroke="#6d28d9" stroke-dasharray="5,2" d="M170.22,-513.64C118.26,-480.68 58.73,-432.22 29.54,-370.65 -3.28,-301.39 -15.4,-260.28 29.54,-198.21 92.47,-111.31 221.69,-87.48 306.45,-81.58"/>
 </a>
 </g>
@@ -173,8 +185,8 @@
 </g>
 <!-- tunnel:tunnels/vx&#45;100 -->
 <g id="node7" class="node">
-<title>tunnel:tunnels/vx&#45;100</title>
-<g id="a_node7"><a xlink:title="tunnel: tunnels/vx&#45;100, type: vxlan over ipsec, vni: 100, transport: udp/4789, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu: 1377 (overhead 123 B)">
+<title>vx&#45;100 [vxlan tunnel]&#10;namespace: tunnels&#10;VLAN 100 stretched from HQ to branch&#45;b, inside the IPsec tunnel.&#10;stack: vxlan over ipsec&#10;vni 100, transport udp/4789, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1377 (overhead 123 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:vxlan100&#10; &#160;sites/hq/rtr&#45;hq:vxlan100&#10;links (3):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:vxlan100 &#160;(tunnel, vxlan over ipsec)&#10; &#160;sites/hq/rtr&#45;hq:vxlan100 &#160;(tunnel, vxlan over ipsec)&#10; &#160;tunnel:tunnels/ipsec&#45;hq&#45;b &#160;(encapsulation, vxlan over ipsec)</title>
+<g id="a_node7"><a xlink:title="vx&#45;100 [vxlan tunnel]&#10;namespace: tunnels&#10;VLAN 100 stretched from HQ to branch&#45;b, inside the IPsec tunnel.&#10;stack: vxlan over ipsec&#10;vni 100, transport udp/4789, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1377 (overhead 123 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:vxlan100&#10; &#160;sites/hq/rtr&#45;hq:vxlan100&#10;links (3):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:vxlan100 &#160;(tunnel, vxlan over ipsec)&#10; &#160;sites/hq/rtr&#45;hq:vxlan100 &#160;(tunnel, vxlan over ipsec)&#10; &#160;tunnel:tunnels/ipsec&#45;hq&#45;b &#160;(encapsulation, vxlan over ipsec)">
 <polygon fill="#ede9fe" stroke="#6d28d9" stroke-width="1.2" stroke-dasharray="5,2" points="422.77,-268.43 334.66,-338.87 158.43,-338.87 70.32,-268.43 158.43,-197.99 334.66,-197.99 422.77,-268.43"/>
 <text text-anchor="start" x="231.54" y="-299.43" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">vx&#45;100</text>
 <text text-anchor="start" x="217.04" y="-285.43" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[vxlan tunnel]</text>
@@ -189,8 +201,8 @@
 </g>
 <!-- sites/branch&#45;b/rtr&#45;branch&#45;b&#45;&#45;tunnel:tunnels/vx&#45;100 -->
 <g id="edge6" class="edge">
-<title>sites/branch&#45;b/rtr&#45;branch&#45;b&#45;&#45;tunnel:tunnels/vx&#45;100</title>
-<g id="a_edge6"><a xlink:title="tunnel: tunnels/vx&#45;100, type: vxlan over ipsec, vni: 100, transport: udp/4789, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu: 1377 (overhead 123 B)">
+<title>tunnel tunnels/vx&#45;100#sites/branch&#45;b/rtr&#45;branch&#45;b:vxlan100&#10;sites/branch&#45;b/rtr&#45;branch&#45;b:vxlan100 — tunnel:tunnels/vx&#45;100&#10;stack: vxlan over ipsec&#10;vni 100, transport udp/4789, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1377 (overhead 123 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:vxlan100&#10; &#160;sites/hq/rtr&#45;hq:vxlan100</title>
+<g id="a_edge6"><a xlink:title="tunnel tunnels/vx&#45;100#sites/branch&#45;b/rtr&#45;branch&#45;b:vxlan100&#10;sites/branch&#45;b/rtr&#45;branch&#45;b:vxlan100 — tunnel:tunnels/vx&#45;100&#10;stack: vxlan over ipsec&#10;vni 100, transport udp/4789, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1377 (overhead 123 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:vxlan100&#10; &#160;sites/hq/rtr&#45;hq:vxlan100">
 <path fill="none" stroke="#6d28d9" stroke-dasharray="5,2" d="M258.66,-457.01C256.12,-417.71 253.31,-374.22 251.04,-339.02"/>
 </a>
 </g>
@@ -201,8 +213,8 @@
 </g>
 <!-- tunnel:tunnels/gre&#45;mgmt -->
 <g id="node8" class="node">
-<title>tunnel:tunnels/gre&#45;mgmt</title>
-<g id="a_node8"><a xlink:title="tunnel: tunnels/gre&#45;mgmt, type: gre over ipsec, transport: gre, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu: 1403 (overhead 97 B)">
+<title>gre&#45;mgmt [gre tunnel]&#10;namespace: tunnels&#10;Out&#45;of&#45;band management, sharing the IPsec underlay with the VXLAN.&#10;stack: gre over ipsec&#10;transport gre, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1403 (overhead 97 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:gre1&#10; &#160;sites/hq/rtr&#45;hq:gre1&#10;links (3):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:gre1 &#160;(tunnel, gre over ipsec)&#10; &#160;sites/hq/rtr&#45;hq:gre1 &#160;(tunnel, gre over ipsec)&#10; &#160;tunnel:tunnels/ipsec&#45;hq&#45;b &#160;(encapsulation, gre over ipsec)</title>
+<g id="a_node8"><a xlink:title="gre&#45;mgmt [gre tunnel]&#10;namespace: tunnels&#10;Out&#45;of&#45;band management, sharing the IPsec underlay with the VXLAN.&#10;stack: gre over ipsec&#10;transport gre, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1403 (overhead 97 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:gre1&#10; &#160;sites/hq/rtr&#45;hq:gre1&#10;links (3):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:gre1 &#160;(tunnel, gre over ipsec)&#10; &#160;sites/hq/rtr&#45;hq:gre1 &#160;(tunnel, gre over ipsec)&#10; &#160;tunnel:tunnels/ipsec&#45;hq&#45;b &#160;(encapsulation, gre over ipsec)">
 <polygon fill="#ede9fe" stroke="#6d28d9" stroke-width="1.2" stroke-dasharray="5,2" points="734.52,-268.43 665.53,-338.87 527.56,-338.87 458.57,-268.43 527.56,-197.99 665.53,-197.99 734.52,-268.43"/>
 <text text-anchor="start" x="574.04" y="-299.43" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">gre&#45;mgmt</text>
 <text text-anchor="start" x="572.54" y="-285.43" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[gre tunnel]</text>
@@ -217,8 +229,8 @@
 </g>
 <!-- sites/branch&#45;b/rtr&#45;branch&#45;b&#45;&#45;tunnel:tunnels/gre&#45;mgmt -->
 <g id="edge9" class="edge">
-<title>sites/branch&#45;b/rtr&#45;branch&#45;b&#45;&#45;tunnel:tunnels/gre&#45;mgmt</title>
-<g id="a_edge9"><a xlink:title="tunnel: tunnels/gre&#45;mgmt, type: gre over ipsec, transport: gre, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu: 1403 (overhead 97 B)">
+<title>tunnel tunnels/gre&#45;mgmt#sites/branch&#45;b/rtr&#45;branch&#45;b:gre1&#10;sites/branch&#45;b/rtr&#45;branch&#45;b:gre1 — tunnel:tunnels/gre&#45;mgmt&#10;stack: gre over ipsec&#10;transport gre, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1403 (overhead 97 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:gre1&#10; &#160;sites/hq/rtr&#45;hq:gre1</title>
+<g id="a_edge9"><a xlink:title="tunnel tunnels/gre&#45;mgmt#sites/branch&#45;b/rtr&#45;branch&#45;b:gre1&#10;sites/branch&#45;b/rtr&#45;branch&#45;b:gre1 — tunnel:tunnels/gre&#45;mgmt&#10;stack: gre over ipsec&#10;transport gre, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1403 (overhead 97 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:gre1&#10; &#160;sites/hq/rtr&#45;hq:gre1">
 <path fill="none" stroke="#6d28d9" stroke-dasharray="5,2" d="M318.54,-486.3C346.29,-450.07 382.75,-408.44 422.54,-378.65 429.55,-373.4 432.85,-374.82 440.54,-370.65 465.23,-357.26 491.16,-341.28 514.63,-326.02"/>
 </a>
 </g>
@@ -228,8 +240,8 @@
 </g>
 <!-- sites/hq/rtr&#45;hq -->
 <g id="node4" class="node">
-<title>sites/hq/rtr&#45;hq</title>
-<g id="a_node4"><a xlink:title="HQ edge router and overlay hub.">
+<title>rtr&#45;hq [router]&#10;namespace: sites/hq&#10;HQ edge router and overlay hub.&#10;labels: role=edge, site=hq&#10;vlans: 100&#10;interfaces (7):&#10; &#160;eth0 &#160;ethernet &#160;198.51.100.2/30&#10; &#160;eth1 &#160;ethernet &#160;10.10.0.1/24&#10; &#160;wg0 &#160;tunnel &#160;10.255.0.1/24&#10; &#160;ipsec0 &#160;tunnel &#160;10.254.0.1/30&#10; &#160;vxlan100 &#160;tunnel &#160;vlan 100 (access)&#10; &#160;gre1 &#160;tunnel &#160;10.252.0.1/30&#10; &#160;ovpn0 &#160;tunnel &#160;10.253.0.1/24&#10;links (5):&#10; &#160;wg0 — tunnel:tunnels/wg&#45;mesh &#160;(tunnel, wireguard)&#10; &#160;ipsec0 — tunnel:tunnels/ipsec&#45;hq&#45;b &#160;(tunnel, ipsec)&#10; &#160;vxlan100 — tunnel:tunnels/vx&#45;100 &#160;(tunnel, vxlan over ipsec)&#10; &#160;gre1 — tunnel:tunnels/gre&#45;mgmt &#160;(tunnel, gre over ipsec)&#10; &#160;ovpn0 — tunnel:tunnels/ovpn&#45;admin &#160;(tunnel, openvpn)</title>
+<g id="a_node4"><a xlink:title="rtr&#45;hq [router]&#10;namespace: sites/hq&#10;HQ edge router and overlay hub.&#10;labels: role=edge, site=hq&#10;vlans: 100&#10;interfaces (7):&#10; &#160;eth0 &#160;ethernet &#160;198.51.100.2/30&#10; &#160;eth1 &#160;ethernet &#160;10.10.0.1/24&#10; &#160;wg0 &#160;tunnel &#160;10.255.0.1/24&#10; &#160;ipsec0 &#160;tunnel &#160;10.254.0.1/30&#10; &#160;vxlan100 &#160;tunnel &#160;vlan 100 (access)&#10; &#160;gre1 &#160;tunnel &#160;10.252.0.1/30&#10; &#160;ovpn0 &#160;tunnel &#160;10.253.0.1/24&#10;links (5):&#10; &#160;wg0 — tunnel:tunnels/wg&#45;mesh &#160;(tunnel, wireguard)&#10; &#160;ipsec0 — tunnel:tunnels/ipsec&#45;hq&#45;b &#160;(tunnel, ipsec)&#10; &#160;vxlan100 — tunnel:tunnels/vx&#45;100 &#160;(tunnel, vxlan over ipsec)&#10; &#160;gre1 — tunnel:tunnels/gre&#45;mgmt &#160;(tunnel, gre over ipsec)&#10; &#160;ovpn0 — tunnel:tunnels/ovpn&#45;admin &#160;(tunnel, openvpn)">
 <polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="827.54,-689.65 658.54,-564.65 827.54,-439.65 996.54,-564.65 827.54,-689.65"/>
 <text text-anchor="start" x="815.04" y="-614.65" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr&#45;hq</text>
 <text text-anchor="start" x="812.54" y="-600.65" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
@@ -252,8 +264,8 @@
 </g>
 <!-- sites/hq/rtr&#45;hq&#45;&#45;tunnel:tunnels/wg&#45;mesh -->
 <g id="edge3" class="edge">
-<title>sites/hq/rtr&#45;hq&#45;&#45;tunnel:tunnels/wg&#45;mesh</title>
-<g id="a_edge3"><a xlink:title="tunnel: tunnels/wg&#45;mesh, type: wireguard, transport: udp/51820, encrypted: chacha20&#45;poly1305, auth: public&#45;key, mtu: 1420 (overhead 80 B)">
+<title>tunnel tunnels/wg&#45;mesh#sites/hq/rtr&#45;hq:wg0&#10;sites/hq/rtr&#45;hq:wg0 — tunnel:tunnels/wg&#45;mesh&#10;stack: wireguard&#10;transport udp/51820, encrypted: chacha20&#45;poly1305, auth public&#45;key, mtu 1420 (overhead 80 B)&#10;endpoints (3):&#10; &#160;sites/branch&#45;a/rtr&#45;branch&#45;a:wg0&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:wg0&#10; &#160;sites/hq/rtr&#45;hq:wg0</title>
+<g id="a_edge3"><a xlink:title="tunnel tunnels/wg&#45;mesh#sites/hq/rtr&#45;hq:wg0&#10;sites/hq/rtr&#45;hq:wg0 — tunnel:tunnels/wg&#45;mesh&#10;stack: wireguard&#10;transport udp/51820, encrypted: chacha20&#45;poly1305, auth public&#45;key, mtu 1420 (overhead 80 B)&#10;endpoints (3):&#10; &#160;sites/branch&#45;a/rtr&#45;branch&#45;a:wg0&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:wg0&#10; &#160;sites/hq/rtr&#45;hq:wg0">
 <path fill="none" stroke="#6d28d9" stroke-dasharray="5,2" d="M906.75,-498.23C933.08,-473.85 961.11,-444.75 982.54,-414.65 998.97,-391.57 1012.94,-363.83 1023.81,-338.81"/>
 </a>
 </g>
@@ -263,8 +275,8 @@
 </g>
 <!-- sites/hq/rtr&#45;hq&#45;&#45;tunnel:tunnels/ipsec&#45;hq&#45;b -->
 <g id="edge5" class="edge">
-<title>sites/hq/rtr&#45;hq&#45;&#45;tunnel:tunnels/ipsec&#45;hq&#45;b</title>
-<g id="a_edge5"><a xlink:title="tunnel: tunnels/ipsec&#45;hq&#45;b, type: ipsec, mode: tunnel, transport: esp, encrypted: aes&#45;256&#45;gcm, auth: certificate, mtu: 1427 (overhead 73 B)">
+<title>tunnel tunnels/ipsec&#45;hq&#45;b#sites/hq/rtr&#45;hq:ipsec0&#10;sites/hq/rtr&#45;hq:ipsec0 — tunnel:tunnels/ipsec&#45;hq&#45;b&#10;stack: ipsec&#10;mode tunnel, transport esp, encrypted: aes&#45;256&#45;gcm, auth certificate, mtu 1427 (overhead 73 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:ipsec0&#10; &#160;sites/hq/rtr&#45;hq:ipsec0</title>
+<g id="a_edge5"><a xlink:title="tunnel tunnels/ipsec&#45;hq&#45;b#sites/hq/rtr&#45;hq:ipsec0&#10;sites/hq/rtr&#45;hq:ipsec0 — tunnel:tunnels/ipsec&#45;hq&#45;b&#10;stack: ipsec&#10;mode tunnel, transport esp, encrypted: aes&#45;256&#45;gcm, auth certificate, mtu 1427 (overhead 73 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:ipsec0&#10; &#160;sites/hq/rtr&#45;hq:ipsec0">
 <path fill="none" stroke="#6d28d9" stroke-dasharray="5,2" d="M902.11,-494.22C933.58,-468.93 972.06,-442.84 1011.54,-427.65 1039.05,-417.06 1123.26,-436.03 1143.54,-414.65 1178.96,-377.31 1260.14,-331.95 1145.54,-198.21 1059.11,-97.33 647.06,-82.26 469.38,-80.52"/>
 </a>
 </g>
@@ -273,8 +285,8 @@
 </g>
 <!-- sites/hq/rtr&#45;hq&#45;&#45;tunnel:tunnels/vx&#45;100 -->
 <g id="edge7" class="edge">
-<title>sites/hq/rtr&#45;hq&#45;&#45;tunnel:tunnels/vx&#45;100</title>
-<g id="a_edge7"><a xlink:title="tunnel: tunnels/vx&#45;100, type: vxlan over ipsec, vni: 100, transport: udp/4789, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu: 1377 (overhead 123 B)">
+<title>tunnel tunnels/vx&#45;100#sites/hq/rtr&#45;hq:vxlan100&#10;sites/hq/rtr&#45;hq:vxlan100 — tunnel:tunnels/vx&#45;100&#10;stack: vxlan over ipsec&#10;vni 100, transport udp/4789, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1377 (overhead 123 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:vxlan100&#10; &#160;sites/hq/rtr&#45;hq:vxlan100</title>
+<g id="a_edge7"><a xlink:title="tunnel tunnels/vx&#45;100#sites/hq/rtr&#45;hq:vxlan100&#10;sites/hq/rtr&#45;hq:vxlan100 — tunnel:tunnels/vx&#45;100&#10;stack: vxlan over ipsec&#10;vni 100, transport udp/4789, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1377 (overhead 123 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:vxlan100&#10; &#160;sites/hq/rtr&#45;hq:vxlan100">
 <path fill="none" stroke="#6d28d9" stroke-dasharray="5,2" d="M737.34,-506.04C679.51,-468.83 613.01,-425.41 600.54,-414.65 584.34,-400.65 587.79,-388.02 568.54,-378.65 542.92,-366.17 468,-378.29 440.54,-370.65 407.97,-361.57 374.6,-346.58 344.92,-330.87"/>
 </a>
 </g>
@@ -285,8 +297,8 @@
 </g>
 <!-- sites/hq/rtr&#45;hq&#45;&#45;tunnel:tunnels/gre&#45;mgmt -->
 <g id="edge10" class="edge">
-<title>sites/hq/rtr&#45;hq&#45;&#45;tunnel:tunnels/gre&#45;mgmt</title>
-<g id="a_edge10"><a xlink:title="tunnel: tunnels/gre&#45;mgmt, type: gre over ipsec, transport: gre, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu: 1403 (overhead 97 B)">
+<title>tunnel tunnels/gre&#45;mgmt#sites/hq/rtr&#45;hq:gre1&#10;sites/hq/rtr&#45;hq:gre1 — tunnel:tunnels/gre&#45;mgmt&#10;stack: gre over ipsec&#10;transport gre, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1403 (overhead 97 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:gre1&#10; &#160;sites/hq/rtr&#45;hq:gre1</title>
+<g id="a_edge10"><a xlink:title="tunnel tunnels/gre&#45;mgmt#sites/hq/rtr&#45;hq:gre1&#10;sites/hq/rtr&#45;hq:gre1 — tunnel:tunnels/gre&#45;mgmt&#10;stack: gre over ipsec&#10;transport gre, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1403 (overhead 97 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:gre1&#10; &#160;sites/hq/rtr&#45;hq:gre1">
 <path fill="none" stroke="#6d28d9" stroke-dasharray="5,2" d="M769.46,-482.54C745.55,-449.86 717.23,-412.06 690.54,-378.65 680.08,-365.55 668.66,-351.83 657.49,-338.7"/>
 </a>
 </g>
@@ -296,8 +308,8 @@
 </g>
 <!-- sites/hq/rtr&#45;hq&#45;&#45;tunnel:tunnels/ovpn&#45;admin -->
 <g id="edge13" class="edge">
-<title>sites/hq/rtr&#45;hq&#45;&#45;tunnel:tunnels/ovpn&#45;admin</title>
-<g id="a_edge13"><a xlink:title="tunnel: tunnels/ovpn&#45;admin, type: openvpn, transport: udp/1194, encrypted: aes&#45;256&#45;gcm, auth: certificate, mtu: 1431 (overhead 69 B)">
+<title>tunnel tunnels/ovpn&#45;admin#sites/hq/rtr&#45;hq:ovpn0&#10;sites/hq/rtr&#45;hq:ovpn0 — tunnel:tunnels/ovpn&#45;admin&#10;stack: openvpn&#10;transport udp/1194, encrypted: aes&#45;256&#45;gcm, auth certificate, mtu 1431 (overhead 69 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/pc&#45;branch&#45;b:tun0&#10; &#160;sites/hq/rtr&#45;hq:ovpn0</title>
+<g id="a_edge13"><a xlink:title="tunnel tunnels/ovpn&#45;admin#sites/hq/rtr&#45;hq:ovpn0&#10;sites/hq/rtr&#45;hq:ovpn0 — tunnel:tunnels/ovpn&#45;admin&#10;stack: openvpn&#10;transport udp/1194, encrypted: aes&#45;256&#45;gcm, auth certificate, mtu 1431 (overhead 69 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/pc&#45;branch&#45;b:tun0&#10; &#160;sites/hq/rtr&#45;hq:ovpn0">
 <path fill="none" stroke="#6d28d9" stroke-dasharray="5,2" d="M837.46,-446.94C840.92,-406.19 844.66,-362.18 847.55,-328.18"/>
 </a>
 </g>
@@ -306,8 +318,8 @@
 </g>
 <!-- tunnel:tunnels/vx&#45;100&#45;&#45;tunnel:tunnels/ipsec&#45;hq&#45;b -->
 <g id="edge8" class="edge">
-<title>tunnel:tunnels/vx&#45;100&#45;&#45;tunnel:tunnels/ipsec&#45;hq&#45;b</title>
-<g id="a_edge8"><a xlink:title="tunnel: tunnels/vx&#45;100, type: vxlan over ipsec, vni: 100, transport: udp/4789, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu: 1377 (overhead 123 B)">
+<title>encapsulation tunnels/vx&#45;100#over&#10;tunnel:tunnels/vx&#45;100 — tunnel:tunnels/ipsec&#45;hq&#45;b&#10;stack: vxlan over ipsec&#10;vni 100, transport udp/4789, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1377 (overhead 123 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:vxlan100&#10; &#160;sites/hq/rtr&#45;hq:vxlan100</title>
+<g id="a_edge8"><a xlink:title="encapsulation tunnels/vx&#45;100#over&#10;tunnel:tunnels/vx&#45;100 — tunnel:tunnels/ipsec&#45;hq&#45;b&#10;stack: vxlan over ipsec&#10;vni 100, transport udp/4789, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1377 (overhead 123 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:vxlan100&#10; &#160;sites/hq/rtr&#45;hq:vxlan100">
 <path fill="none" stroke="#8b5cf6" stroke-dasharray="1,5" d="M298.85,-198.13C313.97,-178.08 330.3,-156.45 344.77,-137.28"/>
 </a>
 </g>
@@ -315,8 +327,8 @@
 </g>
 <!-- tunnel:tunnels/gre&#45;mgmt&#45;&#45;tunnel:tunnels/ipsec&#45;hq&#45;b -->
 <g id="edge11" class="edge">
-<title>tunnel:tunnels/gre&#45;mgmt&#45;&#45;tunnel:tunnels/ipsec&#45;hq&#45;b</title>
-<g id="a_edge11"><a xlink:title="tunnel: tunnels/gre&#45;mgmt, type: gre over ipsec, transport: gre, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu: 1403 (overhead 97 B)">
+<title>encapsulation tunnels/gre&#45;mgmt#over&#10;tunnel:tunnels/gre&#45;mgmt — tunnel:tunnels/ipsec&#45;hq&#45;b&#10;stack: gre over ipsec&#10;transport gre, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1403 (overhead 97 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:gre1&#10; &#160;sites/hq/rtr&#45;hq:gre1</title>
+<g id="a_edge11"><a xlink:title="encapsulation tunnels/gre&#45;mgmt#over&#10;tunnel:tunnels/gre&#45;mgmt — tunnel:tunnels/ipsec&#45;hq&#45;b&#10;stack: gre over ipsec&#10;transport gre, cleartext, carried by tunnels/ipsec&#45;hq&#45;b, mtu 1403 (overhead 97 B)&#10;endpoints (2):&#10; &#160;sites/branch&#45;b/rtr&#45;branch&#45;b:gre1&#10; &#160;sites/hq/rtr&#45;hq:gre1">
 <path fill="none" stroke="#8b5cf6" stroke-dasharray="1,5" d="M523.45,-202.09C495.31,-176.94 463.83,-148.8 438.26,-125.94"/>
 </a>
 </g>

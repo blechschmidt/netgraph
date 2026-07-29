@@ -34,7 +34,7 @@ from netgraph.cli import cli
 from netgraph.errors import RenderError
 from netgraph.loader import load_stream
 from netgraph.render import Layer, build_graph, graph_to_dict
-from netgraph.render.dot import edge_element_id, node_element_id
+from netgraph.render.ids import element_ids
 from netgraph.watch import Status
 from netgraph.web import (
     ASSETS,
@@ -273,12 +273,13 @@ def test_every_record_is_the_json_export_of_its_element(home_lab: str) -> None:
     graph = build_graph(load_stream(home_lab), layer=Layer.L2)
     exported = graph_to_dict(graph)
     details = build_details(graph)
+    ids = element_ids(graph)
 
-    for index, node in enumerate(exported["nodes"]):
-        record = details[node_element_id(index)]
+    for node in exported["nodes"]:
+        record = details[ids.nodes[node["id"]]]
         assert {key: record[key] for key in node} == node
     for index, edge in enumerate(exported["edges"]):
-        record = details[edge_element_id(index)]
+        record = details[ids.edges[index]]
         # ``endpoints`` gains the id of the node each end is drawn as.
         for key in edge:
             if key != "endpoints":
@@ -315,7 +316,7 @@ def test_a_record_carries_the_detail_the_diagram_leaves_out() -> None:
 def test_every_drawn_element_has_a_record_and_every_record_is_drawn(home_lab: str) -> None:
     preview = render_source(home_lab)
     assert preview.svg is not None
-    drawn = set(re.findall(r'<g id="([ne]\d+)" class="(?:node|edge)"', preview.svg))
+    drawn = set(re.findall(r'<g id="((?:node|edge)-[^"]+)" class="(?:node|edge)"', preview.svg))
     assert drawn == set(preview.details)
 
 
@@ -506,7 +507,7 @@ def test_posting_a_stream_returns_a_diagram_and_its_records(server: WebServer) -
     assert payload["status"] == "ok"
     assert payload["counts"] == {"nodes": 2, "edges": 1, "errors": 0, "warnings": 0}
     assert payload["svg"].startswith("<svg")
-    assert set(payload["details"]) == {"n0", "n1", "e0"}
+    assert set(payload["details"]) == {"node-pc-a", "node-pc-b", "edge-cbl-a-b"}
     assert payload["durationMs"] >= 0
 
 

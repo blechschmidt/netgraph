@@ -327,8 +327,11 @@ def test_display_flags_reach_the_renderer(runner: CliRunner) -> None:
     full = invoke(runner, "-i", str(HOME_LAB), "render")
     assert "192.168.10.20/24" not in bare.stdout
     assert "192.168.10.20/24" in full.stdout
-    assert "vlan" not in bare.stdout
-    assert "vlan" in full.stdout
+    # Membership, not the word: the campus switches own an interface *named*
+    # ``Vlan10`` whose type is ``vlan``, and hiding VLAN annotations is not a
+    # licence to rename an interface.
+    assert "vlan 10" not in bare.stdout
+    assert "vlan 10" in full.stdout
 
 
 def test_group_by_namespace_and_layer_reach_the_renderer(runner: CliRunner) -> None:
@@ -337,6 +340,96 @@ def test_group_by_namespace_and_layer_reach_the_renderer(runner: CliRunner) -> N
 
     logical = invoke(runner, "-i", str(HOME_LAB), "render", "--layer", "l2")
     assert "vlan 10" in logical.stdout
+
+
+def test_the_interaction_flags_reach_the_renderer(runner: CliRunner) -> None:
+    result = invoke(
+        runner,
+        "-i",
+        str(HOME_LAB),
+        "render",
+        "--element-ids",
+        "--link-template",
+        "https://git.example.invalid/{file}#L{line}",
+    )
+    assert result.exit_code == 0
+    assert 'id="node-switches_sw-home"' in result.stdout
+    assert 'URL="https://git.example.invalid/switches/sw-home.yaml#L1"' in result.stdout
+    assert "tooltip=" in result.stdout
+
+
+def test_no_tooltips_strips_the_detail_from_the_output(runner: CliRunner) -> None:
+    result = invoke(runner, "-i", str(HOME_LAB), "render", "--no-tooltips")
+    assert result.exit_code == 0
+    assert "tooltip=" not in result.stdout
+
+
+def test_an_unknown_link_placeholder_is_a_usage_error(runner: CliRunner) -> None:
+    """Reported before the inventory is even loaded, with the options listed."""
+    result = invoke(runner, "-i", str(HOME_LAB), "render", "--link-template", "https://x/{author}")
+    assert result.exit_code == 2
+    assert "unknown --link-template placeholder {author}" in result.output
+    assert "{file}" in result.output and "{line}" in result.output
+
+
+def test_watch_takes_the_same_flags(runner: CliRunner) -> None:
+    """``render`` and ``watch`` share one option set; a flag on one is on both."""
+    help_text = invoke(runner, "watch", "--help").output
+    for option in ("--link-template", "--element-ids", "--tooltips"):
+        assert option in help_text
+    result = invoke(runner, "-i", str(HOME_LAB), "watch", "--link-template", "{unknown}")
+    assert result.exit_code == 2
+    assert "unknown --link-template placeholder {unknown}" in result.output
+
+
+@pytest.mark.skipif(shutil.which("dot") is None, reason="Graphviz 'dot' is not installed")
+def test_a_format_that_cannot_carry_the_attributes_says_so(
+    runner: CliRunner, tmp_path: Path
+) -> None:
+    output = tmp_path / "out.png"
+    result = invoke(
+        runner,
+        "-i",
+        str(HOME_LAB),
+        "render",
+        "-f",
+        "png",
+        "-o",
+        str(output),
+        "--element-ids",
+        "--link-template",
+        "https://x/{file}",
+    )
+    assert result.exit_code == 0
+    assert "--link-template, --element-ids are ignored for png output" in result.stderr
+    assert "dot, svg" in result.stderr
+
+
+@pytest.mark.skipif(shutil.which("dot") is None, reason="Graphviz 'dot' is not installed")
+def test_a_raster_render_that_asked_for_nothing_extra_is_quiet(
+    runner: CliRunner, tmp_path: Path
+) -> None:
+    """Warning on every PNG would train the reader to ignore the warnings."""
+    output = tmp_path / "out.png"
+    result = invoke(runner, "-i", str(HOME_LAB), "render", "-f", "png", "-o", str(output))
+    assert result.exit_code == 0
+    assert "ignored for png" not in result.stderr
+
+
+def test_an_svg_render_is_never_warned_at(runner: CliRunner, tmp_path: Path) -> None:
+    result = invoke(
+        runner,
+        "-i",
+        str(HOME_LAB),
+        "render",
+        "-f",
+        "dot",
+        "--element-ids",
+        "--tooltips",
+        "--link-template",
+        "https://x/{file}",
+    )
+    assert "ignored" not in result.stderr
 
 
 def test_layer_3_draws_the_subnets_and_leaves_the_cables_out(runner: CliRunner) -> None:

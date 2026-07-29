@@ -11,16 +11,20 @@
 <polygon fill="white" stroke="transparent" points="-4,4 -4,-261 456,-261 456,4 -4,4"/>
 <!-- devices/pc&#45;alice -->
 <g id="node1" class="node">
-<title>devices/pc&#45;alice</title>
+<title>pc&#45;alice [computer]&#10;namespace: devices&#10;labels: site=office&#10;vlans: 10&#10;interfaces (1):&#10; &#160;eno1 &#160;ethernet &#160;192.168.10.20/24 &#160;00:1e:8c:bb:00:01&#10;links (1):&#10; &#160;eno1 — devices/sw&#45;office:port2 &#160;(cable, copper, 1Gbps) &#160;vlan 10</title>
+<g id="a_node1"><a xlink:title="pc&#45;alice [computer]&#10;namespace: devices&#10;labels: site=office&#10;vlans: 10&#10;interfaces (1):&#10; &#160;eno1 &#160;ethernet &#160;192.168.10.20/24 &#160;00:1e:8c:bb:00:01&#10;links (1):&#10; &#160;eno1 — devices/sw&#45;office:port2 &#160;(cable, copper, 1Gbps) &#160;vlan 10">
 <polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="120,-220.5 0,-220.5 0,-173.5 120,-173.5 120,-220.5"/>
 <text text-anchor="start" x="41.5" y="-208" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">pc&#45;alice</text>
 <text text-anchor="start" x="36.5" y="-194" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
 <text text-anchor="start" x="9" y="-181" font-family="Helvetica,Arial,sans-serif" font-size="10.00">eno1</text>
 <text text-anchor="start" x="33" y="-181" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.20/24</text>
+</a>
+</g>
 </g>
 <!-- devices/sw&#45;office -->
 <g id="node3" class="node">
-<title>devices/sw&#45;office</title>
+<title>sw&#45;office [switch]&#10;namespace: devices&#10;labels: site=office&#10;vlans: 10&#10;interfaces (2):&#10; &#160;port1 &#160;ethernet &#160;vlan 10 (access)&#10; &#160;port2 &#160;ethernet &#160;vlan 10 (access)&#10;links (2):&#10; &#160;port1 — devices/rtr&#45;gw:lan0 &#160;(cable, copper, 1Gbps) &#160;vlan 10&#10; &#160;port2 — devices/pc&#45;alice:eno1 &#160;(cable, copper, 1Gbps) &#160;vlan 10</title>
+<g id="a_node3"><a xlink:title="sw&#45;office [switch]&#10;namespace: devices&#10;labels: site=office&#10;vlans: 10&#10;interfaces (2):&#10; &#160;port1 &#160;ethernet &#160;vlan 10 (access)&#10; &#160;port2 &#160;ethernet &#160;vlan 10 (access)&#10;links (2):&#10; &#160;port1 — devices/rtr&#45;gw:lan0 &#160;(cable, copper, 1Gbps) &#160;vlan 10&#10; &#160;port2 — devices/pc&#45;alice:eno1 &#160;(cable, copper, 1Gbps) &#160;vlan 10">
 <polygon fill="#dcf0dc" stroke="#16a34a" stroke-width="1.2" points="220,-60 148,-60 144,-56 144,0 216,0 220,-4 220,-60"/>
 <polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="216,-56 144,-56 "/>
 <polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="216,-56 216,0 "/>
@@ -31,11 +35,13 @@
 <text text-anchor="start" x="179" y="-21" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
 <text text-anchor="start" x="153" y="-8" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port2</text>
 <text text-anchor="start" x="179" y="-8" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</a>
+</g>
 </g>
 <!-- devices/pc&#45;alice&#45;&#45;devices/sw&#45;office -->
 <g id="edge2" class="edge">
-<title>devices/pc&#45;alice&#45;&#45;devices/sw&#45;office</title>
-<g id="a_edge2"><a xlink:title="cable: cbl&#45;sw&#45;alice, medium: copper, speed: 1Gbps, vlans: 10">
+<title>cable cables/cbl&#45;sw&#45;alice&#10;devices/pc&#45;alice:eno1 — devices/sw&#45;office:port2&#10;medium: copper, speed: 1Gbps&#10;vlans: 10</title>
+<g id="a_edge2"><a xlink:title="cable cables/cbl&#45;sw&#45;alice&#10;devices/pc&#45;alice:eno1 — devices/sw&#45;office:port2&#10;medium: copper, speed: 1Gbps&#10;vlans: 10">
 <path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M76.71,-173.4C98.44,-144.01 136.44,-92.62 160.36,-60.27"/>
 </a>
 </g>
@@ -45,7 +51,8 @@
 </g>
 <!-- devices/rtr&#45;gw -->
 <g id="node2" class="node">
-<title>devices/rtr&#45;gw</title>
+<title>rtr&#45;gw [router]&#10;namespace: devices&#10;labels: site=office&#10;vlans: 10&#10;interfaces (2):&#10; &#160;wan0 &#160;ethernet &#160;203.0.113.2/30&#10; &#160;lan0 &#160;ethernet &#160;192.168.10.1/24 &#160;vlan 10 (access) &#160;00:1e:8c:aa:00:01&#10;links (1):&#10; &#160;lan0 — devices/sw&#45;office:port1 &#160;(cable, copper, 1Gbps) &#160;vlan 10</title>
+<g id="a_node2"><a xlink:title="rtr&#45;gw [router]&#10;namespace: devices&#10;labels: site=office&#10;vlans: 10&#10;interfaces (2):&#10; &#160;wan0 &#160;ethernet &#160;203.0.113.2/30&#10; &#160;lan0 &#160;ethernet &#160;192.168.10.1/24 &#160;vlan 10 (access) &#160;00:1e:8c:aa:00:01&#10;links (1):&#10; &#160;lan0 — devices/sw&#45;office:port1 &#160;(cable, copper, 1Gbps) &#160;vlan 10">
 <polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="304,-257 156,-197 304,-137 452,-197 304,-257"/>
 <text text-anchor="start" x="290" y="-215" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr&#45;gw</text>
 <text text-anchor="start" x="288.5" y="-201" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
@@ -54,11 +61,13 @@
 <text text-anchor="start" x="239" y="-175" font-family="Helvetica,Arial,sans-serif" font-size="10.00">lan0</text>
 <text text-anchor="start" x="265" y="-175" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.1/24</text>
 <text text-anchor="start" x="337" y="-175" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</a>
+</g>
 </g>
 <!-- devices/rtr&#45;gw&#45;&#45;devices/sw&#45;office -->
 <g id="edge1" class="edge">
-<title>devices/rtr&#45;gw&#45;&#45;devices/sw&#45;office</title>
-<g id="a_edge1"><a xlink:title="cable: cbl&#45;rtr&#45;sw, medium: copper, speed: 1Gbps, vlans: 10">
+<title>cable cables/cbl&#45;rtr&#45;sw&#10;devices/rtr&#45;gw:lan0 — devices/sw&#45;office:port1&#10;medium: copper, speed: 1Gbps&#10;vlans: 10</title>
+<g id="a_edge1"><a xlink:title="cable cables/cbl&#45;rtr&#45;sw&#10;devices/rtr&#45;gw:lan0 — devices/sw&#45;office:port1&#10;medium: copper, speed: 1Gbps&#10;vlans: 10">
 <path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M270.34,-150.48C249.04,-121.67 222.13,-85.28 203.64,-60.27"/>
 </a>
 </g>

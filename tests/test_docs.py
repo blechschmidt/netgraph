@@ -209,3 +209,30 @@ def test_the_readme_shows_a_committed_diagram() -> None:
         content = image.read_text(encoding="utf-8")
         assert "<svg" in content and content.rstrip().endswith("</svg>")
     assert "docs/images/home-lab.svg" in (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+
+
+def test_the_readme_tooltip_example_is_what_netgraph_produces() -> None:
+    """The worked example in the rendering section, rendered rather than typed.
+
+    A sample of output in a README is a promise about the tool, and the only
+    kind of promise that survives a refactor is one a test makes.
+    """
+    from netgraph.loader import load_tree
+    from netgraph.render import (
+        RenderOptions,
+        build_details,
+        build_graph,
+        detail_text,
+        element_ids,
+    )
+
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    block = readme.partition("<!-- tooltip-example -->")[2]
+    documented = block.partition("```\n")[2].partition("```")[0].rstrip("\n")
+    assert documented, "the tooltip example is missing from the README"
+
+    graph = build_graph(load_tree(REPO_ROOT / "examples" / "quickstart"))
+    ids = element_ids(graph)
+    details = build_details(graph, RenderOptions(), ids=ids)
+    produced = detail_text(details[ids.nodes["devices/sw-office"]])
+    assert produced == documented

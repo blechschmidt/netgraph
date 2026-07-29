@@ -29,11 +29,13 @@ from netgraph.config import ValidationConfig
 from netgraph.errors import NetgraphError
 from netgraph.loader import Inventory, load_stream
 from netgraph.render import (
+    DETAIL_OPTIONS,
     FilterSpec,
     Graph,
     IconTheme,
     Layer,
     RenderOptions,
+    build_details,
     build_graph,
     filter_graph,
 )
@@ -41,7 +43,6 @@ from netgraph.render.dot import to_image
 from netgraph.rules import Severity
 from netgraph.validate import validate as run_validation
 from netgraph.watch.pipeline import Problem, Status, flatten_problems
-from netgraph.web.details import build_details
 from netgraph.web.svgdoc import prepare
 
 __all__ = ["MAX_VLAN", "Preview", "ViewOptions", "render_source"]
@@ -120,12 +121,22 @@ class ViewOptions:
 
     @property
     def render_options(self) -> RenderOptions:
+        """How to draw the diagram the page embeds.
+
+        ``element_ids`` is always on: the ids are how the page maps the shape
+        under the cursor onto its info-box record. Graphviz's own tooltips are
+        always off, because that record says strictly more and the browser
+        would otherwise pop a second, thinner one over it a moment later
+        (:func:`netgraph.web.svgdoc.prepare` strips any that survive).
+        """
         return RenderOptions(
             show_ips=self.show_ips,
             show_vlans=self.show_vlans,
             group_by_namespace=self.group_by_namespace,
             title=self.title,
             icons=self.icons,
+            tooltips=False,
+            element_ids=True,
         )
 
 
@@ -139,7 +150,7 @@ class Preview:
     #: The diagram as an embeddable ``<svg>`` fragment, or ``None`` when this
     #: pass produced no picture at all.
     svg: str | None = None
-    #: Info-box records keyed by SVG element id; see :mod:`netgraph.web.details`.
+    #: Info-box records keyed by SVG element id; see :mod:`netgraph.render.details`.
     details: Mapping[str, Any] = field(default_factory=dict)
     problems: tuple[Problem, ...] = ()
     nodes: int = 0
@@ -211,7 +222,7 @@ def render_source(source: str, view: ViewOptions | None = None) -> Preview:
 
     try:
         graph = filter_graph(build_graph(inventory, layer=options.layer), options.filter_spec)
-        payload = to_image(graph, options.render_options, format="svg", element_ids=True)
+        payload = to_image(graph, options.render_options, format="svg")
         svg = prepare(payload)
     except (NetgraphError, OSError) as exc:
         return Preview(
@@ -225,7 +236,7 @@ def render_source(source: str, view: ViewOptions | None = None) -> Preview:
         status=Status.INVALID if rejected else Status.OK,
         message=_summary(inventory, graph, rejected=rejected),
         svg=svg,
-        details=build_details(graph),
+        details=build_details(graph, DETAIL_OPTIONS),
         problems=problems,
         nodes=len(graph.nodes),
         edges=len(graph.edges),

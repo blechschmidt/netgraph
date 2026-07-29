@@ -21,6 +21,12 @@ from __future__ import annotations
 
 from typing import Final
 
+from netgraph.render.details import (
+    DETAIL_OPTIONS,
+    build_details,
+    detail_text,
+    namespace_text,
+)
 from netgraph.render.dot import IMAGE_FORMATS, render_dot, render_image, to_dot, to_image
 from netgraph.render.graph import (
     SUBNET_ID_PREFIX,
@@ -51,7 +57,9 @@ from netgraph.render.icons import (
     icon_theme,
     theme_choices,
 )
+from netgraph.render.ids import ElementIds, element_ids
 from netgraph.render.jsonexport import GRAPH_KIND, graph_to_dict, render_json, to_json
+from netgraph.render.links import LINK_FIELDS, LinkTemplate
 from netgraph.render.mermaid import (
     MERMAID_MAX_EDGES,
     mermaid_advisories,
@@ -65,14 +73,17 @@ from netgraph.render.registry import (
     media_type_for,
     renderer_for,
     supports_icons,
+    supports_interaction,
 )
 
 __all__ = [
     "BUNDLED_THEMES",
+    "DETAIL_OPTIONS",
     "FORMATS",
     "GRAPH_KIND",
     "ICON_KINDS",
     "IMAGE_FORMATS",
+    "LINK_FIELDS",
     "MERMAID_MAX_EDGES",
     "RENDERERS",
     "SUBNET_ID_PREFIX",
@@ -82,10 +93,12 @@ __all__ = [
     "TUNNEL_KIND",
     "Edge",
     "EdgeKind",
+    "ElementIds",
     "FilterSpec",
     "Graph",
     "IconTheme",
     "Layer",
+    "LinkTemplate",
     "Node",
     "NodeType",
     "PortView",
@@ -96,7 +109,10 @@ __all__ = [
     "TunnelView",
     "UnknownElementError",
     "advisories_for",
+    "build_details",
     "build_graph",
+    "detail_text",
+    "element_ids",
     "filter_graph",
     "graph_to_dict",
     "icon_theme",
@@ -104,6 +120,7 @@ __all__ = [
     "is_routable_address",
     "media_type_for",
     "mermaid_advisories",
+    "namespace_text",
     "render",
     "render_dot",
     "render_image",
@@ -114,6 +131,7 @@ __all__ = [
     "resolve_tunnels",
     "suffix_for",
     "supports_icons",
+    "supports_interaction",
     "theme_choices",
     "to_dot",
     "to_image",

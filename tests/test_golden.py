@@ -33,6 +33,7 @@ from netgraph.loader import Inventory, load_tree
 from netgraph.render import (
     GRAPH_KIND,
     Layer,
+    LinkTemplate,
     RenderOptions,
     build_graph,
     render_text,
@@ -57,6 +58,10 @@ class Case:
     example: str
     layer: Layer
     options: RenderOptions
+    #: Which formats this case is kept for. Options that only one backend
+    #: honours — tooltips, links, element ids — would otherwise commit two more
+    #: byte-identical copies of a Mermaid and a JSON golden per case.
+    formats: tuple[str, ...] = FORMATS
 
     def golden(self, format: str) -> Path:
         return GOLDEN_DIR / f"{self.name}{suffix_for(format)}"
@@ -123,6 +128,33 @@ CASES = (
         options=RenderOptions(title="Overlay, layer 2"),
     ),
     Case(
+        # Everything an SVG carries besides the picture: a tooltip per node,
+        # edge and cluster, a link back to the declaring document, and a stable
+        # id on all three. Grouped, because a cluster is the one of the three
+        # that has nowhere else to be pinned.
+        name="home-lab-l1-interactive",
+        example="home-lab",
+        layer=Layer.L1,
+        options=RenderOptions(
+            group_by_namespace=True,
+            element_ids=True,
+            link_template=LinkTemplate.parse(
+                "https://git.example.com/net/blob/main/{file}#L{line}"
+            ),
+        ),
+        formats=("dot",),
+    ),
+    Case(
+        # The same inventory with the detail turned off: nothing but the
+        # picture, which is what a diagram published somewhere it should carry
+        # no addresses needs.
+        name="home-lab-l1-inert",
+        example="home-lab",
+        layer=Layer.L1,
+        options=RenderOptions(tooltips=False, show_ips=False, show_vlans=False),
+        formats=("dot",),
+    ),
+    Case(
         # The encapsulation graph: every tunnel a node, and 'over' an edge
         # between two of them. Grouped, so a tunnel keeping its own namespace —
         # unlike a subnet, which keeps none — is pinned down too.
@@ -133,11 +165,19 @@ CASES = (
     ),
 )
 
+#: The cases a Mermaid golden is kept for.
+MERMAID_CASES = tuple(case for case in CASES if "mermaid" in case.formats)
+
+#: The cases a JSON golden is kept for.
+JSON_CASES = tuple(case for case in CASES if "json" in case.formats)
+
 #: The cases whose graph holds subnet nodes.
-L3_CASES = tuple(case for case in CASES if case.layer is Layer.L3)
+L3_CASES = tuple(case for case in CASES if case.layer is Layer.L3 and "json" in case.formats)
 
 #: The cases whose graph holds tunnel nodes for every tunnel.
-OVERLAY_CASES = tuple(case for case in CASES if case.layer is Layer.OVERLAY)
+OVERLAY_CASES = tuple(
+    case for case in CASES if case.layer is Layer.OVERLAY and "json" in case.formats
+)
 
 CASES_BY_NAME = {case.name: case for case in CASES}
 
@@ -158,6 +198,12 @@ def _render(case: Case, inventories: dict[str, Inventory], format: str) -> str:
     return render_text(graph, format, case.options)
 
 
+def _skip_unkept(case: Case, format: str) -> None:
+    """Skip a (case, format) pair the matrix deliberately keeps no golden for."""
+    if format not in case.formats:
+        pytest.skip(f"{case.name} keeps no {format} golden")
+
+
 # --------------------------------------------------------------------------- #
 # The snapshots
 # --------------------------------------------------------------------------- #
@@ -171,6 +217,7 @@ def test_rendering_matches_its_golden_file(
     inventories: dict[str, Inventory],
     regen_golden: bool,
 ) -> None:
+    _skip_unkept(case, format)
     actual = _render(case, inventories, format)
     golden = case.golden(format)
 
@@ -201,6 +248,7 @@ def test_rendering_is_reproducible_within_a_process(
     unsorted set on its own — but combined with the committed golden, which was
     produced by a *different* process, it pins the ordering down.
     """
+    _skip_unkept(case, format)
     assert _render(case, inventories, format) == _render(case, inventories, format)
 
 
@@ -242,7 +290,7 @@ def test_the_dot_golden_is_something_graphviz_accepts(case: Case) -> None:
     assert graphviz.Source(source, engine="dot").pipe(format="svg")
 
 
-@pytest.mark.parametrize("case", CASES, ids=lambda case: case.name)
+@pytest.mark.parametrize("case", JSON_CASES, ids=lambda case: case.name)
 def test_the_json_golden_parses_and_carries_the_envelope(case: Case) -> None:
     payload = json.loads(case.golden("json").read_text(encoding="utf-8"))
     assert payload["kind"] == GRAPH_KIND
@@ -339,7 +387,7 @@ def test_the_l3_json_golden_separates_subnets_from_elements(case: Case) -> None:
         assert second["node"] in ids and "interface" not in second
 
 
-@pytest.mark.parametrize("case", CASES, ids=lambda case: case.name)
+@pytest.mark.parametrize("case", MERMAID_CASES, ids=lambda case: case.name)
 def test_the_mermaid_golden_declares_a_flowchart(case: Case) -> None:
     text = case.golden("mermaid").read_text(encoding="utf-8")
     assert re.search(r"^flowchart ", text, re.MULTILINE)
@@ -361,7 +409,7 @@ def test_every_case_has_a_golden_for_every_format() -> None:
     missing = [
         str(case.golden(format).relative_to(REPO_ROOT))
         for case in CASES
-        for format in FORMATS
+        for format in case.formats
         if not case.golden(format).exists()
     ]
     assert missing == []
@@ -369,7 +417,7 @@ def test_every_case_has_a_golden_for_every_format() -> None:
 
 def test_no_stray_golden_files() -> None:
     """Every committed golden belongs to a case, so renames leave no orphans."""
-    expected = {case.golden(format) for case in CASES for format in FORMATS}
+    expected = {case.golden(format) for case in CASES for format in case.formats}
     actual = {path for path in GOLDEN_DIR.iterdir() if path.suffix != ".md"}
     assert actual == expected
 
@@ -377,7 +425,7 @@ def test_no_stray_golden_files() -> None:
 def test_goldens_are_free_of_machine_specific_paths() -> None:
     """A golden carrying an absolute path would fail on another checkout."""
     for case in CASES:
-        for format in FORMATS:
+        for format in case.formats:
             text = case.golden(format).read_text(encoding="utf-8")
             assert str(REPO_ROOT) not in text
             assert "/home/" not in text

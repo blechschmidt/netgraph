@@ -20,13 +20,35 @@ template environment rather than by discipline:
   name, kind and interfaces. The environment renders with ``autoescape=True``,
   so every bare interpolation is HTML-escaped, which is exactly what Graphviz's
   HTML-like label parser expects.
-* **DOT quoted string** — node ids, tooltips, cluster labels and edge labels.
-  These go through the ``dot_string`` filter (:func:`_dot_string`), which adds
-  the quotes and the backslash escapes and marks the result safe.
+* **DOT quoted string** — node ids, element ids, tooltips, URLs, cluster labels
+  and edge labels. These go through the ``dot_string`` filter
+  (:func:`_dot_string`), which adds the quotes and the backslash escapes, drops
+  what cannot be printed, and marks the result safe.
 
 The template header spells out which to use where. Omitting the filter drops
 the surrounding quotes and Graphviz rejects the file, so the failure mode is
 loud rather than silent.
+
+What a rendering carries besides the picture
+--------------------------------------------
+
+An SVG is the artefact that gets committed to a repository or dropped into a
+wiki, so three attributes travel with it. All three are inert in a PNG or a PDF
+— Graphviz simply has nowhere to put them — and none of them changes the
+drawing:
+
+* ``tooltip`` — the per-element detail of :mod:`netgraph.render.details`, the
+  same records ``netgraph web`` shows in its info boxes, as plain text. Graphviz
+  writes it as ``xlink:title`` on an anchor wrapping the shape, which not every
+  browser pops up, so :func:`_promote_tooltips` moves it into the ``<title>``
+  element of the shape's group on the way out. That is the one construct every
+  browser has shown as a tooltip since SVG 1.1, with no JavaScript.
+* ``URL`` — the link ``--link-template`` builds from the document, line and name
+  each element came from (:mod:`netgraph.render.links`), so a diagram in a wiki
+  links back to the YAML behind every node.
+* ``id`` — a stable identity derived from the fully-qualified name
+  (:mod:`netgraph.render.ids`), so a shape can be deep-linked and styled from
+  outside. Graphviz copies it verbatim into the element it emits.
 
 Icons
 -----
@@ -68,6 +90,14 @@ from jinja2 import Environment, PackageLoader, StrictUndefined
 from markupsafe import Markup
 
 from netgraph.errors import RenderError, clip_text
+from netgraph.loader.inventory import namespace_of
+from netgraph.render.details import (
+    build_details,
+    detail_text,
+    namespace_text,
+    plain_text,
+    printable,
+)
 from netgraph.render.graph import (
     SUBNET_KIND,
     TUNNEL_KIND,
@@ -76,17 +106,16 @@ from netgraph.render.graph import (
     Graph,
     Layer,
     Node,
-    Subnet,
     TunnelView,
 )
 from netgraph.render.icons import IconTheme, suffix_order
+from netgraph.render.ids import ElementIds, element_ids
+from netgraph.render.links import LinkTemplate
 from netgraph.render.options import RenderOptions
 
 __all__ = [
     "DOT_EXECUTABLE",
     "IMAGE_FORMATS",
-    "edge_element_id",
-    "node_element_id",
     "render_dot",
     "render_image",
     "to_dot",
@@ -204,6 +233,13 @@ _ICON_MEDIA_TYPES: Final[Mapping[str, str]] = {
 #: picture should be — so they have to be looked for rather than waited for.
 _IMAGE_TROUBLE: Final = re.compile(r"No loadimage plugin|No or improper image", re.IGNORECASE)
 
+#: One element of an SVG rendering that carries a tooltip: the ``<title>`` the
+#: group was given, and the anchor holding the tooltip Graphviz was asked for.
+#: See :func:`_promote_tooltips` for why the two are swapped.
+_TOOLTIP_ANCHOR: Final = re.compile(
+    rb"<title>[^<]*</title>(\s*<g id=\"a_[^\"]*\"><a\b[^>]*\sxlink:title=\"([^\"]*)\")"
+)
+
 
 # --------------------------------------------------------------------------- #
 # The view model the template consumes
@@ -224,34 +260,6 @@ class _Row:
     spans: bool = False
 
 
-def node_element_id(index: int) -> str:
-    """The ``id`` the ``index``-th node of a graph is drawn with.
-
-    Graphviz copies a node's ``id`` attribute into the element it emits, so
-    this is also the ``id`` on the ``<g class="node">`` of an SVG rendering —
-    which is what lets a front end map a shape under the cursor back onto the
-    node it stands for. Positions come from iterating
-    :attr:`~netgraph.render.graph.Graph.nodes`, which is ordered, so the same
-    graph always produces the same ids.
-
-    The identity is deliberately *not* the fully-qualified name: that may hold
-    characters an XML ``id`` may not, and a diagram published somewhere would
-    then carry the inventory's names in a second, unescaped place.
-    """
-    return f"n{index}"
-
-
-def edge_element_id(index: int) -> str:
-    """The ``id`` the ``index``-th edge of a graph is drawn with.
-
-    The counterpart of :func:`node_element_id`. Edges need one more than nodes
-    do: two elements may be joined by several cables, and an SVG edge names
-    only its endpoints, so without an id the parallel links are
-    indistinguishable.
-    """
-    return f"e{index}"
-
-
 @dataclass(frozen=True, slots=True)
 class _NodeView:
     id: str
@@ -267,8 +275,10 @@ class _NodeView:
     #: when no theme is in use or the theme has no picture for this kind.
     image: str | None = None
     #: ``id`` attribute to emit, or ``None`` to leave the node unidentified.
-    #: See :func:`node_element_id`.
+    #: See :mod:`netgraph.render.ids`.
     element_id: str | None = None
+    #: ``URL`` attribute to emit; see :mod:`netgraph.render.links`.
+    url: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -277,11 +287,13 @@ class _EdgeView:
     target: str
     color: str
     style: str
-    tooltip: str
+    tooltip: str | None = None
     penwidth: str | None = None
     label: str | None = None
-    #: ``id`` attribute to emit; see :func:`edge_element_id`.
+    #: ``id`` attribute to emit; see :mod:`netgraph.render.ids`.
     element_id: str | None = None
+    #: ``URL`` attribute to emit; see :mod:`netgraph.render.links`.
+    url: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -291,6 +303,11 @@ class _GroupView:
     nodes: tuple[_NodeView, ...] = field(default_factory=tuple)
     id: str | None = None
     label: str | None = None
+    tooltip: str | None = None
+    #: ``id`` attribute to emit on the cluster. Distinct from :attr:`id`, which
+    #: is the subgraph's *name* in the DOT source and must start with
+    #: ``cluster`` for Graphviz to box it at all.
+    element_id: str | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -298,13 +315,7 @@ class _GroupView:
 # --------------------------------------------------------------------------- #
 
 
-def to_dot(
-    graph: Graph,
-    options: RenderOptions | None = None,
-    *,
-    target: str = "dot",
-    element_ids: bool = False,
-) -> str:
+def to_dot(graph: Graph, options: RenderOptions | None = None, *, target: str = "dot") -> str:
     """Render ``graph`` as Graphviz DOT source.
 
     The graph is undirected (a cable has no direction, §7.1), so the output is a
@@ -314,18 +325,19 @@ def to_dot(
         target: The output format this DOT is destined for. Only icon
             selection depends on it — see :func:`netgraph.render.icons.suffix_order`
             — and the default suits DOT written out for someone else to lay out.
-        element_ids: Give every node and edge an ``id`` attribute
-            (:func:`node_element_id`, :func:`edge_element_id`). Off by default,
-            because a hand-read DOT file is better without them; a front end
-            that has to find the node under a mouse pointer turns them on.
     """
     opts = options or RenderOptions()
     icons = _icon_files(graph, opts.icons, target=target)
+    # The ids are computed whether or not they are *emitted*: they are how a
+    # detail record is keyed, so the tooltips need them even when the document
+    # itself stays anonymous. A rendering that wants neither pays for neither.
+    identity = element_ids(graph) if opts.tooltips or opts.element_ids else ElementIds()
+    details = build_details(graph, opts, ids=identity) if opts.tooltips else {}
     template = _environment().get_template(_TEMPLATE_NAME)
     return template.render(
         title=opts.title,
-        groups=_groups(graph, opts, icons, element_ids=element_ids),
-        edges=tuple(_edge_views(graph, opts, element_ids=element_ids)),
+        groups=_groups(graph, opts, icons, identity, details),
+        edges=tuple(_edge_views(graph, opts, identity, details)),
         imagepath=str(opts.icons.directory) if icons and opts.icons is not None else None,
         icon_width=_ICON_BOX[0],
         icon_height=_ICON_BOX[1],
@@ -345,20 +357,11 @@ def _icon_files(graph: Graph, theme: IconTheme | None, *, target: str) -> Mappin
     return theme.files(kinds, prefer=suffix_order(target))
 
 
-def to_image(
-    graph: Graph,
-    options: RenderOptions | None = None,
-    *,
-    format: str,
-    element_ids: bool = False,
-) -> bytes:
+def to_image(graph: Graph, options: RenderOptions | None = None, *, format: str) -> bytes:
     """Lay ``graph`` out by running Graphviz, and return the encoded image.
 
     Args:
         format: One of :data:`IMAGE_FORMATS`.
-        element_ids: Passed to :func:`to_dot`. Graphviz copies the ids into the
-            elements of an SVG rendering, so this is how a rendering becomes
-            addressable from a browser.
 
     Raises:
         RenderError: ``format`` is not an image format, the Graphviz ``dot``
@@ -377,8 +380,9 @@ def to_image(
             "or render with '--format dot' and convert the file separately."
         )
 
-    source = to_dot(graph, options, target=format, element_ids=element_ids)
-    theme = (options or RenderOptions()).icons
+    opts = options or RenderOptions()
+    source = to_dot(graph, opts, target=format)
+    theme = opts.icons
     icons = _icon_files(graph, theme, target=format)
     try:
         # Fixed argv, no shell, and the DOT source goes over stdin: nothing from
@@ -405,16 +409,19 @@ def to_image(
     if not completed.stdout:
         detail = _decode(completed.stderr) or "no diagnostic was reported"
         raise RenderError(f"Graphviz produced no {format} output: {detail}")
+    payload = completed.stdout
     if icons:
         # An unreadable icon is the one warning worth escalating: Graphviz
         # succeeds and simply leaves the picture out, so the user would get a
         # diagram of empty labels and no explanation.
         _check_icons_loaded(_decode(completed.stderr), format=format)
         if format == "svg" and theme is not None:
-            return _embed_icons(completed.stdout, theme, icons)
+            payload = _embed_icons(payload, theme, icons)
+    if format == "svg" and opts.tooltips:
+        payload = _promote_tooltips(payload)
     # dot reports non-fatal layout warnings on stderr with a zero exit status;
     # those are not this renderer's to escalate.
-    return completed.stdout
+    return payload
 
 
 def _check_icons_loaded(stderr: str, *, format: str) -> None:
@@ -459,6 +466,30 @@ def _embed_icons(svg: bytes, theme: IconTheme, icons: Mapping[str, str]) -> byte
         return match.group(0) if replacement is None else b'xlink:href="' + replacement + b'"'
 
     return re.sub(rb'xlink:href="([^"]*)"', substitute, svg)
+
+
+def _promote_tooltips(svg: bytes) -> bytes:
+    """Move each tooltip from ``xlink:title`` into the ``<title>`` it belongs to.
+
+    Graphviz writes a ``tooltip`` attribute as ``xlink:title`` on an anchor
+    wrapping the shape, and fills the group's ``<title>`` with the internal name
+    it laid the graph out under. That is the wrong way round for a reader:
+    ``<title>`` is the construct browsers have popped up since SVG 1.1, while
+    ``xlink:title`` is deprecated and widely ignored — so a diagram opened in a
+    browser would show ``routers/rtr-home`` and never the detail this renderer
+    went to the trouble of computing.
+
+    The substitution is textual because the alternative is a full XML round
+    trip, which would cost the standalone document its declaration, its doctype
+    and its comments. It matches Graphviz's own output shape only, and an
+    unmatched document is returned unchanged, so a future Graphviz that emits
+    something else degrades to the old behaviour rather than to a broken file.
+    The replacement text is copied out of an attribute value Graphviz has
+    already escaped, and every escape valid there is valid in element content.
+    """
+    return _TOOLTIP_ANCHOR.sub(
+        lambda match: b"<title>" + match.group(2) + b"</title>" + match.group(1), svg
+    )
 
 
 def _data_uri(path: Path) -> bytes | None:
@@ -517,9 +548,16 @@ def _dot_string(value: object) -> Markup:
     quotes included — and must not be HTML-escaped on its way into the document.
     That marking is why the filter belongs only in DOT-quoted positions; see the
     module docstring.
+
+    Unprintable characters are dropped rather than escaped
+    (:func:`~netgraph.render.details.printable`): DOT has no escape for them,
+    Graphviz would copy one straight into an SVG ``<text>``, and the result
+    would be a document no XML parser accepts. Doing it here rather than in each
+    producer means every quoted position — id, label, tooltip, URL — is covered
+    by construction.
     """
     escaped = (
-        str(value)
+        printable(str(value))
         .replace("\\", "\\\\")
         .replace('"', '\\"')
         .replace("\n", "\\n")
@@ -537,8 +575,8 @@ def _groups(
     graph: Graph,
     options: RenderOptions,
     icons: Mapping[str, str],
-    *,
-    element_ids: bool = False,
+    identity: ElementIds,
+    details: Mapping[str, Mapping[str, object]],
 ) -> tuple[_GroupView, ...]:
     """The node groups to draw: one per namespace, or a single loose group.
 
@@ -547,42 +585,65 @@ def _groups(
     namespace is never boxed either: drawing a frame labelled ``/`` around half
     the diagram helps nobody.
     """
-    # Identity is assigned from the graph's own node order, not from the order
-    # the nodes are drawn in: grouping by namespace reshuffles the second, and
-    # a consumer of the ids resolves them against the graph, not the picture.
-    ids = (
-        {fqn: node_element_id(index) for index, fqn in enumerate(graph.nodes)}
-        if element_ids
-        else {}
-    )
-
     if not options.group_by_namespace:
-        nodes = _node_views(graph.nodes.values(), options, graph.layer, icons, ids)
+        nodes = _node_views(graph, graph.nodes.values(), options, icons, identity, details)
         return (_GroupView(nodes=tuple(nodes)),)
 
     groups: list[_GroupView] = []
     for index, namespace in enumerate(graph.namespaces):
-        members = tuple(_node_views(graph.nodes_in(namespace), options, graph.layer, icons, ids))
-        if namespace:
-            groups.append(_GroupView(nodes=members, id=f"cluster_{index}", label=namespace))
-        else:
-            groups.append(_GroupView(nodes=members))
+        members = graph.nodes_in(namespace)
+        views = tuple(_node_views(graph, members, options, icons, identity, details))
+        if not namespace:
+            groups.append(_GroupView(nodes=views))
+            continue
+        groups.append(
+            _GroupView(
+                nodes=views,
+                # The subgraph's name stays positional: DOT boxes a subgraph only
+                # when its name begins with ``cluster``, and an unquoted DOT id
+                # may hold neither the ``/`` of a namespace nor a ``-``. The
+                # stable identity goes in the ``id`` attribute instead.
+                id=f"cluster_{index}",
+                label=namespace,
+                tooltip=_cluster_tooltip(namespace, members, options, identity, details),
+                element_id=identity.cluster(namespace) if options.element_ids else None,
+            )
+        )
     return tuple(groups)
 
 
+def _cluster_tooltip(
+    namespace: str,
+    members: Iterable[Node],
+    options: RenderOptions,
+    identity: ElementIds,
+    details: Mapping[str, Mapping[str, object]],
+) -> str | None:
+    """What the box around a namespace holds, or ``None`` with tooltips off."""
+    if not options.tooltips:
+        return None
+    records = [
+        record
+        for node in members
+        if (element := identity.node(node.fqn)) is not None
+        and (record := details.get(element)) is not None
+    ]
+    return namespace_text(namespace, records)
+
+
 def _node_views(
+    graph: Graph,
     nodes: Iterable[Node],
     options: RenderOptions,
-    layer: Layer,
     icons: Mapping[str, str],
-    #: ``fqn -> id``; empty when the rendering carries no ids.
-    ids: Mapping[str, str],
+    identity: ElementIds,
+    details: Mapping[str, Mapping[str, object]],
 ) -> Iterator[_NodeView]:
     for node in nodes:
         shape, fill, stroke = _NODE_STYLE.get(node.kind, _DEFAULT_NODE_STYLE)
-        subnet = node.subnet
-        tunnel = node.tunnel
         image = icons.get(node.kind)
+        element = identity.node(node.fqn)
+        record = details.get(element) if element is not None else None
         yield _NodeView(
             id=node.fqn,
             title=_inline(node.name),
@@ -595,13 +656,39 @@ def _node_views(
             fill=fill,
             stroke=stroke,
             style="" if image else _node_style(node),
-            # The description is a DOT string, not HTML, so its line breaks are
+            # A tooltip is a DOT string, not HTML, so its line breaks are
             # meaningful and are kept.
-            tooltip=_node_tooltip(node, subnet, tunnel),
-            rows=_node_rows(node, options, layer),
+            tooltip=detail_text(record) if record is not None else None,
+            rows=_node_rows(node, options, layer=graph.layer),
             image=image,
-            element_id=ids.get(node.fqn),
+            element_id=element if options.element_ids else None,
+            url=_node_url(graph, node, options.link_template),
         )
+
+
+def _node_url(graph: Graph, node: Node, template: LinkTemplate | None) -> str | None:
+    """Where the document behind ``node`` lives, expanded through ``template``.
+
+    A tunnel node stands for a ``tunnel`` document, so it links to that; a
+    layer-3 prefix node stands for an inference from the addresses and links
+    nowhere, because there is no file that says ``192.168.10.0/24``.
+    """
+    if template is None or node.is_subnet:
+        return None
+    fqn = node.tunnel.fqn if node.tunnel is not None else node.fqn
+    return _expand(template, graph, fqn, kind=node.kind)
+
+
+def _expand(template: LinkTemplate, graph: Graph, fqn: str, *, kind: str) -> str | None:
+    """One element's link, or ``None`` when the graph cannot place it."""
+    source = graph.source_of(fqn)
+    return template.expand(
+        file=source.relative if source is not None else None,
+        line=source.line if source is not None else None,
+        name=fqn,
+        namespace=namespace_of(fqn),
+        kind=kind,
+    )
 
 
 def _subtitle(node: Node) -> str:
@@ -611,14 +698,6 @@ def _subtitle(node: Node) -> str:
     if node.tunnel is not None:
         return f"[{node.tunnel.type} tunnel]"
     return f"[{node.kind}]"
-
-
-def _node_tooltip(node: Node, subnet: Subnet | None, tunnel: TunnelView | None) -> str | None:
-    if subnet is not None:
-        return _subnet_tooltip(subnet)
-    if tunnel is not None:
-        return _tunnel_tooltip(tunnel)
-    return node.description
 
 
 def _node_style(node: Node) -> str | None:
@@ -685,7 +764,10 @@ def _node_rows(node: Node, options: RenderOptions, layer: Layer) -> tuple[_Row, 
 
 
 def _edge_views(
-    graph: Graph, options: RenderOptions, *, element_ids: bool = False
+    graph: Graph,
+    options: RenderOptions,
+    identity: ElementIds,
+    details: Mapping[str, Mapping[str, object]],
 ) -> Iterator[_EdgeView]:
     for index, edge in enumerate(graph.edges):
         colour, style = _MEDIUM_STYLE.get(edge.medium, _DEFAULT_MEDIUM_STYLE)
@@ -701,6 +783,8 @@ def _edge_views(
                 if edge.tunnel is None or edge.tunnel.protected
                 else _CLEARTEXT_TUNNEL_STYLE
             )
+        element = identity.edge(index)
+        record = details.get(element) if element is not None else None
         yield _EdgeView(
             source=edge.source,
             target=edge.target,
@@ -708,9 +792,24 @@ def _edge_views(
             style=style,
             penwidth=_penwidth(edge.speed),
             label=_edge_label(edge, graph.layer, options) or None,
-            tooltip=_edge_tooltip(edge, options),
-            element_id=edge_element_id(index) if element_ids else None,
+            tooltip=detail_text(record) if record is not None else None,
+            element_id=element if options.element_ids else None,
+            url=_edge_url(graph, edge, options.link_template),
         )
+
+
+def _edge_url(graph: Graph, edge: Edge, template: LinkTemplate | None) -> str | None:
+    """The document behind a link, expanded through ``template``.
+
+    An adapter attachment is declared by the adapter (§8.2) and a tunnel leg by
+    the tunnel, so both link to the one document that says the link exists. A
+    layer-3 membership is declared by nobody — it follows from two addresses
+    being in one prefix — so it links nowhere.
+    """
+    if template is None or edge.kind is EdgeKind.SUBNET:
+        return None
+    fqn = edge.tunnel.fqn if edge.tunnel is not None else edge.id.partition("#")[0]
+    return _expand(template, graph, fqn, kind=edge.kind.value)
 
 
 def _penwidth(speed: int | None) -> str | None:
@@ -790,37 +889,6 @@ def _edge_label(edge: Edge, layer: Layer, options: RenderOptions) -> str:
     return "\n".join(parts)
 
 
-def _edge_tooltip(edge: Edge, options: RenderOptions) -> str:
-    """The full physical record of a link, shown on hover.
-
-    The tooltip is where the detail the label had no room for lives — but
-    ``--no-show-vlans`` means "do not annotate this diagram with VLANs", not
-    "hide them until the reader hovers", so the display flags apply here too.
-    """
-    if edge.kind is EdgeKind.SUBNET:
-        # A membership has no physical record at all; what a reader wants on
-        # hover is which port of which element the address sits on.
-        parts = [f"{edge.source}:{edge.source_port}"]
-        if edge.addresses:
-            parts.append(", ".join(edge.addresses))
-        if options.show_vlans and edge.vlans:
-            parts.append(f"vlans: {_compact_ids(edge.vlans)}")
-        return " — ".join(parts)
-
-    if edge.tunnel is not None:
-        return _tunnel_tooltip(edge.tunnel, vlans=edge.vlans if options.show_vlans else frozenset())
-
-    parts = [f"{edge.kind}: {edge.name}", f"medium: {edge.medium}"]
-    speed = edge.speed_text
-    if speed:
-        parts.append(f"speed: {speed}")
-    if edge.length_m is not None:
-        parts.append(f"length: {_number(edge.length_m)} m")
-    if options.show_vlans and edge.vlans:
-        parts.append(f"vlans: {_compact_ids(edge.vlans)}")
-    return ", ".join(parts)
-
-
 # --------------------------------------------------------------------------- #
 # Shared formatting
 # --------------------------------------------------------------------------- #
@@ -864,40 +932,6 @@ def _tunnel_rows(view: TunnelView) -> tuple[_Row, ...]:
     return tuple(rows)
 
 
-def _tunnel_tooltip(view: TunnelView, vlans: frozenset[int] = frozenset()) -> str:
-    """The full record of a tunnel, shown on hover."""
-    spec = view.tunnel.spec
-    parts = [f"tunnel: {view.fqn}", f"type: {view.stack_text}"]
-    if view.vni is not None:
-        parts.append(f"vni: {view.vni}")
-    if spec.mode is not None:
-        parts.append(f"mode: {spec.mode}")
-    transport = spec.type.transport
-    parts.append(f"transport: {transport}{f'/{spec.port}' if spec.port is not None else ''}")
-    if view.encrypted:
-        parts.append(f"encrypted: {spec.cipher}" if spec.cipher else "encrypted")
-    elif view.encrypted_by is not None:
-        parts.append(f"cleartext, carried by {view.encrypted_by}")
-    else:
-        parts.append("cleartext")
-    if spec.auth is not None:
-        parts.append(f"auth: {spec.auth}")
-    if view.mtu is not None:
-        parts.append(f"mtu: {view.mtu} (overhead {view.overhead_bytes} B)")
-    if vlans:
-        parts.append(f"vlans: {_compact_ids(vlans)}")
-    return ", ".join(parts)
-
-
-def _subnet_tooltip(subnet: Subnet) -> str:
-    """How populated the prefix is — the number a single-member subnet gives away."""
-    return (
-        f"{subnet.family} subnet {subnet.prefix}: "
-        f"{_count(len(subnet.elements), 'element')}, "
-        f"{_count(len(subnet.addresses), 'address', 'addresses')}"
-    )
-
-
 def _address_lines(addresses: Sequence[str], limit: int) -> list[str]:
     if len(addresses) <= limit:
         return list(addresses)
@@ -924,16 +958,10 @@ def _count(number: int, noun: str, plural: str | None = None) -> str:
     return f"{number} {noun}" if number == 1 else f"{number} {plural or noun + 's'}"
 
 
-def _number(value: float) -> str:
-    """Drop the trailing ``.0`` of a whole-number float."""
-    return str(int(value)) if float(value).is_integer() else str(value)
-
-
-def _inline(text: str) -> str:
-    """Collapse whitespace, so a value cannot break a table row across lines.
-
-    Element and interface names cannot contain a newline (§2 name grammar), but
-    the renderer must not depend on a validator that a later refactor could move
-    or relax — the same reason node ids are quoted rather than trusted.
-    """
-    return " ".join(text.split())
+#: Whatever an inventory wrote, reduced to one line of printable text. A name
+#: cannot contain a newline or a control character (§2 name grammar), but the
+#: renderer must not depend on a validator that a later refactor could move or
+#: relax — the same reason node ids are quoted rather than trusted. Graphviz
+#: rejects a record label holding a control character outright, so this is the
+#: difference between a diagram and an error message.
+_inline = plain_text

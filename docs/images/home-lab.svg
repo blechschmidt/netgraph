@@ -12,8 +12,8 @@
 <text text-anchor="middle" x="681.8" y="-439.2" font-family="Helvetica,Arial,sans-serif" font-size="16.00">home&#45;lab — layer 2</text>
 <!-- hosts/adp&#45;usb&#45;eth -->
 <g id="node1" class="node">
-<title>hosts/adp&#45;usb&#45;eth</title>
-<g id="a_node1"><a xlink:title="USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the&#10;laptop &#45; there is deliberately no cable between the two (NG&#45;X005).&#10;">
+<title>adp&#45;usb&#45;eth [adapter]&#10;namespace: hosts&#10;USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the laptop &#45; there is deliberately no cable between the two (NG&#45;X005).&#10;labels: asset=A&#45;0001, site=home&#10;vlans: 10&#10;interfaces (1):&#10; &#160;enx001122334455 &#160;ethernet &#160;192.168.10.30/24, 2001:db8:10::30/64 &#160;00:11:22:33:44:55&#10;links (2):&#10; &#160;enx001122334455 — switches/sw&#45;home:port4 &#160;(cable, copper, 1Gbps) &#160;vlan 10&#10; &#160;usb0 — hosts/laptop &#160;(attachment, copper, 5Gbps)</title>
+<g id="a_node1"><a xlink:title="adp&#45;usb&#45;eth [adapter]&#10;namespace: hosts&#10;USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the laptop &#45; there is deliberately no cable between the two (NG&#45;X005).&#10;labels: asset=A&#45;0001, site=home&#10;vlans: 10&#10;interfaces (1):&#10; &#160;enx001122334455 &#160;ethernet &#160;192.168.10.30/24, 2001:db8:10::30/64 &#160;00:11:22:33:44:55&#10;links (2):&#10; &#160;enx001122334455 — switches/sw&#45;home:port4 &#160;(cable, copper, 1Gbps) &#160;vlan 10&#10; &#160;usb0 — hosts/laptop &#160;(attachment, copper, 5Gbps)">
 <ellipse fill="#fdf0e3" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5,2" cx="1175.5" cy="-253" rx="188.18" ry="33.47"/>
 <text text-anchor="start" x="1148" y="-264" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">adp&#45;usb&#45;eth</text>
 <text text-anchor="start" x="1156" y="-250" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[adapter]</text>
@@ -24,8 +24,8 @@
 </g>
 <!-- switches/sw&#45;home -->
 <g id="node6" class="node">
-<title>switches/sw&#45;home</title>
-<g id="a_node6"><a xlink:title="Eight&#45;port desktop switch in the hallway cabinet">
+<title>sw&#45;home [switch]&#10;namespace: switches&#10;Eight&#45;port desktop switch in the hallway cabinet&#10;labels: role=access, site=home&#10;vlans: 10&#10;interfaces (7):&#10; &#160;br0 &#160;bridge&#10; &#160;Vlan10 &#160;vlan &#160;192.168.10.2/24 &#160;vlan 10 (access)&#10; &#160;port1 &#160;ethernet &#160;vlan 10 (access) &#160;00:22:07:aa:00:01&#10; &#160;port2 &#160;ethernet &#160;vlan 10 (access) &#160;00:22:07:aa:00:02&#10; &#160;port3 &#160;ethernet &#160;vlan 10 (access) &#160;00:22:07:aa:00:03&#10; &#160;port4 &#160;ethernet &#160;vlan 10 (access) &#160;00:22:07:aa:00:04&#10; &#160;port5 &#160;ethernet &#160;disabled &#160;vlan 10 (access) &#160;00:22:07:aa:00:05&#10;links (4):&#10; &#160;port1 — routers/rtr&#45;home:lan0 &#160;(cable, copper, 1Gbps) &#160;vlan 10&#10; &#160;port2 — hosts/pc&#45;desk:eno1 &#160;(cable, copper, 1Gbps) &#160;vlan 10&#10; &#160;port3 — hosts/srv&#45;nas:eth0 &#160;(cable, copper, 1Gbps) &#160;vlan 10&#10; &#160;port4 — hosts/adp&#45;usb&#45;eth:enx001122334455 &#160;(cable, copper, 1Gbps) &#160;vlan 10</title>
+<g id="a_node6"><a xlink:title="sw&#45;home [switch]&#10;namespace: switches&#10;Eight&#45;port desktop switch in the hallway cabinet&#10;labels: role=access, site=home&#10;vlans: 10&#10;interfaces (7):&#10; &#160;br0 &#160;bridge&#10; &#160;Vlan10 &#160;vlan &#160;192.168.10.2/24 &#160;vlan 10 (access)&#10; &#160;port1 &#160;ethernet &#160;vlan 10 (access) &#160;00:22:07:aa:00:01&#10; &#160;port2 &#160;ethernet &#160;vlan 10 (access) &#160;00:22:07:aa:00:02&#10; &#160;port3 &#160;ethernet &#160;vlan 10 (access) &#160;00:22:07:aa:00:03&#10; &#160;port4 &#160;ethernet &#160;vlan 10 (access) &#160;00:22:07:aa:00:04&#10; &#160;port5 &#160;ethernet &#160;disabled &#160;vlan 10 (access) &#160;00:22:07:aa:00:05&#10;links (4):&#10; &#160;port1 — routers/rtr&#45;home:lan0 &#160;(cable, copper, 1Gbps) &#160;vlan 10&#10; &#160;port2 — hosts/pc&#45;desk:eno1 &#160;(cable, copper, 1Gbps) &#160;vlan 10&#10; &#160;port3 — hosts/srv&#45;nas:eth0 &#160;(cable, copper, 1Gbps) &#160;vlan 10&#10; &#160;port4 — hosts/adp&#45;usb&#45;eth:enx001122334455 &#160;(cable, copper, 1Gbps) &#160;vlan 10">
 <polygon fill="#dcf0dc" stroke="#16a34a" stroke-width="1.2" points="611,-112 460,-112 456,-108 456,0 607,0 611,-4 611,-112"/>
 <polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="607,-108 456,-108 "/>
 <polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="607,-108 607,0 "/>
@@ -50,8 +50,8 @@
 </g>
 <!-- hosts/adp&#45;usb&#45;eth&#45;&#45;switches/sw&#45;home -->
 <g id="edge4" class="edge">
-<title>hosts/adp&#45;usb&#45;eth&#45;&#45;switches/sw&#45;home</title>
-<g id="a_edge4"><a xlink:title="cable: cbl&#45;sw&#45;dongle, medium: copper, speed: 1Gbps, length: 10 m, vlans: 10">
+<title>cable cables/cbl&#45;sw&#45;dongle&#10;hosts/adp&#45;usb&#45;eth:enx001122334455 — switches/sw&#45;home:port4&#10;medium: copper, speed: 1Gbps, length: 10 m, label: H&#45;004&#10;vlans: 10</title>
+<g id="a_edge4"><a xlink:title="cable cables/cbl&#45;sw&#45;dongle&#10;hosts/adp&#45;usb&#45;eth:enx001122334455 — switches/sw&#45;home:port4&#10;medium: copper, speed: 1Gbps, length: 10 m, label: H&#45;004&#10;vlans: 10">
 <path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M1095.66,-222.82C1057.64,-209.25 1011.41,-193.22 969.5,-180 844.99,-140.72 698.63,-100.66 611.11,-77.35"/>
 </a>
 </g>
@@ -60,8 +60,8 @@
 </g>
 <!-- hosts/laptop -->
 <g id="node2" class="node">
-<title>hosts/laptop</title>
-<g id="a_node2"><a xlink:title="Ultrabook without a built&#45;in Ethernet port. It reaches the wired network&#10;through the USB dongle declared in hosts/adp&#45;usb&#45;eth.yaml, so it owns no&#10;cabled interface of its own.&#10;">
+<title>laptop [computer]&#10;namespace: hosts&#10;Ultrabook without a built&#45;in Ethernet port. It reaches the wired network through the USB dongle declared in hosts/adp&#45;usb&#45;eth.yaml, so it owns no cabled interface of its own.&#10;labels: owner=sam, role=laptop, site=home&#10;vlans: 10&#10;interfaces (2):&#10; &#160;lo &#160;loopback &#160;127.0.0.1/8, ::1/128&#10; &#160;wlp0s20f3 &#160;wifi &#160;disabled &#160;8c:8c:aa:30:01:01&#10;links (1):&#10; &#160;hosts/adp&#45;usb&#45;eth:usb0 &#160;(attachment, copper, 5Gbps)</title>
+<g id="a_node2"><a xlink:title="laptop [computer]&#10;namespace: hosts&#10;Ultrabook without a built&#45;in Ethernet port. It reaches the wired network through the USB dongle declared in hosts/adp&#45;usb&#45;eth.yaml, so it owns no cabled interface of its own.&#10;labels: owner=sam, role=laptop, site=home&#10;vlans: 10&#10;interfaces (2):&#10; &#160;lo &#160;loopback &#160;127.0.0.1/8, ::1/128&#10; &#160;wlp0s20f3 &#160;wifi &#160;disabled &#160;8c:8c:aa:30:01:01&#10;links (1):&#10; &#160;hosts/adp&#45;usb&#45;eth:usb0 &#160;(attachment, copper, 5Gbps)">
 <polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="1208,-430 1143,-430 1143,-394 1208,-394 1208,-430"/>
 <text text-anchor="start" x="1161" y="-417" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">laptop</text>
 <text text-anchor="start" x="1152.5" y="-403" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
@@ -70,8 +70,8 @@
 </g>
 <!-- hosts/laptop&#45;&#45;hosts/adp&#45;usb&#45;eth -->
 <g id="edge5" class="edge">
-<title>hosts/laptop&#45;&#45;hosts/adp&#45;usb&#45;eth</title>
-<g id="a_edge5"><a xlink:title="attachment: adp&#45;usb&#45;eth, medium: copper, speed: 5Gbps">
+<title>attachment hosts/adp&#45;usb&#45;eth#upstream&#10;hosts/laptop — hosts/adp&#45;usb&#45;eth:usb0&#10;medium: copper, speed: 5Gbps, label: usb</title>
+<g id="a_edge5"><a xlink:title="attachment hosts/adp&#45;usb&#45;eth#upstream&#10;hosts/laptop — hosts/adp&#45;usb&#45;eth:usb0&#10;medium: copper, speed: 5Gbps, label: usb">
 <path fill="none" stroke="#9ca3af" stroke-width="2" stroke-dasharray="1,5" d="M1175.5,-393.9C1175.5,-368.15 1175.5,-318.97 1175.5,-286.32"/>
 </a>
 </g>
@@ -80,8 +80,8 @@
 </g>
 <!-- hosts/pc&#45;desk -->
 <g id="node3" class="node">
-<title>hosts/pc&#45;desk</title>
-<g id="a_node3"><a xlink:title="Desktop workstation in the study">
+<title>pc&#45;desk [computer]&#10;namespace: hosts&#10;Desktop workstation in the study&#10;labels: owner=sam, role=workstation, site=home&#10;vlans: 10&#10;interfaces (3):&#10; &#160;lo &#160;loopback &#160;127.0.0.1/8, ::1/128&#10; &#160;eno1 &#160;ethernet &#160;192.168.10.20/24, 2001:db8:10::20/64 &#160;3c:97:0e:20:01:01&#10; &#160;wlp1s0 &#160;wifi &#160;disabled &#160;3c:97:0e:20:01:02&#10;links (1):&#10; &#160;eno1 — switches/sw&#45;home:port2 &#160;(cable, copper, 1Gbps) &#160;vlan 10</title>
+<g id="a_node3"><a xlink:title="pc&#45;desk [computer]&#10;namespace: hosts&#10;Desktop workstation in the study&#10;labels: owner=sam, role=workstation, site=home&#10;vlans: 10&#10;interfaces (3):&#10; &#160;lo &#160;loopback &#160;127.0.0.1/8, ::1/128&#10; &#160;eno1 &#160;ethernet &#160;192.168.10.20/24, 2001:db8:10::20/64 &#160;3c:97:0e:20:01:01&#10; &#160;wlp1s0 &#160;wifi &#160;disabled &#160;3c:97:0e:20:01:02&#10;links (1):&#10; &#160;eno1 — switches/sw&#45;home:port2 &#160;(cable, copper, 1Gbps) &#160;vlan 10">
 <polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="209,-276.5 0,-276.5 0,-229.5 209,-229.5 209,-276.5"/>
 <text text-anchor="start" x="86.5" y="-264" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">pc&#45;desk</text>
 <text text-anchor="start" x="81.5" y="-250" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
@@ -92,8 +92,8 @@
 </g>
 <!-- hosts/pc&#45;desk&#45;&#45;switches/sw&#45;home -->
 <g id="edge2" class="edge">
-<title>hosts/pc&#45;desk&#45;&#45;switches/sw&#45;home</title>
-<g id="a_edge2"><a xlink:title="cable: cbl&#45;sw&#45;desk, medium: copper, speed: 1Gbps, length: 8 m, vlans: 10">
+<title>cable cables/cbl&#45;sw&#45;desk&#10;hosts/pc&#45;desk:eno1 — switches/sw&#45;home:port2&#10;medium: copper, speed: 1Gbps, length: 8 m, label: H&#45;002&#10;vlans: 10</title>
+<g id="a_edge2"><a xlink:title="cable cables/cbl&#45;sw&#45;desk&#10;hosts/pc&#45;desk:eno1 — switches/sw&#45;home:port2&#10;medium: copper, speed: 1Gbps, length: 8 m, label: H&#45;002&#10;vlans: 10">
 <path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M139.79,-229.47C163.98,-214.5 197.06,-194.92 227.5,-180 303.2,-142.88 393.05,-107.77 455.74,-84.64"/>
 </a>
 </g>
@@ -102,8 +102,8 @@
 </g>
 <!-- hosts/srv&#45;nas -->
 <g id="node4" class="node">
-<title>hosts/srv&#45;nas</title>
-<g id="a_node4"><a xlink:title="Backup and media server">
+<title>srv&#45;nas [server]&#10;namespace: hosts&#10;Backup and media server&#10;labels: env=prod, role=storage, site=home&#10;vlans: 10&#10;interfaces (2):&#10; &#160;lo &#160;loopback &#160;127.0.0.1/8, ::1/128&#10; &#160;eth0 &#160;ethernet &#160;192.168.10.10/24, 2001:db8:10::10/64 &#160;00:11:32:40:01:01&#10;links (1):&#10; &#160;eth0 — switches/sw&#45;home:port3 &#160;(cable, copper, 1Gbps) &#160;vlan 10</title>
+<g id="a_node4"><a xlink:title="srv&#45;nas [server]&#10;namespace: hosts&#10;Backup and media server&#10;labels: env=prod, role=storage, site=home&#10;vlans: 10&#10;interfaces (2):&#10; &#160;lo &#160;loopback &#160;127.0.0.1/8, ::1/128&#10; &#160;eth0 &#160;ethernet &#160;192.168.10.10/24, 2001:db8:10::10/64 &#160;00:11:32:40:01:01&#10;links (1):&#10; &#160;eth0 — switches/sw&#45;home:port3 &#160;(cable, copper, 1Gbps) &#160;vlan 10">
 <path fill="#eae2f5" stroke="#7c3aed" stroke-width="1.2" d="M451.5,-279.28C451.5,-282.51 405.33,-285.13 348.5,-285.13 291.67,-285.13 245.5,-282.51 245.5,-279.28 245.5,-279.28 245.5,-226.72 245.5,-226.72 245.5,-223.49 291.67,-220.87 348.5,-220.87 405.33,-220.87 451.5,-223.49 451.5,-226.72 451.5,-226.72 451.5,-279.28 451.5,-279.28"/>
 <path fill="none" stroke="#7c3aed" stroke-width="1.2" d="M451.5,-279.28C451.5,-276.06 405.33,-273.44 348.5,-273.44 291.67,-273.44 245.5,-276.06 245.5,-279.28"/>
 <text text-anchor="start" x="331.5" y="-264" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">srv&#45;nas</text>
@@ -115,8 +115,8 @@
 </g>
 <!-- hosts/srv&#45;nas&#45;&#45;switches/sw&#45;home -->
 <g id="edge3" class="edge">
-<title>hosts/srv&#45;nas&#45;&#45;switches/sw&#45;home</title>
-<g id="a_edge3"><a xlink:title="cable: cbl&#45;sw&#45;nas, medium: copper, speed: 1Gbps, length: 0.5 m, vlans: 10">
+<title>cable cables/cbl&#45;sw&#45;nas&#10;hosts/srv&#45;nas:eth0 — switches/sw&#45;home:port3&#10;medium: copper, speed: 1Gbps, length: 0.5 m, label: H&#45;003&#10;vlans: 10</title>
+<g id="a_edge3"><a xlink:title="cable cables/cbl&#45;sw&#45;nas&#10;hosts/srv&#45;nas:eth0 — switches/sw&#45;home:port3&#10;medium: copper, speed: 1Gbps, length: 0.5 m, label: H&#45;003&#10;vlans: 10">
 <path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M378.22,-220.67C405.9,-191.49 447.78,-147.35 481.08,-112.26"/>
 </a>
 </g>
@@ -125,8 +125,8 @@
 </g>
 <!-- routers/rtr&#45;home -->
 <g id="node5" class="node">
-<title>routers/rtr&#45;home</title>
-<g id="a_node5"><a xlink:title="Home edge router. Terminates the ISP hand&#45;off on wan0 and is the default&#10;gateway for the single home VLAN (10).&#10;">
+<title>rtr&#45;home [router]&#10;namespace: routers&#10;Home edge router. Terminates the ISP hand&#45;off on wan0 and is the default gateway for the single home VLAN (10).&#10;labels: env=prod, role=edge, site=home&#10;vlans: 10&#10;interfaces (3):&#10; &#160;lo0 &#160;loopback &#160;192.0.2.1/32, 2001:db8::1/128&#10; &#160;wan0 &#160;ethernet &#160;203.0.113.2/30 &#160;00:1e:8c:00:10:01&#10; &#160;lan0 &#160;ethernet &#160;192.168.10.1/24, 2001:db8:10::1/64 &#160;vlan 10 (access) &#160;00:1e:8c:00:10:02&#10;links (1):&#10; &#160;lan0 — switches/sw&#45;home:port1 &#160;(cable, copper, 1Gbps) &#160;vlan 10</title>
+<g id="a_node5"><a xlink:title="rtr&#45;home [router]&#10;namespace: routers&#10;Home edge router. Terminates the ISP hand&#45;off on wan0 and is the default gateway for the single home VLAN (10).&#10;labels: env=prod, role=edge, site=home&#10;vlans: 10&#10;interfaces (3):&#10; &#160;lo0 &#160;loopback &#160;192.0.2.1/32, 2001:db8::1/128&#10; &#160;wan0 &#160;ethernet &#160;203.0.113.2/30 &#160;00:1e:8c:00:10:01&#10; &#160;lan0 &#160;ethernet &#160;192.168.10.1/24, 2001:db8:10::1/64 &#160;vlan 10 (access) &#160;00:1e:8c:00:10:02&#10;links (1):&#10; &#160;lan0 — switches/sw&#45;home:port1 &#160;(cable, copper, 1Gbps) &#160;vlan 10">
 <polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="719.5,-326 487.5,-253 719.5,-180 951.5,-253 719.5,-326"/>
 <text text-anchor="start" x="699.5" y="-277" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr&#45;home</text>
 <text text-anchor="start" x="704" y="-263" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
@@ -142,8 +142,8 @@
 </g>
 <!-- routers/rtr&#45;home&#45;&#45;switches/sw&#45;home -->
 <g id="edge1" class="edge">
-<title>routers/rtr&#45;home&#45;&#45;switches/sw&#45;home</title>
-<g id="a_edge1"><a xlink:title="cable: cbl&#45;rtr&#45;sw, medium: copper, speed: 1Gbps, length: 0.5 m, vlans: 10">
+<title>cable cables/cbl&#45;rtr&#45;sw&#10;routers/rtr&#45;home:lan0 — switches/sw&#45;home:port1&#10;medium: copper, speed: 1Gbps, length: 0.5 m, label: H&#45;001&#10;vlans: 10</title>
+<g id="a_edge1"><a xlink:title="cable cables/cbl&#45;rtr&#45;sw&#10;routers/rtr&#45;home:lan0 — switches/sw&#45;home:port1&#10;medium: copper, speed: 1Gbps, length: 0.5 m, label: H&#45;001&#10;vlans: 10">
 <path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M666.45,-196.38C641.22,-169.93 611.14,-138.39 585.98,-112.02"/>
 </a>
 </g>
