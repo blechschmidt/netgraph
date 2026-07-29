@@ -538,6 +538,31 @@ defend itself against a walk that never terminates.
 loop. There is no legitimate case; one of the `over` values names the wrong
 tunnel.
 
+#### `E020` — first hop is not on-link
+
+*Alias: `NG-A013`. Severity: error.*
+
+An interface declares `ipv4.gateway` or `ipv6.gateway`, and that address is
+inside none of the prefixes the same interface configures for the same family.
+
+**Why it matters.** A first hop is reached by ARP or by neighbour discovery,
+never by routing — that is the whole point of it. An address outside every
+on-link prefix therefore cannot be resolved, so the host has no way to send the
+packet that would teach it how to reach the gateway. The two usual causes are a
+prefix length shortened without the gateway being moved, and a gateway copied
+from the subnet next door.
+
+An IPv6 link-local gateway is exempt: `fe80::1` is on-link by definition, and
+the interface's own link-local address is autoconfigured rather than written
+down, so there is no declared prefix for it to be inside of.
+
+Reported by [`netgraph ipam`](ipam.md) as well as by `netgraph validate`; the
+IPAM report calls this rule rather than re-deriving it.
+
+**Suppress with** `E020` / `NG-A013`, or an annotation on the element. The
+legitimate case is an unnumbered or point-to-point link whose peer address is
+deliberately outside the local prefix — rare enough to be worth annotating.
+
 ### Warnings
 
 #### `W101` — interface neither routes nor switches
@@ -1045,6 +1070,90 @@ other, joining broadcast domains the diagram shows as separate.
 the element. A VNI deliberately reused across a hub-and-spoke mesh, written as
 several point-to-point tunnels rather than one multipoint one, is the legitimate
 case — and writing it as one multipoint tunnel says it better.
+
+#### `W130` — prefix claimed by two broadcast domains
+
+*Alias: `NG-A010`. Severity: warning.*
+
+One prefix holds addresses on interfaces that declare *different* VLANs. This is
+the address-plan overlap that is not a nesting: neither claim contains the
+other, the two simply collide on the same space.
+
+**Why it matters.** A prefix is the address space of one segment. Every host in
+it believes every address in it is reachable by ARP, and half of them are in the
+other VLAN and are not. Nothing routes between the two either: a router will not
+forward between two interfaces it considers to be on the same subnet. The usual
+cause is a subnet document copied to a second VLAN without its addressing being
+changed.
+
+Only interfaces that declare a `vlan` block count. A host on an access port
+declares none — its broadcast domain is a property of the switch it is cabled
+to, not of its own document — so counting "untagged" as a domain of its own
+would fire on the ordinary pairing of a router sub-interface with the hosts it
+serves. Two ports of *one* element are left to
+[`W111`](#w111--overlapping-prefixes-on-one-element).
+
+When every domain holds exactly the same addresses, nothing is reported here:
+that is one address claimed twice, and
+[`W106`](#w106--one-address-claimed-twice-in-a-subnet) and
+[`E004`](#e004--duplicate-ip-address) say it more sharply, with the offending
+address named.
+
+Reported by [`netgraph ipam`](ipam.md) as the overlapping-prefix conflict.
+
+**Suppress with** `W130` / `NG-A010`, or an annotation on any element addressed
+in the prefix. The legitimate case is a deliberately duplicated plan — two
+identical lab pods, isolated from each other on purpose.
+
+#### `W131` — nested prefix in a different broadcast domain
+
+*Alias: `NG-A011`. Severity: warning.*
+
+One prefix sits inside another, and the two are used in disjoint sets of VLANs:
+`10.0.0.0/16` on VLAN 10 with `10.0.5.0/24` on VLAN 20 beneath it.
+
+**Why it matters.** Nesting on its own is normal — a summarising router and the
+segments underneath it describe one plan at two levels. It stops being normal
+across a VLAN boundary, because the wider prefix tells its own segment that
+every address of the narrower one is on-link. Those hosts will ARP for addresses
+they should be routing to, and get no answer. This is the shape a mask typo
+takes: a `/16` where a `/24` was meant.
+
+As with [`W130`](#w130--prefix-claimed-by-two-broadcast-domains), only
+interfaces that declare a `vlan` block are compared.
+
+Reported by [`netgraph ipam`](ipam.md) as the nested-prefix conflict.
+
+**Suppress with** `W131` / `NG-A011`, or an annotation on any element addressed
+in either prefix. The legitimate case is a summary address deliberately
+configured on a different VLAN from the segments it summarises.
+
+#### `W132` — address outside every prefix on its link
+
+*Alias: `NG-A012`. Severity: warning.*
+
+The two interfaces a cable joins are both addressed in one family, and no prefix
+on either end overlaps a prefix on the other.
+
+**Why it matters.** A cable is one segment, and there is no room inside it for a
+router. An address configured on it that lies outside every prefix the far end
+declares is outside every prefix on its own link, so the two ends cannot exchange
+a single packet. The usual cause is a host that kept the addressing of the desk
+it was moved from.
+
+Only families *both* ends configure are compared, so a switchport — which
+carries no address at all — says nothing here, and the ordinary host-to-access-
+port link is quiet. A dual-stack pair that agrees on IPv6 while disagreeing on
+IPv4 is still reported: the IPv4 half is still broken. Both ends are resolved
+through the LAG master first (§10.6), and a cable landing on an interface with
+no socket is left to [`E012`](#e012--cable-terminates-on-an-interface-with-no-socket).
+
+Reported by [`netgraph ipam`](ipam.md) as the outside-every-declared-prefix
+conflict.
+
+**Suppress with** `W132` / `NG-A012`, or an annotation on either element. The
+legitimate case is a link that is deliberately unnumbered on one side, or one
+whose peer is addressed by an ISP out of a range this inventory does not model.
 
 ### Info
 

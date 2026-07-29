@@ -25,8 +25,14 @@ spec:
       mtu: 1500
       ipv4:
         addresses: [10.1.10.51/24]
+        # The Vlan10 SVI on sw-north-dist-01. 'gateway' is checked against this
+        # interface's own prefixes by NG-A013; 'netgraph ipam' reports it.
+        gateway: 10.1.10.1
       ipv6:
         addresses: [2001:db8:1:10::51/64]
+        # A link-local first hop is the normal IPv6 choice and is on-link by
+        # definition, so NG-A013 exempts it.
+        gateway: fe80::1
 ---
 apiVersion: netgraph.dev/v1alpha1
 kind: server
@@ -85,5 +91,7 @@ spec:
       mtu: 1500
       ipv4:
         addresses: [10.1.10.52/24]
+        gateway: 10.1.10.1
       ipv6:
         addresses: [2001:db8:1:10::52/64]
+        gateway: fe80::1

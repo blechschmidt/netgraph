@@ -1,0 +1,189 @@
+# A dual-stack site: every addressed interface carries both families.
+#
+# Used by tests/test_ipam.py to check that utilisation, free space and
+# aggregation treat IPv4 and IPv6 independently and that a report over both
+# families keeps them apart. The tree validates with no findings, so anything
+# the IPAM conflict report says about it is a regression.
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-core
+spec:
+  forwarding:
+    ipv4: true
+    ipv6: true
+  vlans:
+    - id: 10
+      name: users
+    - id: 20
+      name: servers
+  interfaces:
+    - name: eth0
+      type: ethernet
+      description: Trunk to the access switch
+      mtu: 1500
+      vlan:
+        mode: trunk
+        trunk_vlans: [10, 20]
+        native_vlan: 10
+      ipv4:
+        addresses: [10.10.10.1/24]
+      ipv6:
+        addresses: ["2001:db8:a:10::1/64"]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-access
+spec:
+  vlans:
+    - id: 10
+      name: users
+    - id: 20
+      name: servers
+  interfaces:
+    - name: Ethernet1
+      type: ethernet
+      description: Uplink to the router
+      mtu: 1500
+      vlan:
+        mode: trunk
+        trunk_vlans: [10, 20]
+        native_vlan: 10
+    - name: Ethernet2
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: Ethernet3
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 20
+    - name: Ethernet4
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 20
+    - name: Ethernet5
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-user
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.10.10.50/24]
+        gateway: 10.10.10.1
+      ipv6:
+        addresses: ["2001:db8:a:10::50/64"]
+        gateway: fe80::1
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-app
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.10.20.10/24]
+      ipv6:
+        addresses: ["2001:db8:a:20::10/64"]
+    - name: eth1
+      type: ethernet
+      description: Spare port, not patched
+      enabled: false
+      mtu: 1500
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-db
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.10.20.11/24]
+      ipv6:
+        addresses: ["2001:db8:a:20::11/64"]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-user-2
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.10.10.51/24]
+      ipv6:
+        addresses: ["2001:db8:a:10::51/64"]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-uplink
+spec:
+  endpoints:
+    - rtr-core:eth0
+    - sw-access:Ethernet1
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-user
+spec:
+  endpoints:
+    - sw-access:Ethernet2
+    - pc-user:eth0
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-srv-app
+spec:
+  endpoints:
+    - sw-access:Ethernet3
+    - srv-app:eth0
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-srv-db
+spec:
+  endpoints:
+    - sw-access:Ethernet4
+    - srv-db:eth0
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-user-2
+spec:
+  endpoints:
+    - sw-access:Ethernet5
+    - pc-user-2:eth0
+  medium: copper

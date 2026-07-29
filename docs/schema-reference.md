@@ -139,6 +139,7 @@ RFC 8344's `ip:ipv4` container.
 | `forwarding` | boolean | no | *unset* | Whether the interface forwards IPv4. Left unset in the document, it inherits `spec.forwarding.ipv4`; RFC 8344's own default is false. | `…/ip:ipv4/ip:forwarding` |
 | `mtu` | integer, 68–65535 | no | *unset* | IPv4 MTU. Defaults to `interfaces[].mtu` once the document is loaded. | `…/ip:ipv4/ip:mtu` |
 | `addresses` | [IPv4Address](#specinterfacesipv4addresses) list | no | `[]` | The IPv4 addresses configured on the interface. `10.0.0.1/24` is shorthand for a full entry, and a bare list is shorthand for `{addresses: [...]}`. | `…/ip:ipv4/ip:address` |
+| `gateway` | IPv4 address | no | *unset* | First hop for off-link IPv4 traffic, as a bare address without a prefix length. It must lie inside one of this interface's own prefixes (`NG-A013`). | `rt:routing/…/static-routes/v4ur:ipv4/v4ur:route/…/next-hop-address` |
 
 * A bare list is shorthand for the container: `ipv4: [10.0.0.1/24]` means `ipv4: {addresses: [{ip: 10.0.0.1, prefix_length: 24}]}`.
 
@@ -164,6 +165,7 @@ RFC 8344's `ip:ipv6` container.
 | `forwarding` | boolean | no | *unset* | Whether the interface forwards IPv6. Inherits `spec.forwarding.ipv6` when unset. | `…/ip:ipv6/ip:forwarding` |
 | `mtu` | integer, 1280–4294967295 | no | *unset* | IPv6 MTU. Defaults to `interfaces[].mtu`, but only when that is at least 1280. | `…/ip:ipv6/ip:mtu` |
 | `addresses` | [IPv6Address](#specinterfacesipv6addresses) list | no | `[]` | The IPv6 addresses configured on the interface. Normalised to RFC 5952 lower-case compressed form. | `…/ip:ipv6/ip:address` |
+| `gateway` | IPv6 address | no | *unset* | First hop for off-link IPv6 traffic, as a bare address without a prefix length. It must lie inside one of this interface's own prefixes (`NG-A013`), unless it is link-local: `fe80::1` is on-link by definition and is exempt. | `rt:routing/…/static-routes/v6ur:ipv6/v6ur:route/…/next-hop-address` |
 
 ## `spec.interfaces[].ipv6.addresses[]`
 

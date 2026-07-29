@@ -1,0 +1,83 @@
+# Point-to-point links sized the way the RFCs size them.
+#
+# The IPv4 side is a /31 (RFC 3021): both addresses belong to the two routers,
+# so the prefix holds two hosts rather than none. The IPv6 side is the /127 of
+# RFC 6164. A naive 2^n - 2 would report -0 usable addresses for the first and
+# a subnet-router anycast address nobody configured for the second.
+#
+# The /30 is here as the contrast: same job, two addresses wasted.
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-a
+spec:
+  forwarding:
+    ipv4: true
+    ipv6: true
+  interfaces:
+    - name: eth0
+      type: ethernet
+      description: Point-to-point to rtr-b, RFC 3021 style
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.0/31]
+      ipv6:
+        addresses: ["2001:db8::/127"]
+    - name: eth1
+      type: ethernet
+      description: Point-to-point to rtr-c, the classic /30
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.1.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-b
+spec:
+  forwarding:
+    ipv4: true
+    ipv6: true
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/31]
+      ipv6:
+        addresses: ["2001:db8::1/127"]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-c
+spec:
+  forwarding:
+    ipv4: true
+    ipv6: true
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.1.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - rtr-a:eth0
+    - rtr-b:eth0
+  medium: fiber
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-c
+spec:
+  endpoints:
+    - rtr-a:eth1
+    - rtr-c:eth0
+  medium: fiber

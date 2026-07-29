@@ -1,0 +1,78 @@
+# W130 (NG-A010) - one prefix, two broadcast domains.
+#
+# 10.0.0.0/24 is configured on VLAN 10 and again on VLAN 20. Each host believes
+# the whole prefix is on-link, so it ARPs for the other half and never hears an
+# answer; and no router will forward between two ports it considers one subnet.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-core
+spec:
+  vlans:
+    - id: 10
+      name: users
+    - id: 20
+      name: iot
+  interfaces:
+    - name: Ethernet1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: Ethernet2
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 20
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-users
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+      ipv4:
+        addresses: [10.0.0.10/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-iot
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 20
+      ipv4:
+        addresses: [10.0.0.20/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-users
+spec:
+  endpoints:
+    - sw-core:Ethernet1
+    - pc-users:eth0
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-iot
+spec:
+  endpoints:
+    - sw-core:Ethernet2
+    - pc-iot:eth0
+  medium: copper

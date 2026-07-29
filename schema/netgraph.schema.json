@@ -754,6 +754,19 @@
               },
               "title": "Addresses",
               "type": "array"
+            },
+            "gateway": {
+              "anyOf": [
+                {
+                  "format": "ipv4",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Gateway"
             }
           },
           "type": "object"
@@ -841,6 +854,19 @@
               },
               "title": "Addresses",
               "type": "array"
+            },
+            "gateway": {
+              "anyOf": [
+                {
+                  "format": "ipv6",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Gateway"
             }
           },
           "type": "object"

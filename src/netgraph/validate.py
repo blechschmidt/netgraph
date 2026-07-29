@@ -51,6 +51,7 @@ cable is enough to silence a finding about that cable.
 from __future__ import annotations
 
 import ipaddress
+import itertools
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final, TypeAlias
@@ -881,6 +882,46 @@ def _check_duplicate_ip(ctx: _Context) -> Iterator[_Draft]:
         )
 
 
+def _check_gateway_on_link(ctx: _Context) -> Iterator[_Draft]:
+    """E020 — an interface's ``gateway`` is not inside any prefix it holds.
+
+    A first hop is reached by ARP or neighbour discovery, never by routing: if
+    it is not on-link, the host has no way to send the very packet that would
+    tell it how to reach the gateway. The usual cause is a prefix length that
+    was shortened without the gateway being moved, or a gateway copied from a
+    neighbouring subnet.
+
+    An IPv6 link-local gateway is exempt. ``fe80::1`` is on-link by definition,
+    and the interface's own link-local address is autoconfigured rather than
+    written down, so there is no declared prefix for it to be inside of.
+    """
+    for fqn, owner in ctx.owners.items():
+        for interface in owner.interfaces:
+            for version, gateway in interface.gateways():
+                if gateway.is_link_local:
+                    continue
+                prefixes = [
+                    address.network
+                    for address in interface.addresses()
+                    if address.network.version == version
+                ]
+                if any(gateway in prefix for prefix in prefixes):
+                    continue
+                port = _q(f"{fqn}:{interface.name}")
+                detail = (
+                    f"its only IPv{version} prefixes are {_join_plain([str(p) for p in prefixes])}"
+                    if prefixes
+                    else f"the interface configures no IPv{version} address at all"
+                )
+                yield _Draft(
+                    f"interface {port} has gateway {gateway}, which is not on-link: {detail}. "
+                    f"A first hop is resolved by neighbour discovery, so an off-link one is "
+                    f"never reachable.",
+                    (fqn,),
+                    _index_path(owner, interface.name, f"ipv{version}", "gateway"),
+                )
+
+
 def _check_vlan_mismatch(ctx: _Context) -> Iterator[_Draft]:
     """E005 — the two ends of a link disagree about VLANs (``NG-C011``).
 
@@ -1104,6 +1145,159 @@ def _check_subnet_address_clash(ctx: _Context) -> Iterator[_Draft]:
                 tuple(dict.fromkeys(holder.element for holder in holders)),
                 ("spec", "interfaces", first.index),
             )
+
+
+def _check_prefix_domains(ctx: _Context) -> Iterator[_Draft]:
+    """W130 — one prefix is claimed by two broadcast domains.
+
+    A prefix is the address space of *one* segment. When two interfaces in
+    different VLANs are addressed inside the same prefix, each host believes
+    every address in it is reachable by ARP, and the half of them that sits in
+    the other VLAN is not. Nothing routes between the two either, because a
+    router will not forward between two interfaces it considers the same
+    subnet. In IPAM terms this is the overlap that is *not* a nesting: neither
+    claim contains the other, they simply collide.
+
+    Only explicitly tagged interfaces count. A host on an access port declares
+    no ``vlan`` block — its broadcast domain is a property of the switch it is
+    cabled to, not of the document — so treating "untagged" as a domain of its
+    own would fire on the ordinary pairing of a router sub-interface with the
+    hosts it serves.
+
+    When every domain holds *the same* addresses, nothing is said here: that is
+    one address claimed twice, which ``W106`` and ``E004`` report more sharply
+    and with the offending address named. The prefix is only reported as split
+    once the two halves hold addresses of their own, which is when the split is
+    a fact about the plan rather than about a single typo.
+    """
+    for subnet in ctx.subnets:
+        tagged = [member for member in subnet.members if member.scope is not None]
+        domains: dict[int, list[AddressPlacement]] = {}
+        for member in tagged:
+            domains.setdefault(member.scope, []).append(member)  # type: ignore[arg-type]
+        # Two ports of one element in two VLANs of one prefix is a mistake too,
+        # but it is ``W111``'s (overlapping prefixes on one element) and saying
+        # it twice helps nobody.
+        if len(domains) < 2 or len({member.element for member in tagged}) < 2:
+            continue
+        held = [frozenset(member.ip for member in members) for members in domains.values()]
+        if all(addresses == held[0] for addresses in held):
+            continue
+        first = tagged[0]
+        detail = _join_plain(
+            [
+                f"VLAN {vlan} ({_join([member.port for member in members])})"
+                for vlan, members in sorted(domains.items())
+            ]
+        )
+        yield _Draft(
+            f"subnet {_q(subnet.prefix)} is claimed by "
+            f"{count_text(len(domains), 'broadcast domain')}: {detail}. Neither half can "
+            f"reach the other by ARP, and no router will forward between them.",
+            tuple(dict.fromkeys(member.element for member in tagged)),
+            ("spec", "interfaces", first.index),
+        )
+
+
+def _check_nested_prefix_domains(ctx: _Context) -> Iterator[_Draft]:
+    """W131 — a nested prefix is used in a different broadcast domain than its parent.
+
+    Nesting on its own is normal: ``10.0.0.0/16`` on a summarising router and
+    ``10.0.5.0/24`` on the segment beneath it describe the same plan at two
+    levels. It stops being normal when the two sit in different VLANs, because
+    the wider prefix then tells its own segment that every address of the
+    narrower one is on-link, which it is not. That is the mask-typo shape:
+    ``/16`` typed where ``/24`` was meant.
+
+    Compared pairwise over the derived prefixes, which are few — one per
+    distinct prefix in the inventory — and only for prefixes that actually have
+    tagged members on both sides, for the reason given on :func:`_check_prefix_domains`.
+    """
+    domains = [(subnet, _tagged_domains(subnet)) for subnet in ctx.subnets]
+    for (outer, outer_vlans), (inner, inner_vlans) in itertools.combinations(domains, 2):
+        # ``ctx.subnets`` is sorted by network address then prefix length, so
+        # the wider prefix of an overlapping pair always comes first.
+        if not (outer_vlans and inner_vlans and inner_vlans.isdisjoint(outer_vlans)):
+            continue
+        if inner.network.version != outer.network.version or not inner.network.subnet_of(
+            outer.network  # type: ignore[arg-type]
+        ):
+            continue
+        first = inner.members[0]
+        yield _Draft(
+            f"subnet {_q(inner.prefix)} sits inside {_q(outer.prefix)}, but the two are used "
+            f"in different broadcast domains: {_q(inner.prefix)} in "
+            f"{_vlan_list(inner_vlans)} and {_q(outer.prefix)} in {_vlan_list(outer_vlans)}. "
+            f"Hosts in {_q(outer.prefix)} treat every address of {_q(inner.prefix)} as "
+            f"on-link, so they will ARP for it instead of routing to it.",
+            tuple(dict.fromkeys(member.element for member in (*inner.members, *outer.members))),
+            ("spec", "interfaces", first.index),
+        )
+
+
+def _tagged_domains(subnet: Subnet) -> frozenset[int]:
+    """The VLANs a prefix's *explicitly tagged* members sit in."""
+    return frozenset(member.scope for member in subnet.members if member.scope is not None)
+
+
+def _vlan_list(vlans: frozenset[int]) -> str:
+    return _join_plain([f"VLAN {vlan}" for vlan in sorted(vlans)])
+
+
+def _check_link_prefixes(ctx: _Context) -> Iterator[_Draft]:
+    """W132 — two directly linked interfaces are addressed in prefixes that do not meet.
+
+    A cable is one segment, so an address configured on it that lies outside
+    every prefix the other end declares is outside every prefix *on its own
+    link*: the two ends cannot exchange a single packet without a router, and
+    there is no room for one between them. The usual cause is a host that kept
+    the addressing of the desk it was moved from.
+
+    Only families both ends configure are compared. A switchport carries no
+    address at all and says nothing here, which is why this is quiet on the
+    ordinary host-to-access-port link; and a dual-stack pair that agrees on
+    IPv6 while disagreeing on IPv4 is still reported, because the IPv4 half is
+    still broken. Both ends resolve through the LAG master first (§10.6).
+
+    A cable landing on an interface with no socket — a loopback, a vlan
+    sub-interface, a bridge — is skipped: ``E012`` already says the cable
+    cannot exist, and there is no link for two prefixes to fail to meet on.
+    """
+    for cable_fqn, first, second in _linked_endpoints(ctx):
+        left, right = ctx.effective(first), ctx.effective(second)
+        if left is None or right is None or not (left.is_cableable and right.is_cableable):
+            continue
+        for version in (4, 6):
+            near = _on_link_prefixes(left, version)
+            far = _on_link_prefixes(right, version)
+            if not near or not far:
+                continue
+            if any(one.overlaps(other) for one in near for other in far):
+                continue
+            yield _Draft(
+                f"cable {_q(cable_fqn)} joins {_describe_port(first, left)} in "
+                f"{_join_plain([str(prefix) for prefix in near])} to "
+                f"{_describe_port(second, right)} in "
+                f"{_join_plain([str(prefix) for prefix in far])}; the two ends share no IPv"
+                f"{version} prefix, so neither address is inside any prefix on its own link.",
+                _cable_elements(cable_fqn, first, second),
+                ("spec", "endpoints"),
+            )
+
+
+def _on_link_prefixes(interface: Interface, version: int) -> tuple[IPNetwork, ...]:
+    """The routable prefixes of one family an interface puts on its link.
+
+    Loopback and link-local addresses are dropped: neither is reachable across
+    a cable, so neither says anything about whether the two ends meet.
+    """
+    return tuple(
+        dict.fromkeys(
+            address.network
+            for address in interface.addresses()
+            if address.network.version == version and is_routable_address(address)
+        )
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -2559,6 +2753,7 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("E017", _check_tunnel_endpoint_type),
     ("E018", _check_encapsulation_target),
     ("E019", _check_encapsulation_cycle),
+    ("E020", _check_gateway_on_link),
     ("W101", _check_unaddressed_interface),
     ("W102", _check_mtu_mismatch),
     ("W103", _check_orphan_device),
@@ -2588,6 +2783,9 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("W127", _check_cleartext_tunnel),
     ("W128", _check_unused_tunnel_interface),
     ("W129", _check_vni_clash),
+    ("W130", _check_prefix_domains),
+    ("W131", _check_nested_prefix_domains),
+    ("W132", _check_link_prefixes),
     ("I001", _check_local_mac),
     ("I002", _check_uncabled_interface),
     ("I003", _check_nonstandard_port),

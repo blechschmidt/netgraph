@@ -280,6 +280,13 @@ RULES: Final[tuple[Rule, ...]] = (
         title="cyclic tunnel encapsulation",
     ),
     Rule(
+        "E020",
+        Severity.ERROR,
+        "An interface's 'gateway' lies outside every prefix configured on it.",
+        ("NG-A013",),
+        title="first hop is not on-link",
+    ),
+    Rule(
         "W101",
         Severity.WARNING,
         "An interface has neither IPv4 nor IPv6 and is not a switchport.",
@@ -481,6 +488,27 @@ RULES: Final[tuple[Rule, ...]] = (
         "Two tunnels terminating on one element use the same VNI.",
         ("NG-T014",),
         title="two tunnels share a VNI on one element",
+    ),
+    Rule(
+        "W130",
+        Severity.WARNING,
+        "One prefix is claimed by two broadcast domains that cannot reach each other.",
+        ("NG-A010",),
+        title="prefix claimed by two broadcast domains",
+    ),
+    Rule(
+        "W131",
+        Severity.WARNING,
+        "A prefix nested inside another is used in a different broadcast domain.",
+        ("NG-A011",),
+        title="nested prefix in a different broadcast domain",
+    ),
+    Rule(
+        "W132",
+        Severity.WARNING,
+        "Two directly linked interfaces are addressed in prefixes that do not meet.",
+        ("NG-A012",),
+        title="address outside every prefix on its link",
     ),
     Rule(
         "I001",

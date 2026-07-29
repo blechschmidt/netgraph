@@ -1,0 +1,141 @@
+# W131 (NG-A011) - a nested prefix lives in a different broadcast domain.
+#
+# The VLAN 10 hosts were given a /16 where a /24 was meant, so they treat every
+# address of the VLAN 20 prefix 10.0.5.0/24 as on-link and ARP for it instead
+# of routing to it. Nesting alone would be fine; nesting across a VLAN boundary
+# is the mask typo.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-core
+spec:
+  vlans:
+    - id: 10
+      name: users
+    - id: 20
+      name: servers
+  interfaces:
+    - name: Ethernet1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: Ethernet2
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: Ethernet3
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 20
+    - name: Ethernet4
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 20
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-users-01
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+      ipv4:
+        addresses: [10.0.1.10/16]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-users-02
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+      ipv4:
+        addresses: [10.0.1.11/16]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-01
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 20
+      ipv4:
+        addresses: [10.0.5.10/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-02
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 20
+      ipv4:
+        addresses: [10.0.5.11/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-users-01
+spec:
+  endpoints:
+    - sw-core:Ethernet1
+    - pc-users-01:eth0
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-users-02
+spec:
+  endpoints:
+    - sw-core:Ethernet2
+    - pc-users-02:eth0
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-srv-01
+spec:
+  endpoints:
+    - sw-core:Ethernet3
+    - srv-01:eth0
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-srv-02
+spec:
+  endpoints:
+    - sw-core:Ethernet4
+    - srv-02:eth0
+  medium: copper

@@ -411,6 +411,14 @@ ipv4:
 | `forwarding` | boolean | O | device `spec.forwarding` | → `ip:*/forwarding`. |
 | `mtu` | mtu | O | interface `mtu` | → `ip:ipv4/mtu`, `ip:ipv6/mtu`. |
 | `addresses` | list[Address] | O | `[]` | Key is `ip`; duplicates are an error (`NG-A002`). |
+| `gateway` | ipv4-address / ipv6-address | O | *unset* | First hop for off-link traffic, written **without** a prefix length. Must lie inside one of this interface's own prefixes (`NG-A013`). |
+
+`gateway` is the one field of these containers that RFC 8344 does not define: a
+default route lives in `ietf-routing`
+(`rt:routing/…/static-routes/…/next-hop-address`), not in `ietf-ip`. netgraph
+keeps it on the interface anyway, because that is where an operator writes it
+and where the only check worth making — is the first hop on-link? — can be
+made. An IPv6 link-local gateway such as `fe80::1` is exempt from that check.
 
 Address entries:
 
@@ -999,6 +1007,10 @@ named. §10.10 maps them.
 | `NG-A007` | warning | A loopback interface carries a prefix other than `/32` (v4) or `/128` (v6). |
 | `NG-A008` | warning | Exactly one element is addressed in a prefix. Host routes and point-to-point prefixes (at most two host addresses: `/30`–`/32`, `/126`–`/128`) are exempt — the peer of an ISP hand-off is not a declared device. |
 | `NG-A009` | warning | Two elements claim the same address inside one prefix while sitting in different broadcast domains. When they share one, `NG-A004` reports it instead. |
+| `NG-A010` | warning | One prefix is claimed by interfaces in two different VLANs, and the two hold addresses of their own. Neither half can ARP for the other, and no router forwards between them. |
+| `NG-A011` | warning | A prefix nested inside another is used in a VLAN the wider prefix is not, so hosts in the wider one ARP for addresses they should route to. |
+| `NG-A012` | warning | The two interfaces a cable joins are addressed in prefixes that do not overlap, so neither address is inside any prefix on its own link. |
+| `NG-A013` | error | An interface's `gateway` is inside none of the prefixes that interface configures for the same family. A link-local IPv6 gateway is exempt. |
 
 ### 10.4 VLANs
 
@@ -1148,6 +1160,10 @@ first assigned: `E` error, `W` warning, `I` info.
 | `W128` | warning | `NG-T013` | An enabled `type: tunnel` interface is named by no `tunnel` document. |
 | `W129` | warning | `NG-T014` | Two tunnels terminating on one element declare the same `vni`. |
 | `I003` | info | `NG-T015` | A tunnel's `port` is not the registered port for its type. |
+| `E020` | error | `NG-A013` | An interface's `gateway` is on none of the prefixes it configures for that family. A link-local IPv6 gateway is exempt. |
+| `W130` | warning | `NG-A010` | One prefix is claimed by interfaces in two VLANs that hold addresses of their own. When the addresses are identical it is `W106`/`E004` instead. |
+| `W131` | warning | `NG-A011` | A nested prefix is used in a VLAN its parent prefix is not. |
+| `W132` | warning | `NG-A012` | The two ends of a cable are addressed in prefixes that do not overlap. Only families both ends configure are compared. |
 
 Ids are permanent (§10), so a suppression written today keeps meaning the same
 thing. Where a short id covers two schema ids (`E001`), naming either alias

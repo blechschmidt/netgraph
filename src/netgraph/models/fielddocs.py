@@ -251,6 +251,11 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "entry, and a bare list is shorthand for `{addresses: [...]}`.",
         "…/ip:ipv4/ip:address",
     ),
+    ("IPv4Config", "gateway"): Doc(
+        "First hop for off-link IPv4 traffic, as a bare address without a prefix length. It "
+        "must lie inside one of this interface's own prefixes (`NG-A013`).",
+        "rt:routing/…/static-routes/v4ur:ipv4/v4ur:route/…/next-hop-address",
+    ),
     ("IPv4Address", "ip"): Doc(
         "The address itself, without a prefix and without a zone index. RFC 8344's list key.",
         "…/ip:ipv4/ip:address/ip:ip",
@@ -275,6 +280,12 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "The IPv6 addresses configured on the interface. Normalised to RFC 5952 lower-case "
         "compressed form.",
         "…/ip:ipv6/ip:address",
+    ),
+    ("IPv6Config", "gateway"): Doc(
+        "First hop for off-link IPv6 traffic, as a bare address without a prefix length. It "
+        "must lie inside one of this interface's own prefixes (`NG-A013`), unless it is "
+        "link-local: `fe80::1` is on-link by definition and is exempt.",
+        "rt:routing/…/static-routes/v6ur:ipv6/v6ur:route/…/next-hop-address",
     ),
     ("IPv6Address", "ip"): Doc(
         "The address itself, zone-free. RFC 8344's list key.", "…/ip:ipv6/ip:address/ip:ip"

@@ -60,6 +60,8 @@ status line every few seconds is commentary by any measure.
 
 from __future__ import annotations
 
+import csv
+import io
 import json
 import shutil
 import sys
@@ -98,6 +100,20 @@ from netgraph.importer import (
     read_inputs,
     write_files,
 )
+from netgraph.ipam import (
+    DEFAULT_SIZE,
+    Utilisation,
+    allocations_within,
+    format_capacity,
+    format_utilisation,
+    free_space,
+    next_free,
+    parse_prefix,
+    parse_size,
+    usable_addresses,
+)
+from netgraph.ipam import Report as IpamReport
+from netgraph.ipam import build_report as build_ipam_report
 from netgraph.loader import (
     YAML_SUFFIXES,
     Inventory,
@@ -140,11 +156,11 @@ from netgraph.render import (
 )
 from netgraph.render.dot import DOT_EXECUTABLE
 from netgraph.report import FORMATS as REPORT_FORMATS
-from netgraph.report import build_report, render_report
+from netgraph.report import Diagnostic, build_report, render_report
 from netgraph.rules import RULES, Severity
 from netgraph.scaffold import SCHEMA_FILE_NAME, build_scaffold, write_scaffold
 from netgraph.schema import build_schema
-from netgraph.subnets import subnets_of
+from netgraph.subnets import IPNetwork, subnets_of
 from netgraph.trace import DEFAULT_MAX_HOPS, TraceError, TraceResult, render_trace, trace
 from netgraph.trace import REPORT_FORMATS as TRACE_FORMATS
 from netgraph.validate import Finding
@@ -2175,6 +2191,399 @@ _LISTINGS: Final[dict[str, Any]] = {
     "vlans": _list_vlans,
     "subnets": _list_subnets,
 }
+
+
+# --------------------------------------------------------------------------- #
+# ipam
+# --------------------------------------------------------------------------- #
+
+#: Output formats of ``netgraph ipam``. ``table`` reads; the other two pipe.
+IPAM_FORMATS: Final[tuple[str, ...]] = ("table", "json", "csv")
+
+#: Utilisation bands and the colour each is printed in. Read in order, so the
+#: first band a value falls into wins. Thresholds are the ones a capacity plan
+#: is usually reviewed against: past 80 % a prefix needs a decision, past 95 %
+#: it needs one today.
+_UTILISATION_COLOURS: Final[tuple[tuple[float, str], ...]] = ((95.0, "red"), (80.0, "yellow"))
+
+
+@cli.command("ipam")
+@click.option(
+    "--free",
+    "free_prefix",
+    metavar="PREFIX",
+    default=None,
+    help="List the unallocated CIDR blocks inside PREFIX instead of the utilisation table.",
+)
+@click.option(
+    "--next-free",
+    "next_free_prefix",
+    metavar="PREFIX",
+    default=None,
+    help="Print the first free block inside PREFIX, and nothing else.",
+)
+@click.option(
+    "--size",
+    "size",
+    metavar="LENGTH",
+    default=None,
+    help="Prefix length --next-free should look for, as '24' or '/24'. "
+    "[default: /24 for IPv4, /64 for IPv6]",
+)
+@click.option(
+    "--aggregate",
+    "aggregated",
+    is_flag=True,
+    help="Collapse sibling prefixes that fill their supernet into one row.",
+)
+@click.option(
+    "--conflicts",
+    "conflicts_only",
+    is_flag=True,
+    help="Report only the address-plan conflicts, without the utilisation table.",
+)
+@click.option(
+    "--family",
+    type=click.Choice(("all", "ipv4", "ipv6")),
+    default="all",
+    show_default=True,
+    help="Restrict the utilisation table to one address family.",
+)
+@click.option(
+    "-F",
+    "--format",
+    "--output-format",
+    "output_format",
+    type=click.Choice(IPAM_FORMATS),
+    default="table",
+    show_default=True,
+    help="table is for reading; json and csv are for scripting.",
+)
+@click.pass_obj
+def ipam_command(
+    app: AppContext,
+    free_prefix: str | None,
+    next_free_prefix: str | None,
+    size: str | None,
+    aggregated: bool,
+    conflicts_only: bool,
+    family: str,
+    output_format: str,
+) -> None:
+    """Report subnet utilisation, free address space and address-plan conflicts.
+
+    With no options this prints how full every prefix in the inventory is,
+    followed by the conflicts :mod:`netgraph.validate` finds in the address
+    plan — the same findings, at the same severities, that ``netgraph validate``
+    reports, filtered to the rules that are about addressing.
+
+    ``--free`` and ``--next-free`` answer the question an engineer actually has
+    when adding a device: what is left, and where does the next block start.
+
+    Exits 1 when a conflict is reported as an error, or when ``--next-free``
+    finds no room.
+    """
+    console = app.console()
+    _reject_conflicting_ipam_options(
+        free_prefix, next_free_prefix, size, aggregated, conflicts_only, family
+    )
+    inventory = app.load()
+    _warn_about_load_errors(console, inventory)
+
+    if next_free_prefix is not None:
+        _report_next_free(app, console, inventory, next_free_prefix, size, output_format)
+        return
+    if free_prefix is not None:
+        _report_free_space(app, console, inventory, free_prefix, output_format)
+        return
+
+    report = build_ipam_report(inventory, app.config().validation, aggregated=aggregated)
+    _report_ipam(app, console, inventory, report, family, output_format, conflicts_only)
+
+
+def _reject_conflicting_ipam_options(
+    free_prefix: str | None,
+    next_free_prefix: str | None,
+    size: str | None,
+    aggregated: bool,
+    conflicts_only: bool,
+    family: str,
+) -> None:
+    """Refuse option combinations that would silently ignore one of them.
+
+    Click cannot express "these are alternatives", and a flag that is quietly
+    dropped is worse than an error: the operator believes they asked for
+    something they did not get.
+    """
+    if free_prefix is not None and next_free_prefix is not None:
+        raise click.UsageError("--free and --next-free ask different questions; use one of them")
+    query = free_prefix is not None or next_free_prefix is not None
+    if size is not None and next_free_prefix is None:
+        raise click.UsageError("--size only means something with --next-free")
+    asked = "--free" if free_prefix is not None else "--next-free"
+    for flag, name in ((aggregated, "--aggregate"), (conflicts_only, "--conflicts")):
+        if flag and query:
+            raise click.UsageError(
+                f"{name} applies to the utilisation report, which {asked} replaces"
+            )
+    if conflicts_only and aggregated:
+        raise click.UsageError("--conflicts prints no utilisation table for --aggregate to fold")
+    if family != "all" and (query or conflicts_only):
+        raise click.UsageError("--family applies to the utilisation table only")
+
+
+def _parse_prefix_option(text: str, option: str) -> IPNetwork:
+    """Read a prefix from the command line, or fail with click's own wording."""
+    try:
+        return parse_prefix(text)
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), param_hint=option) from None
+
+
+def _report_next_free(
+    app: AppContext,
+    console: Console,
+    inventory: Inventory,
+    text: str,
+    size: str | None,
+    output_format: str,
+) -> None:
+    """``--next-free``: the first free block, on stdout and nothing else.
+
+    The prefix is printed bare so the command composes —
+    ``netgraph ipam --next-free 10.0.0.0/8 --size 26`` is meant to be read by
+    the next command in a pipeline as often as by a person.
+    """
+    prefix = _parse_prefix_option(text, "--next-free")
+    length = DEFAULT_SIZE[prefix.version] if size is None else _parse_size(size, prefix.version)
+    subnets = subnets_of(inventory)
+    block = next_free(prefix, length, subnets)
+
+    if output_format == "json":
+        console.print(
+            _serialise(
+                {
+                    "prefix": str(prefix),
+                    "size": length,
+                    "next": str(block) if block is not None else None,
+                },
+                "json",
+            )
+        )
+    elif output_format == "csv":
+        console.print(
+            _csv(("PREFIX", "SIZE", "NEXT"), [[str(prefix), str(length), str(block or "")]])
+        )
+    elif block is not None:
+        console.print(str(block))
+
+    if block is None:
+        console.error(
+            f"no free /{length} inside {prefix}; "
+            f"run 'netgraph ipam --free {prefix}' to see what is left"
+        )
+        raise click.exceptions.Exit(EXIT_INVALID)
+    app.log(f"first free /{length} in {prefix} is {block}", level=1)
+
+
+def _parse_size(size: str, version: int) -> int:
+    try:
+        return parse_size(size, version)
+    except ValueError as exc:
+        raise click.BadParameter(str(exc), param_hint="--size") from None
+
+
+def _report_free_space(
+    app: AppContext,
+    console: Console,
+    inventory: Inventory,
+    text: str,
+    output_format: str,
+) -> None:
+    """``--free``: the holes in one prefix, as the fewest CIDR blocks."""
+    prefix = _parse_prefix_option(text, "--free")
+    subnets = subnets_of(inventory)
+    blocks = free_space(prefix, subnets)
+    allocated = allocations_within(prefix, subnets)
+
+    headers = ("BLOCK", "IP", "HOSTS")
+    aligns: tuple[Align, ...] = ("left", "right", "right")
+    rows = [[str(block), str(block.version), _capacity_text(block)] for block in blocks]
+    records = [
+        {
+            "block": str(block),
+            "family": f"ipv{block.version}",
+            "capacity": usable_addresses(block),
+        }
+        for block in blocks
+    ]
+
+    if output_format == "json":
+        console.print(
+            _serialise(
+                {
+                    "prefix": str(prefix),
+                    "allocated": [str(block) for block in allocated],
+                    "free": records,
+                },
+                "json",
+            )
+        )
+        return
+    if output_format == "csv":
+        console.print(_csv(headers, rows))
+        return
+
+    console.info(
+        f"free space in {prefix}: {len(blocks)} block(s), "
+        f"{len(allocated)} allocation(s) already carved out"
+    )
+    console.table(headers, rows, aligns=aligns, empty=f"{prefix} is fully allocated")
+
+
+def _report_ipam(
+    app: AppContext,
+    console: Console,
+    inventory: Inventory,
+    report: IpamReport,
+    family: str,
+    output_format: str,
+    conflicts_only: bool,
+) -> None:
+    """The default report: utilisation, then conflicts."""
+    rows = report.rows if family == "all" else report.of_family(4 if family == "ipv4" else 6)
+    diagnostics = [Diagnostic.from_finding(finding, inventory) for finding in report.findings]
+
+    if output_format == "json":
+        payload: dict[str, Any] = {"conflicts": [entry.as_record() for entry in diagnostics]}
+        if not conflicts_only:
+            payload = {"subnets": [row.record() for row in rows], **payload}
+        console.print(_serialise(payload, "json"))
+    elif output_format == "csv":
+        if conflicts_only:
+            console.print(_conflicts_csv(diagnostics))
+        else:
+            # One CSV document holds one table. The utilisation rows are the
+            # half a spreadsheet or an awk script wants; the conflicts are a
+            # different shape entirely, and gluing them together would produce
+            # a file no parser reads correctly.
+            console.print(_utilisation_csv(rows))
+            if report.findings:
+                console.info(
+                    f"{_plural(len(report.findings), 'conflict')} not shown: CSV holds one "
+                    f"table, so run 'netgraph ipam --conflicts --format csv' for them"
+                )
+    else:
+        if not conflicts_only:
+            _print_utilisation_table(console, rows, aggregated=report.aggregated)
+            # The heading only earns its line when something precedes it; with
+            # ``--conflicts`` the list is the whole output and needs no label.
+            console.print()
+            console.print(console.bold("conflicts"))
+        _report_problems(console, (), report.findings)
+
+    if any(finding.severity.is_fatal for finding in report.findings):
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+
+def _print_utilisation_table(
+    console: Console, rows: Sequence[Utilisation], *, aggregated: bool
+) -> None:
+    headers = ["PREFIX", "IP", "VLANS", "HOSTS", "USED", "FREE", "UTIL", "DEVICES"]
+    aligns: list[Align] = [
+        "left",
+        "right",
+        "left",
+        "right",
+        "right",
+        "right",
+        "right",
+        "right",
+    ]
+    if aggregated:
+        headers.append("PARTS")
+        aligns.append("right")
+
+    table: list[list[str]] = []
+    for row in rows:
+        cells = [
+            row.prefix,
+            str(row.version),
+            compact_ids(row.vlans) or "-",
+            format_capacity(row.capacity, host_bits=row.host_bits),
+            str(row.assigned),
+            format_capacity(row.free, host_bits=row.host_bits),
+            _utilisation_cell(console, row),
+            str(row.devices),
+        ]
+        if aggregated:
+            cells.append(str(len(row.members)) if row.is_aggregate else "-")
+        table.append(cells)
+    console.table(headers, table, aligns=aligns, empty="no addresses declared")
+
+
+def _utilisation_cell(console: Console, row: Utilisation) -> str:
+    """The utilisation percentage, coloured once it is worth acting on."""
+    text = format_utilisation(row.assigned, row.capacity)
+    percent = row.assigned * 100 / row.capacity if row.capacity else 0.0
+    for threshold, colour in _UTILISATION_COLOURS:
+        if percent >= threshold:
+            return console.style(text, fg=colour)
+    return text
+
+
+def _capacity_text(block: IPNetwork) -> str:
+    return format_capacity(usable_addresses(block), host_bits=block.max_prefixlen - block.prefixlen)
+
+
+def _utilisation_csv(rows: Sequence[Utilisation]) -> str:
+    return _csv(
+        ("prefix", "family", "vlans", "capacity", "assigned", "free", "utilisation", "devices"),
+        [
+            [
+                row.prefix,
+                row.family,
+                " ".join(str(vlan) for vlan in row.vlans),
+                str(row.capacity),
+                str(row.assigned),
+                str(row.free),
+                f"{row.assigned / row.capacity:.6f}" if row.capacity else "",
+                str(row.devices),
+            ]
+            for row in rows
+        ],
+    )
+
+
+def _conflicts_csv(diagnostics: Sequence[Diagnostic]) -> str:
+    return _csv(
+        ("rule", "alias", "severity", "element", "file", "message"),
+        [
+            [
+                entry.rule,
+                entry.alias or "",
+                str(entry.severity),
+                entry.element or "",
+                entry.file or "",
+                entry.message,
+            ]
+            for entry in diagnostics
+        ],
+    )
+
+
+def _csv(headers: Sequence[str], rows: Iterable[Sequence[str]]) -> str:
+    """Render a table as RFC 4180 CSV, without a trailing newline.
+
+    ``\\n`` line endings rather than csv's default ``\\r\\n``: every other
+    format this CLI writes uses them, and a mixed-ending file surprises the
+    next tool in the pipeline more than a Unix-ending CSV does.
+    """
+    buffer = io.StringIO()
+    writer = csv.writer(buffer, lineterminator="\n")
+    writer.writerow(headers)
+    writer.writerows(rows)
+    return buffer.getvalue().rstrip("\n")
 
 
 # --------------------------------------------------------------------------- #

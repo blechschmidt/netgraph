@@ -191,6 +191,35 @@ def _reject_zone(value: Any) -> Any:
     return value
 
 
+def _plain_gateway(value: Any, family: int) -> Any:
+    """Normalise a ``gateway`` entry: a bare address, never a prefix.
+
+    A first hop is one host, so ``10.0.0.254/24`` is a category error rather
+    than a spelling of ``10.0.0.254``. Saying so here beats pydantic's generic
+    "value is not a valid IPv4 address", because the mistake — pasting the
+    address *with* its mask out of an ``ip addr`` listing — has an obvious fix.
+    """
+    if not isinstance(value, str):
+        return _reject_zone(value)
+    text = _reject_zone(value.strip())
+    if "/" in text:
+        raise ValueError(
+            f"{echo_value(value)} carries a prefix length; a 'gateway' is a single "
+            f"first-hop address, written as {text.partition('/')[0]}"
+        )
+    try:
+        gateway = ipaddress.ip_address(text)
+    except ValueError as exc:
+        raise ValueError(
+            f"{echo_value(value)} is not a valid IPv{family} address: {clip_text(str(exc))}"
+        ) from exc
+    if gateway.version != family:
+        raise ValueError(
+            f"{echo_value(value)} is an IPv{gateway.version} address, expected IPv{family}"
+        )
+    return gateway
+
+
 class IPv4Address(NetgraphModel):
     """One entry of ``interfaces[].ipv4.addresses`` (RFC 8344 ``ip:address``).
 
@@ -328,7 +357,16 @@ def _expand_family_shorthand(value: Any, family: int) -> Any:
 
 
 class _AddressFamily(NetgraphModel):
-    """Shared fields of the ``ipv4``/``ipv6`` containers (RFC 8344)."""
+    """Shared fields of the ``ipv4``/``ipv6`` containers (RFC 8344).
+
+    ``gateway`` is declared by each subclass rather than here, because its type
+    is family-specific. It is the one field of these containers that RFC 8344
+    does not define: a default route lives in ``ietf-routing``
+    (``rt:routing/control-plane-protocols/static-routes/…/next-hop-address``),
+    not in ``ietf-ip``. netgraph keeps it on the interface anyway, because that
+    is where an operator writes it and where the only check worth making —
+    "is the first hop on-link?" (``E020``) — can be made.
+    """
 
     #: ``ip:ipv4/enabled`` / ``ip:ipv6/enabled``.
     enabled: Boolean = True
@@ -347,11 +385,20 @@ class IPv4Config(_AddressFamily):
     #: ``ip:ipv4/mtu``; defaults to the interface MTU.
     mtu: IPv4Mtu | None = None
     addresses: list[IPv4Address] = Field(default_factory=list)
+    #: First hop for traffic this interface cannot deliver on-link — the
+    #: next-hop of the default route. Not part of RFC 8344; see
+    #: :class:`_AddressFamily`.
+    gateway: ipaddress.IPv4Address | None = None
 
     @model_validator(mode="before")
     @classmethod
     def _accept_bare_list(cls, value: Any) -> Any:
         return _expand_family_shorthand(value, 4)
+
+    @field_validator("gateway", mode="before")
+    @classmethod
+    def _normalise_gateway(cls, value: Any) -> Any:
+        return _plain_gateway(value, 4)
 
     @field_validator("addresses")
     @classmethod
@@ -366,11 +413,18 @@ class IPv6Config(_AddressFamily):
     #: ``ip:ipv6/mtu``; defaults to the interface MTU when it is at least 1280.
     mtu: IPv6Mtu | None = None
     addresses: list[IPv6Address] = Field(default_factory=list)
+    #: First hop for off-link IPv6 traffic. See :class:`_AddressFamily`.
+    gateway: ipaddress.IPv6Address | None = None
 
     @model_validator(mode="before")
     @classmethod
     def _accept_bare_list(cls, value: Any) -> Any:
         return _expand_family_shorthand(value, 6)
+
+    @field_validator("gateway", mode="before")
+    @classmethod
+    def _normalise_gateway(cls, value: Any) -> Any:
+        return _plain_gateway(value, 6)
 
     @field_validator("addresses")
     @classmethod
@@ -601,6 +655,20 @@ class Interface(NetgraphModel):
         v4: tuple[IPv4Address | IPv6Address, ...] = tuple(self.ipv4.addresses) if self.ipv4 else ()
         v6: tuple[IPv4Address | IPv6Address, ...] = tuple(self.ipv6.addresses) if self.ipv6 else ()
         return v4 + v6
+
+    def gateways(self) -> tuple[tuple[int, ipaddress.IPv4Address | ipaddress.IPv6Address], ...]:
+        """Each configured first hop as ``(family, address)``, IPv4 first.
+
+        Callers that care about the gateway invariably care about it per family
+        — a first hop has to be on-link in a prefix of its *own* family — so the
+        version is handed over with it rather than re-derived.
+        """
+        gateways: list[tuple[int, ipaddress.IPv4Address | ipaddress.IPv6Address]] = []
+        if self.ipv4 is not None and self.ipv4.gateway is not None:
+            gateways.append((4, self.ipv4.gateway))
+        if self.ipv6 is not None and self.ipv6.gateway is not None:
+            gateways.append((6, self.ipv6.gateway))
+        return tuple(gateways)
 
 
 def _duplicates(values: list[str]) -> list[str]:

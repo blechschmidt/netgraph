@@ -1134,7 +1134,8 @@ Two problems are visible only from here, and `netgraph validate` reports both:
 | [`W105`](docs/validation-rules.md#w105--subnet-with-a-single-member) | Exactly one element is addressed in a prefix — a typo'd prefix length, or a neighbour nobody wrote down. Host routes and point-to-point prefixes are exempt. |
 | [`W106`](docs/validation-rules.md#w106--one-address-claimed-twice-in-a-subnet) | Two elements claim the same address in one prefix from different VLANs, so the layer-3 view cannot tell which of them answers. |
 
-`netgraph list subnets` prints the same grouping as a table, and
+`netgraph list subnets` prints the same grouping as a table,
+[`netgraph ipam`](#netgraph-ipam) sizes it and reports what conflicts, and
 `render --layer l3 -f json` exports it with a `type` discriminator on every node
 (`element` or `subnet`) so a consumer can tell a derived prefix from a declared
 device.
@@ -1471,6 +1472,96 @@ tunnels/gre-mgmt    gre over ipsec      -  underlay      2  rtr-branch-b:gre1, r
 tunnels/ovpn-admin  openvpn             -  yes           2  pc-branch-b:tun0, rtr-hq:ovpn0
 ```
 
+### `netgraph ipam`
+
+`list subnets` says which prefixes exist. `ipam` says whether the address plan
+is healthy: how full every prefix is, what is free inside one, and what
+conflicts.
+
+```
+netgraph ipam [--free PREFIX | --next-free PREFIX [--size N]]
+              [--aggregate] [--conflicts] [--family all|ipv4|ipv6]
+              [-F table|json|csv]
+```
+
+```console
+$ netgraph -i examples/campus ipam --family ipv4
+PREFIX           IP  VLANS  HOSTS  USED  FREE    UTIL  DEVICES
+---------------  --  -----  -----  ----  ----  ------  -------
+10.1.0.0/30       4  -          2     2     0  100.0%        2
+10.1.10.0/24      4  10       254     3   251    1.2%        3
+10.1.20.0/24      4  20       254     2   252    0.8%        2
+10.1.99.0/24      4  99       254     4   250    1.6%        4
+10.2.0.0/30       4  -          2     2     0  100.0%        2
+...
+198.51.100.8/30   4  -          2     2     0  100.0%        2
+
+conflicts
+no problems found
+```
+
+`HOSTS` is what the prefix can actually hold, not `2^n`: IPv4 spends two
+addresses on the network and the broadcast, except on a `/31` (RFC 3021) and a
+`/32`; IPv6 reserves one for the subnet-router anycast address (RFC 4291
+§2.6.1). A `/64` prints as `2^64` rather than as twenty digits, and a prefix in
+use that rounds to zero prints as `<0.1%`.
+
+The other half of the report is the conflicts, and they are **not** a second
+implementation of anything. `ipam` calls `netgraph validate` and filters to the
+addressing rules, so a suppression or a re-grading in `netgraph.toml` applies to
+both commands identically:
+
+| Conflict | Rule |
+|---|---|
+| Duplicate host address within a prefix | [`E004`](docs/validation-rules.md#e004--duplicate-ip-address), [`W106`](docs/validation-rules.md#w106--one-address-claimed-twice-in-a-subnet) — existing rules, called not copied |
+| Prefixes that overlap but are not nested | [`W130`](docs/validation-rules.md#w130--prefix-claimed-by-two-broadcast-domains) |
+| A nested prefix whose parent is on another VLAN | [`W131`](docs/validation-rules.md#w131--nested-prefix-in-a-different-broadcast-domain) |
+| An address outside every prefix on its link | [`W132`](docs/validation-rules.md#w132--address-outside-every-prefix-on-its-link) |
+| A `gateway` that is not on-link | [`E020`](docs/validation-rules.md#e020--first-hop-is-not-on-link) |
+
+Adding a device is two commands. What is left, and where the next block starts:
+
+```console
+$ netgraph -i examples/campus ipam --free 10.1.0.0/22
+free space in 10.1.0.0/22: 8 block(s), 1 allocation(s) already carved out
+BLOCK          IP  HOSTS
+-------------  --  -----
+10.1.0.4/30     4      2
+10.1.0.8/29     4      6
+10.1.0.16/28    4     14
+10.1.0.32/27    4     30
+10.1.0.64/26    4     62
+10.1.0.128/25   4    126
+10.1.1.0/24     4    254
+10.1.2.0/23     4    510
+
+$ netgraph -i examples/campus ipam --next-free 10.1.0.0/16
+10.1.1.0/24
+
+$ netgraph -i examples/campus ipam --next-free 2001:db8:1::/48
+2001:db8:1:1::/64
+```
+
+`--next-free` prints one prefix and nothing else, so it pipes. It walks the free
+list rather than enumerating candidates, which is why searching a v6 `/32` for a
+free `/64` returns immediately instead of considering 2^32 blocks.
+
+| Option | Default | Effect |
+|---|---|---|
+| `--free PREFIX` | — | List the unallocated CIDR blocks inside `PREFIX`. Allocation is per subnet, not per address. |
+| `--next-free PREFIX` | — | Print the first free block inside `PREFIX`, and nothing else. |
+| `--size LENGTH` | `/24` (v4), `/64` (v6) | Block size `--next-free` looks for; `24` and `/24` both work. |
+| `--aggregate` | off | Collapse sibling prefixes that between them fill their supernet into one row. |
+| `--conflicts` | off | Report only the conflicts, without the utilisation table. |
+| `--family` | `all` | Restrict the utilisation table to `ipv4` or `ipv6`. |
+| `-F, --format, --output-format` | `table` | `table` reads; `json` carries both halves of the report; `csv` carries one table. |
+
+Exits 1 when a conflict is an error, or when `--next-free` finds no room.
+[`docs/ipam.md`](docs/ipam.md) has the full treatment: the sizing rules per
+prefix length, how free space and aggregation are computed, the JSON and CSV
+contracts, and why "overlapping but not nested" is a VLAN question rather than a
+question about bits.
+
 ### `netgraph show`
 
 Print the fully resolved configuration of one element — defaults materialised,
@@ -1704,6 +1795,7 @@ netgraph -i examples/campus render --namespace sites/north --layer l2 -f svg -o 
 | [`docs/schema-reference.md`](docs/schema-reference.md) | Every field, its type, whether it is required, its default and its YANG path. Generated from the models. |
 | [`docs/validation-rules.md`](docs/validation-rules.md) | Every rule, its severity, why it matters and how to suppress it. |
 | [`docs/paths.md`](docs/paths.md) | `netgraph path`: how the layer-2 and layer-3 traces decide, the JSON contract, and what is deliberately not modelled. |
+| [`docs/ipam.md`](docs/ipam.md) | `netgraph ipam`: how a prefix is sized, how free space is computed, and which existing rule each address-plan conflict is. |
 | [`docs/ci.md`](docs/ci.md) | Running `validate` in CI: the json/sarif/github output formats, the GitHub Action, the pre-commit hook. |
 | [`docs/yang-mapping.md`](docs/yang-mapping.md) | The relationship to RFC 8343, RFC 8344 and IEEE 802.1Q — including what is deliberately not covered. |
 | [`docs/follow-ups.md`](docs/follow-ups.md) | Known gaps, deferred deliberately: what was measured, why it was left, and what a fix would have to do. |
