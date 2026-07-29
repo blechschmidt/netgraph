@@ -32,9 +32,12 @@ import pytest
 from netgraph.loader import Inventory, load_tree
 from netgraph.render import (
     GRAPH_KIND,
+    AggregateSpec,
+    BundleMode,
     Layer,
     LinkTemplate,
     RenderOptions,
+    aggregate_graph,
     build_graph,
     render_text,
     suffix_for,
@@ -42,7 +45,8 @@ from netgraph.render import (
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
-GOLDEN_DIR = Path(__file__).resolve().parent / "fixtures" / "golden"
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+GOLDEN_DIR = FIXTURES / "golden"
 
 #: The text formats a golden is kept for.
 FORMATS = ("dot", "mermaid", "json")
@@ -54,7 +58,8 @@ class Case:
 
     #: Stem of the golden file, e.g. ``campus-l2-grouped``.
     name: str
-    #: Directory under ``examples/``.
+    #: Directory under ``examples/`` — or, with :attr:`fixture` set, under
+    #: ``tests/fixtures/``.
     example: str
     layer: Layer
     options: RenderOptions
@@ -62,6 +67,19 @@ class Case:
     #: honours — tooltips, links, element ids — would otherwise commit two more
     #: byte-identical copies of a Mermaid and a JSON golden per case.
     formats: tuple[str, ...] = FORMATS
+    #: The aggregation applied between building the graph and rendering it, as
+    #: ``netgraph render`` applies it. ``None`` renders the graph as built,
+    #: which is what every case predating ``--collapse`` does.
+    aggregate: AggregateSpec | None = None
+    #: Is ``example`` a test fixture rather than a published example? A tree
+    #: that exists only to exercise a transform — one four-member LAG and two
+    #: spare cross-links — teaches nobody anything, so it does not belong in
+    #: ``examples/``.
+    fixture: bool = False
+
+    @property
+    def root(self) -> Path:
+        return (FIXTURES if self.fixture else EXAMPLES) / self.example
 
     def golden(self, format: str) -> Path:
         return GOLDEN_DIR / f"{self.name}{suffix_for(format)}"
@@ -163,6 +181,72 @@ CASES = (
         layer=Layer.OVERLAY,
         options=RenderOptions(group_by_namespace=True, title="Overlay, encapsulation"),
     ),
+    Case(
+        # The site-level overview: three sites, three backbone fibres, and the
+        # sixteen links inside them counted rather than drawn. ``element_ids``
+        # is on because a collapsed node has to be as addressable as a real one
+        # — that is the property the entry in the README depends on.
+        name="campus-l1-collapsed",
+        example="campus",
+        layer=Layer.L1,
+        options=RenderOptions(title="Campus, collapsed to sites", element_ids=True),
+        aggregate=AggregateSpec(collapse_depth=1),
+    ),
+    Case(
+        # One namespace collapsed by name, the rest drawn in full: the mixed
+        # graph, where an aggregate node and the devices it does *not* stand for
+        # share a diagram.
+        name="campus-l1-collapsed-north",
+        example="campus",
+        layer=Layer.L1,
+        options=RenderOptions(show_ips=False, show_vlans=False),
+        aggregate=AggregateSpec(collapse=("sites/north",)),
+        formats=("dot", "json"),
+    ),
+    Case(
+        # The default: a declared four-member LAG drawn as one edge, the two
+        # spare cross-links beside it drawn as two, because nothing in the
+        # inventory says they are one link.
+        name="aggregate-l1-lag",
+        example="aggregate",
+        layer=Layer.L1,
+        options=RenderOptions(title="LAG bundled by default"),
+        aggregate=AggregateSpec(),
+        fixture=True,
+    ),
+    Case(
+        # ``--bundle-links``: every parallel link folded, so the six east-west
+        # cables become one edge that is deliberately *not* called a LAG.
+        name="aggregate-l1-bundled",
+        example="aggregate",
+        layer=Layer.L1,
+        options=RenderOptions(title="Every parallel link bundled"),
+        aggregate=AggregateSpec(bundle=BundleMode.ALL),
+        fixture=True,
+    ),
+    Case(
+        # ``--no-bundle-links``: eight cables, eight edges. The behaviour every
+        # release before this one had, kept reachable and kept pinned.
+        name="aggregate-l1-unbundled",
+        example="aggregate",
+        layer=Layer.L1,
+        options=RenderOptions(title="Nothing bundled"),
+        aggregate=AggregateSpec(bundle=BundleMode.NONE),
+        fixture=True,
+        formats=("dot", "json"),
+    ),
+    Case(
+        # Both transforms at once, which is the combination a large tree is
+        # rendered with: the sites collapse, and the links that only became
+        # parallel *because* they collapsed are folded by the second pass.
+        name="aggregate-l1-collapsed-bundled",
+        example="aggregate",
+        layer=Layer.L1,
+        options=RenderOptions(title="Collapsed and bundled", group_by_namespace=True),
+        aggregate=AggregateSpec(collapse_depth=1, bundle=BundleMode.ALL),
+        fixture=True,
+        formats=("dot", "json"),
+    ),
 )
 
 #: The cases a Mermaid golden is kept for.
@@ -184,17 +268,22 @@ CASES_BY_NAME = {case.name: case for case in CASES}
 
 @pytest.fixture(scope="session")
 def inventories() -> dict[str, Inventory]:
-    """Both example trees, loaded once for the whole session."""
+    """Every tree the matrix renders, loaded once for the whole session."""
     loaded = {}
-    for example in sorted({case.example for case in CASES}):
-        inventory = load_tree(EXAMPLES / example)
-        assert inventory.errors == [], f"{example} does not load cleanly: {inventory.errors}"
-        loaded[example] = inventory
+    for case in CASES:
+        if case.example in loaded:
+            continue
+        inventory = load_tree(case.root)
+        assert inventory.errors == [], f"{case.example} does not load cleanly: {inventory.errors}"
+        loaded[case.example] = inventory
     return loaded
 
 
 def _render(case: Case, inventories: dict[str, Inventory], format: str) -> str:
     graph = build_graph(inventories[case.example], layer=case.layer)
+    # The same order ``netgraph render`` uses: resolve, then summarise, then
+    # draw. A golden produced any other way would pin a pipeline nobody runs.
+    graph = aggregate_graph(graph, case.aggregate)
     return render_text(graph, format, case.options)
 
 
@@ -261,6 +350,21 @@ def test_a_rebuilt_graph_renders_identically(inventories: dict[str, Inventory]) 
     assert first == second
 
 
+def test_a_rebuilt_collapsed_graph_renders_identically(inventories: dict[str, Inventory]) -> None:
+    """Aggregation groups by namespace and by node pair, so it must not use sets loosely."""
+    case = CASES_BY_NAME["campus-l1-collapsed"]
+    inventory = inventories[case.example]
+    renders = {
+        render_text(
+            aggregate_graph(build_graph(inventory, layer=case.layer), case.aggregate),
+            "dot",
+            case.options,
+        )
+        for _ in range(2)
+    }
+    assert len(renders) == 1
+
+
 def test_reloading_the_inventory_reproduces_the_golden() -> None:
     """A second load from disk yields the same bytes.
 
@@ -268,7 +372,7 @@ def test_reloading_the_inventory_reproduces_the_golden() -> None:
     renderer that depends on the order the filesystem happened to return.
     """
     case = CASES_BY_NAME["home-lab-l1"]
-    inventory = load_tree(EXAMPLES / case.example)
+    inventory = load_tree(case.root)
     assert inventory.errors == []
     actual = render_text(build_graph(inventory, layer=case.layer), "dot", case.options)
     assert actual == case.golden("dot").read_text(encoding="utf-8")
@@ -316,15 +420,19 @@ def test_the_json_golden_parses_and_carries_the_envelope(case: Case) -> None:
         assert not any("vlans" in port for port in ports)
 
     # Every node says which kind of thing it is, at every layer.
-    assert {node["type"] for node in payload["nodes"]} <= {"element", "subnet", "tunnel"}
+    types = {node["type"] for node in payload["nodes"]}
+    assert types <= {"element", "subnet", "tunnel", "aggregate"}
     if case.layer is Layer.L3:
         assert any(node["type"] == "subnet" for node in payload["nodes"])
     elif case.layer is Layer.OVERLAY:
         assert any(node["type"] == "tunnel" for node in payload["nodes"])
     else:
         # Below the overlay layer a tunnel is an edge, unless it joins more than
-        # two endpoints and has no line shape to take.
-        assert all(node["type"] in {"element", "tunnel"} for node in payload["nodes"])
+        # two endpoints and has no line shape to take. A collapsed namespace is
+        # a node at every layer.
+        assert types <= {"element", "tunnel", "aggregate"}
+    collapses = case.aggregate is not None and case.aggregate.collapses
+    assert ("aggregate" in types) == collapses
 
 
 @pytest.mark.parametrize("case", OVERLAY_CASES, ids=lambda case: case.name)
@@ -385,6 +493,70 @@ def test_the_l3_json_golden_separates_subnets_from_elements(case: Case) -> None:
         first, second = edge["endpoints"]
         assert first["node"] not in ids and first["interface"]
         assert second["node"] in ids and "interface" not in second
+
+
+#: The cases whose graph was summarised rather than drawn in full.
+AGGREGATE_CASES = tuple(
+    case
+    for case in CASES
+    if case.aggregate is not None and case.aggregate.collapses and "json" in case.formats
+)
+
+#: The cases whose graph folds parallel links into one edge.
+BUNDLE_CASES = tuple(
+    case for case in CASES if case.name.startswith("aggregate-") and "json" in case.formats
+)
+
+
+@pytest.mark.parametrize("case", AGGREGATE_CASES, ids=lambda case: case.name)
+def test_the_collapsed_json_golden_says_what_each_box_stands_for(case: Case) -> None:
+    """A consumer must be able to get from one box back to the devices behind it."""
+    payload = json.loads(case.golden("json").read_text(encoding="utf-8"))
+    aggregates = [node for node in payload["nodes"] if node["type"] == "aggregate"]
+    assert aggregates, "an aggregate case with no aggregate node would assert nothing"
+
+    ids = {node["id"] for node in payload["nodes"]}
+    drawn = {edge["id"] for edge in payload["edges"]}
+    for node in aggregates:
+        assert node["kind"] == "namespace"
+        assert node["interfaces"] == []
+        summary = node["aggregate"]
+        assert node["id"] == f"ns:{summary['namespace']}"
+        assert node["name"] == summary["namespace"]
+        # The elements it stands for are gone from the document — that is what
+        # collapsing *is* — so they must be named, and named in full.
+        assert summary["elements"]
+        assert not (set(summary["elements"]) & ids)
+        assert summary["elementCount"] == len(summary["elements"])
+        assert sum(summary["countsByKind"].values()) == len(summary["elements"])
+        # And so must the links that vanished inside it, or a reader counting
+        # cables on the page would conclude the site has none.
+        assert not (set(summary["internalLinks"]) & drawn)
+
+
+@pytest.mark.parametrize("case", BUNDLE_CASES, ids=lambda case: case.name)
+def test_the_bundled_json_golden_lists_every_link_it_folded(case: Case) -> None:
+    """A bundle is a summary of links, not a link: it has to name its members."""
+    payload = json.loads(case.golden("json").read_text(encoding="utf-8"))
+    bundles = [edge for edge in payload["edges"] if "bundle" in edge]
+    if case.aggregate is not None and case.aggregate.bundle is BundleMode.NONE:
+        assert bundles == [], "--no-bundle-links must draw every link as itself"
+        return
+    assert bundles, "a bundling case with no bundle would assert nothing"
+
+    ids = {node["id"] for node in payload["nodes"]}
+    for edge in bundles:
+        bundle = edge["bundle"]
+        assert bundle["size"] == len(bundle["links"]) >= 2
+        assert edge["id"] == f"{bundle['links'][0]['id']}#bundle"
+        # A member is exported exactly as an unbundled link is, and is never
+        # itself a bundle: folding flattens.
+        for link in bundle["links"]:
+            assert "bundle" not in link
+            assert {end["node"] for end in link["endpoints"]} <= ids
+        # The drawn rate is the sum of what was folded in: four 1G cables are
+        # 4G, which is the whole reason an operator builds a LAG.
+        assert edge["speed"] == sum(link["speed"] for link in bundle["links"])
 
 
 @pytest.mark.parametrize("case", MERMAID_CASES, ids=lambda case: case.name)

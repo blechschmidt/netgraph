@@ -89,8 +89,9 @@ from typing import Final
 from jinja2 import Environment, PackageLoader, StrictUndefined
 from markupsafe import Markup
 
-from netgraph.errors import RenderError, clip_text, compact_ids
+from netgraph.errors import RenderError, clip_text, compact_ids, count_text
 from netgraph.loader.inventory import namespace_of
+from netgraph.render.aggregate import AGGREGATE_KIND, AggregateView
 from netgraph.render.details import (
     build_details,
     detail_text,
@@ -159,6 +160,12 @@ _NODE_STYLE: Final[Mapping[str, tuple[str, str, str]]] = {
     # A tunnel is not hardware either, but unlike a subnet it *is* declared, so
     # it keeps a shape of its own rather than borrowing a box.
     TUNNEL_KIND: ("hexagon", "#ede9fe", "#6d28d9"),
+    # A collapsed namespace is a *folder* of elements, and Graphviz's ``folder``
+    # shape says exactly that — a reader who has ever seen a file manager knows
+    # there is something inside it without being told. The slate palette is the
+    # one no element kind uses, so a box that is not a device cannot be mistaken
+    # for one at a glance.
+    AGGREGATE_KIND: ("folder", "#e2e8f0", "#475569"),
 }
 _DEFAULT_NODE_STYLE: Final[tuple[str, str, str]] = ("box", "#f5f5f5", "#6b7280")
 
@@ -325,6 +332,11 @@ class _EdgeView:
     #: Label colour; set only under a highlight, for the same reason as
     #: :attr:`_NodeView.fontcolor`.
     fontcolor: str | None = None
+    #: Graphviz layout weight. Set only on a bundled edge, where it is the
+    #: number of links folded in: four cables between two switches should pull
+    #: them together four times as hard as one, which is what keeps a LAG short
+    #: and straight instead of routed around the diagram.
+    weight: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -742,9 +754,11 @@ def _node_url(graph: Graph, node: Node, template: LinkTemplate | None) -> str | 
 
     A tunnel node stands for a ``tunnel`` document, so it links to that; a
     layer-3 prefix node stands for an inference from the addresses and links
-    nowhere, because there is no file that says ``192.168.10.0/24``.
+    nowhere, because there is no file that says ``192.168.10.0/24``. A collapsed
+    namespace stands for a directory rather than a document: there are many
+    files behind it and no line to point at, so it links nowhere either.
     """
-    if template is None or node.is_subnet:
+    if template is None or node.is_subnet or node.is_aggregate:
         return None
     fqn = node.tunnel.fqn if node.tunnel is not None else node.fqn
     return _expand(template, graph, fqn, kind=node.kind)
@@ -768,6 +782,10 @@ def _subtitle(node: Node) -> str:
         return f"[{node.subnet.family} subnet]"
     if node.tunnel is not None:
         return f"[{node.tunnel.type} tunnel]"
+    if node.aggregate is not None:
+        # Not "[namespace]": the reader needs to know at a glance that the box
+        # is a stand-in, and the number is the one fact a shape cannot carry.
+        return f"[namespace, {count_text(node.aggregate.size, 'element')}]"
     return f"[{node.kind}]"
 
 
@@ -803,6 +821,9 @@ def _node_rows(node: Node, options: RenderOptions, layer: Layer) -> tuple[_Row, 
     if node.tunnel is not None:
         return _tunnel_rows(node.tunnel)
 
+    if node.aggregate is not None:
+        return _aggregate_rows(node.aggregate, options)
+
     # At layer 3 each address is printed on the edge that puts the element in a
     # subnet, which also says which interface holds it; repeating the list under
     # the node would double the label to say less.
@@ -824,7 +845,7 @@ def _node_rows(node: Node, options: RenderOptions, layer: Layer) -> tuple[_Row, 
         hidden = len(rows) - _MAX_PORT_ROWS
         rows = [
             *rows[:_MAX_PORT_ROWS],
-            _Row(port=f"(+{_count(hidden, 'more interface')})", spans=True),
+            _Row(port=f"(+{count_text(hidden, 'more interface')})", spans=True),
         ]
     return tuple(rows)
 
@@ -875,6 +896,7 @@ def _edge_views(
             element_id=element if options.element_ids else None,
             url=_edge_url(graph, edge, options.link_template),
             fontcolor=emphasis.fontcolor if emphasis is not None else None,
+            weight=str(edge.bundle.size) if edge.bundle is not None else None,
         )
 
 
@@ -884,9 +906,11 @@ def _edge_url(graph: Graph, edge: Edge, template: LinkTemplate | None) -> str | 
     An adapter attachment is declared by the adapter (§8.2) and a tunnel leg by
     the tunnel, so both link to the one document that says the link exists. A
     layer-3 membership is declared by nobody — it follows from two addresses
-    being in one prefix — so it links nowhere.
+    being in one prefix — so it links nowhere. Neither does a bundle: several
+    documents declare it, and picking one of them would send the reader to an
+    arbitrary member. The tooltip names them all.
     """
-    if template is None or edge.kind is EdgeKind.SUBNET:
+    if template is None or edge.kind is EdgeKind.SUBNET or edge.bundle is not None:
         return None
     fqn = edge.tunnel.fqn if edge.tunnel is not None else edge.id.partition("#")[0]
     return _expand(template, graph, fqn, kind=edge.kind.value)
@@ -936,6 +960,10 @@ def _edge_label(edge: Edge, layer: Layer, options: RenderOptions) -> str:
     ports = _port_pair(edge)
     if ports:
         parts.append(ports)
+    if edge.bundle is not None:
+        # How many lines this one line stands for, immediately under the ports,
+        # because it is the fact that distinguishes a bundle from a link.
+        parts.append(edge.bundle.summary)
 
     if edge.kind is EdgeKind.TUNNEL and edge.tunnel is not None:
         parts.extend(_tunnel_label(edge.tunnel))
@@ -959,7 +987,9 @@ def _edge_label(edge: Edge, layer: Layer, options: RenderOptions) -> str:
 
     if edge.label:
         parts.append(edge.label)
-    if edge.kind is EdgeKind.CABLE and edge.medium != "copper":
+    # A bundle whose members disagree about the medium reports none, and an
+    # empty line in a label is a blank row rather than nothing.
+    if edge.kind is EdgeKind.CABLE and edge.medium and edge.medium != "copper":
         parts.append(edge.medium)
     speed = edge.speed_text
     if speed:
@@ -995,6 +1025,25 @@ def _tunnel_label(view: TunnelView) -> list[str]:
     return parts
 
 
+def _aggregate_rows(view: AggregateView, options: RenderOptions) -> tuple[_Row, ...]:
+    """The record rows of a collapsed namespace: its census, then what it joins.
+
+    The label answers the three questions the collapsed elements would have
+    answered between them — how many of what, in which VLANs, in which prefixes
+    — because a box that only said ``sites/north`` would summarise nothing. The
+    element names themselves stay in the tooltip: there may be two hundred.
+    """
+    rows = [_Row(port=view.kind_text, spans=True)]
+    if view.internal_links:
+        rows.append(_Row(port=f"{count_text(len(view.internal_links), 'link')} inside", spans=True))
+    if options.show_vlans and view.vlans:
+        rows.append(_Row(port=f"vlan {compact_ids(view.vlans)}", spans=True))
+    if options.show_ips and view.subnets:
+        for line in _address_lines(view.subnets, options.max_addresses):
+            rows.append(_Row(port=line, spans=True))
+    return tuple(rows)
+
+
 def _tunnel_rows(view: TunnelView) -> tuple[_Row, ...]:
     """The record rows of a tunnel drawn as a node: its stack, then its ends."""
     rows: list[_Row] = []
@@ -1006,7 +1055,7 @@ def _tunnel_rows(view: TunnelView) -> tuple[_Row, ...]:
         rows.append(_Row(port=_inline(end.element_name), addresses=_inline(end.interface)))
     hidden = len(view.ends) - _MAX_PORT_ROWS
     if hidden > 0:
-        rows.append(_Row(port=f"(+{_count(hidden, 'more endpoint')})", spans=True))
+        rows.append(_Row(port=f"(+{count_text(hidden, 'more endpoint')})", spans=True))
     if view.mtu is not None:
         rows.append(_Row(port=f"mtu {view.mtu}", spans=True))
     return tuple(rows)
@@ -1017,11 +1066,6 @@ def _address_lines(addresses: Sequence[str], limit: int) -> list[str]:
         return list(addresses)
     remaining = len(addresses) - limit
     return [*addresses[:limit], f"(+{remaining} more)"]
-
-
-def _count(number: int, noun: str, plural: str | None = None) -> str:
-    """``1 element`` / ``3 elements``, with an explicit plural where needed."""
-    return f"{number} {noun}" if number == 1 else f"{number} {plural or noun + 's'}"
 
 
 #: Whatever an inventory wrote, reduced to one line of printable text. A name

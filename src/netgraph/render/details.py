@@ -47,7 +47,7 @@ import re
 from collections.abc import Callable, Iterable, Iterator, Mapping
 from typing import Any, Final
 
-from netgraph.errors import clip_text
+from netgraph.errors import clip_text, count_text
 from netgraph.render.graph import Graph
 from netgraph.render.ids import ElementIds, element_ids
 from netgraph.render.jsonexport import graph_to_dict
@@ -172,14 +172,23 @@ def _narrow(document: dict[str, Any], options: RenderOptions) -> None:
     a machine-readable document and wrong for a tooltip: see the module
     docstring on display options.
     """
+    # A bundled edge carries its members' records inside it, and they are
+    # records of exactly the same shape, so the options have to reach them too.
+    members = [
+        link for edge in document["edges"] for link in edge.get("bundle", {}).get("links", ())
+    ]
     if not options.show_vlans:
-        for record in (*document["nodes"], *document["edges"]):
+        for record in (*document["nodes"], *document["edges"], *members):
             record["vlans"] = []
+            if "aggregate" in record:
+                record["aggregate"] = dict(record["aggregate"], vlans=[])
     if not options.show_ips:
         for node in document["nodes"]:
             if "subnet" in node:
                 node["subnet"] = dict(node["subnet"], addresses=[])
-        for edge in document["edges"]:
+            if "aggregate" in node:
+                node["aggregate"] = dict(node["aggregate"], subnets=[])
+        for edge in (*document["edges"], *members):
             edge.pop("addresses", None)
 
 
@@ -216,9 +225,9 @@ def namespace_text(namespace: str, records: Iterable[Mapping[str, Any]]) -> str:
         vlans.update(record.get("vlans", ()))
     lines = [
         f"namespace {plain_text(namespace)}",
-        _count(len(members), "element")
+        count_text(len(members), "element")
         + (
-            ": " + ", ".join(_count(count, kind) for kind, count in sorted(kinds.items()))
+            ": " + ", ".join(count_text(count, kind) for kind, count in sorted(kinds.items()))
             if kinds
             else ""
         ),
@@ -248,6 +257,9 @@ def _node_lines(record: Mapping[str, Any]) -> Iterator[str]:
         yield from _subnet_lines(subnet)
     if isinstance(tunnel, Mapping):
         yield from _tunnel_lines(tunnel)
+    aggregate = record.get("aggregate")
+    if isinstance(aggregate, Mapping):
+        yield from _aggregate_lines(aggregate)
 
     vlans = record.get("vlans")
     if vlans:
@@ -263,7 +275,39 @@ def _subtitle(record: Mapping[str, Any]) -> str:
         return f"{subnet.get('family', 'ip')} subnet"
     if isinstance(tunnel, Mapping):
         return f"{tunnel.get('type', 'tunnel')} tunnel"
+    if isinstance(record.get("aggregate"), Mapping):
+        return "namespace"
     return plain_text(str(record.get("kind", "element")))
+
+
+def _aggregate_lines(aggregate: Mapping[str, Any]) -> Iterator[str]:
+    """A collapsed namespace: how big it is, what is in it, what it swallowed.
+
+    The elements are listed rather than only counted. A reader hovering over one
+    box that stands for two hundred devices is asking *which* devices, and a
+    tooltip that answered "two hundred" would be the box's label again.
+    """
+    elements = list(aggregate.get("elements", ()))
+    counts = aggregate.get("countsByKind")
+    yield (
+        f"collapsed namespace {plain_text(str(aggregate.get('namespace', '')))}: "
+        + count_text(len(elements), "element")
+        + (
+            ": " + ", ".join(count_text(int(number), kind) for kind, number in counts.items())
+            if isinstance(counts, Mapping) and counts
+            else ""
+        )
+    )
+    internal = list(aggregate.get("internalLinks", ()))
+    if internal:
+        # Without this the reader would count the edges on the page and
+        # conclude the site has no cabling in it.
+        yield count_text(len(internal), "link") + " inside, not drawn"
+    subnets = list(aggregate.get("subnets", ()))
+    if subnets:
+        yield "subnets: " + _listed(plain_text(str(prefix)) for prefix in subnets)
+    if elements:
+        yield "elements: " + _listed(plain_text(str(element)) for element in elements)
 
 
 def _subnet_lines(subnet: Mapping[str, Any]) -> Iterator[str]:
@@ -272,7 +316,7 @@ def _subnet_lines(subnet: Mapping[str, Any]) -> Iterator[str]:
     elements = list(subnet.get("elements", ()))
     yield (
         f"prefix {plain_text(str(subnet.get('prefix', '')))}: "
-        f"{_count(len(elements), 'element')}, {_count(len(addresses), 'address', 'addresses')}"
+        f"{count_text(len(elements), 'element')}, {count_text(len(addresses), 'address', 'addresses')}"
     )
     if addresses:
         yield "addresses: " + _listed(plain_text(str(address)) for address in addresses)
@@ -312,12 +356,44 @@ def _tunnel_lines(tunnel: Mapping[str, Any]) -> Iterator[str]:
     yield from _rows("endpoints", tunnel.get("endpoints", ()), _endpoint_row)
 
 
+def _bundle_lines(bundle: Mapping[str, Any]) -> Iterator[str]:
+    """The links one drawn edge stands for, one per row.
+
+    This is the whole affordance for a bundle: the picture says "four links",
+    and the only place a reader can find out *which* four is here.
+    """
+    links = list(bundle.get("links", ()))
+    aggregate = bundle.get("aggregate")
+    if isinstance(aggregate, list) and aggregate:
+        yield "link aggregation: " + " — ".join(
+            _endpoint(end) for end in aggregate if isinstance(end, Mapping)
+        )
+    yield from _rows("bundled links", links, _bundled_row)
+
+
+def _bundled_row(link: Mapping[str, Any]) -> str:
+    """One member of a bundle: its ports, then how it differs from its siblings."""
+    parts = [" — ".join(_endpoint(endpoint) for endpoint in link.get("endpoints", ()))]
+    detail = [
+        plain_text(str(value))
+        for value in (link.get("id"), link.get("medium"), link.get("speedText"), link.get("label"))
+        if value
+    ]
+    if detail:
+        parts.append(f"({', '.join(detail)})")
+    return "  ".join(parts)
+
+
 def _edge_lines(record: Mapping[str, Any]) -> Iterator[str]:
     """An edge: what it is, what it joins, and what it carries."""
     kind = plain_text(str(record.get("kind", "link")))
     identity = plain_text(str(record.get("id", "")))
     yield f"{kind} {identity}" if identity else kind
     yield " — ".join(_endpoint(endpoint) for endpoint in record.get("endpoints", ()))
+
+    bundle = record.get("bundle")
+    if isinstance(bundle, Mapping):
+        yield from _bundle_lines(bundle)
 
     tunnel = record.get("tunnel")
     if isinstance(tunnel, Mapping):
@@ -440,10 +516,6 @@ def _compact_ids(ids: Iterable[int]) -> str:
         else:
             ranges.append([value, value])
     return ",".join(str(low) if low == high else f"{low}-{high}" for low, high in ranges)
-
-
-def _count(number: int, noun: str, plural: str | None = None) -> str:
-    return f"{number} {noun}" if number == 1 else f"{number} {plural or noun + 's'}"
 
 
 def _number(value: float) -> str:

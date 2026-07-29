@@ -13,14 +13,30 @@ the same inventory produce byte-identical output.
 Node types
 ----------
 
-Every node carries a ``type`` discriminator: ``element``, ``subnet`` or
-``tunnel``. Below layer 3 the first dominates; a layer-3 document mixes element
-and subnet nodes and an ``overlay`` document mixes element and tunnel nodes, so
-a consumer must be able to tell a derived prefix or a tunnel from a declared
-device without guessing from the identifier. A ``subnet`` node adds a ``subnet``
-object — the prefix, the family, the addresses inside it and the elements
-holding them — and a ``tunnel`` node adds a ``tunnel`` object; neither carries
-interfaces. An ``element`` node is exactly what it is at layer 1.
+Every node carries a ``type`` discriminator: ``element``, ``subnet``, ``tunnel``
+or ``aggregate``. Below layer 3 the first dominates; a layer-3 document mixes
+element and subnet nodes and an ``overlay`` document mixes element and tunnel
+nodes, so a consumer must be able to tell a derived prefix or a tunnel from a
+declared device without guessing from the identifier. A ``subnet`` node adds a
+``subnet`` object — the prefix, the family, the addresses inside it and the
+elements holding them — and a ``tunnel`` node adds a ``tunnel`` object; neither
+carries interfaces. An ``element`` node is exactly what it is at layer 1.
+
+Aggregates
+----------
+
+``--collapse`` replaces a whole namespace with one node, and ``--bundle-links``
+one set of parallel links with one edge. Both are marked, because a consumer
+that read either as a single device or a single cable would be misled about the
+network rather than merely about the picture:
+
+* an ``aggregate`` node carries an ``aggregate`` object naming the namespace,
+  **every element it stands for**, the count per kind, the VLANs and prefixes
+  they participate in, and the ids of the links that ran wholly inside it and
+  are therefore absent from ``edges``;
+* a bundled edge carries a ``bundle`` object with the member count and the full
+  record of each member link, exported by the same code that exports an
+  unbundled one — so nothing is lost by asking for the summary.
 """
 
 from __future__ import annotations
@@ -29,6 +45,7 @@ import json
 from typing import Any, Final
 
 from netgraph.models import API_VERSION
+from netgraph.render.aggregate import AggregateView, BundleView
 from netgraph.render.graph import Edge, EdgeKind, Graph, Node, PortView, Subnet, TunnelView
 from netgraph.render.options import RenderOptions
 
@@ -113,9 +130,35 @@ def _node(node: Node, options: RenderOptions) -> dict[str, Any]:
         payload["subnet"] = _subnet(node.subnet)
     if node.tunnel is not None:
         payload["tunnel"] = _tunnel(node.tunnel)
+    if node.aggregate is not None:
+        payload["aggregate"] = _aggregate(node.aggregate)
     payload["vlans"] = sorted(node.vlans)
     payload["interfaces"] = [_port(port, options) for port in node.ports]
     return payload
+
+
+def _aggregate(view: AggregateView) -> dict[str, Any]:
+    """A collapsed namespace: what it stands for, in full.
+
+    ``elements`` is the point of the object. A consumer holding one aggregate
+    node must be able to get back to the devices behind it — to count them, to
+    look them up in ``netgraph render -f json`` without ``--collapse``, or to
+    refuse to treat the box as a device. Like ``subnet`` and ``tunnel``, none of
+    it is gated on a display flag: which elements a box stands for is topology,
+    not decoration.
+    """
+    return {
+        "namespace": view.namespace,
+        "elements": list(view.elements),
+        "elementCount": view.size,
+        "countsByKind": dict(view.by_kind),
+        "namespaces": list(view.namespaces),
+        "vlans": sorted(view.vlans),
+        "subnets": list(view.subnets),
+        # The links the summary swallowed. Absent from ``edges`` by
+        # construction, so a consumer counting cables needs them named.
+        "internalLinks": list(view.internal_links),
+    }
 
 
 def _subnet(subnet: Subnet) -> dict[str, Any]:
@@ -215,7 +258,28 @@ def _edge(edge: Edge) -> dict[str, Any]:
         payload["label"] = edge.label
     if edge.length_m is not None:
         payload["lengthM"] = edge.length_m
+    if edge.bundle is not None:
+        payload["bundle"] = _bundle(edge.bundle)
     payload["vlans"] = sorted(edge.vlans)
+    return payload
+
+
+def _bundle(view: BundleView) -> dict[str, Any]:
+    """The links one drawn edge stands for, each exported in full.
+
+    Recursion is safe and shallow: bundling flattens, so a member is never
+    itself a bundle.
+    """
+    payload: dict[str, Any] = {"size": view.size, "links": [_edge(edge) for edge in view.edges]}
+    if view.aggregate is not None:
+        source, target = view.aggregate
+        # A declared link aggregation, not a set of links that merely run in
+        # parallel: the inventory said these are one logical link.
+        payload["aggregate"] = [
+            {"node": node, "interface": interface}
+            for node, interface in ((view.edges[0].source, source), (view.edges[0].target, target))
+            if interface
+        ]
     return payload
 
 

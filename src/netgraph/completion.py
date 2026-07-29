@@ -33,7 +33,7 @@ from typing import Final
 import click
 from click.shell_completion import CompletionItem, get_completion_class
 
-from netgraph.errors import NetgraphError
+from netgraph.errors import NetgraphError, count_text
 from netgraph.models import DOCUMENT_KINDS
 from netgraph.models.fielddocs import KIND_NOTES
 from netgraph.render import RENDERERS, Layer
@@ -46,6 +46,7 @@ __all__ = [
     "complete_format",
     "complete_kind",
     "complete_layer",
+    "complete_namespace",
     "complete_node",
     "complete_rule",
     "completion_script",
@@ -183,6 +184,29 @@ def complete_node(
     a name the filter then rejects.
     """
     return _element_items(ctx, incomplete, nodes_only=True)
+
+
+def complete_namespace(
+    ctx: click.Context, param: click.Parameter, incomplete: str
+) -> list[CompletionItem]:
+    """Every namespace holding an element, and every ancestor of one.
+
+    For ``--namespace`` and ``--collapse``, both of which match a namespace and
+    everything below it: ``sites`` is therefore a legal value even when no
+    element sits directly in it, so it has to be offered. Ordered outermost
+    first, which is the order a reader narrows in.
+    """
+    elements = _load_elements(_inventory_path(ctx), nodes_only=True)
+    counts: dict[str, int] = {}
+    for fqn in elements:
+        namespace = fqn.rpartition("/")[0]
+        while namespace:
+            counts[namespace] = counts.get(namespace, 0) + 1
+            namespace = namespace.rpartition("/")[0]
+    ordered = sorted(counts, key=lambda namespace: (namespace.count("/"), namespace))
+    return _items(
+        ((namespace, count_text(counts[namespace], "element")) for namespace in ordered), incomplete
+    )
 
 
 def _element_items(

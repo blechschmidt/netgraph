@@ -1,0 +1,145 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkGraph",
+  "layer": "l1",
+  "nodes": [
+    {
+      "id": "ns:sites/east",
+      "type": "aggregate",
+      "name": "sites/east",
+      "kind": "namespace",
+      "namespace": "sites",
+      "aggregate": {
+        "namespace": "sites/east",
+        "elements": [
+          "sites/east/pc-east-01",
+          "sites/east/sw-east-01",
+          "sites/east/sw-east-02"
+        ],
+        "elementCount": 3,
+        "countsByKind": {
+          "computer": 1,
+          "switch": 2
+        },
+        "namespaces": [
+          "sites/east"
+        ],
+        "vlans": [
+          10
+        ],
+        "subnets": [
+          "10.20.0.0/24"
+        ],
+        "internalLinks": [
+          "cables/cbl-lag-1#bundle",
+          "cables/cbl-desk-1"
+        ]
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": []
+    },
+    {
+      "id": "ns:sites/west",
+      "type": "aggregate",
+      "name": "sites/west",
+      "kind": "namespace",
+      "namespace": "sites",
+      "aggregate": {
+        "namespace": "sites/west",
+        "elements": [
+          "sites/west/sw-west-01"
+        ],
+        "elementCount": 1,
+        "countsByKind": {
+          "switch": 1
+        },
+        "namespaces": [
+          "sites/west"
+        ],
+        "vlans": [
+          10
+        ],
+        "subnets": [
+          "10.20.0.0/24"
+        ],
+        "internalLinks": []
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "cables/cbl-east-west#bundle",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "ns:sites/east"
+        },
+        {
+          "node": "ns:sites/west"
+        }
+      ],
+      "medium": "copper",
+      "speed": 2000000000,
+      "speedText": "2Gbps",
+      "bundle": {
+        "size": 2,
+        "links": [
+          {
+            "id": "cables/cbl-east-west",
+            "kind": "cable",
+            "endpoints": [
+              {
+                "node": "ns:sites/east",
+                "interface": "GigabitEthernet1/0/20"
+              },
+              {
+                "node": "ns:sites/west",
+                "interface": "GigabitEthernet1/0/20"
+              }
+            ],
+            "medium": "copper",
+            "speed": 1000000000,
+            "speedText": "1Gbps",
+            "label": "CBL-EAST-WEST",
+            "lengthM": 2.0,
+            "vlans": [
+              10
+            ]
+          },
+          {
+            "id": "cables/cbl-east-west-2",
+            "kind": "cable",
+            "endpoints": [
+              {
+                "node": "ns:sites/east",
+                "interface": "GigabitEthernet1/0/21"
+              },
+              {
+                "node": "ns:sites/west",
+                "interface": "GigabitEthernet1/0/21"
+              }
+            ],
+            "medium": "copper",
+            "speed": 1000000000,
+            "speedText": "1Gbps",
+            "label": "CBL-EAST-WEST-2",
+            "lengthM": 2.0,
+            "vlans": [
+              10
+            ]
+          }
+        ]
+      },
+      "vlans": [
+        10
+      ]
+    }
+  ],
+  "title": "Collapsed and bundled"
+}

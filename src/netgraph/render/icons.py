@@ -41,7 +41,7 @@ from types import MappingProxyType
 from typing import Final
 
 from netgraph.errors import RenderError
-from netgraph.render.graph import SUBNET_KIND
+from netgraph.render.graph import SUBNET_KIND, TUNNEL_KIND
 
 __all__ = [
     "BUNDLED_THEMES",
@@ -58,8 +58,20 @@ __all__ = [
 ]
 
 #: Every kind a theme may hold a picture for: the six element kinds that become
-#: nodes, plus the derived layer-3 subnet node. ``cable`` is not here — a cable
-#: is an edge, and an edge has no icon.
+#: nodes, the derived layer-3 subnet node, and the tunnel. ``cable`` is not here
+#: — a cable is an edge, and an edge has no icon. Neither is
+#: :data:`~netgraph.render.aggregate.AGGREGATE_KIND`: a collapsed namespace is
+#: not a *thing* with a picture, it is a box holding several, and the folder
+#: shape it falls back to says so better than any glyph would.
+#:
+#: The tunnel glyph is a **conduit**, one for every tunnel type (see entry 6 of
+#: ``docs/follow-ups.md``): a bore with a payload entering one end and leaving
+#: the other. It draws the encapsulation, which is what every tunnel type has in
+#: common, and deliberately draws nothing about confidentiality — a lock or an
+#: open padlock would put netgraph's guess about a security property into a
+#: picture, and a reader who did not recognise the glyph would read its absence
+#: as "nothing to say". That stays a colour and a word, on the edge and in
+#: ``W127``.
 ICON_KINDS: Final[tuple[str, ...]] = (
     "router",
     "switch",
@@ -68,6 +80,7 @@ ICON_KINDS: Final[tuple[str, ...]] = (
     "server",
     "adapter",
     SUBNET_KIND,
+    TUNNEL_KIND,
 )
 
 #: Image formats a theme file may be in, and that Graphviz can load. The order

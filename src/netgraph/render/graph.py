@@ -68,7 +68,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from fnmatch import fnmatchcase
 from pathlib import Path
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
 from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of, short_name
 from netgraph.models import (
@@ -81,6 +81,13 @@ from netgraph.models import (
     format_bitrate,
 )
 from netgraph.subnets import AddressPlacement, Subnet, is_routable_address, subnets_of
+
+if TYPE_CHECKING:  # pragma: no cover - imported for typing only
+    # :mod:`netgraph.render.aggregate` consumes this module, so the dependency
+    # can only run one way at import time. The two annotations below are the
+    # whole of what points back, and ``from __future__ import annotations``
+    # keeps them strings.
+    from netgraph.render.aggregate import AggregateView, BundleView
 
 __all__ = [
     "SUBNET_ID_PREFIX",
@@ -138,6 +145,11 @@ class NodeType(str, Enum):
     #: A ``tunnel`` document drawn as a node rather than as an edge, because it
     #: joins more than two endpoints or because something is nested inside it.
     TUNNEL = "tunnel"
+    #: A whole namespace, collapsed into one box by
+    #: :func:`~netgraph.render.aggregate.collapse_namespaces`. It stands for
+    #: elements the diagram no longer draws, so a consumer must be able to tell
+    #: it from the single device it otherwise looks like.
+    AGGREGATE = "aggregate"
 
     def __str__(self) -> str:
         return self.value
@@ -382,6 +394,9 @@ class Node:
     subnet: Subnet | None = None
     #: The tunnel this node stands for; set exactly for a tunnel node.
     tunnel: TunnelView | None = None
+    #: The collapsed namespace this node stands for; set exactly for an
+    #: aggregate node (:mod:`netgraph.render.aggregate`).
+    aggregate: AggregateView | None = None
 
     @classmethod
     def for_tunnel(cls, view: TunnelView) -> Node:
@@ -428,6 +443,11 @@ class Node:
     @property
     def is_tunnel(self) -> bool:
         return self.type is NodeType.TUNNEL
+
+    @property
+    def is_aggregate(self) -> bool:
+        """Does this node stand for a whole namespace rather than one thing?"""
+        return self.type is NodeType.AGGREGATE
 
     @property
     def is_element(self) -> bool:
@@ -504,6 +524,10 @@ class Edge:
     #: The tunnel this edge is, or is a leg of; set on ``tunnel`` and
     #: ``encapsulation`` edges.
     tunnel: TunnelView | None = None
+    #: The links this edge stands for, when several parallel ones were folded
+    #: into it (:mod:`netgraph.render.aggregate`). ``None`` on a link that is
+    #: exactly itself.
+    bundle: BundleView | None = None
 
     @property
     def name(self) -> str:
@@ -589,15 +613,26 @@ class Graph:
         return tuple(node for node in self.nodes.values() if node.is_tunnel)
 
     @property
+    def aggregate_nodes(self) -> tuple[Node, ...]:
+        """The collapsed-namespace nodes, in graph order; empty without ``--collapse``."""
+        return tuple(node for node in self.nodes.values() if node.is_aggregate)
+
+    @property
     def tunnels(self) -> tuple[TunnelView, ...]:
-        """Every tunnel the graph draws, as a node or as an edge, in graph order."""
+        """Every tunnel the graph draws, as a node or as an edge, in graph order.
+
+        A tunnel folded into a bundle still counts: it is drawn, as one strand
+        of an edge that says how many strands it has.
+        """
         seen: dict[str, TunnelView] = {}
         for node in self.nodes.values():
             if node.tunnel is not None:
                 seen.setdefault(node.tunnel.fqn, node.tunnel)
         for edge in self.edges:
-            if edge.tunnel is not None:
-                seen.setdefault(edge.tunnel.fqn, edge.tunnel)
+            members = edge.bundle.edges if edge.bundle is not None else (edge,)
+            for member in members:
+                if member.tunnel is not None:
+                    seen.setdefault(member.tunnel.fqn, member.tunnel)
         return tuple(seen.values())
 
     @property

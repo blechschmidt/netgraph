@@ -1,0 +1,48 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-west-01
+  description: West / rack 1
+  labels:
+    site: west
+spec:
+  vendor: Cisco
+  model: C9300-24T
+  location: West / rack 1
+  bridge:
+    name: br0
+    type: customer-vlan-bridge
+    address: 00:1b:0d:e0:03:00
+  vlans:
+    - id: 10
+      name: data
+  interfaces:
+    - name: br0
+      type: bridge
+      description: Switching instance
+      members:
+        - GigabitEthernet1/0/20
+        - GigabitEthernet1/0/21
+    - name: Vlan10
+      type: vlan
+      parent: br0
+      description: In-band management
+      vlan:
+        mode: access
+        access_vlan: 10
+      ipv4:
+        addresses: [10.20.0.4/24]
+    - name: GigabitEthernet1/0/20
+      type: ethernet
+      description: Uplink to the east site
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/21
+      type: ethernet
+      description: Second uplink to the east site
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10

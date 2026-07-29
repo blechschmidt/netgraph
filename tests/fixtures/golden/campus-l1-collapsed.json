@@ -1,0 +1,282 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkGraph",
+  "layer": "l1",
+  "nodes": [
+    {
+      "id": "ns:sites/north",
+      "type": "aggregate",
+      "name": "sites/north",
+      "kind": "namespace",
+      "namespace": "sites",
+      "aggregate": {
+        "namespace": "sites/north",
+        "elements": [
+          "sites/north/access/sw-north-acc-01",
+          "sites/north/access/sw-north-acc-02",
+          "sites/north/access/sw-north-acc-03",
+          "sites/north/core/rtr-north-core-01",
+          "sites/north/distribution/sw-north-dist-01",
+          "sites/north/hosts/pc-north-01",
+          "sites/north/hosts/srv-north-01",
+          "sites/north/hosts/pc-north-02"
+        ],
+        "elementCount": 8,
+        "countsByKind": {
+          "computer": 2,
+          "router": 1,
+          "server": 1,
+          "switch": 4
+        },
+        "namespaces": [
+          "sites/north/access",
+          "sites/north/core",
+          "sites/north/distribution",
+          "sites/north/hosts"
+        ],
+        "vlans": [
+          1,
+          10,
+          20,
+          30,
+          99
+        ],
+        "subnets": [
+          "10.1.0.0/30",
+          "10.1.10.0/24",
+          "10.1.20.0/24",
+          "10.1.99.0/24",
+          "192.0.2.1/32",
+          "198.51.100.0/30",
+          "198.51.100.8/30",
+          "2001:db8::1/128",
+          "2001:db8:1::/64",
+          "2001:db8:1:10::/64",
+          "2001:db8:1:20::/64",
+          "2001:db8:ff:1::/64",
+          "2001:db8:ff:3::/64"
+        ],
+        "internalLinks": [
+          "sites/north/cables/cbl-north-core-dist",
+          "sites/north/cables/cbl-north-dist-acc01",
+          "sites/north/cables/cbl-north-dist-acc02",
+          "sites/north/cables/cbl-north-dist-acc03",
+          "sites/north/cables/cbl-north-acc01-pc01",
+          "sites/north/cables/cbl-north-acc01-srv01",
+          "sites/north/cables/cbl-north-acc02-pc02"
+        ]
+      },
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": []
+    },
+    {
+      "id": "ns:sites/south",
+      "type": "aggregate",
+      "name": "sites/south",
+      "kind": "namespace",
+      "namespace": "sites",
+      "aggregate": {
+        "namespace": "sites/south",
+        "elements": [
+          "sites/south/access/sw-south-acc-01",
+          "sites/south/access/sw-south-acc-02",
+          "sites/south/core/rtr-south-core-01",
+          "sites/south/distribution/sw-south-dist-01",
+          "sites/south/hosts/pc-south-01",
+          "sites/south/hosts/srv-south-01",
+          "sites/south/hosts/pc-south-02"
+        ],
+        "elementCount": 7,
+        "countsByKind": {
+          "computer": 2,
+          "router": 1,
+          "server": 1,
+          "switch": 3
+        },
+        "namespaces": [
+          "sites/south/access",
+          "sites/south/core",
+          "sites/south/distribution",
+          "sites/south/hosts"
+        ],
+        "vlans": [
+          1,
+          10,
+          20,
+          30,
+          99
+        ],
+        "subnets": [
+          "10.2.0.0/30",
+          "10.2.10.0/24",
+          "10.2.20.0/24",
+          "10.2.99.0/24",
+          "192.0.2.2/32",
+          "198.51.100.0/30",
+          "198.51.100.4/30",
+          "2001:db8::2/128",
+          "2001:db8:2::/64",
+          "2001:db8:2:10::/64",
+          "2001:db8:2:20::/64",
+          "2001:db8:ff:1::/64",
+          "2001:db8:ff:2::/64"
+        ],
+        "internalLinks": [
+          "sites/south/cables/cbl-south-core-dist",
+          "sites/south/cables/cbl-south-dist-acc01",
+          "sites/south/cables/cbl-south-dist-acc02",
+          "sites/south/cables/cbl-south-acc01-pc01",
+          "sites/south/cables/cbl-south-acc01-srv01",
+          "sites/south/cables/cbl-south-acc02-pc02"
+        ]
+      },
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": []
+    },
+    {
+      "id": "ns:sites/west",
+      "type": "aggregate",
+      "name": "sites/west",
+      "kind": "namespace",
+      "namespace": "sites",
+      "aggregate": {
+        "namespace": "sites/west",
+        "elements": [
+          "sites/west/access/sw-west-acc-01",
+          "sites/west/access/sw-west-acc-02",
+          "sites/west/core/rtr-west-core-01",
+          "sites/west/distribution/sw-west-dist-01",
+          "sites/west/hosts/pc-west-01",
+          "sites/west/hosts/srv-west-01",
+          "sites/west/hosts/pc-west-02"
+        ],
+        "elementCount": 7,
+        "countsByKind": {
+          "computer": 2,
+          "router": 1,
+          "server": 1,
+          "switch": 3
+        },
+        "namespaces": [
+          "sites/west/access",
+          "sites/west/core",
+          "sites/west/distribution",
+          "sites/west/hosts"
+        ],
+        "vlans": [
+          1,
+          10,
+          20,
+          30,
+          99
+        ],
+        "subnets": [
+          "10.3.0.0/30",
+          "10.3.10.0/24",
+          "10.3.20.0/24",
+          "10.3.99.0/24",
+          "192.0.2.3/32",
+          "198.51.100.4/30",
+          "198.51.100.8/30",
+          "2001:db8::3/128",
+          "2001:db8:3::/64",
+          "2001:db8:3:10::/64",
+          "2001:db8:3:20::/64",
+          "2001:db8:ff:2::/64",
+          "2001:db8:ff:3::/64"
+        ],
+        "internalLinks": [
+          "sites/west/cables/cbl-west-core-dist",
+          "sites/west/cables/cbl-west-dist-acc01",
+          "sites/west/cables/cbl-west-dist-acc02",
+          "sites/west/cables/cbl-west-acc01-pc01",
+          "sites/west/cables/cbl-west-acc01-srv01",
+          "sites/west/cables/cbl-west-acc02-pc02"
+        ]
+      },
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "backbone/cbl-bb-north-south",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "ns:sites/north",
+          "interface": "xe-0/0/1"
+        },
+        {
+          "node": "ns:sites/south",
+          "interface": "xe-0/0/2"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "label": "BB-NS",
+      "lengthM": 4200.0,
+      "vlans": []
+    },
+    {
+      "id": "backbone/cbl-bb-south-west",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "ns:sites/south",
+          "interface": "xe-0/0/1"
+        },
+        {
+          "node": "ns:sites/west",
+          "interface": "xe-0/0/2"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "label": "BB-SW",
+      "lengthM": 4200.0,
+      "vlans": []
+    },
+    {
+      "id": "backbone/cbl-bb-west-north",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "ns:sites/north",
+          "interface": "xe-0/0/2"
+        },
+        {
+          "node": "ns:sites/west",
+          "interface": "xe-0/0/1"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "label": "BB-WN",
+      "lengthM": 4200.0,
+      "vlans": []
+    }
+  ],
+  "title": "Campus, collapsed to sites"
+}

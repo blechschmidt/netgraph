@@ -1,0 +1,203 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-east-01
+  description: East / rack 1
+  labels:
+    site: east
+spec:
+  vendor: Cisco
+  model: C9300-24T
+  location: East / rack 1
+  bridge:
+    name: br0
+    type: customer-vlan-bridge
+    address: 00:1b:0d:e0:01:00
+  vlans:
+    - id: 10
+      name: data
+  interfaces:
+    - name: br0
+      type: bridge
+      description: Switching instance
+      members:
+        - Port-channel1
+        - GigabitEthernet1/0/9
+        - GigabitEthernet1/0/10
+        - GigabitEthernet1/0/11
+        - GigabitEthernet1/0/20
+    - name: Vlan10
+      type: vlan
+      parent: br0
+      description: In-band management
+      vlan:
+        mode: access
+        access_vlan: 10
+      ipv4:
+        addresses: [10.20.0.2/24]
+    - name: Port-channel1
+      type: lag
+      description: Four-member LAG to the other east switch
+      mtu: 1500
+      members:
+        - GigabitEthernet1/0/1
+        - GigabitEthernet1/0/2
+        - GigabitEthernet1/0/3
+        - GigabitEthernet1/0/4
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/1
+      type: ethernet
+      description: LAG member 1
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/2
+      type: ethernet
+      description: LAG member 2
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/3
+      type: ethernet
+      description: LAG member 3
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/4
+      type: ethernet
+      description: LAG member 4
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/9
+      type: ethernet
+      description: Spare cross-link, outside the aggregate
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/10
+      type: ethernet
+      description: Second spare cross-link, outside the aggregate
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/11
+      type: ethernet
+      description: Desk port
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/20
+      type: ethernet
+      description: Uplink to the west site
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-east-02
+  description: East / rack 2
+  labels:
+    site: east
+spec:
+  vendor: Cisco
+  model: C9300-24T
+  location: East / rack 2
+  bridge:
+    name: br0
+    type: customer-vlan-bridge
+    address: 00:1b:0d:e0:02:00
+  vlans:
+    - id: 10
+      name: data
+  interfaces:
+    - name: br0
+      type: bridge
+      description: Switching instance
+      members:
+        - Port-channel1
+        - GigabitEthernet1/0/9
+        - GigabitEthernet1/0/10
+        - GigabitEthernet1/0/21
+    - name: Vlan10
+      type: vlan
+      parent: br0
+      description: In-band management
+      vlan:
+        mode: access
+        access_vlan: 10
+      ipv4:
+        addresses: [10.20.0.3/24]
+    - name: Port-channel1
+      type: lag
+      description: Four-member LAG to the other east switch
+      mtu: 1500
+      members:
+        - GigabitEthernet1/0/1
+        - GigabitEthernet1/0/2
+        - GigabitEthernet1/0/3
+        - GigabitEthernet1/0/4
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/1
+      type: ethernet
+      description: LAG member 1
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/2
+      type: ethernet
+      description: LAG member 2
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/3
+      type: ethernet
+      description: LAG member 3
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/4
+      type: ethernet
+      description: LAG member 4
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/9
+      type: ethernet
+      description: Spare cross-link, outside the aggregate
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/10
+      type: ethernet
+      description: Second spare cross-link, outside the aggregate
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+    - name: GigabitEthernet1/0/21
+      type: ethernet
+      description: Second uplink to the west site
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10

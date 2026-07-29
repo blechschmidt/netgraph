@@ -424,36 +424,46 @@ parser.
 
 ---
 
-## 6. A tunnel has no icon, so `--icons` falls back to a shape for it
+## 6. ~~A tunnel has no icon, so `--icons` falls back to a shape for it~~ — drawn
 
-**Status:** open. Raised while adding the `tunnel` kind (2026-07-29).
+**Status:** closed 2026-07-29. The bundled theme ships `tunnel.svg` and
+`tunnel.png`, and `tunnel` is in `ICON_KINDS`.
 
-`--icons THEME` draws each node as its kind's picture
-(`netgraph.render.icons.ICON_KINDS`). The bundled themes carry pictures for the
-six hardware kinds, and `tunnel` was deliberately **not** added to that tuple: a
-tunnel is not hardware, the Cisco topology idiom the bundled artwork follows has
-no glyph for one, and inventing a lock or a pipe would put netgraph's guess
-about a security property into a picture rather than into a label — which is
-exactly what `W127` and the crimson edge exist to say in words.
+The original entry left three questions and argued for one answer each. All
+three were answered the way it predicted, so what follows is what was actually
+drawn and why the drawing is safe.
 
-The consequence is visible rather than broken: with a theme in use, hardware is
-drawn as icons and a tunnel node keeps its violet hexagon. That mixes two visual
-languages in one diagram, which is worth fixing eventually.
+**1. Should a tunnel be a glyph at all? Yes.** The alternative the entry floated
+— leaving tunnels as the only shapes on a page of icons — reads as an oversight
+rather than as a distinction. A reader cannot tell "netgraph has no picture for
+this" from "this theme is incomplete", and the encapsulation view (`--layer
+overlay`) is *entirely* tunnels: with no glyph it was a page of violet hexagons
+with icons only at the edges. Mixing two visual languages in one diagram was the
+complaint, and adding the glyph is the only fix that removes it.
 
-A fix would have to decide, in this order:
+**2. One glyph, or one per type? One.** `TunnelType` has eight members and would
+be nine tomorrow; eight pieces of artwork kept in step with an enum is a
+maintenance cost paid forever to say something the label already says, since
+every tunnel node and edge is annotated with its stack (`vxlan over ipsec`). The
+one glyph draws what all eight have in common: a **conduit** — a bore, with a
+payload entering one end and leaving the other. That is encapsulation, and it is
+the only thing a picture of a tunnel can honestly mean.
 
-1. Whether a tunnel *should* be a glyph at all, or whether the encapsulation
-   view reads better with the tunnels as the only shapes on a page of icons.
-2. If it should: one glyph for every type, or one per type? Eight glyphs is a
-   lot of artwork to keep in step with `TunnelType`, and the type is already on
-   the label. One is likely right.
-3. Whether an icon can carry "cleartext" at all, or whether that has to stay a
-   colour and a word. It has to stay a colour and a word: a reader who does not
-   recognise the glyph would read a missing lock as "nothing to say".
+**3. Can an icon carry "cleartext"? No, and it does not try.** This was the
+question with a real hazard behind it, and the entry's reasoning stands: a lock
+on the encrypted glyph makes its *absence* the carrier of "this is in the
+clear", and absence is not something a reader notices. Confidentiality stays
+where it already was — the crimson edge, the word `cleartext` on the label, and
+`W127` in prose — and the conduit is identical whether the tunnel is WireGuard
+or GRE. The one thing an icon must not do is make a security property quieter
+than it was, and this one leaves it exactly as loud.
 
-Until then, `IconTheme.files` simply returns no file for `tunnel` and the shape
-is used, which is the documented fallback for a theme with a missing picture —
-so nothing fails, and a theme that *does* ship `tunnel.svg` already works.
+The consequence for a theme author is unchanged: `ICON_KINDS` grew by one entry,
+a theme without `tunnel.svg` still falls back to the violet hexagon, and
+`IconTheme.kinds()` reports what a theme actually covers. `AGGREGATE_KIND`
+(entry 9) was deliberately *not* added: a collapsed namespace is not a thing
+with a picture but a box holding several, and Graphviz's `folder` shape says so
+better than any glyph would.
 
 ---
 
@@ -792,6 +802,85 @@ drawings once as a diff against the first, which trades bytes for client code
 and would need measuring before it earns its place. Neither is worth doing until
 somebody has a network where the file size actually gets in the way — this is
 recorded so that the first person who does has the numbers.
+
+---
+
+## 9. ~~A 1000-device diagram is a hairball~~ — fixed, 30× the layout, 200× the file
+
+**Status:** closed 2026-07-29. `--collapse`, `--collapse-depth` and
+`--bundle-links` summarise a graph instead of narrowing it.
+
+Entries 1, 5 and 7 all measured the *pipeline* on `tools/bench_pipeline.py`'s
+default tree and made it fast. None of them measured the **diagram**, and the
+diagram was where the size actually hurt: every filter netgraph had removed
+detail by removing elements, so a reader of a 1056-device tree could ask for a
+part of the network but never for a summary of the whole of it. `dot` will lay
+1056 nodes out — but the result is 3.5 MB of SVG that no one can read.
+
+### The harness
+
+`tools/bench_pipeline.py --aggregate`, on the same default tree — **1056 devices
+in 2106 documents across 138 files, 1.2 MB of YAML**, through libyaml. It times
+the transform *and* the Graphviz layout, and measures the SVG, because the
+transform is linear in the graph and `dot` is superlinear in it: the whole
+return on collapsing a tree is what the layout no longer has to do.
+
+Two trees are timed. The default has one uplink per rack switch and therefore no
+parallel links at all — which is why `--bundle-links` is a no-op on it, and that
+is worth recording rather than hiding. `--uplinks 4` gives every rack switch a
+four-member LAG to its site router, which is the shape bundling exists for; the
+flag defaults to 1 so the tree entries 1, 5 and 7 measured is unchanged.
+
+### Measured, default tree (1056 nodes, 1050 edges)
+
+| Aggregation | Nodes | Edges | Transform | Layout | SVG |
+|---|---|---|---|---|---|
+| `--no-bundle-links` | 1056 | 1050 | — | 835 ms | 3 486 kB |
+| *(default: LAG only)* | 1056 | 1050 | 1.5 ms | 781 ms | 3 486 kB |
+| `--bundle-links` | 1056 | 1050 | 2.1 ms | 790 ms | 3 486 kB |
+| `--collapse-depth 1` | **6** | **0** | 22.3 ms | **28.5 ms** | **16.7 kB** |
+| `--collapse-depth 2` | 12 | 42 | 22.3 ms | 39.9 ms | 90.8 kB |
+
+### Measured, four-member LAG per rack (`--uplinks 4`: 1056 nodes, 1176 edges)
+
+| Aggregation | Nodes | Edges | Transform | Layout | SVG |
+|---|---|---|---|---|---|
+| `--no-bundle-links` | 1056 | 1176 | — | 919 ms | 3 658 kB |
+| *(default: LAG only)* | 1056 | **1050** | 3.8 ms | 795 ms | 3 568 kB |
+| `--bundle-links` | 1056 | 1050 | 3.3 ms | 794 ms | 3 546 kB |
+| `--collapse-depth 1` | 6 | 0 | 23.0 ms | 28.7 ms | 16.7 kB |
+| `--collapse-depth 2` | 12 | 42 | 24.1 ms | 55.2 ms | 167 kB |
+
+### What the numbers say
+
+* **Collapsing is the lever that matters.** `--collapse-depth 1` turns 1056
+  nodes into 6 and 835 ms of layout into 28 ms — **29× faster, and 209× smaller**
+  — because Graphviz's cost is in the node and edge count and collapsing removes
+  almost all of both. The transform costs 22 ms, i.e. 3 % of what it saves, and
+  is dominated by re-deriving each namespace's subnet list from its members'
+  addresses.
+* **Bundling is a legibility change, not a performance one.** Folding 126 LAG
+  members into 42 edges buys 13 % of the layout and 2 % of the file. That is the
+  honest result: bundling exists so a four-cable LAG reads as one link, not so a
+  large tree renders faster. It is on by default anyway because it costs 4 ms and
+  removes a band of stacked parallel lines that says nothing.
+* **The default is nearly free.** LAG bundling on a tree with no LAG in it costs
+  1.5 ms on 1050 edges and returns the graph object unchanged, so a rendering of
+  an inventory that declares no aggregate is byte-identical to what it was.
+
+### What is deliberately not done
+
+`--collapse` does not *summarise the summary*: an aggregate node lists its
+element count per kind, its VLANs and its prefixes, but not, say, the internal
+diameter or the oversubscription ratio. Those are analyses, and
+`netgraph render -f json` now exports the element list behind every box, so a
+consumer that wants one can compute it without netgraph guessing which one.
+
+The other bound worth naming: `--collapse-depth` counts from the shallowest
+namespace every element shares, which makes depth 1 mean "one node per site" in
+the trees people actually have. In a tree with no shared root — several
+top-level directories — depth 1 collapses each of them, which is the same rule
+producing a different answer, not a special case.
 
 ---
 

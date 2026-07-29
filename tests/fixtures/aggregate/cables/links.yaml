@@ -1,0 +1,143 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-lag-1
+  description: Port-channel1 member 1
+spec:
+  endpoints:
+    - sw-east-01:GigabitEthernet1/0/1
+    - sw-east-02:GigabitEthernet1/0/1
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+  length_m: 2
+  label: CBL-LAG-1
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-lag-2
+  description: Port-channel1 member 2
+spec:
+  endpoints:
+    - sw-east-01:GigabitEthernet1/0/2
+    - sw-east-02:GigabitEthernet1/0/2
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+  length_m: 2
+  label: CBL-LAG-2
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-lag-3
+  description: Port-channel1 member 3
+spec:
+  endpoints:
+    - sw-east-01:GigabitEthernet1/0/3
+    - sw-east-02:GigabitEthernet1/0/3
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+  length_m: 2
+  label: CBL-LAG-3
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-lag-4
+  description: Port-channel1 member 4
+spec:
+  endpoints:
+    - sw-east-01:GigabitEthernet1/0/4
+    - sw-east-02:GigabitEthernet1/0/4
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+  length_m: 2
+  label: CBL-LAG-4
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-spare-1
+  description: Parallel cross-link outside the aggregate
+spec:
+  endpoints:
+    - sw-east-01:GigabitEthernet1/0/9
+    - sw-east-02:GigabitEthernet1/0/9
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+  length_m: 2
+  label: CBL-SPARE-1
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-spare-2
+  description: Second parallel cross-link outside the aggregate
+spec:
+  endpoints:
+    - sw-east-01:GigabitEthernet1/0/10
+    - sw-east-02:GigabitEthernet1/0/10
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+  length_m: 2
+  label: CBL-SPARE-2
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-desk-1
+  description: Desk link
+spec:
+  endpoints:
+    - sw-east-01:GigabitEthernet1/0/11
+    - pc-east-01:eno1
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+  length_m: 2
+  label: CBL-DESK-1
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-east-west
+  description: Inter-site link, the one that survives a collapse
+spec:
+  endpoints:
+    - sw-east-01:GigabitEthernet1/0/20
+    - sw-west-01:GigabitEthernet1/0/20
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+  length_m: 2
+  label: CBL-EAST-WEST
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-east-west-2
+  description: Second inter-site link, parallel to the first once the sites collapse
+spec:
+  endpoints:
+    - sw-east-02:GigabitEthernet1/0/21
+    - sw-west-01:GigabitEthernet1/0/21
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+  length_m: 2
+  label: CBL-EAST-WEST-2

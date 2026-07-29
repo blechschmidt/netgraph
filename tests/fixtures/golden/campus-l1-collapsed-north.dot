@@ -1,0 +1,122 @@
+graph netgraph {
+  graph [
+    rankdir=TB,
+    splines=true,
+    overlap=false,
+    nodesep=0.5,
+    ranksep=0.7,
+    fontname="Helvetica,Arial,sans-serif",
+    fontsize=12,
+  ];
+  node [fontname="Helvetica,Arial,sans-serif", fontsize=10, style=filled, penwidth=1.2];
+  edge [fontname="Helvetica,Arial,sans-serif", fontsize=8];
+
+  "ns:sites/north" [shape=folder, fillcolor="#e2e8f0", color="#475569", tooltip="sites/north [namespace]\nnamespace: sites\ncollapsed namespace sites/north: 8 elements: 2 computers, 1 router, 1 server, 4 switches\n7 links inside, not drawn\nelements: sites/north/access/sw-north-acc-01, sites/north/access/sw-north-acc-02, sites/north/access/sw-north-acc-03, sites/north/core/rtr-north-core-01, sites/north/distribution/sw-north-dist-01, sites/north/hosts/pc-north-01, (+2 more)\nlinks (2):\n  xe-0/0/1 — sites/south/core/rtr-south-core-01:xe-0/0/2  (cable, fiber, 10Gbps)\n  xe-0/0/2 — sites/west/core/rtr-west-core-01:xe-0/0/1  (cable, fiber, 10Gbps)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sites/north</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[namespace, 8 elements]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">2 computers, 1 router, 1 server, 4 switches</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">7 links inside</TD></TR>
+    </TABLE>
+  >];
+  "sites/south/access/sw-south-acc-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-south-acc-01 [switch]\nnamespace: sites/south/access\nAccess switch 01, South campus. Layer-2 only: the ports are untagged access ports, and the switch's own management address lives on the Vlan99 SVI rather than on a port (NG-V009).\nlabels: env=prod, role=access, site=south\ninterfaces (6):\n  br0  bridge\n  Vlan99  vlan\n  GigabitEthernet1/0/1  ethernet  00:1b:0d:02:a1:01\n  GigabitEthernet1/0/2  ethernet  00:1b:0d:02:a1:02\n  GigabitEthernet1/0/3  ethernet  disabled  00:1b:0d:02:a1:03\n  TenGigabitEthernet1/1/1  ethernet  00:1b:0d:02:a1:11\nlinks (3):\n  TenGigabitEthernet1/1/1 — sites/south/distribution/sw-south-dist-01:Ethernet49/1  (cable, fiber, 10Gbps)\n  GigabitEthernet1/0/1 — sites/south/hosts/pc-south-01:eno1  (cable, copper, 1Gbps)\n  GigabitEthernet1/0/2 — sites/south/hosts/srv-south-01:eth0  (cable, copper, 1Gbps)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-south-acc-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+    </TABLE>
+  >];
+  "sites/south/access/sw-south-acc-02" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-south-acc-02 [switch]\nnamespace: sites/south/access\nAccess switch 02, South campus - second floor riser.\nlabels: env=prod, role=access, site=south\ninterfaces (5):\n  br0  bridge\n  Vlan99  vlan\n  GigabitEthernet1/0/1  ethernet  00:1b:0d:02:a2:01\n  GigabitEthernet1/0/2  ethernet  disabled  00:1b:0d:02:a2:02\n  TenGigabitEthernet1/1/1  ethernet  00:1b:0d:02:a2:11\nlinks (2):\n  TenGigabitEthernet1/1/1 — sites/south/distribution/sw-south-dist-01:Ethernet50/1  (cable, fiber, 10Gbps)\n  GigabitEthernet1/0/1 — sites/south/hosts/pc-south-02:eno1  (cable, copper, 1Gbps)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-south-acc-02</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+    </TABLE>
+  >];
+  "sites/south/core/rtr-south-core-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-south-core-01 [router]\nnamespace: sites/south/core\nLayer-3 core router for the South campus. It routes between the campus VLANs (whose gateways sit on sw-south-dist-01) and carries the two backbone fibres of the inter-site ring.\nlabels: env=prod, role=core, site=south\ninterfaces (4):\n  lo0  loopback\n  xe-0/0/0  ethernet  00:05:86:02:c0:00\n  xe-0/0/1  ethernet  00:05:86:02:c0:01\n  xe-0/0/2  ethernet  00:05:86:02:c0:02\nlinks (3):\n  xe-0/0/2 — ns:sites/north:xe-0/0/1  (cable, fiber, 10Gbps)\n  xe-0/0/1 — sites/west/core/rtr-west-core-01:xe-0/0/2  (cable, fiber, 10Gbps)\n  xe-0/0/0 — sites/south/distribution/sw-south-dist-01:Ethernet52/1  (cable, fiber, 10Gbps)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-south-core-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
+    </TABLE>
+  >];
+  "sites/south/distribution/sw-south-dist-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-south-dist-01 [switch]\nnamespace: sites/south/distribution\nDistribution switch for the South campus. It aggregates the access-layer trunks, hosts the SVI gateway for every campus VLAN, and reaches the core router over a routed (untagged) fibre uplink.\nlabels: env=prod, role=distribution, site=south\ninterfaces (7):\n  br0  bridge\n  Vlan10  vlan\n  Vlan20  vlan\n  Vlan99  vlan\n  Ethernet49/1  ethernet  00:1c:73:02:d0:01\n  Ethernet50/1  ethernet  00:1c:73:02:d0:02\n  Ethernet52/1  ethernet  00:1c:73:02:d0:04\nlinks (3):\n  Ethernet52/1 — sites/south/core/rtr-south-core-01:xe-0/0/0  (cable, fiber, 10Gbps)\n  Ethernet49/1 — sites/south/access/sw-south-acc-01:TenGigabitEthernet1/1/1  (cable, fiber, 10Gbps)\n  Ethernet50/1 — sites/south/access/sw-south-acc-02:TenGigabitEthernet1/1/1  (cable, fiber, 10Gbps)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-south-dist-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+    </TABLE>
+  >];
+  "sites/south/hosts/pc-south-01" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="pc-south-01 [computer]\nnamespace: sites/south/hosts\nStaff workstation, South campus floor 1\nlabels: env=prod, role=workstation, site=south\ninterfaces (2):\n  lo  loopback\n  eno1  ethernet  b4:96:91:02:10:01\nlinks (1):\n  eno1 — sites/south/access/sw-south-acc-01:GigabitEthernet1/0/1  (cable, copper, 1Gbps)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pc-south-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+    </TABLE>
+  >];
+  "sites/south/hosts/srv-south-01" [shape=cylinder, fillcolor="#eae2f5", color="#7c3aed", tooltip="srv-south-01 [server]\nnamespace: sites/south/hosts\nTeaching-lab application server, South campus\nlabels: env=prod, role=application, site=south\ninterfaces (2):\n  lo  loopback\n  eth0  ethernet  3c:d9:2b:02:20:01\nlinks (1):\n  eth0 — sites/south/access/sw-south-acc-01:GigabitEthernet1/0/2  (cable, copper, 1Gbps)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>srv-south-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[server]</TD></TR>
+    </TABLE>
+  >];
+  "sites/south/hosts/pc-south-02" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="pc-south-02 [computer]\nnamespace: sites/south/hosts\nStaff workstation, South campus floor 2\nlabels: env=prod, role=workstation, site=south\ninterfaces (2):\n  lo  loopback\n  eno1  ethernet  e8:6a:64:02:11:01\nlinks (1):\n  eno1 — sites/south/access/sw-south-acc-02:GigabitEthernet1/0/1  (cable, copper, 1Gbps)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pc-south-02</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+    </TABLE>
+  >];
+  "sites/west/access/sw-west-acc-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-west-acc-01 [switch]\nnamespace: sites/west/access\nAccess switch 01, West annexe. Layer-2 only: the ports are untagged access ports, and the switch's own management address lives on the Vlan99 SVI rather than on a port (NG-V009).\nlabels: env=prod, role=access, site=west\ninterfaces (6):\n  br0  bridge\n  Vlan99  vlan\n  GigabitEthernet1/0/1  ethernet  00:1b:0d:03:a1:01\n  GigabitEthernet1/0/2  ethernet  00:1b:0d:03:a1:02\n  GigabitEthernet1/0/3  ethernet  disabled  00:1b:0d:03:a1:03\n  TenGigabitEthernet1/1/1  ethernet  00:1b:0d:03:a1:11\nlinks (3):\n  TenGigabitEthernet1/1/1 — sites/west/distribution/sw-west-dist-01:Ethernet49/1  (cable, fiber, 10Gbps)\n  GigabitEthernet1/0/1 — sites/west/hosts/pc-west-01:eno1  (cable, copper, 1Gbps)\n  GigabitEthernet1/0/2 — sites/west/hosts/srv-west-01:eth0  (cable, copper, 1Gbps)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-west-acc-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+    </TABLE>
+  >];
+  "sites/west/access/sw-west-acc-02" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-west-acc-02 [switch]\nnamespace: sites/west/access\nAccess switch 02, West annexe - second floor riser.\nlabels: env=prod, role=access, site=west\ninterfaces (5):\n  br0  bridge\n  Vlan99  vlan\n  GigabitEthernet1/0/1  ethernet  00:1b:0d:03:a2:01\n  GigabitEthernet1/0/2  ethernet  disabled  00:1b:0d:03:a2:02\n  TenGigabitEthernet1/1/1  ethernet  00:1b:0d:03:a2:11\nlinks (2):\n  TenGigabitEthernet1/1/1 — sites/west/distribution/sw-west-dist-01:Ethernet50/1  (cable, fiber, 10Gbps)\n  GigabitEthernet1/0/1 — sites/west/hosts/pc-west-02:eno1  (cable, copper, 1Gbps)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-west-acc-02</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+    </TABLE>
+  >];
+  "sites/west/core/rtr-west-core-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-west-core-01 [router]\nnamespace: sites/west/core\nLayer-3 core router for the West annexe. It routes between the campus VLANs (whose gateways sit on sw-west-dist-01) and carries the two backbone fibres of the inter-site ring.\nlabels: env=prod, role=core, site=west\ninterfaces (4):\n  lo0  loopback\n  xe-0/0/0  ethernet  00:05:86:03:c0:00\n  xe-0/0/1  ethernet  00:05:86:03:c0:01\n  xe-0/0/2  ethernet  00:05:86:03:c0:02\nlinks (3):\n  xe-0/0/2 — sites/south/core/rtr-south-core-01:xe-0/0/1  (cable, fiber, 10Gbps)\n  xe-0/0/1 — ns:sites/north:xe-0/0/2  (cable, fiber, 10Gbps)\n  xe-0/0/0 — sites/west/distribution/sw-west-dist-01:Ethernet52/1  (cable, fiber, 10Gbps)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-west-core-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
+    </TABLE>
+  >];
+  "sites/west/distribution/sw-west-dist-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-west-dist-01 [switch]\nnamespace: sites/west/distribution\nDistribution switch for the West annexe. It aggregates the access-layer trunks, hosts the SVI gateway for every campus VLAN, and reaches the core router over a routed (untagged) fibre uplink.\nlabels: env=prod, role=distribution, site=west\ninterfaces (7):\n  br0  bridge\n  Vlan10  vlan\n  Vlan20  vlan\n  Vlan99  vlan\n  Ethernet49/1  ethernet  00:1c:73:03:d0:01\n  Ethernet50/1  ethernet  00:1c:73:03:d0:02\n  Ethernet52/1  ethernet  00:1c:73:03:d0:04\nlinks (3):\n  Ethernet52/1 — sites/west/core/rtr-west-core-01:xe-0/0/0  (cable, fiber, 10Gbps)\n  Ethernet49/1 — sites/west/access/sw-west-acc-01:TenGigabitEthernet1/1/1  (cable, fiber, 10Gbps)\n  Ethernet50/1 — sites/west/access/sw-west-acc-02:TenGigabitEthernet1/1/1  (cable, fiber, 10Gbps)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-west-dist-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+    </TABLE>
+  >];
+  "sites/west/hosts/pc-west-01" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="pc-west-01 [computer]\nnamespace: sites/west/hosts\nStaff workstation, West annexe floor 1\nlabels: env=prod, role=workstation, site=west\ninterfaces (2):\n  lo  loopback\n  eno1  ethernet  b4:96:91:03:10:01\nlinks (1):\n  eno1 — sites/west/access/sw-west-acc-01:GigabitEthernet1/0/1  (cable, copper, 1Gbps)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pc-west-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+    </TABLE>
+  >];
+  "sites/west/hosts/srv-west-01" [shape=cylinder, fillcolor="#eae2f5", color="#7c3aed", tooltip="srv-west-01 [server]\nnamespace: sites/west/hosts\nTeaching-lab application server, West annexe\nlabels: env=prod, role=application, site=west\ninterfaces (2):\n  lo  loopback\n  eth0  ethernet  3c:d9:2b:03:20:01\nlinks (1):\n  eth0 — sites/west/access/sw-west-acc-01:GigabitEthernet1/0/2  (cable, copper, 1Gbps)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>srv-west-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[server]</TD></TR>
+    </TABLE>
+  >];
+  "sites/west/hosts/pc-west-02" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="pc-west-02 [computer]\nnamespace: sites/west/hosts\nStaff workstation, West annexe floor 2\nlabels: env=prod, role=workstation, site=west\ninterfaces (2):\n  lo  loopback\n  eno1  ethernet  e8:6a:64:03:11:01\nlinks (1):\n  eno1 — sites/west/access/sw-west-acc-02:GigabitEthernet1/0/1  (cable, copper, 1Gbps)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pc-west-02</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+    </TABLE>
+  >];
+
+  "ns:sites/north" -- "sites/south/core/rtr-south-core-01" [color="#d97706", style=bold, penwidth=2.5, label="xe-0/0/1 -- xe-0/0/2\nBB-NS\nfiber\n10Gbps", tooltip="cable backbone/cbl-bb-north-south\nns:sites/north:xe-0/0/1 — sites/south/core/rtr-south-core-01:xe-0/0/2\nmedium: fiber, speed: 10Gbps, length: 4200 m, label: BB-NS"];
+  "sites/south/core/rtr-south-core-01" -- "sites/west/core/rtr-west-core-01" [color="#d97706", style=bold, penwidth=2.5, label="xe-0/0/1 -- xe-0/0/2\nBB-SW\nfiber\n10Gbps", tooltip="cable backbone/cbl-bb-south-west\nsites/south/core/rtr-south-core-01:xe-0/0/1 — sites/west/core/rtr-west-core-01:xe-0/0/2\nmedium: fiber, speed: 10Gbps, length: 4200 m, label: BB-SW"];
+  "ns:sites/north" -- "sites/west/core/rtr-west-core-01" [color="#d97706", style=bold, penwidth=2.5, label="xe-0/0/2 -- xe-0/0/1\nBB-WN\nfiber\n10Gbps", tooltip="cable backbone/cbl-bb-west-north\nns:sites/north:xe-0/0/2 — sites/west/core/rtr-west-core-01:xe-0/0/1\nmedium: fiber, speed: 10Gbps, length: 4200 m, label: BB-WN"];
+  "sites/south/core/rtr-south-core-01" -- "sites/south/distribution/sw-south-dist-01" [color="#d97706", style=bold, penwidth=2.5, label="xe-0/0/0 -- Ethernet52/1\nF-201\nfiber\n10Gbps", tooltip="cable sites/south/cables/cbl-south-core-dist\nsites/south/core/rtr-south-core-01:xe-0/0/0 — sites/south/distribution/sw-south-dist-01:Ethernet52/1\nmedium: fiber, speed: 10Gbps, length: 12 m, label: F-201"];
+  "sites/south/access/sw-south-acc-01" -- "sites/south/distribution/sw-south-dist-01" [color="#d97706", style=bold, penwidth=2.5, label="TenGigabitEthernet1/1/1 -- Ethernet49/1\nF-202\nfiber\n10Gbps", tooltip="cable sites/south/cables/cbl-south-dist-acc01\nsites/south/access/sw-south-acc-01:TenGigabitEthernet1/1/1 — sites/south/distribution/sw-south-dist-01:Ethernet49/1\nmedium: fiber, speed: 10Gbps, length: 45 m, label: F-202"];
+  "sites/south/access/sw-south-acc-02" -- "sites/south/distribution/sw-south-dist-01" [color="#d97706", style=bold, penwidth=2.5, label="TenGigabitEthernet1/1/1 -- Ethernet50/1\nF-203\nfiber\n10Gbps", tooltip="cable sites/south/cables/cbl-south-dist-acc02\nsites/south/access/sw-south-acc-02:TenGigabitEthernet1/1/1 — sites/south/distribution/sw-south-dist-01:Ethernet50/1\nmedium: fiber, speed: 10Gbps, length: 78 m, label: F-203"];
+  "sites/south/hosts/pc-south-01" -- "sites/south/access/sw-south-acc-01" [color="#4a4a4a", style=solid, penwidth=1.5, label="eno1 -- GigabitEthernet1/0/1\nC-201\n1Gbps", tooltip="cable sites/south/cables/cbl-south-acc01-pc01\nsites/south/hosts/pc-south-01:eno1 — sites/south/access/sw-south-acc-01:GigabitEthernet1/0/1\nmedium: copper, speed: 1Gbps, length: 22 m, label: C-201"];
+  "sites/south/hosts/srv-south-01" -- "sites/south/access/sw-south-acc-01" [color="#4a4a4a", style=solid, penwidth=1.5, label="eth0 -- GigabitEthernet1/0/2\nC-202\n1Gbps", tooltip="cable sites/south/cables/cbl-south-acc01-srv01\nsites/south/hosts/srv-south-01:eth0 — sites/south/access/sw-south-acc-01:GigabitEthernet1/0/2\nmedium: copper, speed: 1Gbps, length: 6 m, label: C-202"];
+  "sites/south/hosts/pc-south-02" -- "sites/south/access/sw-south-acc-02" [color="#4a4a4a", style=solid, penwidth=1.5, label="eno1 -- GigabitEthernet1/0/1\nC-203\n1Gbps", tooltip="cable sites/south/cables/cbl-south-acc02-pc02\nsites/south/hosts/pc-south-02:eno1 — sites/south/access/sw-south-acc-02:GigabitEthernet1/0/1\nmedium: copper, speed: 1Gbps, length: 18 m, label: C-203"];
+  "sites/west/core/rtr-west-core-01" -- "sites/west/distribution/sw-west-dist-01" [color="#d97706", style=bold, penwidth=2.5, label="xe-0/0/0 -- Ethernet52/1\nF-301\nfiber\n10Gbps", tooltip="cable sites/west/cables/cbl-west-core-dist\nsites/west/core/rtr-west-core-01:xe-0/0/0 — sites/west/distribution/sw-west-dist-01:Ethernet52/1\nmedium: fiber, speed: 10Gbps, length: 12 m, label: F-301"];
+  "sites/west/access/sw-west-acc-01" -- "sites/west/distribution/sw-west-dist-01" [color="#d97706", style=bold, penwidth=2.5, label="TenGigabitEthernet1/1/1 -- Ethernet49/1\nF-302\nfiber\n10Gbps", tooltip="cable sites/west/cables/cbl-west-dist-acc01\nsites/west/access/sw-west-acc-01:TenGigabitEthernet1/1/1 — sites/west/distribution/sw-west-dist-01:Ethernet49/1\nmedium: fiber, speed: 10Gbps, length: 45 m, label: F-302"];
+  "sites/west/access/sw-west-acc-02" -- "sites/west/distribution/sw-west-dist-01" [color="#d97706", style=bold, penwidth=2.5, label="TenGigabitEthernet1/1/1 -- Ethernet50/1\nF-303\nfiber\n10Gbps", tooltip="cable sites/west/cables/cbl-west-dist-acc02\nsites/west/access/sw-west-acc-02:TenGigabitEthernet1/1/1 — sites/west/distribution/sw-west-dist-01:Ethernet50/1\nmedium: fiber, speed: 10Gbps, length: 78 m, label: F-303"];
+  "sites/west/hosts/pc-west-01" -- "sites/west/access/sw-west-acc-01" [color="#4a4a4a", style=solid, penwidth=1.5, label="eno1 -- GigabitEthernet1/0/1\nC-301\n1Gbps", tooltip="cable sites/west/cables/cbl-west-acc01-pc01\nsites/west/hosts/pc-west-01:eno1 — sites/west/access/sw-west-acc-01:GigabitEthernet1/0/1\nmedium: copper, speed: 1Gbps, length: 22 m, label: C-301"];
+  "sites/west/hosts/srv-west-01" -- "sites/west/access/sw-west-acc-01" [color="#4a4a4a", style=solid, penwidth=1.5, label="eth0 -- GigabitEthernet1/0/2\nC-302\n1Gbps", tooltip="cable sites/west/cables/cbl-west-acc01-srv01\nsites/west/hosts/srv-west-01:eth0 — sites/west/access/sw-west-acc-01:GigabitEthernet1/0/2\nmedium: copper, speed: 1Gbps, length: 6 m, label: C-302"];
+  "sites/west/hosts/pc-west-02" -- "sites/west/access/sw-west-acc-02" [color="#4a4a4a", style=solid, penwidth=1.5, label="eno1 -- GigabitEthernet1/0/1\nC-303\n1Gbps", tooltip="cable sites/west/cables/cbl-west-acc02-pc02\nsites/west/hosts/pc-west-02:eno1 — sites/west/access/sw-west-acc-02:GigabitEthernet1/0/1\nmedium: copper, speed: 1Gbps, length: 18 m, label: C-303"];
+}

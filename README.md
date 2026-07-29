@@ -635,6 +635,8 @@ from an inventory with a dangling cable is worse than no diagram.
 | `--show-ips` / `--no-show-ips` | on | Print configured IP addresses on the nodes. |
 | `--show-vlans` / `--no-show-vlans` | on | Annotate nodes and links with VLAN membership. |
 | `--group-by-namespace` | off | Draw each namespace as a visual group (a Graphviz cluster, a Mermaid subgraph). |
+| `--collapse NS`, `--collapse-depth N` | off | Replace a namespace with one node standing for everything in it — see [Aggregation](#aggregation-one-node-per-site-one-line-per-bundle). |
+| `--bundle-links` / `--no-bundle-links` | LAGs only | Draw parallel links between one pair of elements as one edge. |
 | `--icons THEME\|DIR` | off | Draw each element as an icon instead of a plain shape — see [Icons](#icons). `cisco`, `none`, or a directory of your own. Graphviz formats only. |
 | `--tooltips` / `--no-tooltips` | on | Carry the full record of every element — interfaces, addresses, VLANs, cabling — as hover text. `dot`, `svg` and `html` only; see [Interactive SVG](#interactive-svg-tooltips-links-and-ids). |
 | `--link-template URL` | off | Link each element back to the YAML that declares it, e.g. `https://git.example.com/net/blob/main/{file}#L{line}`. `dot`, `svg` and `html` only. |
@@ -681,6 +683,96 @@ GitLab and `mmdc` will not draw one, however valid it is. `render` warns when it
 crosses the line and names the filters that would bring it back down; `-f dot`
 and `-f svg` have no such limit.
 
+#### Aggregation: one node per site, one line per bundle
+
+Every filter above removes detail by removing elements. Past a few hundred
+devices that is the wrong question: you do not want *less* of the network, you
+want all of it in less space. Two options summarise instead of narrowing, and
+both run before the renderers, so `dot`, `svg`, `mermaid`, `json` and `html`
+all get the same answer.
+
+| Option | Repeatable | Draws |
+|---|---|---|
+| `--collapse NS` | yes | One node for `NS` and everything under it, labelled with the namespace, its element count per kind, and the VLANs and prefixes it participates in. |
+| `--collapse-depth N` | no | The same, for every namespace `N` levels deep. |
+| `--bundle-links` / `--no-bundle-links` | no | Fold every set of parallel links into one edge / fold none. Unset folds declared link aggregations only. |
+
+`--collapse-depth 1` is the site-level overview of a large tree in one flag:
+
+```bash
+netgraph -i examples/campus render --collapse-depth 1 --group-by-namespace \
+  --title "campus — one node per site" -f svg -o campus-collapsed.svg
+```
+
+![The campus example collapsed to three nodes: sites/north, sites/south and
+sites/west, each labelled with its element counts, VLANs and subnets, joined by
+the three backbone fibres](docs/images/campus-collapsed.svg)
+
+Depth is counted from the **shallowest namespace that actually branches**. Every
+element of `examples/campus` lives under `sites/`, so that directory is not a
+level a reader distinguishes — nothing is outside it — and depth 1 means one
+node per site rather than one node for the campus. Depth 2 would be one node per
+tier inside each site.
+
+Nothing is thrown away, only folded:
+
+* Links **crossing** a boundary keep their identity and attach to the collapsed
+  node — the three backbone fibres above are the same three cables, with the
+  same labels and the same rates.
+* Links **inside** one are counted on the label (`7 links inside`) rather than
+  drawn, and named in full in the tooltip and in `-f json`.
+* The collapsed node takes a tooltip and an `--element-ids` id exactly as a real
+  node does, so a collapsed diagram is as deep-linkable as any other.
+* `-f json` marks it `"type": "aggregate"` and gives it an `aggregate` object
+  listing **every element it stands for**, so a consumer can never mistake one
+  box for one device:
+
+```console
+$ netgraph -i examples/campus render --collapse-depth 1 -f json |
+    jq '.nodes[0].aggregate | {namespace, elementCount, countsByKind}'
+{
+  "namespace": "sites/north",
+  "elementCount": 8,
+  "countsByKind": { "computer": 2, "router": 1, "server": 1, "switch": 4 }
+}
+```
+
+**Link bundling** solves the other half. Four cables in a LAG, or three cables
+and a tunnel, draw as a band of parallel lines that Graphviz stacks into noise;
+a bundle draws one edge, labelled with the count, weighted by it so the layout
+pulls the endpoints together, and carrying every member in its tooltip and in
+`-f json`.
+
+LAG members are bundled **by default**, because the inventory has already said
+they are one logical link — a switch declaring
+
+```yaml
+- name: Port-channel1
+  type: lag
+  members: [GigabitEthernet1/0/1, GigabitEthernet1/0/2,
+            GigabitEthernet1/0/3, GigabitEthernet1/0/4]
+```
+
+draws one edge labelled `Port-channel1 -- Port-channel1 / lag, 4 members /
+4Gbps`, the sum of what the members carry. Nothing is guessed: two spare
+cross-links running alongside that LAG stay two edges, and two distinct
+port-channels between one pair of switches stay two bundles. `--bundle-links`
+goes further and folds every set of parallel links, whatever the reason they are
+parallel — a judgement about legibility rather than a claim about the
+configuration, so it is opt-in and the resulting edge is *not* called a LAG.
+`--no-bundle-links` draws every cable, which is what a cabling document wants.
+
+```bash
+netgraph render --collapse-depth 1 -f svg -o overview.svg      # sites only
+netgraph render --collapse sites/north --collapse sites/south  # two of three
+netgraph render --collapse-depth 1 --bundle-links -f svg       # one line per pair
+netgraph render --no-bundle-links -f dot -o cabling.dot        # every cable
+```
+
+Filters and aggregation compose, in that order: the filter decides what exists,
+the collapse folds what is left, so `--kind switch --collapse-depth 1` gives one
+box per site holding that site's switches and nothing else.
+
 #### Icons
 
 By default a node is a Graphviz shape — a diamond for a router, a 3-D box for a
@@ -701,17 +793,28 @@ Only *how* a node is drawn changes. The labels, the addresses, the VLANs, the
 edges and every filter behave exactly as they do without a theme, and a kind the
 theme has no picture for keeps its plain shape rather than disappearing.
 
-**`cisco`** ships with netgraph and covers every kind, including the subnet
-clouds of `--layer l3`. The artwork is drawn in the topology idiom Cisco made
-the industry convention and is netgraph's own, under the same MIT licence as the
+**`cisco`** ships with netgraph and covers every kind that becomes a node: the
+six hardware kinds, the subnet clouds of `--layer l3`, and the tunnel conduit of
+`--layer overlay`. The artwork is drawn in the topology idiom Cisco made the
+industry convention and is netgraph's own, under the same MIT licence as the
 rest of the package — Cisco's published icon library is copyrighted and is not
 redistributed here.
+
+The tunnel glyph is a **conduit**: a bore with a payload going in one end and
+coming out the other. There is one for every tunnel type, because encapsulation
+is what they have in common and the type is on the label anyway, and it says
+nothing at all about confidentiality — a lock would put netgraph's guess about a
+security property into a picture, and a reader who did not recognise the glyph
+would read its absence as "nothing to say". That stays a colour and a word: a
+cleartext tunnel is drawn crimson and labelled `cleartext`, and `W127` says so
+in prose. A collapsed namespace gets no icon either — it is not a *thing* with a
+picture but a box holding several, and the folder shape says that better.
 
 **A directory** works just as well, which is how you use that library, or any
 other set, if you have it. A theme is nothing but a directory of images named
 after the kinds they stand for — `router`, `switch`, `hub`, `computer`,
-`server`, `adapter` and `subnet`, with an `.svg`, `.png`, `.jpg` or `.gif`
-extension:
+`server`, `adapter`, `subnet` and `tunnel`, with an `.svg`, `.png`, `.jpg` or
+`.gif` extension:
 
 ```bash
 ls my-icons/          # router.png  switch.png  server.png
@@ -958,8 +1061,14 @@ means *not configured* rather than *unknown*. `title` appears only when
 `--title` was given, and `dangling` only under `--force`, so an export that is
 missing links says so rather than implying they do not exist. Node `id` is what
 every edge endpoint refers to; an endpoint's `interface` is absent when the edge
-attaches to an element rather than to one of its ports. At `--layer l3` a node's
-`type` distinguishes a declared `element` from a derived `subnet`.
+attaches to an element rather than to one of its ports. A node's `type`
+distinguishes a declared `element` from a derived one — a `subnet` at
+`--layer l3`, a `tunnel` at `--layer overlay`, an `aggregate` under `--collapse`
+— and each adds an object of that name. An `aggregate` node's object carries the
+full list of elements it stands for, and a bundled edge carries a `bundle`
+object holding every link folded into it, exported by the same code that exports
+an unbundled one: a summary is machine-readable as a summary, never as a device
+or as a cable.
 
 `--show-ips` and `--show-vlans` control the *per-interface* detail, exactly as
 they control what a diagram prints; node and link VLAN membership is always
@@ -1440,6 +1549,7 @@ completing do too:
 |---|---|
 | `netgraph show <TAB>` | Every element of the inventory named by `-i`, fully qualified and by short name, described by its kind. |
 | `--neighbors-of <TAB>` | The same, minus the cables: a cable is an edge, not a node. |
+| `--namespace`, `--collapse <TAB>` | Every namespace holding an element and every ancestor of one, outermost first, with how many elements each covers. |
 | `-f/--format <TAB>` | The registered output formats, with what each one produces. |
 | `--layer <TAB>` | `l1`, `l2`, `l3`, with what each one draws. |
 | `--kind <TAB>` | The element kinds the option accepts — no `cable` on a filter, `cable` included on `netgraph schema`. |

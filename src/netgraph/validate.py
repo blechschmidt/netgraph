@@ -56,6 +56,7 @@ from dataclasses import dataclass
 from typing import Final, TypeAlias
 
 from netgraph.config import ValidationConfig
+from netgraph.errors import count_text
 from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of
 from netgraph.loader.provenance import Site
 from netgraph.models import (
@@ -967,8 +968,8 @@ def _check_adapter_capacity(ctx: _Context) -> Iterator[_Draft]:
         if capacity is None or len(adapter.interfaces) <= capacity:
             continue
         yield _Draft(
-            f"adapter {_q(fqn)} declares {_count(len(adapter.interfaces), 'downstream interface')}"
-            f" but has only {_count(capacity, 'port')}",
+            f"adapter {_q(fqn)} declares {count_text(len(adapter.interfaces), 'downstream interface')}"
+            f" but has only {count_text(capacity, 'port')}",
             (fqn,),
             ("spec", "interfaces"),
         )
@@ -1097,7 +1098,7 @@ def _check_subnet_address_clash(ctx: _Context) -> Iterator[_Draft]:
             domains = _join_plain([_describe_scope(holder.scope) for holder in holders])
             yield _Draft(
                 f"address {ip} in subnet {_q(subnet.prefix)} is claimed by "
-                f"{_count(len(holders), 'interface')} in different broadcast domains "
+                f"{count_text(len(holders), 'interface')} in different broadcast domains "
                 f"({domains}): {_join([holder.port for holder in holders])}. The layer-3 view "
                 f"draws one subnet, so not all of them can be reached at that address.",
                 tuple(dict.fromkeys(holder.element for holder in holders)),
@@ -1124,7 +1125,7 @@ def _check_stacking_cycle(ctx: _Context) -> Iterator[_Draft]:
             chain = " -> ".join(_q(name) for name in (*cycle, cycle[0]))
             yield _Draft(
                 f"interface stacking on {_q(fqn)} is cyclic: {chain}. "
-                f"{_count(len(cycle), 'interface')} ({_join(ports)}) would each have to "
+                f"{count_text(len(cycle), 'interface')} ({_join(ports)}) would each have to "
                 f"sit on top of the next.",
                 (fqn,),
                 _index_path(owner, cycle[0]),
@@ -1197,7 +1198,7 @@ def _check_member_is_aggregated(ctx: _Context) -> Iterator[_Draft]:
             path = _index_path(owner, member)
             if len(aggregates) > 1:
                 yield _Draft(
-                    f"interface {_q(port)} is a member of {_count(len(aggregates), 'aggregate')} "
+                    f"interface {_q(port)} is a member of {count_text(len(aggregates), 'aggregate')} "
                     f"at once: {_join([f'{fqn}:{name}' for name in aggregates])}. A port "
                     f"belongs to one aggregate.",
                     (fqn,),
@@ -1683,7 +1684,7 @@ def _describe_vlans(vlans: frozenset[int]) -> str:
     if not vlans:
         return "no VLAN at all"
     ids = sorted(vlans)
-    return f"{_count(len(ids), 'VLAN')} ({_join_plain([str(vlan_id) for vlan_id in ids])})"
+    return f"{count_text(len(ids), 'VLAN')} ({_join_plain([str(vlan_id) for vlan_id in ids])})"
 
 
 def _describe_carried(vlan: VlanConfig) -> str:
@@ -1919,11 +1920,11 @@ def _check_disconnected_topology(ctx: _Context) -> Iterator[_Draft]:
         return
     representatives = [min(island) for island in islands]
     described = ", ".join(
-        f"{_q(representative)} ({_count(len(island), 'element')})"
+        f"{_q(representative)} ({count_text(len(island), 'element')})"
         for representative, island in zip(representatives, islands, strict=True)
     )
     yield _Draft(
-        f"the topology is disconnected: {_count(len(islands), 'island')} with no link between "
+        f"the topology is disconnected: {count_text(len(islands), 'island')} with no link between "
         f"them ({described}); either a cable or an 'attached_to' is missing, or these are "
         f"separate networks that belong in separate inventories",
         tuple(representatives),
@@ -2040,7 +2041,7 @@ def _check_hub_subnets(ctx: _Context) -> Iterator[_Draft]:
                 for _, port, prefixes in addressed
             )
             yield _Draft(
-                f"hub {_q(hubs[0])} joins {_count(len(addressed), f'IPv{version} port')} that "
+                f"hub {_q(hubs[0])} joins {count_text(len(addressed), f'IPv{version} port')} that "
                 f"share no prefix: {described}. A hub is one broadcast domain, so its ports "
                 f"cannot reach each other from different subnets.",
                 (*hubs, *dict.fromkeys(owner_fqn for owner_fqn, _, _ in addressed)),
@@ -2174,7 +2175,7 @@ def _check_attachment_cycle(ctx: _Context) -> Iterator[_Draft]:
         chain = " -> ".join(_q(fqn) for fqn in (*cycle, cycle[0]))
         yield _Draft(
             f"adapter attachment is cyclic: {chain}. "
-            f"{_count(len(cycle), 'adapter')} would each have to be plugged into the next.",
+            f"{count_text(len(cycle), 'adapter')} would each have to be plugged into the next.",
             tuple(cycle),
             ("spec", "upstream", "attached_to"),
         )
@@ -2228,7 +2229,7 @@ def _check_unattached_adapter(ctx: _Context) -> Iterator[_Draft]:
         if not cabled:
             continue
         yield _Draft(
-            f"adapter {_q(fqn)} has {_count(len(cabled), 'cabled downstream port')} "
+            f"adapter {_q(fqn)} has {count_text(len(cabled), 'cabled downstream port')} "
             f"({_join(cabled)}) but no 'upstream.attached_to'; nothing says which machine it is "
             f"plugged into",
             (fqn,),
@@ -2708,11 +2709,6 @@ def _is_layer3(device: Device) -> bool:
 
 def _q(value: str) -> str:
     return f"'{value}'"
-
-
-def _count(number: int, noun: str) -> str:
-    """``1 port`` / ``4 ports``."""
-    return f"{number} {noun}" if number == 1 else f"{number} {noun}s"
 
 
 def _join(names: Sequence[str], limit: int = _MAX_LISTED) -> str:

@@ -17,6 +17,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator, Mapping
 from typing import Final
 
+from netgraph.render.aggregate import AGGREGATE_KIND, AggregateView
 from netgraph.render.graph import (
     SUBNET_KIND,
     TUNNEL_KIND,
@@ -56,6 +57,10 @@ _NODE_SHAPE: Final[Mapping[str, tuple[str, str]]] = {
     # ``[[…]]`` is Mermaid's subroutine box: a thing the diagram delegates to,
     # which is what a tunnel is to the path underneath it.
     TUNNEL_KIND: ("[[", "]]"),
+    # A trapezoid: the one shape Mermaid has left once the eight kinds above
+    # have taken theirs, and its widening base reads as "several things under
+    # one heading", which is what a collapsed namespace is.
+    AGGREGATE_KIND: ("[/", "\\]"),
 }
 _DEFAULT_SHAPE: Final[tuple[str, str]] = ("[", "]")
 
@@ -69,6 +74,7 @@ _CLASS_STYLE: Final[Mapping[str, str]] = {
     "adapter": "fill:#fdf0e3,stroke:#ea580c,stroke-width:1px,stroke-dasharray:4 3",
     SUBNET_KIND: "fill:#e0f2f1,stroke:#0f766e,stroke-width:1px",
     TUNNEL_KIND: "fill:#ede9fe,stroke:#6d28d9,stroke-width:1px,stroke-dasharray:4 3",
+    AGGREGATE_KIND: "fill:#e2e8f0,stroke:#475569,stroke-width:2px",
 }
 
 #: Link syntax per edge style: solid, thick (fibre) and dotted (attachment).
@@ -206,6 +212,9 @@ def _node_text(node: Node, options: RenderOptions, layer: Layer) -> str:
             parts.append(f"mtu {node.tunnel.mtu}")
         return "\n".join(parts)
 
+    if node.aggregate is not None:
+        return "\n".join(_aggregate_text(node.aggregate, options))
+
     parts = [node.name, f"[{node.kind}]"]
     # At layer 3 the addresses live on the edges, where they say which interface
     # holds them; see the DOT renderer for the same reasoning.
@@ -238,6 +247,8 @@ def _edge_text(edge: Edge, layer: Layer, options: RenderOptions) -> str:
     ports = _port_text(edge)
     if ports:
         parts.append(ports)
+    if edge.bundle is not None:
+        parts.append(edge.bundle.summary)
 
     if edge.kind is EdgeKind.TUNNEL and edge.tunnel is not None:
         parts.extend(_tunnel_text(edge.tunnel))
@@ -256,12 +267,35 @@ def _edge_text(edge: Edge, layer: Layer, options: RenderOptions) -> str:
     else:
         if edge.label:
             parts.append(edge.label)
-        if edge.kind is EdgeKind.CABLE and edge.medium != "copper":
+        # A bundle whose members disagree about the medium reports none; an
+        # empty part would show as a stray separator in the label.
+        if edge.kind is EdgeKind.CABLE and edge.medium and edge.medium != "copper":
             parts.append(edge.medium)
         speed = edge.speed_text
         if speed:
             parts.append(speed)
     return " · ".join(parts)
+
+
+def _aggregate_text(view: AggregateView, options: RenderOptions) -> list[str]:
+    """A collapsed namespace, as the same census the DOT renderer draws.
+
+    The element names are left out here and in DOT alike: the box may stand for
+    two hundred of them, and Mermaid has no tooltip to move them to. The JSON
+    export is where a reader who needs the list goes.
+    """
+    parts = [view.namespace, "[namespace]", view.summary]
+    if view.internal_links:
+        parts.append(f"{len(view.internal_links)} links inside")
+    if options.show_vlans and view.vlans:
+        parts.append(f"vlans: {_compact_ids(view.vlans)}")
+    if options.show_ips and view.subnets:
+        shown = view.subnets[: options.max_addresses]
+        hidden = len(view.subnets) - len(shown)
+        parts.extend(shown)
+        if hidden:
+            parts.append(f"(+{hidden} more)")
+    return parts
 
 
 def _tunnel_text(view: TunnelView) -> list[str]:

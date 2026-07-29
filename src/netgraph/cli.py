@@ -82,6 +82,7 @@ from netgraph.completion import (
     complete_format,
     complete_kind,
     complete_layer,
+    complete_namespace,
     complete_node,
     complete_rule,
     completion_script,
@@ -111,6 +112,8 @@ from netgraph.render import (
     FORMATS,
     LINK_FIELDS,
     RENDERERS,
+    AggregateSpec,
+    BundleMode,
     FilterSpec,
     Graph,
     Highlight,
@@ -120,7 +123,9 @@ from netgraph.render import (
     RenderOptions,
     UnknownElementError,
     advisories_for,
+    aggregate_graph,
     build_graph,
+    collapse_targets,
     filter_graph,
     icon_theme,
     is_binary_format,
@@ -710,6 +715,7 @@ _FILTER_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
         "namespaces",
         multiple=True,
         metavar="NS",
+        shell_complete=complete_namespace,
         help="Keep only elements in this namespace or below it. Repeatable.",
     ),
     click.option(
@@ -748,6 +754,48 @@ _FILTER_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
         default=1,
         show_default=True,
         help="How many hops --neighbors-of reaches.",
+    ),
+)
+
+#: What a rendering *summarises* rather than draws. Distinct from the filters
+#: above: nothing here removes an element from the answer, it only folds several
+#: of them into one box or one line, and the box says which ones. Only the
+#: commands that draw the whole inventory take these, for the same reason the
+#: filters are limited to them.
+_AGGREGATE_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
+    click.option(
+        "--collapse",
+        "collapse",
+        multiple=True,
+        metavar="NS",
+        shell_complete=complete_namespace,
+        help=(
+            "Replace this namespace and everything under it with one node, labelled with "
+            "what it holds. Links crossing the boundary attach to it; links inside it are "
+            "counted rather than drawn. Repeatable."
+        ),
+    ),
+    click.option(
+        "--collapse-depth",
+        type=click.IntRange(1),
+        default=None,
+        metavar="N",
+        help=(
+            "Collapse every namespace N levels deep, counted from the shallowest one that "
+            "branches: '--collapse-depth 1' is the site-level overview of a tree laid out "
+            "as sites/<site>/<tier>."
+        ),
+    ),
+    click.option(
+        "--bundle-links/--no-bundle-links",
+        "bundle_links",
+        default=None,
+        help=(
+            "Draw parallel links between the same pair of elements as one edge, with the "
+            "count in the label. Members of a declared 'lag' interface are bundled either "
+            "way unless --no-bundle-links is given, since the inventory already says they "
+            "are one logical link."
+        ),
     ),
 )
 
@@ -855,6 +903,7 @@ _VALIDATION_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
 #: Everything ``render`` and ``watch`` have in common, in ``--help`` order.
 _GRAPH_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
     *_FILTER_OPTIONS,
+    *_AGGREGATE_OPTIONS,
     *_DISPLAY_OPTIONS,
     _LAYER_OPTION,
     *_VALIDATION_OPTIONS,
@@ -893,6 +942,24 @@ def _filter_spec(params: Mapping[str, Any]) -> FilterSpec:
         names=tuple(params["names"]),
         neighbors_of=params["neighbors_of"],
         depth=params["depth"],
+    )
+
+
+def _aggregate_spec(params: Mapping[str, Any]) -> AggregateSpec:
+    """Build the aggregation from the parsed :data:`_AGGREGATE_OPTIONS`.
+
+    ``--bundle-links/--no-bundle-links`` is tri-state on purpose: unset means
+    "fold only what the inventory itself calls one link", which is neither of
+    the two things a plain boolean could say. Click leaves ``None`` behind for
+    an unset flag pair, and that is what carries the third state.
+    """
+    bundling = params["bundle_links"]
+    return AggregateSpec(
+        collapse=tuple(params["collapse"]),
+        collapse_depth=params["collapse_depth"],
+        bundle=BundleMode.LAG
+        if bundling is None
+        else (BundleMode.ALL if bundling else BundleMode.NONE),
     )
 
 
@@ -998,9 +1065,12 @@ def render_command(
         _report_problems(console, (), findings)
 
     layers, spec = _layers(params, output_format), _filter_spec(params)
+    aggregate = _aggregate_spec(params)
     graphs: list[Graph] = []
     for layer in layers:
-        graph = _build_graph(app, inventory, layer=layer, spec=spec)
+        graph = _build_graph(
+            app, inventory, layer=layer, spec=spec, aggregate=aggregate, console=console
+        )
         where = f" at layer {layer}" if len(layers) > 1 else ""
         for problem in graph.dangling:
             console.warn(f"dropped from the graph{where}: {problem}")
@@ -1105,8 +1175,25 @@ def _report_interaction_support(
     )
 
 
-def _build_graph(app: AppContext, inventory: Inventory, *, layer: Layer, spec: FilterSpec) -> Graph:
-    """Build and filter the graph, turning a bad ``--neighbors-of`` into a usage error."""
+def _build_graph(
+    app: AppContext,
+    inventory: Inventory,
+    *,
+    layer: Layer,
+    spec: FilterSpec,
+    aggregate: AggregateSpec | None = None,
+    console: Console | None = None,
+) -> Graph:
+    """Build, filter and summarise the graph.
+
+    The three run in that order and only that order: filtering decides what
+    exists, and aggregation folds what is left. Doing it the other way round
+    would let ``--kind switch`` empty a collapsed node of everything it claims
+    to stand for.
+
+    Raises:
+        click.BadParameter: ``--neighbors-of`` names no element.
+    """
     graph = build_graph(inventory, layer=layer)
     if not spec.is_empty:
         app.log(f"applying filters: {spec.describe()}", level=1)
@@ -1123,11 +1210,50 @@ def _build_graph(app: AppContext, inventory: Inventory, *, layer: Layer, spec: F
             param_hint="'--neighbors-of'",
         ) from exc
 
+    if aggregate is not None and not aggregate.is_empty:
+        app.log(f"aggregating: {aggregate.describe()}", level=1)
+        if console is not None and aggregate.collapses:
+            _report_collapse(console, filtered, aggregate)
+        filtered = aggregate_graph(filtered, aggregate)
+
     app.log(
         f"graph has {len(filtered.nodes)} node(s) and {len(filtered.edges)} edge(s)",
         level=1,
     )
     return filtered
+
+
+def _report_collapse(console: Console, graph: Graph, spec: AggregateSpec) -> None:
+    """Say so when a collapse folded nothing.
+
+    A ``--collapse`` that matched no element is silent otherwise, and the
+    resulting diagram is indistinguishable from one where the flag worked and
+    the namespace was small — so a typo would cost a reader the whole point of
+    the flag without ever saying so.
+    """
+    targets = collapse_targets(graph, spec)
+    folded = {
+        target
+        for target in targets
+        for node in graph.nodes.values()
+        if node.namespace == target or node.namespace.startswith(f"{target}/")
+    }
+    if not folded:
+        console.warn(
+            "nothing was collapsed: no element sits in the namespace(s) asked for. "
+            "Run 'netgraph list devices' to see the fully-qualified names"
+            if spec.collapse
+            else f"nothing was collapsed: no namespace is {spec.collapse_depth} level(s) "
+            "below the shallowest one that branches"
+        )
+        return
+    for named in spec.collapse:
+        candidate = named.strip("/")
+        if candidate and candidate not in folded:
+            console.warn(
+                f"--collapse {named!r} folded nothing: no element sits in it, or an "
+                "enclosing namespace was collapsed instead"
+            )
 
 
 def _write_output(
@@ -1487,6 +1613,7 @@ def watch_command(
         output_format=output_format,
         layers=_layers(params, output_format),
         spec=_filter_spec(params),
+        aggregate=_aggregate_spec(params),
         options=options,
         strict=bool(params["strict"]),
         force=bool(params["force"]),

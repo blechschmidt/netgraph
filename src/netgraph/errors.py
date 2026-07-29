@@ -23,6 +23,7 @@ __all__ = [
     "ValidationError",
     "clip_text",
     "compact_ids",
+    "count_text",
     "echo_value",
     "format_path",
 ]
@@ -31,6 +32,35 @@ __all__ = [
 #: rest. Long enough that every well-formed value netgraph accepts — the
 #: longest of which is a 253-character name — is recognisable from its prefix.
 MAX_ECHOED_VALUE_LENGTH: Final = 120
+
+
+#: Noun endings that take ``-es`` rather than ``-s``. ``switch`` is the one that
+#: matters — it is an element kind, so it reaches a diagram label and a tooltip
+#: through :func:`count_text` — but the rule is the general English one rather
+#: than a special case for it, because the nouns counted here come from the
+#: inventory's own vocabulary and that vocabulary grows.
+_SIBILANT_ENDINGS: Final[tuple[str, ...]] = ("s", "x", "z", "ch", "sh")
+
+
+def count_text(number: int, noun: str, plural: str | None = None) -> str:
+    """``1 element`` / ``3 elements`` / ``4 switches``.
+
+    Display-only, and shared by every layer that counts something into a
+    sentence a user reads — a node label, a tooltip, a CLI summary — because
+    three copies of it produced ``4 switchs`` in one of them and not in the
+    others, which is exactly the sort of drift a shared helper exists to stop.
+
+    Args:
+        number: How many.
+        noun: The singular. Pluralised by the ordinary English rule.
+        plural: An irregular plural, for a noun the rule gets wrong.
+    """
+    if number == 1:
+        return f"{number} {noun}"
+    if plural is not None:
+        return f"{number} {plural}"
+    suffix = "es" if noun.endswith(_SIBILANT_ENDINGS) else "s"
+    return f"{number} {noun}{suffix}"
 
 
 def clip_text(text: str, *, limit: int = MAX_ECHOED_VALUE_LENGTH) -> str:

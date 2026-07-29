@@ -29,10 +29,12 @@ from netgraph.config import load_config
 from netgraph.errors import NetgraphError, RenderError, format_path
 from netgraph.loader import Inventory, LoadError, load_tree
 from netgraph.render import (
+    AggregateSpec,
     FilterSpec,
     Layer,
     RenderOptions,
     UnknownElementError,
+    aggregate_graph,
     build_graph,
     filter_graph,
     render_layers,
@@ -123,6 +125,9 @@ class RenderRequest:
     #: see :func:`netgraph.render.render_layers`.
     layers: tuple[Layer, ...] = (Layer.L1,)
     spec: FilterSpec = field(default_factory=FilterSpec)
+    #: What to summarise rather than draw. Unlike ``spec`` this removes nothing;
+    #: see :mod:`netgraph.render.aggregate`.
+    aggregate: AggregateSpec = field(default_factory=AggregateSpec)
     options: RenderOptions = field(default_factory=RenderOptions)
     #: Promote surviving warnings to errors, as ``--strict`` does elsewhere.
     strict: bool = False
@@ -201,7 +206,9 @@ def run_cycle(request: RenderRequest) -> CycleResult:
             )
 
         graphs = [
-            filter_graph(build_graph(inventory, layer=layer), request.spec)
+            aggregate_graph(
+                filter_graph(build_graph(inventory, layer=layer), request.spec), request.aggregate
+            )
             for layer in request.layers
         ]
         payload = render_layers(graphs, request.output_format, request.options)

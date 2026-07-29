@@ -1,0 +1,20 @@
+---
+title: "LAG bundled by default"
+---
+flowchart TB
+    n0[/"pc-east-01<br/>[computer]<br/>10.20.0.11/24<br/>vlans: 10"/]
+    n1["sw-east-01<br/>[switch]<br/>10.20.0.2/24<br/>vlans: 10"]
+    n2["sw-east-02<br/>[switch]<br/>10.20.0.3/24<br/>vlans: 10"]
+    n3["sw-west-01<br/>[switch]<br/>10.20.0.4/24<br/>vlans: 10"]
+
+    n1 -- "Port-channel1 ↔ Port-channel1 · lag, 4 members · 4Gbps" --- n2
+    n1 -- "GigabitEthernet1/0/9 ↔ GigabitEthernet1/0/9 · CBL-SPARE-1 · 1Gbps" --- n2
+    n1 -- "GigabitEthernet1/0/10 ↔ GigabitEthernet1/0/10 · CBL-SPARE-2 · 1Gbps" --- n2
+    n0 -- "eno1 ↔ GigabitEthernet1/0/11 · CBL-DESK-1 · 1Gbps" --- n1
+    n1 -- "GigabitEthernet1/0/20 ↔ GigabitEthernet1/0/20 · CBL-EAST-WEST · 1Gbps" --- n3
+    n2 -- "GigabitEthernet1/0/21 ↔ GigabitEthernet1/0/21 · CBL-EAST-WEST-2 · 1Gbps" --- n3
+
+    classDef computer fill:#f5f5f5,stroke:#6b7280,stroke-width:1px
+    classDef switch fill:#dcf0dc,stroke:#16a34a,stroke-width:1px
+    class n0 computer
+    class n1,n2,n3 switch

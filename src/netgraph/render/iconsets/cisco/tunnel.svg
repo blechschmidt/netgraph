@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="56" viewBox="0 0 72 56" role="img" aria-label="Tunnel">
+  <title>Tunnel</title>
+  <g stroke="#6d28d9" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M16 14 H56 A6 14 0 0 1 56 42 H16 A6 14 0 0 1 16 14 Z" fill="#ede9fe"/>
+    <ellipse cx="16" cy="28" rx="6" ry="14" fill="#ddd0f7"/>
+    <ellipse cx="16" cy="28" rx="2.5" ry="6" fill="#ffffff"/>
+  </g>
+  <g fill="#6d28d9" stroke="none">
+    <path d="M0 26.8 H10 V24.4 L16 28.2 10 32 V29.6 H0 Z"/>
+    <path d="M62 26.8 H66 V24.4 L72 28.2 66 32 V29.6 H62 Z"/>
+  </g>
+</svg>

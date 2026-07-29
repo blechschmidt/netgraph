@@ -16,7 +16,7 @@ graph netgraph {
 
   subgraph cluster_0 {
     label="sites/north/access";
-    tooltip="namespace sites/north/access\n3 elements: 3 switchs\nvlans: 1,10,20,30,99";
+    tooltip="namespace sites/north/access\n3 elements: 3 switches\nvlans: 1,10,20,30,99";
     style=rounded;
     color="#9ca3af";
     fontcolor="#4b5563";
@@ -132,7 +132,7 @@ graph netgraph {
 
   subgraph cluster_4 {
     label="sites/south/access";
-    tooltip="namespace sites/south/access\n2 elements: 2 switchs\nvlans: 1,10,20,30,99";
+    tooltip="namespace sites/south/access\n2 elements: 2 switches\nvlans: 1,10,20,30,99";
     style=rounded;
     color="#9ca3af";
     fontcolor="#4b5563";
@@ -232,7 +232,7 @@ graph netgraph {
 
   subgraph cluster_8 {
     label="sites/west/access";
-    tooltip="namespace sites/west/access\n2 elements: 2 switchs\nvlans: 1,10,20,30,99";
+    tooltip="namespace sites/west/access\n2 elements: 2 switches\nvlans: 1,10,20,30,99";
     style=rounded;
     color="#9ca3af";
     fontcolor="#4b5563";

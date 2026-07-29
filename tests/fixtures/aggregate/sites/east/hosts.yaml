@@ -1,0 +1,17 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-east-01
+  description: A desk in the east site
+  labels:
+    site: east
+spec:
+  vendor: Lenovo
+  model: ThinkCentre M75q
+  interfaces:
+    - name: eno1
+      type: ethernet
+      description: Onboard NIC
+      mtu: 1500
+      ipv4:
+        addresses: [10.20.0.11/24]

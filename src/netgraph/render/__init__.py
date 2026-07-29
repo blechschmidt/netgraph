@@ -23,6 +23,18 @@ from collections.abc import Sequence
 from typing import Final
 
 from netgraph.errors import RenderError
+from netgraph.render.aggregate import (
+    AGGREGATE_ID_PREFIX,
+    AGGREGATE_KIND,
+    AggregateSpec,
+    AggregateView,
+    BundleMode,
+    BundleView,
+    aggregate_graph,
+    bundle_links,
+    collapse_namespaces,
+    collapse_targets,
+)
 from netgraph.render.details import (
     DETAIL_OPTIONS,
     build_details,
@@ -85,6 +97,8 @@ from netgraph.render.registry import (
 )
 
 __all__ = [
+    "AGGREGATE_ID_PREFIX",
+    "AGGREGATE_KIND",
     "BUNDLED_THEMES",
     "DETAIL_OPTIONS",
     "FORMATS",
@@ -101,6 +115,10 @@ __all__ = [
     "TEXT_FORMATS",
     "TUNNEL_ID_PREFIX",
     "TUNNEL_KIND",
+    "AggregateSpec",
+    "AggregateView",
+    "BundleMode",
+    "BundleView",
     "Edge",
     "EdgeKind",
     "ElementIds",
@@ -120,8 +138,12 @@ __all__ = [
     "TunnelView",
     "UnknownElementError",
     "advisories_for",
+    "aggregate_graph",
     "build_details",
     "build_graph",
+    "bundle_links",
+    "collapse_namespaces",
+    "collapse_targets",
     "content_security_policy_for",
     "detail_text",
     "element_ids",

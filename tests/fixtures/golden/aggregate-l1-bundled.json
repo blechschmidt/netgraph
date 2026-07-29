@@ -1,0 +1,589 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkGraph",
+  "layer": "l1",
+  "nodes": [
+    {
+      "id": "sites/east/pc-east-01",
+      "type": "element",
+      "name": "pc-east-01",
+      "kind": "computer",
+      "namespace": "sites/east",
+      "description": "A desk in the east site",
+      "labels": {
+        "site": "east"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "description": "Onboard NIC",
+          "mtu": 1500,
+          "addresses": [
+            "10.20.0.11/24"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sites/east/sw-east-01",
+      "type": "element",
+      "name": "sw-east-01",
+      "kind": "switch",
+      "namespace": "sites/east",
+      "description": "East / rack 1",
+      "labels": {
+        "site": "east"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "In-band management",
+          "addresses": [
+            "10.20.0.2/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "Port-channel1",
+          "type": "lag",
+          "description": "Four-member LAG to the other east switch",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "LAG member 1",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "description": "LAG member 2",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/3",
+          "type": "ethernet",
+          "description": "LAG member 3",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/4",
+          "type": "ethernet",
+          "description": "LAG member 4",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/9",
+          "type": "ethernet",
+          "description": "Spare cross-link, outside the aggregate",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/10",
+          "type": "ethernet",
+          "description": "Second spare cross-link, outside the aggregate",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/11",
+          "type": "ethernet",
+          "description": "Desk port",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/20",
+          "type": "ethernet",
+          "description": "Uplink to the west site",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sites/east/sw-east-02",
+      "type": "element",
+      "name": "sw-east-02",
+      "kind": "switch",
+      "namespace": "sites/east",
+      "description": "East / rack 2",
+      "labels": {
+        "site": "east"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "In-band management",
+          "addresses": [
+            "10.20.0.3/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "Port-channel1",
+          "type": "lag",
+          "description": "Four-member LAG to the other east switch",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "LAG member 1",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "description": "LAG member 2",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/3",
+          "type": "ethernet",
+          "description": "LAG member 3",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/4",
+          "type": "ethernet",
+          "description": "LAG member 4",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/9",
+          "type": "ethernet",
+          "description": "Spare cross-link, outside the aggregate",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/10",
+          "type": "ethernet",
+          "description": "Second spare cross-link, outside the aggregate",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/21",
+          "type": "ethernet",
+          "description": "Second uplink to the west site",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sites/west/sw-west-01",
+      "type": "element",
+      "name": "sw-west-01",
+      "kind": "switch",
+      "namespace": "sites/west",
+      "description": "West / rack 1",
+      "labels": {
+        "site": "west"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "In-band management",
+          "addresses": [
+            "10.20.0.4/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/20",
+          "type": "ethernet",
+          "description": "Uplink to the east site",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/21",
+          "type": "ethernet",
+          "description": "Second uplink to the east site",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "cables/cbl-lag-1#bundle",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/east/sw-east-01"
+        },
+        {
+          "node": "sites/east/sw-east-02"
+        }
+      ],
+      "medium": "copper",
+      "speed": 6000000000,
+      "speedText": "6Gbps",
+      "bundle": {
+        "size": 6,
+        "links": [
+          {
+            "id": "cables/cbl-lag-1",
+            "kind": "cable",
+            "endpoints": [
+              {
+                "node": "sites/east/sw-east-01",
+                "interface": "GigabitEthernet1/0/1"
+              },
+              {
+                "node": "sites/east/sw-east-02",
+                "interface": "GigabitEthernet1/0/1"
+              }
+            ],
+            "medium": "copper",
+            "speed": 1000000000,
+            "speedText": "1Gbps",
+            "label": "CBL-LAG-1",
+            "lengthM": 2.0,
+            "vlans": [
+              10
+            ]
+          },
+          {
+            "id": "cables/cbl-lag-2",
+            "kind": "cable",
+            "endpoints": [
+              {
+                "node": "sites/east/sw-east-01",
+                "interface": "GigabitEthernet1/0/2"
+              },
+              {
+                "node": "sites/east/sw-east-02",
+                "interface": "GigabitEthernet1/0/2"
+              }
+            ],
+            "medium": "copper",
+            "speed": 1000000000,
+            "speedText": "1Gbps",
+            "label": "CBL-LAG-2",
+            "lengthM": 2.0,
+            "vlans": [
+              10
+            ]
+          },
+          {
+            "id": "cables/cbl-lag-3",
+            "kind": "cable",
+            "endpoints": [
+              {
+                "node": "sites/east/sw-east-01",
+                "interface": "GigabitEthernet1/0/3"
+              },
+              {
+                "node": "sites/east/sw-east-02",
+                "interface": "GigabitEthernet1/0/3"
+              }
+            ],
+            "medium": "copper",
+            "speed": 1000000000,
+            "speedText": "1Gbps",
+            "label": "CBL-LAG-3",
+            "lengthM": 2.0,
+            "vlans": [
+              10
+            ]
+          },
+          {
+            "id": "cables/cbl-lag-4",
+            "kind": "cable",
+            "endpoints": [
+              {
+                "node": "sites/east/sw-east-01",
+                "interface": "GigabitEthernet1/0/4"
+              },
+              {
+                "node": "sites/east/sw-east-02",
+                "interface": "GigabitEthernet1/0/4"
+              }
+            ],
+            "medium": "copper",
+            "speed": 1000000000,
+            "speedText": "1Gbps",
+            "label": "CBL-LAG-4",
+            "lengthM": 2.0,
+            "vlans": [
+              10
+            ]
+          },
+          {
+            "id": "cables/cbl-spare-1",
+            "kind": "cable",
+            "endpoints": [
+              {
+                "node": "sites/east/sw-east-01",
+                "interface": "GigabitEthernet1/0/9"
+              },
+              {
+                "node": "sites/east/sw-east-02",
+                "interface": "GigabitEthernet1/0/9"
+              }
+            ],
+            "medium": "copper",
+            "speed": 1000000000,
+            "speedText": "1Gbps",
+            "label": "CBL-SPARE-1",
+            "lengthM": 2.0,
+            "vlans": [
+              10
+            ]
+          },
+          {
+            "id": "cables/cbl-spare-2",
+            "kind": "cable",
+            "endpoints": [
+              {
+                "node": "sites/east/sw-east-01",
+                "interface": "GigabitEthernet1/0/10"
+              },
+              {
+                "node": "sites/east/sw-east-02",
+                "interface": "GigabitEthernet1/0/10"
+              }
+            ],
+            "medium": "copper",
+            "speed": 1000000000,
+            "speedText": "1Gbps",
+            "label": "CBL-SPARE-2",
+            "lengthM": 2.0,
+            "vlans": [
+              10
+            ]
+          }
+        ]
+      },
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "cables/cbl-desk-1",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/east/pc-east-01",
+          "interface": "eno1"
+        },
+        {
+          "node": "sites/east/sw-east-01",
+          "interface": "GigabitEthernet1/0/11"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "CBL-DESK-1",
+      "lengthM": 2.0,
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "cables/cbl-east-west",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/east/sw-east-01",
+          "interface": "GigabitEthernet1/0/20"
+        },
+        {
+          "node": "sites/west/sw-west-01",
+          "interface": "GigabitEthernet1/0/20"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "CBL-EAST-WEST",
+      "lengthM": 2.0,
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "cables/cbl-east-west-2",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/east/sw-east-02",
+          "interface": "GigabitEthernet1/0/21"
+        },
+        {
+          "node": "sites/west/sw-west-01",
+          "interface": "GigabitEthernet1/0/21"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "CBL-EAST-WEST-2",
+      "lengthM": 2.0,
+      "vlans": [
+        10
+      ]
+    }
+  ],
+  "title": "Every parallel link bundled"
+}
