@@ -21,6 +21,7 @@ from netgraph.models.cable import Cable
 from netgraph.models.device import Computer, Hub, Router, Server, Switch
 from netgraph.models.diagnostics import decode_field_error
 from netgraph.models.element import KINDS, ElementBase
+from netgraph.models.tunnel import Tunnel
 
 __all__ = [
     "ELEMENT_MODELS",
@@ -38,11 +39,12 @@ ELEMENT_MODELS: Final[tuple[type[ElementBase], ...]] = (
     Server,
     Cable,
     Adapter,
+    Tunnel,
 )
 
 #: A parsed document. Discriminated on ``kind`` (§3).
 Element = Annotated[
-    Switch | Router | Hub | Computer | Server | Cable | Adapter,
+    Switch | Router | Hub | Computer | Server | Cable | Adapter | Tunnel,
     Field(discriminator="kind"),
 ]
 

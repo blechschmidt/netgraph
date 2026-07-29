@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
 from netgraph.errors import SchemaIssue, format_path
-from netgraph.models import Adapter, Cable, Device, Element
+from netgraph.models import Adapter, Cable, Device, Element, Tunnel
 
 __all__ = [
     "Inventory",
@@ -169,7 +169,7 @@ class Resolution:
 class Inventory:
     """Every element of a loaded tree, indexed by fully-qualified name.
 
-    The four element maps preserve load order (``NG-L005``), so iterating an
+    The five element maps preserve load order (``NG-L005``), so iterating an
     inventory is deterministic and renderers produce stable output.
     """
 
@@ -181,6 +181,8 @@ class Inventory:
     devices: dict[str, Device] = field(default_factory=dict)
     cables: dict[str, Cable] = field(default_factory=dict)
     adapters: dict[str, Adapter] = field(default_factory=dict)
+    #: The subset of :attr:`elements` that are tunnels (§14).
+    tunnels: dict[str, Tunnel] = field(default_factory=dict)
     #: Provenance of each element, keyed by fully-qualified name.
     sources: dict[str, SourceLocation] = field(default_factory=dict)
     #: Problems found while loading, in the order they were encountered.
@@ -210,6 +212,8 @@ class Inventory:
             self.cables[fqn] = element
         elif isinstance(element, Adapter):
             self.adapters[fqn] = element
+        elif isinstance(element, Tunnel):
+            self.tunnels[fqn] = element
         elif isinstance(element, Device):
             self.devices[fqn] = element
 
@@ -310,5 +314,6 @@ class Inventory:
         return (
             f"Inventory(root={str(self.root)!r}, elements={len(self.elements)}, "
             f"devices={len(self.devices)}, cables={len(self.cables)}, "
-            f"adapters={len(self.adapters)}, errors={len(self.errors)})"
+            f"adapters={len(self.adapters)}, tunnels={len(self.tunnels)}, "
+            f"errors={len(self.errors)})"
         )

@@ -13,12 +13,14 @@ the same inventory produce byte-identical output.
 Node types
 ----------
 
-Every node carries a ``type`` discriminator, ``element`` or ``subnet``. Below
-layer 3 only the first occurs; a layer-3 document mixes the two, and a consumer
-must be able to tell a derived prefix from a declared device without guessing
-from the identifier. A ``subnet`` node adds a ``subnet`` object — the prefix,
-the family, the addresses inside it and the elements holding them — and carries
-no interfaces; an ``element`` node is exactly what it is at layer 1.
+Every node carries a ``type`` discriminator: ``element``, ``subnet`` or
+``tunnel``. Below layer 3 the first dominates; a layer-3 document mixes element
+and subnet nodes and an ``overlay`` document mixes element and tunnel nodes, so
+a consumer must be able to tell a derived prefix or a tunnel from a declared
+device without guessing from the identifier. A ``subnet`` node adds a ``subnet``
+object — the prefix, the family, the addresses inside it and the elements
+holding them — and a ``tunnel`` node adds a ``tunnel`` object; neither carries
+interfaces. An ``element`` node is exactly what it is at layer 1.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ import json
 from typing import Any, Final
 
 from netgraph.models import API_VERSION
-from netgraph.render.graph import Edge, EdgeKind, Graph, Node, PortView, Subnet
+from netgraph.render.graph import Edge, EdgeKind, Graph, Node, PortView, Subnet, TunnelView
 from netgraph.render.options import RenderOptions
 
 __all__ = ["GRAPH_KIND", "graph_to_dict", "render_json", "to_json"]
@@ -54,11 +56,12 @@ def to_json(graph: Graph, options: RenderOptions | None = None, *, indent: int =
         }
 
     A node is ``{id, type, name, kind, namespace, vlans, interfaces}`` plus the
-    optional ``description``, ``labels`` and — for a layer-3 prefix node —
-    ``subnet``. ``id`` is the fully-qualified name, and is what every edge
-    endpoint refers to. An edge is ``{id, kind, endpoints, vlans}`` plus the
-    medium, speed, label and length it was declared with; ``endpoints`` is a
-    two-element list of ``{node, interface}``, with ``interface`` absent when
+    optional ``description``, ``labels`` and — for a layer-3 prefix node or a
+    tunnel node — ``subnet`` or ``tunnel``. ``id`` is the fully-qualified name,
+    and is what every edge endpoint refers to. An edge is
+    ``{id, kind, endpoints, vlans}`` plus the medium, speed, label and length it
+    was declared with, or the ``tunnel`` object when it is one; ``endpoints`` is
+    a two-element list of ``{node, interface}``, with ``interface`` absent when
     the edge attaches to an element rather than to one of its ports.
 
     Within one ``apiVersion`` these keys are only added, never renamed or
@@ -108,6 +111,8 @@ def _node(node: Node, options: RenderOptions) -> dict[str, Any]:
         payload["labels"] = dict(sorted(node.labels.items()))
     if node.subnet is not None:
         payload["subnet"] = _subnet(node.subnet)
+    if node.tunnel is not None:
+        payload["tunnel"] = _tunnel(node.tunnel)
     payload["vlans"] = sorted(node.vlans)
     payload["interfaces"] = [_port(port, options) for port in node.ports]
     return payload
@@ -126,6 +131,47 @@ def _subnet(subnet: Subnet) -> dict[str, Any]:
         "addresses": list(subnet.addresses),
         "elements": list(subnet.elements),
     }
+
+
+def _tunnel(view: TunnelView) -> dict[str, Any]:
+    """A tunnel's encapsulation, its endpoints and where it sits in the stack.
+
+    Like ``subnet``, this is not gated on any display flag: at the overlay layer
+    the encapsulation *is* the topology, and a consumer asking "what carries
+    this VXLAN?" would otherwise have to re-resolve ``over`` itself.
+    """
+    spec = view.tunnel.spec
+    payload: dict[str, Any] = {
+        "id": view.fqn,
+        "type": view.type,
+        "layer": view.layer,
+        "transport": spec.type.transport.value,
+        "endpoints": [{"node": end.element, "interface": end.interface} for end in view.ends],
+        "encrypted": view.encrypted,
+        "protected": view.protected,
+        # The stack, innermost first, is what makes ``vxlan over ipsec`` a fact
+        # a consumer can read rather than a phrase it has to parse.
+        "stack": list(view.stack),
+        "depth": view.depth,
+        "overheadBytes": view.overhead_bytes,
+    }
+    if view.over is not None:
+        payload["over"] = view.over
+    if view.encrypted_by is not None:
+        payload["encryptedBy"] = view.encrypted_by
+    if spec.port is not None:
+        payload["port"] = spec.port
+    if spec.mode is not None:
+        payload["mode"] = spec.mode.value
+    if view.vni is not None:
+        payload["vni"] = view.vni
+    if spec.cipher:
+        payload["cipher"] = spec.cipher
+    if spec.auth is not None:
+        payload["auth"] = spec.auth.value
+    if view.mtu is not None:
+        payload["mtu"] = view.mtu
+    return payload
 
 
 def _port(port: PortView, options: RenderOptions) -> dict[str, Any]:
@@ -157,6 +203,9 @@ def _edge(edge: Edge) -> dict[str, Any]:
     if edge.kind is EdgeKind.SUBNET:
         # A membership runs over no medium; the addresses are what it *is*.
         payload["addresses"] = list(edge.addresses)
+    elif edge.tunnel is not None:
+        # Neither does a tunnel: what it runs over is the rest of the diagram.
+        payload["tunnel"] = _tunnel(edge.tunnel)
     else:
         payload["medium"] = edge.medium
     if edge.speed is not None:

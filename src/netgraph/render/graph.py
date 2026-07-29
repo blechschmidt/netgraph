@@ -25,17 +25,24 @@ each link derives the VLANs it carries from its two ends
 database and the links it terminates. ``netgraph render --vlan 10`` keeps the
 host attached to an access port in VLAN 10, which is what a reader means.
 
-The three layers
-----------------
+The four layers
+---------------
 
-:class:`Layer` picks *which graph* is built, and only layer 3 changes what
-exists:
+:class:`Layer` picks *which graph* is built, and only layers 3 and ``overlay``
+change what exists:
 
 ``l1``
     The physical topology: one node per device and adapter, one edge per cable
     and per adapter attachment, annotated with medium, rate and cable labels.
+    Tunnels are drawn too, as logical edges over that topology — a tunnel is a
+    declared element, and a diagram that silently left it out would be wrong by
+    omission — but they are told apart by :class:`EdgeKind`, so a consumer
+    asking "what could a technician unplug?" still gets the cables alone.
 ``l2``
-    The same nodes and edges, annotated with VLAN membership instead.
+    The same nodes and edges, annotated with VLAN membership instead. A
+    layer-2 tunnel (VXLAN, Geneve, L2TP) extends a broadcast domain across the
+    underlay, so it carries VLANs exactly as a trunk does; a layer-3 tunnel
+    carries none.
 ``l3``
     A different graph. Nodes are the elements that hold a routable address
     *plus one node per IP prefix* (:mod:`netgraph.subnets`); edges join an
@@ -43,13 +50,20 @@ exists:
     devices are adjacent at layer 3 because they share a subnet, not because a
     cable happens to run between them. Elements with no routable address are
     left out rather than drawn floating, and loopback, link-local and
-    unnumbered interfaces contribute nothing.
+    unnumbered interfaces contribute nothing. A tunnel needs no special case
+    here: the addresses on its ``tunnel`` interfaces put both ends in one
+    prefix, which is exactly what the overlay *is* at layer 3.
+``overlay``
+    The tunnels themselves. Every tunnel becomes a node, joined to each element
+    it terminates on and — this is why it is a node — to the tunnel it is
+    encapsulated in. That edge is what makes ``VXLAN over IPsec`` drawable:
+    nesting is a relation between two links, and a link cannot end on a link.
 """
 
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Container, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from fnmatch import fnmatchcase
@@ -62,6 +76,8 @@ from netgraph.models import (
     Cable,
     Device,
     Interface,
+    Tunnel,
+    TunnelType,
     format_bitrate,
 )
 from netgraph.subnets import AddressPlacement, Subnet, is_routable_address, subnets_of
@@ -69,6 +85,8 @@ from netgraph.subnets import AddressPlacement, Subnet, is_routable_address, subn
 __all__ = [
     "SUBNET_ID_PREFIX",
     "SUBNET_KIND",
+    "TUNNEL_ID_PREFIX",
+    "TUNNEL_KIND",
     "Edge",
     "EdgeKind",
     "FilterSpec",
@@ -78,9 +96,12 @@ __all__ = [
     "NodeType",
     "PortView",
     "Subnet",
+    "TunnelEnd",
+    "TunnelView",
     "build_graph",
     "filter_graph",
     "is_routable_address",
+    "resolve_tunnels",
 ]
 
 
@@ -93,6 +114,9 @@ class Layer(str, Enum):
     L2 = "l2"
     #: Routed: IP prefixes as nodes, joined to the elements addressed in them.
     L3 = "l3"
+    #: Encapsulation: tunnels as nodes, joined to their endpoints and to the
+    #: tunnels they run inside (§14).
+    OVERLAY = "overlay"
 
     def __str__(self) -> str:
         return self.value
@@ -101,21 +125,25 @@ class Layer(str, Enum):
 class NodeType(str, Enum):
     """What a node stands for.
 
-    Layer 1 and layer 2 hold nothing but elements; layer 3 mixes the two, so a
-    consumer of a rendering needs to be able to tell them apart without
-    pattern-matching on names.
+    Layer 1 and layer 2 hold elements and — where a tunnel joins more than two
+    of them — tunnels; layer 3 and the overlay view mix element nodes with
+    derived ones, so a consumer of a rendering needs to be able to tell them
+    apart without pattern-matching on names.
     """
 
     #: A device or an adapter: hardware the inventory declares.
     ELEMENT = "element"
     #: An IP prefix, derived from the addresses of the elements (layer 3 only).
     SUBNET = "subnet"
+    #: A ``tunnel`` document drawn as a node rather than as an edge, because it
+    #: joins more than two endpoints or because something is nested inside it.
+    TUNNEL = "tunnel"
 
     def __str__(self) -> str:
         return self.value
 
 
-#: ``kind`` reported for a subnet node. The seven element kinds of §3 are all
+#: ``kind`` reported for a subnet node. The eight element kinds of §3 are all
 #: taken, so this one cannot collide with a declared kind.
 SUBNET_KIND: Final = "subnet"
 
@@ -123,6 +151,17 @@ SUBNET_KIND: Final = "subnet"
 #: cannot occur in an element's fully-qualified name (§2 name grammar), so a
 #: subnet node can never shadow a device.
 SUBNET_ID_PREFIX: Final = "subnet:"
+
+#: ``kind`` reported for a tunnel node. It is also the declared ``kind`` of the
+#: document it stands for, unlike :data:`SUBNET_KIND`: a tunnel node *is* the
+#: element, drawn as a node instead of as an edge.
+TUNNEL_KIND: Final = "tunnel"
+
+#: Prefix of a tunnel node's identity, e.g. ``tunnel:sites/hq/vx-100``. The same
+#: reasoning as :data:`SUBNET_ID_PREFIX`: a colon keeps it out of the namespace
+#: of declared names, so the node and the element it stands for stay distinct
+#: even in a graph that holds both.
+TUNNEL_ID_PREFIX: Final = "tunnel:"
 
 
 class EdgeKind(str, Enum):
@@ -134,6 +173,11 @@ class EdgeKind(str, Enum):
     ATTACHMENT = "attachment"
     #: An element has an address in a subnet (layer 3 only).
     SUBNET = "subnet"
+    #: A ``tunnel`` document (§14): either the whole point-to-point tunnel, or
+    #: one endpoint's leg of a tunnel drawn as a node.
+    TUNNEL = "tunnel"
+    #: A tunnel's ``over``: this tunnel is carried inside that one (§14.3).
+    ENCAPSULATION = "encapsulation"
 
     def __str__(self) -> str:
         return self.value
@@ -182,6 +226,134 @@ class PortView:
 
 
 @dataclass(frozen=True, slots=True)
+class TunnelEnd:
+    """One end of a tunnel, resolved against the inventory."""
+
+    #: Fully-qualified name of the element the tunnel terminates on.
+    element: str
+    #: The ``tunnel`` interface on it, e.g. ``wg0``.
+    interface: str
+
+    @property
+    def element_name(self) -> str:
+        """The element's short name, for a label with no room for a namespace."""
+        return short_name(self.element)
+
+    def __str__(self) -> str:
+        return f"{self.element}:{self.interface}"
+
+
+@dataclass(frozen=True, slots=True)
+class TunnelView:
+    """One ``tunnel`` document, resolved and placed in its encapsulation stack.
+
+    Resolution happens once, here, for the same reason cable endpoints do: the
+    DOT, Mermaid and JSON renderings of one inventory must agree about what runs
+    inside what.
+    """
+
+    #: Fully-qualified name of the ``tunnel`` document.
+    fqn: str
+    name: str
+    namespace: str
+    tunnel: Tunnel
+    #: The endpoints that resolved, in the document's canonical (sorted) order.
+    ends: tuple[TunnelEnd, ...] = ()
+    #: Fully-qualified name of the tunnel this one runs inside, when ``over``
+    #: resolved to one.
+    over: str | None = None
+    #: How many tunnels this one is nested inside; 0 runs on the underlay
+    #: network itself.
+    depth: int = 0
+    #: The encapsulation stack, this tunnel's type first, then each underlay
+    #: outwards: ``("vxlan", "ipsec")`` for VXLAN over IPsec.
+    stack: tuple[str, ...] = ()
+    #: The nearest underlay tunnel that encrypts, when this one does not. A
+    #: VXLAN inside an IPsec tunnel is confidential even though VXLAN encrypts
+    #: nothing, which is exactly why nesting is worth drawing.
+    encrypted_by: str | None = None
+
+    @property
+    def id(self) -> str:
+        """Identity of the node standing for this tunnel."""
+        return f"{TUNNEL_ID_PREFIX}{self.fqn}"
+
+    @property
+    def type(self) -> str:
+        """``wireguard``, ``ipsec``, ``vxlan`` … (§14.1)."""
+        return self.tunnel.spec.type.value
+
+    @property
+    def layer(self) -> int:
+        """2 when the tunnel carries frames, 3 when it carries packets."""
+        return self.tunnel.spec.type.layer
+
+    @property
+    def encrypted(self) -> bool:
+        """Is the payload protected by the tunnel itself?"""
+        return self.tunnel.encrypts
+
+    @property
+    def protected(self) -> bool:
+        """Is the payload protected by *something* — this tunnel or an underlay?"""
+        return self.encrypted or self.encrypted_by is not None
+
+    @property
+    def vni(self) -> int | None:
+        return self.tunnel.spec.vni
+
+    @property
+    def mtu(self) -> int | None:
+        return self.tunnel.spec.mtu
+
+    @property
+    def label(self) -> str | None:
+        return self.tunnel.spec.label
+
+    @property
+    def is_multipoint(self) -> bool:
+        """Does the tunnel join more than two endpoints?"""
+        return len(self.ends) > 2
+
+    @property
+    def elements(self) -> tuple[str, ...]:
+        """The elements the tunnel terminates on, without repeats, in end order."""
+        return tuple(dict.fromkeys(end.element for end in self.ends))
+
+    @property
+    def overhead_bytes(self) -> int:
+        """Encapsulation cost of the whole stack, in bytes over IPv4.
+
+        A VXLAN over IPsec costs both headers, and an overlay MTU has to fit
+        inside what is left; ``W126`` is the rule that says so.
+        """
+        return sum(TunnelType(name).overhead_bytes for name in self.stack)
+
+    @property
+    def stack_text(self) -> str:
+        """The stack as a reader says it out loud: ``vxlan over ipsec``."""
+        return " over ".join(self.stack) if self.stack else self.type
+
+    @property
+    def summary(self) -> str:
+        """One line naming the type, the VNI and what protects it."""
+        parts = [self.stack_text]
+        if self.vni is not None:
+            parts.append(f"vni {self.vni}")
+        if not self.encrypted:
+            parts.append("encrypted underlay" if self.encrypted_by else "cleartext")
+        return ", ".join(parts)
+
+    def restricted_to(self, elements: Container[str]) -> TunnelView:
+        """The same tunnel with only the ends held by ``elements``.
+
+        Filtering a graph removes elements; a tunnel node that kept listing them
+        would report endpoints the reader cannot see.
+        """
+        return replace(self, ends=tuple(end for end in self.ends if end.element in elements))
+
+
+@dataclass(frozen=True, slots=True)
 class Node:
     """One drawable thing: an element, or — at layer 3 — an IP subnet.
 
@@ -208,6 +380,27 @@ class Node:
     type: NodeType = NodeType.ELEMENT
     #: The prefix this node stands for; set exactly for a subnet node.
     subnet: Subnet | None = None
+    #: The tunnel this node stands for; set exactly for a tunnel node.
+    tunnel: TunnelView | None = None
+
+    @classmethod
+    def for_tunnel(cls, view: TunnelView) -> Node:
+        """The node standing for one tunnel.
+
+        Unlike a subnet, a tunnel *is* a declared element, so it keeps its own
+        namespace: ``--group-by-namespace`` draws it inside the site whose
+        directory declared it, which is where the document lives.
+        """
+        return cls(
+            fqn=view.id,
+            name=view.name,
+            kind=TUNNEL_KIND,
+            namespace=view.namespace,
+            element=None,
+            vlans=frozenset(),
+            type=NodeType.TUNNEL,
+            tunnel=view,
+        )
 
     @classmethod
     def for_subnet(cls, subnet: Subnet) -> Node:
@@ -233,12 +426,30 @@ class Node:
         return self.type is NodeType.SUBNET
 
     @property
+    def is_tunnel(self) -> bool:
+        return self.type is NodeType.TUNNEL
+
+    @property
+    def is_element(self) -> bool:
+        """Does this node stand for a device or an adapter the reader can point at?"""
+        return self.type is NodeType.ELEMENT
+
+    @property
+    def _document(self) -> Device | Adapter | Tunnel | None:
+        """The declared document behind the node, tunnels included."""
+        if self.element is not None:
+            return self.element
+        return self.tunnel.tunnel if self.tunnel is not None else None
+
+    @property
     def labels(self) -> Mapping[str, str]:
-        return self.element.metadata.labels if self.element is not None else {}
+        document = self._document
+        return document.metadata.labels if document is not None else {}
 
     @property
     def description(self) -> str | None:
-        return self.element.metadata.description if self.element is not None else None
+        document = self._document
+        return document.metadata.description if document is not None else None
 
     @property
     def addresses(self) -> tuple[str, ...]:
@@ -290,11 +501,21 @@ class Edge:
     #: The element the edge came from, for exporters that want the full record.
     cable: Cable | None = None
     adapter: Adapter | None = None
+    #: The tunnel this edge is, or is a leg of; set on ``tunnel`` and
+    #: ``encapsulation`` edges.
+    tunnel: TunnelView | None = None
 
     @property
     def name(self) -> str:
-        """The short name of the cable, or of the adapter for an attachment."""
+        """The short name of the cable, the adapter or the tunnel."""
+        if self.tunnel is not None:
+            return self.tunnel.name
         return short_name(self.id.partition("#")[0])
+
+    @property
+    def is_logical(self) -> bool:
+        """Is this something nobody can unplug — a subnet, a tunnel, a nesting?"""
+        return self.kind is not EdgeKind.CABLE and self.kind is not EdgeKind.ATTACHMENT
 
     @property
     def is_self_link(self) -> bool:
@@ -339,12 +560,34 @@ class Graph:
     @property
     def element_nodes(self) -> tuple[Node, ...]:
         """The nodes standing for a declared device or adapter, in graph order."""
-        return tuple(node for node in self.nodes.values() if not node.is_subnet)
+        return tuple(node for node in self.nodes.values() if node.is_element)
 
     @property
     def subnet_nodes(self) -> tuple[Node, ...]:
         """The subnet nodes, in graph order; empty below layer 3."""
         return tuple(node for node in self.nodes.values() if node.is_subnet)
+
+    @property
+    def tunnel_nodes(self) -> tuple[Node, ...]:
+        """The tunnel nodes, in graph order.
+
+        A point-to-point tunnel is an *edge* below the overlay layer, so this is
+        empty unless the graph holds a multipoint tunnel or was built for
+        :attr:`Layer.OVERLAY`.
+        """
+        return tuple(node for node in self.nodes.values() if node.is_tunnel)
+
+    @property
+    def tunnels(self) -> tuple[TunnelView, ...]:
+        """Every tunnel the graph draws, as a node or as an edge, in graph order."""
+        seen: dict[str, TunnelView] = {}
+        for node in self.nodes.values():
+            if node.tunnel is not None:
+                seen.setdefault(node.tunnel.fqn, node.tunnel)
+        for edge in self.edges:
+            if edge.tunnel is not None:
+                seen.setdefault(edge.tunnel.fqn, edge.tunnel)
+        return tuple(seen.values())
 
     @property
     def vlans(self) -> frozenset[int]:
@@ -386,15 +629,17 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         layer: ``l1`` and ``l2`` build the same physical graph and differ only in
             the annotations a renderer draws from it (§8.2). ``l3`` builds the
             routed graph instead: subnets become nodes, cables disappear, and
-            elements without a routable address drop out. See the module
-            docstring.
+            elements without a routable address drop out. ``overlay`` builds the
+            encapsulation graph: tunnels become nodes, joined to their endpoints
+            and to the tunnels they run inside. See the module docstring.
 
     Returns:
-        A graph whose every edge references two nodes that exist. Cables with an
-        unresolvable endpoint are reported in :attr:`Graph.dangling` instead of
-        raising, because ``--force`` must still produce a picture. The layer-3
-        graph keeps that list too: an unresolved cable costs a host the VLAN
-        membership it would have inherited from the link.
+        A graph whose every edge references two nodes that exist. Cables and
+        tunnels with an unresolvable endpoint are reported in
+        :attr:`Graph.dangling` instead of raising, because ``--force`` must still
+        produce a picture. The layer-3 graph keeps that list too: an unresolved
+        cable costs a host the VLAN membership it would have inherited from the
+        link.
     """
     # Iterate the full element map so nodes keep inventory load order rather
     # than the devices-then-adapters order of ``interface_owners``.
@@ -409,6 +654,11 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
     }
 
     edges, dangling = _build_edges(inventory)
+    tunnels, tunnel_dangling = resolve_tunnels(inventory)
+    dangling += tunnel_dangling
+
+    tunnel_nodes, tunnel_edges = _tunnel_topology(tunnels, ports)
+    edges += tunnel_edges
     node_vlans = _node_vlans(inventory, ports, edges)
 
     nodes = {
@@ -423,8 +673,12 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         )
         for fqn, owner in owners.items()
     }
+    nodes.update(tunnel_nodes)
+
     if layer is Layer.L3:
         nodes, edges = _routed_view(nodes, subnets_of(inventory))
+    elif layer is Layer.OVERLAY:
+        nodes, edges = _overlay_view(nodes, tunnels)
     return Graph(root=inventory.root, nodes=nodes, edges=edges, layer=layer, dangling=dangling)
 
 
@@ -479,6 +733,233 @@ def _routed_view(
         node = Node.for_subnet(subnet)
         kept[node.fqn] = node
     return kept, tuple(edges)
+
+
+def _overlay_view(
+    nodes: Mapping[str, Node], tunnels: Sequence[TunnelView]
+) -> tuple[dict[str, Node], tuple[Edge, ...]]:
+    """Turn the physical graph into the encapsulation one (§14.5).
+
+    Every tunnel becomes a node, because nesting is a relation between two
+    *links* and a link cannot end on a link: ``over`` is drawable only once the
+    inner tunnel has a node to start from. The elements are kept as the ground
+    the stack stands on — a tunnel with nothing at either end says nothing —
+    and everything physical is discarded: at this layer two elements are
+    adjacent because they agreed to encapsulate, not because a cable runs
+    between them.
+
+    Nodes come out as the terminating elements in inventory order, followed by
+    the tunnels in inventory order; edges follow the tunnels, each one's
+    endpoints first and its underlay last.
+    """
+    members = {element for view in tunnels for element in view.elements}
+    kept = {fqn: node for fqn, node in nodes.items() if node.is_element and fqn in members}
+    for view in tunnels:
+        kept[view.id] = Node.for_tunnel(view)
+
+    edges: list[Edge] = []
+    for view in tunnels:
+        edges.extend(_endpoint_edges(view))
+        if view.over is not None:
+            edges.append(
+                Edge(
+                    id=f"{view.fqn}#over",
+                    kind=EdgeKind.ENCAPSULATION,
+                    source=view.id,
+                    target=f"{TUNNEL_ID_PREFIX}{view.over}",
+                    medium="",
+                    label=view.type,
+                    tunnel=view,
+                )
+            )
+    return kept, tuple(edges)
+
+
+def _tunnel_topology(
+    tunnels: Sequence[TunnelView], ports: Mapping[str, tuple[PortView, ...]]
+) -> tuple[dict[str, Node], tuple[Edge, ...]]:
+    """The nodes and edges tunnels contribute to the layer-1/layer-2 graph.
+
+    A point-to-point tunnel is an edge: it joins two elements, exactly as a
+    cable does, and giving it a node would put a box in the middle of every VPN
+    on the diagram. A tunnel with three or more endpoints has no such shape, so
+    it becomes a node with one leg per endpoint — the same choice a subnet gets
+    at layer 3, for the same reason.
+    """
+    nodes: dict[str, Node] = {}
+    edges: list[Edge] = []
+    for view in tunnels:
+        if view.is_multipoint:
+            nodes[view.id] = Node.for_tunnel(view)
+            edges.extend(_endpoint_edges(view, ports))
+            continue
+        first, second = view.ends
+        edges.append(
+            Edge(
+                id=view.fqn,
+                kind=EdgeKind.TUNNEL,
+                source=first.element,
+                target=second.element,
+                source_port=first.interface,
+                target_port=second.interface,
+                # A tunnel runs over whatever the underlay provides; claiming a
+                # medium would claim a wire that is not this element's.
+                medium="",
+                label=view.label,
+                vlans=_tunnel_vlans(view, ports),
+                tunnel=view,
+            )
+        )
+    return nodes, tuple(edges)
+
+
+def _endpoint_edges(
+    view: TunnelView, ports: Mapping[str, tuple[PortView, ...]] | None = None
+) -> Iterator[Edge]:
+    """One edge per endpoint of a tunnel drawn as a node."""
+    vlans = _tunnel_vlans(view, ports) if ports is not None else frozenset()
+    for end in view.ends:
+        yield Edge(
+            id=f"{view.fqn}#{end}",
+            kind=EdgeKind.TUNNEL,
+            source=end.element,
+            target=view.id,
+            source_port=end.interface,
+            medium="",
+            vlans=vlans,
+            tunnel=view,
+        )
+
+
+def _tunnel_vlans(
+    view: TunnelView, ports: Mapping[str, tuple[PortView, ...]] | None
+) -> frozenset[int]:
+    """The VLANs a tunnel carries between its ends.
+
+    A **layer-2** tunnel — VXLAN, Geneve, L2TP — extends a broadcast domain
+    across the underlay; that is the entire reason it exists, so it carries the
+    VLANs its endpoints are configured for exactly as a trunk does. A
+    **layer-3** tunnel carries packets, so it carries no VLAN at all, however
+    the ports at either end happen to be configured.
+    """
+    if ports is None or view.layer != 2:
+        return frozenset()
+    carried: set[int] = set()
+    for end in view.ends:
+        for port in ports.get(end.element, ()):
+            if port.name == end.interface:
+                carried |= port.vlans
+    return frozenset(carried)
+
+
+def resolve_tunnels(inventory: Inventory) -> tuple[tuple[TunnelView, ...], tuple[str, ...]]:
+    """Resolve every ``tunnel`` document against ``inventory`` (§14.3).
+
+    Endpoints are resolved to fully-qualified names and ``over`` to the tunnel
+    it names, then the encapsulation chain of each tunnel is walked outwards to
+    give it a depth, a stack (``("vxlan", "ipsec")``) and the nearest underlay
+    that encrypts.
+
+    Returns:
+        The resolved tunnels in inventory load order, and one message per
+        problem — an endpoint that names nothing, an ``over`` that names no
+        tunnel, a chain that loops. Problems are *reported*, never raised: the
+        validator refuses such an inventory (``E016``…``E019``), and the graph
+        layer still has to cope because ``--force`` exists.
+    """
+    owners = inventory.interface_owners
+    dangling: list[str] = []
+    partial: dict[str, TunnelView] = {}
+
+    for fqn, tunnel in inventory.tunnels.items():
+        namespace = namespace_of(fqn)
+        ends: list[TunnelEnd] = []
+        missing: list[str] = []
+        for ref in tunnel.endpoints:
+            owner_fqn = inventory.resolve_fqn(ref.device, namespace=namespace)
+            owner = owners.get(owner_fqn) if owner_fqn is not None else None
+            if owner_fqn is None or owner is None or owner.interface(ref.interface) is None:
+                missing.append(str(ref))
+                continue
+            ends.append(TunnelEnd(element=owner_fqn, interface=ref.interface))
+        if missing:
+            dangling.append(f"{fqn}: unresolved endpoint(s): {', '.join(missing)}")
+        if len(ends) < 2:
+            dangling.append(f"{fqn}: fewer than two endpoints resolve, so it is not drawn")
+            continue
+
+        over: str | None = None
+        declared = tunnel.spec.over
+        if declared is not None:
+            target = inventory.resolve_fqn(declared, namespace=namespace)
+            if target is None or target not in inventory.tunnels:
+                dangling.append(f"{fqn}: 'over' names no known tunnel: {declared!r}")
+            else:
+                over = target
+
+        partial[fqn] = TunnelView(
+            fqn=fqn,
+            name=tunnel.metadata.name,
+            namespace=namespace,
+            tunnel=tunnel,
+            ends=tuple(ends),
+            over=over,
+        )
+
+    # An underlay that was itself dropped cannot be drawn under anything.
+    for fqn, view in partial.items():
+        if view.over is not None and view.over not in partial:
+            dangling.append(f"{fqn}: 'over' names {view.over!r}, which is not drawn")
+            partial[fqn] = replace(view, over=None)
+
+    reported: set[frozenset[str]] = set()
+    views: list[TunnelView] = []
+    for fqn in partial:
+        chain, cycle = _encapsulation_chain(fqn, partial)
+        # Every tunnel in a loop walks the same loop, rotated to start at
+        # itself, so the members are what identifies it — not the order. The
+        # first one in inventory order reports it, which keeps the message
+        # deterministic without repeating it once per member.
+        if cycle is not None and frozenset(cycle) not in reported:
+            reported.add(frozenset(cycle))
+            dangling.append(
+                "tunnel encapsulation loops: " + " over ".join(cycle) + " over " + cycle[0]
+            )
+        outer = chain[1:]
+        views.append(
+            replace(
+                partial[fqn],
+                depth=len(outer),
+                stack=tuple(partial[step].type for step in chain),
+                encrypted_by=next(
+                    (step for step in outer if partial[step].encrypted),
+                    None,
+                ),
+            )
+        )
+    return tuple(views), tuple(dangling)
+
+
+def _encapsulation_chain(
+    fqn: str, tunnels: Mapping[str, TunnelView]
+) -> tuple[tuple[str, ...], tuple[str, ...] | None]:
+    """``fqn`` and every tunnel it runs inside, innermost first.
+
+    Returns the chain and, when the ``over`` references loop, the members of
+    that loop in the order they were walked — so the caller can report the cycle
+    once rather than once per tunnel in it.
+    """
+    chain: list[str] = []
+    seen: set[str] = set()
+    current: str | None = fqn
+    while current is not None and current in tunnels:
+        if current in seen:
+            start = chain.index(current)
+            return tuple(chain), tuple(chain[start:])
+        seen.add(current)
+        chain.append(current)
+        current = tunnels[current].over
+    return tuple(chain), None
 
 
 def _build_edges(inventory: Inventory) -> tuple[tuple[Edge, ...], tuple[str, ...]]:
@@ -730,9 +1211,9 @@ def filter_graph(graph: Graph, spec: FilterSpec) -> Graph:
         seed = _resolve_node(graph, spec.neighbors_of)
         reachable = _neighbourhood(graph, seed, spec.depth)
 
-    # Every predicate is about a declared element; subnets follow from whichever
-    # elements survive (see FilterSpec).
-    kept = {fqn for fqn, node in graph.nodes.items() if not node.is_subnet}
+    # Every predicate is about a device or an adapter; subnet and tunnel nodes
+    # follow from whichever of those survive (see FilterSpec).
+    kept = {fqn for fqn, node in graph.nodes.items() if node.is_element}
     if reachable is not None:
         kept &= reachable
     if spec.namespaces:
@@ -744,11 +1225,11 @@ def filter_graph(graph: Graph, spec: FilterSpec) -> Graph:
     if spec.vlans:
         kept &= {fqn for fqn in kept if graph.nodes[fqn].vlans & spec.vlans}
 
-    subnets = _kept_subnets(graph, kept, reachable=reachable, seed=seed)
+    derived = _kept_derived(graph, kept, reachable=reachable, seed=seed)
     nodes = {
-        fqn: subnets.get(fqn, node)
+        fqn: derived.get(fqn, node)
         for fqn, node in graph.nodes.items()
-        if fqn in kept or fqn in subnets
+        if fqn in kept or fqn in derived
     }
     edges = tuple(
         edge
@@ -768,27 +1249,33 @@ def filter_graph(graph: Graph, spec: FilterSpec) -> Graph:
     )
 
 
-def _kept_subnets(
+def _kept_derived(
     graph: Graph, kept: Iterable[str], *, reachable: set[str] | None, seed: str | None
 ) -> dict[str, Node]:
-    """The surviving subnet nodes, narrowed to the members that survived too.
+    """The surviving subnet and tunnel nodes, narrowed to the members left.
 
-    A prefix nobody selected still has is dropped: an empty subnet box would
-    claim a broadcast domain the diagram no longer shows anything in. The one
-    exception is a subnet named directly by ``--neighbors-of``, which is the
-    element the reader asked about.
+    A prefix nobody selected still has is dropped, and so is a tunnel with no
+    endpoint left: an empty box would claim a broadcast domain — or an overlay —
+    the diagram no longer shows anything in. The one exception is a node named
+    directly by ``--neighbors-of``, which is the thing the reader asked about.
     """
     elements = set(kept)
     surviving: dict[str, Node] = {}
     for fqn, node in graph.nodes.items():
-        if not node.is_subnet or node.subnet is None:
+        if node.is_element:
             continue
         if reachable is not None and fqn not in reachable:
             continue
-        narrowed = node.subnet.restricted_to(elements)
-        if not narrowed.members and fqn != seed:
-            continue
-        surviving[fqn] = replace(node, subnet=narrowed, vlans=narrowed.vlans)
+        if node.subnet is not None:
+            narrowed = node.subnet.restricted_to(elements)
+            if not narrowed.members and fqn != seed:
+                continue
+            surviving[fqn] = replace(node, subnet=narrowed, vlans=narrowed.vlans)
+        elif node.tunnel is not None:
+            restricted = node.tunnel.restricted_to(elements)
+            if not restricted.ends and fqn != seed:
+                continue
+            surviving[fqn] = replace(node, tunnel=restricted)
     return surviving
 
 

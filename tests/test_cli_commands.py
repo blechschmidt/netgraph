@@ -29,6 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
 HOME_LAB = EXAMPLES / "home-lab"
 CAMPUS = EXAMPLES / "campus"
+OVERLAY = EXAMPLES / "overlay"
 INVALID = REPO_ROOT / "tests" / "fixtures" / "invalid"
 
 #: An inventory whose only problem is an error, and one whose only problem is a
@@ -295,6 +296,27 @@ def test_an_unaddressed_inventory_at_layer_3_blames_the_addressing_not_the_filte
     assert "no element carries a routable address" in result.stderr
     assert "selected no elements" not in result.stderr
 
+    # …and the same for an overlay view of an inventory that declares no tunnel.
+    overlay = invoke(runner, "-i", str(tmp_path), "render", "--layer", "overlay", "-f", "json")
+    assert overlay.exit_code == 0
+    assert json.loads(overlay.stdout)["nodes"] == []
+    assert "declares no tunnel" in overlay.stderr
+
+
+def test_the_overlay_layer_draws_the_encapsulation_stack(runner: CliRunner) -> None:
+    result = invoke(runner, "-i", str(OVERLAY), "render", "--layer", "overlay", "-f", "json")
+    assert result.exit_code == 0
+    document = json.loads(result.stdout)
+    assert document["layer"] == "overlay"
+
+    tunnels = {node["name"]: node["tunnel"] for node in document["nodes"] if "tunnel" in node}
+    assert tunnels["vx-100"]["stack"] == ["vxlan", "ipsec"]
+    nesting = [edge for edge in document["edges"] if edge["kind"] == "encapsulation"]
+    assert {edge["endpoints"][0]["node"] for edge in nesting} == {
+        "tunnel:tunnels/vx-100",
+        "tunnel:tunnels/gre-mgmt",
+    }
+
 
 def test_display_flags_reach_the_renderer(runner: CliRunner) -> None:
     bare = invoke(runner, "-i", str(HOME_LAB), "render", "--no-show-ips", "--no-show-vlans")
@@ -504,20 +526,58 @@ def test_list_defaults_to_devices(runner: CliRunner) -> None:
     assert "switches/sw-home" in result.stdout
 
 
-@pytest.mark.parametrize("what", ["devices", "cables", "vlans", "subnets"])
+@pytest.mark.parametrize("what", ["devices", "cables", "tunnels", "vlans", "subnets"])
 def test_every_listing_renders_in_every_format(runner: CliRunner, what: str) -> None:
-    table = invoke(runner, "-i", str(HOME_LAB), "list", what)
+    # The overlay example is the one that holds all five, so it is what proves
+    # every listing has something to print.
+    table = invoke(runner, "-i", str(OVERLAY), "list", what)
     assert table.exit_code == 0
     assert table.stdout.strip()
 
-    as_json = invoke(runner, "-i", str(HOME_LAB), "list", what, "-F", "json")
+    as_json = invoke(runner, "-i", str(OVERLAY), "list", what, "-F", "json")
     assert as_json.exit_code == 0
     records = json.loads(as_json.stdout)
     assert isinstance(records, list) and records
 
-    as_yaml = invoke(runner, "-i", str(HOME_LAB), "list", what, "-F", "yaml")
+    as_yaml = invoke(runner, "-i", str(OVERLAY), "list", what, "-F", "yaml")
     assert as_yaml.exit_code == 0
     assert yaml.safe_load(as_yaml.stdout) == records
+
+
+def test_the_tunnel_listing_shows_the_stack_rather_than_only_the_type() -> None:
+    """A reader asking "is this encrypted?" must not have to resolve `over`."""
+    runner = CliRunner()
+    records = json.loads(invoke(runner, "-i", str(OVERLAY), "list", "tunnels", "-F", "json").stdout)
+    by_name = {record["name"]: record for record in records}
+
+    vxlan = by_name["tunnels/vx-100"]
+    assert vxlan["stack"] == ["vxlan", "ipsec"]
+    assert vxlan["over"] == "tunnels/ipsec-hq-b"
+    assert (vxlan["encrypted"], vxlan["protected"]) == (False, True)
+    assert (vxlan["vni"], vxlan["layer"], vxlan["port"]) == (100, 2, 4789)
+
+    assert by_name["tunnels/wg-mesh"]["stack"] == ["wireguard"]
+    assert len(by_name["tunnels/wg-mesh"]["endpoints"]) == 3
+
+    table = invoke(runner, "-i", str(OVERLAY), "list", "tunnels").stdout
+    assert "vxlan over ipsec" in table
+    assert "underlay" in table
+
+
+def test_the_tunnel_listing_still_prints_a_tunnel_it_cannot_resolve(
+    runner: CliRunner, tmp_path: Path
+) -> None:
+    """A reader runs this command *because* something is wrong."""
+    (tmp_path / "net.yaml").write_text(
+        (INVALID / "e016-unknown-tunnel-endpoint.yaml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    result = invoke(runner, "-i", str(tmp_path), "list", "tunnels", "-F", "json")
+    assert result.exit_code == 0
+    (record,) = json.loads(result.stdout)
+    assert record["name"] == "tun-ghost"
+    # Unresolvable, so it has no stack of its own beyond its declared type.
+    assert record["stack"] == ["wireguard"]
 
 
 def test_the_device_listing_names_every_element_that_becomes_a_node(runner: CliRunner) -> None:
@@ -532,6 +592,12 @@ def test_the_device_listing_names_every_element_that_becomes_a_node(runner: CliR
         "routers/rtr-home",
         "switches/sw-home",
     }
+
+
+def test_the_home_lab_declares_no_tunnel(runner: CliRunner) -> None:
+    result = invoke(runner, "-i", str(HOME_LAB), "list", "tunnels")
+    assert result.exit_code == 0
+    assert "no tunnels declared" in result.stdout
 
 
 def test_the_cable_listing_shows_both_endpoints(runner: CliRunner) -> None:

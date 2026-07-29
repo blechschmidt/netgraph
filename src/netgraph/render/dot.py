@@ -68,7 +68,17 @@ from jinja2 import Environment, PackageLoader, StrictUndefined
 from markupsafe import Markup
 
 from netgraph.errors import RenderError, clip_text
-from netgraph.render.graph import SUBNET_KIND, Edge, EdgeKind, Graph, Layer, Node, Subnet
+from netgraph.render.graph import (
+    SUBNET_KIND,
+    TUNNEL_KIND,
+    Edge,
+    EdgeKind,
+    Graph,
+    Layer,
+    Node,
+    Subnet,
+    TunnelView,
+)
 from netgraph.render.icons import IconTheme, suffix_order
 from netgraph.render.options import RenderOptions
 
@@ -116,6 +126,9 @@ _NODE_STYLE: Final[Mapping[str, tuple[str, str, str]]] = {
     "server": ("cylinder", "#eae2f5", "#7c3aed"),
     "adapter": ("ellipse", "#fdf0e3", "#ea580c"),
     SUBNET_KIND: ("box", "#e0f2f1", "#0f766e"),
+    # A tunnel is not hardware either, but unlike a subnet it *is* declared, so
+    # it keeps a shape of its own rather than borrowing a box.
+    TUNNEL_KIND: ("hexagon", "#ede9fe", "#6d28d9"),
 }
 _DEFAULT_NODE_STYLE: Final[tuple[str, str, str]] = ("box", "#f5f5f5", "#6b7280")
 
@@ -135,6 +148,19 @@ _ATTACHMENT_STYLE: Final[tuple[str, str]] = ("#9ca3af", "dotted")
 
 #: A subnet membership is not a cable either, so it borrows the subnet's colour.
 _SUBNET_EDGE_STYLE: Final[tuple[str, str]] = ("#0f766e", "solid")
+
+#: A tunnel is drawn dashed, because it runs over a path the diagram already
+#: shows rather than over one of its own. Colour carries confidentiality — the
+#: one property of a tunnel a reader most needs at a glance — and the two are
+#: far enough apart in lightness to survive a greyscale print: violet when the
+#: payload is protected, crimson when it crosses the underlay in the clear.
+_TUNNEL_STYLE: Final[tuple[str, str]] = ("#6d28d9", "dashed")
+_CLEARTEXT_TUNNEL_STYLE: Final[tuple[str, str]] = ("#be123c", "dashed")
+
+#: A tunnel's ``over`` is not a path at all; it says one link is carried by
+#: another. Dotted and violet: the vocabulary of the tunnel it belongs to,
+#: with a line weight that keeps it behind the tunnels themselves.
+_ENCAPSULATION_STYLE: Final[tuple[str, str]] = ("#8b5cf6", "dotted")
 
 #: Pen width per link rate, widest threshold first. A reader should be able to
 #: rank two links by rate without reading either label, which needs the steps to
@@ -555,11 +581,12 @@ def _node_views(
     for node in nodes:
         shape, fill, stroke = _NODE_STYLE.get(node.kind, _DEFAULT_NODE_STYLE)
         subnet = node.subnet
+        tunnel = node.tunnel
         image = icons.get(node.kind)
         yield _NodeView(
             id=node.fqn,
             title=_inline(node.name),
-            subtitle=f"[{subnet.family} subnet]" if subnet is not None else f"[{node.kind}]",
+            subtitle=_subtitle(node),
             # An icon *is* the glyph, so the shape it would sit inside is taken
             # away rather than drawn around it. The palette stays on the view
             # because the icon carries the same colours: a theme without a
@@ -570,11 +597,28 @@ def _node_views(
             style="" if image else _node_style(node),
             # The description is a DOT string, not HTML, so its line breaks are
             # meaningful and are kept.
-            tooltip=_subnet_tooltip(subnet) if subnet is not None else node.description,
+            tooltip=_node_tooltip(node, subnet, tunnel),
             rows=_node_rows(node, options, layer),
             image=image,
             element_id=ids.get(node.fqn),
         )
+
+
+def _subtitle(node: Node) -> str:
+    """The bracketed line under a node's name: what sort of thing it is."""
+    if node.subnet is not None:
+        return f"[{node.subnet.family} subnet]"
+    if node.tunnel is not None:
+        return f"[{node.tunnel.type} tunnel]"
+    return f"[{node.kind}]"
+
+
+def _node_tooltip(node: Node, subnet: Subnet | None, tunnel: TunnelView | None) -> str | None:
+    if subnet is not None:
+        return _subnet_tooltip(subnet)
+    if tunnel is not None:
+        return _tunnel_tooltip(tunnel)
+    return node.description
 
 
 def _node_style(node: Node) -> str | None:
@@ -583,6 +627,10 @@ def _node_style(node: Node) -> str | None:
         # Rounded, for something derived rather than declared: the reader should
         # not go looking for a device with this name.
         return "filled,rounded"
+    if node.is_tunnel:
+        # Dashed, for something declared but not physical: there is a document
+        # behind this box, but nothing anyone can put a hand on.
+        return "filled,dashed"
     if node.kind == "adapter":
         # §8.2: an adapter is hardware that may be collapsed into its host, so it
         # is drawn as a provisional part of the diagram.
@@ -601,6 +649,9 @@ def _node_rows(node: Node, options: RenderOptions, layer: Layer) -> tuple[_Row, 
         if options.show_vlans and node.vlans:
             return (_Row(port=f"vlan {_compact_ids(node.vlans)}", spans=True),)
         return ()
+
+    if node.tunnel is not None:
+        return _tunnel_rows(node.tunnel)
 
     # At layer 3 each address is printed on the edge that puts the element in a
     # subnet, which also says which interface holds it; repeating the list under
@@ -642,6 +693,14 @@ def _edge_views(
             colour, style = _ATTACHMENT_STYLE
         elif edge.kind is EdgeKind.SUBNET:
             colour, style = _SUBNET_EDGE_STYLE
+        elif edge.kind is EdgeKind.ENCAPSULATION:
+            colour, style = _ENCAPSULATION_STYLE
+        elif edge.kind is EdgeKind.TUNNEL:
+            colour, style = (
+                _TUNNEL_STYLE
+                if edge.tunnel is None or edge.tunnel.protected
+                else _CLEARTEXT_TUNNEL_STYLE
+            )
         yield _EdgeView(
             source=edge.source,
             target=edge.target,
@@ -689,10 +748,21 @@ def _edge_label(edge: Edge, layer: Layer, options: RenderOptions) -> str:
     physical detail moves to the tooltip. At layer 3 the label is the address
     that puts the element in the subnet.
     """
+    if edge.kind is EdgeKind.ENCAPSULATION:
+        # The edge *is* the sentence "this runs inside that"; naming the inner
+        # tunnel's type is what tells the reader which way round it goes.
+        return f"{edge.label} over" if edge.label else "over"
+
     parts: list[str] = []
     ports = _port_pair(edge)
     if ports:
         parts.append(ports)
+
+    if edge.kind is EdgeKind.TUNNEL and edge.tunnel is not None:
+        parts.extend(_tunnel_label(edge.tunnel))
+        if layer is Layer.L2 and options.show_vlans and edge.vlans:
+            parts.append(f"vlan {_compact_ids(edge.vlans)}")
+        return "\n".join(parts)
 
     if edge.kind is EdgeKind.SUBNET:
         if options.show_ips and edge.addresses:
@@ -737,6 +807,9 @@ def _edge_tooltip(edge: Edge, options: RenderOptions) -> str:
             parts.append(f"vlans: {_compact_ids(edge.vlans)}")
         return " — ".join(parts)
 
+    if edge.tunnel is not None:
+        return _tunnel_tooltip(edge.tunnel, vlans=edge.vlans if options.show_vlans else frozenset())
+
     parts = [f"{edge.kind}: {edge.name}", f"medium: {edge.medium}"]
     speed = edge.speed_text
     if speed:
@@ -751,6 +824,69 @@ def _edge_tooltip(edge: Edge, options: RenderOptions) -> str:
 # --------------------------------------------------------------------------- #
 # Shared formatting
 # --------------------------------------------------------------------------- #
+
+
+def _tunnel_label(view: TunnelView) -> list[str]:
+    """What a tunnel edge is annotated with, after the ports it joins.
+
+    The encapsulation is always named — a dashed line says "tunnel" but not
+    *which* tunnel, and the difference between WireGuard and cleartext GRE is
+    the whole point. Nesting is spelled out on the same line (``vxlan over
+    ipsec``) so a reader never has to open the overlay view to see it.
+    """
+    parts = [view.stack_text]
+    if view.vni is not None:
+        parts.append(f"vni {view.vni}")
+    if view.label:
+        parts.append(view.label)
+    if not view.encrypted:
+        # A tunnel a reader assumes is private but is not is the single most
+        # expensive thing this diagram can get wrong, so it is on the label
+        # rather than in the tooltip.
+        parts.append("via encrypted underlay" if view.encrypted_by else "cleartext")
+    return parts
+
+
+def _tunnel_rows(view: TunnelView) -> tuple[_Row, ...]:
+    """The record rows of a tunnel drawn as a node: its stack, then its ends."""
+    rows: list[_Row] = []
+    # The subtitle already says ``[ipsec tunnel]``; the summary only earns a row
+    # when it adds a VNI, an underlay or the fact that nothing is encrypted.
+    if view.summary != view.type:
+        rows.append(_Row(port=view.summary, spans=True))
+    for end in view.ends[:_MAX_PORT_ROWS]:
+        rows.append(_Row(port=_inline(end.element_name), addresses=_inline(end.interface)))
+    hidden = len(view.ends) - _MAX_PORT_ROWS
+    if hidden > 0:
+        rows.append(_Row(port=f"(+{_count(hidden, 'more endpoint')})", spans=True))
+    if view.mtu is not None:
+        rows.append(_Row(port=f"mtu {view.mtu}", spans=True))
+    return tuple(rows)
+
+
+def _tunnel_tooltip(view: TunnelView, vlans: frozenset[int] = frozenset()) -> str:
+    """The full record of a tunnel, shown on hover."""
+    spec = view.tunnel.spec
+    parts = [f"tunnel: {view.fqn}", f"type: {view.stack_text}"]
+    if view.vni is not None:
+        parts.append(f"vni: {view.vni}")
+    if spec.mode is not None:
+        parts.append(f"mode: {spec.mode}")
+    transport = spec.type.transport
+    parts.append(f"transport: {transport}{f'/{spec.port}' if spec.port is not None else ''}")
+    if view.encrypted:
+        parts.append(f"encrypted: {spec.cipher}" if spec.cipher else "encrypted")
+    elif view.encrypted_by is not None:
+        parts.append(f"cleartext, carried by {view.encrypted_by}")
+    else:
+        parts.append("cleartext")
+    if spec.auth is not None:
+        parts.append(f"auth: {spec.auth}")
+    if view.mtu is not None:
+        parts.append(f"mtu: {view.mtu} (overhead {view.overhead_bytes} B)")
+    if vlans:
+        parts.append(f"vlans: {_compact_ids(vlans)}")
+    return ", ".join(parts)
 
 
 def _subnet_tooltip(subnet: Subnet) -> str:

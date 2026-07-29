@@ -325,6 +325,27 @@
     return head;
   }
 
+  // A tunnel is the one record where the interesting facts are neither
+  // physical nor addressing: what it encapsulates, what carries it, and — the
+  // one a reader most needs — whether anything in the stack encrypts.
+  function tunnelSection(tunnel) {
+    if (!tunnel) { return null; }
+    var protection = tunnel.encrypted
+      ? "yes" + (tunnel.cipher ? " (" + tunnel.cipher + ")" : "")
+      : (tunnel.encryptedBy ? "by " + tunnel.encryptedBy : "no — cleartext");
+    return section("tunnel", definitions([
+      ["stack", tunnel.stack.join(" over ")],
+      ["carries", "layer " + tunnel.layer],
+      ["transport", tunnel.transport + (tunnel.port ? "/" + tunnel.port : "")],
+      ["mode", tunnel.mode],
+      ["vni", tunnel.vni],
+      ["encrypted", protection],
+      ["auth", tunnel.auth],
+      ["mtu", tunnel.mtu ? tunnel.mtu + " (overhead " + tunnel.overheadBytes + " B)" : ""],
+      ["over", tunnel.over]
+    ]));
+  }
+
   function describeNode(record) {
     var box = document.createDocumentFragment();
     box.appendChild(heading(record.name, record.kind));
@@ -345,6 +366,8 @@
         ["elements", join(record.subnet.elements)]
       ])));
     }
+
+    append(box, tunnelSection(record.tunnel));
 
     append(box, section("vlans", tags((record.vlans || []).map(function (id) {
       return "vlan " + id;
@@ -374,7 +397,7 @@
             link.interface || "—",
             link.peer,
             link.peerInterface || "—",
-            [link.medium || link.kind, link.speedText].filter(Boolean).join(" "),
+            [link.stack || link.medium || link.kind, link.speedText].filter(Boolean).join(" "),
             join(link.vlans)
           ]
         };
@@ -403,6 +426,8 @@
       ["length", record.lengthM ? record.lengthM + " m" : ""],
       ["addresses", join(record.addresses)]
     ])));
+
+    append(box, tunnelSection(record.tunnel));
 
     append(box, section("endpoints", table(["element", "interface"], ends.map(function (end) {
       return { cells: [end.node, end.interface || "—"] };

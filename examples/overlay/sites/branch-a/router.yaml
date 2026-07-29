@@ -1,0 +1,30 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-branch-a
+  description: Branch A edge router. Mesh member only.
+  labels: {site: branch-a, role: edge}
+spec:
+  vendor: MikroTik
+  model: RB5009
+  location: Branch A, wall mount
+  interfaces:
+    - name: ether1
+      type: ethernet
+      description: uplink to wan-core
+      mtu: 1500
+      ipv4:
+        addresses: [198.51.100.6/30]
+    - name: ether2
+      type: ethernet
+      description: branch LAN
+      mtu: 1500
+      ipv4:
+        addresses: [10.20.0.1/24]
+    - name: wg0
+      type: tunnel
+      description: site-to-site mesh
+      parent: ether1
+      mtu: 1420
+      ipv4:
+        addresses: [10.255.0.2/24]

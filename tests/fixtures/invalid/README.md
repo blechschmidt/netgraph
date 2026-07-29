@@ -49,6 +49,16 @@ id in `netgraph.rules.RULE_IDS` has a file here.
 | `w123-unattached-adapter.yaml` | `W123` | `NG-X002` | A cabled dongle with no `attached_to`. |
 | `w124-attached-to-switch.yaml` | `W124` | `NG-X007` | `attached_to` names a switch. |
 | `i002-uncabled-interface.yaml` | `I002` | `NG-C015` | `pc-a:eth1` is enabled and nothing is patched into it. |
+| `e016-unknown-tunnel-endpoint.yaml` | `E016` | `NG-T002` | A tunnel names `pc-ghost`, which is not declared. |
+| `e017-tunnel-endpoint-type.yaml` | `E017` | `NG-T003` | A tunnel terminates on `pc-b:eth0`, an ethernet port. |
+| `e018-unknown-underlay.yaml` | `E018` | `NG-T004` | `over: ipsec-core`, which is not declared. |
+| `e019-encapsulation-cycle.yaml` | `E019` | `NG-T005` | Two IPsec tunnels each run inside the other. |
+| `w125-underlay-does-not-reach.yaml` | `W125` | `NG-T006` | An OpenVPN mesh reaches `pc-c`; its WireGuard underlay does not. |
+| `w126-tunnel-mtu.yaml` | `W126` | `NG-T011` | MTU 1420 inside an MTU 1420 tunnel, minus 69 bytes of OpenVPN. |
+| `w127-cleartext-tunnel.yaml` | `W127` | `NG-T012` | A GRE tunnel over nothing that encrypts. |
+| `w128-unused-tunnel-interface.yaml` | `W128` | `NG-T013` | `pc-a:wg0` exists; no `tunnel` document names it. |
+| `w129-vni-clash.yaml` | `W129` | `NG-T014` | Two VXLANs on `pc-a` both claim VNI 100. |
+| `i003-nonstandard-tunnel-port.yaml` | `I003` | `NG-T015` | WireGuard on 51821 rather than 51820. |
 
 ## Load them one at a time
 
@@ -88,7 +98,13 @@ warnings interact. Two rules bite in particular:
   or cable them. `lag` aggregates are exempt and need neither.
 * **W121** fires when the inventory falls into two or more islands of *two or
   more* elements each. A lone device is W103's, not W121's, so a fixture with
-  one cabled pair plus one orphan is safe.
+  one cabled pair plus one orphan is safe. A tunnel is not a physical link and
+  does not join two islands.
+* **W127** fires for every `gre`, `vxlan`, `geneve`, `l2tp` and `pptp` tunnel
+  that is not nested inside an encrypting one. A fixture that needs a tunnel but
+  is not about encryption should use `wireguard`, `ipsec` or `openvpn`.
+* **W128** fires for every enabled `tunnel` interface no `tunnel` document names,
+  so a fixture that declares one has to use it — or say `enabled: false`.
 
 Keep the file to the smallest set of documents that still triggers the rule,
 and add a comment at the top saying what makes it fire.

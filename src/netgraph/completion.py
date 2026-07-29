@@ -64,6 +64,7 @@ _LAYER_HELP: Final[dict[str, str]] = {
     Layer.L1.value: "physical topology: what is plugged into what",
     Layer.L2.value: "the same topology annotated with VLANs",
     Layer.L3.value: "IP subnets and the elements addressed in them",
+    Layer.OVERLAY.value: "tunnels, their endpoints and what they run inside",
 }
 
 
@@ -129,7 +130,7 @@ def complete_format(
 def complete_layer(
     ctx: click.Context, param: click.Parameter, incomplete: str
 ) -> list[CompletionItem]:
-    """The three layer views, described by what each one draws."""
+    """The layer views, described by what each one draws."""
     return _items(((layer.value, _LAYER_HELP[layer.value]) for layer in Layer), incomplete)
 
 

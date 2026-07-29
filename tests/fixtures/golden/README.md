@@ -1,7 +1,7 @@
 # Renderer golden files
 
-Committed snapshots of the DOT, Mermaid and JSON renderings of the two example
-inventories. `tests/test_golden.py` asserts each renderer reproduces its file
+Committed snapshots of the DOT, Mermaid and JSON renderings of three of the
+example inventories. `tests/test_golden.py` asserts each renderer reproduces its file
 byte for byte.
 
 They exist because `netgraph render -f dot > topology.dot` is meant to produce a
@@ -17,6 +17,9 @@ makes that regression fail a test instead of surprising a user.
 | `campus-l2-grouped` | `examples/campus` | L2 | `group_by_namespace=True`, `title`, `max_addresses=2` |
 | `home-lab-l3` | `examples/home-lab` | L3 | `title` |
 | `campus-l3-grouped` | `examples/campus` | L3 | `group_by_namespace=True`, `title` |
+| `overlay-l1` | `examples/overlay` | L1 | `title` |
+| `overlay-l2` | `examples/overlay` | L2 | `title` |
+| `overlay-overlay` | `examples/overlay` | overlay | `group_by_namespace=True`, `title` |
 
 Each stem has a `.dot`, `.mmd` and `.json` file. The matrix is defined by
 `CASES` in `tests/test_golden.py`; a case with a missing file, or a file with no

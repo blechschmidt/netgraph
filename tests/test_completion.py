@@ -123,14 +123,18 @@ def test_watch_completes_the_same_formats() -> None:
 
 def test_layers_come_from_the_enum_and_say_what_they_draw() -> None:
     items = complete(["render", "--layer"])
-    assert [item.value for item in items] == ["l1", "l2", "l3"]
-    assert "subnet" in {item.value: item.help or "" for item in items}["l3"]
+    assert [item.value for item in items] == ["l1", "l2", "l3", "overlay"]
+    described = {item.value: item.help or "" for item in items}
+    assert "subnet" in described["l3"]
+    assert "tunnel" in described["overlay"]
 
 
 def test_a_filter_completes_the_kinds_that_are_nodes() -> None:
-    """A cable is an edge, so ``--kind cable`` would select nothing."""
+    """A cable is an edge, and so is a tunnel; neither can be selected."""
     items = complete(["render", "--kind"])
-    assert [item.value for item in items] == [kind for kind in KINDS if kind != "cable"]
+    assert [item.value for item in items] == [
+        kind for kind in KINDS if kind not in {"cable", "tunnel"}
+    ]
     assert all(item.help for item in items)
 
 

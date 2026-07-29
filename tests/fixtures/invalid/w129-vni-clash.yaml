@@ -1,0 +1,87 @@
+# W129 (NG-T014) - two tunnels terminating on one element share a VNI.
+#
+# Both VXLANs claim virtual network 100 on pc-a and on pc-b, so they will bridge
+# into each other. Nesting them inside an IPsec tunnel is what keeps W127 quiet;
+# a layer-2 tunnel interface needs no address, which is why W101 leaves the
+# 'vx' ports alone.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+    - name: ipsec0
+      type: tunnel
+      mtu: 1400
+      ipv4:
+        addresses: [10.9.0.1/30]
+    - name: vx1
+      type: tunnel
+      mtu: 1350
+    - name: vx2
+      type: tunnel
+      mtu: 1350
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+    - name: ipsec0
+      type: tunnel
+      mtu: 1400
+      ipv4:
+        addresses: [10.9.0.2/30]
+    - name: vx1
+      type: tunnel
+      mtu: 1350
+    - name: vx2
+      type: tunnel
+      mtu: 1350
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints: [pc-a:eth0, pc-b:eth0]
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: ipsec-a-b
+spec:
+  type: ipsec
+  endpoints: [pc-a:ipsec0, pc-b:ipsec0]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: vx-one
+spec:
+  type: vxlan
+  vni: 100
+  endpoints: [pc-a:vx1, pc-b:vx1]
+  over: ipsec-a-b
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: vx-two
+spec:
+  type: vxlan
+  vni: 100
+  endpoints: [pc-a:vx2, pc-b:vx2]
+  over: ipsec-a-b

@@ -1,7 +1,8 @@
 # netgraph
 
-Declare your network — switches, routers, hubs, computers, servers, cables and
-adapters — in a folder tree of YAML files, then render it as a network graph.
+Declare your network — switches, routers, hubs, computers, servers, cables,
+adapters and tunnels — in a folder tree of YAML files, then render it as a
+network graph.
 
 netgraph reads the tree, checks that the documents agree with each other, and
 draws the result as SVG, PNG, PDF, Graphviz DOT, Mermaid or JSON. It can also
@@ -358,7 +359,7 @@ from an inventory with a dangling cable is worse than no diagram.
 |---|---|---|
 | `-f, --format FORMAT` | `dot` | One of `dot`, `svg`, `png`, `pdf`, `mermaid`, `json`. `svg`, `png` and `pdf` need Graphviz; the other three do not. |
 | `-o, --output FILE` | stdout | Write to this file instead of stdout. Parent directories are created. Required for `png` and `pdf` when stdout is a terminal. |
-| `--layer l1\|l2\|l3` | `l1` | Which view to draw — see [Layers](#layers-l1-l2-and-l3). `l1` is the physical topology, `l2` the same topology annotated with VLANs, `l3` the IP subnets and who is addressed in them. |
+| `--layer l1\|l2\|l3\|overlay` | `l1` | Which view to draw — see [Layers](#layers-l1-l2-l3-and-overlay). `l1` is the physical topology, `l2` the same topology annotated with VLANs, `l3` the IP subnets and who is addressed in them, `overlay` the tunnels and what runs inside what. |
 | `--title TEXT` | none | Caption for the diagram. |
 | `--show-ips` / `--no-show-ips` | on | Print configured IP addresses on the nodes. |
 | `--show-vlans` / `--no-show-vlans` | on | Annotate nodes and links with VLAN membership. |
@@ -377,7 +378,7 @@ themselves.
 |---|---|---|
 | `--namespace NS` | yes | Elements in `NS` or in any namespace below it. |
 | `--vlan VID` | yes | Elements participating in that VLAN (1–4094). A host on an untagged access port counts as a member. |
-| `--kind KIND` | yes | Elements of that kind: `switch`, `router`, `hub`, `computer`, `server`, `adapter`. |
+| `--kind KIND` | yes | Elements of that kind: `switch`, `router`, `hub`, `computer`, `server`, `adapter`. A cable is an edge and so is a tunnel, so neither is selectable; both follow whichever elements survive. |
 | `--name GLOB` | yes | Elements whose short **or** fully-qualified name matches the shell-style glob. |
 | `--neighbors-of NAME` | no | Only the neighbourhood of one element. An unknown name is a usage error, with suggestions. |
 | `--depth N` | no | How many hops `--neighbors-of` reaches. Default 1. |
@@ -510,15 +511,16 @@ attaches to an element rather than to one of its ports. At `--layer l3` a node's
 they control what a diagram prints; node and link VLAN membership is always
 exported, because it is topology rather than decoration.
 
-### Layers: l1, l2 and l3
+### Layers: l1, l2, l3 and overlay
 
-One inventory, three questions. `--layer` picks which one the diagram answers.
+One inventory, four questions. `--layer` picks which one the diagram answers.
 
 | Layer | Nodes | Edges | Annotations | Reach for it when |
 |---|---|---|---|---|
-| `l1` | devices and adapters | one per cable, one per adapter attachment | medium, link rate, cable label, length | You are standing at the rack. "Which port is this patched into, and with what?" |
+| `l1` | devices and adapters | one per cable, one per adapter attachment, one per tunnel | medium, link rate, cable label, length; encapsulation on a tunnel | You are standing at the rack. "Which port is this patched into, and with what?" |
 | `l2` | the same | the same | VLAN membership per node and per link, port mode | "Is this host in VLAN 10 all the way to the gateway?" Broadcast domains, trunk pruning, a VLAN that stops one switch short. |
 | `l3` | the elements that hold a routable address, **plus one node per IP prefix** | one per address: element ↔ the subnet it is addressed in, labelled with the interface and the address | VLANs the prefix is reachable in | "Why can these two not reach each other?" The addressing plan, gateways, a subnet mask that is one bit off. |
+| `overlay` | the elements that terminate a tunnel, **plus one node per tunnel** | one per endpoint, plus one per `over` — this tunnel runs inside that one | encapsulation stack, VNI, MTU budget, what encrypts | "Is this traffic actually protected, and what carries it?" VPNs, VXLAN fabrics, a cleartext overlay somebody assumed was private. |
 
 `l1` and `l2` are the same graph drawn twice. `l3` is a **different graph**:
 cables do not appear, because two devices are adjacent at layer 3 when they
@@ -543,6 +545,20 @@ What layer 3 leaves out is deliberate:
 * **VLAN identity of a prefix.** Grouping is by prefix alone, because that is
   what a routing table keys on. A prefix deliberately re-used in two VLANs
   therefore appears once — which is exactly what `W106` below points out.
+
+The `overlay` layer is a different graph again. Every tunnel becomes a **node**,
+joined to each element it terminates on and to the tunnel it runs inside:
+
+![Encapsulation diagram of the overlay example: three routers and a workstation joined to five tunnel nodes, with the VXLAN and GRE tunnels each drawn running inside the IPsec tunnel](docs/images/overlay.svg)
+
+<sub>Produced from [`examples/overlay`](examples/overlay) with
+`netgraph -i examples/overlay render --layer overlay --group-by-namespace --title "overlay — encapsulation" -f svg -o docs/images/overlay.svg`.</sub>
+
+A tunnel has to become a node there because nesting is a relation between two
+*links*, and a link cannot end on a link — which is why `vxlan over ipsec` is
+undrawable at layer 1 and obvious here. Below that layer a point-to-point tunnel
+stays a dashed edge, so `netgraph render` shows the VPNs over the physical
+topology without a box in the middle of each one.
 
 Two problems are visible only from here, and `netgraph validate` reports both:
 
@@ -687,13 +703,14 @@ network.
 List what the inventory declares.
 
 ```
-netgraph list [devices|cables|vlans|subnets] [-F table|json|yaml]
+netgraph list [devices|cables|tunnels|vlans|subnets] [-F table|json|yaml]
 ```
 
 | Argument | Columns |
 |---|---|
 | `devices` (default) | name, kind, port count, first routable address, VLANs |
 | `cables` | name, medium, speed, both ends, length |
+| `tunnels` | name, encapsulation stack, VNI, what protects it, endpoints |
 | `vlans` | id, name, member elements, member ports |
 | `subnets` | prefix, family, address count, element count, VLANs |
 
@@ -706,8 +723,21 @@ document literally says: a host on an untagged access port is listed as a member
 of that VLAN even though it declares none. Loopback and link-local prefixes are
 left out of `subnets`, since listing `127.0.0.0/8` once per machine would say
 nothing about the addressing plan. `subnets` is the same grouping
-[`--layer l3`](#layers-l1-l2-and-l3) draws, so the table and the diagram can
-never disagree.
+[`--layer l3`](#layers-l1-l2-l3-and-overlay) draws, and `tunnels` the same
+resolution `--layer overlay` draws, so the tables and the diagrams can never
+disagree. The `ENCRYPTED` column reads `underlay` for a tunnel that encrypts
+nothing itself but runs inside one that does:
+
+```console
+$ netgraph -i examples/overlay list tunnels
+NAME                STACK             VNI  ENCRYPTED  ENDS  ENDPOINTS
+------------------  ----------------  ---  ---------  ----  ----------------------------------------------
+tunnels/wg-mesh     wireguard           -  yes           3  rtr-branch-a:wg0, rtr-branch-b:wg0, rtr-hq:wg0
+tunnels/ipsec-hq-b  ipsec               -  yes           2  rtr-branch-b:ipsec0, rtr-hq:ipsec0
+tunnels/vx-100      vxlan over ipsec  100  underlay      2  rtr-branch-b:vxlan100, rtr-hq:vxlan100
+tunnels/gre-mgmt    gre over ipsec      -  underlay      2  rtr-branch-b:gre1, rtr-hq:gre1
+tunnels/ovpn-admin  openvpn             -  yes           2  pc-branch-b:tun0, rtr-hq:ovpn0
+```
 
 ### `netgraph show`
 

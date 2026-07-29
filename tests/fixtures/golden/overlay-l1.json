@@ -1,0 +1,787 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkGraph",
+  "layer": "l1",
+  "nodes": [
+    {
+      "id": "sites/branch-a/pc-branch-a",
+      "type": "element",
+      "name": "pc-branch-a",
+      "kind": "computer",
+      "namespace": "sites/branch-a",
+      "description": "Workstation, Branch A.",
+      "labels": {
+        "site": "branch-a"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "enp3s0",
+          "type": "ethernet",
+          "mtu": 1500,
+          "addresses": [
+            "10.20.0.10/24"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sites/branch-a/rtr-branch-a",
+      "type": "element",
+      "name": "rtr-branch-a",
+      "kind": "router",
+      "namespace": "sites/branch-a",
+      "description": "Branch A edge router. Mesh member only.",
+      "labels": {
+        "role": "edge",
+        "site": "branch-a"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "ether1",
+          "type": "ethernet",
+          "description": "uplink to wan-core",
+          "mtu": 1500,
+          "addresses": [
+            "198.51.100.6/30"
+          ]
+        },
+        {
+          "name": "ether2",
+          "type": "ethernet",
+          "description": "branch LAN",
+          "mtu": 1500,
+          "addresses": [
+            "10.20.0.1/24"
+          ]
+        },
+        {
+          "name": "wg0",
+          "type": "tunnel",
+          "description": "site-to-site mesh",
+          "mtu": 1420,
+          "addresses": [
+            "10.255.0.2/24"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sites/branch-b/pc-branch-b",
+      "type": "element",
+      "name": "pc-branch-b",
+      "kind": "computer",
+      "namespace": "sites/branch-b",
+      "description": "Administrator's workstation. Dials into HQ over OpenVPN.",
+      "labels": {
+        "site": "branch-b"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "enp3s0",
+          "type": "ethernet",
+          "mtu": 1500,
+          "addresses": [
+            "10.30.0.10/24"
+          ]
+        },
+        {
+          "name": "tun0",
+          "type": "tunnel",
+          "description": "remote access to HQ",
+          "mtu": 1431,
+          "addresses": [
+            "10.253.0.10/24"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sites/branch-b/rtr-branch-b",
+      "type": "element",
+      "name": "rtr-branch-b",
+      "kind": "router",
+      "namespace": "sites/branch-b",
+      "description": "Branch B edge router. Mesh member, and the far end of the IPsec stack.",
+      "labels": {
+        "role": "edge",
+        "site": "branch-b"
+      },
+      "vlans": [
+        100
+      ],
+      "interfaces": [
+        {
+          "name": "ether1",
+          "type": "ethernet",
+          "description": "uplink to wan-core",
+          "mtu": 1500,
+          "addresses": [
+            "198.51.100.10/30"
+          ]
+        },
+        {
+          "name": "ether2",
+          "type": "ethernet",
+          "description": "branch LAN",
+          "mtu": 1500,
+          "addresses": [
+            "10.30.0.1/24"
+          ]
+        },
+        {
+          "name": "wg0",
+          "type": "tunnel",
+          "description": "site-to-site mesh",
+          "mtu": 1420,
+          "addresses": [
+            "10.255.0.3/24"
+          ]
+        },
+        {
+          "name": "ipsec0",
+          "type": "tunnel",
+          "description": "encrypted transport to hq",
+          "mtu": 1427,
+          "addresses": [
+            "10.254.0.2/30"
+          ]
+        },
+        {
+          "name": "vxlan100",
+          "type": "tunnel",
+          "description": "stretched VLAN 100, inside ipsec0",
+          "mtu": 1377,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              100
+            ]
+          }
+        },
+        {
+          "name": "gre1",
+          "type": "tunnel",
+          "description": "management GRE, inside ipsec0",
+          "mtu": 1403,
+          "addresses": [
+            "10.252.0.2/30"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sites/hq/rtr-hq",
+      "type": "element",
+      "name": "rtr-hq",
+      "kind": "router",
+      "namespace": "sites/hq",
+      "description": "HQ edge router and overlay hub.",
+      "labels": {
+        "role": "edge",
+        "site": "hq"
+      },
+      "vlans": [
+        100
+      ],
+      "interfaces": [
+        {
+          "name": "eth0",
+          "type": "ethernet",
+          "description": "uplink to wan-core",
+          "mtu": 1500,
+          "addresses": [
+            "198.51.100.2/30"
+          ]
+        },
+        {
+          "name": "eth1",
+          "type": "ethernet",
+          "description": "HQ LAN",
+          "mtu": 1500,
+          "addresses": [
+            "10.10.0.1/24"
+          ]
+        },
+        {
+          "name": "wg0",
+          "type": "tunnel",
+          "description": "site-to-site mesh",
+          "mtu": 1420,
+          "addresses": [
+            "10.255.0.1/24"
+          ]
+        },
+        {
+          "name": "ipsec0",
+          "type": "tunnel",
+          "description": "encrypted transport to branch-b",
+          "mtu": 1427,
+          "addresses": [
+            "10.254.0.1/30"
+          ]
+        },
+        {
+          "name": "vxlan100",
+          "type": "tunnel",
+          "description": "stretched VLAN 100, inside ipsec0",
+          "mtu": 1377,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              100
+            ]
+          }
+        },
+        {
+          "name": "gre1",
+          "type": "tunnel",
+          "description": "management GRE, inside ipsec0",
+          "mtu": 1403,
+          "addresses": [
+            "10.252.0.1/30"
+          ]
+        },
+        {
+          "name": "ovpn0",
+          "type": "tunnel",
+          "description": "remote-access concentrator",
+          "mtu": 1431,
+          "addresses": [
+            "10.253.0.1/24"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sites/hq/srv-hq",
+      "type": "element",
+      "name": "srv-hq",
+      "kind": "server",
+      "namespace": "sites/hq",
+      "description": "File server, HQ.",
+      "labels": {
+        "site": "hq"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "mtu": 1500,
+          "addresses": [
+            "10.10.0.10/24"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "wan/wan-core",
+      "type": "element",
+      "name": "wan-core",
+      "kind": "router",
+      "namespace": "wan",
+      "description": "Provider edge. Three /30 hand-offs, one per site.",
+      "labels": {
+        "role": "wan"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "ge-0/0/0",
+          "type": "ethernet",
+          "description": "hand-off to hq",
+          "mtu": 1500,
+          "addresses": [
+            "198.51.100.1/30"
+          ]
+        },
+        {
+          "name": "ge-0/0/1",
+          "type": "ethernet",
+          "description": "hand-off to branch-a",
+          "mtu": 1500,
+          "addresses": [
+            "198.51.100.5/30"
+          ]
+        },
+        {
+          "name": "ge-0/0/2",
+          "type": "ethernet",
+          "description": "hand-off to branch-b",
+          "mtu": 1500,
+          "addresses": [
+            "198.51.100.9/30"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tunnel:tunnels/wg-mesh",
+      "type": "tunnel",
+      "name": "wg-mesh",
+      "kind": "tunnel",
+      "namespace": "tunnels",
+      "description": "Full mesh between the three sites.",
+      "labels": {
+        "role": "transit"
+      },
+      "tunnel": {
+        "id": "tunnels/wg-mesh",
+        "type": "wireguard",
+        "layer": 3,
+        "transport": "udp",
+        "endpoints": [
+          {
+            "node": "sites/branch-a/rtr-branch-a",
+            "interface": "wg0"
+          },
+          {
+            "node": "sites/branch-b/rtr-branch-b",
+            "interface": "wg0"
+          },
+          {
+            "node": "sites/hq/rtr-hq",
+            "interface": "wg0"
+          }
+        ],
+        "encrypted": true,
+        "protected": true,
+        "stack": [
+          "wireguard"
+        ],
+        "depth": 0,
+        "overheadBytes": 80,
+        "port": 51820,
+        "cipher": "chacha20-poly1305",
+        "auth": "public-key",
+        "mtu": 1420
+      },
+      "vlans": [],
+      "interfaces": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "cables/cbl-hq-srv",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/hq/rtr-hq",
+          "interface": "eth1"
+        },
+        {
+          "node": "sites/hq/srv-hq",
+          "interface": "eno1"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "vlans": []
+    },
+    {
+      "id": "cables/cbl-branch-a-pc",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/branch-a/pc-branch-a",
+          "interface": "enp3s0"
+        },
+        {
+          "node": "sites/branch-a/rtr-branch-a",
+          "interface": "ether2"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "vlans": []
+    },
+    {
+      "id": "cables/cbl-branch-b-pc",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/branch-b/pc-branch-b",
+          "interface": "enp3s0"
+        },
+        {
+          "node": "sites/branch-b/rtr-branch-b",
+          "interface": "ether2"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "vlans": []
+    },
+    {
+      "id": "cables/cbl-wan-hq",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/hq/rtr-hq",
+          "interface": "eth0"
+        },
+        {
+          "node": "wan/wan-core",
+          "interface": "ge-0/0/0"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "PE-01",
+      "vlans": []
+    },
+    {
+      "id": "cables/cbl-wan-branch-a",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/branch-a/rtr-branch-a",
+          "interface": "ether1"
+        },
+        {
+          "node": "wan/wan-core",
+          "interface": "ge-0/0/1"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "PE-02",
+      "vlans": []
+    },
+    {
+      "id": "cables/cbl-wan-branch-b",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/branch-b/rtr-branch-b",
+          "interface": "ether1"
+        },
+        {
+          "node": "wan/wan-core",
+          "interface": "ge-0/0/2"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "PE-03",
+      "vlans": []
+    },
+    {
+      "id": "tunnels/wg-mesh#sites/branch-a/rtr-branch-a:wg0",
+      "kind": "tunnel",
+      "endpoints": [
+        {
+          "node": "sites/branch-a/rtr-branch-a",
+          "interface": "wg0"
+        },
+        {
+          "node": "tunnel:tunnels/wg-mesh"
+        }
+      ],
+      "tunnel": {
+        "id": "tunnels/wg-mesh",
+        "type": "wireguard",
+        "layer": 3,
+        "transport": "udp",
+        "endpoints": [
+          {
+            "node": "sites/branch-a/rtr-branch-a",
+            "interface": "wg0"
+          },
+          {
+            "node": "sites/branch-b/rtr-branch-b",
+            "interface": "wg0"
+          },
+          {
+            "node": "sites/hq/rtr-hq",
+            "interface": "wg0"
+          }
+        ],
+        "encrypted": true,
+        "protected": true,
+        "stack": [
+          "wireguard"
+        ],
+        "depth": 0,
+        "overheadBytes": 80,
+        "port": 51820,
+        "cipher": "chacha20-poly1305",
+        "auth": "public-key",
+        "mtu": 1420
+      },
+      "vlans": []
+    },
+    {
+      "id": "tunnels/wg-mesh#sites/branch-b/rtr-branch-b:wg0",
+      "kind": "tunnel",
+      "endpoints": [
+        {
+          "node": "sites/branch-b/rtr-branch-b",
+          "interface": "wg0"
+        },
+        {
+          "node": "tunnel:tunnels/wg-mesh"
+        }
+      ],
+      "tunnel": {
+        "id": "tunnels/wg-mesh",
+        "type": "wireguard",
+        "layer": 3,
+        "transport": "udp",
+        "endpoints": [
+          {
+            "node": "sites/branch-a/rtr-branch-a",
+            "interface": "wg0"
+          },
+          {
+            "node": "sites/branch-b/rtr-branch-b",
+            "interface": "wg0"
+          },
+          {
+            "node": "sites/hq/rtr-hq",
+            "interface": "wg0"
+          }
+        ],
+        "encrypted": true,
+        "protected": true,
+        "stack": [
+          "wireguard"
+        ],
+        "depth": 0,
+        "overheadBytes": 80,
+        "port": 51820,
+        "cipher": "chacha20-poly1305",
+        "auth": "public-key",
+        "mtu": 1420
+      },
+      "vlans": []
+    },
+    {
+      "id": "tunnels/wg-mesh#sites/hq/rtr-hq:wg0",
+      "kind": "tunnel",
+      "endpoints": [
+        {
+          "node": "sites/hq/rtr-hq",
+          "interface": "wg0"
+        },
+        {
+          "node": "tunnel:tunnels/wg-mesh"
+        }
+      ],
+      "tunnel": {
+        "id": "tunnels/wg-mesh",
+        "type": "wireguard",
+        "layer": 3,
+        "transport": "udp",
+        "endpoints": [
+          {
+            "node": "sites/branch-a/rtr-branch-a",
+            "interface": "wg0"
+          },
+          {
+            "node": "sites/branch-b/rtr-branch-b",
+            "interface": "wg0"
+          },
+          {
+            "node": "sites/hq/rtr-hq",
+            "interface": "wg0"
+          }
+        ],
+        "encrypted": true,
+        "protected": true,
+        "stack": [
+          "wireguard"
+        ],
+        "depth": 0,
+        "overheadBytes": 80,
+        "port": 51820,
+        "cipher": "chacha20-poly1305",
+        "auth": "public-key",
+        "mtu": 1420
+      },
+      "vlans": []
+    },
+    {
+      "id": "tunnels/ipsec-hq-b",
+      "kind": "tunnel",
+      "endpoints": [
+        {
+          "node": "sites/branch-b/rtr-branch-b",
+          "interface": "ipsec0"
+        },
+        {
+          "node": "sites/hq/rtr-hq",
+          "interface": "ipsec0"
+        }
+      ],
+      "tunnel": {
+        "id": "tunnels/ipsec-hq-b",
+        "type": "ipsec",
+        "layer": 3,
+        "transport": "esp",
+        "endpoints": [
+          {
+            "node": "sites/branch-b/rtr-branch-b",
+            "interface": "ipsec0"
+          },
+          {
+            "node": "sites/hq/rtr-hq",
+            "interface": "ipsec0"
+          }
+        ],
+        "encrypted": true,
+        "protected": true,
+        "stack": [
+          "ipsec"
+        ],
+        "depth": 0,
+        "overheadBytes": 73,
+        "mode": "tunnel",
+        "cipher": "aes-256-gcm",
+        "auth": "certificate",
+        "mtu": 1427
+      },
+      "vlans": []
+    },
+    {
+      "id": "tunnels/vx-100",
+      "kind": "tunnel",
+      "endpoints": [
+        {
+          "node": "sites/branch-b/rtr-branch-b",
+          "interface": "vxlan100"
+        },
+        {
+          "node": "sites/hq/rtr-hq",
+          "interface": "vxlan100"
+        }
+      ],
+      "tunnel": {
+        "id": "tunnels/vx-100",
+        "type": "vxlan",
+        "layer": 2,
+        "transport": "udp",
+        "endpoints": [
+          {
+            "node": "sites/branch-b/rtr-branch-b",
+            "interface": "vxlan100"
+          },
+          {
+            "node": "sites/hq/rtr-hq",
+            "interface": "vxlan100"
+          }
+        ],
+        "encrypted": false,
+        "protected": true,
+        "stack": [
+          "vxlan",
+          "ipsec"
+        ],
+        "depth": 1,
+        "overheadBytes": 123,
+        "over": "tunnels/ipsec-hq-b",
+        "encryptedBy": "tunnels/ipsec-hq-b",
+        "port": 4789,
+        "vni": 100,
+        "mtu": 1377
+      },
+      "vlans": [
+        100
+      ]
+    },
+    {
+      "id": "tunnels/gre-mgmt",
+      "kind": "tunnel",
+      "endpoints": [
+        {
+          "node": "sites/branch-b/rtr-branch-b",
+          "interface": "gre1"
+        },
+        {
+          "node": "sites/hq/rtr-hq",
+          "interface": "gre1"
+        }
+      ],
+      "tunnel": {
+        "id": "tunnels/gre-mgmt",
+        "type": "gre",
+        "layer": 3,
+        "transport": "gre",
+        "endpoints": [
+          {
+            "node": "sites/branch-b/rtr-branch-b",
+            "interface": "gre1"
+          },
+          {
+            "node": "sites/hq/rtr-hq",
+            "interface": "gre1"
+          }
+        ],
+        "encrypted": false,
+        "protected": true,
+        "stack": [
+          "gre",
+          "ipsec"
+        ],
+        "depth": 1,
+        "overheadBytes": 97,
+        "over": "tunnels/ipsec-hq-b",
+        "encryptedBy": "tunnels/ipsec-hq-b",
+        "mtu": 1403
+      },
+      "vlans": []
+    },
+    {
+      "id": "tunnels/ovpn-admin",
+      "kind": "tunnel",
+      "endpoints": [
+        {
+          "node": "sites/branch-b/pc-branch-b",
+          "interface": "tun0"
+        },
+        {
+          "node": "sites/hq/rtr-hq",
+          "interface": "ovpn0"
+        }
+      ],
+      "tunnel": {
+        "id": "tunnels/ovpn-admin",
+        "type": "openvpn",
+        "layer": 3,
+        "transport": "udp",
+        "endpoints": [
+          {
+            "node": "sites/branch-b/pc-branch-b",
+            "interface": "tun0"
+          },
+          {
+            "node": "sites/hq/rtr-hq",
+            "interface": "ovpn0"
+          }
+        ],
+        "encrypted": true,
+        "protected": true,
+        "stack": [
+          "openvpn"
+        ],
+        "depth": 0,
+        "overheadBytes": 69,
+        "port": 1194,
+        "cipher": "aes-256-gcm",
+        "auth": "certificate",
+        "mtu": 1431
+      },
+      "vlans": []
+    }
+  ],
+  "title": "Overlay, layer 1"
+}

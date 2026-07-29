@@ -105,10 +105,39 @@ CASES = (
         layer=Layer.L3,
         options=RenderOptions(group_by_namespace=True, title="Campus, layer 3"),
     ),
+    Case(
+        # Tunnels over the physical topology: the point-to-point ones as edges,
+        # the three-ended mesh as a node, and the two nested tunnels labelled
+        # with the stack they run in.
+        name="overlay-l1",
+        example="overlay",
+        layer=Layer.L1,
+        options=RenderOptions(title="Overlay, layer 1"),
+    ),
+    Case(
+        # VLAN 100 crosses the VXLAN, which is the whole reason a layer-2 tunnel
+        # carries VLANs at all.
+        name="overlay-l2",
+        example="overlay",
+        layer=Layer.L2,
+        options=RenderOptions(title="Overlay, layer 2"),
+    ),
+    Case(
+        # The encapsulation graph: every tunnel a node, and 'over' an edge
+        # between two of them. Grouped, so a tunnel keeping its own namespace —
+        # unlike a subnet, which keeps none — is pinned down too.
+        name="overlay-overlay",
+        example="overlay",
+        layer=Layer.OVERLAY,
+        options=RenderOptions(group_by_namespace=True, title="Overlay, encapsulation"),
+    ),
 )
 
 #: The cases whose graph holds subnet nodes.
 L3_CASES = tuple(case for case in CASES if case.layer is Layer.L3)
+
+#: The cases whose graph holds tunnel nodes for every tunnel.
+OVERLAY_CASES = tuple(case for case in CASES if case.layer is Layer.OVERLAY)
 
 CASES_BY_NAME = {case.name: case for case in CASES}
 
@@ -239,9 +268,44 @@ def test_the_json_golden_parses_and_carries_the_envelope(case: Case) -> None:
         assert not any("vlans" in port for port in ports)
 
     # Every node says which kind of thing it is, at every layer.
-    assert {node["type"] for node in payload["nodes"]} <= {"element", "subnet"}
-    if case.layer is not Layer.L3:
-        assert all(node["type"] == "element" for node in payload["nodes"])
+    assert {node["type"] for node in payload["nodes"]} <= {"element", "subnet", "tunnel"}
+    if case.layer is Layer.L3:
+        assert any(node["type"] == "subnet" for node in payload["nodes"])
+    elif case.layer is Layer.OVERLAY:
+        assert any(node["type"] == "tunnel" for node in payload["nodes"])
+    else:
+        # Below the overlay layer a tunnel is an edge, unless it joins more than
+        # two endpoints and has no line shape to take.
+        assert all(node["type"] in {"element", "tunnel"} for node in payload["nodes"])
+
+
+@pytest.mark.parametrize("case", OVERLAY_CASES, ids=lambda case: case.name)
+def test_the_overlay_json_golden_carries_the_encapsulation_stack(case: Case) -> None:
+    """The nesting a reader came for has to survive into the exported document."""
+    payload = json.loads(case.golden("json").read_text(encoding="utf-8"))
+    tunnels = [node for node in payload["nodes"] if node["type"] == "tunnel"]
+    assert tunnels
+
+    for node in tunnels:
+        assert node["kind"] == "tunnel"
+        assert node["interfaces"] == []
+        tunnel = node["tunnel"]
+        assert node["id"] == f"tunnel:{tunnel['id']}"
+        # The stack always starts with the tunnel's own type, so a consumer can
+        # read ``["vxlan", "ipsec"]`` as "vxlan over ipsec" without re-resolving.
+        assert tunnel["stack"][0] == tunnel["type"]
+        assert tunnel["depth"] == len(tunnel["stack"]) - 1
+        assert ("over" in tunnel) == (tunnel["depth"] > 0)
+        # A cleartext tunnel is only "protected" when something above it encrypts.
+        assert tunnel["protected"] == (tunnel["encrypted"] or "encryptedBy" in tunnel)
+
+    nested = [node["tunnel"] for node in tunnels if node["tunnel"]["depth"] > 0]
+    assert nested, "the overlay example exists to exercise nesting"
+    for tunnel in nested:
+        assert f"tunnel:{tunnel['over']}" in {node["id"] for node in tunnels}
+
+    encapsulation = [edge for edge in payload["edges"] if edge["kind"] == "encapsulation"]
+    assert len(encapsulation) == len(nested)
 
 
 @pytest.mark.parametrize("case", L3_CASES, ids=lambda case: case.name)

@@ -423,6 +423,39 @@ parser.
 
 ---
 
+## 6. A tunnel has no icon, so `--icons` falls back to a shape for it
+
+**Status:** open. Raised while adding the `tunnel` kind (2026-07-29).
+
+`--icons THEME` draws each node as its kind's picture
+(`netgraph.render.icons.ICON_KINDS`). The bundled themes carry pictures for the
+six hardware kinds, and `tunnel` was deliberately **not** added to that tuple: a
+tunnel is not hardware, the Cisco topology idiom the bundled artwork follows has
+no glyph for one, and inventing a lock or a pipe would put netgraph's guess
+about a security property into a picture rather than into a label — which is
+exactly what `W127` and the crimson edge exist to say in words.
+
+The consequence is visible rather than broken: with a theme in use, hardware is
+drawn as icons and a tunnel node keeps its violet hexagon. That mixes two visual
+languages in one diagram, which is worth fixing eventually.
+
+A fix would have to decide, in this order:
+
+1. Whether a tunnel *should* be a glyph at all, or whether the encapsulation
+   view reads better with the tunnels as the only shapes on a page of icons.
+2. If it should: one glyph for every type, or one per type? Eight glyphs is a
+   lot of artwork to keep in step with `TunnelType`, and the type is already on
+   the label. One is likely right.
+3. Whether an icon can carry "cleartext" at all, or whether that has to stay a
+   colour and a word. It has to stay a colour and a word: a reader who does not
+   recognise the glyph would read a missing lock as "nothing to say".
+
+Until then, `IconTheme.files` simply returns no file for `tunnel` and the shape
+is used, which is the documented fallback for a theme with a missing picture —
+so nothing fails, and a theme that *does* ship `tunnel.svg` already works.
+
+---
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

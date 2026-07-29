@@ -1,0 +1,53 @@
+# E016 (NG-T002) - a tunnel endpoint names an element that is not declared.
+#
+# Nothing called 'pc-ghost' exists, so the graph layer drops the tunnel and the
+# diagram shows two hosts with no overlay between them. The cable keeps W103
+# quiet; every prefix here is a /30, which W105 exempts.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+    - name: wg0
+      type: tunnel
+      mtu: 1420
+      ipv4:
+        addresses: [10.9.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-b:eth0
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: tun-ghost
+spec:
+  type: wireguard
+  endpoints:
+    - pc-ghost:wg0
+    - pc-a:wg0

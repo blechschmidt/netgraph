@@ -1,0 +1,16 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-hq
+  description: File server, HQ.
+  labels: {site: hq}
+spec:
+  vendor: Dell
+  model: PowerEdge R350
+  location: HQ, rack 1
+  interfaces:
+    - name: eno1
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.10.0.10/24]

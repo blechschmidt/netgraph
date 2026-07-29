@@ -51,7 +51,7 @@ IPV6_MIN_MTU: Final = 1280
 
 
 class InterfaceType(str, Enum):
-    """§6.2.1 — the four core types plus the two extension types."""
+    """§6.2.1 — the four core types plus the three extension types."""
 
     ETHERNET = "ethernet"
     WIFI = "wifi"
@@ -59,6 +59,10 @@ class InterfaceType(str, Enum):
     BRIDGE = "bridge"
     VLAN = "vlan"
     LAG = "lag"
+    #: The local end of a ``tunnel`` document: ``wg0``, ``ipsec0``, ``vxlan100``
+    #: (§14). Carries the *overlay* configuration — addresses inside the tunnel —
+    #: while the tunnel document carries the encapsulation.
+    TUNNEL = "tunnel"
 
     @property
     def iana_if_type(self) -> str:
@@ -78,7 +82,16 @@ _IANA_IF_TYPE: Final[dict[InterfaceType, str]] = {
     InterfaceType.BRIDGE: "ianaift:bridge",
     InterfaceType.VLAN: "ianaift:l2vlan",
     InterfaceType.LAG: "ianaift:ieee8023adLag",
+    InterfaceType.TUNNEL: "ianaift:tunnel",
 }
+
+#: Types whose ``parent`` names the interface they are stacked on. A ``vlan``
+#: sub-interface must name one (``NG-I002``); a ``tunnel`` interface may name
+#: the underlay port its outer packets leave by, which is optional because the
+#: local end of a tunnel is often chosen by the routing table (§14.4).
+_PARENT_TYPES: Final[frozenset[InterfaceType]] = frozenset(
+    {InterfaceType.VLAN, InterfaceType.TUNNEL}
+)
 
 #: Types that require ``members`` (§6.2, ``NG-I003``).
 AGGREGATE_TYPES: Final[frozenset[InterfaceType]] = frozenset(
@@ -485,11 +498,19 @@ class Interface(NetgraphModel):
                     path=("vlan",),
                 )
         elif self.parent is not None:
-            raise field_error(
-                f"'parent' is only allowed for type 'vlan', not {self.type.value!r}",
-                rule="NG-I002",
-                path=("parent",),
-            )
+            if self.type not in _PARENT_TYPES:
+                raise field_error(
+                    f"'parent' is only allowed for types 'vlan' and 'tunnel', "
+                    f"not {self.type.value!r}",
+                    rule="NG-I002",
+                    path=("parent",),
+                )
+            if self.parent == self.name:
+                raise field_error(
+                    "'parent' must not be the interface itself",
+                    rule="NG-I002",
+                    path=("parent",),
+                )
 
         if self.type in AGGREGATE_TYPES:
             if self.members is None:

@@ -1,0 +1,32 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-hq-srv
+spec:
+  endpoints: [rtr-hq:eth1, srv-hq:eno1]
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-branch-a-pc
+spec:
+  endpoints: [rtr-branch-a:ether2, pc-branch-a:enp3s0]
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-branch-b-pc
+spec:
+  endpoints: [rtr-branch-b:ether2, pc-branch-b:enp3s0]
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+  connector: rj45

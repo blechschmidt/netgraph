@@ -18,7 +18,8 @@
       "hub": "#/$defs/Hub",
       "router": "#/$defs/Router",
       "server": "#/$defs/Server",
-      "switch": "#/$defs/Switch"
+      "switch": "#/$defs/Switch",
+      "tunnel": "#/$defs/Tunnel"
     },
     "propertyName": "kind"
   },
@@ -43,6 +44,9 @@
     },
     {
       "$ref": "#/$defs/Adapter"
+    },
+    {
+      "$ref": "#/$defs/Tunnel"
     }
   ],
   "$defs": {
@@ -972,10 +976,23 @@
             ]
           },
           "else": {
-            "not": {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "tunnel"
+                }
+              },
               "required": [
-                "parent"
+                "type"
               ]
+            },
+            "then": true,
+            "else": {
+              "not": {
+                "required": [
+                  "parent"
+                ]
+              }
             }
           }
         },
@@ -1043,14 +1060,15 @@
       ]
     },
     "InterfaceType": {
-      "description": "§6.2.1 — the four core types plus the two extension types.",
+      "description": "§6.2.1 — the four core types plus the three extension types.",
       "enum": [
         "ethernet",
         "wifi",
         "loopback",
         "bridge",
         "vlan",
-        "lag"
+        "lag",
+        "tunnel"
       ],
       "title": "InterfaceType",
       "type": "string"
@@ -1220,6 +1238,228 @@
       ],
       "title": "Switch",
       "type": "object"
+    },
+    "Tunnel": {
+      "additionalProperties": false,
+      "description": "An undirected logical link between two or more `tunnel` interfaces.",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "tunnel",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. An undirected logical link between two or more `tunnel` interfaces. Owns no interfaces; `over` nests it inside another tunnel."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/TunnelSpec",
+          "title": "spec",
+          "description": "The body of a `tunnel` document."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "title": "Tunnel",
+      "type": "object"
+    },
+    "TunnelAuth": {
+      "description": "`spec.auth` — how the two ends prove who they are.\n\nDeliberately an *enumeration of methods*, never a place to put material: a\nkey, a password or a certificate in an inventory is a secret in version\ncontrol, and netgraph has no use for one.",
+      "enum": [
+        "psk",
+        "certificate",
+        "public-key",
+        "password"
+      ],
+      "title": "TunnelAuth",
+      "type": "string"
+    },
+    "TunnelMode": {
+      "description": "`spec.mode` — IPsec's two encapsulation modes (RFC 4301 §3.2).",
+      "enum": [
+        "tunnel",
+        "transport"
+      ],
+      "title": "TunnelMode",
+      "type": "string"
+    },
+    "TunnelSpec": {
+      "additionalProperties": false,
+      "description": "`spec` of a `tunnel` document (§14).",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/TunnelType",
+          "title": "type",
+          "description": "The encapsulation: `wireguard`, `ipsec`, `openvpn`, `pptp`, `l2tp`, `gre`, `vxlan` or `geneve`. It decides the layer carried, the outer transport, the default port, whether the payload is encrypted and how much MTU the headers cost."
+        },
+        "endpoints": {
+          "items": {
+            "$ref": "#/$defs/InterfaceRef"
+          },
+          "title": "endpoints",
+          "type": "array",
+          "description": "Two or more `device:interface` references, each naming an interface of `type: tunnel` (`NG-T001`, `NG-T003`). The link is undirected, so the list is sorted on load. Three or more endpoints make it multipoint, and it is then drawn as a node rather than a line."
+        },
+        "over": {
+          "anyOf": [
+            {
+              "maxLength": 1024,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*(?:/[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "over",
+          "description": "The tunnel this one is encapsulated in — `vxlan` over `ipsec` is written by naming the IPsec tunnel here (`NG-T004`). Absent means the tunnel runs directly over the physical topology. The chain must not loop (`NG-T005`)."
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TunnelMode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "mode",
+          "description": "IPsec's encapsulation mode, `tunnel` or `transport` (RFC 4301). Defaults to `tunnel`; every other type has only one mode and must not declare it (`NG-T008`)."
+        },
+        "vni": {
+          "anyOf": [
+            {
+              "maximum": 16777215,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "vni",
+          "description": "The 24-bit VXLAN/Geneve virtual network identifier. Required for those two types and rejected for every other (`NG-T007`)."
+        },
+        "port": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "port",
+          "description": "Outer UDP/TCP port. Defaults to the registered port of the type (WireGuard 51820, OpenVPN 1194, L2TP 1701, VXLAN 4789, Geneve 6081) and is rejected for GRE and IPsec, which run directly over IP (`NG-T008`)."
+        },
+        "mtu": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 68,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "mtu",
+          "description": "MTU of the tunnel interface. Compared with what the underlay leaves after the encapsulation overhead of the whole stack (`NG-T011`)."
+        },
+        "encrypted": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "encrypted",
+          "description": "Whether the payload is protected. Defaults to what the type does — true for WireGuard, IPsec and OpenVPN, false for GRE, VXLAN, Geneve, L2TP and PPTP, whose MPPE is broken. Set it to true to record that the deployment protects an otherwise cleartext type some other way."
+        },
+        "cipher": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "cipher",
+          "description": "Negotiated cipher suite, free text (`chacha20-poly1305`, `aes-256-gcm`). Only on a tunnel that encrypts (`NG-T009`)."
+        },
+        "auth": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TunnelAuth"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "auth",
+          "description": "How the endpoints authenticate each other: `psk`, `certificate`, `public-key` or `password`. The *method*, never the material — netgraph stores no secrets (`NG-T010`)."
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "label",
+          "description": "Free-text identifier printed on the edge, as a cable's `label` is."
+        }
+      },
+      "required": [
+        "type",
+        "endpoints"
+      ],
+      "title": "TunnelSpec",
+      "type": "object"
+    },
+    "TunnelType": {
+      "description": "`spec.type` — the encapsulation the tunnel uses (§14.1).",
+      "enum": [
+        "wireguard",
+        "ipsec",
+        "openvpn",
+        "pptp",
+        "l2tp",
+        "gre",
+        "vxlan",
+        "geneve"
+      ],
+      "title": "TunnelType",
+      "type": "string"
     },
     "UpstreamPort": {
       "additionalProperties": false,

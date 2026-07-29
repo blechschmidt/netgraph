@@ -73,6 +73,7 @@ from netgraph.models import (
     Medium,
     Server,
     Switch,
+    Tunnel,
     VlanConfig,
     VlanMode,
 )
@@ -264,6 +265,73 @@ class _Endpoint:
 
 
 @dataclass(frozen=True, slots=True)
+class _TunnelEnd:
+    """One endpoint of a tunnel, resolved against the inventory (§14.3).
+
+    The shape mirrors :class:`_Endpoint` deliberately: a tunnel endpoint is the
+    same ``device:interface`` reference a cable uses, so the diagnostics a
+    reader gets for a typo should be the same too.
+    """
+
+    tunnel_fqn: str
+    tunnel: Tunnel
+    ref: InterfaceRef
+    #: Position within ``spec.endpoints``, for the field path.
+    index: int
+    #: The element the device part names, when it resolves to an interface owner.
+    owner_fqn: str | None = None
+    owner: InterfaceOwner | None = None
+    #: The interface the reference names, when the element declares one.
+    interface: Interface | None = None
+    #: Candidates when the device name stayed ambiguous (§2.2).
+    ambiguous: tuple[str, ...] = ()
+    #: Set when the name resolved to an element that owns no interfaces.
+    wrong_kind: str | None = None
+
+    @property
+    def resolved(self) -> bool:
+        """Does this endpoint name a real interface on a real element?"""
+        return self.owner_fqn is not None and self.interface is not None
+
+    @property
+    def port(self) -> str:
+        """The endpoint as ``element:interface``, fully qualified where known."""
+        return f"{self.owner_fqn or self.ref.device}:{self.ref.interface}"
+
+    @property
+    def field_path(self) -> tuple[str | int, ...]:
+        return ("spec", "endpoints", self.index)
+
+
+@dataclass(frozen=True, slots=True)
+class _Encapsulation:
+    """One tunnel's ``spec.over``, resolved (§14.3).
+
+    Four rules read it — ``E018`` (does it name a tunnel at all), ``E019`` (do
+    the references loop), ``W125`` (does the underlay actually reach both ends)
+    and ``W127`` (does anything in the stack encrypt) — so it is resolved once
+    and shared, which is also what keeps the validator and the renderer
+    agreeing about what runs inside what.
+    """
+
+    tunnel_fqn: str
+    tunnel: Tunnel
+    #: The reference as written, e.g. ``ipsec-ab``.
+    ref: str
+    #: The tunnel the reference names, when it resolves to exactly one.
+    over_fqn: str | None = None
+    over: Tunnel | None = None
+    #: Candidates when the name stayed ambiguous (§2.2).
+    ambiguous: tuple[str, ...] = ()
+    #: Set when the name resolved to an element that is not a tunnel.
+    wrong_kind: str | None = None
+
+    @property
+    def field_path(self) -> tuple[str | int, ...]:
+        return ("spec", "over")
+
+
+@dataclass(frozen=True, slots=True)
 class _Attachment:
     """One adapter's ``upstream.attached_to`` reference, resolved (§8.2).
 
@@ -303,6 +371,12 @@ class _Context:
     endpoints: tuple[_Endpoint, ...]
     #: Every adapter that declares an ``attached_to``, in load order.
     attachments: tuple[_Attachment, ...]
+    #: Every tunnel endpoint, in load order (§14).
+    tunnel_ends: tuple[_TunnelEnd, ...]
+    #: Every tunnel that declares an ``over``, in load order.
+    encapsulations: tuple[_Encapsulation, ...]
+    #: ``(owner fqn, interface name)`` -> the tunnels terminating on it.
+    tunnel_ports: Mapping[tuple[str, str], tuple[str, ...]]
     #: ``(owner fqn, interface name)`` -> the endpoints landing on it, in load order.
     terminations: Mapping[tuple[str, str], tuple[_Endpoint, ...]]
     #: Element fqns reachable through a cable or an adapter attachment.
@@ -339,6 +413,27 @@ class _Context:
             return interface
         masters = self.lag_masters.get(endpoint.owner_fqn, {})
         return masters.get(interface.name, interface)
+
+    def bridges_frames(self, owner_fqn: str, interface: str) -> bool:
+        """Is this port the end of a layer-2 tunnel?
+
+        VXLAN, Geneve and L2TP carry ethernet frames, so their interfaces are
+        switchports in everything but name: they neither hold an address nor
+        need one, and ``W101`` would otherwise fire on every one of them.
+        """
+        return any(
+            self.inventory.tunnels[fqn].spec.type.layer == 2
+            for fqn in self.tunnel_ports.get((owner_fqn, interface), ())
+            if fqn in self.inventory.tunnels
+        )
+
+    def tunnel_elements(self, tunnel_fqn: str) -> frozenset[str]:
+        """The elements a tunnel terminates on, as far as its endpoints resolve."""
+        return frozenset(
+            end.owner_fqn
+            for end in self.tunnel_ends
+            if end.tunnel_fqn == tunnel_fqn and end.owner_fqn is not None
+        )
 
     def is_suppressed(self, rule_id: str, elements: Sequence[str]) -> bool:
         """Does any element involved carry an annotation silencing ``rule_id``?"""
@@ -396,11 +491,30 @@ def _build_context(inventory: Inventory) -> _Context:
             connected.add(resolution.fqn)
             connected.add(fqn)
 
+    tunnel_ends: list[_TunnelEnd] = []
+    tunnel_ports: dict[tuple[str, str], list[str]] = {}
+    encapsulations: list[_Encapsulation] = []
+    for tunnel_fqn, tunnel in inventory.tunnels.items():
+        namespace = namespace_of(tunnel_fqn)
+        for index, ref in enumerate(tunnel.endpoints):
+            end = _resolve_tunnel_end(inventory, tunnel_fqn, tunnel, ref, index, namespace)
+            tunnel_ends.append(end)
+            if end.resolved and end.owner_fqn is not None:
+                tunnel_ports.setdefault((end.owner_fqn, ref.interface), []).append(tunnel_fqn)
+        over = tunnel.spec.over
+        if over is not None:
+            encapsulations.append(
+                _resolve_encapsulation(inventory, tunnel_fqn, tunnel, over, namespace)
+            )
+
     return _Context(
         inventory=inventory,
         owners=owners,
         endpoints=tuple(endpoints),
         attachments=tuple(attachments),
+        tunnel_ends=tuple(tunnel_ends),
+        encapsulations=tuple(encapsulations),
+        tunnel_ports={key: tuple(value) for key, value in tunnel_ports.items()},
         terminations={key: tuple(value) for key, value in terminations.items()},
         connected=frozenset(connected),
         lag_masters={fqn: _lag_masters(owner) for fqn, owner in owners.items()},
@@ -453,6 +567,67 @@ def _resolve_endpoint(
         owner=element,
         interface=None if is_upstream else element.interface(ref.interface),
         is_upstream=is_upstream,
+    )
+
+
+def _resolve_tunnel_end(
+    inventory: Inventory,
+    tunnel_fqn: str,
+    tunnel: Tunnel,
+    ref: InterfaceRef,
+    index: int,
+    namespace: str,
+) -> _TunnelEnd:
+    """Resolve one endpoint of a tunnel (§4.2, §14.3)."""
+    resolution = inventory.lookup(ref.device, namespace=namespace)
+    element = resolution.element
+    if element is None:
+        return _TunnelEnd(
+            tunnel_fqn=tunnel_fqn,
+            tunnel=tunnel,
+            ref=ref,
+            index=index,
+            ambiguous=resolution.ambiguous,
+        )
+    if not isinstance(element, _OWNER_TYPES):
+        return _TunnelEnd(
+            tunnel_fqn=tunnel_fqn,
+            tunnel=tunnel,
+            ref=ref,
+            index=index,
+            wrong_kind=element.kind,
+        )
+    return _TunnelEnd(
+        tunnel_fqn=tunnel_fqn,
+        tunnel=tunnel,
+        ref=ref,
+        index=index,
+        owner_fqn=resolution.fqn,
+        owner=element,
+        interface=element.interface(ref.interface),
+    )
+
+
+def _resolve_encapsulation(
+    inventory: Inventory, tunnel_fqn: str, tunnel: Tunnel, ref: str, namespace: str
+) -> _Encapsulation:
+    """Resolve one tunnel's ``spec.over`` (§14.3)."""
+    resolution = inventory.lookup(ref, namespace=namespace)
+    element = resolution.element
+    if element is None:
+        return _Encapsulation(
+            tunnel_fqn=tunnel_fqn, tunnel=tunnel, ref=ref, ambiguous=resolution.ambiguous
+        )
+    if not isinstance(element, Tunnel):
+        return _Encapsulation(
+            tunnel_fqn=tunnel_fqn, tunnel=tunnel, ref=ref, wrong_kind=element.kind
+        )
+    return _Encapsulation(
+        tunnel_fqn=tunnel_fqn,
+        tunnel=tunnel,
+        ref=ref,
+        over_fqn=resolution.fqn,
+        over=element,
     )
 
 
@@ -749,7 +924,7 @@ def _check_adapter_capacity(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_unaddressed_interface(ctx: _Context) -> Iterator[_Draft]:
-    """W101 — an interface has no address and is not a switchport."""
+    """W101 — an interface has no address, is not a switchport and bridges nothing."""
     for fqn, owner in ctx.owners.items():
         # §6.5: a hub is a layer-1 repeater; its ports cannot hold an address,
         # so the rule would fire on every one of them.
@@ -764,6 +939,8 @@ def _check_unaddressed_interface(ctx: _Context) -> Iterator[_Draft]:
             if interface.has_ipv4_addresses or interface.has_ipv6_addresses:
                 continue
             if interface.vlan is not None:
+                continue
+            if ctx.bridges_frames(fqn, interface.name):
                 continue
             yield _Draft(
                 f"interface {_q(f'{fqn}:{interface.name}')} has no IPv4 or IPv6 address and "
@@ -2006,6 +2183,285 @@ def _check_attachment_is_a_host(ctx: _Context) -> Iterator[_Draft]:
         )
 
 
+# --------------------------------------------------------------------------- #
+# Tunnels (§10.9)
+# --------------------------------------------------------------------------- #
+
+
+def _check_tunnel_endpoints(ctx: _Context) -> Iterator[_Draft]:
+    """E016 — a tunnel endpoint references an unknown element or interface."""
+    for end in ctx.tunnel_ends:
+        elements = (end.tunnel_fqn,)
+        prefix = f"tunnel {_q(end.tunnel_fqn)} endpoint {end.ref}"
+        owner, owner_fqn = end.owner, end.owner_fqn
+
+        if end.ambiguous:
+            yield _Draft(
+                f"{prefix}: {_q(end.ref.device)} is ambiguous here; it matches "
+                f"{_join(sorted(end.ambiguous))}. Move the tunnel next to the element it "
+                f"refers to, or rename one of them.",
+                elements,
+                end.field_path,
+            )
+        elif end.wrong_kind is not None:
+            yield _Draft(
+                f"{prefix}: {_q(end.ref.device)} is a {end.wrong_kind}, which owns no interfaces",
+                elements,
+                end.field_path,
+            )
+        elif owner is None or owner_fqn is None:
+            yield _Draft(
+                f"{prefix}: no element named {_q(end.ref.device)} is declared in this inventory",
+                elements,
+                end.field_path,
+            )
+        elif not end.resolved:
+            yield _Draft(
+                f"{prefix}: {_q(owner_fqn)} has no interface {_q(end.ref.interface)}; "
+                f"it declares {_join(sorted(owner.interface_names()))}",
+                (*elements, owner_fqn),
+                end.field_path,
+            )
+
+
+def _check_tunnel_endpoint_type(ctx: _Context) -> Iterator[_Draft]:
+    """E017 — a tunnel endpoint is not a ``tunnel`` interface (``NG-T003``).
+
+    The endpoint of a tunnel is the *virtual* interface the operating system
+    presents — ``wg0``, ``ipsec0``, ``vxlan100`` — not the physical port its
+    outer packets happen to leave by. Landing a tunnel on ``eth0`` would draw an
+    overlay on top of the very link that carries it, and would put the tunnel's
+    inner addresses on the underlay interface.
+    """
+    for end in ctx.tunnel_ends:
+        interface = end.interface
+        if interface is None or end.owner_fqn is None:
+            continue
+        if interface.type is InterfaceType.TUNNEL:
+            continue
+        yield _Draft(
+            f"tunnel {_q(end.tunnel_fqn)} terminates on {_q(end.port)}, which is of type "
+            f"{_q(interface.type.value)}; a tunnel endpoint must be a 'tunnel' interface. "
+            f"Declare one and point 'parent' at {_q(interface.name)} if the outer packets "
+            f"leave by it.",
+            (end.tunnel_fqn, end.owner_fqn),
+            end.field_path,
+        )
+
+
+def _check_encapsulation_target(ctx: _Context) -> Iterator[_Draft]:
+    """E018 — a tunnel's ``over`` names no tunnel (``NG-T004``)."""
+    for step in ctx.encapsulations:
+        if step.ambiguous:
+            yield _Draft(
+                f"tunnel {_q(step.tunnel_fqn)} runs over {_q(step.ref)}, which is ambiguous "
+                f"here; it matches {_join(sorted(step.ambiguous))}",
+                (step.tunnel_fqn,),
+                step.field_path,
+            )
+        elif step.wrong_kind is not None:
+            yield _Draft(
+                f"tunnel {_q(step.tunnel_fqn)} runs over {_q(step.ref)}, which is a "
+                f"{step.wrong_kind}; 'over' names the tunnel this one is encapsulated in. "
+                f"A tunnel that runs directly over the physical topology omits it.",
+                (step.tunnel_fqn,),
+                step.field_path,
+            )
+        elif step.over_fqn is None:
+            yield _Draft(
+                f"tunnel {_q(step.tunnel_fqn)} runs over {_q(step.ref)}, which is not declared "
+                f"in this inventory",
+                (step.tunnel_fqn,),
+                step.field_path,
+            )
+
+
+def _check_encapsulation_cycle(ctx: _Context) -> Iterator[_Draft]:
+    """E019 — the ``over`` references loop (``NG-T005``).
+
+    A tunnel carried by a tunnel carried by the first is not a deep stack, it is
+    a definition with no bottom: nothing in it ever reaches a real packet.
+    """
+    over = {step.tunnel_fqn: step.over_fqn for step in ctx.encapsulations if step.over_fqn}
+    for cycle in _attachment_cycles(over):
+        anchor = cycle[0]
+        yield _Draft(
+            f"tunnel encapsulation loops: {' runs over '.join(_q(fqn) for fqn in cycle)} "
+            f"runs over {_q(anchor)}. One of them has to reach the underlay network.",
+            tuple(cycle),
+            ("spec", "over"),
+        )
+
+
+def _check_underlay_reach(ctx: _Context) -> Iterator[_Draft]:
+    """W125 — an overlay's endpoints are not all reachable through its underlay.
+
+    ``vxlan over ipsec`` only works where the IPsec tunnel actually goes. When
+    the outer tunnel does not terminate on every element the inner one does,
+    the inner tunnel's outer packets have no protected path for at least one of
+    its ends — the overlay is drawn joining two sites that cannot in fact reach
+    each other that way.
+    """
+    for step in ctx.encapsulations:
+        if step.over_fqn is None:
+            continue
+        inner = ctx.tunnel_elements(step.tunnel_fqn)
+        outer = ctx.tunnel_elements(step.over_fqn)
+        stranded = sorted(inner - outer)
+        if not stranded or not outer:
+            continue
+        yield _Draft(
+            f"tunnel {_q(step.tunnel_fqn)} runs over {_q(step.over_fqn)}, but "
+            f"{_join(stranded)} {'is' if len(stranded) == 1 else 'are'} not an endpoint of "
+            f"the underlay; the outer packets have no such path",
+            (step.tunnel_fqn, step.over_fqn, *stranded),
+            step.field_path,
+        )
+
+
+def _check_tunnel_mtu(ctx: _Context) -> Iterator[_Draft]:
+    """W126 — an overlay MTU does not fit inside its underlay (``NG-T011``).
+
+    Encapsulation is not free: every header in the stack comes off the payload
+    the overlay can carry. An overlay MTU that ignores it produces packets the
+    underlay has to fragment or drop, which is the classic "small transfers work,
+    large ones hang" failure.
+    """
+    for step in ctx.encapsulations:
+        outer, outer_fqn = step.over, step.over_fqn
+        if outer is None or outer_fqn is None:
+            continue
+        spec = step.tunnel.spec
+        if spec.mtu is None or outer.spec.mtu is None:
+            continue
+        # The underlay's own MTU already accounts for its own headers, so what
+        # is left for this tunnel is that number minus this tunnel's overhead.
+        budget = outer.spec.mtu - spec.type.overhead_bytes
+        if spec.mtu <= budget:
+            continue
+        yield _Draft(
+            f"tunnel {_q(step.tunnel_fqn)} has mtu {spec.mtu} but runs over {_q(outer_fqn)}, "
+            f"whose mtu {outer.spec.mtu} leaves {budget} after {spec.type.overhead_bytes} bytes "
+            f"of {spec.type} encapsulation; large packets will be fragmented or dropped",
+            (step.tunnel_fqn, outer_fqn),
+            ("spec", "mtu"),
+        )
+
+
+def _check_cleartext_tunnel(ctx: _Context) -> Iterator[_Draft]:
+    """W127 — a tunnel carries traffic in the clear (``NG-T012``).
+
+    GRE, VXLAN, Geneve, L2TP and PPTP encrypt nothing — PPTP's MPPE is broken,
+    so it counts as cleartext however it is configured. That is perfectly
+    correct inside a data centre and perfectly wrong across the internet, and a
+    diagram is exactly where the difference should be visible. Nesting silences
+    the finding: a VXLAN inside an IPsec tunnel is protected by the underlay,
+    which is why ``over`` exists.
+    """
+    over = {step.tunnel_fqn: step.over_fqn for step in ctx.encapsulations if step.over_fqn}
+    for fqn, tunnel in ctx.inventory.tunnels.items():
+        if tunnel.encrypts:
+            continue
+        protector = _encrypting_underlay(fqn, over, ctx.inventory.tunnels)
+        if protector is not None:
+            continue
+        yield _Draft(
+            f"tunnel {_q(fqn)} is {tunnel.spec.type}, which encrypts nothing, and no tunnel "
+            f"in its 'over' chain does either; everything it carries crosses the underlay in "
+            f"the clear. Nest it inside an encrypting tunnel, or set 'encrypted: true' if the "
+            f"deployment protects it some other way.",
+            (fqn,),
+            ("spec", "type"),
+        )
+
+
+def _encrypting_underlay(
+    fqn: str, over: Mapping[str, str], tunnels: Mapping[str, Tunnel]
+) -> str | None:
+    """The nearest tunnel in ``fqn``'s ``over`` chain that encrypts, if any."""
+    seen = {fqn}
+    current = over.get(fqn)
+    while current is not None and current not in seen:
+        outer = tunnels.get(current)
+        if outer is None:
+            return None
+        if outer.encrypts:
+            return current
+        seen.add(current)
+        current = over.get(current)
+    return None
+
+
+def _check_unused_tunnel_interface(ctx: _Context) -> Iterator[_Draft]:
+    """W128 — a ``tunnel`` interface is the endpoint of no tunnel (``NG-T013``).
+
+    The counterpart of ``I002`` for the overlay: a ``tunnel`` interface with no
+    ``tunnel`` document naming it describes one end of something the inventory
+    never says the other end of, so it is drawn as a port that goes nowhere.
+    """
+    for fqn, owner in ctx.owners.items():
+        for index, interface in enumerate(owner.interfaces):
+            if interface.type is not InterfaceType.TUNNEL or not interface.enabled:
+                continue
+            if (fqn, interface.name) in ctx.tunnel_ports:
+                continue
+            yield _Draft(
+                f"interface {_q(f'{fqn}:{interface.name}')} is a tunnel interface but no "
+                f"'tunnel' document names it, so the far end is unknown",
+                (fqn,),
+                ("spec", "interfaces", index),
+            )
+
+
+def _check_vni_clash(ctx: _Context) -> Iterator[_Draft]:
+    """W129 — two tunnels on one element share a VNI (``NG-T014``).
+
+    A VXLAN identifier names a virtual network *on a VTEP*. Two tunnels reusing
+    one on the same element are either the same overlay written twice or two
+    overlays that will bridge into each other.
+    """
+    by_key: dict[tuple[str, int], list[str]] = {}
+    for end in ctx.tunnel_ends:
+        vni = end.tunnel.spec.vni
+        if vni is None or end.owner_fqn is None:
+            continue
+        holders = by_key.setdefault((end.owner_fqn, vni), [])
+        if end.tunnel_fqn not in holders:
+            holders.append(end.tunnel_fqn)
+
+    reported: set[tuple[str, ...]] = set()
+    for (owner_fqn, vni), holders in by_key.items():
+        if len(holders) < 2 or tuple(holders) in reported:
+            continue
+        reported.add(tuple(holders))
+        yield _Draft(
+            f"element {_q(owner_fqn)} terminates {len(holders)} tunnels that all use vni "
+            f"{vni}: {_join(holders)}",
+            (holders[0], *holders[1:], owner_fqn),
+            ("spec", "vni"),
+        )
+
+
+def _check_nonstandard_port(ctx: _Context) -> Iterator[_Draft]:
+    """I003 — a tunnel listens on a port other than the registered one.
+
+    Information rather than a complaint: moving WireGuard off 51820 is a normal
+    thing to do. It is printed because the port is the one fact a firewall rule
+    needs and the one most likely to have been copied from another tunnel.
+    """
+    for fqn, tunnel in ctx.inventory.tunnels.items():
+        default = tunnel.spec.type.default_port
+        port = tunnel.spec.port
+        if default is None or port is None or port == default:
+            continue
+        yield _Draft(
+            f"tunnel {_q(fqn)} listens on {tunnel.spec.type.transport}/{port}; the registered "
+            f"port for {tunnel.spec.type} is {default}",
+            (fqn,),
+            ("spec", "port"),
+        )
+
+
 #: Every check, paired with the rule it reports, in report order.
 _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("E001", _check_endpoint_references),
@@ -2023,6 +2479,10 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("E013", _check_attachment_and_cable),
     ("E014", _check_attachment_cycle),
     ("E015", _check_attachment_target),
+    ("E016", _check_tunnel_endpoints),
+    ("E017", _check_tunnel_endpoint_type),
+    ("E018", _check_encapsulation_target),
+    ("E019", _check_encapsulation_cycle),
     ("W101", _check_unaddressed_interface),
     ("W102", _check_mtu_mismatch),
     ("W103", _check_orphan_device),
@@ -2047,8 +2507,14 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("W122", _check_hub_subnets),
     ("W123", _check_unattached_adapter),
     ("W124", _check_attachment_is_a_host),
+    ("W125", _check_underlay_reach),
+    ("W126", _check_tunnel_mtu),
+    ("W127", _check_cleartext_tunnel),
+    ("W128", _check_unused_tunnel_interface),
+    ("W129", _check_vni_clash),
     ("I001", _check_local_mac),
     ("I002", _check_uncabled_interface),
+    ("I003", _check_nonstandard_port),
 )
 
 

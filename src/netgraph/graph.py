@@ -38,17 +38,19 @@ Nodes carry ``kind``, ``namespace``, ``name``, ``interfaces`` (the interface
 *names*, in declaration order), ``ports`` (the full
 :class:`~netgraph.render.graph.PortView` records), ``vlans`` and ``node_type``.
 Edges carry ``source``/``target`` with their ``source_port``/``target_port``,
-plus ``medium``, ``speed``, ``label``, ``length_m`` and ``vlans``. ``source``
+plus ``medium``, ``speed``, ``label``, ``length_m``, ``vlans`` and — on a
+tunnel or an encapsulation edge — the resolved
+:class:`~netgraph.render.graph.TunnelView`. ``source``
 and ``target`` are repeated in the edge attributes on purpose: networkx yields
 ``(u, v)`` in adjacency order, which is not the order the cable declared its
 ends in, so ``data["source_port"]`` would otherwise be ambiguous — see
 :func:`ports_of`.
 
 ``node_type`` distinguishes a declared element from a node this layer derives:
-an IP prefix at layer 3 (:data:`SUBNET_TYPE`) or a VLAN broadcast domain
-(:data:`DOMAIN_TYPE`, produced by :func:`layers`). Filtering predicates apply to
-elements; derived nodes are kept exactly as long as one selected element still
-belongs to them.
+an IP prefix at layer 3 (:data:`SUBNET_TYPE`), a tunnel drawn as a node
+(:data:`TUNNEL_TYPE`) or a VLAN broadcast domain (:data:`DOMAIN_TYPE`, produced
+by :func:`layers`). Filtering predicates apply to elements; derived nodes are
+kept exactly as long as one selected element still belongs to them.
 """
 
 from __future__ import annotations
@@ -66,6 +68,8 @@ from netgraph.loader.inventory import Inventory
 from netgraph.render.graph import (
     SUBNET_ID_PREFIX,
     SUBNET_KIND,
+    TUNNEL_ID_PREFIX,
+    TUNNEL_KIND,
     Edge,
     EdgeKind,
     Layer,
@@ -82,12 +86,16 @@ from netgraph.render.graph import (
 __all__ = [
     "DOMAIN_TYPE",
     "ELEMENT_TYPE",
+    "LINK_EDGE_KINDS",
     "PHYSICAL_EDGE_KINDS",
     # Re-exported from the resolution layer: both belong to the vocabulary of
     # node ids here, so a caller that only imports this module still has them.
     "SUBNET_ID_PREFIX",
     "SUBNET_KIND",
     "SUBNET_TYPE",
+    "TUNNEL_ID_PREFIX",
+    "TUNNEL_KIND",
+    "TUNNEL_TYPE",
     "VLAN_KIND",
     "VLAN_NODE_PREFIX",
     "BroadcastDomain",
@@ -108,10 +116,12 @@ __all__ = [
 ELEMENT_TYPE: Final = str(NodeType.ELEMENT)
 #: ``node_type`` of an IP prefix node (layer 3).
 SUBNET_TYPE: Final = str(NodeType.SUBNET)
+#: ``node_type`` of a tunnel node (§14).
+TUNNEL_TYPE: Final = str(NodeType.TUNNEL)
 #: ``node_type`` of a VLAN broadcast-domain node (:func:`layers`).
 DOMAIN_TYPE: Final = "domain"
 
-#: ``kind`` reported for a broadcast-domain node. The seven element kinds of §3
+#: ``kind`` reported for a broadcast-domain node. The eight element kinds of §3
 #: and :data:`~netgraph.render.graph.SUBNET_KIND` are all taken, so this cannot
 #: collide with a declared kind.
 VLAN_KIND: Final = "vlan"
@@ -127,6 +137,18 @@ VLAN_NODE_PREFIX: Final = "vlan:"
 PHYSICAL_EDGE_KINDS: Final[frozenset[str]] = frozenset(
     {str(EdgeKind.CABLE), str(EdgeKind.ATTACHMENT)}
 )
+
+#: Edge kinds that carry a frame from one element to another. A tunnel is not
+#: something a technician can unplug, so it is not in
+#: :data:`PHYSICAL_EDGE_KINDS` — but a layer-2 tunnel does extend a broadcast
+#: domain across the underlay, which is the whole reason VXLAN exists, so
+#: :func:`broadcast_domains` has to walk it.
+LINK_EDGE_KINDS: Final[frozenset[str]] = PHYSICAL_EDGE_KINDS | {str(EdgeKind.TUNNEL)}
+
+#: Link kinds that carry only the VLANs their two ends agree on. An adapter
+#: attachment is not one — §8.2 requires that collapsing an adapter into its
+#: host must not change connectivity, and a USB dongle does not prune VLANs.
+_VLAN_PRUNING_KINDS: Final[frozenset[str]] = frozenset({str(EdgeKind.CABLE), str(EdgeKind.TUNNEL)})
 
 
 # --------------------------------------------------------------------------- #
@@ -194,11 +216,21 @@ def _node_attrs(node: Node) -> dict[str, Any]:
         "ports": node.ports,
         "vlans": node.vlans,
         "addresses": node.routable_addresses,
-        "members": node.subnet.elements if node.subnet is not None else (),
+        "members": _members_of(node),
         "element": node.element,
         "subnet": node.subnet,
+        "tunnel": node.tunnel,
         "node": node,
     }
+
+
+def _members_of(node: Node) -> tuple[str, ...]:
+    """The elements a derived node stands for; empty for a declared element."""
+    if node.subnet is not None:
+        return node.subnet.elements
+    if node.tunnel is not None:
+        return node.tunnel.elements
+    return ()
 
 
 def _edge_attrs(edge: Edge) -> dict[str, Any]:
@@ -217,6 +249,7 @@ def _edge_attrs(edge: Edge) -> dict[str, Any]:
         "addresses": edge.addresses,
         "cable": edge.cable,
         "adapter": edge.adapter,
+        "tunnel": edge.tunnel,
         "edge": edge,
     }
 
@@ -392,6 +425,15 @@ def _narrow_derived(data: Mapping[str, Any], kept: set[str]) -> dict[str, Any] |
     cannot see. Returns ``None`` when nothing it stands for is left.
     """
     attrs = dict(data)
+    tunnel = attrs.get("tunnel")
+    if tunnel is not None and _node_type(data) == TUNNEL_TYPE:
+        restricted = tunnel.restricted_to(kept)
+        if not restricted.ends:
+            return None
+        attrs["tunnel"] = restricted
+        attrs["members"] = restricted.elements
+        return attrs
+
     subnet = attrs.get("subnet")
     if subnet is not None:
         restricted = subnet.restricted_to(kept)
@@ -544,6 +586,7 @@ def _domain_view(graph: nx.MultiGraph, domains: Sequence[BroadcastDomain]) -> nx
             domain=domain,
             element=None,
             subnet=None,
+            tunnel=None,
         )
         for member in domain.members:
             ports = tuple(
@@ -572,6 +615,7 @@ def _domain_view(graph: nx.MultiGraph, domains: Sequence[BroadcastDomain]) -> nx
                 addresses=(),
                 cable=None,
                 adapter=None,
+                tunnel=None,
             )
     return result
 
@@ -587,6 +631,9 @@ def broadcast_domains(graph: nx.MultiGraph) -> tuple[BroadcastDomain, ...]:
 
     * a **cable** carries VLAN 10 when its ``vlans`` contains 10, i.e. when both
       ends agree on it (:func:`~netgraph.render.graph._link_vlans`);
+    * a **layer-2 tunnel** carries it on the same terms: VXLAN, Geneve and L2TP
+      extend a broadcast domain across the underlay, so two sites bridged by one
+      are a single domain rather than two that share a number;
     * an **adapter attachment** always carries it, for candidates on both ends.
       §8.2 requires that collapsing an adapter into its host must not change
       connectivity, and a USB dongle does not prune VLANs.
@@ -632,16 +679,22 @@ def broadcast_domains(graph: nx.MultiGraph) -> tuple[BroadcastDomain, ...]:
 def _vlan_links(
     graph: nx.MultiGraph, vlan: int, candidates: set[str]
 ) -> tuple[dict[str, set[str]], tuple[tuple[str, str, str], ...]]:
-    """Adjacency and edge ids of the links carrying ``vlan`` between candidates."""
+    """Adjacency and edge ids of the links carrying ``vlan`` between candidates.
+
+    Layer-2 tunnels count: a VXLAN joining two sites in VLAN 10 makes them one
+    broadcast domain, which is the whole reason the overlay was built. A
+    layer-3 tunnel carries no VLAN at all (see
+    :func:`~netgraph.render.graph._tunnel_vlans`), so it prunes itself out here.
+    """
     adjacency: dict[str, set[str]] = {fqn: set() for fqn in candidates}
     links: list[tuple[str, str, str]] = []
     for source, target, key, data in graph.edges(keys=True, data=True):
         kind = data.get("kind")
-        if kind not in PHYSICAL_EDGE_KINDS:
+        if kind not in LINK_EDGE_KINDS:
             continue
         if source not in candidates or target not in candidates:
             continue
-        if kind == str(EdgeKind.CABLE) and vlan not in data.get("vlans", frozenset()):
+        if kind in _VLAN_PRUNING_KINDS and vlan not in data.get("vlans", frozenset()):
             continue
         adjacency[source].add(target)
         adjacency[target].add(source)
@@ -689,6 +742,8 @@ class GraphStats:
     elements: int
     #: Distinct VLAN ids anything in the graph participates in.
     vlans: int
+    #: Tunnels the graph draws, as nodes or as edges (§14).
+    tunnels: int
     #: Distinct IP prefixes the visible elements are addressed in.
     subnets: int
     #: Distinct namespaces holding at least one element; the root counts as one.
@@ -705,6 +760,7 @@ class GraphStats:
             "edges": self.edges,
             "elements": self.elements,
             "vlans": self.vlans,
+            "tunnels": self.tunnels,
             "subnets": self.subnets,
             "namespaces": self.namespaces,
             "components": self.components,
@@ -725,11 +781,15 @@ def stats(graph: nx.MultiGraph) -> GraphStats:
     vlans: set[int] = set()
     prefixes: set[str] = set()
     namespaces: set[str] = set()
+    tunnels: set[str] = set()
     by_kind: dict[str, int] = {}
     elements = 0
 
     for _, data in graph.nodes(data=True):
         vlans |= set(data.get("vlans", frozenset()))
+        tunnel = data.get("tunnel")
+        if tunnel is not None:
+            tunnels.add(tunnel.fqn)
         if _node_type(data) != ELEMENT_TYPE:
             continue
         elements += 1
@@ -740,12 +800,16 @@ def stats(graph: nx.MultiGraph) -> GraphStats:
 
     for _, _, data in graph.edges(data=True):
         vlans |= set(data.get("vlans", frozenset()))
+        tunnel = data.get("tunnel")
+        if tunnel is not None:
+            tunnels.add(tunnel.fqn)
 
     return GraphStats(
         nodes=graph.number_of_nodes(),
         edges=graph.number_of_edges(),
         elements=elements,
         vlans=len(vlans),
+        tunnels=len(tunnels),
         subnets=len(prefixes),
         namespaces=len(namespaces),
         components=nx.number_connected_components(graph),

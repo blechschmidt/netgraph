@@ -15,7 +15,7 @@ __all__ = ["DEFAULT_API_VERSION", "KINDS", "ElementBase"]
 #: Re-exported for callers that build documents programmatically.
 DEFAULT_API_VERSION = API_VERSION
 
-#: The seven kinds defined by ``netgraph.dev/v1alpha1`` (§3).
+#: The eight kinds defined by ``netgraph.dev/v1alpha1`` (§3).
 KINDS: tuple[str, ...] = (
     "switch",
     "router",
@@ -24,6 +24,7 @@ KINDS: tuple[str, ...] = (
     "server",
     "cable",
     "adapter",
+    "tunnel",
 )
 
 

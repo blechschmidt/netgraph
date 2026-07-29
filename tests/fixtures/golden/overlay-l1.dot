@@ -1,0 +1,106 @@
+graph netgraph {
+  graph [
+    rankdir=TB,
+    splines=true,
+    overlap=false,
+    nodesep=0.5,
+    ranksep=0.7,
+    fontname="Helvetica,Arial,sans-serif",
+    fontsize=12,
+    label="Overlay, layer 1",
+    labelloc=t,
+    fontsize=16,
+  ];
+  node [fontname="Helvetica,Arial,sans-serif", fontsize=10, style=filled, penwidth=1.2];
+  edge [fontname="Helvetica,Arial,sans-serif", fontsize=8];
+
+  "sites/branch-a/pc-branch-a" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="Workstation, Branch A.", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pc-branch-a</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+      <TR><TD ALIGN="LEFT">enp3s0</TD><TD ALIGN="LEFT">10.20.0.10/24</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "sites/branch-a/rtr-branch-a" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="Branch A edge router. Mesh member only.", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-branch-a</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
+      <TR><TD ALIGN="LEFT">ether1</TD><TD ALIGN="LEFT">198.51.100.6/30</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">ether2</TD><TD ALIGN="LEFT">10.20.0.1/24</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">wg0</TD><TD ALIGN="LEFT">10.255.0.2/24</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "sites/branch-b/pc-branch-b" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="Administrator's workstation. Dials into HQ over OpenVPN.", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pc-branch-b</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+      <TR><TD ALIGN="LEFT">enp3s0</TD><TD ALIGN="LEFT">10.30.0.10/24</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">tun0</TD><TD ALIGN="LEFT">10.253.0.10/24</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "sites/branch-b/rtr-branch-b" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="Branch B edge router. Mesh member, and the far end of the IPsec stack.", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-branch-b</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
+      <TR><TD ALIGN="LEFT">ether1</TD><TD ALIGN="LEFT">198.51.100.10/30</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">ether2</TD><TD ALIGN="LEFT">10.30.0.1/24</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">wg0</TD><TD ALIGN="LEFT">10.255.0.3/24</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">ipsec0</TD><TD ALIGN="LEFT">10.254.0.2/30</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">vxlan100</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 100</TD></TR>
+      <TR><TD ALIGN="LEFT">gre1</TD><TD ALIGN="LEFT">10.252.0.2/30</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "sites/hq/rtr-hq" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="HQ edge router and overlay hub.", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-hq</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
+      <TR><TD ALIGN="LEFT">eth0</TD><TD ALIGN="LEFT">198.51.100.2/30</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">eth1</TD><TD ALIGN="LEFT">10.10.0.1/24</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">wg0</TD><TD ALIGN="LEFT">10.255.0.1/24</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">ipsec0</TD><TD ALIGN="LEFT">10.254.0.1/30</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">vxlan100</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 100</TD></TR>
+      <TR><TD ALIGN="LEFT">gre1</TD><TD ALIGN="LEFT">10.252.0.1/30</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">ovpn0</TD><TD ALIGN="LEFT">10.253.0.1/24</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "sites/hq/srv-hq" [shape=cylinder, fillcolor="#eae2f5", color="#7c3aed", tooltip="File server, HQ.", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>srv-hq</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[server]</TD></TR>
+      <TR><TD ALIGN="LEFT">eno1</TD><TD ALIGN="LEFT">10.10.0.10/24</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "wan/wan-core" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="Provider edge. Three /30 hand-offs, one per site.", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>wan-core</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
+      <TR><TD ALIGN="LEFT">ge-0/0/0</TD><TD ALIGN="LEFT">198.51.100.1/30</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">ge-0/0/1</TD><TD ALIGN="LEFT">198.51.100.5/30</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">ge-0/0/2</TD><TD ALIGN="LEFT">198.51.100.9/30</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
+  "tunnel:tunnels/wg-mesh" [shape=hexagon, fillcolor="#ede9fe", color="#6d28d9", style="filled,dashed", tooltip="tunnel: tunnels/wg-mesh, type: wireguard, transport: udp/51820, encrypted: chacha20-poly1305, auth: public-key, mtu: 1420 (overhead 80 B)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>wg-mesh</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[wireguard tunnel]</TD></TR>
+      <TR><TD ALIGN="LEFT">rtr-branch-a</TD><TD ALIGN="LEFT">wg0</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">rtr-branch-b</TD><TD ALIGN="LEFT">wg0</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">rtr-hq</TD><TD ALIGN="LEFT">wg0</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">mtu 1420</TD></TR>
+    </TABLE>
+  >];
+
+  "sites/hq/rtr-hq" -- "sites/hq/srv-hq" [color="#4a4a4a", style=solid, penwidth=1.5, label="eth1 -- eno1\n1Gbps", tooltip="cable: cbl-hq-srv, medium: copper, speed: 1Gbps"];
+  "sites/branch-a/pc-branch-a" -- "sites/branch-a/rtr-branch-a" [color="#4a4a4a", style=solid, penwidth=1.5, label="enp3s0 -- ether2\n1Gbps", tooltip="cable: cbl-branch-a-pc, medium: copper, speed: 1Gbps"];
+  "sites/branch-b/pc-branch-b" -- "sites/branch-b/rtr-branch-b" [color="#4a4a4a", style=solid, penwidth=1.5, label="enp3s0 -- ether2\n1Gbps", tooltip="cable: cbl-branch-b-pc, medium: copper, speed: 1Gbps"];
+  "sites/hq/rtr-hq" -- "wan/wan-core" [color="#d97706", style=bold, penwidth=1.5, label="eth0 -- ge-0/0/0\nPE-01\nfiber\n1Gbps", tooltip="cable: cbl-wan-hq, medium: fiber, speed: 1Gbps"];
+  "sites/branch-a/rtr-branch-a" -- "wan/wan-core" [color="#d97706", style=bold, penwidth=1.5, label="ether1 -- ge-0/0/1\nPE-02\nfiber\n1Gbps", tooltip="cable: cbl-wan-branch-a, medium: fiber, speed: 1Gbps"];
+  "sites/branch-b/rtr-branch-b" -- "wan/wan-core" [color="#d97706", style=bold, penwidth=1.5, label="ether1 -- ge-0/0/2\nPE-03\nfiber\n1Gbps", tooltip="cable: cbl-wan-branch-b, medium: fiber, speed: 1Gbps"];
+  "sites/branch-a/rtr-branch-a" -- "tunnel:tunnels/wg-mesh" [color="#6d28d9", style=dashed, label="wg0\nwireguard\nMESH", tooltip="tunnel: tunnels/wg-mesh, type: wireguard, transport: udp/51820, encrypted: chacha20-poly1305, auth: public-key, mtu: 1420 (overhead 80 B)"];
+  "sites/branch-b/rtr-branch-b" -- "tunnel:tunnels/wg-mesh" [color="#6d28d9", style=dashed, label="wg0\nwireguard\nMESH", tooltip="tunnel: tunnels/wg-mesh, type: wireguard, transport: udp/51820, encrypted: chacha20-poly1305, auth: public-key, mtu: 1420 (overhead 80 B)"];
+  "sites/hq/rtr-hq" -- "tunnel:tunnels/wg-mesh" [color="#6d28d9", style=dashed, label="wg0\nwireguard\nMESH", tooltip="tunnel: tunnels/wg-mesh, type: wireguard, transport: udp/51820, encrypted: chacha20-poly1305, auth: public-key, mtu: 1420 (overhead 80 B)"];
+  "sites/branch-b/rtr-branch-b" -- "sites/hq/rtr-hq" [color="#6d28d9", style=dashed, label="ipsec0 -- ipsec0\nipsec", tooltip="tunnel: tunnels/ipsec-hq-b, type: ipsec, mode: tunnel, transport: esp, encrypted: aes-256-gcm, auth: certificate, mtu: 1427 (overhead 73 B)"];
+  "sites/branch-b/rtr-branch-b" -- "sites/hq/rtr-hq" [color="#6d28d9", style=dashed, label="vxlan100 -- vxlan100\nvxlan over ipsec\nvni 100\nvia encrypted underlay", tooltip="tunnel: tunnels/vx-100, type: vxlan over ipsec, vni: 100, transport: udp/4789, cleartext, carried by tunnels/ipsec-hq-b, mtu: 1377 (overhead 123 B), vlans: 100"];
+  "sites/branch-b/rtr-branch-b" -- "sites/hq/rtr-hq" [color="#6d28d9", style=dashed, label="gre1 -- gre1\ngre over ipsec\nvia encrypted underlay", tooltip="tunnel: tunnels/gre-mgmt, type: gre over ipsec, transport: gre, cleartext, carried by tunnels/ipsec-hq-b, mtu: 1403 (overhead 97 B)"];
+  "sites/branch-b/pc-branch-b" -- "sites/hq/rtr-hq" [color="#6d28d9", style=dashed, label="tun0 -- ovpn0\nopenvpn", tooltip="tunnel: tunnels/ovpn-admin, type: openvpn, transport: udp/1194, encrypted: aes-256-gcm, auth: certificate, mtu: 1431 (overhead 69 B)"];
+}

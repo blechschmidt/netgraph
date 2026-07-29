@@ -15,6 +15,7 @@ Three properties are asserted here, and each one protects a different promise:
 from __future__ import annotations
 
 import html
+import itertools
 import shutil
 from pathlib import Path
 
@@ -32,9 +33,10 @@ INVALID_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "invalid"
 #: The inventories under ``examples/``, and what each one is expected to hold.
 #: Pinning the counts keeps a stray file or a lost document visible.
 EXAMPLE_SHAPES: dict[str, dict[str, int]] = {
-    "quickstart": {"devices": 3, "cables": 2, "adapters": 0},
-    "home-lab": {"devices": 5, "cables": 4, "adapters": 1},
-    "campus": {"devices": 21, "cables": 21, "adapters": 0},
+    "quickstart": {"devices": 3, "cables": 2, "adapters": 0, "tunnels": 0},
+    "home-lab": {"devices": 5, "cables": 4, "adapters": 1, "tunnels": 0},
+    "campus": {"devices": 21, "cables": 21, "adapters": 0, "tunnels": 0},
+    "overlay": {"devices": 7, "cables": 6, "adapters": 0, "tunnels": 5},
 }
 
 #: ``e002-double-termination.yaml`` -> ``E002``.
@@ -200,12 +202,17 @@ def _render_svg(inventory: Inventory) -> str:
     later step: devices and adapters become nodes, cables and ``attached_to``
     attachments become edges. It exists to prove that the example topologies
     survive an actual layout pass, not to define the output format.
+
+    Cables and tunnels are both *links*, so neither becomes a node here — the
+    real renderer draws a multipoint tunnel as one, but reproducing that rule
+    would make this helper a second implementation of the thing it is meant to
+    be independent of.
     """
     import graphviz
 
     graph = graphviz.Graph("netgraph")
     for fqn, element in inventory.elements.items():
-        if fqn in inventory.cables:
+        if fqn in inventory.cables or fqn in inventory.tunnels:
             continue
         graph.node(fqn, label=element.metadata.name)
 
@@ -224,6 +231,15 @@ def _render_svg(inventory: Inventory) -> str:
         assert host_fqn is not None
         graph.edge(host_fqn, fqn, style="dashed", label=adapter.upstream.type.value)
 
+    for fqn, tunnel in inventory.tunnels.items():
+        namespace = namespace_of(fqn)
+        ends = [inventory.resolve_fqn(ref.device, namespace=namespace) for ref in tunnel.endpoints]
+        assert all(end is not None for end in ends)
+        # A point-to-multipoint tunnel is a chain here rather than a star; the
+        # count the caller asserts is what matters, not the shape.
+        for left, right in itertools.pairwise(ends):
+            graph.edge(str(left), str(right), style="dotted", label=tunnel.metadata.name)
+
     return str(graph.pipe(format="svg", encoding="utf-8"))
 
 
@@ -235,11 +251,12 @@ def test_an_example_inventory_renders_to_svg(name: str) -> None:
 
     assert "<svg" in svg
     assert svg.rstrip().endswith("</svg>")
-    # One node per element that is not a cable, one edge per cable, plus one
-    # per adapter attachment.
+    # One node per element that is neither a cable nor a tunnel; one edge per
+    # cable, per adapter attachment, and per leg of a tunnel.
     shape = EXAMPLE_SHAPES[name]
+    legs = sum(len(tunnel.endpoints) - 1 for tunnel in inventory.tunnels.values())
     assert svg.count('class="node"') == shape["devices"] + shape["adapters"]
-    assert svg.count('class="edge"') == shape["cables"] + shape["adapters"]
+    assert svg.count('class="edge"') == shape["cables"] + shape["adapters"] + legs
     # Graphviz writes a hyphen as the character reference '&#45;'.
     text = html.unescape(svg)
     for device in inventory.devices.values():

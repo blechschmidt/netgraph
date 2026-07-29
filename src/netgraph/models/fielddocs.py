@@ -37,6 +37,7 @@ from netgraph.models.interface import (
     VlanConfig,
 )
 from netgraph.models.metadata import Metadata
+from netgraph.models.tunnel import TunnelSpec
 
 __all__ = [
     "DOCUMENTED_MODELS",
@@ -81,6 +82,7 @@ DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
     InterfaceRef,
     AdapterSpec,
     UpstreamPort,
+    TunnelSpec,
 )
 
 #: What distinguishes one ``kind`` from the next, one sentence each.
@@ -93,6 +95,8 @@ KIND_NOTES: Final[dict[str, str]] = {
     "server": "End host, drawn as a rack-mount server. Structurally identical to `computer`.",
     "cable": "An undirected link between exactly two interfaces. Owns no interfaces.",
     "adapter": "Presents interfaces over a non-network host port.",
+    "tunnel": "An undirected logical link between two or more `tunnel` interfaces. Owns no "
+    "interfaces; `over` nests it inside another tunnel.",
 }
 
 #: One entry per ``(model name, field name)``. Checked for exact coverage.
@@ -377,6 +381,66 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "The host the adapter is plugged into. A bare device name, never a `device:interface` "
         "reference (`NG-X001`). This is what joins the adapter to the graph when no cable does.",
         NONE,
+    ),
+    # -- tunnel ------------------------------------------------------------
+    ("TunnelSpec", "type"): Doc(
+        "The encapsulation: `wireguard`, `ipsec`, `openvpn`, `pptp`, `l2tp`, `gre`, `vxlan` or "
+        "`geneve`. It decides the layer carried, the outer transport, the default port, whether "
+        "the payload is encrypted and how much MTU the headers cost.",
+        NONE,
+    ),
+    ("TunnelSpec", "endpoints"): Doc(
+        "Two or more `device:interface` references, each naming an interface of `type: tunnel` "
+        "(`NG-T001`, `NG-T003`). The link is undirected, so the list is sorted on load. Three or "
+        "more endpoints make it multipoint, and it is then drawn as a node rather than a line.",
+        NONE,
+    ),
+    ("TunnelSpec", "over"): Doc(
+        "The tunnel this one is encapsulated in — `vxlan` over `ipsec` is written by naming the "
+        "IPsec tunnel here (`NG-T004`). Absent means the tunnel runs directly over the physical "
+        "topology. The chain must not loop (`NG-T005`).",
+        NONE,
+    ),
+    ("TunnelSpec", "mode"): Doc(
+        "IPsec's encapsulation mode, `tunnel` or `transport` (RFC 4301). Defaults to `tunnel`; "
+        "every other type has only one mode and must not declare it (`NG-T008`).",
+        NONE,
+    ),
+    ("TunnelSpec", "vni"): Doc(
+        "The 24-bit VXLAN/Geneve virtual network identifier. Required for those two types and "
+        "rejected for every other (`NG-T007`).",
+        NONE,
+    ),
+    ("TunnelSpec", "port"): Doc(
+        "Outer UDP/TCP port. Defaults to the registered port of the type (WireGuard 51820, "
+        "OpenVPN 1194, L2TP 1701, VXLAN 4789, Geneve 6081) and is rejected for GRE and IPsec, "
+        "which run directly over IP (`NG-T008`).",
+        NONE,
+    ),
+    ("TunnelSpec", "mtu"): Doc(
+        "MTU of the tunnel interface. Compared with what the underlay leaves after the "
+        "encapsulation overhead of the whole stack (`NG-T011`).",
+        NONE,
+    ),
+    ("TunnelSpec", "encrypted"): Doc(
+        "Whether the payload is protected. Defaults to what the type does — true for WireGuard, "
+        "IPsec and OpenVPN, false for GRE, VXLAN, Geneve, L2TP and PPTP, whose MPPE is broken. "
+        "Set it to true to record that the deployment protects an otherwise cleartext type some "
+        "other way.",
+        NONE,
+    ),
+    ("TunnelSpec", "cipher"): Doc(
+        "Negotiated cipher suite, free text (`chacha20-poly1305`, `aes-256-gcm`). Only on a "
+        "tunnel that encrypts (`NG-T009`).",
+        NONE,
+    ),
+    ("TunnelSpec", "auth"): Doc(
+        "How the endpoints authenticate each other: `psk`, `certificate`, `public-key` or "
+        "`password`. The *method*, never the material — netgraph stores no secrets (`NG-T010`).",
+        NONE,
+    ),
+    ("TunnelSpec", "label"): Doc(
+        "Free-text identifier printed on the edge, as a cable's `label` is."
     ),
 }
 

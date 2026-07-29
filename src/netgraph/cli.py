@@ -101,6 +101,7 @@ from netgraph.render import (
     icon_theme,
     is_binary_format,
     render,
+    resolve_tunnels,
     supports_icons,
     theme_choices,
 )
@@ -135,7 +136,10 @@ CONTEXT_SETTINGS = {
     "max_content_width": 100,
 }
 
-#: Element kinds that become graph nodes, i.e. everything but ``cable``.
+#: Element kinds ``--kind`` can select. A cable is an edge, and a tunnel is one
+#: too below the ``overlay`` layer — where it does become a node it is derived
+#: from the elements it joins, exactly as a subnet is, so it is kept whenever one
+#: of them survives rather than selected in its own right.
 NODE_KINDS: Final[tuple[str, ...]] = (
     "switch",
     "router",
@@ -196,7 +200,7 @@ class AppContext:
         self.log(
             f"loaded {len(inventory.elements)} element(s): "
             f"{len(inventory.devices)} device(s), {len(inventory.cables)} cable(s), "
-            f"{len(inventory.adapters)} adapter(s)",
+            f"{len(inventory.adapters)} adapter(s), {len(inventory.tunnels)} tunnel(s)",
             level=1,
         )
         return inventory
@@ -638,8 +642,9 @@ def _empty_graph_reason(layer: Layer, spec: FilterSpec) -> str:
     """Why there is nothing to draw, which is not always the filters.
 
     At layer 3 an inventory with no routable address produces an empty graph on
-    its own, and blaming filters that were never given would send the reader
-    looking in the wrong place.
+    its own, and so does an overlay view of an inventory with no tunnel;
+    blaming filters that were never given would send the reader looking in the
+    wrong place.
     """
     if not spec.is_empty:
         return "the filters selected no elements; the output will be an empty graph"
@@ -648,6 +653,11 @@ def _empty_graph_reason(layer: Layer, spec: FilterSpec) -> str:
             "nothing to draw at layer 3: no element carries a routable address. "
             "Loopback and link-local addresses are excluded; run 'netgraph list subnets' "
             "to see what the inventory is addressed in"
+        )
+    if layer is Layer.OVERLAY:
+        return (
+            "nothing to draw in the overlay view: the inventory declares no tunnel. "
+            "Render '--layer l1' for the physical topology, or add a 'tunnel' document"
         )
     # No filter and nothing at layer 1 means the tree itself is empty, which is
     # what a freshly scaffolded 'netgraph init --minimal' looks like.
@@ -1159,7 +1169,7 @@ def _open_browser(app: AppContext, url: str) -> None:
 @cli.command("list")
 @click.argument(
     "what",
-    type=click.Choice(["devices", "cables", "vlans", "subnets"]),
+    type=click.Choice(["devices", "cables", "tunnels", "vlans", "subnets"]),
     default="devices",
     required=False,
 )
@@ -1173,7 +1183,7 @@ def _open_browser(app: AppContext, url: str) -> None:
 )
 @click.pass_obj
 def list_command(app: AppContext, what: str, output_format: str) -> None:
-    """List the devices, cables, VLANs or subnets an inventory declares."""
+    """List the devices, cables, tunnels, VLANs or subnets an inventory declares."""
     console = app.console()
     inventory = app.load()
     _warn_about_load_errors(console, inventory)
@@ -1262,6 +1272,56 @@ def _list_cables(inventory: Inventory) -> _Listing:
     return headers, aligns, rows, records
 
 
+def _list_tunnels(inventory: Inventory) -> _Listing:
+    """Every tunnel, with its encapsulation stack and what protects it.
+
+    The stack comes from :func:`~netgraph.render.graph.resolve_tunnels`, the
+    same resolution ``render --layer overlay`` draws, so the listing and the
+    diagram cannot disagree about what runs inside what. A tunnel whose
+    endpoints do not resolve is still listed — the reader is most likely running
+    this command *because* something is wrong — with its stack left at its own
+    type.
+    """
+    views = {view.fqn: view for view in resolve_tunnels(inventory)[0]}
+    rows: list[list[str]] = []
+    records: list[dict[str, Any]] = []
+    for fqn, tunnel in inventory.tunnels.items():
+        spec = tunnel.spec
+        view = views.get(fqn)
+        stack = view.stack_text if view is not None else spec.type.value
+        protection = "yes" if tunnel.encrypts else ("underlay" if view and view.protected else "no")
+        rows.append(
+            [
+                fqn,
+                stack,
+                str(spec.vni) if spec.vni is not None else "-",
+                protection,
+                str(len(spec.endpoints)),
+                ", ".join(str(ref) for ref in spec.endpoints),
+            ]
+        )
+        records.append(
+            {
+                "name": fqn,
+                "type": spec.type.value,
+                "stack": list(view.stack) if view is not None else [spec.type.value],
+                "layer": spec.type.layer,
+                "over": view.over if view is not None else spec.over,
+                "vni": spec.vni,
+                "encrypted": tunnel.encrypts,
+                "protected": view.protected if view is not None else tunnel.encrypts,
+                "transport": spec.type.transport.value,
+                "port": spec.port,
+                "mtu": spec.mtu,
+                "endpoints": [str(ref) for ref in spec.endpoints],
+                "source": str(inventory.source_of(fqn) or ""),
+            }
+        )
+    headers = ("NAME", "STACK", "VNI", "ENCRYPTED", "ENDS", "ENDPOINTS")
+    aligns: tuple[Align, ...] = ("left", "left", "right", "left", "right", "left")
+    return headers, aligns, rows, records
+
+
 def _list_vlans(inventory: Inventory) -> _Listing:
     """Every VLAN, with the elements that participate in it.
 
@@ -1342,6 +1402,7 @@ def _list_subnets(inventory: Inventory) -> _Listing:
 _LISTINGS: Final[dict[str, Any]] = {
     "devices": _list_devices,
     "cables": _list_cables,
+    "tunnels": _list_tunnels,
     "vlans": _list_vlans,
     "subnets": _list_subnets,
 }

@@ -74,6 +74,10 @@ def build_details(graph: Graph) -> dict[str, dict[str, Any]]:
                     "peerElement": other.get("element"),
                     "peerInterface": other.get("interface"),
                     "medium": edge.get("medium"),
+                    # A tunnel runs over no medium, so the stack it belongs to
+                    # is what the "medium" column of the links table shows
+                    # instead: 'vxlan over ipsec' rather than a blank cell.
+                    "stack": " over ".join(edge["tunnel"]["stack"]) if "tunnel" in edge else None,
                     "speedText": edge.get("speedText"),
                     "label": edge.get("label"),
                     "vlans": edge.get("vlans", []),

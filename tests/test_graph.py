@@ -680,6 +680,7 @@ def test_stats_of_an_empty_graph(tmp_path: Path) -> None:
         "edges": 0,
         "elements": 0,
         "vlans": 0,
+        "tunnels": 0,
         "subnets": 0,
         "namespaces": 0,
         "components": 0,

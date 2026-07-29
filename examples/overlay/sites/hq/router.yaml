@@ -1,0 +1,69 @@
+# The hub of every overlay: the WireGuard mesh, the IPsec tunnel to branch-b,
+# and the remote-access OpenVPN concentrator.
+#
+# Each tunnel interface carries the addressing *inside* its tunnel and its own
+# MTU, sized from the encapsulation overhead of the stack above it
+# (docs/schema.md §14.1). 'parent' names the port the outer packets leave by.
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-hq
+  description: HQ edge router and overlay hub.
+  labels: {site: hq, role: edge}
+spec:
+  vendor: Ubiquiti
+  model: EdgeRouter 4
+  location: HQ, comms room
+  vlans:
+    - id: 100
+      name: overlay
+      description: Stretched layer-2 segment, HQ to branch-b.
+  interfaces:
+    - name: eth0
+      type: ethernet
+      description: uplink to wan-core
+      mtu: 1500
+      ipv4:
+        addresses: [198.51.100.2/30]
+    - name: eth1
+      type: ethernet
+      description: HQ LAN
+      mtu: 1500
+      ipv4:
+        addresses: [10.10.0.1/24]
+    - name: wg0
+      type: tunnel
+      description: site-to-site mesh
+      parent: eth0
+      mtu: 1420
+      ipv4:
+        addresses: [10.255.0.1/24]
+    - name: ipsec0
+      type: tunnel
+      description: encrypted transport to branch-b
+      parent: eth0
+      mtu: 1427
+      ipv4:
+        addresses: [10.254.0.1/30]
+    - name: vxlan100
+      type: tunnel
+      description: stretched VLAN 100, inside ipsec0
+      parent: ipsec0
+      mtu: 1377
+      vlan:
+        mode: access
+        access_vlan: 100
+    - name: gre1
+      type: tunnel
+      description: management GRE, inside ipsec0
+      parent: ipsec0
+      mtu: 1403
+      ipv4:
+        addresses: [10.252.0.1/30]
+    - name: ovpn0
+      type: tunnel
+      description: remote-access concentrator
+      parent: eth0
+      mtu: 1431
+      ipv4:
+        addresses: [10.253.0.1/24]

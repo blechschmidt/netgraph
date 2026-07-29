@@ -4,7 +4,8 @@ The models mirror ``docs/schema.md`` one-to-one:
 
 * :class:`Metadata` and :class:`ElementBase` -- the document envelope (§3).
 * :class:`Interface` and friends -- RFC 8343 / RFC 8344 / 802.1Q data (§6.2).
-* :class:`Device` and its five kinds, :class:`Cable`, :class:`Adapter` (§6-§8).
+* :class:`Device` and its five kinds, :class:`Cable`, :class:`Adapter` (§6-§8)
+  and :class:`Tunnel`, the logical counterpart of a cable (§14).
 * :data:`Element` -- the discriminated union on ``kind``.
 
 :func:`parse_document` is the entry point the loader uses; it raises
@@ -69,6 +70,15 @@ from netgraph.models.scalars import (
     normalise_mac,
     parse_bitrate,
 )
+from netgraph.models.tunnel import (
+    MAX_VNI,
+    Tunnel,
+    TunnelAuth,
+    TunnelMode,
+    TunnelSpec,
+    TunnelTransport,
+    TunnelType,
+)
 
 __all__ = [
     "ADAPTER_INTERFACE_TYPES",
@@ -77,6 +87,7 @@ __all__ = [
     "CABLEABLE_TYPES",
     "ELEMENT_MODELS",
     "KINDS",
+    "MAX_VNI",
     "RESERVED_LABEL_PREFIX",
     "AcceptableFrames",
     "Adapter",
@@ -108,6 +119,12 @@ __all__ = [
     "SchemaIssue",
     "Server",
     "Switch",
+    "Tunnel",
+    "TunnelAuth",
+    "TunnelMode",
+    "TunnelSpec",
+    "TunnelTransport",
+    "TunnelType",
     "UpstreamPort",
     "UpstreamType",
     "VlanConfig",

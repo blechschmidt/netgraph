@@ -1,0 +1,20 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-branch-b
+  description: Administrator's workstation. Dials into HQ over OpenVPN.
+  labels: {site: branch-b}
+spec:
+  interfaces:
+    - name: enp3s0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.30.0.10/24]
+    - name: tun0
+      type: tunnel
+      description: remote access to HQ
+      parent: enp3s0
+      mtu: 1431
+      ipv4:
+        addresses: [10.253.0.10/24]

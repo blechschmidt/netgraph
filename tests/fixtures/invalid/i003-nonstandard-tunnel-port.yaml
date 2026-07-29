@@ -1,0 +1,55 @@
+# I003 (NG-T015) - a tunnel listens on a port other than the registered one.
+#
+# WireGuard's registered port is 51820. Moving it is a normal thing to do, which
+# is why this is information rather than a complaint - but the port is what a
+# firewall rule needs, so it is printed.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+    - name: wg0
+      type: tunnel
+      mtu: 1420
+      ipv4:
+        addresses: [10.9.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+    - name: wg0
+      type: tunnel
+      mtu: 1420
+      ipv4:
+        addresses: [10.9.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints: [pc-a:eth0, pc-b:eth0]
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: wg-a-b
+spec:
+  type: wireguard
+  endpoints: [pc-a:wg0, pc-b:wg0]
+  port: 51821

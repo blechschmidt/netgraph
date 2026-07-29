@@ -485,6 +485,13 @@ def test_the_page_and_its_assets_are_served(server: WebServer) -> None:
         assert body == asset(name)
 
 
+def test_the_layer_selector_offers_every_layer_the_server_accepts() -> None:
+    """A layer the page cannot ask for is a view nobody finds."""
+    page = asset("index.html").decode("utf-8")
+    for layer in Layer:
+        assert f'<option value="{layer.value}">' in page, layer.value
+
+
 def test_the_editor_is_seeded_from_the_command_line(server: WebServer) -> None:
     status, headers, body = request(server, SOURCE_PATH)
     assert status == 200

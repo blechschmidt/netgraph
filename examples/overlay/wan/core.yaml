@@ -1,0 +1,31 @@
+# The provider edge every site is homed to. It carries no overlay of its own:
+# the tunnels run *through* it, which is the whole point of an overlay.
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: wan-core
+  description: Provider edge. Three /30 hand-offs, one per site.
+  labels: {role: wan}
+spec:
+  vendor: Juniper
+  model: MX204
+  location: IX, hall 2
+  interfaces:
+    - name: ge-0/0/0
+      type: ethernet
+      description: hand-off to hq
+      mtu: 1500
+      ipv4:
+        addresses: [198.51.100.1/30]
+    - name: ge-0/0/1
+      type: ethernet
+      description: hand-off to branch-a
+      mtu: 1500
+      ipv4:
+        addresses: [198.51.100.5/30]
+    - name: ge-0/0/2
+      type: ethernet
+      description: hand-off to branch-b
+      mtu: 1500
+      ipv4:
+        addresses: [198.51.100.9/30]

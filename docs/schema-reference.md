@@ -30,6 +30,7 @@ the field maps to, with `…` standing for
 | `server` | [DeviceSpec](#spec--switch-router-hub-computer-server) | End host, drawn as a rack-mount server. Structurally identical to `computer`. |
 | `cable` | [CableSpec](#spec--cable) | An undirected link between exactly two interfaces. Owns no interfaces. |
 | `adapter` | [AdapterSpec](#spec--adapter) | Presents interfaces over a non-network host port. |
+| `tunnel` | [TunnelSpec](#spec--tunnel) | An undirected logical link between two or more `tunnel` interfaces. Owns no interfaces; `over` nests it inside another tunnel. |
 
 ## Document envelope
 
@@ -106,7 +107,7 @@ One entry per port or logical interface. Used by both devices and adapters.
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
 | `name` | interface name | **yes** | — | Interface name as the device itself spells it (`eth0`, `GigabitEthernet0/2`). Unique within the element (`NG-I001`), and the target of a cable endpoint. | `/if:interfaces/if:interface/if:name` |
-| `type` | `ethernet` \| `wifi` \| `loopback` \| `bridge` \| `vlan` \| `lag` | **yes** | — | What kind of interface this is. Decides which other fields are allowed and whether a cable may terminate here (`NG-C009`). | `…/if:type` |
+| `type` | `ethernet` \| `wifi` \| `loopback` \| `bridge` \| `vlan` \| `lag` \| `tunnel` | **yes** | — | What kind of interface this is. Decides which other fields are allowed and whether a cable may terminate here (`NG-C009`). | `…/if:type` |
 | `description` | string | no | *unset* | Free text describing what the port is for. | `…/if:description` |
 | `enabled` | boolean | no | `true` | Intended administrative state. A disabled interface is exempt from `W101`. | `…/if:enabled` |
 | `mac` | MAC address | no | *unset* | Hardware address, EUI-48. Accepted in colon, dash or Cisco dotted form and normalised to lower-case colon form. `if:phys-address` is `config false` in RFC 8343, so an exporter must not write it to a live datastore. | `…/if:phys-address` |
@@ -236,6 +237,29 @@ The host-facing port of an adapter.
 
 * Declaring `attached_to` **and** cabling the upstream port is an error (`NG-X005`): the host attachment is declared exactly once.
 
+## `spec` — tunnel
+
+A tunnel is an undirected logical link between two or more interfaces of `type: tunnel`. It is to a logical topology what a cable is to a physical one, and a first-class element for the same reason.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `type` | `wireguard` \| `ipsec` \| `openvpn` \| `pptp` \| `l2tp` \| `gre` \| `vxlan` \| `geneve` | **yes** | — | The encapsulation: `wireguard`, `ipsec`, `openvpn`, `pptp`, `l2tp`, `gre`, `vxlan` or `geneve`. It decides the layer carried, the outer transport, the default port, whether the payload is encrypted and how much MTU the headers cost. | — |
+| `endpoints` | [InterfaceRef](#specendpoints) list | **yes** | — | Two or more `device:interface` references, each naming an interface of `type: tunnel` (`NG-T001`, `NG-T003`). The link is undirected, so the list is sorted on load. Three or more endpoints make it multipoint, and it is then drawn as a node rather than a line. | — |
+| `over` | element reference | no | *unset* | The tunnel this one is encapsulated in — `vxlan` over `ipsec` is written by naming the IPsec tunnel here (`NG-T004`). Absent means the tunnel runs directly over the physical topology. The chain must not loop (`NG-T005`). | — |
+| `mode` | `tunnel` \| `transport` | no | *unset* | IPsec's encapsulation mode, `tunnel` or `transport` (RFC 4301). Defaults to `tunnel`; every other type has only one mode and must not declare it (`NG-T008`). | — |
+| `vni` | integer, 0–16777215 | no | *unset* | The 24-bit VXLAN/Geneve virtual network identifier. Required for those two types and rejected for every other (`NG-T007`). | — |
+| `port` | integer, 1–65535 | no | *unset* | Outer UDP/TCP port. Defaults to the registered port of the type (WireGuard 51820, OpenVPN 1194, L2TP 1701, VXLAN 4789, Geneve 6081) and is rejected for GRE and IPsec, which run directly over IP (`NG-T008`). | — |
+| `mtu` | integer, 68–65535 | no | *unset* | MTU of the tunnel interface. Compared with what the underlay leaves after the encapsulation overhead of the whole stack (`NG-T011`). | — |
+| `encrypted` | boolean | no | *unset* | Whether the payload is protected. Defaults to what the type does — true for WireGuard, IPsec and OpenVPN, false for GRE, VXLAN, Geneve, L2TP and PPTP, whose MPPE is broken. Set it to true to record that the deployment protects an otherwise cleartext type some other way. | — |
+| `cipher` | string | no | *unset* | Negotiated cipher suite, free text (`chacha20-poly1305`, `aes-256-gcm`). Only on a tunnel that encrypts (`NG-T009`). | — |
+| `auth` | `psk` \| `certificate` \| `public-key` \| `password` | no | *unset* | How the endpoints authenticate each other: `psk`, `certificate`, `public-key` or `password`. The *method*, never the material — netgraph stores no secrets (`NG-T010`). | — |
+| `label` | string | no | *unset* | Free-text identifier printed on the edge, as a cable's `label` is. | — |
+
+* `endpoints` uses the same `device:interface` form a cable does, and each one must name an interface of `type: tunnel` (`NG-T003`) — the virtual interface the tunnel presents, not the physical port its outer packets leave by.
+* `over` nests one tunnel inside another: `vxlan` over `ipsec` is written by naming the IPsec tunnel there. The chain must not loop (`NG-T005`).
+* `type` supplies the defaults for `port`, `encrypted` and `mode`, and the encapsulation overhead `NG-T011` measures an MTU against. Materialised on load, so a loaded document states them explicitly.
+* There is nowhere to put a key, a password or a certificate, and the fields people reach for are rejected by name (`NG-T010`). `auth` records the *method*.
+
 ## Enumerations
 
 ### `interfaces[].type`
@@ -250,6 +274,7 @@ Only `ethernet`, `wifi` and `lag` can terminate a cable (`NG-C009`).
 | `bridge` | `ianaift:bridge` | no |
 | `vlan` | `ianaift:l2vlan` | no |
 | `lag` | `ianaift:ieee8023adLag` | yes |
+| `tunnel` | `ianaift:tunnel` | no |
 
 ### `vlan.mode`
 
@@ -312,6 +337,52 @@ Only `usb` and `usb-c` have an IANA interface-type identity.
 | `m2` |
 | `sfp` |
 | `internal` |
+
+### `tunnel.type`
+
+Each type fixes the layer carried, the outer transport and port, whether the payload is encrypted, and the encapsulation overhead. See §14.1 of the schema for the table.
+
+| Value |
+|---|
+| `wireguard` |
+| `ipsec` |
+| `openvpn` |
+| `pptp` |
+| `l2tp` |
+| `gre` |
+| `vxlan` |
+| `geneve` |
+
+### `tunnel` outer transport
+
+Derived from `type`; `gre` and `esp` run directly over IP and carry no port.
+
+| Value |
+|---|
+| `udp` |
+| `tcp` |
+| `gre` |
+| `esp` |
+
+### `tunnel.mode`
+
+IPsec only; every other type has a single mode.
+
+| Value |
+|---|
+| `tunnel` |
+| `transport` |
+
+### `tunnel.auth`
+
+The authentication *method*. netgraph never stores key material (`NG-T010`).
+
+| Value |
+|---|
+| `psk` |
+| `certificate` |
+| `public-key` |
+| `password` |
 
 ## Scalar formats
 

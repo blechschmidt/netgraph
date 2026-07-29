@@ -1,0 +1,84 @@
+# Five tunnels, four shapes.
+#
+#   wg-mesh      point-to-multipoint, three endpoints -> drawn as a node
+#   ipsec-hq-b   point-to-point, encrypting            -> drawn as a line
+#   vx-100       layer 2, over ipsec-hq-b              -> VXLAN over IPsec
+#   gre-mgmt     layer 3, over ipsec-hq-b              -> a second tenant of one underlay
+#   ovpn-admin   remote access, host to concentrator
+#
+# Every MTU is the underlay's minus this tunnel's overhead (docs/schema.md
+# §14.1), which is what keeps NG-T011 quiet. There is nowhere here to put a key:
+# 'auth' names the method and nothing else (§14.2).
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: wg-mesh
+  description: Full mesh between the three sites.
+  labels: {role: transit}
+spec:
+  type: wireguard
+  endpoints:
+    - rtr-hq:wg0
+    - rtr-branch-a:wg0
+    - rtr-branch-b:wg0
+  mtu: 1420
+  cipher: chacha20-poly1305
+  auth: public-key
+  label: MESH
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: ipsec-hq-b
+  description: The encrypted transport branch-b's overlays ride inside.
+  labels: {role: transit}
+spec:
+  type: ipsec
+  mode: tunnel
+  endpoints:
+    - rtr-hq:ipsec0
+    - rtr-branch-b:ipsec0
+  mtu: 1427
+  cipher: aes-256-gcm
+  auth: certificate
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: vx-100
+  description: VLAN 100 stretched from HQ to branch-b, inside the IPsec tunnel.
+spec:
+  type: vxlan
+  vni: 100
+  endpoints:
+    - rtr-hq:vxlan100
+    - rtr-branch-b:vxlan100
+  over: ipsec-hq-b
+  mtu: 1377
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: gre-mgmt
+  description: Out-of-band management, sharing the IPsec underlay with the VXLAN.
+spec:
+  type: gre
+  endpoints:
+    - rtr-hq:gre1
+    - rtr-branch-b:gre1
+  over: ipsec-hq-b
+  mtu: 1403
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: ovpn-admin
+  description: Remote access from the administrator's workstation to HQ.
+spec:
+  type: openvpn
+  endpoints:
+    - rtr-hq:ovpn0
+    - pc-branch-b:tun0
+  mtu: 1431
+  cipher: aes-256-gcm
+  auth: certificate

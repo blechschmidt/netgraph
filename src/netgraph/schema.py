@@ -278,7 +278,14 @@ _CONDITIONALS: Final[dict[str, list[dict[str, Any]]]] = {
         {
             "if": {"properties": {"type": {"const": "vlan"}}, "required": ["type"]},
             "then": {"required": ["parent", "vlan"]},
-            "else": {"not": {"required": ["parent"]}},
+            # A ``tunnel`` interface *may* name the underlay port its outer
+            # packets leave by (§14.4); every other type may not name a parent
+            # at all.
+            "else": {
+                "if": {"properties": {"type": {"const": "tunnel"}}, "required": ["type"]},
+                "then": True,
+                "else": {"not": {"required": ["parent"]}},
+            },
         },
         {
             "if": {

@@ -45,18 +45,14 @@ from pydantic.fields import FieldInfo  # noqa: E402
 
 from netgraph.models import (  # noqa: E402
     AcceptableFrames,
-    Adapter,
     AdapterSpec,
     BridgeConfig,
     BridgeType,
-    Cable,
     CableSpec,
-    Computer,
     DeviceSpec,
     Duplex,
     ElementBase,
     Forwarding,
-    Hub,
     Interface,
     InterfaceRef,
     InterfaceType,
@@ -66,9 +62,11 @@ from netgraph.models import (  # noqa: E402
     IPv6Config,
     Medium,
     Metadata,
-    Router,
-    Server,
-    Switch,
+    TunnelAuth,
+    TunnelMode,
+    TunnelSpec,
+    TunnelTransport,
+    TunnelType,
     UpstreamPort,
     UpstreamType,
     VlanConfig,
@@ -76,6 +74,7 @@ from netgraph.models import (  # noqa: E402
     VlanMode,
     VlanSet,
 )
+from netgraph.models.document import ELEMENT_MODELS  # noqa: E402
 from netgraph.models.fielddocs import (  # noqa: E402
     DOCUMENTED_MODELS,
     FIELD_DOCS,
@@ -225,6 +224,25 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "the host attachment is declared exactly once.",
         ),
     ),
+    Section(
+        TunnelSpec,
+        "`spec` — tunnel",
+        "A tunnel is an undirected logical link between two or more interfaces of "
+        "`type: tunnel`. It is to a logical topology what a cable is to a physical one, and a "
+        "first-class element for the same reason.",
+        notes=(
+            "`endpoints` uses the same `device:interface` form a cable does, and each one must "
+            "name an interface of `type: tunnel` (`NG-T003`) — the virtual interface the tunnel "
+            "presents, not the physical port its outer packets leave by.",
+            "`over` nests one tunnel inside another: `vxlan` over `ipsec` is written by naming "
+            "the IPsec tunnel there. The chain must not loop (`NG-T005`).",
+            "`type` supplies the defaults for `port`, `encrypted` and `mode`, and the "
+            "encapsulation overhead `NG-T011` measures an MTU against. Materialised on load, so "
+            "a loaded document states them explicitly.",
+            "There is nowhere to put a key, a password or a certificate, and the fields people "
+            "reach for are rejected by name (`NG-T010`). `auth` records the *method*.",
+        ),
+    ),
 )
 
 #: Enumerations rendered as value tables, with the note that explains them.
@@ -247,6 +265,23 @@ ENUMS: Final[tuple[tuple[type[enum.Enum], str, str], ...]] = (
         UpstreamType,
         "`upstream.type`",
         "Only `usb` and `usb-c` have an IANA interface-type identity.",
+    ),
+    (
+        TunnelType,
+        "`tunnel.type`",
+        "Each type fixes the layer carried, the outer transport and port, whether the payload "
+        "is encrypted, and the encapsulation overhead. See §14.1 of the schema for the table.",
+    ),
+    (
+        TunnelTransport,
+        "`tunnel` outer transport",
+        "Derived from `type`; `gre` and `esp` run directly over IP and carry no port.",
+    ),
+    (TunnelMode, "`tunnel.mode`", "IPsec only; every other type has a single mode."),
+    (
+        TunnelAuth,
+        "`tunnel.auth`",
+        "The authentication *method*. netgraph never stores key material (`NG-T010`).",
     ),
 )
 
@@ -488,7 +523,7 @@ def _field_rows(section: Section) -> Iterator[str]:
 
 
 def _kind_table() -> Iterator[str]:
-    models = (Switch, Router, Hub, Computer, Server, Cable, Adapter)
+    models = ELEMENT_MODELS
     yield "| `kind` | `spec` model | Notes |"
     yield "|---|---|---|"
     for model in models:

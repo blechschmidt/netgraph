@@ -1,0 +1,46 @@
+---
+title: "Overlay, encapsulation"
+---
+flowchart TB
+    subgraph ns0["sites/branch-a"]
+        direction TB
+        n0(["rtr-branch-a<br/>[router]<br/>198.51.100.6/30<br/>10.20.0.1/24<br/>10.255.0.2/24"])
+    end
+    subgraph ns1["sites/branch-b"]
+        direction TB
+        n1[/"pc-branch-b<br/>[computer]<br/>10.30.0.10/24<br/>10.253.0.10/24"/]
+        n2(["rtr-branch-b<br/>[router]<br/>198.51.100.10/30<br/>10.30.0.1/24<br/>10.255.0.3/24<br/>10.254.0.2/30<br/>(+1 more)<br/>vlans: 100"])
+    end
+    subgraph ns2["sites/hq"]
+        direction TB
+        n3(["rtr-hq<br/>[router]<br/>198.51.100.2/30<br/>10.10.0.1/24<br/>10.255.0.1/24<br/>10.254.0.1/30<br/>(+2 more)<br/>vlans: 100"])
+    end
+    subgraph ns3["tunnels"]
+        direction TB
+        n4[["wg-mesh<br/>[wireguard tunnel]<br/>mtu 1420"]]
+        n5[["ipsec-hq-b<br/>[ipsec tunnel]<br/>mtu 1427"]]
+        n6[["vx-100<br/>[vxlan tunnel]<br/>vxlan over ipsec, vni 100, encrypted underlay<br/>mtu 1377"]]
+        n7[["gre-mgmt<br/>[gre tunnel]<br/>gre over ipsec, encrypted underlay<br/>mtu 1403"]]
+        n8[["ovpn-admin<br/>[openvpn tunnel]<br/>mtu 1431"]]
+    end
+
+    n0 -. "wg0 · wireguard · MESH" .- n4
+    n2 -. "wg0 · wireguard · MESH" .- n4
+    n3 -. "wg0 · wireguard · MESH" .- n4
+    n2 -. "ipsec0 · ipsec" .- n5
+    n3 -. "ipsec0 · ipsec" .- n5
+    n2 -. "vxlan100 · vxlan over ipsec · vni 100 · via encrypted underlay" .- n6
+    n3 -. "vxlan100 · vxlan over ipsec · vni 100 · via encrypted underlay" .- n6
+    n6 -. "vxlan over" .- n5
+    n2 -. "gre1 · gre over ipsec · via encrypted underlay" .- n7
+    n3 -. "gre1 · gre over ipsec · via encrypted underlay" .- n7
+    n7 -. "gre over" .- n5
+    n1 -. "tun0 · openvpn" .- n8
+    n3 -. "ovpn0 · openvpn" .- n8
+
+    classDef computer fill:#f5f5f5,stroke:#6b7280,stroke-width:1px
+    classDef router fill:#dbe9f6,stroke:#2563eb,stroke-width:1px
+    classDef tunnel fill:#ede9fe,stroke:#6d28d9,stroke-width:1px,stroke-dasharray:4 3
+    class n1 computer
+    class n0,n2,n3 router
+    class n4,n5,n6,n7,n8 tunnel

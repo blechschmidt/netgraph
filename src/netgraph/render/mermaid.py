@@ -17,7 +17,16 @@ from __future__ import annotations
 from collections.abc import Iterable, Iterator, Mapping
 from typing import Final
 
-from netgraph.render.graph import SUBNET_KIND, Edge, EdgeKind, Graph, Layer, Node
+from netgraph.render.graph import (
+    SUBNET_KIND,
+    TUNNEL_KIND,
+    Edge,
+    EdgeKind,
+    Graph,
+    Layer,
+    Node,
+    TunnelView,
+)
 from netgraph.render.options import RenderOptions
 
 __all__ = ["MERMAID_MAX_EDGES", "mermaid_advisories", "render_mermaid", "to_mermaid"]
@@ -44,6 +53,9 @@ _NODE_SHAPE: Final[Mapping[str, tuple[str, str]]] = {
     "server": ("[(", ")]"),
     "adapter": (">", "]"),
     SUBNET_KIND: ("(", ")"),
+    # ``[[…]]`` is Mermaid's subroutine box: a thing the diagram delegates to,
+    # which is what a tunnel is to the path underneath it.
+    TUNNEL_KIND: ("[[", "]]"),
 }
 _DEFAULT_SHAPE: Final[tuple[str, str]] = ("[", "]")
 
@@ -56,12 +68,19 @@ _CLASS_STYLE: Final[Mapping[str, str]] = {
     "server": "fill:#eae2f5,stroke:#7c3aed,stroke-width:1px",
     "adapter": "fill:#fdf0e3,stroke:#ea580c,stroke-width:1px,stroke-dasharray:4 3",
     SUBNET_KIND: "fill:#e0f2f1,stroke:#0f766e,stroke-width:1px",
+    TUNNEL_KIND: "fill:#ede9fe,stroke:#6d28d9,stroke-width:1px,stroke-dasharray:4 3",
 }
 
 #: Link syntax per edge style: solid, thick (fibre) and dotted (attachment).
 _SOLID: Final = ("---", "-- {label} ---")
 _THICK: Final = ("===", "== {label} ===")
 _DOTTED: Final = ("-.-", "-. {label} .-")
+
+#: Edge kinds with no physical line to encode: they take the dotted style and
+#: rely on their label. See :func:`_edges`.
+_LOGICAL_EDGE_KINDS: Final[frozenset[EdgeKind]] = frozenset(
+    {EdgeKind.TUNNEL, EdgeKind.ENCAPSULATION}
+)
 
 _INDENT: Final = "    "
 
@@ -130,6 +149,11 @@ def _edges(graph: Graph, ids: Mapping[str, str], options: RenderOptions) -> Iter
             # A membership is a plain line: it is not a cable, so it has no
             # medium to encode in the line style.
             plain, labelled = _SOLID
+        elif edge.kind in _LOGICAL_EDGE_KINDS:
+            # Mermaid offers three line styles and the physical ones are spoken
+            # for, so a tunnel borrows the dotted line and says what it is in
+            # the label — which it would carry anyway.
+            plain, labelled = _DOTTED
         elif edge.kind is EdgeKind.ATTACHMENT or edge.medium == "wireless":
             plain, labelled = _DOTTED
         elif edge.medium == "fiber":
@@ -174,6 +198,14 @@ def _node_text(node: Node, options: RenderOptions, layer: Layer) -> str:
             parts.append(f"vlans: {_compact_ids(node.vlans)}")
         return "\n".join(parts)
 
+    if node.tunnel is not None:
+        parts = [node.name, f"[{node.tunnel.type} tunnel]"]
+        if node.tunnel.summary != node.tunnel.type:
+            parts.append(node.tunnel.summary)
+        if node.tunnel.mtu is not None:
+            parts.append(f"mtu {node.tunnel.mtu}")
+        return "\n".join(parts)
+
     parts = [node.name, f"[{node.kind}]"]
     # At layer 3 the addresses live on the edges, where they say which interface
     # holds them; see the DOT renderer for the same reasoning.
@@ -199,10 +231,19 @@ def _edge_text(edge: Edge, layer: Layer, options: RenderOptions) -> str:
     with a middle dot separator. A layer-3 membership carries the interface and
     the address it holds — there is no physical detail to choose between.
     """
+    if edge.kind is EdgeKind.ENCAPSULATION:
+        return f"{edge.label} over" if edge.label else "over"
+
     parts: list[str] = []
     ports = _port_text(edge)
     if ports:
         parts.append(ports)
+
+    if edge.kind is EdgeKind.TUNNEL and edge.tunnel is not None:
+        parts.extend(_tunnel_text(edge.tunnel))
+        if layer is Layer.L2 and options.show_vlans and edge.vlans:
+            parts.append(f"vlan {_compact_ids(edge.vlans)}")
+        return " · ".join(parts)
 
     if edge.kind is EdgeKind.SUBNET:
         if options.show_ips and edge.addresses:
@@ -221,6 +262,18 @@ def _edge_text(edge: Edge, layer: Layer, options: RenderOptions) -> str:
         if speed:
             parts.append(speed)
     return " · ".join(parts)
+
+
+def _tunnel_text(view: TunnelView) -> list[str]:
+    """The encapsulation, the VNI and — loudest — whether it is in the clear."""
+    parts = [view.stack_text]
+    if view.vni is not None:
+        parts.append(f"vni {view.vni}")
+    if view.label:
+        parts.append(view.label)
+    if not view.encrypted:
+        parts.append("via encrypted underlay" if view.encrypted_by else "cleartext")
+    return parts
 
 
 def _port_text(edge: Edge) -> str:

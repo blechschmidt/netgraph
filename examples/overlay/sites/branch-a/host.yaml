@@ -1,0 +1,13 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-branch-a
+  description: Workstation, Branch A.
+  labels: {site: branch-a}
+spec:
+  interfaces:
+    - name: enp3s0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.20.0.10/24]

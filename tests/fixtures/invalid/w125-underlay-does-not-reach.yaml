@@ -1,0 +1,123 @@
+# W125 (NG-T006) - an overlay terminates where its underlay does not reach.
+#
+# The OpenVPN tunnel runs over 'wg-a-b', which only joins pc-a and pc-b, yet it
+# also terminates on pc-c: the outer packets to that third endpoint have no
+# such path. A hub joins all three so W103 and W121 stay quiet, and every host
+# sits in one prefix so W122 does too.
+apiVersion: netgraph.dev/v1alpha1
+kind: hub
+metadata:
+  name: hub-a
+spec:
+  interfaces:
+    - name: p1
+      type: ethernet
+      mtu: 1500
+    - name: p2
+      type: ethernet
+      mtu: 1500
+    - name: p3
+      type: ethernet
+      mtu: 1500
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/29]
+    - name: wg0
+      type: tunnel
+      mtu: 1420
+      ipv4:
+        addresses: [10.9.0.1/30]
+    - name: ovpn0
+      type: tunnel
+      mtu: 1400
+      ipv4:
+        addresses: [10.10.0.1/29]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/29]
+    - name: wg0
+      type: tunnel
+      mtu: 1420
+      ipv4:
+        addresses: [10.9.0.2/30]
+    - name: ovpn0
+      type: tunnel
+      mtu: 1400
+      ipv4:
+        addresses: [10.10.0.2/29]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-c
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.3/29]
+    - name: ovpn0
+      type: tunnel
+      mtu: 1400
+      ipv4:
+        addresses: [10.10.0.3/29]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-hub
+spec:
+  endpoints: [pc-a:eth0, hub-a:p1]
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-b-hub
+spec:
+  endpoints: [pc-b:eth0, hub-a:p2]
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-c-hub
+spec:
+  endpoints: [pc-c:eth0, hub-a:p3]
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: wg-a-b
+spec:
+  type: wireguard
+  endpoints: [pc-a:wg0, pc-b:wg0]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: ovpn-mesh
+spec:
+  type: openvpn
+  endpoints: [pc-a:ovpn0, pc-b:ovpn0, pc-c:ovpn0]
+  over: wg-a-b

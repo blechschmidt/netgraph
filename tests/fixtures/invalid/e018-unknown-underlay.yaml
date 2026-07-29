@@ -1,0 +1,58 @@
+# E018 (NG-T004) - 'over' names a tunnel that is not declared.
+#
+# Nothing called 'ipsec-core' exists, so the WireGuard tunnel is silently
+# demoted from "nested" to "straight over the underlay network".
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+    - name: wg0
+      type: tunnel
+      mtu: 1420
+      ipv4:
+        addresses: [10.9.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+    - name: wg0
+      type: tunnel
+      mtu: 1420
+      ipv4:
+        addresses: [10.9.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - pc-a:eth0
+    - pc-b:eth0
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: wg-a-b
+spec:
+  type: wireguard
+  endpoints:
+    - pc-a:wg0
+    - pc-b:wg0
+  over: ipsec-core

@@ -8,7 +8,7 @@ without importing the validator itself.
 Two identifier vocabularies exist and both are accepted everywhere a rule can be
 named (``netgraph.toml``, the ``netgraph/ignore`` annotation, ``--disable``):
 
-* The **short ids** ``E001``…``E015``, ``W101``…``W124`` and ``I001``…``I002``
+* The **short ids** ``E001``…``E019``, ``W101``…``W129`` and ``I001``…``I003``
   used by the validation engine and printed in diagnostics. The letter is the
   default severity — ``E`` error, ``W`` warning, ``I`` info — as first
   assigned; a rule keeps its id when an inventory re-grades it.
@@ -190,6 +190,30 @@ RULES: Final[tuple[Rule, ...]] = (
         ("NG-X001",),
     ),
     Rule(
+        "E016",
+        Severity.ERROR,
+        "A tunnel endpoint references an unknown element or interface.",
+        ("NG-T002",),
+    ),
+    Rule(
+        "E017",
+        Severity.ERROR,
+        "A tunnel endpoint is not an interface of type 'tunnel'.",
+        ("NG-T003",),
+    ),
+    Rule(
+        "E018",
+        Severity.ERROR,
+        "A tunnel's 'over' names no tunnel of this inventory.",
+        ("NG-T004",),
+    ),
+    Rule(
+        "E019",
+        Severity.ERROR,
+        "Tunnel 'over' references form a cycle, so nothing reaches the underlay.",
+        ("NG-T005",),
+    ),
+    Rule(
         "W101",
         Severity.WARNING,
         "An interface has neither IPv4 nor IPv6 and is not a switchport.",
@@ -334,6 +358,36 @@ RULES: Final[tuple[Rule, ...]] = (
         ("NG-X007",),
     ),
     Rule(
+        "W125",
+        Severity.WARNING,
+        "An overlay terminates where its underlay tunnel does not reach.",
+        ("NG-T006",),
+    ),
+    Rule(
+        "W126",
+        Severity.WARNING,
+        "A tunnel's MTU does not fit inside its underlay after encapsulation.",
+        ("NG-T011",),
+    ),
+    Rule(
+        "W127",
+        Severity.WARNING,
+        "A tunnel encrypts nothing and no tunnel it runs inside does either.",
+        ("NG-T012",),
+    ),
+    Rule(
+        "W128",
+        Severity.WARNING,
+        "A 'tunnel' interface is named by no tunnel document.",
+        ("NG-T013",),
+    ),
+    Rule(
+        "W129",
+        Severity.WARNING,
+        "Two tunnels terminating on one element use the same VNI.",
+        ("NG-T014",),
+    ),
+    Rule(
         "I001",
         Severity.INFO,
         "A MAC address is locally administered rather than vendor-assigned.",
@@ -344,6 +398,12 @@ RULES: Final[tuple[Rule, ...]] = (
         Severity.INFO,
         "An interface is enabled but terminates no cable.",
         ("NG-C015",),
+    ),
+    Rule(
+        "I003",
+        Severity.INFO,
+        "A tunnel listens on a port other than the registered one for its type.",
+        ("NG-T015",),
     ),
 )
 

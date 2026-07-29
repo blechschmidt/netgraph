@@ -1,0 +1,34 @@
+# The physical topology, which is all three sites homed to one provider edge.
+# Every overlay in tunnels/ rides over these three links.
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-wan-hq
+spec:
+  endpoints: [wan-core:ge-0/0/0, rtr-hq:eth0]
+  medium: fiber
+  speed: 1Gbps
+  connector: lc
+  label: PE-01
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-wan-branch-a
+spec:
+  endpoints: [wan-core:ge-0/0/1, rtr-branch-a:ether1]
+  medium: fiber
+  speed: 1Gbps
+  connector: lc
+  label: PE-02
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-wan-branch-b
+spec:
+  endpoints: [wan-core:ge-0/0/2, rtr-branch-b:ether1]
+  medium: fiber
+  speed: 1Gbps
+  connector: lc
+  label: PE-03

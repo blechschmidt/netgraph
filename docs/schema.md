@@ -49,6 +49,7 @@ expands §9 with the reasoning and with what is deliberately left uncovered.
 11. [Worked examples](#11-worked-examples)
 12. [Compatibility policy](#12-compatibility-policy)
 13. [Editor integration](#13-editor-integration)
+14. [Tunnels](#14-tunnels)
 
 ---
 
@@ -195,9 +196,9 @@ spec:
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
 | `apiVersion` | string | M | — | MUST be `netgraph.dev/v1alpha1` for this revision. See §12. |
-| `kind` | enum | M | — | One of `switch`, `router`, `hub`, `computer`, `server`, `cable`, `adapter`. Lower-case; other spellings are rejected. |
+| `kind` | enum | M | — | One of `switch`, `router`, `hub`, `computer`, `server`, `cable`, `adapter`, `tunnel`. Lower-case; other spellings are rejected. |
 | `metadata` | mapping | M | — | §3.1 |
-| `spec` | mapping | M | — | Shape depends on `kind`: §6 (devices), §7 (cable), §8 (adapter). |
+| `spec` | mapping | M | — | Shape depends on `kind`: §6 (devices), §7 (cable), §8 (adapter), §14 (tunnel). |
 
 ### 3.1 `metadata`
 
@@ -341,7 +342,7 @@ free of boilerplate.
 | `ipv4` | AddressFamily | O | `null` | §6.2.3. |
 | `ipv6` | AddressFamily | O | `null` | §6.2.3. |
 | `vlan` | Vlan | O | `null` | §6.2.4. |
-| `parent` | ifname | C | — | Required for `type: vlan`; MUST NOT appear otherwise. → `if:lower-layer-if`. |
+| `parent` | ifname | C | — | Required for `type: vlan`, optional for `type: tunnel`, MUST NOT appear otherwise. → `if:lower-layer-if`. |
 | `members` | list[ifname] | C | — | Required for `type: lag` and `type: bridge`; MUST NOT appear otherwise. → `if:lower-layer-if`. |
 
 #### 6.2.1 Interface `type`
@@ -355,13 +356,17 @@ The four **core** types are mandatory for every implementation:
 | `loopback` | `ianaift:softwareLoopback` | Host loopback or router loopback. |
 | `bridge` | `ianaift:bridge` | Software bridge / switch SVI parent. Takes `members`. |
 
-Two **extension** types complete the model for the common cases that would
-otherwise be inexpressible (sub-interfaces and link aggregation):
+Three **extension** types complete the model for the common cases that would
+otherwise be inexpressible (sub-interfaces, link aggregation and overlays):
 
 | `type` | iana-if-type identity | Meaning |
 |---|---|---|
 | `vlan` | `ianaift:l2vlan` | 802.1Q sub-interface. Requires `parent` and `vlan.access_vlan` (the encapsulation VID). |
 | `lag` | `ianaift:ieee8023adLag` | Aggregated link. Requires `members`. |
+| `tunnel` | `ianaift:tunnel` | The local end of a `tunnel` document (§14): `wg0`, `ipsec0`, `vxlan100`. Holds the *overlay* configuration — the addresses inside the tunnel — while the tunnel document holds the encapsulation. `parent` optionally names the underlay port. |
+
+Only `ethernet`, `wifi` and `lag` can terminate a cable (`NG-C009`); only
+`tunnel` can terminate a tunnel (`NG-T003`).
 
 #### 6.2.2 `mtu`
 
@@ -512,6 +517,11 @@ spec:
 * A cable between two interfaces of the same device is permitted (loopback
   cables and MLAG peer links on a single logical switch exist) but raises a
   warning (`NG-C004`).
+* A cable is the *physical* link. Its logical counterpart — WireGuard, IPsec,
+  OpenVPN, PPTP, L2TP, GRE, VXLAN, Geneve, and any of them nested inside
+  another — is the `tunnel` kind, §14. Section numbers are append-only, which
+  is why a kind added after §13 is documented there rather than next to this
+  one.
 
 ---
 
@@ -753,7 +763,7 @@ named. §10.9 maps them.
 |---|---|---|
 | `NG-D001` | error | The document is a mapping with the four envelope keys; `apiVersion`, `kind`, `metadata`, `spec` are all present. |
 | `NG-D002` | error | `apiVersion` is a recognised version string. |
-| `NG-D003` | error | `kind` is one of the seven defined kinds, lower-case. |
+| `NG-D003` | error | `kind` is one of the eight defined kinds, lower-case. |
 | `NG-D004` | error | `spec` matches the shape required by `kind`. |
 | `NG-D005` | error | No unknown keys anywhere in the document. |
 | `NG-N001` | error | `metadata.name` matches the name grammar (§4.1). |
@@ -909,6 +919,16 @@ first assigned: `E` error, `W` warning, `I` info.
 | `W123` | warning | `NG-X002` | An adapter has cabled downstream ports but neither an `attached_to` nor a cable on its upstream port. |
 | `W124` | warning | `NG-X007` | `attached_to` points at a `hub` or a `switch` rather than at a host. |
 | `I002` | info | `NG-C015` | An interface is `enabled: true` but terminates no cable. `lag` aggregates are exempt: `NG-C012` asks for the members to be cabled. |
+| `E016` | error | `NG-T002` | A tunnel endpoint references an unknown element or interface, or a name that stays ambiguous. |
+| `E017` | error | `NG-T003` | A tunnel endpoint is not an interface of `type: tunnel`. |
+| `E018` | error | `NG-T004` | `over` names no tunnel of this inventory. |
+| `E019` | error | `NG-T005` | The `over` references form a cycle, so no tunnel in it reaches the underlay. |
+| `W125` | warning | `NG-T006` | A tunnel terminates on an element its `over` underlay does not reach. |
+| `W126` | warning | `NG-T011` | A tunnel's `mtu` exceeds its underlay's `mtu` minus its own encapsulation overhead (§14.1). |
+| `W127` | warning | `NG-T012` | A tunnel encrypts nothing and no tunnel in its `over` chain does either. |
+| `W128` | warning | `NG-T013` | An enabled `type: tunnel` interface is named by no `tunnel` document. |
+| `W129` | warning | `NG-T014` | Two tunnels terminating on one element declare the same `vni`. |
+| `I003` | info | `NG-T015` | A tunnel's `port` is not the registered port for its type. |
 
 Ids are permanent (§10), so a suppression written today keeps meaning the same
 thing. Where a short id covers two schema ids (`E001`), naming either alias
@@ -2058,3 +2078,159 @@ as a sexagesimal integer, and by the time either the schema or the loader looks
 at it the original digits are gone. Quote MAC addresses (§5). netgraph's own
 loader detects the case and says so; an editor will simply report that a number
 is not a string.
+
+---
+
+## 14. Tunnels
+
+A tunnel is an undirected **logical** link between two or more interfaces. It is
+to a logical topology what a cable (§7) is to a physical one, and a first-class
+element for the same reason: it carries its own metadata, has its own identity,
+and is validated independently of the devices it joins.
+
+Section numbers in this document are append-only, so the kind added after §13
+is documented here rather than between §7 and §8. Everything else about it
+mirrors the cable: the same `device:interface` endpoint grammar (§4.2), the
+same undirected semantics, the same namespace rules.
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: ipsec-hq-branch
+  labels: {site: hq}
+spec:
+  type: ipsec
+  mode: tunnel
+  endpoints:
+    - rtr-hq:ipsec0
+    - rtr-branch:ipsec0
+  mtu: 1400
+  cipher: aes-256-gcm
+  auth: certificate
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: tunnel
+metadata:
+  name: vx-100
+spec:
+  type: vxlan
+  vni: 100
+  endpoints:
+    - rtr-hq:vxlan100
+    - rtr-branch:vxlan100
+  over: ipsec-hq-branch      # VXLAN over IPsec
+  mtu: 1350
+```
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `type` | enum | M | — | The encapsulation; see §14.1. |
+| `endpoints` | list[ifref] | M | — | Two or more entries, each naming a `type: tunnel` interface (`NG-T001`, `NG-T003`). Order is not significant; the loader sorts them. |
+| `over` | element ref | O | `null` | The tunnel this one runs inside (§14.3). Absent means it runs over the physical topology. |
+| `mode` | enum | C | `tunnel` for `ipsec` and `l2tp` | `tunnel` or `transport` (RFC 4301 §3.2). Rejected for every other type (`NG-T008`). |
+| `vni` | uint24 | C | — | Required for `vxlan` and `geneve`, rejected otherwise (`NG-T007`). |
+| `port` | uint16 | O | the registered port of `type` | Rejected for `gre` and `ipsec`, which run directly over IP (`NG-T008`). |
+| `mtu` | mtu | O | `null` | MTU of the tunnel interface; checked against the underlay by `NG-T011`. |
+| `encrypted` | boolean | O | what `type` does | Set it `true` to record that a cleartext type is protected some other way. |
+| `cipher` | string | C | `null` | Free text (`chacha20-poly1305`, `aes-256-gcm`). Only on a tunnel that encrypts (`NG-T009`). |
+| `auth` | enum | C | `null` | `psk`, `certificate`, `public-key`, `password`. Only on a tunnel that encrypts or authenticates (`NG-T009`). |
+| `label` | string | O | `null` | Free-text identifier printed on the edge, as a cable's `label` is. |
+
+### 14.1 Tunnel types
+
+`type` is not a free-text tag: it fixes five facts the renderer and the
+validator both use, so a diagram can say what a tunnel actually does rather than
+only what it is called.
+
+| `type` | Carries | Outer | Port | Encrypts | Overhead |
+|---|---|---|---|---|---|
+| `wireguard` | packets (L3) | UDP | 51820 | yes | 80 B |
+| `ipsec` | packets (L3) | ESP (IP 50) | — | yes | 73 B |
+| `openvpn` | packets (L3) | UDP | 1194 | yes | 69 B |
+| `pptp` | packets (L3) | GRE (IP 47) | — | **no** | 40 B |
+| `l2tp` | frames (L2) | UDP | 1701 | **no** | 40 B |
+| `gre` | packets (L3) | GRE (IP 47) | — | **no** | 24 B |
+| `vxlan` | frames (L2) | UDP | 4789 | **no** | 50 B |
+| `geneve` | frames (L2) | UDP | 6081 | **no** | 50 B |
+
+* **Carries** decides whether the tunnel is a layer-2 link. A layer-2 tunnel
+  extends a broadcast domain across the underlay, so it carries the VLANs its
+  endpoints are configured for and `netgraph render --layer l2` annotates it
+  exactly as it annotates a trunk. A layer-3 tunnel carries no VLAN.
+* **Encrypts** is a property of the technology, not of the deployment. PPTP is
+  listed as cleartext deliberately: MPPE is broken, so a PPTP tunnel protects
+  nothing. A cleartext tunnel that is not nested inside an encrypting one is
+  `NG-T012`.
+* **Overhead** is the widely published worst case over IPv4 — the number an
+  operator would set an overlay MTU from — not an exact packet layout, which
+  varies with cipher, IP version and NAT traversal. `NG-T011` measures an `mtu`
+  against it.
+
+`port`, `mode` and `encrypted` are **materialised on load** from this table
+(§1), so a loaded document states them explicitly even when the file did not.
+
+### 14.2 What a tunnel does not hold
+
+There is nowhere in this schema to put a private key, a pre-shared key, a
+password, a passphrase or a certificate, and the field names people reach for
+are rejected **by name** with an explanation rather than as unknown keys
+(`NG-T010`). An inventory is a file in version control that gets rendered into
+diagrams and pasted into tickets; it is the wrong place for key material, and a
+schema that accepted some would be inviting the mistake.
+
+`auth` records the authentication *method* — which is what a reader of a diagram
+needs and what an auditor asks for — and `cipher` the negotiated suite.
+
+### 14.3 Semantics
+
+* A tunnel is **undirected**, exactly as a cable is. The endpoint order carries
+  no meaning and the loader sorts it for canonical output.
+* An endpoint names a **`type: tunnel` interface** (`NG-T003`) — the virtual
+  interface the operating system presents (`wg0`, `ipsec0`, `vxlan100`), never
+  the physical port the outer packets leave by. That interface holds the
+  *overlay* configuration: the addresses inside the tunnel, which is what puts
+  both ends in one prefix at layer 3. Its optional `parent` may name the
+  underlay port, which is `if:lower-layer-if` (§14.4).
+* Unlike a cable, an interface may terminate **several** tunnels: a router that
+  is the hub of three VPNs presents three virtual interfaces, but a VTEP may
+  legitimately carry several VXLANs. What is checked instead is that two of them
+  do not claim the same `vni` on one element (`NG-T014`).
+* **Two or more endpoints.** Three or more make the tunnel multipoint — a VXLAN
+  mesh, a hub-and-spoke VPN — and it is then drawn as a *node* with one leg per
+  endpoint rather than as a line, the same choice a subnet gets at layer 3.
+* **`over` nests one tunnel inside another.** `vxlan over ipsec` is written by
+  naming the IPsec tunnel in the VXLAN's `over`. The chain is walked outwards to
+  give every tunnel a depth, a stack (`("vxlan", "ipsec")`) and the nearest
+  underlay that encrypts; it must not loop (`NG-T005`), and each step should
+  reach every endpoint of the tunnel above it (`NG-T006`). Nesting is what makes
+  a cleartext overlay confidential, so it is what silences `NG-T012`.
+* A tunnel is **not a cable**. It is not part of the physical topology, does not
+  join two islands for `NG-C014`, and is not something a technician can unplug.
+  Renderers draw it dashed and violet, or crimson when nothing in its stack
+  encrypts.
+
+### 14.4 YANG mapping
+
+A tunnel has no YANG representation of its own — ietf-interfaces models devices,
+not the encapsulation between them, exactly as it does not model a cable (§9.4).
+It projects onto the interfaces at its ends:
+
+| YAML | Projection |
+|---|---|
+| `endpoints[]` | the `if:interface` named by each reference, whose `if:type` is `ianaift:tunnel` |
+| `interfaces[].parent` on a `type: tunnel` interface | `if:lower-layer-if` — the underlay port the outer packets leave by |
+| `tunnel.mtu` | netgraph-only; RFC 8343 has no layer-2 MTU node (§9.2) |
+| `type`, `mode`, `vni`, `port`, `encrypted`, `cipher`, `auth`, `over` | netgraph-only. The IETF tunnel models (`ietf-ipsec`, RFC 9061) sit outside the three this schema maps to; see [`yang-mapping.md`](yang-mapping.md) |
+
+### 14.5 The overlay view
+
+`netgraph render --layer overlay` draws the encapsulation graph: every tunnel
+becomes a node, joined to each element it terminates on and to the tunnel it
+runs inside. The tunnel has to become a node there because nesting is a relation
+between two *links*, and a link cannot end on a link — which is exactly why
+`VXLAN over IPsec` is undrawable at layer 1 and obvious here.
+
+Below that layer a point-to-point tunnel stays an edge, so `netgraph render`
+shows the VPNs over the physical topology without a box in the middle of each
+one. `netgraph list tunnels` prints the same resolution as a table.

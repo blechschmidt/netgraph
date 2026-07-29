@@ -146,7 +146,7 @@ stack, so declaring any of those would describe hardware that is not a hub.
 ## Pass 3 — semantics
 
 Every document has parsed. Do they agree with **each other**? These
-forty-one rules are the only ones that can be suppressed, re-graded or
+fifty-one rules are the only ones that can be suppressed, re-graded or
 disabled — they are judgements about a whole inventory rather than facts about
 one document.
 
@@ -440,6 +440,74 @@ adapter's.
 no legitimate case — an adapter that is genuinely plugged into nothing should
 leave `attached_to` out, which says so exactly.
 
+#### `E016` — unknown tunnel endpoint
+
+*Alias: `NG-T002`. Severity: error.*
+
+A tunnel endpoint names an element that is not declared, an element that owns no
+interfaces (a cable, or another tunnel), an interface that element does not
+have, or a name that stays ambiguous after the namespace lookup.
+
+**Why it matters.** The `tunnel` twin of
+[`E001`](#e001--unknown-cable-endpoint), and it fails the same way: the graph
+layer drops a tunnel whose ends it cannot resolve, so the diagram shows two
+sites with no overlay between them and says nothing about why. The message lists
+the interfaces the element *does* declare.
+
+**Suppress with** `E016` / `NG-T002`. Annotating the *tunnel* works, and so does
+annotating the element the endpoint was meant to name.
+
+#### `E017` — tunnel endpoint is not a tunnel interface
+
+*Alias: `NG-T003`. Severity: error.*
+
+A tunnel endpoint resolves to an interface whose `type` is not `tunnel` —
+usually the physical port the outer packets leave by.
+
+**Why it matters.** The endpoint of a tunnel is the *virtual* interface the
+operating system presents: `wg0`, `ipsec0`, `vxlan100`. Landing the tunnel on
+`eth0` instead draws the overlay on top of the very link that carries it, and
+puts the tunnel's inner addresses on the underlay port, where the layer-3 view
+would then place both in the wrong subnet. Declare a `tunnel` interface and, if
+you want to record which port the outer packets use, point its `parent` at the
+physical one.
+
+**Suppress with** `E017` / `NG-T003`, or an annotation on the tunnel or on the
+element holding the port.
+
+#### `E018` — `over` names no tunnel
+
+*Alias: `NG-T004`. Severity: error.*
+
+`spec.over` names an element that is not declared, one that is not a tunnel, or
+a short name that stays ambiguous after the namespace lookup (§2.2).
+
+**Why it matters.** `over` is the only thing that says a tunnel is nested. A
+reference that resolves to nothing silently demotes `vxlan over ipsec` to a bare
+VXLAN, which changes the answer to the question the diagram is most often drawn
+to answer — is this traffic encrypted? A tunnel that genuinely runs straight
+over the physical topology omits `over`, which says so exactly.
+
+**Suppress with** `E018` / `NG-T004`, or an annotation on the tunnel.
+
+#### `E019` — cyclic tunnel encapsulation
+
+*Alias: `NG-T005`. Severity: error.*
+
+The `over` references form a loop: a VXLAN carried by an IPsec tunnel carried by
+that VXLAN. The message spells the loop out as a chain.
+
+**Why it matters.** No tunnel in the loop ever reaches the underlay network, so
+none of them can carry a packet. Everything that walks the chain — the
+encapsulation stack a rendering prints, the MTU budget of
+[`W126`](#w126--tunnel-mtu-does-not-fit-its-underlay), the protection lookup of
+[`W127`](#w127--tunnel-carries-traffic-in-the-clear) — would otherwise have to
+defend itself against a walk that never terminates.
+
+**Suppress with** `E019` / `NG-T005`, or an annotation on any tunnel in the
+loop. There is no legitimate case; one of the `over` values names the wrong
+tunnel.
+
 ### Warnings
 
 #### `W101` — interface neither routes nor switches
@@ -519,7 +587,7 @@ splits a subnet into halves that cannot reach each other while every individual
 document still looks right. The other reading is just as useful — the neighbour
 exists but was never written down, so the diagram is missing a device. Only the
 layer-3 view can show this at all, which is why the rule arrived with it; see
-[`--layer l3`](../README.md#layers-l1-l2-and-l3).
+[`--layer l3`](../README.md#layers-l1-l2-l3-and-overlay).
 
 **Suppress with** `W105` / `NG-A008`, or an annotation on the element holding
 the address. A deliberately sparse management prefix, and a link whose peer is
@@ -853,6 +921,101 @@ distinct node it is rather than folding it into a switch.
 device. An SFP module modelled as an adapter of the switch it sits in is the
 legitimate case.
 
+#### `W125` — overlay reaches past its underlay
+
+*Alias: `NG-T006`. Severity: warning.*
+
+A tunnel names an `over`, but at least one element it terminates on is not an
+endpoint of that underlay tunnel.
+
+**Why it matters.** `vxlan over ipsec` only works where the IPsec tunnel
+actually goes. An overlay that terminates on a third site whose outer packets
+have no protected path is drawn joining places that cannot in fact reach each
+other that way — and, worse, is drawn as protected when the traffic to that one
+endpoint is not. Either the underlay is missing an endpoint or the overlay has
+one too many.
+
+**Suppress with** `W125` / `NG-T006`, or an annotation on either tunnel or on
+the stranded element. The legitimate case is an underlay that netgraph only
+partly models — a provider MPLS cloud declared as a two-ended tunnel between the
+sites that matter.
+
+#### `W126` — tunnel MTU does not fit its underlay
+
+*Alias: `NG-T011`. Severity: warning.*
+
+A tunnel declares an `mtu` larger than its underlay's `mtu` minus the
+encapsulation overhead of its own type.
+
+**Why it matters.** Encapsulation is not free: every header in the stack comes
+off the payload the overlay can carry. VXLAN costs 50 bytes, WireGuard 80, IPsec
+about 73, GRE 24. An overlay MTU that ignores them produces packets the underlay
+has to fragment or drop, which is the classic "small transfers work, large ones
+hang" failure — invisible until someone copies a big file, and by then nobody
+suspects the diagram. `netgraph list tunnels` prints the stack the budget is
+computed over.
+
+**Suppress with** `W126` / `NG-T011`, or an annotation on either tunnel. The
+overheads netgraph uses are the widely published worst case over IPv4; a
+deployment that has measured its own and knows it fits is the legitimate case.
+
+#### `W127` — tunnel carries traffic in the clear
+
+*Alias: `NG-T012`. Severity: warning.*
+
+A tunnel's type encrypts nothing — `gre`, `vxlan`, `geneve`, `l2tp` or `pptp` —
+and no tunnel in its `over` chain does either. PPTP counts as cleartext however
+it is configured: MPPE is broken.
+
+**Why it matters.** This is the single most expensive thing a network diagram
+can get wrong. "There is a tunnel between the sites" reads as "the traffic is
+protected", and for half the tunnel types in this schema it is not. Inside a
+data centre that is perfectly correct and the rule is noise; across the internet
+it is a finding worth stopping for. Nesting silences it — a VXLAN inside an
+IPsec tunnel is protected by the underlay, which is exactly why `over` exists —
+and so does `encrypted: true`, which records that the deployment protects it
+some other way.
+
+**Suppress with** `W127` / `NG-T012`, or an annotation on the tunnel. An
+inventory that is entirely one data centre fabric will want
+`ignore = ["W127"]` in `netgraph.toml`.
+
+#### `W128` — tunnel interface named by no tunnel
+
+*Alias: `NG-T013`. Severity: warning.*
+
+An interface of `type: tunnel` is `enabled: true` and no `tunnel` document names
+it as an endpoint.
+
+**Why it matters.** The overlay counterpart of
+[`I002`](#i002--enabled-interface-terminates-no-cable), but a warning rather
+than information: a spare *physical* port is a normal thing to own, while a
+virtual interface exists only because something configured it. One with no
+tunnel document describes one end of something the inventory never states the
+other end of, so the diagram shows a port that goes nowhere. Either the tunnel
+document is missing or the interface is left over from one that was deleted.
+
+**Suppress with** `W128` / `NG-T013`, or an annotation on the element. Saying
+`enabled: false` on the interface silences it *and* tells the next reader the
+overlay is not in service.
+
+#### `W129` — two tunnels share a VNI on one element
+
+*Alias: `NG-T014`. Severity: warning.*
+
+Two VXLAN or Geneve tunnels terminating on the same element declare the same
+`vni`.
+
+**Why it matters.** A VNI names a virtual network *on a VTEP*. Two tunnels
+reusing one on the same element are either the same overlay written twice — one
+of the two documents is stale — or two overlays that will bridge into each
+other, joining broadcast domains the diagram shows as separate.
+
+**Suppress with** `W129` / `NG-T014`, or an annotation on either tunnel or on
+the element. A VNI deliberately reused across a hub-and-spoke mesh, written as
+several point-to-point tunnels rather than one multipoint one, is the legitimate
+case — and writing it as one multipoint tunnel says it better.
+
 ### Info
 
 #### `I001` — locally administered MAC address
@@ -900,6 +1063,23 @@ ISP that is not an element, carry a `netgraph/ignore` annotation instead.
 An inventory that models patch panels or fully populated switches will see a lot
 of these. `ignore = ["I002"]` in `netgraph.toml` turns the whole rule off for
 that inventory in one line.
+
+#### `I003` — tunnel on a non-standard port
+
+*Alias: `NG-T015`. Severity: info.*
+
+A tunnel declares a `port` other than the registered one for its type:
+WireGuard 51820, OpenVPN 1194, L2TP 1701, VXLAN 4789, Geneve 6081. GRE and IPsec
+run directly over IP and carry no port, so they never trip it.
+
+**Why it matters.** Information rather than a complaint: moving WireGuard off
+51820 to dodge a scanner or to run two instances is a normal thing to do. It is
+printed because the port is the one fact a firewall rule needs, and the one most
+likely to have been copied from the tunnel next to it in the file.
+
+**Suppress with** `I003` / `NG-T015`, or an annotation on the tunnel. An
+inventory that moves every tunnel off its default port should say
+`ignore = ["I003"]` in `netgraph.toml` once.
 
 ## Suppressing a rule
 
