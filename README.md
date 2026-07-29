@@ -620,6 +620,47 @@ $ netgraph -i inventory validate -F github
 [`docs/ci.md`](docs/ci.md) documents all three, plus the composite GitHub Action
 and the pre-commit hook this repository ships.
 
+### `netgraph fmt`
+
+Rewrite inventory YAML in its one canonical form — two-space indent, keys in
+schema order, one quoting rule, comments and blank lines untouched. The way
+`gofmt` and `ruff format` do it for code, so that how a file is laid out is
+never what a review is spent on.
+
+```console
+$ netgraph fmt                       # rewrite the inventory -i points at
+$ netgraph fmt inventory devices/    # rewrite these paths
+$ netgraph fmt --check inventory     # write nothing; exit 1 and list what differs
+$ netgraph fmt --diff inventory      # write nothing; print a unified diff
+$ ... | netgraph fmt --stdin         # format a stream onto stdout
+```
+
+| Option | Default | Effect |
+|---|---|---|
+| `--check` | off | Write nothing. List the files that are not canonical, and exit 1 if there are any. For CI. |
+| `--diff` | off | Write nothing. Print a unified diff of what would change, and exit 1 if there is one. |
+| `--stdin` | off | Format the stream on stdin onto stdout. The path `-` means the same. |
+
+`--check` and `--diff` cannot be combined. With no paths, the global
+`-i`/`--inventory` decides what is formatted.
+
+**Formatting never changes what a document means.** Every file is read back with
+the same strict loader `validate` and `render` use and compared against what it
+said before — as its validated model where the document validates, and as its
+raw parsed data where it does not. A file that fails that comparison is left
+exactly as it was, and the failure is reported as a bug in netgraph. Formatting
+is also idempotent: running it twice produces the same bytes as running it once.
+Both properties are tested over every document under `examples/` and
+`tests/fixtures/`.
+
+Discovery is the loader's, so `.netgraphignore` and the dot- and
+underscore-prefix rules apply exactly as they do to `validate`: a file the
+inventory would not read is a file `fmt` does not rewrite.
+
+[`docs/format.md`](docs/format.md) defines the canonical form clause by clause,
+including what `fmt` deliberately will not do — it canonicalises documents, it
+does not repair them.
+
 ### `netgraph render`
 
 Render the inventory as a network graph. **Validation always runs first**, and
@@ -1661,7 +1702,7 @@ to each candidate; bash lists the values alone, as it does for everything.
 | Code | Meaning |
 |---|---|
 | 0 | Success. |
-| 1 | The inventory was rejected: `validate` found errors, `render` refused to draw, `init` refused to write into an occupied directory, or `import` produced a tree that does not validate. Also: `path` found no path. |
+| 1 | The inventory was rejected: `validate` found errors, `render` refused to draw, `init` refused to write into an occupied directory, or `import` produced a tree that does not validate. Also: `path` found no path, and `fmt --check`/`--diff` found a file that is not canonical. |
 | 2 | Usage error, or an unusable `netgraph.toml`. |
 | 3 | The inventory could not be discovered or read at all; or an `import` input was missing, unreadable or malformed, or would have clobbered an existing file without `--force`. |
 | 5 | The rendering could not be produced (Graphviz missing, output not writable, binary format to a terminal). |
@@ -1794,9 +1835,10 @@ netgraph -i examples/campus render --namespace sites/north --layer l2 -f svg -o 
 | [`docs/schema.md`](docs/schema.md) | The specification. Why the schema looks the way it does, with three complete worked examples, and the editor setup in §13. |
 | [`docs/schema-reference.md`](docs/schema-reference.md) | Every field, its type, whether it is required, its default and its YANG path. Generated from the models. |
 | [`docs/validation-rules.md`](docs/validation-rules.md) | Every rule, its severity, why it matters and how to suppress it. |
+| [`docs/format.md`](docs/format.md) | The canonical form `netgraph fmt` writes: layout, key order, quoting, and the two properties that make rewriting files safe. |
 | [`docs/paths.md`](docs/paths.md) | `netgraph path`: how the layer-2 and layer-3 traces decide, the JSON contract, and what is deliberately not modelled. |
 | [`docs/ipam.md`](docs/ipam.md) | `netgraph ipam`: how a prefix is sized, how free space is computed, and which existing rule each address-plan conflict is. |
-| [`docs/ci.md`](docs/ci.md) | Running `validate` in CI: the json/sarif/github output formats, the GitHub Action, the pre-commit hook. |
+| [`docs/ci.md`](docs/ci.md) | Running `validate` in CI: the json/sarif/github output formats, the GitHub Action, the pre-commit hooks. |
 | [`docs/yang-mapping.md`](docs/yang-mapping.md) | The relationship to RFC 8343, RFC 8344 and IEEE 802.1Q — including what is deliberately not covered. |
 | [`docs/follow-ups.md`](docs/follow-ups.md) | Known gaps, deferred deliberately: what was measured, why it was left, and what a fix would have to do. |
 

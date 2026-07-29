@@ -14,9 +14,6 @@ spec:
   vendor: Juniper
   model: MX204
   location: Building A, Hauptstrasse 1 / MER / U12
-  forwarding:
-    ipv4: true
-    ipv6: true
   interfaces:
     - name: lo0
       type: loopback
@@ -29,7 +26,7 @@ spec:
     - name: xe-0/0/0
       type: ethernet
       description: Routed fibre downlink to sw-north-dist-01
-      mac: 00:05:86:01:c0:00
+      mac: '00:05:86:01:c0:00'
       mtu: 9000
       ipv4:
         addresses: [10.1.0.1/30]
@@ -39,7 +36,7 @@ spec:
     - name: xe-0/0/1
       type: ethernet
       description: Backbone fibre to rtr-south-core-01
-      mac: 00:05:86:01:c0:01
+      mac: '00:05:86:01:c0:01'
       mtu: 9000
       ipv4:
         addresses: [198.51.100.1/30]
@@ -49,9 +46,12 @@ spec:
     - name: xe-0/0/2
       type: ethernet
       description: Backbone fibre to rtr-west-core-01
-      mac: 00:05:86:01:c0:02
+      mac: '00:05:86:01:c0:02'
       mtu: 9000
       ipv4:
         addresses: [198.51.100.10/30]
       ipv6:
         addresses: [2001:db8:ff:3::2/64]
+  forwarding:
+    ipv4: true
+    ipv6: true

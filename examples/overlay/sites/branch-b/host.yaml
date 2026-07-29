@@ -14,7 +14,7 @@ spec:
     - name: tun0
       type: tunnel
       description: remote access to HQ
-      parent: enp3s0
       mtu: 1431
       ipv4:
         addresses: [10.253.0.10/24]
+      parent: enp3s0

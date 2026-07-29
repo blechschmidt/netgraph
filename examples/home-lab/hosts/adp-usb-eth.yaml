@@ -7,11 +7,11 @@ metadata:
     laptop - there is deliberately no cable between the two (NG-X005).
   labels:
     site: home
-    asset: "A-0001"
+    asset: A-0001
 spec:
   vendor: Anker
   model: A83130A1
-  serial: "AK2231007744"
+  serial: AK2231007744
   form_factor: usb-ethernet
   passthrough: true
   ports: 1
@@ -24,7 +24,7 @@ spec:
     - name: enx001122334455
       type: ethernet
       description: Dongle Ethernet port
-      mac: 00:11:22:33:44:55
+      mac: '00:11:22:33:44:55'
       mtu: 1500
       ipv4:
         addresses: [192.168.10.30/24]

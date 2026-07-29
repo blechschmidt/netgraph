@@ -286,7 +286,15 @@ Without the action, the same thing by hand:
 ## pre-commit
 
 netgraph ships `.pre-commit-hooks.yaml`, so an inventory repository can run the
-same check before the commit is written:
+same checks before the commit is written. Three hooks are published:
+
+| Hook | What it does |
+|---|---|
+| `netgraph-validate` | Validates the whole tree. Takes no filenames. |
+| `netgraph-fmt` | Rewrites the staged files into canonical form. |
+| `netgraph-fmt-check` | Reports staged files that are not canonical, rewriting nothing. |
+
+Start with validation:
 
 ```yaml
 # .pre-commit-config.yaml
@@ -312,6 +320,50 @@ option has to go:
         args: [--strict]
         files: ^inventory/.*\.ya?ml$
 ```
+
+### Formatting
+
+`netgraph-fmt` puts the staged YAML into the canonical form of
+[`docs/format.md`](format.md). Unlike the hook above it *does* take filenames —
+formatting is per-file, whereas a cable is only dangling when compared against
+the devices in the other files:
+
+```yaml
+      - id: netgraph-fmt
+```
+
+It rewrites in place and relies on pre-commit noticing the modification, which
+fails the commit whatever the exit status. That is the intended loop: the files
+come back fixed and `git add` is the whole remedy. Formatting never changes what
+a document means — see [Safety](format.md#safety) — but nothing is committed
+without being seen.
+
+For a repository that would rather see the failure than have files rewritten
+underneath it, `netgraph-fmt-check` reports and changes nothing:
+
+```yaml
+      - id: netgraph-fmt-check
+```
+
+Restrict `files` rather than overriding `entry` for an inventory below the
+repository root; this hook is given the paths to work on:
+
+```yaml
+      - id: netgraph-fmt
+        files: ^inventory/.*\.ya?ml$
+```
+
+The same check belongs in the build, next to whatever formats the code:
+
+```yaml
+      - run: pip install netgraph
+      - run: netgraph fmt --check inventory
+```
+
+This repository does exactly that for its own `examples/` tree; the step is in
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml), and it prints a
+`netgraph fmt --diff` into the log when it fails so the fix is in the build
+output rather than only reproducible locally.
 
 ## Other CI systems
 

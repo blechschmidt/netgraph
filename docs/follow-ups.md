@@ -1184,6 +1184,62 @@ producing a different answer, not a special case.
 
 ---
 
+## 10. netgraph now depends on a second YAML parser
+
+**Status:** accepted 2026-07-29, deliberately. `ruamel.yaml` is a runtime
+dependency, used by `netgraph fmt` and by nothing else.
+
+**Why a second parser at all.** `netgraph fmt` has to preserve comments, blank
+lines, quoting style and whether a collection was written flow or block. PyYAML
+discards all four during parsing — that is not a gap in it, it is most of why it
+is fast — and there is no configuration that changes this. A formatter built on
+PyYAML would have to reproduce the source layout from a token stream it does not
+keep, which is writing a round-trip parser and calling it something else.
+
+**What was considered and rejected.**
+
+- *Reimplementing round-trip parsing.* A YAML parser that keeps comment
+  positions and scalar styles is thousands of lines and is where formatters go
+  wrong. It would also be a third opinion in this repository about what a plain
+  scalar means, and the divergences recorded below show that two is already
+  enough to have to reconcile.
+- *Making `fmt` an optional extra.* Rejected: it is a published pre-commit hook
+  and a documented CI step, and an extra that half the users do not install
+  turns "run `netgraph fmt`" into a support question.
+- *Replacing PyYAML with ruamel everywhere.* Rejected on measurement. The
+  loading path is the throughput bottleneck (entries 1 and 5) and is currently
+  libyaml-backed; ruamel's round-trip parser is pure Python and much slower, and
+  the strictness `netgraph.loader.documents` adds — duplicate-key rejection, the
+  YAML 1.2 boolean rule — would all have to be rebuilt on a different API for a
+  path that has no use for a single thing round-tripping buys.
+
+**What the dependency is fenced with.**
+
+- **Nothing on the loading path imports it.** `netgraph.fmt` is imported lazily,
+  inside `fmt_command`, so `validate` and `render` do not pay its ~30 ms of
+  import time — an eighth of what starting the CLI costs at all, and `validate`
+  runs in a pre-commit hook. `netgraph.loader` is untouched by this work.
+- **The two parsers are checked against each other on every format.**
+  `netgraph.fmt.verify` re-reads every formatted file with the *strict* loader
+  and compares it against what that loader read before. Nothing is written that
+  the two disagree about, so a divergence is a refusal rather than a corruption.
+- **The divergences are real, and the fence caught them.** Building this found
+  two places where ruamel and PyYAML disagree about the same bytes: ruamel reads
+  `1:02` as the string `"1:02"` where PyYAML reads the integer 62, and ruamel
+  emits `::1/128` unquoted inside a flow sequence, which PyYAML then refuses to
+  parse. Both were found by the verification pass failing on
+  `examples/`, not by review. They are handled in
+  `netgraph.fmt.scalars` — `is_untouchable` and `plain_survives` respectively —
+  and both ask netgraph's own loader for the answer rather than assuming one.
+
+**What would justify revisiting this.** A PyYAML release that can round-trip
+comments, or a `fmt` that needs to run on the loading path — neither of which is
+in sight. If ruamel became unmaintained, `netgraph.fmt.canonical` is the only
+module that imports it, and `docs/format.md` is a specification precise enough
+to reimplement against.
+
+---
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

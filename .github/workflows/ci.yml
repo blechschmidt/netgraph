@@ -110,6 +110,26 @@ jobs:
         # semantics instead of checking the same thing three times.
         run: mypy --python-version ${{ matrix.python-version }} src/
 
+      - name: netgraph fmt --check
+        # What ruff is to this repository's Python, ``fmt`` is to the YAML it
+        # ships: ``examples/`` is documentation, and documentation that does not
+        # follow the format netgraph documents is documentation arguing with
+        # itself.
+        #
+        # ``--check`` lists what differs; the ``--diff`` afterwards turns that
+        # list into an applicable patch in the log, so the fix does not require
+        # reproducing the run locally. It runs only once the check has failed,
+        # and its own exit status is discarded -- the verdict is already in.
+        run: |
+          set -euo pipefail
+          if ! netgraph fmt --check examples; then
+            echo "::group::netgraph fmt --diff examples"
+            netgraph fmt --diff examples || true
+            echo "::endgroup::"
+            echo "::error::examples/ is not in canonical form; run 'netgraph fmt examples'"
+            exit 1
+          fi
+
       - name: pytest
         id: pytest
         # ``--cov=netgraph`` and the coverage floor also live in pyproject.toml

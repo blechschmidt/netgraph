@@ -34,10 +34,10 @@ metadata:
   labels: {role: transit}
 spec:
   type: ipsec
-  mode: tunnel
   endpoints:
     - rtr-hq:ipsec0
     - rtr-branch-b:ipsec0
+  mode: tunnel
   mtu: 1427
   cipher: aes-256-gcm
   auth: certificate
@@ -49,11 +49,11 @@ metadata:
   description: VLAN 100 stretched from HQ to branch-b, inside the IPsec tunnel.
 spec:
   type: vxlan
-  vni: 100
   endpoints:
     - rtr-hq:vxlan100
     - rtr-branch-b:vxlan100
   over: ipsec-hq-b
+  vni: 100
   mtu: 1377
 ---
 apiVersion: netgraph.dev/v1alpha1

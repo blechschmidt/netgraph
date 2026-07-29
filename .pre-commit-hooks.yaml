@@ -30,3 +30,35 @@
   # One inventory, one process. Without this pre-commit may run the hook in
   # several workers, each loading the whole tree to report the same findings.
   require_serial: true
+
+- id: netgraph-fmt
+  name: netgraph fmt
+  description: >-
+    Rewrite netgraph YAML into the canonical form of ``docs/format.md``, so
+    that how a file is laid out is never what a review is spent on.
+  entry: netgraph fmt
+  language: python
+  files: \.ya?ml$
+  # Unlike netgraph-validate, this hook *does* take filenames. Formatting is a
+  # per-file operation, so a commit touching one document has no reason to walk
+  # the whole tree, and ``fmt`` accepts a list of paths exactly as it accepts a
+  # folder. Discovery still applies to each: a path a ``.netgraphignore``
+  # excludes is skipped even when it is named outright.
+  pass_filenames: true
+  # ``fmt`` rewrites in place, which is the point of running it here: the files
+  # come back fixed and ``git add`` is the whole remedy. pre-commit notices the
+  # modification and fails the commit regardless of the exit status, so nothing
+  # reformatted can slip through unreviewed.
+  require_serial: true
+
+- id: netgraph-fmt-check
+  name: netgraph fmt --check
+  description: >-
+    Report netgraph YAML that is not in canonical form, changing nothing. For
+    repositories that would rather see the failure than have files rewritten
+    underneath them.
+  entry: netgraph fmt --check
+  language: python
+  files: \.ya?ml$
+  pass_filenames: true
+  require_serial: true

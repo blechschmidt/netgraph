@@ -14,19 +14,6 @@ spec:
   vendor: Cisco
   model: C9200L-48P
   location: Building A, Hauptstrasse 1 / floor 1 / IDF-1
-  bridge:
-    name: br0
-    type: customer-vlan-bridge
-    address: 00:1b:0d:01:a1:ff
-  vlans:
-    - id: 10
-      name: staff
-    - id: 20
-      name: lab
-    - id: 30
-      name: voice
-    - id: 99
-      name: mgmt
   interfaces:
     - name: br0
       type: bridge
@@ -39,18 +26,18 @@ spec:
 
     - name: Vlan99
       type: vlan
-      parent: br0
       description: In-band management
+      ipv4:
+        addresses: [10.1.99.11/24]
       vlan:
         mode: access
         access_vlan: 99
-      ipv4:
-        addresses: [10.1.99.11/24]
+      parent: br0
 
     - name: GigabitEthernet1/0/1
       type: ethernet
       description: Desk - pc-north-01
-      mac: 00:1b:0d:01:a1:01
+      mac: '00:1b:0d:01:a1:01'
       mtu: 1500
       vlan:
         mode: access
@@ -59,7 +46,7 @@ spec:
     - name: GigabitEthernet1/0/2
       type: ethernet
       description: Teaching lab - srv-north-01
-      mac: 00:1b:0d:01:a1:02
+      mac: '00:1b:0d:01:a1:02'
       mtu: 1500
       vlan:
         mode: access
@@ -69,7 +56,7 @@ spec:
       type: ethernet
       description: Spare desk port
       enabled: false
-      mac: 00:1b:0d:01:a1:03
+      mac: '00:1b:0d:01:a1:03'
       vlan:
         mode: access
         access_vlan: 10
@@ -77,12 +64,25 @@ spec:
     - name: TenGigabitEthernet1/1/1
       type: ethernet
       description: Fibre trunk uplink to sw-north-dist-01
-      mac: 00:1b:0d:01:a1:11
+      mac: '00:1b:0d:01:a1:11'
       mtu: 9000
       vlan:
         mode: trunk
         trunk_vlans: [1, 10, 20, 30, 99]
         native_vlan: 1
+  bridge:
+    name: br0
+    type: customer-vlan-bridge
+    address: '00:1b:0d:01:a1:ff'
+  vlans:
+    - id: 10
+      name: staff
+    - id: 20
+      name: lab
+    - id: 30
+      name: voice
+    - id: 99
+      name: mgmt
 ---
 apiVersion: netgraph.dev/v1alpha1
 kind: switch
@@ -97,19 +97,6 @@ spec:
   vendor: Cisco
   model: C9200L-24P
   location: Building A, Hauptstrasse 1 / floor 2 / IDF-2
-  bridge:
-    name: br0
-    type: customer-vlan-bridge
-    address: 00:1b:0d:01:a2:ff
-  vlans:
-    - id: 10
-      name: staff
-    - id: 20
-      name: lab
-    - id: 30
-      name: voice
-    - id: 99
-      name: mgmt
   interfaces:
     - name: br0
       type: bridge
@@ -121,18 +108,18 @@ spec:
 
     - name: Vlan99
       type: vlan
-      parent: br0
       description: In-band management
+      ipv4:
+        addresses: [10.1.99.12/24]
       vlan:
         mode: access
         access_vlan: 99
-      ipv4:
-        addresses: [10.1.99.12/24]
+      parent: br0
 
     - name: GigabitEthernet1/0/1
       type: ethernet
       description: Desk - pc-north-02
-      mac: 00:1b:0d:01:a2:01
+      mac: '00:1b:0d:01:a2:01'
       mtu: 1500
       vlan:
         mode: access
@@ -142,7 +129,7 @@ spec:
       type: ethernet
       description: Spare lab port
       enabled: false
-      mac: 00:1b:0d:01:a2:02
+      mac: '00:1b:0d:01:a2:02'
       vlan:
         mode: access
         access_vlan: 20
@@ -150,12 +137,25 @@ spec:
     - name: TenGigabitEthernet1/1/1
       type: ethernet
       description: Fibre trunk uplink to sw-north-dist-01
-      mac: 00:1b:0d:01:a2:11
+      mac: '00:1b:0d:01:a2:11'
       mtu: 9000
       vlan:
         mode: trunk
         trunk_vlans: [1, 10, 20, 30, 99]
         native_vlan: 1
+  bridge:
+    name: br0
+    type: customer-vlan-bridge
+    address: '00:1b:0d:01:a2:ff'
+  vlans:
+    - id: 10
+      name: staff
+    - id: 20
+      name: lab
+    - id: 30
+      name: voice
+    - id: 99
+      name: mgmt
 ---
 # The same class of switch, declared against templates/c9200l-48p instead of
 # by hand. The two hundred lines above become nine: the template carries the
@@ -174,13 +174,13 @@ metadata:
     role: access
     env: prod
 spec:
-  from: templates/c9200l-48p
   location: Building A, Hauptstrasse 1 / floor 3 / IDF-3
-  bridge:
-    address: 00:1b:0d:01:a3:ff
   interfaces:
     - name: Vlan99
       ipv4:
         addresses: [10.1.99.13/24]
     - name: TenGigabitEthernet1/1/1
-      mac: 00:1b:0d:01:a3:11
+      mac: '00:1b:0d:01:a3:11'
+  from: templates/c9200l-48p
+  bridge:
+    address: '00:1b:0d:01:a3:ff'

@@ -17,11 +17,11 @@ spec:
       ipv4:
         addresses: [127.0.0.1/8]
       ipv6:
-        addresses: ["::1/128"]
+        addresses: ['::1/128']
 
     - name: eth0
       type: ethernet
-      mac: 00:11:32:40:01:01
+      mac: '00:11:32:40:01:01'
       mtu: 1500
       ipv4:
         addresses: [192.168.10.10/24]

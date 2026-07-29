@@ -11,9 +11,9 @@ spec:
     - sw-home:port1
   medium: copper
   speed: 1Gbps
+  length_m: 0.5
   category: cat6
   connector: rj45
-  length_m: 0.5
   label: H-001
 ---
 apiVersion: netgraph.dev/v1alpha1
@@ -28,9 +28,9 @@ spec:
     - pc-desk:eno1
   medium: copper
   speed: 1Gbps
+  length_m: 8
   category: cat6
   connector: rj45
-  length_m: 8
   label: H-002
 ---
 apiVersion: netgraph.dev/v1alpha1
@@ -45,9 +45,9 @@ spec:
     - srv-nas:eth0
   medium: copper
   speed: 1Gbps
+  length_m: 0.5
   category: cat6a
   connector: rj45
-  length_m: 0.5
   label: H-003
 ---
 apiVersion: netgraph.dev/v1alpha1
@@ -65,7 +65,7 @@ spec:
     - adp-usb-eth:enx001122334455
   medium: copper
   speed: 1Gbps
+  length_m: 10
   category: cat6
   connector: rj45
-  length_m: 10
   label: H-004

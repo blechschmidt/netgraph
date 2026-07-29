@@ -14,10 +14,6 @@ spec:
   vendor: Ubiquiti
   model: EdgeRouter 4
   location: HQ, comms room
-  vlans:
-    - id: 100
-      name: overlay
-      description: Stretched layer-2 segment, HQ to branch-b.
   interfaces:
     - name: eth0
       type: ethernet
@@ -34,36 +30,40 @@ spec:
     - name: wg0
       type: tunnel
       description: site-to-site mesh
-      parent: eth0
       mtu: 1420
       ipv4:
         addresses: [10.255.0.1/24]
+      parent: eth0
     - name: ipsec0
       type: tunnel
       description: encrypted transport to branch-b
-      parent: eth0
       mtu: 1427
       ipv4:
         addresses: [10.254.0.1/30]
+      parent: eth0
     - name: vxlan100
       type: tunnel
       description: stretched VLAN 100, inside ipsec0
-      parent: ipsec0
       mtu: 1377
       vlan:
         mode: access
         access_vlan: 100
+      parent: ipsec0
     - name: gre1
       type: tunnel
       description: management GRE, inside ipsec0
-      parent: ipsec0
       mtu: 1403
       ipv4:
         addresses: [10.252.0.1/30]
+      parent: ipsec0
     - name: ovpn0
       type: tunnel
       description: remote-access concentrator
-      parent: eth0
       mtu: 1431
       ipv4:
         addresses: [10.253.0.1/24]
+      parent: eth0
+  vlans:
+    - id: 100
+      name: overlay
+      description: Stretched layer-2 segment, HQ to branch-b.

@@ -12,9 +12,9 @@ spec:
     - sw-west-dist-01:Ethernet52/1
   medium: fiber
   speed: 10Gbps
+  length_m: 12
   category: om4
   connector: lc
-  length_m: 12
   label: F-301
 ---
 apiVersion: netgraph.dev/v1alpha1
@@ -31,9 +31,9 @@ spec:
     - sw-west-acc-01:TenGigabitEthernet1/1/1
   medium: fiber
   speed: 10Gbps
+  length_m: 45
   category: om4
   connector: lc
-  length_m: 45
   label: F-302
 ---
 apiVersion: netgraph.dev/v1alpha1
@@ -50,9 +50,9 @@ spec:
     - sw-west-acc-02:TenGigabitEthernet1/1/1
   medium: fiber
   speed: 10Gbps
+  length_m: 78
   category: om4
   connector: lc
-  length_m: 78
   label: F-303
 ---
 apiVersion: netgraph.dev/v1alpha1
@@ -68,9 +68,9 @@ spec:
     - pc-west-01:eno1
   medium: copper
   speed: 1Gbps
+  length_m: 22
   category: cat6
   connector: rj45
-  length_m: 22
   label: C-301
 ---
 apiVersion: netgraph.dev/v1alpha1
@@ -86,9 +86,9 @@ spec:
     - srv-west-01:eth0
   medium: copper
   speed: 1Gbps
+  length_m: 6
   category: cat6a
   connector: rj45
-  length_m: 6
   label: C-302
 ---
 apiVersion: netgraph.dev/v1alpha1
@@ -104,7 +104,7 @@ spec:
     - pc-west-02:eno1
   medium: copper
   speed: 1Gbps
+  length_m: 18
   category: cat6
   connector: rj45
-  length_m: 18
   label: C-303

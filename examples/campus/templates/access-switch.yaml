@@ -17,18 +17,6 @@ metadata:
 spec:
   vendor: Cisco
   model: C9200L-48P
-  bridge:
-    name: br0
-    type: customer-vlan-bridge
-  vlans:
-    - id: 10
-      name: staff
-    - id: 20
-      name: lab
-    - id: 30
-      name: voice
-    - id: 99
-      name: mgmt
   interfaces:
     - name: br0
       type: bridge
@@ -86,7 +74,6 @@ spec:
 
     - name: Vlan99
       type: vlan
-      parent: br0
       description: In-band management
       vlan:
         mode: access
@@ -95,6 +82,7 @@ spec:
     # One entry, forty-eight ports (docs/schema.md §6.2.5). '{}' substitutes
     # the current port number into the description. The ports ship
     # administratively down; a switch enables the ones it has patched.
+      parent: br0
     - range: GigabitEthernet1/0/[1-48]
       type: ethernet
       description: Access port {} - staff
@@ -112,3 +100,15 @@ spec:
         mode: trunk
         trunk_vlans: [1, 10, 20, 30, 99]
         native_vlan: 1
+  bridge:
+    name: br0
+    type: customer-vlan-bridge
+  vlans:
+    - id: 10
+      name: staff
+    - id: 20
+      name: lab
+    - id: 30
+      name: voice
+    - id: 99
+      name: mgmt

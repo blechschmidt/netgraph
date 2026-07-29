@@ -4,9 +4,6 @@ metadata:
   name: sw-office
   labels: {site: office}
 spec:
-  vlans:
-    - id: 10
-      name: office
   interfaces:
     - name: port1
       type: ethernet
@@ -18,3 +15,6 @@ spec:
       description: Desk
       mtu: 1500
       vlan: {mode: access, access_vlan: 10}
+  vlans:
+    - id: 10
+      name: office

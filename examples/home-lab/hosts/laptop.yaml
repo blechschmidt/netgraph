@@ -19,10 +19,10 @@ spec:
       ipv4:
         addresses: [127.0.0.1/8]
       ipv6:
-        addresses: ["::1/128"]
+        addresses: ['::1/128']
 
     - name: wlp0s20f3
       type: wifi
       description: Disabled while docked
       enabled: false
-      mac: 8c:8c:aa:30:01:01
+      mac: '8c:8c:aa:30:01:01'

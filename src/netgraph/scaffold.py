@@ -129,7 +129,7 @@ metadata:
     # wan0 faces the ISP, which is not an element of this inventory, so it
     # terminates no cable on purpose. Saying so is what an exception looks
     # like; deleting the rule for everybody would not be.
-    netgraph/ignore: "NG-C015"
+    netgraph/ignore: NG-C015
 spec:
   vendor: MikroTik
   vlans:
@@ -145,7 +145,7 @@ spec:
     - name: lan0
       type: ethernet
       description: Downlink to the switch
-      mac: 00:1e:8c:aa:00:01
+      mac: '00:1e:8c:aa:00:01'
       mtu: 1500
       vlan:
         mode: access
@@ -192,7 +192,7 @@ spec:
   interfaces:
     - name: eno1
       type: ethernet
-      mac: 00:1e:8c:bb:00:01
+      mac: '00:1e:8c:bb:00:01'
       mtu: 1500
       ipv4:
         addresses: [192.168.10.20/24]

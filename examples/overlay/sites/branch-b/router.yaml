@@ -8,10 +8,6 @@ spec:
   vendor: MikroTik
   model: RB5009
   location: Branch B, comms cupboard
-  vlans:
-    - id: 100
-      name: overlay
-      description: Stretched layer-2 segment, HQ to branch-b.
   interfaces:
     - name: ether1
       type: ethernet
@@ -28,29 +24,33 @@ spec:
     - name: wg0
       type: tunnel
       description: site-to-site mesh
-      parent: ether1
       mtu: 1420
       ipv4:
         addresses: [10.255.0.3/24]
+      parent: ether1
     - name: ipsec0
       type: tunnel
       description: encrypted transport to hq
-      parent: ether1
       mtu: 1427
       ipv4:
         addresses: [10.254.0.2/30]
+      parent: ether1
     - name: vxlan100
       type: tunnel
       description: stretched VLAN 100, inside ipsec0
-      parent: ipsec0
       mtu: 1377
       vlan:
         mode: access
         access_vlan: 100
+      parent: ipsec0
     - name: gre1
       type: tunnel
       description: management GRE, inside ipsec0
-      parent: ipsec0
       mtu: 1403
       ipv4:
         addresses: [10.252.0.2/30]
+      parent: ipsec0
+  vlans:
+    - id: 100
+      name: overlay
+      description: Stretched layer-2 segment, HQ to branch-b.

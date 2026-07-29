@@ -15,11 +15,10 @@ spec:
     - rtr-south-core-01:xe-0/0/2
   medium: fiber
   speed: 10Gbps
+  length_m: 4200
   category: os2
   connector: lc
-  length_m: 4200
   label: BB-NS
-
 ---
 apiVersion: netgraph.dev/v1alpha1
 kind: cable
@@ -38,11 +37,10 @@ spec:
     - rtr-west-core-01:xe-0/0/2
   medium: fiber
   speed: 10Gbps
+  length_m: 4200
   category: os2
   connector: lc
-  length_m: 4200
   label: BB-SW
-
 ---
 apiVersion: netgraph.dev/v1alpha1
 kind: cable
@@ -61,7 +59,7 @@ spec:
     - rtr-north-core-01:xe-0/0/2
   medium: fiber
   speed: 10Gbps
+  length_m: 4200
   category: os2
   connector: lc
-  length_m: 4200
   label: BB-WN

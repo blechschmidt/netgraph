@@ -24,7 +24,7 @@ spec:
     - name: wg0
       type: tunnel
       description: site-to-site mesh
-      parent: ether1
       mtu: 1420
       ipv4:
         addresses: [10.255.0.2/24]
+      parent: ether1

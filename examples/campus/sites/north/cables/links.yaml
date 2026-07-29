@@ -12,9 +12,9 @@ spec:
     - sw-north-dist-01:Ethernet52/1
   medium: fiber
   speed: 10Gbps
+  length_m: 12
   category: om4
   connector: lc
-  length_m: 12
   label: F-101
 ---
 apiVersion: netgraph.dev/v1alpha1
@@ -31,9 +31,9 @@ spec:
     - sw-north-acc-01:TenGigabitEthernet1/1/1
   medium: fiber
   speed: 10Gbps
+  length_m: 45
   category: om4
   connector: lc
-  length_m: 45
   label: F-102
 ---
 apiVersion: netgraph.dev/v1alpha1
@@ -50,9 +50,9 @@ spec:
     - sw-north-acc-02:TenGigabitEthernet1/1/1
   medium: fiber
   speed: 10Gbps
+  length_m: 78
   category: om4
   connector: lc
-  length_m: 78
   label: F-103
 ---
 apiVersion: netgraph.dev/v1alpha1
@@ -69,9 +69,9 @@ spec:
     - sw-north-acc-03:TenGigabitEthernet1/1/1
   medium: fiber
   speed: 10Gbps
+  length_m: 96
   category: om4
   connector: lc
-  length_m: 96
   label: F-104
 ---
 apiVersion: netgraph.dev/v1alpha1
@@ -87,9 +87,9 @@ spec:
     - pc-north-01:eno1
   medium: copper
   speed: 1Gbps
+  length_m: 22
   category: cat6
   connector: rj45
-  length_m: 22
   label: C-101
 ---
 apiVersion: netgraph.dev/v1alpha1
@@ -105,9 +105,9 @@ spec:
     - srv-north-01:eth0
   medium: copper
   speed: 1Gbps
+  length_m: 6
   category: cat6a
   connector: rj45
-  length_m: 6
   label: C-102
 ---
 apiVersion: netgraph.dev/v1alpha1
@@ -123,7 +123,7 @@ spec:
     - pc-north-02:eno1
   medium: copper
   speed: 1Gbps
+  length_m: 18
   category: cat6
   connector: rj45
-  length_m: 18
   label: C-103

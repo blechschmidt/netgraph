@@ -70,7 +70,7 @@ import webbrowser
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import Any, Final, TypeVar
+from typing import TYPE_CHECKING, Any, Final, TypeVar
 
 import click
 import click.core
@@ -91,7 +91,7 @@ from netgraph.completion import (
 )
 from netgraph.config import Config, ValidationConfig, load_config
 from netgraph.console import Align, Console
-from netgraph.errors import NetgraphError, RenderError, compact_ids, format_path
+from netgraph.errors import LoaderError, NetgraphError, RenderError, compact_ids, format_path
 from netgraph.importer import (
     DIALECTS,
     Draft,
@@ -181,6 +181,14 @@ from netgraph.watch import (
 )
 from netgraph.web import DEFAULT_PORT as WEB_PORT
 from netgraph.web import WebServer
+
+if TYPE_CHECKING:
+    # ``netgraph.fmt`` pulls in ruamel.yaml, which costs roughly 30 ms of import
+    # time -- an eighth of what starting the CLI costs at all. Only ``fmt``
+    # needs it, and ``validate`` runs in a pre-commit hook, so the import is
+    # made where it is used (see ``fmt_command``) and only the names needed for
+    # annotations are taken here.
+    from netgraph.fmt import Mode, Summary
 
 __all__ = ["cli", "main"]
 
@@ -682,6 +690,136 @@ def _is_rejected(inventory: Inventory, findings: Iterable[Finding]) -> bool:
     graph entirely, which no amount of severity configuration can make benign.
     """
     return bool(inventory.errors) or any(finding.severity.is_fatal for finding in findings)
+
+
+# --------------------------------------------------------------------------- #
+# fmt
+# --------------------------------------------------------------------------- #
+
+
+@cli.command("fmt")
+@click.argument(
+    "paths",
+    nargs=-1,
+    # Deliberately unvalidated by click: ``exists=True`` would reject the ``-``
+    # that means stdin before this command ever saw it, and a path that is
+    # missing is better reported by the loader, which says what it looked for.
+    type=click.Path(path_type=Path),
+)
+@click.option(
+    "--check",
+    "check",
+    is_flag=True,
+    default=False,
+    help="Write nothing; exit 1 listing the files that are not canonical.",
+)
+@click.option(
+    "--diff",
+    "show_diff",
+    is_flag=True,
+    default=False,
+    help="Write nothing; print a unified diff of what would change.",
+)
+@click.option(
+    "--stdin",
+    "use_stdin",
+    is_flag=True,
+    default=False,
+    help="Format the YAML stream on stdin and write it to stdout. Same as the path '-'.",
+)
+@click.pass_obj
+def fmt_command(
+    app: AppContext,
+    paths: tuple[Path, ...],
+    check: bool,
+    show_diff: bool,
+    use_stdin: bool,
+) -> None:
+    """Rewrite inventory YAML in its canonical form.
+
+    With no PATHS, formats the inventory ``-i`` points at. A PATH may be a
+    folder to walk or a single YAML file; discovery is the loader's, so
+    ``.netgraphignore`` and the dot- and underscore-prefix rules apply exactly
+    as they do to ``validate``.
+
+    ``docs/format.md`` defines the form. Formatting never changes what a
+    document means: every file is read back with the strict loader and compared
+    against what it said before, and a file that does not survive that check is
+    left alone.
+
+    Exits 1 when ``--check`` finds a file that is not canonical, or when any
+    file could not be formatted.
+    """
+    from netgraph.fmt import Mode, format_paths
+
+    if check and show_diff:
+        raise click.UsageError("--check and --diff cannot be combined; pick one.")
+    console = app.console()
+
+    if use_stdin or (len(paths) == 1 and str(paths[0]) == "-"):
+        _format_stdin(console)
+        return
+
+    mode = Mode.CHECK if check else Mode.DIFF if show_diff else Mode.WRITE
+    roots = paths or (app.inventory,)
+    app.log(f"formatting {len(roots)} path(s) in {mode.value} mode", level=1)
+    summary = format_paths(roots, mode=mode)
+    _report_formatting(console, summary, mode=mode)
+
+    if summary.rejects(mode):
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+
+def _format_stdin(console: Console) -> None:
+    """Format the stream on stdin onto stdout.
+
+    Nothing is summarised and nothing goes to stderr on success: the output is
+    the whole point, and a caller has almost certainly redirected it.
+
+    Raises:
+        LoaderError: The stream is not well-formed YAML.
+    """
+    from netgraph.fmt import STDIN_NAME, FormatSyntaxError, format_source
+
+    try:
+        formatted = format_source(sys.stdin.read(), name=STDIN_NAME)
+    except FormatSyntaxError as exc:
+        raise LoaderError(str(exc)) from exc
+    # ``print`` rather than ``echo``-per-line: the canonical form already ends
+    # in exactly one newline, and click would add a second.
+    click.echo(formatted, nl=False, color=console.color)
+
+
+def _report_formatting(console: Console, summary: Summary, *, mode: Mode) -> None:
+    """Say what happened to each file, in the register the mode calls for.
+
+    Only what a pipe would want goes to stdout — the diff in ``--diff``, the
+    file list in ``--check``. Everything else is commentary on stderr, so
+    ``netgraph fmt --diff | git apply`` and ``netgraph fmt --check | xargs``
+    both work.
+    """
+    from netgraph.fmt import Mode
+
+    for problem in summary.discovery_errors:
+        console.warn(str(problem))
+
+    if mode is Mode.DIFF:
+        for result in summary.changed:
+            click.echo(result.diff, nl=False, color=console.color)
+    elif mode is Mode.CHECK:
+        for result in summary.changed:
+            console.print(result.display)
+
+    for result in summary.failures:
+        console.error(f"{result.display}: {result.error}")
+
+    changed = len(summary.changed)
+    unchanged = len(summary.unchanged)
+    verb = "reformatted" if mode is Mode.WRITE else "would be reformatted"
+    parts = [f"{changed} file(s) {verb}", f"{unchanged} already formatted"]
+    if summary.failures:
+        parts.append(f"{len(summary.failures)} failed")
+    console.info(", ".join(parts))
 
 
 # --------------------------------------------------------------------------- #

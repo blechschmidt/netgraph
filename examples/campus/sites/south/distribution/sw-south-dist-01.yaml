@@ -14,22 +14,6 @@ spec:
   vendor: Arista
   model: 7050SX3-48YC8
   location: Building C, Suedring 44 / MER / U10
-  forwarding:
-    ipv4: true
-    ipv6: true
-  bridge:
-    name: br0
-    type: customer-vlan-bridge
-    address: 00:1c:73:02:d0:ff
-  vlans:
-    - id: 10
-      name: staff
-    - id: 20
-      name: lab
-    - id: 30
-      name: voice
-    - id: 99
-      name: mgmt
   interfaces:
     - name: br0
       type: bridge
@@ -40,42 +24,42 @@ spec:
 
     - name: Vlan10
       type: vlan
-      parent: br0
       description: Staff gateway
-      vlan:
-        mode: access
-        access_vlan: 10
       ipv4:
         addresses: [10.2.10.1/24]
       ipv6:
         addresses: [2001:db8:2:10::1/64]
+      vlan:
+        mode: access
+        access_vlan: 10
+      parent: br0
 
     - name: Vlan20
       type: vlan
-      parent: br0
       description: Teaching-lab gateway
-      vlan:
-        mode: access
-        access_vlan: 20
       ipv4:
         addresses: [10.2.20.1/24]
       ipv6:
         addresses: [2001:db8:2:20::1/64]
+      vlan:
+        mode: access
+        access_vlan: 20
+      parent: br0
 
     - name: Vlan99
       type: vlan
-      parent: br0
       description: Management gateway
+      ipv4:
+        addresses: [10.2.99.1/24]
       vlan:
         mode: access
         access_vlan: 99
-      ipv4:
-        addresses: [10.2.99.1/24]
+      parent: br0
 
     - name: Ethernet49/1
       type: ethernet
       description: Fibre trunk to sw-south-acc-01
-      mac: 00:1c:73:02:d0:01
+      mac: '00:1c:73:02:d0:01'
       mtu: 9000
       vlan:
         mode: trunk
@@ -85,7 +69,7 @@ spec:
     - name: Ethernet50/1
       type: ethernet
       description: Fibre trunk to sw-south-acc-02
-      mac: 00:1c:73:02:d0:02
+      mac: '00:1c:73:02:d0:02'
       mtu: 9000
       vlan:
         mode: trunk
@@ -97,9 +81,25 @@ spec:
       description: |
         Routed fibre uplink to rtr-south-core-01. No 'vlan' block: this port
         is a layer-3 interface, not a bridge port.
-      mac: 00:1c:73:02:d0:04
+      mac: '00:1c:73:02:d0:04'
       mtu: 9000
       ipv4:
         addresses: [10.2.0.2/30]
       ipv6:
         addresses: [2001:db8:2::2/64]
+  bridge:
+    name: br0
+    type: customer-vlan-bridge
+    address: '00:1c:73:02:d0:ff'
+  vlans:
+    - id: 10
+      name: staff
+    - id: 20
+      name: lab
+    - id: 30
+      name: voice
+    - id: 99
+      name: mgmt
+  forwarding:
+    ipv4: true
+    ipv6: true

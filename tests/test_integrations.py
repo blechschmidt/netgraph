@@ -53,30 +53,70 @@ def action() -> dict[str, Any]:
 # --------------------------------------------------------------------------- #
 
 
-def test_the_hook_file_declares_netgraph_validate(hooks: list[dict[str, Any]]) -> None:
-    ids = [hook["id"] for hook in hooks]
-    assert ids == ["netgraph-validate"], "the published hook ids are an API; adding one is fine"
+#: Every hook this repository publishes, in file order. A hook id is an API --
+#: somebody else's ``.pre-commit-config.yaml`` names it -- so adding one is
+#: fine and renaming or removing one is a breaking change.
+PUBLISHED_HOOKS = ["netgraph-validate", "netgraph-fmt", "netgraph-fmt-check"]
 
-    (hook,) = hooks
-    assert hook["entry"] == "netgraph validate"
+
+def test_the_hook_file_declares_exactly_the_published_hooks(hooks: list[dict[str, Any]]) -> None:
+    assert [hook["id"] for hook in hooks] == PUBLISHED_HOOKS
+
+
+@pytest.mark.parametrize("hook_id", PUBLISHED_HOOKS)
+def test_every_hook_is_declared_the_same_way(hooks: list[dict[str, Any]], hook_id: str) -> None:
+    hook = next(entry for entry in hooks if entry["id"] == hook_id)
     assert hook["language"] == "python", "pre-commit builds the venv from pyproject.toml"
-    assert hook["pass_filenames"] is False, "the tree is validated as a whole"
-    assert hook["require_serial"] is True
+    assert hook["require_serial"] is True, "one inventory, one process"
     assert hook["name"] and hook["description"]
 
 
-def test_the_hook_only_runs_when_yaml_changed(hooks: list[dict[str, Any]]) -> None:
-    pattern = re.compile(hooks[0]["files"])
+def test_validation_takes_no_filenames_and_formatting_takes_them(
+    hooks: list[dict[str, Any]],
+) -> None:
+    """The one place the hooks deliberately differ, and why.
+
+    A cable is only dangling when compared against the devices in the *other*
+    files, so validation is a property of the tree. Formatting is a property of
+    a file, so there is no reason to walk the tree to do it.
+    """
+    filenames = {hook["id"]: hook["pass_filenames"] for hook in hooks}
+    assert filenames == {
+        "netgraph-validate": False,
+        "netgraph-fmt": True,
+        "netgraph-fmt-check": True,
+    }
+
+
+@pytest.mark.parametrize("hook_id", PUBLISHED_HOOKS)
+def test_every_hook_only_runs_when_yaml_changed(hooks: list[dict[str, Any]], hook_id: str) -> None:
+    hook = next(entry for entry in hooks if entry["id"] == hook_id)
+    pattern = re.compile(hook["files"])
     assert pattern.search("inventory/devices/sw.yaml")
     assert pattern.search("sw.yml")
     assert not pattern.search("README.md")
 
 
-def test_the_hook_entry_is_a_command_the_cli_actually_has() -> None:
-    """``entry: netgraph validate`` has to keep resolving, options and all."""
-    result = CliRunner().invoke(cli, ["validate", "--help"])
+@pytest.mark.parametrize(
+    ("hook_id", "command", "options"),
+    [
+        ("netgraph-validate", "validate", ("--strict", "--disable", "--output-format")),
+        ("netgraph-fmt", "fmt", ("--check", "--diff", "--stdin")),
+        ("netgraph-fmt-check", "fmt", ("--check",)),
+    ],
+)
+def test_every_hook_entry_is_a_command_the_cli_actually_has(
+    hooks: list[dict[str, Any]], hook_id: str, command: str, options: tuple[str, ...]
+) -> None:
+    """An ``entry`` is run verbatim by pre-commit; it has to keep resolving."""
+    hook = next(entry for entry in hooks if entry["id"] == hook_id)
+    words = hook["entry"].split()
+    assert words[0] == "netgraph"
+    assert words[1] == command
+
+    result = CliRunner().invoke(cli, [*words[1:], "--help"])
     assert result.exit_code == 0
-    for option in ("--strict", "--disable", "--output-format"):
+    for option in options:
         assert option in result.output
 
 
