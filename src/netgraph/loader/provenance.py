@@ -44,9 +44,20 @@ class Site:
     path: FieldPath
 
     @property
+    def mark(self) -> tuple[int, int] | None:
+        """1-based line and column of the value, or of its closest ancestor."""
+        return self.document.mark_for(self.path)
+
+    @property
     def line(self) -> int | None:
         """1-based line of the value, or of the closest ancestor that exists."""
         return self.document.line_for(self.path)
+
+    @property
+    def column(self) -> int | None:
+        """1-based column of the value, or of the closest ancestor that exists."""
+        mark = self.mark
+        return None if mark is None else mark[1]
 
     @property
     def file(self) -> Path:

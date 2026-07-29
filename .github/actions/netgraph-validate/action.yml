@@ -1,0 +1,157 @@
+name: netgraph validate
+description: >-
+  Validate a netgraph YAML inventory and emit the result as SARIF, JSON or
+  GitHub Actions annotations.
+author: netgraph contributors
+
+branding:
+  icon: share-2
+  color: blue
+
+inputs:
+  inventory:
+    description: Root folder of the YAML inventory tree, or a single YAML file.
+    required: false
+    default: "."
+  strict:
+    description: >-
+      Promote every warning to an error, so any finding fails the run
+      (netgraph validate --strict).
+    required: false
+    default: "false"
+  disable:
+    description: >-
+      Rule ids to silence, separated by whitespace, commas or newlines. Short
+      ids (E001) and schema aliases (NG-C002) are both accepted.
+    required: false
+    default: ""
+  output-format:
+    description: >-
+      One of text, json, sarif or github. sarif is written to a file for
+      github/codeql-action/upload-sarif; github writes annotations straight to
+      the log; json is for a step that post-processes the findings.
+    required: false
+    default: sarif
+  output-file:
+    description: >-
+      Where to write the structured document. Defaults to
+      ${RUNNER_TEMP}/netgraph-validate.<format>. Ignored for the github and
+      text formats, which write to the log by design.
+    required: false
+    default: ""
+  fail-on-error:
+    description: >-
+      Fail the step when the inventory does not validate. Set to false when a
+      later step must still run -- uploading SARIF, most obviously, since an
+      upload that only happens on success would never report anything.
+    required: false
+    default: "true"
+  install:
+    description: >-
+      Install netgraph before running it. Set to false when an earlier step has
+      already installed the version you want.
+    required: false
+    default: "true"
+  version:
+    description: >-
+      What to install, as a pip requirement (netgraph==0.1.0, a URL, a local
+      path). Empty installs the checkout this action came from, which is what
+      pins the tool to the `rev`/`@ref` the workflow already chose.
+    required: false
+    default: ""
+
+outputs:
+  exit-code:
+    description: The exit code of netgraph validate. 0 is clean, 1 means findings.
+    value: ${{ steps.validate.outputs.exit-code }}
+  failed:
+    description: "'true' when the inventory did not validate."
+    value: ${{ steps.validate.outputs.failed }}
+  report:
+    description: >-
+      Path of the written document, empty for the github and text formats. Feed
+      it to github/codeql-action/upload-sarif.
+    value: ${{ steps.validate.outputs.report }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install netgraph
+      if: inputs.install == 'true'
+      shell: bash
+      env:
+        NETGRAPH_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        python -m pip install --disable-pip-version-check --upgrade pip
+        if [ -n "${NETGRAPH_VERSION}" ]; then
+          python -m pip install --disable-pip-version-check "${NETGRAPH_VERSION}"
+        else
+          # $GITHUB_ACTION_PATH is .github/actions/netgraph-validate inside the
+          # checkout of the repository this action was resolved from, so three
+          # levels up is netgraph itself -- at exactly the ref the workflow
+          # asked for. Installing from PyPI here would silently ignore that.
+          python -m pip install --disable-pip-version-check "${GITHUB_ACTION_PATH}/../../.."
+        fi
+        netgraph --version
+
+    - name: Run netgraph validate
+      id: validate
+      shell: bash
+      env:
+        NETGRAPH_INVENTORY: ${{ inputs.inventory }}
+        NETGRAPH_STRICT: ${{ inputs.strict }}
+        NETGRAPH_DISABLE: ${{ inputs.disable }}
+        NETGRAPH_FORMAT: ${{ inputs.output-format }}
+        NETGRAPH_OUTPUT: ${{ inputs.output-file }}
+        NETGRAPH_FAIL: ${{ inputs.fail-on-error }}
+      run: |
+        set -uo pipefail
+
+        case "${NETGRAPH_FORMAT}" in
+          text|json|sarif|github) ;;
+          *)
+            echo "::error::output-format must be text, json, sarif or github, not '${NETGRAPH_FORMAT}'"
+            exit 2
+            ;;
+        esac
+
+        args=(--inventory "${NETGRAPH_INVENTORY}" validate --output-format "${NETGRAPH_FORMAT}")
+        if [ "${NETGRAPH_STRICT}" = "true" ]; then
+          args+=(--strict)
+        fi
+        # Split on whitespace and commas so that a workflow can write the list
+        # as "E001,W103", as a YAML block scalar, or as one id per line.
+        for rule in $(printf '%s' "${NETGRAPH_DISABLE}" | tr ',' ' '); do
+          args+=(--disable "${rule}")
+        done
+
+        report=""
+        rc=0
+        if [ "${NETGRAPH_FORMAT}" = "github" ] || [ "${NETGRAPH_FORMAT}" = "text" ]; then
+          # Both are meant to be read in the log; capturing them in a file would
+          # hide the annotations the github format exists to produce.
+          netgraph "${args[@]}" || rc=$?
+        else
+          report="${NETGRAPH_OUTPUT}"
+          if [ -z "${report}" ]; then
+            report="${RUNNER_TEMP}/netgraph-validate.${NETGRAPH_FORMAT}"
+          fi
+          mkdir -p "$(dirname "${report}")"
+          netgraph "${args[@]}" >"${report}" || rc=$?
+          if [ ! -s "${report}" ]; then
+            echo "::error::netgraph validate exited ${rc} without writing a ${NETGRAPH_FORMAT} document"
+            exit 1
+          fi
+        fi
+
+        {
+          echo "exit-code=${rc}"
+          echo "failed=$([ "${rc}" -eq 0 ] && echo false || echo true)"
+          echo "report=${report}"
+        } >>"${GITHUB_OUTPUT}"
+
+        if [ "${rc}" -ne 0 ] && [ "${NETGRAPH_FAIL}" = "true" ]; then
+          exit "${rc}"
+        fi
+        exit 0

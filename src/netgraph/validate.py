@@ -57,6 +57,7 @@ from typing import Final, TypeAlias
 
 from netgraph.config import ValidationConfig
 from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of
+from netgraph.loader.provenance import Site
 from netgraph.models import (
     AGGREGATE_TYPES,
     Adapter,
@@ -168,6 +169,20 @@ class Finding:
         return self.source.relative if self.source is not None else None
 
     @property
+    def site(self) -> Site | None:
+        """Where the offending field was written: file, line and column.
+
+        Narrower than :attr:`source`, which only names the document. Following
+        the loader's provenance also means a value a device inherited from a
+        template resolves to the *template's* file, so an editor or a CI
+        annotation sends the reader to the line they have to change.
+
+        ``None`` when the element was built without a parsed document behind it
+        — an inventory assembled in memory has no line to point at.
+        """
+        return self.source.locate(self.field_path) if self.source is not None else None
+
+    @property
     def location(self) -> str:
         """Provenance in ``sites/hq/sw.yaml#0:17`` notation (``-`` when unknown)."""
         return str(self.source) if self.source is not None else "-"
@@ -268,7 +283,12 @@ class _Endpoint:
 
     @property
     def field_path(self) -> tuple[str | int, ...]:
-        return ("spec", "endpoints", self.index)
+        # The model sorts ``spec.endpoints`` (§7.1), so ``index`` is a position
+        # in the *canonical* order and the document may have written it
+        # somewhere else. Reporting the canonical index would point a CI
+        # annotation at the other end of the cable.
+        written = self.ref.document_index
+        return ("spec", "endpoints", self.index if written is None else written)
 
 
 @dataclass(frozen=True, slots=True)
@@ -307,7 +327,9 @@ class _TunnelEnd:
 
     @property
     def field_path(self) -> tuple[str | int, ...]:
-        return ("spec", "endpoints", self.index)
+        # Sorted on load like a cable's (§14.3); see :attr:`_Endpoint.field_path`.
+        written = self.ref.document_index
+        return ("spec", "endpoints", self.index if written is None else written)
 
 
 @dataclass(frozen=True, slots=True)

@@ -214,8 +214,10 @@ def test_e001_unknown_device(tmp_path: Path) -> None:
     finding = only(validate(inventory), "E001")[0]
     assert finding.severity is Severity.ERROR
     assert "no element named 'ghost'" in finding.message
-    # §7.1 sorts the endpoints canonically, so 'ghost' comes first.
-    assert finding.field_path == ("spec", "endpoints", 0)
+    # §7.1 sorts the endpoints canonically, which puts 'ghost' first in the
+    # model -- but the field path is the one the *document* uses, so that a
+    # report underlines the line the reader actually has to fix.
+    assert finding.field_path == ("spec", "endpoints", 1)
     assert finding.file == "net.yaml"
 
 

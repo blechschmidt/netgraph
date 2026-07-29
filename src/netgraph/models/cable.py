@@ -10,7 +10,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, ClassVar, Literal
 
-from pydantic import model_serializer, model_validator
+from pydantic import PrivateAttr, model_serializer, model_validator
 
 from netgraph.errors import echo_value
 from netgraph.models.base import NetgraphModel
@@ -18,7 +18,7 @@ from netgraph.models.diagnostics import field_error
 from netgraph.models.element import ElementBase
 from netgraph.models.scalars import BitRate, ElementRef, IfName, LengthMetres
 
-__all__ = ["Cable", "CableSpec", "Duplex", "InterfaceRef", "Medium"]
+__all__ = ["Cable", "CableSpec", "Duplex", "InterfaceRef", "Medium", "sort_endpoints"]
 
 
 class Medium(str, Enum):
@@ -70,9 +70,25 @@ class InterfaceRef(NetgraphModel):
             return {"device": device, "interface": interface}
         return value
 
+    #: Position this reference held in ``spec.endpoints`` as it was *written*,
+    #: before :func:`sort_endpoints` moved it. ``None`` for a reference that
+    #: never went through an endpoint list.
+    _document_index: int | None = PrivateAttr(default=None)
+
     @model_serializer
     def _serialise(self) -> str:
         return str(self)
+
+    @property
+    def document_index(self) -> int | None:
+        """Where this endpoint sits in the document, or ``None`` if unknown.
+
+        Kept on the reference rather than as a permutation on the spec because
+        :meth:`__eq__` here compares :attr:`sort_key` and nothing else, so the
+        bookkeeping stays invisible to equality — two cables written with their
+        endpoints in opposite orders must still compare equal (§7.1).
+        """
+        return self._document_index
 
     @property
     def sort_key(self) -> tuple[str, str]:
@@ -90,6 +106,22 @@ class InterfaceRef(NetgraphModel):
         if isinstance(other, str):
             return str(self) == other
         return NotImplemented
+
+
+def sort_endpoints(endpoints: list[InterfaceRef]) -> None:
+    """Put an endpoint list in canonical order, remembering where each entry was.
+
+    Cables (§7.1) and tunnels (§14.3) are both undirected, so both sort
+    ``spec.endpoints`` to make the graph edge and the JSON export canonical.
+    Sorting moves entries away from the position they occupy in the document,
+    and a diagnostic naming ``spec.endpoints[1]`` would then point at the
+    *other* end of the link — in the machine-readable report formats, at the
+    wrong line of the file. Each reference therefore keeps the index it was
+    written at, in :attr:`InterfaceRef.document_index`.
+    """
+    for index, ref in enumerate(endpoints):
+        ref._document_index = index
+    endpoints.sort(key=lambda ref: ref.sort_key)
 
 
 class CableSpec(NetgraphModel):
@@ -115,9 +147,7 @@ class CableSpec(NetgraphModel):
                 rule="NG-C001",
                 path=("endpoints",),
             )
-        # §7.1: the link is undirected, so the endpoint order carries no
-        # meaning. Sorting makes the graph edge and the JSON export canonical.
-        self.endpoints.sort(key=lambda ref: ref.sort_key)
+        sort_endpoints(self.endpoints)
 
         if self.medium is Medium.WIRELESS:
             for key in ("length_m", "category"):

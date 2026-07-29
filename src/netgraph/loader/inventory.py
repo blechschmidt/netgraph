@@ -19,11 +19,12 @@ Loading never raises for a bad document: problems are collected as
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
 from netgraph.errors import SchemaIssue, format_path
+from netgraph.loader.provenance import Provenance, Site
 from netgraph.models import Adapter, Cable, Device, Element, Tunnel
 
 __all__ = [
@@ -74,6 +75,24 @@ class SourceLocation:
     index: int
     #: 1-based line the document starts on, when the parser could report one.
     line: int | None = None
+    #: The document's redirect table (:mod:`netgraph.loader.provenance`), kept so
+    #: a diagnostic about one *field* can be narrowed from "this document" to
+    #: the line and column that wrote it — in the template's file, when that is
+    #: where the value came from. ``None`` when the element was built without a
+    #: parsed document behind it, as the tests and the importer do.
+    #:
+    #: Excluded from equality and from ``repr``: it is a lookup table for
+    #: diagnostics, not part of the identity of a location, and it transitively
+    #: holds a whole YAML node tree.
+    provenance: Provenance | None = field(default=None, compare=False, repr=False)
+
+    def locate(self, field_path: Sequence[str | int] = ()) -> Site | None:
+        """Where the value at ``field_path`` inside this document was written.
+
+        Returns ``None`` when no provenance was recorded, in which case the
+        caller has nothing finer than the document itself to point at.
+        """
+        return None if self.provenance is None else self.provenance.locate(field_path)
 
     def __str__(self) -> str:
         suffix = f":{self.line}" if self.line is not None else ""

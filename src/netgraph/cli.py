@@ -125,6 +125,8 @@ from netgraph.render import (
     theme_choices,
 )
 from netgraph.render.dot import DOT_EXECUTABLE
+from netgraph.report import FORMATS as REPORT_FORMATS
+from netgraph.report import build_report, render_report
 from netgraph.rules import RULES, Severity
 from netgraph.scaffold import SCHEMA_FILE_NAME, build_scaffold, write_scaffold
 from netgraph.schema import build_schema
@@ -207,15 +209,21 @@ class AppContext:
 
     # -- inventory -------------------------------------------------------
 
-    def load(self) -> Inventory:
+    def load(self, *, keep_provenance: bool = False) -> Inventory:
         """Load the inventory tree.
+
+        Args:
+            keep_provenance: Keep the per-field origin tables so a finding can
+                be reported at the line and column that caused it. Costs memory
+                for the lifetime of the inventory; see
+                :func:`~netgraph.loader.load_tree`.
 
         Raises:
             LoaderError: The path does not exist or is not loadable at all.
                 Problems *inside* the tree are collected on the inventory.
         """
         self.log(f"loading inventory from {self.inventory}", level=1)
-        inventory = load_tree(self.inventory)
+        inventory = load_tree(self.inventory, keep_provenance=keep_provenance)
         self.log(
             f"loaded {len(inventory.elements)} element(s): "
             f"{len(inventory.devices)} device(s), {len(inventory.cables)} cable(s), "
@@ -572,17 +580,47 @@ _EXPECTED_IMPORT_RULES: Final[frozenset[str]] = frozenset(
     shell_complete=complete_rule,
     help="Silence a rule by id (E001, NG-C002, ...). Repeatable.",
 )
+@click.option(
+    "-F",
+    "--output-format",
+    type=click.Choice(REPORT_FORMATS),
+    default="text",
+    show_default=True,
+    help="text is for reading; json, sarif and github are for CI.",
+)
 @click.pass_obj
-def validate_command(app: AppContext, strict: bool, disabled: tuple[str, ...]) -> None:
+def validate_command(
+    app: AppContext, strict: bool, disabled: tuple[str, ...], output_format: str
+) -> None:
     """Check the inventory for schema and semantic problems.
 
     Exits 1 when anything is reported as an error, 0 otherwise.
+
+    The structured formats put their document on stdout and move the human
+    summary to stderr, so ``netgraph validate -F sarif > report.sarif`` writes a
+    file a code-scanning upload accepts while a person watching the run still
+    sees what happened. ``--quiet`` drops that summary; it never drops the
+    document.
     """
-    console = app.console()
-    inventory = app.load()
+    # Only the structured formats report a line and a column, and paying for
+    # them is a measurable amount of retained memory -- so the text path, which
+    # locates a finding at its document, does not.
+    inventory = app.load(keep_provenance=output_format != "text")
     findings = _run_validation(app, inventory, strict=strict, disabled=disabled)
 
-    _report_problems(console, inventory.errors, findings)
+    if output_format == "text":
+        _report_problems(app.console(), inventory.errors, findings)
+    else:
+        report = build_report(inventory, findings)
+        # The summary is commentary once the document is the output, so it goes
+        # to stderr through ``info`` -- which is what ``--quiet`` silences.
+        _report_problems(app.console(), inventory.errors, findings, commentary=True)
+        document = render_report(report, output_format)
+        # A clean inventory emits no workflow commands at all; printing the
+        # empty string would put a stray blank line in the build log.
+        if document:
+            app.console().print(document)
+
     if _is_rejected(inventory, findings):
         raise click.exceptions.Exit(EXIT_INVALID)
 
@@ -1935,13 +1973,25 @@ class _Problem:
 
 
 def _report_problems(
-    console: Console, errors: Iterable[LoadError], findings: Iterable[Finding]
+    console: Console,
+    errors: Iterable[LoadError],
+    findings: Iterable[Finding],
+    *,
+    commentary: bool = False,
 ) -> None:
-    """Print load errors and findings grouped by severity, most severe first."""
+    """Print load errors and findings grouped by severity, most severe first.
+
+    Args:
+        commentary: Write the report to stderr as commentary rather than to
+            stdout as data, which is what the structured output formats need:
+            stdout is theirs, and ``--quiet`` then silences the human half
+            without touching the document.
+    """
+    write = console.info if commentary else console.print
     problems = [_Problem.from_load_error(error) for error in errors]
     problems.extend(_Problem.from_finding(finding) for finding in findings)
     if not problems:
-        console.print(console.style("no problems found", fg="green"))
+        write(console.style("no problems found", fg="green"))
         return
 
     for severity in sorted(Severity, key=lambda value: value.rank):
@@ -1950,12 +2000,12 @@ def _report_problems(
             continue
         colour = _SEVERITY_COLOUR[severity]
         heading = f"{severity}s ({len(group)}):"
-        console.print(console.style(heading, fg=colour, bold=True))
+        write(console.style(heading, fg=colour, bold=True))
         for line in _problem_lines(console, group, colour):
-            console.print(line)
-        console.print()
+            write(line)
+        write()
 
-    console.print(_summary(console, problems))
+    write(_summary(console, problems))
 
 
 def _problem_lines(console: Console, problems: Sequence[_Problem], colour: str) -> Iterator[str]:

@@ -41,6 +41,10 @@ element involved, not just the anchor, because any of them can suppress it.
 `--strict` promotes every surviving warning to an error. Severities can also be
 re-graded per inventory — see [Suppressing a rule](#suppressing-a-rule).
 
+For a machine, `-F json`, `-F sarif` and `-F github` report the same findings
+with the rule id, the schema alias, the file, the line and the column of the
+offending value, and a link back to this document. See [`docs/ci.md`](ci.md).
+
 Rule ids are permanent. Once assigned, an id is never reused for a different
 rule, so a suppression written today keeps meaning what it meant.
 

@@ -139,6 +139,150 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # The example inventories are the only trees this repository ships that a user
+  # would recognise, so they are also what the CI integrations are exercised
+  # against: if the composite action, the SARIF upload or the annotation format
+  # breaks, it breaks here rather than in somebody else's pipeline.
+  discover-examples:
+    name: discover examples
+    runs-on: ubuntu-24.04
+    outputs:
+      inventories: ${{ steps.list.outputs.inventories }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: List the example inventories
+        id: list
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          names=()
+          for inventory in examples/*/; do
+            names+=("$(basename "$inventory")")
+          done
+
+          # A glob that quietly matched nothing would produce an empty matrix,
+          # and an empty matrix is a job that succeeds having checked nothing.
+          if [ "${#names[@]}" -lt 2 ]; then
+            echo "::error::expected at least 2 example inventories under examples/, found ${#names[@]}"
+            exit 1
+          fi
+
+          printf 'inventories=%s\n' \
+            "$(printf '%s\n' "${names[@]}" | jq --raw-input --slurp --compact-output 'split("\n") | map(select(. != ""))')" \
+            >>"$GITHUB_OUTPUT"
+
+  validate-examples:
+    name: validate ${{ matrix.inventory }}
+    runs-on: ubuntu-24.04
+    needs: discover-examples
+
+    permissions:
+      contents: read
+      # Only the upload-sarif step needs this, and only on this repository's own
+      # branches -- the token a fork's pull request gets is read-only.
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        inventory: ${{ fromJSON(needs.discover-examples.outputs.inventories) }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # Uses the action from this very checkout, so a change to it is tested by
+      # the pull request that makes it rather than after the merge.
+      - name: Validate, as SARIF
+        id: sarif
+        uses: ./.github/actions/netgraph-validate
+        with:
+          inventory: examples/${{ matrix.inventory }}
+          strict: "true"
+          output-format: sarif
+          # Report first, fail afterwards: a run that stopped here would never
+          # upload the findings that explain why it stopped.
+          fail-on-error: "false"
+
+      - name: Upload the SARIF report
+        # A fork's pull request cannot write security events; skipping is the
+        # documented behaviour, and the next step still fails the job.
+        if: >-
+          github.event_name != 'pull_request'
+          || github.event.pull_request.head.repo.full_name == github.repository
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ steps.sarif.outputs.report }}
+          category: netgraph-${{ matrix.inventory }}
+
+      - name: Check the SARIF document
+        env:
+          REPORT: ${{ steps.sarif.outputs.report }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+
+          report = json.load(open(os.environ["REPORT"], encoding="utf-8"))
+          run = report["runs"][0]
+          rules = run["tool"]["driver"]["rules"]
+          print(f"{len(rules)} rules described, {len(run['results'])} results")
+
+          from netgraph.rules import RULES
+
+          missing = {rule.id for rule in RULES} - {entry["id"] for entry in rules}
+          if missing:
+              raise SystemExit(f"::error::rules missing from the SARIF driver: {sorted(missing)}")
+          if report["version"] != "2.1.0":
+              raise SystemExit(f"::error::expected SARIF 2.1.0, got {report['version']}")
+          PY
+
+      # The annotation format is what a pull request actually sees, so it is run
+      # for real rather than inspected: anything it reports lands on the diff.
+      - name: Validate, as annotations
+        uses: ./.github/actions/netgraph-validate
+        with:
+          inventory: examples/${{ matrix.inventory }}
+          strict: "true"
+          output-format: github
+          install: "false"
+
+      - name: Check the JSON envelope
+        run: |
+          set -euo pipefail
+          netgraph --quiet --inventory "examples/${{ matrix.inventory }}" \
+            validate --strict --output-format json >report.json
+          python - <<'PY'
+          import json
+
+          report = json.load(open("report.json", encoding="utf-8"))
+          summary = report["summary"]
+          print(json.dumps(summary))
+          if report["schemaVersion"] != 1:
+              raise SystemExit(f"::error::unexpected envelope version {report['schemaVersion']}")
+          if summary["total"] != len(report["findings"]):
+              raise SystemExit("::error::summary.total disagrees with the findings array")
+          PY
+
+      # The examples are the documentation; one of them failing --strict means
+      # the README shows an inventory netgraph itself would reject.
+      - name: Fail if the example did not validate
+        if: steps.sarif.outputs.failed == 'true'
+        run: |
+          echo "::error::examples/${{ matrix.inventory }} does not validate under --strict"
+          exit 1
+
   render-examples:
     name: render examples
     runs-on: ubuntu-24.04

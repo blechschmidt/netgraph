@@ -30,7 +30,7 @@ from typing import Annotated, Any, ClassVar, Final, Literal
 from pydantic import Field, model_validator
 
 from netgraph.models.base import NetgraphModel
-from netgraph.models.cable import InterfaceRef
+from netgraph.models.cable import InterfaceRef, sort_endpoints
 from netgraph.models.diagnostics import field_error
 from netgraph.models.element import ElementBase
 from netgraph.models.scalars import ElementRef, InterfaceMtu
@@ -295,7 +295,7 @@ class TunnelSpec(NetgraphModel):
         # §14.3: like a cable, a tunnel is undirected, so the endpoint order
         # carries no meaning. Sorting makes the graph edge and the JSON export
         # canonical.
-        self.endpoints.sort(key=lambda ref: ref.sort_key)
+        sort_endpoints(self.endpoints)
 
     def _check_type_specific(self) -> None:
         profile = self.type.profile

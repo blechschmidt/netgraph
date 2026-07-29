@@ -1,0 +1,32 @@
+# Hooks this repository offers to other repositories.
+#
+# Not to be confused with .pre-commit-config.yaml, which is the set of hooks
+# netgraph runs on *itself*. This file is the public one: it is what
+#
+#   repos:
+#     - repo: https://github.com/blechschmidt/netgraph
+#       rev: v0.1.0
+#       hooks:
+#         - id: netgraph-validate
+#
+# resolves to in somebody else's inventory repository.
+#
+# ``docs/ci.md`` has the full write-up, including how to point the hook at an
+# inventory that does not sit at the repository root.
+
+- id: netgraph-validate
+  name: netgraph validate
+  description: >-
+    Check a netgraph YAML inventory for schema and semantic problems before the
+    commit lands, with the same rules ``netgraph validate`` applies in CI.
+  entry: netgraph validate
+  language: python
+  # The hook validates the tree as a whole -- a cable is only dangling when
+  # compared against the devices in the other files -- so it takes no
+  # filenames. This pattern therefore decides *whether* to run, not what to run
+  # on: a commit touching no YAML cannot have broken the inventory.
+  files: \.ya?ml$
+  pass_filenames: false
+  # One inventory, one process. Without this pre-commit may run the hook in
+  # several workers, each loading the whole tree to report the same findings.
+  require_serial: true

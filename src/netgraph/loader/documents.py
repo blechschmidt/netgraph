@@ -292,12 +292,15 @@ class RawDocument:
         """1-based line the document starts on."""
         return None if self.node is None else self.node.start_mark.line + 1
 
-    def line_for(self, field_path: Sequence[str | int]) -> int | None:
-        """Line of the value at ``field_path``, or of the closest ancestor found.
+    def mark_for(self, field_path: Sequence[str | int]) -> tuple[int, int] | None:
+        """1-based line and column of the value at ``field_path``.
 
         ``("spec", "interfaces", 0, "mtu")`` walks mappings by key and sequences
         by index. A path that does not exist in the document — a missing
         mandatory key, say — degrades to the deepest node that does.
+
+        The mark is the *value* node's, not the key's, which is what an editor
+        or a CI annotation wants to underline: ``mtu: 900`` points at ``900``.
         """
         node = self.node
         if node is None:
@@ -307,7 +310,12 @@ class RawDocument:
             if child is None:
                 break
             node = child
-        return node.start_mark.line + 1
+        return node.start_mark.line + 1, node.start_mark.column + 1
+
+    def line_for(self, field_path: Sequence[str | int]) -> int | None:
+        """Line of the value at ``field_path``, or of the closest ancestor found."""
+        mark = self.mark_for(field_path)
+        return None if mark is None else mark[0]
 
 
 def _child_node(node: yaml.Node, part: str | int) -> yaml.Node | None:

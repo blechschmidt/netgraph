@@ -487,12 +487,14 @@ spec:
     inventory = load_tree(root)
 
     assert list(inventory.elements) == ["fine"], "one bad file must not hide the others"
-    assert [(error.field_path, error.line) for error in inventory.errors] == [
-        (("spec", "interfaces", 0, "mtu"), 9),
-        (("spec", "bogus"), 10),
+    # The column is the offending *value*: ``      mtu: 3`` puts the 3 in
+    # column 12, which is what a CI annotation underlines.
+    assert [(error.field_path, error.line, error.column) for error in inventory.errors] == [
+        (("spec", "interfaces", 0, "mtu"), 9, 12),
+        (("spec", "bogus"), 10, 10),
     ]
     assert inventory.errors[1].rule == "NG-D005"
-    assert str(inventory.errors[0]).startswith("bad.yaml#0:9: spec.interfaces[0].mtu: ")
+    assert str(inventory.errors[0]).startswith("bad.yaml#0:9:12: spec.interfaces[0].mtu: ")
 
 
 def test_missing_key_is_located_at_the_closest_known_node(tmp_path: Path) -> None:

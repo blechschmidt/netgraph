@@ -23,6 +23,7 @@ from types import ModuleType
 
 import pytest
 
+from netgraph.report import LOAD_RULE
 from netgraph.rules import RULES
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -116,6 +117,22 @@ def test_the_rule_document_explains_how_to_suppress_each_rule(validation_rules_d
     for rule in RULES:
         section = validation_rules_doc.split(f"#### `{rule.id}` — ", 1)[1].split("\n#### ", 1)[0]
         assert "**Suppress with**" in section, f"{rule.id} does not say how to suppress it"
+
+
+@pytest.mark.parametrize("rule", [*RULES, LOAD_RULE], ids=[rule.id for rule in (*RULES, LOAD_RULE)])
+def test_every_rule_title_matches_its_heading(rule: object, validation_rules_doc: str) -> None:
+    """``Rule.title`` is what the deep link in every report is built from.
+
+    The SARIF ``helpUri`` and the human-readable part of a GitHub annotation
+    title both come from it, so a heading reworded without touching the
+    catalogue would ship links that 404 in somebody's code-scanning UI.
+    """
+    assert isinstance(rule, type(RULES[0]))
+    assert rule.title, f"{rule.id} has no title"
+    assert rule.anchor in anchors_of(DOCS / "validation-rules.md"), (
+        f"{rule.id}: no heading in validation-rules.md answers to '#{rule.anchor}'"
+    )
+    assert rule.help_uri.endswith(f"#{rule.anchor}")
 
 
 def test_the_rule_document_names_no_rule_that_does_not_exist(validation_rules_doc: str) -> None:

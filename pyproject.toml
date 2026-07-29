@@ -59,9 +59,12 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/netgraph/netgraph"
-Repository = "https://github.com/netgraph/netgraph"
-Issues = "https://github.com/netgraph/netgraph/issues"
+# The canonical URLs. ``netgraph.rules.RULES_DOC_URL`` and the SARIF
+# ``informationUri`` are built from the same repository, so a rename has to
+# happen here and there at once; ``tests/test_docs.py`` pins the anchors.
+Homepage = "https://github.com/blechschmidt/netgraph"
+Repository = "https://github.com/blechschmidt/netgraph"
+Issues = "https://github.com/blechschmidt/netgraph/issues"
 
 [project.scripts]
 netgraph = "netgraph.cli:main"
@@ -73,8 +76,10 @@ packages = ["src/netgraph"]
 # None of these are optional decoration. tests/test_examples.py loads, validates
 # and renders every inventory under ``/examples``; tests/test_docs.py reads
 # ``/docs`` and executes the generator in ``/tools``; tests/test_schema.py
-# compares ``/schema`` against what the models produce. An sdist without them
-# would ship a test suite that cannot pass.
+# compares ``/schema`` against what the models produce; tests/test_integrations.py
+# reads the pre-commit hook definitions, the composite action and the workflow
+# that exercises it. An sdist without them would ship a test suite that cannot
+# pass.
 include = [
     "/src",
     "/tests",
@@ -82,6 +87,9 @@ include = [
     "/docs",
     "/tools",
     "/schema",
+    "/.github",
+    "/.pre-commit-hooks.yaml",
+    "/.pre-commit-config.yaml",
     "/README.md",
     "/LICENSE",
 ]

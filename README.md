@@ -573,10 +573,26 @@ reported as an error, 0 otherwise — so it drops straight into CI.
 |---|---|---|
 | `--strict` | off | Promote every warning to an error, so any finding fails the run. Can only turn strictness on; `netgraph.toml` decides otherwise. |
 | `--disable RULE` | none | Silence a rule by id (`E001`, `NG-C002`, `*`). Repeatable. Adds to what `netgraph.toml` already ignores. |
+| `-F, --output-format` | `text` | `text` to read; `json`, `sarif` or `github` for automation. |
 
 Findings are grouped by severity, most severe first, and each line reads
 `file.yaml#doc:line  RULE  message`. See
 [`docs/validation-rules.md`](docs/validation-rules.md) for every rule.
+
+The three structured formats put their document on stdout and move the human
+summary to stderr, so the output stays pipeable; `--quiet` drops that summary
+and never the document. `json` is a documented envelope, `sarif` is SARIF 2.1.0
+for GitHub code scanning, and `github` emits workflow commands that annotate a
+pull request in place:
+
+```console
+$ netgraph -i inventory validate -F sarif --strict > netgraph.sarif
+$ netgraph -i inventory validate -F github
+::error file=inventory/cables/links.yaml,line=8,col=7,title=E001 unknown cable endpoint::cable 'cbl-core-desk' endpoint pc-desk:eth0: no element named 'pc-desk' is declared in this inventory
+```
+
+[`docs/ci.md`](docs/ci.md) documents all three, plus the composite GitHub Action
+and the pre-commit hook this repository ships.
 
 ### `netgraph render`
 
@@ -1310,6 +1326,7 @@ netgraph -i examples/campus render --namespace sites/north --layer l2 -f svg -o 
 | [`docs/schema.md`](docs/schema.md) | The specification. Why the schema looks the way it does, with three complete worked examples, and the editor setup in §13. |
 | [`docs/schema-reference.md`](docs/schema-reference.md) | Every field, its type, whether it is required, its default and its YANG path. Generated from the models. |
 | [`docs/validation-rules.md`](docs/validation-rules.md) | Every rule, its severity, why it matters and how to suppress it. |
+| [`docs/ci.md`](docs/ci.md) | Running `validate` in CI: the json/sarif/github output formats, the GitHub Action, the pre-commit hook. |
 | [`docs/yang-mapping.md`](docs/yang-mapping.md) | The relationship to RFC 8343, RFC 8344 and IEEE 802.1Q — including what is deliberately not covered. |
 | [`docs/follow-ups.md`](docs/follow-ups.md) | Known gaps, deferred deliberately: what was measured, why it was left, and what a fix would have to do. |
 
@@ -1363,9 +1380,11 @@ drawn.
 ## Project layout
 
 ```
-docs/               specification, generated reference, rule and YANG guides
+docs/               specification, generated reference, rule, CI and YANG guides
 examples/           four runnable inventories, also used as golden fixtures
 schema/             the generated JSON Schema, for editors and CI
+.github/actions/    the composite action that runs validate in a workflow
+.pre-commit-hooks.yaml  the netgraph-validate hook, for inventory repositories
 tools/              doc and schema generators (checked for drift by the tests),
                     the icon rasteriser, plus the pipeline benchmark harness
 src/netgraph/
@@ -1384,6 +1403,7 @@ src/netgraph/
 │   ├── draft.py    the neutral inventory every reader appends to, and the dedup
 │   └── emit.py     commented YAML in docs/schema.md field order
 ├── rules.py        catalogue of validation rules and severities
+├── report.py       validate as json, SARIF 2.1.0 and GitHub workflow commands
 ├── schema.py       JSON Schema emitted for editors (netgraph schema)
 ├── subnets.py      IP prefixes derived from the configured addresses
 ├── validate.py     semantic validation engine
