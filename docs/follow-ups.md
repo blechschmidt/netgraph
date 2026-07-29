@@ -456,7 +456,56 @@ so nothing fails, and a theme that *does* ship `tunnel.svg` already works.
 
 ---
 
-## Checked and found sound
+## 7. `validate` is the second cost in the pipeline — profiled
+
+**Status:** open, being worked on (2026-07-29). Entry 5 named this target: with
+`load_tree` at 54 % of the pipeline, `validate` is second at 30 %, and neither
+of the two prior passes touched it. This entry is that third pass. The profile
+below was taken **before any change**, so the "measured and rejected" section
+this entry will grow can be checked against it.
+
+### The harness
+
+`tools/profile_validate.py`, committed alongside `tools/bench_pipeline.py` and
+generating the same default tree — **1056 devices in 2106 documents across 138
+files, 1.2 MB of YAML**, through libyaml. It breaks the cost down **by rule**
+rather than by function, because `validate` is a fixed list of checks over one
+prepared context: a function-level profile spreads a rule's cost over the
+helpers it shares with a dozen others (`_linked_endpoints`, `_q`, `_join`) and
+hides which *rule* is worth attacking. Each check is timed end to end over one
+shared context, including the engine work its drafts cause — the suppression
+test, the `Finding` construction, the source lookup — since that work exists
+only because the rule yielded something. `_build_context` is charged to no rule
+and broken down separately. Minimum of seven runs.
+
+### Before
+
+`validate` over the benchmark tree: **220–229 ms**, 2143 findings.
+
+| Item | Before | Share |
+|---|---|---|
+| `_build_context` — `subnets_of` | 42–43 ms | 19 % |
+| `_build_context` — endpoint resolution | 7.6 ms | 3 % |
+| `_build_context` — per-owner maps | 3.8 ms | 2 % |
+| `_build_context` — suppressions | 0.4 ms | — |
+| **`_build_context` total** | **60–62 ms** | **27 %** |
+| `W110` reserved address | 49–50 ms | 22 % |
+| `E004` duplicate IP | 33.5 ms | 15 % |
+| `W111` overlapping prefixes | 26–27 ms | 12 % |
+| `W112` loopback prefix | 19–21 ms | 9 % |
+| `I001` locally administered MAC | 6.1 ms | 3 % |
+| `E007` stacking cycle | 1.9 ms | 1 % |
+| `E008` member is aggregated | 1.7 ms | 1 % |
+| `W101` unaddressed interface | 1.4 ms | 1 % |
+| the other 43 rules, summed | 14 ms | 6 % |
+| engine + final sort (residual) | 7–14 ms | 3–6 % |
+
+Four rules are 58 % of `validate` on their own, and with `subnets_of` the same
+five items are **77 %**. Every one of the five walks addresses, and `I001` — the
+only rule in the table that actually reports anything, 2100 findings — is 3 %.
+So the cost is not in reporting; it is in deriving.
+
+
 
 Recorded so a later reviewer knows these were examined rather than skipped.
 
