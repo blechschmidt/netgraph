@@ -755,6 +755,46 @@ harness, committed so the next pass can repeat it.
 
 ---
 
+## 8. An HTML page grows with the number of views, not only with the network
+
+**Status:** open. `-f html` is usable at the sizes netgraph is usable at; the
+growth is worth knowing about before someone points it at a campus with every
+layer switched on.
+
+The page embeds one *laid-out drawing per view* — each `--layer` given, with and
+without the addresses and the VLAN annotations — because a browser cannot lay a
+graph out and a toggle that re-flowed the diagram would need one. Identical
+drawings are stored once, so an inventory with no VLANs pays nothing for the
+VLAN toggle, but a network where all four combinations differ pays for all four.
+
+### Measured
+
+Rendered with the defaults (`--show-ips`, `--show-vlans`), against the same
+inventory rendered as a plain SVG:
+
+| Inventory | Layers | `-f svg` | `-f html` |
+|---|---|---|---|
+| `examples/home-lab` (6 nodes) | l1 | 20 kB | 86 kB |
+| `examples/campus` (22 nodes) | l2 | 102 kB | 240 kB |
+| `examples/campus` | l1, l2, l3 | 109 kB | 880 kB |
+
+The fixed cost is ~40 kB: the client, the style sheet and the records. The rest
+is drawings, and the count is `layers × up to 4`. Everything compresses well —
+an SVG is repetitive text — so a page served with `Content-Encoding: gzip` costs
+a fraction of the figures above; a page *emailed* costs all of it.
+
+### What a fix would do
+
+Not "render fewer views": the toggles are the reason the format exists. The
+honest options are (a) a flag that narrows which views are embedded, for
+publishing a large network where only the default matters, and (b) storing the
+drawings once as a diff against the first, which trades bytes for client code
+and would need measuring before it earns its place. Neither is worth doing until
+somebody has a network where the file size actually gets in the way — this is
+recorded so that the first person who does has the numbers.
+
+---
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

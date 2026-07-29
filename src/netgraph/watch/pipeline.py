@@ -35,7 +35,7 @@ from netgraph.render import (
     UnknownElementError,
     build_graph,
     filter_graph,
-    render,
+    render_layers,
 )
 from netgraph.rules import Severity
 from netgraph.validate import Finding
@@ -118,7 +118,10 @@ class RenderRequest:
 
     inventory: Path
     output_format: str = "svg"
-    layer: Layer = Layer.L1
+    #: The layers to draw. More than one only makes sense for a format that
+    #: holds several — ``html`` — and the command line refuses it for the rest;
+    #: see :func:`netgraph.render.render_layers`.
+    layers: tuple[Layer, ...] = (Layer.L1,)
     spec: FilterSpec = field(default_factory=FilterSpec)
     options: RenderOptions = field(default_factory=RenderOptions)
     #: Promote surviving warnings to errors, as ``--strict`` does elsewhere.
@@ -197,8 +200,11 @@ def run_cycle(request: RenderRequest) -> CycleResult:
                 duration=elapsed(),
             )
 
-        graph = filter_graph(build_graph(inventory, layer=request.layer), request.spec)
-        payload = render(graph, request.output_format, request.options)
+        graphs = [
+            filter_graph(build_graph(inventory, layer=layer), request.spec)
+            for layer in request.layers
+        ]
+        payload = render_layers(graphs, request.output_format, request.options)
     except (NetgraphError, UnknownElementError, OSError) as exc:
         return CycleResult(
             status=Status.FAILED,
@@ -206,16 +212,20 @@ def run_cycle(request: RenderRequest) -> CycleResult:
             duration=elapsed(),
         )
 
+    # Every count is over every layer drawn. A one-layer run — which is all but
+    # ``-f html --layer … --layer …`` — is the same number it always was.
+    nodes = sum(len(graph.nodes) for graph in graphs)
+    edges = sum(len(graph.edges) for graph in graphs)
     return CycleResult(
         status=Status.OK,
         payload=payload,
-        message=f"{_plural(len(graph.nodes), 'node')}, {_plural(len(graph.edges), 'edge')}",
+        message=f"{_plural(nodes, 'node')}, {_plural(edges, 'edge')}",
         problems=problems,
         errors=tuple(inventory.errors),
         findings=tuple(findings),
-        dangling=tuple(graph.dangling),
-        nodes=len(graph.nodes),
-        edges=len(graph.edges),
+        dangling=tuple(text for graph in graphs for text in graph.dangling),
+        nodes=nodes,
+        edges=edges,
         duration=elapsed(),
     )
 

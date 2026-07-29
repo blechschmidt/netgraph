@@ -1,0 +1,2678 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; img-src data:; style-src &#39;sha256-q27VuOU3DGzFhFM9gLt3va48NzD8mSUXL23qhL/Hm1U=&#39;; script-src &#39;sha256-z/z0v0cbwMW4ICHE+SFjkX+4kxVJGE5C5u3CVj8/+Pw=&#39; &#39;sha256-PuUgciWSWfSiPfcUM+8C3GjRvY4yHMDpV71hUBBGOJA=&#39;; base-uri &#39;none&#39;; form-action &#39;none&#39;">
+<meta name="generator" content="netgraph 0.1.0">
+<title>home-lab — every layer</title>
+<link rel="icon" href="data:,">
+<style>/* The self-contained page `netgraph render -f html` writes.
+ *
+ * Inlined into the document at render time, so every rule here costs bytes in
+ * every published diagram: this is deliberately small, and it borrows the
+ * palette and the type of the web preview's style sheet so that the two look
+ * like one tool.
+ *
+ * Nothing here loads anything. No @import, no url() to a file, no web font --
+ * a page that fetched so much as a stylesheet would stop being something you
+ * can email, and the strict Content-Security-Policy in the document's own
+ * <meta> would refuse it anyway.
+ */
+
+:root {
+  color-scheme: light dark;
+  --edge: rgba(128, 128, 128, .35);
+  --accent: #0969da;
+  --warning: #9a6700;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --panel: 24rem;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  display: flex;
+  flex-direction: column;
+  font: 13px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: Canvas;
+  color: CanvasText;
+  overflow: hidden;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- header */
+
+header {
+  display: flex;
+  gap: .6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: .45rem .7rem;
+  border-bottom: 1px solid var(--edge);
+}
+
+header h1 {
+  font: 600 14px/1.3 var(--mono);
+  margin: 0;
+  letter-spacing: .02em;
+  overflow-wrap: anywhere;
+}
+
+.counts { font-family: var(--mono); font-size: 12px; opacity: .7; }
+.spacer { flex: 1 1 auto; }
+
+.field, .check {
+  display: inline-flex;
+  gap: .35rem;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  opacity: .9;
+}
+
+select, input, button {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: inherit;
+  background: Canvas;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  padding: .22rem .4rem;
+}
+
+input[type="search"] { min-width: 12rem; }
+button { cursor: pointer; }
+button:hover { border-color: currentColor; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ------------------------------------------------------------------ body */
+
+main {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  cursor: grab;
+  /* Pointer events do the panning and the pinch-zoom, so the browser must not
+   * also scroll the page out from under them. */
+  touch-action: none;
+  background:
+    radial-gradient(circle at 1px 1px, var(--edge) 1px, transparent 0) 0 0 / 22px 22px;
+}
+
+.stage.panning { cursor: grabbing; }
+
+.viewport {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+.view { position: absolute; inset: 0; }
+.view[hidden] { display: none; }
+
+.view svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The hit area of a node is its shape; of an edge, its stroke -- which is a
+ * couple of pixels wide, so the pointer needs help finding it. */
+.view svg g.edge path { stroke-linecap: round; }
+.view svg g.edge { pointer-events: visibleStroke; }
+.view svg g.node, .view svg g.edge { cursor: pointer; }
+/* A --link-template anchor is a link in a picture the page itself navigates by
+ * clicking, so a plain click selects and only a modified one follows it; the
+ * pointer must not promise otherwise. */
+.view svg a { cursor: inherit; }
+
+.view svg g.ng-dim { opacity: .16; }
+.view svg g.ng-match > * { stroke-width: 2.2; }
+.view svg g.ng-match { filter: drop-shadow(0 0 2px currentColor); }
+.view svg g.ng-selected > * { stroke-width: 3; }
+.view svg g.ng-selected { filter: drop-shadow(0 0 4px var(--accent)); }
+
+.hint {
+  position: absolute;
+  left: 50%;
+  bottom: .6rem;
+  transform: translateX(-50%);
+  padding: .2rem .5rem;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: Canvas;
+  font: 11px/1.5 var(--mono);
+  opacity: .7;
+  pointer-events: none;
+}
+
+/* ----------------------------------------------------------------- panel */
+
+.panel {
+  flex: 0 0 var(--panel);
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--edge);
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.panel-head {
+  display: flex;
+  gap: .5rem;
+  align-items: baseline;
+  padding: .35rem .7rem;
+  border-bottom: 1px solid var(--edge);
+  font: 600 11px/1.6 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  opacity: .8;
+}
+
+.panel-head button { padding: 0 .3rem; border-color: transparent; opacity: .8; }
+
+.panel-head .hint-count {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: .7;
+}
+
+.results { list-style: none; margin: 0; padding: .2rem 0; border-bottom: 1px solid var(--edge); }
+.results li { margin: 0; }
+
+.results button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  padding: .2rem .7rem;
+  background: transparent;
+}
+
+.results button:hover, .results button:focus-visible {
+  background: color-mix(in srgb, CanvasText 8%, transparent);
+}
+
+.results .kind { opacity: .55; }
+.results button[aria-current="true"] { color: var(--accent); font-weight: 700; }
+
+.detail { padding: .55rem .7rem .9rem; }
+.empty { opacity: .55; margin: 0; padding: .6rem .7rem; }
+
+/* ------------------------------------------- one record, drawn (detail.js) */
+
+.detail h2, .card h2 {
+  font: 600 13px/1.35 var(--mono);
+  margin: 0;
+  display: flex;
+  gap: .4rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+
+.detail h2 .kind, .card h2 .kind { font-weight: 400; opacity: .65; }
+
+/* A table may be wider than the panel and scroll: breaking "ethernet" across
+ * two lines to save a few pixels costs more than the scrollbar does. */
+.detail section, .card section { margin-top: .5rem; overflow-x: auto; }
+
+.detail h3, .card h3 {
+  font: 600 10px/1.6 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  opacity: .6;
+  margin: 0 0 .15rem;
+}
+
+.detail dl, .card dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: .05rem .6rem;
+  margin: 0;
+}
+
+.detail dt, .card dt { opacity: .6; }
+.detail dd, .card dd { margin: 0; overflow-wrap: anywhere; }
+
+.detail table, .card table { border-collapse: collapse; width: 100%; }
+
+.detail th, .card th {
+  text-align: left;
+  font: 600 10px/1.6 var(--mono);
+  opacity: .55;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding-right: .6rem;
+}
+
+.detail td, .card td {
+  vertical-align: top;
+  padding: .05rem .6rem .05rem 0;
+  white-space: nowrap;
+}
+
+.detail tr.off td, .card tr.off td { opacity: .5; text-decoration: line-through solid; }
+
+.detail .tag, .card .tag {
+  display: inline-block;
+  padding: 0 .3rem;
+  margin-right: .2rem;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.detail .note, .card .note { opacity: .65; }
+.detail .source { display: block; margin-top: .6rem; color: var(--accent); }
+
+/* ------------------------------------------------------------- hover card */
+
+.card {
+  position: fixed;
+  z-index: 10;
+  max-width: min(30rem, 46vw);
+  max-height: 60vh;
+  overflow: hidden;
+  padding: .5rem .65rem .6rem;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: Canvas;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .28);
+  font-family: var(--mono);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------- keys box */
+
+.keys {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 11;
+  padding: .5rem .7rem;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: Canvas;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .28);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.keys dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: .1rem .7rem;
+  margin: 0;
+}
+
+.keys dt { opacity: .6; }
+.keys dd { margin: 0; }
+
+/* ------------------------------------------------------------ small, print */
+
+@media (max-width: 760px) {
+  main { flex-direction: column; }
+  .panel { flex: 0 0 45%; border-left: 0; border-top: 1px solid var(--edge); }
+  .hint { display: none; }
+}
+
+@media print {
+  body { overflow: visible; height: auto; }
+  header, .panel, .card, .keys, .hint { display: none; }
+  .stage { overflow: visible; background: none; }
+  .viewport { position: static; transform: none !important; }
+  .view { position: static; }
+  .view svg { height: auto; }
+  .view svg g.ng-dim { opacity: 1; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>home-lab — every layer</h1>
+  <span id="ng-counts" class="counts"></span>
+  <span class="spacer"></span>
+  <label class="field">layer
+    <select id="ng-layer">
+      <option value="0">l1 — physical</option>
+      <option value="1">l2 — VLANs</option>
+      <option value="2">l3 — IP subnets</option>
+    </select>
+  </label>
+  <label class="field" title="Dim everything outside one namespace">namespace
+    <select id="ng-namespace">
+      <option value="">all</option>
+      <option value="hosts">hosts</option>
+      <option value="routers">routers</option>
+      <option value="switches">switches</option>
+    </select>
+  </label>
+  <label class="check" title="Show the configured addresses"><input id="ng-ips" type="checkbox" checked> IPs</label>
+  <label class="check" title="Show VLAN membership"><input id="ng-vlans" type="checkbox" checked> VLANs</label>
+  <label class="sr-only" for="ng-search">Search by name, address, MAC or VLAN</label>
+  <input id="ng-search" type="search" placeholder="search  (/)" autocomplete="off"
+    spellcheck="false" aria-controls="ng-results" aria-describedby="ng-matches">
+  <button id="ng-fit" type="button" title="Fit the diagram in the window (f)">Fit</button>
+  <button id="ng-reset" type="button" title="Back to how the page opened">Reset</button>
+  <button id="ng-help" type="button" aria-expanded="false" aria-controls="ng-keys">Keys</button>
+</header>
+
+<main>
+  <div id="ng-stage" class="stage" tabindex="0" role="group"
+    aria-label="Network diagram. Drag to pan, scroll to zoom, arrow keys to move; search to find an element.">
+    <div id="ng-viewport" class="viewport">
+      <div class="view" data-view="v1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0.00 0.00 1371.59 491.00" preserveAspectRatio="xMidYMid meet">
+<g id="v1-graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 487)">
+<polygon fill="white" stroke="transparent" points="-4,4 -4,-487 1367.59,-487 1367.59,4 -4,4" />
+<text text-anchor="middle" x="681.8" y="-466.2" font-family="Helvetica,Arial,sans-serif" font-size="16.00">home-lab — every layer</text>
+
+<g id="v1-node-hosts_adp-usb-eth" class="node">
+<ellipse fill="#fdf0e3" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5,2" cx="1175.5" cy="-271" rx="188.18" ry="33.47" />
+<text text-anchor="start" x="1148" y="-282" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">adp-usb-eth</text>
+<text text-anchor="start" x="1156" y="-268" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[adapter]</text>
+<text text-anchor="start" x="1051.5" y="-255" font-family="Helvetica,Arial,sans-serif" font-size="10.00">enx001122334455</text>
+<text text-anchor="start" x="1132.5" y="-255" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.30/24, 2001:db8:10::30/64</text>
+</g>
+
+<g id="v1-node-switches_sw-home" class="node">
+<polygon fill="#dcf0dc" stroke="#16a34a" stroke-width="1.2" points="611,-112 460,-112 456,-108 456,0 607,0 611,-4 611,-112" />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="607,-108 456,-108 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="607,-108 607,0 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="607,-108 611,-112 " />
+<text text-anchor="start" x="512.5" y="-100" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">sw-home</text>
+<text text-anchor="start" x="516.5" y="-86" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[switch]</text>
+<text text-anchor="start" x="465.5" y="-73" font-family="Helvetica,Arial,sans-serif" font-size="10.00">Vlan10</text>
+<text text-anchor="start" x="498.5" y="-73" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.2/24</text>
+<text text-anchor="start" x="570.5" y="-73" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="465.5" y="-60" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port1</text>
+<text text-anchor="start" x="570.5" y="-60" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="465.5" y="-47" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port2</text>
+<text text-anchor="start" x="570.5" y="-47" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="465.5" y="-34" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port3</text>
+<text text-anchor="start" x="570.5" y="-34" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="465.5" y="-21" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port4</text>
+<text text-anchor="start" x="570.5" y="-21" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="465.5" y="-8" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port5</text>
+<text text-anchor="start" x="570.5" y="-8" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v1-edge-cables_cbl-sw-dongle" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M1093.95,-241C1056.16,-227.69 1010.61,-211.83 969.5,-198 844.52,-155.96 698.61,-109.25 611.26,-81.54" />
+<text text-anchor="middle" x="933.5" y="-166.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455 -- port4</text>
+<text text-anchor="middle" x="933.5" y="-157.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-004</text>
+<text text-anchor="middle" x="933.5" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+<text text-anchor="middle" x="933.5" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v1-node-hosts_laptop" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="1208,-457 1143,-457 1143,-421 1208,-421 1208,-457" />
+<text text-anchor="start" x="1161" y="-444" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">laptop</text>
+<text text-anchor="start" x="1152.5" y="-430" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v1-edge-hosts_adp-usb-eth_upstream" class="edge">
+<path fill="none" stroke="#9ca3af" stroke-width="2" stroke-dasharray="1,5" d="M1175.5,-420.86C1175.5,-393.44 1175.5,-339.26 1175.5,-304.38" />
+<text text-anchor="middle" x="1187.5" y="-389.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb0</text>
+<text text-anchor="middle" x="1187.5" y="-380.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb</text>
+<text text-anchor="middle" x="1187.5" y="-371.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">5Gbps</text>
+</g>
+
+<g id="v1-node-hosts_pc-desk" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="209,-294.5 0,-294.5 0,-247.5 209,-247.5 209,-294.5" />
+<text text-anchor="start" x="86.5" y="-282" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">pc-desk</text>
+<text text-anchor="start" x="81.5" y="-268" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+<text text-anchor="start" x="9.5" y="-255" font-family="Helvetica,Arial,sans-serif" font-size="10.00">eno1</text>
+<text text-anchor="start" x="33.5" y="-255" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.20/24, 2001:db8:10::20/64</text>
+</g>
+
+<g id="v1-edge-cables_cbl-sw-desk" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M140.84,-247.46C165.05,-232.77 197.77,-213.5 227.5,-198 303.74,-158.24 393.32,-117.65 455.78,-90.29" />
+<text text-anchor="middle" x="375.5" y="-166.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1 -- port2</text>
+<text text-anchor="middle" x="375.5" y="-157.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-002</text>
+<text text-anchor="middle" x="375.5" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+<text text-anchor="middle" x="375.5" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v1-node-hosts_srv-nas" class="node">
+<path fill="#eae2f5" stroke="#7c3aed" stroke-width="1.2" d="M451.5,-297.28C451.5,-300.51 405.33,-303.13 348.5,-303.13 291.67,-303.13 245.5,-300.51 245.5,-297.28 245.5,-297.28 245.5,-244.72 245.5,-244.72 245.5,-241.49 291.67,-238.87 348.5,-238.87 405.33,-238.87 451.5,-241.49 451.5,-244.72 451.5,-244.72 451.5,-297.28 451.5,-297.28" />
+<path fill="none" stroke="#7c3aed" stroke-width="1.2" d="M451.5,-297.28C451.5,-294.06 405.33,-291.44 348.5,-291.44 291.67,-291.44 245.5,-294.06 245.5,-297.28" />
+<text text-anchor="start" x="331.5" y="-282" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">srv-nas</text>
+<text text-anchor="start" x="331.5" y="-268" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[server]</text>
+<text text-anchor="start" x="254.5" y="-255" font-family="Helvetica,Arial,sans-serif" font-size="10.00">eth0</text>
+<text text-anchor="start" x="275.5" y="-255" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.10/24, 2001:db8:10::10/64</text>
+</g>
+
+<g id="v1-edge-cables_cbl-sw-nas" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M375.8,-238.57C404.64,-205.36 450.7,-152.33 485.61,-112.13" />
+<text text-anchor="middle" x="485.5" y="-166.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0 -- port3</text>
+<text text-anchor="middle" x="485.5" y="-157.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-003</text>
+<text text-anchor="middle" x="485.5" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+<text text-anchor="middle" x="485.5" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v1-node-routers_rtr-home" class="node">
+<polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="719.5,-344 487.5,-271 719.5,-198 951.5,-271 719.5,-344" />
+<text text-anchor="start" x="699.5" y="-295" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr-home</text>
+<text text-anchor="start" x="704" y="-281" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
+<text text-anchor="start" x="612.5" y="-268" font-family="Helvetica,Arial,sans-serif" font-size="10.00">lo0</text>
+<text text-anchor="start" x="638.5" y="-268" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.0.2.1/32, 2001:db8::1/128</text>
+<text text-anchor="start" x="612.5" y="-255" font-family="Helvetica,Arial,sans-serif" font-size="10.00">wan0</text>
+<text text-anchor="start" x="638.5" y="-255" font-family="Helvetica,Arial,sans-serif" font-size="10.00">203.0.113.2/30</text>
+<text text-anchor="start" x="612.5" y="-242" font-family="Helvetica,Arial,sans-serif" font-size="10.00">lan0</text>
+<text text-anchor="start" x="638.5" y="-242" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.1/24, 2001:db8:10::1/64</text>
+<text text-anchor="start" x="794.5" y="-242" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v1-edge-cables_cbl-rtr-sw" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M670.14,-213.48C642.81,-182.17 608.96,-143.42 581.8,-112.31" />
+<text text-anchor="middle" x="654" y="-166.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0 -- port1</text>
+<text text-anchor="middle" x="654" y="-157.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-001</text>
+<text text-anchor="middle" x="654" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+<text text-anchor="middle" x="654" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+</g>
+</svg></div>
+      <div class="view" data-view="v2" hidden><svg xmlns="http://www.w3.org/2000/svg" viewBox="0.00 0.00 1307.59 417.00" preserveAspectRatio="xMidYMid meet">
+<g id="v2-graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 413)">
+<polygon fill="white" stroke="transparent" points="-4,4 -4,-413 1303.59,-413 1303.59,4 -4,4" />
+<text text-anchor="middle" x="649.8" y="-392.2" font-family="Helvetica,Arial,sans-serif" font-size="16.00">home-lab — every layer</text>
+
+<g id="v2-node-hosts_adp-usb-eth" class="node">
+<ellipse fill="#fdf0e3" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5,2" cx="1111.5" cy="-197" rx="188.18" ry="33.47" />
+<text text-anchor="start" x="1084" y="-208" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">adp-usb-eth</text>
+<text text-anchor="start" x="1092" y="-194" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[adapter]</text>
+<text text-anchor="start" x="987.5" y="-181" font-family="Helvetica,Arial,sans-serif" font-size="10.00">enx001122334455</text>
+<text text-anchor="start" x="1068.5" y="-181" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.30/24, 2001:db8:10::30/64</text>
+</g>
+
+<g id="v2-node-switches_sw-home" class="node">
+<polygon fill="#dcf0dc" stroke="#16a34a" stroke-width="1.2" points="579,-47 460,-47 456,-43 456,0 575,0 579,-4 579,-47" />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="575,-43 456,-43 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="575,-43 575,0 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="575,-43 579,-47 " />
+<text text-anchor="start" x="496.5" y="-34.5" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">sw-home</text>
+<text text-anchor="start" x="500.5" y="-20.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[switch]</text>
+<text text-anchor="start" x="465.5" y="-7.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">Vlan10</text>
+<text text-anchor="start" x="498.5" y="-7.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.2/24</text>
+</g>
+
+<g id="v2-edge-cables_cbl-sw-dongle" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M1032.78,-166.72C994.6,-152.97 947.93,-136.83 905.5,-124 791.34,-89.48 656.01,-56.56 579.1,-38.58" />
+<text text-anchor="middle" x="857.5" y="-92.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455 -- port4</text>
+<text text-anchor="middle" x="857.5" y="-83.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-004</text>
+<text text-anchor="middle" x="857.5" y="-74.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+</g>
+
+<g id="v2-node-hosts_laptop" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="1144,-383 1079,-383 1079,-347 1144,-347 1144,-383" />
+<text text-anchor="start" x="1097" y="-370" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">laptop</text>
+<text text-anchor="start" x="1088.5" y="-356" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v2-edge-hosts_adp-usb-eth_upstream" class="edge">
+<path fill="none" stroke="#9ca3af" stroke-width="2" stroke-dasharray="1,5" d="M1111.5,-346.86C1111.5,-319.44 1111.5,-265.26 1111.5,-230.38" />
+<text text-anchor="middle" x="1123.5" y="-315.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb0</text>
+<text text-anchor="middle" x="1123.5" y="-306.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb</text>
+<text text-anchor="middle" x="1123.5" y="-297.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">5Gbps</text>
+</g>
+
+<g id="v2-node-hosts_pc-desk" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="209,-220.5 0,-220.5 0,-173.5 209,-173.5 209,-220.5" />
+<text text-anchor="start" x="86.5" y="-208" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">pc-desk</text>
+<text text-anchor="start" x="81.5" y="-194" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+<text text-anchor="start" x="9.5" y="-181" font-family="Helvetica,Arial,sans-serif" font-size="10.00">eno1</text>
+<text text-anchor="start" x="33.5" y="-181" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.20/24, 2001:db8:10::20/64</text>
+</g>
+
+<g id="v2-edge-cables_cbl-sw-desk" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M138.76,-173.45C162.9,-158.19 196.35,-138.29 227.5,-124 303.82,-88.99 396.2,-59.35 455.87,-41.75" />
+<text text-anchor="middle" x="383.5" y="-92.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1 -- port2</text>
+<text text-anchor="middle" x="383.5" y="-83.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-002</text>
+<text text-anchor="middle" x="383.5" y="-74.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+</g>
+
+<g id="v2-node-hosts_srv-nas" class="node">
+<path fill="#eae2f5" stroke="#7c3aed" stroke-width="1.2" d="M451.5,-223.28C451.5,-226.51 405.33,-229.13 348.5,-229.13 291.67,-229.13 245.5,-226.51 245.5,-223.28 245.5,-223.28 245.5,-170.72 245.5,-170.72 245.5,-167.49 291.67,-164.87 348.5,-164.87 405.33,-164.87 451.5,-167.49 451.5,-170.72 451.5,-170.72 451.5,-223.28 451.5,-223.28" />
+<path fill="none" stroke="#7c3aed" stroke-width="1.2" d="M451.5,-223.28C451.5,-220.06 405.33,-217.44 348.5,-217.44 291.67,-217.44 245.5,-220.06 245.5,-223.28" />
+<text text-anchor="start" x="331.5" y="-208" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">srv-nas</text>
+<text text-anchor="start" x="331.5" y="-194" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[server]</text>
+<text text-anchor="start" x="254.5" y="-181" font-family="Helvetica,Arial,sans-serif" font-size="10.00">eth0</text>
+<text text-anchor="start" x="275.5" y="-181" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.10/24, 2001:db8:10::10/64</text>
+</g>
+
+<g id="v2-edge-cables_cbl-sw-nas" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M379.5,-164.54C413.04,-130.51 465.69,-77.08 495.32,-47.01" />
+<text text-anchor="middle" x="490.5" y="-92.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0 -- port3</text>
+<text text-anchor="middle" x="490.5" y="-83.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-003</text>
+<text text-anchor="middle" x="490.5" y="-74.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+</g>
+
+<g id="v2-node-routers_rtr-home" class="node">
+<polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="687.5,-270 487.5,-197 687.5,-124 887.5,-197 687.5,-270" />
+<text text-anchor="start" x="667.5" y="-221" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr-home</text>
+<text text-anchor="start" x="672" y="-207" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
+<text text-anchor="start" x="596.5" y="-194" font-family="Helvetica,Arial,sans-serif" font-size="10.00">lo0</text>
+<text text-anchor="start" x="622.5" y="-194" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.0.2.1/32, 2001:db8::1/128</text>
+<text text-anchor="start" x="596.5" y="-181" font-family="Helvetica,Arial,sans-serif" font-size="10.00">wan0</text>
+<text text-anchor="start" x="622.5" y="-181" font-family="Helvetica,Arial,sans-serif" font-size="10.00">203.0.113.2/30</text>
+<text text-anchor="start" x="596.5" y="-168" font-family="Helvetica,Arial,sans-serif" font-size="10.00">lan0</text>
+<text text-anchor="start" x="622.5" y="-168" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.1/24, 2001:db8:10::1/64</text>
+</g>
+
+<g id="v2-edge-cables_cbl-rtr-sw" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M634.64,-142.68C602.87,-110.62 564.07,-71.48 540.07,-47.27" />
+<text text-anchor="middle" x="609" y="-92.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0 -- port1</text>
+<text text-anchor="middle" x="609" y="-83.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-001</text>
+<text text-anchor="middle" x="609" y="-74.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+</g>
+</g>
+</svg></div>
+      <div class="view" data-view="v3" hidden><svg xmlns="http://www.w3.org/2000/svg" viewBox="0.00 0.00 485.12 439.00" preserveAspectRatio="xMidYMid meet">
+<g id="v3-graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 435)">
+<polygon fill="white" stroke="transparent" points="-4,4 -4,-435 481.12,-435 481.12,4 -4,4" />
+<text text-anchor="middle" x="238.56" y="-414.2" font-family="Helvetica,Arial,sans-serif" font-size="16.00">home-lab — every layer</text>
+
+<g id="v3-node-hosts_adp-usb-eth" class="node">
+<ellipse fill="#fdf0e3" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5,2" cx="425.5" cy="-245" rx="51.74" ry="24.08" />
+<text text-anchor="start" x="398.5" y="-250" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">adp-usb-eth</text>
+<text text-anchor="start" x="406.5" y="-236" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[adapter]</text>
+</g>
+
+<g id="v3-node-switches_sw-home" class="node">
+<polygon fill="#dcf0dc" stroke="#16a34a" stroke-width="1.2" points="239,-112 158,-112 154,-108 154,0 235,0 239,-4 239,-112" />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="235,-108 154,-108 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="235,-108 235,0 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="235,-108 239,-112 " />
+<text text-anchor="start" x="175.5" y="-100" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">sw-home</text>
+<text text-anchor="start" x="179.5" y="-86" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[switch]</text>
+<text text-anchor="start" x="163.5" y="-73" font-family="Helvetica,Arial,sans-serif" font-size="10.00">Vlan10</text>
+<text text-anchor="start" x="198.5" y="-73" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="163.5" y="-60" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port1</text>
+<text text-anchor="start" x="198.5" y="-60" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="163.5" y="-47" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port2</text>
+<text text-anchor="start" x="198.5" y="-47" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="163.5" y="-34" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port3</text>
+<text text-anchor="start" x="198.5" y="-34" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="163.5" y="-21" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port4</text>
+<text text-anchor="start" x="198.5" y="-21" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="163.5" y="-8" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port5</text>
+<text text-anchor="start" x="198.5" y="-8" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v3-edge-cables_cbl-sw-dongle" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M400.56,-223.63C361.84,-192.02 286.8,-130.74 239.3,-91.95" />
+<text text-anchor="middle" x="385.5" y="-166.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455 -- port4</text>
+<text text-anchor="middle" x="385.5" y="-157.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-004</text>
+<text text-anchor="middle" x="385.5" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+<text text-anchor="middle" x="385.5" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v3-node-hosts_laptop" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="458,-405 393,-405 393,-369 458,-369 458,-405" />
+<text text-anchor="start" x="411" y="-392" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">laptop</text>
+<text text-anchor="start" x="402.5" y="-378" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v3-edge-hosts_adp-usb-eth_upstream" class="edge">
+<path fill="none" stroke="#9ca3af" stroke-width="2" stroke-dasharray="1,5" d="M425.5,-368.83C425.5,-343.86 425.5,-297.44 425.5,-269.37" />
+<text text-anchor="middle" x="437.5" y="-337.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb0</text>
+<text text-anchor="middle" x="437.5" y="-328.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb</text>
+<text text-anchor="middle" x="437.5" y="-319.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">5Gbps</text>
+</g>
+
+<g id="v3-node-hosts_pc-desk" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="65,-263 0,-263 0,-227 65,-227 65,-263" />
+<text text-anchor="start" x="14.5" y="-250" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">pc-desk</text>
+<text text-anchor="start" x="9.5" y="-236" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v3-edge-cables_cbl-sw-desk" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M40.57,-226.86C51.52,-204.67 72.6,-165.47 97.5,-137 113.94,-118.2 135.15,-100.41 153.73,-86.4" />
+<text text-anchor="middle" x="121.5" y="-166.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1 -- port2</text>
+<text text-anchor="middle" x="121.5" y="-157.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-002</text>
+<text text-anchor="middle" x="121.5" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+<text text-anchor="middle" x="121.5" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v3-node-hosts_srv-nas" class="node">
+<path fill="#eae2f5" stroke="#7c3aed" stroke-width="1.2" d="M155.5,-264.02C155.5,-266.36 143.4,-268.25 128.5,-268.25 113.6,-268.25 101.5,-266.36 101.5,-264.02 101.5,-264.02 101.5,-225.98 101.5,-225.98 101.5,-223.64 113.6,-221.75 128.5,-221.75 143.4,-221.75 155.5,-223.64 155.5,-225.98 155.5,-225.98 155.5,-264.02 155.5,-264.02" />
+<path fill="none" stroke="#7c3aed" stroke-width="1.2" d="M155.5,-264.02C155.5,-261.69 143.4,-259.8 128.5,-259.8 113.6,-259.8 101.5,-261.69 101.5,-264.02" />
+<text text-anchor="start" x="111.5" y="-250" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">srv-nas</text>
+<text text-anchor="start" x="111.5" y="-236" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[server]</text>
+</g>
+
+<g id="v3-edge-cables_cbl-sw-nas" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M136.7,-221.44C146.49,-194.54 163.19,-148.61 176.46,-112.12" />
+<text text-anchor="middle" x="190.5" y="-166.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0 -- port3</text>
+<text text-anchor="middle" x="190.5" y="-157.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-003</text>
+<text text-anchor="middle" x="190.5" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+<text text-anchor="middle" x="190.5" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v3-node-routers_rtr-home" class="node">
+<polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="264.5,-292 191.5,-245 264.5,-198 337.5,-245 264.5,-292" />
+<text text-anchor="start" x="245" y="-256" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr-home</text>
+<text text-anchor="start" x="249.5" y="-242" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
+<text text-anchor="start" x="237.5" y="-229" font-family="Helvetica,Arial,sans-serif" font-size="10.00">lan0</text>
+<text text-anchor="start" x="260.5" y="-229" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v3-edge-cables_cbl-rtr-sw" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M250.9,-206.61C241.06,-179.53 227.59,-142.5 216.52,-112.06" />
+<text text-anchor="middle" x="261" y="-166.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0 -- port1</text>
+<text text-anchor="middle" x="261" y="-157.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-001</text>
+<text text-anchor="middle" x="261" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+<text text-anchor="middle" x="261" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+</g>
+</svg></div>
+      <div class="view" data-view="v4" hidden><svg xmlns="http://www.w3.org/2000/svg" viewBox="0.00 0.00 455.12 328.00" preserveAspectRatio="xMidYMid meet">
+<g id="v4-graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 324)">
+<polygon fill="white" stroke="transparent" points="-4,4 -4,-324 451.12,-324 451.12,4 -4,4" />
+<text text-anchor="middle" x="223.56" y="-303.2" font-family="Helvetica,Arial,sans-serif" font-size="16.00">home-lab — every layer</text>
+
+<g id="v4-node-hosts_adp-usb-eth" class="node">
+<ellipse fill="#fdf0e3" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5,2" cx="395.5" cy="-147" rx="51.74" ry="24.08" />
+<text text-anchor="start" x="368.5" y="-152" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">adp-usb-eth</text>
+<text text-anchor="start" x="376.5" y="-138" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[adapter]</text>
+</g>
+
+<g id="v4-node-switches_sw-home" class="node">
+<polygon fill="#dcf0dc" stroke="#16a34a" stroke-width="1.2" points="219,-36 162,-36 158,-32 158,0 215,0 219,-4 219,-36" />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="215,-32 158,-32 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="215,-32 215,0 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="215,-32 219,-36 " />
+<text text-anchor="start" x="167.5" y="-23" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">sw-home</text>
+<text text-anchor="start" x="171.5" y="-9" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[switch]</text>
+</g>
+
+<g id="v4-edge-cables_cbl-sw-dongle" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M369.66,-125.79C345.91,-107.68 309.36,-80.98 275.5,-61 257.44,-50.35 236.28,-40.08 219.34,-32.37" />
+<text text-anchor="middle" x="363.5" y="-81.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455 -- port4</text>
+<text text-anchor="middle" x="363.5" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-004</text>
+<text text-anchor="middle" x="363.5" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+</g>
+
+<g id="v4-node-hosts_laptop" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="428,-294 363,-294 363,-258 428,-258 428,-294" />
+<text text-anchor="start" x="381" y="-281" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">laptop</text>
+<text text-anchor="start" x="372.5" y="-267" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v4-edge-hosts_adp-usb-eth_upstream" class="edge">
+<path fill="none" stroke="#9ca3af" stroke-width="2" stroke-dasharray="1,5" d="M395.5,-257.87C395.5,-235.53 395.5,-196.34 395.5,-171.31" />
+<text text-anchor="middle" x="407.5" y="-226.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb0</text>
+<text text-anchor="middle" x="407.5" y="-217.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb</text>
+<text text-anchor="middle" x="407.5" y="-208.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">5Gbps</text>
+</g>
+
+<g id="v4-node-hosts_pc-desk" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="65,-165 0,-165 0,-129 65,-129 65,-165" />
+<text text-anchor="start" x="14.5" y="-152" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">pc-desk</text>
+<text text-anchor="start" x="9.5" y="-138" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v4-edge-cables_cbl-sw-desk" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M40.47,-128.86C50.01,-109.99 67.6,-79.84 90.5,-61 110.23,-44.77 137.16,-33.83 157.8,-27.2" />
+<text text-anchor="middle" x="114.5" y="-81.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1 -- port2</text>
+<text text-anchor="middle" x="114.5" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-002</text>
+<text text-anchor="middle" x="114.5" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+</g>
+
+<g id="v4-node-hosts_srv-nas" class="node">
+<path fill="#eae2f5" stroke="#7c3aed" stroke-width="1.2" d="M155.5,-166.02C155.5,-168.36 143.4,-170.25 128.5,-170.25 113.6,-170.25 101.5,-168.36 101.5,-166.02 101.5,-166.02 101.5,-127.98 101.5,-127.98 101.5,-125.64 113.6,-123.75 128.5,-123.75 143.4,-123.75 155.5,-125.64 155.5,-127.98 155.5,-127.98 155.5,-166.02 155.5,-166.02" />
+<path fill="none" stroke="#7c3aed" stroke-width="1.2" d="M155.5,-166.02C155.5,-163.69 143.4,-161.8 128.5,-161.8 113.6,-161.8 101.5,-163.69 101.5,-166.02" />
+<text text-anchor="start" x="111.5" y="-152" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">srv-nas</text>
+<text text-anchor="start" x="111.5" y="-138" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[server]</text>
+</g>
+
+<g id="v4-edge-cables_cbl-sw-nas" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M134.52,-123.63C139.68,-106.06 147.95,-81.27 158.5,-61 162.97,-52.41 169,-43.6 174.49,-36.27" />
+<text text-anchor="middle" x="181.5" y="-81.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0 -- port3</text>
+<text text-anchor="middle" x="181.5" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-003</text>
+<text text-anchor="middle" x="181.5" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+</g>
+
+<g id="v4-node-routers_rtr-home" class="node">
+<polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="249.5,-181 191.5,-147 249.5,-113 307.5,-147 249.5,-181" />
+<text text-anchor="start" x="229.5" y="-152" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr-home</text>
+<text text-anchor="start" x="234" y="-138" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
+</g>
+
+<g id="v4-edge-cables_cbl-rtr-sw" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M237.41,-119.88C229.55,-103.03 219.04,-80.66 209.5,-61 205.51,-52.79 201,-43.72 197.18,-36.12" />
+<text text-anchor="middle" x="244" y="-81.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0 -- port1</text>
+<text text-anchor="middle" x="244" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">H-001</text>
+<text text-anchor="middle" x="244" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">1Gbps</text>
+</g>
+</g>
+</svg></div>
+      <div class="view" data-view="v5" hidden><svg xmlns="http://www.w3.org/2000/svg" viewBox="0.00 0.00 1371.59 464.00" preserveAspectRatio="xMidYMid meet">
+<g id="v5-graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 460)">
+<polygon fill="white" stroke="transparent" points="-4,4 -4,-460 1367.59,-460 1367.59,4 -4,4" />
+<text text-anchor="middle" x="681.8" y="-439.2" font-family="Helvetica,Arial,sans-serif" font-size="16.00">home-lab — every layer</text>
+
+<g id="v5-node-hosts_adp-usb-eth" class="node">
+<ellipse fill="#fdf0e3" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5,2" cx="1175.5" cy="-253" rx="188.18" ry="33.47" />
+<text text-anchor="start" x="1148" y="-264" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">adp-usb-eth</text>
+<text text-anchor="start" x="1156" y="-250" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[adapter]</text>
+<text text-anchor="start" x="1051.5" y="-237" font-family="Helvetica,Arial,sans-serif" font-size="10.00">enx001122334455</text>
+<text text-anchor="start" x="1132.5" y="-237" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.30/24, 2001:db8:10::30/64</text>
+</g>
+
+<g id="v5-node-switches_sw-home" class="node">
+<polygon fill="#dcf0dc" stroke="#16a34a" stroke-width="1.2" points="611,-112 460,-112 456,-108 456,0 607,0 611,-4 611,-112" />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="607,-108 456,-108 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="607,-108 607,0 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="607,-108 611,-112 " />
+<text text-anchor="start" x="512.5" y="-100" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">sw-home</text>
+<text text-anchor="start" x="516.5" y="-86" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[switch]</text>
+<text text-anchor="start" x="465.5" y="-73" font-family="Helvetica,Arial,sans-serif" font-size="10.00">Vlan10</text>
+<text text-anchor="start" x="498.5" y="-73" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.2/24</text>
+<text text-anchor="start" x="570.5" y="-73" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="465.5" y="-60" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port1</text>
+<text text-anchor="start" x="570.5" y="-60" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="465.5" y="-47" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port2</text>
+<text text-anchor="start" x="570.5" y="-47" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="465.5" y="-34" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port3</text>
+<text text-anchor="start" x="570.5" y="-34" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="465.5" y="-21" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port4</text>
+<text text-anchor="start" x="570.5" y="-21" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="465.5" y="-8" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port5</text>
+<text text-anchor="start" x="570.5" y="-8" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v5-edge-cables_cbl-sw-dongle" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M1095.66,-222.82C1057.64,-209.25 1011.41,-193.22 969.5,-180 844.99,-140.72 698.63,-100.66 611.11,-77.35" />
+<text text-anchor="middle" x="934.5" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455 -- port4</text>
+<text text-anchor="middle" x="934.5" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v5-node-hosts_laptop" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="1208,-430 1143,-430 1143,-394 1208,-394 1208,-430" />
+<text text-anchor="start" x="1161" y="-417" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">laptop</text>
+<text text-anchor="start" x="1152.5" y="-403" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v5-edge-hosts_adp-usb-eth_upstream" class="edge">
+<path fill="none" stroke="#9ca3af" stroke-width="2" stroke-dasharray="1,5" d="M1175.5,-393.9C1175.5,-368.15 1175.5,-318.97 1175.5,-286.32" />
+<text text-anchor="middle" x="1184.5" y="-362.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb0</text>
+<text text-anchor="middle" x="1184.5" y="-353.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb</text>
+</g>
+
+<g id="v5-node-hosts_pc-desk" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="209,-276.5 0,-276.5 0,-229.5 209,-229.5 209,-276.5" />
+<text text-anchor="start" x="86.5" y="-264" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">pc-desk</text>
+<text text-anchor="start" x="81.5" y="-250" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+<text text-anchor="start" x="9.5" y="-237" font-family="Helvetica,Arial,sans-serif" font-size="10.00">eno1</text>
+<text text-anchor="start" x="33.5" y="-237" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.20/24, 2001:db8:10::20/64</text>
+</g>
+
+<g id="v5-edge-cables_cbl-sw-desk" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M139.79,-229.47C163.98,-214.5 197.06,-194.92 227.5,-180 303.2,-142.88 393.05,-107.77 455.74,-84.64" />
+<text text-anchor="middle" x="341.5" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1 -- port2</text>
+<text text-anchor="middle" x="341.5" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v5-node-hosts_srv-nas" class="node">
+<path fill="#eae2f5" stroke="#7c3aed" stroke-width="1.2" d="M451.5,-279.28C451.5,-282.51 405.33,-285.13 348.5,-285.13 291.67,-285.13 245.5,-282.51 245.5,-279.28 245.5,-279.28 245.5,-226.72 245.5,-226.72 245.5,-223.49 291.67,-220.87 348.5,-220.87 405.33,-220.87 451.5,-223.49 451.5,-226.72 451.5,-226.72 451.5,-279.28 451.5,-279.28" />
+<path fill="none" stroke="#7c3aed" stroke-width="1.2" d="M451.5,-279.28C451.5,-276.06 405.33,-273.44 348.5,-273.44 291.67,-273.44 245.5,-276.06 245.5,-279.28" />
+<text text-anchor="start" x="331.5" y="-264" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">srv-nas</text>
+<text text-anchor="start" x="331.5" y="-250" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[server]</text>
+<text text-anchor="start" x="254.5" y="-237" font-family="Helvetica,Arial,sans-serif" font-size="10.00">eth0</text>
+<text text-anchor="start" x="275.5" y="-237" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.10/24, 2001:db8:10::10/64</text>
+</g>
+
+<g id="v5-edge-cables_cbl-sw-nas" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M378.22,-220.67C405.9,-191.49 447.78,-147.35 481.08,-112.26" />
+<text text-anchor="middle" x="480.5" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0 -- port3</text>
+<text text-anchor="middle" x="480.5" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v5-node-routers_rtr-home" class="node">
+<polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="719.5,-326 487.5,-253 719.5,-180 951.5,-253 719.5,-326" />
+<text text-anchor="start" x="699.5" y="-277" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr-home</text>
+<text text-anchor="start" x="704" y="-263" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
+<text text-anchor="start" x="612.5" y="-250" font-family="Helvetica,Arial,sans-serif" font-size="10.00">lo0</text>
+<text text-anchor="start" x="638.5" y="-250" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.0.2.1/32, 2001:db8::1/128</text>
+<text text-anchor="start" x="612.5" y="-237" font-family="Helvetica,Arial,sans-serif" font-size="10.00">wan0</text>
+<text text-anchor="start" x="638.5" y="-237" font-family="Helvetica,Arial,sans-serif" font-size="10.00">203.0.113.2/30</text>
+<text text-anchor="start" x="612.5" y="-224" font-family="Helvetica,Arial,sans-serif" font-size="10.00">lan0</text>
+<text text-anchor="start" x="638.5" y="-224" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.1/24, 2001:db8:10::1/64</text>
+<text text-anchor="start" x="794.5" y="-224" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v5-edge-cables_cbl-rtr-sw" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M666.45,-196.38C641.22,-169.93 611.14,-138.39 585.98,-112.02" />
+<text text-anchor="middle" x="649" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0 -- port1</text>
+<text text-anchor="middle" x="649" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+</g>
+</svg></div>
+      <div class="view" data-view="v6" hidden><svg xmlns="http://www.w3.org/2000/svg" viewBox="0.00 0.00 1307.59 390.00" preserveAspectRatio="xMidYMid meet">
+<g id="v6-graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 386)">
+<polygon fill="white" stroke="transparent" points="-4,4 -4,-386 1303.59,-386 1303.59,4 -4,4" />
+<text text-anchor="middle" x="649.8" y="-365.2" font-family="Helvetica,Arial,sans-serif" font-size="16.00">home-lab — every layer</text>
+
+<g id="v6-node-hosts_adp-usb-eth" class="node">
+<ellipse fill="#fdf0e3" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5,2" cx="1111.5" cy="-179" rx="188.18" ry="33.47" />
+<text text-anchor="start" x="1084" y="-190" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">adp-usb-eth</text>
+<text text-anchor="start" x="1092" y="-176" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[adapter]</text>
+<text text-anchor="start" x="987.5" y="-163" font-family="Helvetica,Arial,sans-serif" font-size="10.00">enx001122334455</text>
+<text text-anchor="start" x="1068.5" y="-163" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.30/24, 2001:db8:10::30/64</text>
+</g>
+
+<g id="v6-node-switches_sw-home" class="node">
+<polygon fill="#dcf0dc" stroke="#16a34a" stroke-width="1.2" points="579,-47 460,-47 456,-43 456,0 575,0 579,-4 579,-47" />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="575,-43 456,-43 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="575,-43 575,0 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="575,-43 579,-47 " />
+<text text-anchor="start" x="496.5" y="-34.5" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">sw-home</text>
+<text text-anchor="start" x="500.5" y="-20.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[switch]</text>
+<text text-anchor="start" x="465.5" y="-7.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">Vlan10</text>
+<text text-anchor="start" x="498.5" y="-7.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.2/24</text>
+</g>
+
+<g id="v6-edge-cables_cbl-sw-dongle" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M1034.97,-148.6C996.5,-134.5 948.93,-118.1 905.5,-106 791.78,-74.33 656.3,-48.51 579.24,-34.92" />
+<text text-anchor="middle" x="847.5" y="-74.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455 -- port4</text>
+</g>
+
+<g id="v6-node-hosts_laptop" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="1144,-356 1079,-356 1079,-320 1144,-320 1144,-356" />
+<text text-anchor="start" x="1097" y="-343" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">laptop</text>
+<text text-anchor="start" x="1088.5" y="-329" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v6-edge-hosts_adp-usb-eth_upstream" class="edge">
+<path fill="none" stroke="#9ca3af" stroke-width="2" stroke-dasharray="1,5" d="M1111.5,-319.9C1111.5,-294.15 1111.5,-244.97 1111.5,-212.32" />
+<text text-anchor="middle" x="1120.5" y="-288.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb0</text>
+<text text-anchor="middle" x="1120.5" y="-279.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb</text>
+</g>
+
+<g id="v6-node-hosts_pc-desk" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="209,-202.5 0,-202.5 0,-155.5 209,-155.5 209,-202.5" />
+<text text-anchor="start" x="86.5" y="-190" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">pc-desk</text>
+<text text-anchor="start" x="81.5" y="-176" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+<text text-anchor="start" x="9.5" y="-163" font-family="Helvetica,Arial,sans-serif" font-size="10.00">eno1</text>
+<text text-anchor="start" x="33.5" y="-163" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.20/24, 2001:db8:10::20/64</text>
+</g>
+
+<g id="v6-edge-cables_cbl-sw-desk" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M137.74,-155.39C161.82,-139.81 195.62,-119.55 227.5,-106 303.55,-73.69 396.19,-50.22 455.98,-36.98" />
+<text text-anchor="middle" x="344.5" y="-74.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1 -- port2</text>
+</g>
+
+<g id="v6-node-hosts_srv-nas" class="node">
+<path fill="#eae2f5" stroke="#7c3aed" stroke-width="1.2" d="M451.5,-205.28C451.5,-208.51 405.33,-211.13 348.5,-211.13 291.67,-211.13 245.5,-208.51 245.5,-205.28 245.5,-205.28 245.5,-152.72 245.5,-152.72 245.5,-149.49 291.67,-146.87 348.5,-146.87 405.33,-146.87 451.5,-149.49 451.5,-152.72 451.5,-152.72 451.5,-205.28 451.5,-205.28" />
+<path fill="none" stroke="#7c3aed" stroke-width="1.2" d="M451.5,-205.28C451.5,-202.06 405.33,-199.44 348.5,-199.44 291.67,-199.44 245.5,-202.06 245.5,-205.28" />
+<text text-anchor="start" x="331.5" y="-190" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">srv-nas</text>
+<text text-anchor="start" x="331.5" y="-176" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[server]</text>
+<text text-anchor="start" x="254.5" y="-163" font-family="Helvetica,Arial,sans-serif" font-size="10.00">eth0</text>
+<text text-anchor="start" x="275.5" y="-163" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.10/24, 2001:db8:10::10/64</text>
+</g>
+
+<g id="v6-edge-cables_cbl-sw-nas" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M383.11,-146.57C415.65,-117.01 463.58,-73.48 492.54,-47.17" />
+<text text-anchor="middle" x="485.5" y="-74.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0 -- port3</text>
+</g>
+
+<g id="v6-node-routers_rtr-home" class="node">
+<polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="687.5,-252 487.5,-179 687.5,-106 887.5,-179 687.5,-252" />
+<text text-anchor="start" x="667.5" y="-203" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr-home</text>
+<text text-anchor="start" x="672" y="-189" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
+<text text-anchor="start" x="596.5" y="-176" font-family="Helvetica,Arial,sans-serif" font-size="10.00">lo0</text>
+<text text-anchor="start" x="622.5" y="-176" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.0.2.1/32, 2001:db8::1/128</text>
+<text text-anchor="start" x="596.5" y="-163" font-family="Helvetica,Arial,sans-serif" font-size="10.00">wan0</text>
+<text text-anchor="start" x="622.5" y="-163" font-family="Helvetica,Arial,sans-serif" font-size="10.00">203.0.113.2/30</text>
+<text text-anchor="start" x="596.5" y="-150" font-family="Helvetica,Arial,sans-serif" font-size="10.00">lan0</text>
+<text text-anchor="start" x="622.5" y="-150" font-family="Helvetica,Arial,sans-serif" font-size="10.00">192.168.10.1/24, 2001:db8:10::1/64</text>
+</g>
+
+<g id="v6-edge-cables_cbl-rtr-sw" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M630.42,-126.46C600.71,-99.63 565.88,-68.19 542.84,-47.38" />
+<text text-anchor="middle" x="599" y="-74.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0 -- port1</text>
+</g>
+</g>
+</svg></div>
+      <div class="view" data-view="v7" hidden><svg xmlns="http://www.w3.org/2000/svg" viewBox="0.00 0.00 485.12 412.00" preserveAspectRatio="xMidYMid meet">
+<g id="v7-graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 408)">
+<polygon fill="white" stroke="transparent" points="-4,4 -4,-408 481.12,-408 481.12,4 -4,4" />
+<text text-anchor="middle" x="238.56" y="-387.2" font-family="Helvetica,Arial,sans-serif" font-size="16.00">home-lab — every layer</text>
+
+<g id="v7-node-hosts_adp-usb-eth" class="node">
+<ellipse fill="#fdf0e3" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5,2" cx="425.5" cy="-227" rx="51.74" ry="24.08" />
+<text text-anchor="start" x="398.5" y="-232" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">adp-usb-eth</text>
+<text text-anchor="start" x="406.5" y="-218" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[adapter]</text>
+</g>
+
+<g id="v7-node-switches_sw-home" class="node">
+<polygon fill="#dcf0dc" stroke="#16a34a" stroke-width="1.2" points="239,-112 158,-112 154,-108 154,0 235,0 239,-4 239,-112" />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="235,-108 154,-108 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="235,-108 235,0 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="235,-108 239,-112 " />
+<text text-anchor="start" x="175.5" y="-100" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">sw-home</text>
+<text text-anchor="start" x="179.5" y="-86" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[switch]</text>
+<text text-anchor="start" x="163.5" y="-73" font-family="Helvetica,Arial,sans-serif" font-size="10.00">Vlan10</text>
+<text text-anchor="start" x="198.5" y="-73" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="163.5" y="-60" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port1</text>
+<text text-anchor="start" x="198.5" y="-60" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="163.5" y="-47" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port2</text>
+<text text-anchor="start" x="198.5" y="-47" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="163.5" y="-34" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port3</text>
+<text text-anchor="start" x="198.5" y="-34" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="163.5" y="-21" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port4</text>
+<text text-anchor="start" x="198.5" y="-21" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="163.5" y="-8" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port5</text>
+<text text-anchor="start" x="198.5" y="-8" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v7-edge-cables_cbl-sw-dongle" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M398.78,-206.28C359.61,-177.38 286.19,-123.19 239.4,-88.66" />
+<text text-anchor="middle" x="372.5" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455 -- port4</text>
+<text text-anchor="middle" x="372.5" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v7-node-hosts_laptop" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="458,-378 393,-378 393,-342 458,-342 458,-378" />
+<text text-anchor="start" x="411" y="-365" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">laptop</text>
+<text text-anchor="start" x="402.5" y="-351" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v7-edge-hosts_adp-usb-eth_upstream" class="edge">
+<path fill="none" stroke="#9ca3af" stroke-width="2" stroke-dasharray="1,5" d="M425.5,-341.87C425.5,-318.71 425.5,-277.31 425.5,-251.32" />
+<text text-anchor="middle" x="434.5" y="-310.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb0</text>
+<text text-anchor="middle" x="434.5" y="-301.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb</text>
+</g>
+
+<g id="v7-node-hosts_pc-desk" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="65,-245 0,-245 0,-209 65,-209 65,-245" />
+<text text-anchor="start" x="14.5" y="-232" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">pc-desk</text>
+<text text-anchor="start" x="9.5" y="-218" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v7-edge-cables_cbl-sw-desk" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M44.22,-208.74C57.22,-190.15 79.29,-160.13 101.5,-137 117.48,-120.36 136.7,-103.65 153.66,-89.84" />
+<text text-anchor="middle" x="125.5" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1 -- port2</text>
+<text text-anchor="middle" x="125.5" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v7-node-hosts_srv-nas" class="node">
+<path fill="#eae2f5" stroke="#7c3aed" stroke-width="1.2" d="M155.5,-246.02C155.5,-248.36 143.4,-250.25 128.5,-250.25 113.6,-250.25 101.5,-248.36 101.5,-246.02 101.5,-246.02 101.5,-207.98 101.5,-207.98 101.5,-205.64 113.6,-203.75 128.5,-203.75 143.4,-203.75 155.5,-205.64 155.5,-207.98 155.5,-207.98 155.5,-246.02 155.5,-246.02" />
+<path fill="none" stroke="#7c3aed" stroke-width="1.2" d="M155.5,-246.02C155.5,-243.69 143.4,-241.8 128.5,-241.8 113.6,-241.8 101.5,-243.69 101.5,-246.02" />
+<text text-anchor="start" x="111.5" y="-232" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">srv-nas</text>
+<text text-anchor="start" x="111.5" y="-218" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[server]</text>
+</g>
+
+<g id="v7-edge-cables_cbl-sw-nas" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M137.53,-203.56C146.85,-180.39 161.75,-143.36 174.24,-112.32" />
+<text text-anchor="middle" x="185.5" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0 -- port3</text>
+<text text-anchor="middle" x="185.5" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v7-node-routers_rtr-home" class="node">
+<polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="264.5,-274 191.5,-227 264.5,-180 337.5,-227 264.5,-274" />
+<text text-anchor="start" x="245" y="-238" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr-home</text>
+<text text-anchor="start" x="249.5" y="-224" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
+<text text-anchor="start" x="237.5" y="-211" font-family="Helvetica,Arial,sans-serif" font-size="10.00">lan0</text>
+<text text-anchor="start" x="260.5" y="-211" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v7-edge-cables_cbl-rtr-sw" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M249.75,-189.33C240.68,-166.81 228.9,-137.53 218.72,-112.23" />
+<text text-anchor="middle" x="257" y="-148.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0 -- port1</text>
+<text text-anchor="middle" x="257" y="-139.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+</g>
+</svg></div>
+      <div class="view" data-view="v8" hidden><svg xmlns="http://www.w3.org/2000/svg" viewBox="0.00 0.00 455.12 301.00" preserveAspectRatio="xMidYMid meet">
+<g id="v8-graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 297)">
+<polygon fill="white" stroke="transparent" points="-4,4 -4,-297 451.12,-297 451.12,4 -4,4" />
+<text text-anchor="middle" x="223.56" y="-276.2" font-family="Helvetica,Arial,sans-serif" font-size="16.00">home-lab — every layer</text>
+
+<g id="v8-node-hosts_adp-usb-eth" class="node">
+<ellipse fill="#fdf0e3" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5,2" cx="395.5" cy="-129" rx="51.74" ry="24.08" />
+<text text-anchor="start" x="368.5" y="-134" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">adp-usb-eth</text>
+<text text-anchor="start" x="376.5" y="-120" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[adapter]</text>
+</g>
+
+<g id="v8-node-switches_sw-home" class="node">
+<polygon fill="#dcf0dc" stroke="#16a34a" stroke-width="1.2" points="219,-36 162,-36 158,-32 158,0 215,0 219,-4 219,-36" />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="215,-32 158,-32 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="215,-32 215,0 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="215,-32 219,-36 " />
+<text text-anchor="start" x="167.5" y="-23" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">sw-home</text>
+<text text-anchor="start" x="171.5" y="-9" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[switch]</text>
+</g>
+
+<g id="v8-edge-cables_cbl-sw-dongle" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M362.35,-110.49C336.73,-96.96 300.38,-77.78 268.5,-61 252.26,-52.45 234.15,-42.95 219.28,-35.14" />
+<text text-anchor="middle" x="329.5" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455 -- port4</text>
+</g>
+
+<g id="v8-node-hosts_laptop" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="428,-267 363,-267 363,-231 428,-231 428,-267" />
+<text text-anchor="start" x="381" y="-254" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">laptop</text>
+<text text-anchor="start" x="372.5" y="-240" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v8-edge-hosts_adp-usb-eth_upstream" class="edge">
+<path fill="none" stroke="#9ca3af" stroke-width="2" stroke-dasharray="1,5" d="M395.5,-230.84C395.5,-210.39 395.5,-176.11 395.5,-153.28" />
+<text text-anchor="middle" x="404.5" y="-199.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb0</text>
+<text text-anchor="middle" x="404.5" y="-190.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">usb</text>
+</g>
+
+<g id="v8-node-hosts_pc-desk" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="65,-147 0,-147 0,-111 65,-111 65,-147" />
+<text text-anchor="start" x="14.5" y="-134" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">pc-desk</text>
+<text text-anchor="start" x="9.5" y="-120" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v8-edge-cables_cbl-sw-desk" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M46.02,-110.86C58.25,-96.19 77.4,-75.24 97.5,-61 116.1,-47.82 139.49,-37.13 157.9,-29.84" />
+<text text-anchor="middle" x="121.5" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1 -- port2</text>
+</g>
+
+<g id="v8-node-hosts_srv-nas" class="node">
+<path fill="#eae2f5" stroke="#7c3aed" stroke-width="1.2" d="M155.5,-148.02C155.5,-150.36 143.4,-152.25 128.5,-152.25 113.6,-152.25 101.5,-150.36 101.5,-148.02 101.5,-148.02 101.5,-109.98 101.5,-109.98 101.5,-107.64 113.6,-105.75 128.5,-105.75 143.4,-105.75 155.5,-107.64 155.5,-109.98 155.5,-109.98 155.5,-148.02 155.5,-148.02" />
+<path fill="none" stroke="#7c3aed" stroke-width="1.2" d="M155.5,-148.02C155.5,-145.69 143.4,-143.8 128.5,-143.8 113.6,-143.8 101.5,-145.69 101.5,-148.02" />
+<text text-anchor="start" x="111.5" y="-134" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">srv-nas</text>
+<text text-anchor="start" x="111.5" y="-120" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[server]</text>
+</g>
+
+<g id="v8-edge-cables_cbl-sw-nas" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M137.16,-105.73C142.65,-92.43 150.26,-75.37 158.5,-61 163.4,-52.45 169.63,-43.49 175.14,-36.06" />
+<text text-anchor="middle" x="181.5" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0 -- port3</text>
+</g>
+
+<g id="v8-node-routers_rtr-home" class="node">
+<polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="249.5,-163 191.5,-129 249.5,-95 307.5,-129 249.5,-163" />
+<text text-anchor="start" x="229.5" y="-134" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr-home</text>
+<text text-anchor="start" x="234" y="-120" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
+</g>
+
+<g id="v8-edge-cables_cbl-rtr-sw" class="edge">
+<path fill="none" stroke="#4a4a4a" stroke-width="1.5" d="M235.51,-102.99C224.04,-82.5 208.12,-54.05 198.06,-36.09" />
+<text text-anchor="middle" x="237" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0 -- port1</text>
+</g>
+</g>
+</svg></div>
+      <div class="view" data-view="v9" hidden><svg xmlns="http://www.w3.org/2000/svg" viewBox="0.00 0.00 1216.89 270.00" preserveAspectRatio="xMidYMid meet">
+<g id="v9-graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 266)">
+<polygon fill="white" stroke="transparent" points="-4,4 -4,-266 1212.89,-266 1212.89,4 -4,4" />
+<text text-anchor="middle" x="604.44" y="-245.2" font-family="Helvetica,Arial,sans-serif" font-size="16.00">home-lab — every layer</text>
+
+<g id="v9-node-hosts_adp-usb-eth" class="node">
+<ellipse fill="#fdf0e3" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5,2" cx="357.89" cy="-180" rx="51.74" ry="24.08" />
+<text text-anchor="start" x="330.89" y="-185" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">adp-usb-eth</text>
+<text text-anchor="start" x="338.89" y="-171" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[adapter]</text>
+</g>
+
+<g id="v9-node-subnet_192.168.10.0_24" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M556.89,-47C556.89,-47 492.89,-47 492.89,-47 486.89,-47 480.89,-41 480.89,-35 480.89,-35 480.89,-12 480.89,-12 480.89,-6 486.89,0 492.89,0 492.89,0 556.89,0 556.89,0 562.89,0 568.89,-6 568.89,-12 568.89,-12 568.89,-35 568.89,-35 568.89,-41 562.89,-47 556.89,-47" />
+<text text-anchor="start" x="489.89" y="-34.5" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">192.168.10.0/24</text>
+<text text-anchor="start" x="496.39" y="-20.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv4 subnet]</text>
+<text text-anchor="start" x="508.89" y="-7.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v9-edge-hosts_adp-usb-eth_enx001122334455_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M393.99,-162.65C421.54,-148.78 459.03,-126.72 484.89,-99 498.91,-83.97 509.56,-63.1 516.33,-47.27" />
+<text text-anchor="middle" x="536.39" y="-88.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455</text>
+<text text-anchor="middle" x="536.39" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">192.168.10.30/24</text>
+</g>
+
+<g id="v9-node-subnet_2001_db8_10_64" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M183.39,-47C183.39,-47 114.39,-47 114.39,-47 108.39,-47 102.39,-41 102.39,-35 102.39,-35 102.39,-12 102.39,-12 102.39,-6 108.39,0 114.39,0 114.39,0 183.39,0 183.39,0 189.39,0 195.39,-6 195.39,-12 195.39,-12 195.39,-35 195.39,-35 195.39,-41 189.39,-47 183.39,-47" />
+<text text-anchor="start" x="111.89" y="-34.5" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">2001:db8:10::/64</text>
+<text text-anchor="start" x="120.89" y="-20.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv6 subnet]</text>
+<text text-anchor="start" x="133.39" y="-7.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v9-edge-hosts_adp-usb-eth_enx001122334455_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M317.24,-164.98C283.18,-151.79 234.69,-129.5 199.89,-99 183.27,-84.43 169.49,-63.31 160.46,-47.28" />
+<text text-anchor="middle" x="234.89" y="-88.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455</text>
+<text text-anchor="middle" x="234.89" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">2001:db8:10::30/64</text>
+</g>
+
+<g id="v9-node-hosts_pc-desk" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="197.39,-198 132.39,-198 132.39,-162 197.39,-162 197.39,-198" />
+<text text-anchor="start" x="146.89" y="-185" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">pc-desk</text>
+<text text-anchor="start" x="141.89" y="-171" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v9-edge-hosts_pc-desk_eno1_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M197.47,-162.76C221.94,-150.98 256.5,-135.21 287.89,-124 327.79,-109.75 342.37,-118.68 379.89,-99 396.37,-90.36 396.02,-81.72 411.89,-72 433.4,-58.83 459.21,-47.68 480.72,-39.49" />
+<text text-anchor="middle" x="443.89" y="-88.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1</text>
+<text text-anchor="middle" x="443.89" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">192.168.10.20/24</text>
+</g>
+
+<g id="v9-edge-hosts_pc-desk_eno1_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M145.5,-161.76C124.99,-143.02 94.79,-113.77 88.89,-99 84.44,-87.86 83.66,-82.8 88.89,-72 93.58,-62.31 101.3,-54 109.68,-47.16" />
+<text text-anchor="middle" x="123.89" y="-88.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1</text>
+<text text-anchor="middle" x="123.89" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">2001:db8:10::20/64</text>
+</g>
+
+<g id="v9-node-hosts_srv-nas" class="node">
+<path fill="#eae2f5" stroke="#7c3aed" stroke-width="1.2" d="M88.89,-199.02C88.89,-201.36 76.79,-203.25 61.89,-203.25 46.99,-203.25 34.89,-201.36 34.89,-199.02 34.89,-199.02 34.89,-160.98 34.89,-160.98 34.89,-158.64 46.99,-156.75 61.89,-156.75 76.79,-156.75 88.89,-158.64 88.89,-160.98 88.89,-160.98 88.89,-199.02 88.89,-199.02" />
+<path fill="none" stroke="#7c3aed" stroke-width="1.2" d="M88.89,-199.02C88.89,-196.69 76.79,-194.8 61.89,-194.8 46.99,-194.8 34.89,-196.69 34.89,-199.02" />
+<text text-anchor="start" x="44.89" y="-185" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">srv-nas</text>
+<text text-anchor="start" x="44.89" y="-171" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[server]</text>
+</g>
+
+<g id="v9-edge-hosts_srv-nas_eth0_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M77.38,-156.53C86.61,-144.93 99.35,-131.64 113.89,-124 177.99,-90.32 208.99,-129.02 274.89,-99 291.82,-91.29 290.2,-80.22 306.89,-72 363.01,-44.36 435.08,-32.69 480.64,-27.84" />
+<text text-anchor="middle" x="338.89" y="-88.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0</text>
+<text text-anchor="middle" x="338.89" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">192.168.10.10/24</text>
+</g>
+
+<g id="v9-edge-hosts_srv-nas_eth0_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M37.51,-157.84C14.73,-135.45 -13,-99.63 6.89,-72 28.46,-42.04 69.79,-30.7 102.32,-26.55" />
+<text text-anchor="middle" x="41.89" y="-88.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0</text>
+<text text-anchor="middle" x="41.89" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">2001:db8:10::10/64</text>
+</g>
+
+<g id="v9-node-routers_rtr-home" class="node">
+<polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="939.89,-227 866.89,-180 939.89,-133 1012.89,-180 939.89,-227" />
+<text text-anchor="start" x="920.39" y="-191" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr-home</text>
+<text text-anchor="start" x="924.89" y="-177" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
+<text text-anchor="start" x="912.89" y="-164" font-family="Helvetica,Arial,sans-serif" font-size="10.00">lan0</text>
+<text text-anchor="start" x="935.89" y="-164" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v9-node-subnet_192.0.2.1_32" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M951.39,-41.5C951.39,-41.5 900.39,-41.5 900.39,-41.5 894.39,-41.5 888.39,-35.5 888.39,-29.5 888.39,-29.5 888.39,-17.5 888.39,-17.5 888.39,-11.5 894.39,-5.5 900.39,-5.5 900.39,-5.5 951.39,-5.5 951.39,-5.5 957.39,-5.5 963.39,-11.5 963.39,-17.5 963.39,-17.5 963.39,-29.5 963.39,-29.5 963.39,-35.5 957.39,-41.5 951.39,-41.5" />
+<text text-anchor="start" x="898.89" y="-28.5" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">192.0.2.1/32</text>
+<text text-anchor="start" x="897.89" y="-14.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv4 subnet]</text>
+</g>
+
+<g id="v9-edge-routers_rtr-home_lo0_192.0.2.1_32" class="edge">
+<path fill="none" stroke="#0f766e" d="M935.92,-135.14C933.1,-104.09 929.48,-64.14 927.45,-41.73" />
+<text text-anchor="middle" x="954.89" y="-88.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lo0</text>
+<text text-anchor="middle" x="954.89" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">192.0.2.1/32</text>
+</g>
+
+<g id="v9-edge-routers_rtr-home_lan0_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M911.74,-150.8C885.23,-125.97 843.2,-90.92 799.89,-72 723.3,-38.55 625.07,-28.61 569.13,-25.69" />
+<text text-anchor="middle" x="875.39" y="-92.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0</text>
+<text text-anchor="middle" x="875.39" y="-83.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">192.168.10.1/24</text>
+<text text-anchor="middle" x="875.39" y="-74.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v9-node-subnet_203.0.113.0_30" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M1070.39,-41.5C1070.39,-41.5 1011.39,-41.5 1011.39,-41.5 1005.39,-41.5 999.39,-35.5 999.39,-29.5 999.39,-29.5 999.39,-17.5 999.39,-17.5 999.39,-11.5 1005.39,-5.5 1011.39,-5.5 1011.39,-5.5 1070.39,-5.5 1070.39,-5.5 1076.39,-5.5 1082.39,-11.5 1082.39,-17.5 1082.39,-17.5 1082.39,-29.5 1082.39,-29.5 1082.39,-35.5 1076.39,-41.5 1070.39,-41.5" />
+<text text-anchor="start" x="1008.89" y="-28.5" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">203.0.113.0/30</text>
+<text text-anchor="start" x="1012.89" y="-14.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv4 subnet]</text>
+</g>
+
+<g id="v9-edge-routers_rtr-home_wan0_203.0.113.0_30" class="edge">
+<path fill="none" stroke="#0f766e" d="M961.06,-146.61C982,-114.58 1013.24,-66.8 1029.74,-41.55" />
+<text text-anchor="middle" x="1035.39" y="-88.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">wan0</text>
+<text text-anchor="middle" x="1035.39" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">203.0.113.2/30</text>
+</g>
+
+<g id="v9-node-subnet_2001_db8_1_128" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M1196.89,-41.5C1196.89,-41.5 1130.89,-41.5 1130.89,-41.5 1124.89,-41.5 1118.89,-35.5 1118.89,-29.5 1118.89,-29.5 1118.89,-17.5 1118.89,-17.5 1118.89,-11.5 1124.89,-5.5 1130.89,-5.5 1130.89,-5.5 1196.89,-5.5 1196.89,-5.5 1202.89,-5.5 1208.89,-11.5 1208.89,-17.5 1208.89,-17.5 1208.89,-29.5 1208.89,-29.5 1208.89,-35.5 1202.89,-41.5 1196.89,-41.5" />
+<text text-anchor="start" x="1127.89" y="-28.5" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">2001:db8::1/128</text>
+<text text-anchor="start" x="1135.39" y="-14.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv6 subnet]</text>
+</g>
+
+<g id="v9-edge-routers_rtr-home_lo0_2001_db8_1_128" class="edge">
+<path fill="none" stroke="#0f766e" d="M978.31,-157.57C1005.12,-142.17 1041.42,-120.42 1071.89,-99 1097.95,-80.68 1126.18,-57.23 1144.4,-41.58" />
+<text text-anchor="middle" x="1134.39" y="-88.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lo0</text>
+<text text-anchor="middle" x="1134.39" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">2001:db8::1/128</text>
+</g>
+
+<g id="v9-edge-routers_rtr-home_lan0_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M892.05,-163.6C847.89,-148.82 780.89,-124.98 724.89,-99 702.69,-88.7 700.27,-79.26 676.89,-72 631.57,-57.93 316.55,-35.7 195.83,-27.59" />
+<text text-anchor="middle" x="757.89" y="-92.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0</text>
+<text text-anchor="middle" x="757.89" y="-83.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">2001:db8:10::1/64</text>
+<text text-anchor="middle" x="757.89" y="-74.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v9-node-switches_sw-home" class="node">
+<polygon fill="#dcf0dc" stroke="#16a34a" stroke-width="1.2" points="675.39,-236 594.39,-236 590.39,-232 590.39,-124 671.39,-124 675.39,-128 675.39,-236" />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="671.39,-232 590.39,-232 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="671.39,-232 671.39,-124 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="671.39,-232 675.39,-236 " />
+<text text-anchor="start" x="611.89" y="-224" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">sw-home</text>
+<text text-anchor="start" x="615.89" y="-210" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[switch]</text>
+<text text-anchor="start" x="599.89" y="-197" font-family="Helvetica,Arial,sans-serif" font-size="10.00">Vlan10</text>
+<text text-anchor="start" x="634.89" y="-197" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="599.89" y="-184" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port1</text>
+<text text-anchor="start" x="634.89" y="-184" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="599.89" y="-171" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port2</text>
+<text text-anchor="start" x="634.89" y="-171" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="599.89" y="-158" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port3</text>
+<text text-anchor="start" x="634.89" y="-158" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="599.89" y="-145" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port4</text>
+<text text-anchor="start" x="634.89" y="-145" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="599.89" y="-132" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port5</text>
+<text text-anchor="start" x="634.89" y="-132" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v9-edge-switches_sw-home_Vlan10_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M619.31,-123.76C613.18,-106.05 604.61,-87.13 592.89,-72 585.48,-62.44 575.61,-54.04 565.69,-47.07" />
+<text text-anchor="middle" x="638.39" y="-92.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">Vlan10</text>
+<text text-anchor="middle" x="638.39" y="-83.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">192.168.10.2/24</text>
+<text text-anchor="middle" x="638.39" y="-74.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+</g>
+</svg></div>
+      <div class="view" data-view="v10" hidden><svg xmlns="http://www.w3.org/2000/svg" viewBox="0.00 0.00 1213.95 206.00" preserveAspectRatio="xMidYMid meet">
+<g id="v10-graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 202)">
+<polygon fill="white" stroke="transparent" points="-4,4 -4,-202 1209.95,-202 1209.95,4 -4,4" />
+<text text-anchor="middle" x="602.97" y="-181.2" font-family="Helvetica,Arial,sans-serif" font-size="16.00">home-lab — every layer</text>
+
+<g id="v10-node-hosts_adp-usb-eth" class="node">
+<ellipse fill="#fdf0e3" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5,2" cx="360.95" cy="-138" rx="51.74" ry="24.08" />
+<text text-anchor="start" x="333.95" y="-143" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">adp-usb-eth</text>
+<text text-anchor="start" x="341.95" y="-129" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[adapter]</text>
+</g>
+
+<g id="v10-node-subnet_192.168.10.0_24" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M553.95,-36C553.95,-36 489.95,-36 489.95,-36 483.95,-36 477.95,-30 477.95,-24 477.95,-24 477.95,-12 477.95,-12 477.95,-6 483.95,0 489.95,0 489.95,0 553.95,0 553.95,0 559.95,0 565.95,-6 565.95,-12 565.95,-12 565.95,-24 565.95,-24 565.95,-30 559.95,-36 553.95,-36" />
+<text text-anchor="start" x="486.95" y="-23" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">192.168.10.0/24</text>
+<text text-anchor="start" x="493.45" y="-9" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv4 subnet]</text>
+</g>
+
+<g id="v10-edge-hosts_adp-usb-eth_enx001122334455_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M402.27,-123.55C427.28,-113.95 458.73,-99.16 481.95,-79 495.75,-67.02 506.82,-49.19 513.79,-36.08" />
+<text text-anchor="middle" x="530.45" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455</text>
+<text text-anchor="middle" x="530.45" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">192.168.10.30/24</text>
+</g>
+
+<g id="v10-node-subnet_2001_db8_10_64" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M180.45,-36C180.45,-36 111.45,-36 111.45,-36 105.45,-36 99.45,-30 99.45,-24 99.45,-24 99.45,-12 99.45,-12 99.45,-6 105.45,0 111.45,0 111.45,0 180.45,0 180.45,0 186.45,0 192.45,-6 192.45,-12 192.45,-12 192.45,-24 192.45,-24 192.45,-30 186.45,-36 180.45,-36" />
+<text text-anchor="start" x="108.95" y="-23" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">2001:db8:10::/64</text>
+<text text-anchor="start" x="117.95" y="-9" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv6 subnet]</text>
+</g>
+
+<g id="v10-edge-hosts_adp-usb-eth_enx001122334455_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M314.45,-127.48C279.85,-118.83 232.64,-103.58 196.95,-79 180.4,-67.6 166.04,-49.51 156.81,-36.17" />
+<text text-anchor="middle" x="231.95" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455</text>
+<text text-anchor="middle" x="231.95" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">2001:db8:10::30/64</text>
+</g>
+
+<g id="v10-node-hosts_pc-desk" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="197.45,-156 132.45,-156 132.45,-120 197.45,-120 197.45,-156" />
+<text text-anchor="start" x="146.95" y="-143" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">pc-desk</text>
+<text text-anchor="start" x="141.95" y="-129" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v10-edge-hosts_pc-desk_eno1_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M197.49,-128.57C252.67,-114.2 360.27,-85.85 376.95,-79 392.04,-72.8 394.15,-67.86 408.95,-61 431.17,-50.7 456.68,-41.04 477.83,-33.59" />
+<text text-anchor="middle" x="440.95" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1</text>
+<text text-anchor="middle" x="440.95" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">192.168.10.20/24</text>
+</g>
+
+<g id="v10-edge-hosts_pc-desk_eno1_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M136.42,-119.95C116.13,-107.15 91.52,-90.01 85.95,-79 77.36,-62.05 92.67,-46.94 109.96,-36.13" />
+<text text-anchor="middle" x="120.95" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1</text>
+<text text-anchor="middle" x="120.95" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">2001:db8:10::20/64</text>
+</g>
+
+<g id="v10-node-hosts_srv-nas" class="node">
+<path fill="#eae2f5" stroke="#7c3aed" stroke-width="1.2" d="M88.95,-157.02C88.95,-159.36 76.85,-161.25 61.95,-161.25 47.05,-161.25 34.95,-159.36 34.95,-157.02 34.95,-157.02 34.95,-118.98 34.95,-118.98 34.95,-116.64 47.05,-114.75 61.95,-114.75 76.85,-114.75 88.95,-116.64 88.95,-118.98 88.95,-118.98 88.95,-157.02 88.95,-157.02" />
+<path fill="none" stroke="#7c3aed" stroke-width="1.2" d="M88.95,-157.02C88.95,-154.69 76.85,-152.8 61.95,-152.8 47.05,-152.8 34.95,-154.69 34.95,-157.02" />
+<text text-anchor="start" x="44.95" y="-143" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">srv-nas</text>
+<text text-anchor="start" x="44.95" y="-129" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[server]</text>
+</g>
+
+<g id="v10-edge-hosts_srv-nas_eth0_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M89.18,-116.8C96.86,-111.93 105.45,-107.21 113.95,-104 180.46,-78.87 204.8,-102.35 271.95,-79 287.36,-73.64 288.63,-66.62 303.95,-61 362.03,-39.71 432.97,-28.61 477.82,-23.28" />
+<text text-anchor="middle" x="335.95" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0</text>
+<text text-anchor="middle" x="335.95" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">192.168.10.10/24</text>
+</g>
+
+<g id="v10-edge-hosts_srv-nas_eth0_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M34.78,-120.12C13.48,-104.73 -10.23,-81.36 4.95,-61 26.48,-32.13 67.06,-22.32 99.18,-19.33" />
+<text text-anchor="middle" x="39.95" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0</text>
+<text text-anchor="middle" x="39.95" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">2001:db8:10::10/64</text>
+</g>
+
+<g id="v10-node-routers_rtr-home" class="node">
+<polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="936.95,-172 878.95,-138 936.95,-104 994.95,-138 936.95,-172" />
+<text text-anchor="start" x="916.95" y="-143" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr-home</text>
+<text text-anchor="start" x="921.45" y="-129" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
+</g>
+
+<g id="v10-node-subnet_192.0.2.1_32" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M948.45,-36C948.45,-36 897.45,-36 897.45,-36 891.45,-36 885.45,-30 885.45,-24 885.45,-24 885.45,-12 885.45,-12 885.45,-6 891.45,0 897.45,0 897.45,0 948.45,0 948.45,0 954.45,0 960.45,-6 960.45,-12 960.45,-12 960.45,-24 960.45,-24 960.45,-30 954.45,-36 948.45,-36" />
+<text text-anchor="start" x="895.95" y="-23" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">192.0.2.1/32</text>
+<text text-anchor="start" x="894.95" y="-9" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv4 subnet]</text>
+</g>
+
+<g id="v10-edge-routers_rtr-home_lo0_192.0.2.1_32" class="edge">
+<path fill="none" stroke="#0f766e" d="M933.27,-106C930.63,-83.74 927.17,-54.55 925,-36.29" />
+<text text-anchor="middle" x="952.95" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lo0</text>
+<text text-anchor="middle" x="952.95" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">192.0.2.1/32</text>
+</g>
+
+<g id="v10-edge-routers_rtr-home_lan0_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M910.86,-119.23C883.65,-101.59 839.15,-75.19 796.95,-61 718.44,-34.6 621.7,-24.72 566.39,-21.08" />
+<text text-anchor="middle" x="866.45" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0</text>
+<text text-anchor="middle" x="866.45" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">192.168.10.1/24</text>
+</g>
+
+<g id="v10-node-subnet_203.0.113.0_30" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M1067.45,-36C1067.45,-36 1008.45,-36 1008.45,-36 1002.45,-36 996.45,-30 996.45,-24 996.45,-24 996.45,-12 996.45,-12 996.45,-6 1002.45,0 1008.45,0 1008.45,0 1067.45,0 1067.45,0 1073.45,0 1079.45,-6 1079.45,-12 1079.45,-12 1079.45,-24 1079.45,-24 1079.45,-30 1073.45,-36 1067.45,-36" />
+<text text-anchor="start" x="1005.95" y="-23" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">203.0.113.0/30</text>
+<text text-anchor="start" x="1009.95" y="-9" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv4 subnet]</text>
+</g>
+
+<g id="v10-edge-routers_rtr-home_wan0_203.0.113.0_30" class="edge">
+<path fill="none" stroke="#0f766e" d="M955.95,-114.81C975.49,-91.97 1005.51,-56.9 1023.3,-36.12" />
+<text text-anchor="middle" x="1026.45" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">wan0</text>
+<text text-anchor="middle" x="1026.45" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">203.0.113.2/30</text>
+</g>
+
+<g id="v10-node-subnet_2001_db8_1_128" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M1193.95,-36C1193.95,-36 1127.95,-36 1127.95,-36 1121.95,-36 1115.95,-30 1115.95,-24 1115.95,-24 1115.95,-12 1115.95,-12 1115.95,-6 1121.95,0 1127.95,0 1127.95,0 1193.95,0 1193.95,0 1199.95,0 1205.95,-6 1205.95,-12 1205.95,-12 1205.95,-24 1205.95,-24 1205.95,-30 1199.95,-36 1193.95,-36" />
+<text text-anchor="start" x="1124.95" y="-23" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">2001:db8::1/128</text>
+<text text-anchor="start" x="1132.45" y="-9" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv6 subnet]</text>
+</g>
+
+<g id="v10-edge-routers_rtr-home_lo0_2001_db8_1_128" class="edge">
+<path fill="none" stroke="#0f766e" d="M969.83,-123.13C995.56,-111.98 1032.04,-95.5 1062.95,-79 1087.94,-65.66 1115.36,-48.66 1134.82,-36.16" />
+<text text-anchor="middle" x="1122.45" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lo0</text>
+<text text-anchor="middle" x="1122.45" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">2001:db8::1/128</text>
+</g>
+
+<g id="v10-edge-routers_rtr-home_lan0_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M897.09,-127.13C853.74,-116.2 782.55,-97.64 721.95,-79 698.57,-71.81 693.89,-66.02 669.95,-61 579.4,-42.02 303.6,-26.76 192.78,-21.23" />
+<text text-anchor="middle" x="754.95" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0</text>
+<text text-anchor="middle" x="754.95" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">2001:db8:10::1/64</text>
+</g>
+
+<g id="v10-node-switches_sw-home" class="node">
+<polygon fill="#dcf0dc" stroke="#16a34a" stroke-width="1.2" points="660.45,-156 603.45,-156 599.45,-152 599.45,-120 656.45,-120 660.45,-124 660.45,-156" />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="656.45,-152 599.45,-152 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="656.45,-152 656.45,-120 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="656.45,-152 660.45,-156 " />
+<text text-anchor="start" x="608.95" y="-143" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">sw-home</text>
+<text text-anchor="start" x="612.95" y="-129" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[switch]</text>
+</g>
+
+<g id="v10-edge-switches_sw-home_Vlan10_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M624.04,-120C617.64,-103.45 606.13,-78.33 589.95,-61 580.77,-51.16 568.78,-42.75 557.43,-36.09" />
+<text text-anchor="middle" x="631.45" y="-72.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">Vlan10</text>
+<text text-anchor="middle" x="631.45" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">192.168.10.2/24</text>
+</g>
+</g>
+</svg></div>
+      <div class="view" data-view="v11" hidden><svg xmlns="http://www.w3.org/2000/svg" viewBox="0.00 0.00 924.00 261.00" preserveAspectRatio="xMidYMid meet">
+<g id="v11-graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 257)">
+<polygon fill="white" stroke="transparent" points="-4,4 -4,-257 920,-257 920,4 -4,4" />
+<text text-anchor="middle" x="458" y="-236.2" font-family="Helvetica,Arial,sans-serif" font-size="16.00">home-lab — every layer</text>
+
+<g id="v11-node-hosts_adp-usb-eth" class="node">
+<ellipse fill="#fdf0e3" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5,2" cx="321" cy="-171" rx="51.74" ry="24.08" />
+<text text-anchor="start" x="294" y="-176" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">adp-usb-eth</text>
+<text text-anchor="start" x="302" y="-162" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[adapter]</text>
+</g>
+
+<g id="v11-node-subnet_192.168.10.0_24" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M388,-47C388,-47 324,-47 324,-47 318,-47 312,-41 312,-35 312,-35 312,-12 312,-12 312,-6 318,0 324,0 324,0 388,0 388,0 394,0 400,-6 400,-12 400,-12 400,-35 400,-35 400,-41 394,-47 388,-47" />
+<text text-anchor="start" x="321" y="-34.5" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">192.168.10.0/24</text>
+<text text-anchor="start" x="327.5" y="-20.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv4 subnet]</text>
+<text text-anchor="start" x="340" y="-7.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v11-edge-hosts_adp-usb-eth_enx001122334455_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M326.55,-146.95C333.1,-119.7 343.94,-74.64 350.48,-47.45" />
+<text text-anchor="middle" x="376.5" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455</text>
+</g>
+
+<g id="v11-node-subnet_2001_db8_10_64" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M135.5,-47C135.5,-47 66.5,-47 66.5,-47 60.5,-47 54.5,-41 54.5,-35 54.5,-35 54.5,-12 54.5,-12 54.5,-6 60.5,0 66.5,0 66.5,0 135.5,0 135.5,0 141.5,0 147.5,-6 147.5,-12 147.5,-12 147.5,-35 147.5,-35 147.5,-41 141.5,-47 135.5,-47" />
+<text text-anchor="start" x="64" y="-34.5" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">2001:db8:10::/64</text>
+<text text-anchor="start" x="73" y="-20.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv6 subnet]</text>
+<text text-anchor="start" x="85.5" y="-7.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v11-edge-hosts_adp-usb-eth_enx001122334455_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M292.21,-150.76C273.66,-139.07 248.68,-124.59 225,-115 183.34,-98.12 160.75,-119.69 127,-90 114.6,-79.09 108.05,-61.47 104.62,-47.26" />
+<text text-anchor="middle" x="160.5" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455</text>
+</g>
+
+<g id="v11-node-hosts_pc-desk" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="207.5,-189 142.5,-189 142.5,-153 207.5,-153 207.5,-189" />
+<text text-anchor="start" x="157" y="-176" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">pc-desk</text>
+<text text-anchor="start" x="152" y="-162" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v11-edge-hosts_pc-desk_eno1_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M196.47,-152.74C229.16,-126.47 291.4,-76.43 327.73,-47.23" />
+<text text-anchor="middle" x="301.5" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1</text>
+</g>
+
+<g id="v11-edge-hosts_pc-desk_eno1_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M142.37,-156.03C116.66,-143.06 82.64,-121.05 67,-90 59.8,-75.7 67.73,-59.75 77.74,-47.17" />
+<text text-anchor="middle" x="76.5" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1</text>
+</g>
+
+<g id="v11-node-hosts_srv-nas" class="node">
+<path fill="#eae2f5" stroke="#7c3aed" stroke-width="1.2" d="M54,-190.02C54,-192.36 41.9,-194.25 27,-194.25 12.1,-194.25 0,-192.36 0,-190.02 0,-190.02 0,-151.98 0,-151.98 0,-149.64 12.1,-147.75 27,-147.75 41.9,-147.75 54,-149.64 54,-151.98 54,-151.98 54,-190.02 54,-190.02" />
+<path fill="none" stroke="#7c3aed" stroke-width="1.2" d="M54,-190.02C54,-187.69 41.9,-185.8 27,-185.8 12.1,-185.8 0,-187.69 0,-190.02" />
+<text text-anchor="start" x="10" y="-176" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">srv-nas</text>
+<text text-anchor="start" x="10" y="-162" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[server]</text>
+</g>
+
+<g id="v11-edge-hosts_srv-nas_eth0_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M54.27,-152.64C73.31,-141 99.59,-125.86 124,-115 156.1,-100.71 166.1,-102.33 199,-90 237.44,-75.6 280.42,-57.52 311.68,-44.01" />
+<text text-anchor="middle" x="251" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0</text>
+</g>
+
+<g id="v11-edge-hosts_srv-nas_eth0_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M25.31,-147.45C24.77,-126.54 26.68,-95.23 40,-72 45.54,-62.33 53.9,-53.94 62.67,-47.02" />
+<text text-anchor="middle" x="48" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0</text>
+</g>
+
+<g id="v11-node-routers_rtr-home" class="node">
+<polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="665,-218 592,-171 665,-124 738,-171 665,-218" />
+<text text-anchor="start" x="645.5" y="-182" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr-home</text>
+<text text-anchor="start" x="650" y="-168" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
+<text text-anchor="start" x="638" y="-155" font-family="Helvetica,Arial,sans-serif" font-size="10.00">lan0</text>
+<text text-anchor="start" x="661" y="-155" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v11-node-subnet_192.0.2.1_32" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M658.5,-41.5C658.5,-41.5 607.5,-41.5 607.5,-41.5 601.5,-41.5 595.5,-35.5 595.5,-29.5 595.5,-29.5 595.5,-17.5 595.5,-17.5 595.5,-11.5 601.5,-5.5 607.5,-5.5 607.5,-5.5 658.5,-5.5 658.5,-5.5 664.5,-5.5 670.5,-11.5 670.5,-17.5 670.5,-17.5 670.5,-29.5 670.5,-29.5 670.5,-35.5 664.5,-41.5 658.5,-41.5" />
+<text text-anchor="start" x="606" y="-28.5" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">192.0.2.1/32</text>
+<text text-anchor="start" x="605" y="-14.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv4 subnet]</text>
+</g>
+
+<g id="v11-edge-routers_rtr-home_lo0_192.0.2.1_32" class="edge">
+<path fill="none" stroke="#0f766e" d="M656.09,-129.47C649.72,-100.54 641.49,-63.1 636.77,-41.65" />
+<text text-anchor="middle" x="652.5" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lo0</text>
+</g>
+
+<g id="v11-edge-routers_rtr-home_lan0_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M639.89,-139.87C619.92,-117.84 590.07,-88.95 558,-72 507.68,-45.4 442.52,-33.54 400.02,-28.36" />
+<text text-anchor="middle" x="597" y="-83.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0</text>
+<text text-anchor="middle" x="597" y="-74.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v11-node-subnet_203.0.113.0_30" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M777.5,-41.5C777.5,-41.5 718.5,-41.5 718.5,-41.5 712.5,-41.5 706.5,-35.5 706.5,-29.5 706.5,-29.5 706.5,-17.5 706.5,-17.5 706.5,-11.5 712.5,-5.5 718.5,-5.5 718.5,-5.5 777.5,-5.5 777.5,-5.5 783.5,-5.5 789.5,-11.5 789.5,-17.5 789.5,-17.5 789.5,-29.5 789.5,-29.5 789.5,-35.5 783.5,-41.5 777.5,-41.5" />
+<text text-anchor="start" x="716" y="-28.5" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">203.0.113.0/30</text>
+<text text-anchor="start" x="720" y="-14.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv4 subnet]</text>
+</g>
+
+<g id="v11-edge-routers_rtr-home_wan0_203.0.113.0_30" class="edge">
+<path fill="none" stroke="#0f766e" d="M684.25,-136.25C701.11,-106.7 724.92,-64.96 738.15,-41.76" />
+<text text-anchor="middle" x="728" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">wan0</text>
+</g>
+
+<g id="v11-node-subnet_2001_db8_1_128" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M904,-41.5C904,-41.5 838,-41.5 838,-41.5 832,-41.5 826,-35.5 826,-29.5 826,-29.5 826,-17.5 826,-17.5 826,-11.5 832,-5.5 838,-5.5 838,-5.5 904,-5.5 904,-5.5 910,-5.5 916,-11.5 916,-17.5 916,-17.5 916,-29.5 916,-29.5 916,-35.5 910,-41.5 904,-41.5" />
+<text text-anchor="start" x="835" y="-28.5" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">2001:db8::1/128</text>
+<text text-anchor="start" x="842.5" y="-14.5" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv6 subnet]</text>
+</g>
+
+<g id="v11-edge-routers_rtr-home_lo0_2001_db8_1_128" class="edge">
+<path fill="none" stroke="#0f766e" d="M699.48,-145.65C741.17,-116.2 810.27,-67.39 846.74,-41.63" />
+<text text-anchor="middle" x="803.5" y="-79.1" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lo0</text>
+</g>
+
+<g id="v11-edge-routers_rtr-home_lan0_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M628.17,-147.37C589.14,-124.52 524.98,-90.07 465,-72 449.97,-67.47 242.52,-41.78 147.7,-30.18" />
+<text text-anchor="middle" x="523" y="-83.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0</text>
+<text text-anchor="middle" x="523" y="-74.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+
+<g id="v11-node-switches_sw-home" class="node">
+<polygon fill="#dcf0dc" stroke="#16a34a" stroke-width="1.2" points="506.5,-227 425.5,-227 421.5,-223 421.5,-115 502.5,-115 506.5,-119 506.5,-227" />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="502.5,-223 421.5,-223 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="502.5,-223 502.5,-115 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="502.5,-223 506.5,-227 " />
+<text text-anchor="start" x="443" y="-215" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">sw-home</text>
+<text text-anchor="start" x="447" y="-201" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[switch]</text>
+<text text-anchor="start" x="431" y="-188" font-family="Helvetica,Arial,sans-serif" font-size="10.00">Vlan10</text>
+<text text-anchor="start" x="466" y="-188" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="431" y="-175" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port1</text>
+<text text-anchor="start" x="466" y="-175" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="431" y="-162" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port2</text>
+<text text-anchor="start" x="466" y="-162" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="431" y="-149" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port3</text>
+<text text-anchor="start" x="466" y="-149" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="431" y="-136" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port4</text>
+<text text-anchor="start" x="466" y="-136" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+<text text-anchor="start" x="431" y="-123" font-family="Helvetica,Arial,sans-serif" font-size="10.00">port5</text>
+<text text-anchor="start" x="466" y="-123" font-family="Helvetica,Arial,sans-serif" font-size="10.00">vlan 10</text>
+</g>
+
+<g id="v11-edge-switches_sw-home_Vlan10_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M444.41,-114.85C437.68,-100.07 429.21,-84.69 419,-72 411.53,-62.72 401.86,-54.26 392.35,-47.13" />
+<text text-anchor="middle" x="443" y="-83.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">Vlan10</text>
+<text text-anchor="middle" x="443" y="-74.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">vlan 10</text>
+</g>
+</g>
+</svg></div>
+      <div class="view" data-view="v12" hidden><svg xmlns="http://www.w3.org/2000/svg" viewBox="0.00 0.00 901.00 197.00" preserveAspectRatio="xMidYMid meet">
+<g id="v12-graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 193)">
+<polygon fill="white" stroke="transparent" points="-4,4 -4,-193 897,-193 897,4 -4,4" />
+<text text-anchor="middle" x="446.5" y="-172.2" font-family="Helvetica,Arial,sans-serif" font-size="16.00">home-lab — every layer</text>
+
+<g id="v12-node-hosts_adp-usb-eth" class="node">
+<ellipse fill="#fdf0e3" stroke="#ea580c" stroke-width="1.2" stroke-dasharray="5,2" cx="330" cy="-129" rx="51.74" ry="24.08" />
+<text text-anchor="start" x="303" y="-134" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">adp-usb-eth</text>
+<text text-anchor="start" x="311" y="-120" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[adapter]</text>
+</g>
+
+<g id="v12-node-subnet_192.168.10.0_24" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M386,-36C386,-36 322,-36 322,-36 316,-36 310,-30 310,-24 310,-24 310,-12 310,-12 310,-6 316,0 322,0 322,0 386,0 386,0 392,0 398,-6 398,-12 398,-12 398,-24 398,-24 398,-30 392,-36 386,-36" />
+<text text-anchor="start" x="319" y="-23" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">192.168.10.0/24</text>
+<text text-anchor="start" x="325.5" y="-9" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv4 subnet]</text>
+</g>
+
+<g id="v12-edge-hosts_adp-usb-eth_enx001122334455_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M335.09,-104.88C339.63,-84.26 346.17,-54.54 350.25,-36.02" />
+<text text-anchor="middle" x="377.5" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455</text>
+</g>
+
+<g id="v12-node-subnet_2001_db8_10_64" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M133.5,-36C133.5,-36 64.5,-36 64.5,-36 58.5,-36 52.5,-30 52.5,-24 52.5,-24 52.5,-12 52.5,-12 52.5,-6 58.5,0 64.5,0 64.5,0 133.5,0 133.5,0 139.5,0 145.5,-6 145.5,-12 145.5,-12 145.5,-24 145.5,-24 145.5,-30 139.5,-36 133.5,-36" />
+<text text-anchor="start" x="62" y="-23" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">2001:db8:10::/64</text>
+<text text-anchor="start" x="71" y="-9" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv6 subnet]</text>
+</g>
+
+<g id="v12-edge-hosts_adp-usb-eth_enx001122334455_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M289.8,-113.68C271.91,-107.55 250.52,-100.54 231,-95 184.44,-81.78 163.08,-99.89 125,-70 114.21,-61.53 107.5,-47.37 103.6,-36.12" />
+<text text-anchor="middle" x="158.5" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">enx001122334455</text>
+</g>
+
+<g id="v12-node-hosts_pc-desk" class="node">
+<polygon fill="#f5f5f5" stroke="#6b7280" stroke-width="1.2" points="213.5,-147 148.5,-147 148.5,-111 213.5,-111 213.5,-147" />
+<text text-anchor="start" x="163" y="-134" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">pc-desk</text>
+<text text-anchor="start" x="158" y="-120" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[computer]</text>
+</g>
+
+<g id="v12-edge-hosts_pc-desk_eno1_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M208.03,-110.97C240.44,-90.55 294.43,-56.54 326.87,-36.09" />
+<text text-anchor="middle" x="291.5" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1</text>
+</g>
+
+<g id="v12-edge-hosts_pc-desk_eno1_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M148.3,-121.55C120.76,-114.2 83.05,-99.21 65,-70 57.95,-58.59 66.08,-46.06 76.15,-36.27" />
+<text text-anchor="middle" x="74.5" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eno1</text>
+</g>
+
+<g id="v12-node-hosts_srv-nas" class="node">
+<path fill="#eae2f5" stroke="#7c3aed" stroke-width="1.2" d="M54,-148.02C54,-150.36 41.9,-152.25 27,-152.25 12.1,-152.25 0,-150.36 0,-148.02 0,-148.02 0,-109.98 0,-109.98 0,-107.64 12.1,-105.75 27,-105.75 41.9,-105.75 54,-107.64 54,-109.98 54,-109.98 54,-148.02 54,-148.02" />
+<path fill="none" stroke="#7c3aed" stroke-width="1.2" d="M54,-148.02C54,-145.69 41.9,-143.8 27,-143.8 12.1,-143.8 0,-145.69 0,-148.02" />
+<text text-anchor="start" x="10" y="-134" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">srv-nas</text>
+<text text-anchor="start" x="10" y="-120" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[server]</text>
+</g>
+
+<g id="v12-edge-hosts_srv-nas_eth0_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M54.04,-118.99C110.43,-100.19 241.03,-56.66 309.81,-33.73" />
+<text text-anchor="middle" x="228" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0</text>
+</g>
+
+<g id="v12-edge-hosts_srv-nas_eth0_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M11.89,-105.53C4.72,-91.84 -0.6,-74.44 8,-61 17.94,-45.46 35.25,-35.59 52.12,-29.36" />
+<text text-anchor="middle" x="16" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">eth0</text>
+</g>
+
+<g id="v12-node-routers_rtr-home" class="node">
+<polygon fill="#dbe9f6" stroke="#2563eb" stroke-width="1.2" points="642,-163 584,-129 642,-95 700,-129 642,-163" />
+<text text-anchor="start" x="622" y="-134" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">rtr-home</text>
+<text text-anchor="start" x="626.5" y="-120" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[router]</text>
+</g>
+
+<g id="v12-node-subnet_192.0.2.1_32" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M635.5,-36C635.5,-36 584.5,-36 584.5,-36 578.5,-36 572.5,-30 572.5,-24 572.5,-24 572.5,-12 572.5,-12 572.5,-6 578.5,0 584.5,0 584.5,0 635.5,0 635.5,0 641.5,0 647.5,-6 647.5,-12 647.5,-12 647.5,-24 647.5,-24 647.5,-30 641.5,-36 635.5,-36" />
+<text text-anchor="start" x="583" y="-23" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">192.0.2.1/32</text>
+<text text-anchor="start" x="582" y="-9" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv4 subnet]</text>
+</g>
+
+<g id="v12-edge-routers_rtr-home_lo0_192.0.2.1_32" class="edge">
+<path fill="none" stroke="#0f766e" d="M633.68,-99.65C627.75,-79.46 619.98,-53 614.99,-36" />
+<text text-anchor="middle" x="629.5" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lo0</text>
+</g>
+
+<g id="v12-edge-routers_rtr-home_lan0_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M618.84,-108.12C600.1,-93.04 572.4,-72.92 545,-61 497.21,-40.2 438.06,-29.25 398.36,-23.81" />
+<text text-anchor="middle" x="570" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0</text>
+</g>
+
+<g id="v12-node-subnet_203.0.113.0_30" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M754.5,-36C754.5,-36 695.5,-36 695.5,-36 689.5,-36 683.5,-30 683.5,-24 683.5,-24 683.5,-12 683.5,-12 683.5,-6 689.5,0 695.5,0 695.5,0 754.5,0 754.5,0 760.5,0 766.5,-6 766.5,-12 766.5,-12 766.5,-24 766.5,-24 766.5,-30 760.5,-36 754.5,-36" />
+<text text-anchor="start" x="693" y="-23" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">203.0.113.0/30</text>
+<text text-anchor="start" x="697" y="-9" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv4 subnet]</text>
+</g>
+
+<g id="v12-edge-routers_rtr-home_wan0_203.0.113.0_30" class="edge">
+<path fill="none" stroke="#0f766e" d="M659.4,-105.15C675.09,-84.55 697.8,-54.72 711.97,-36.11" />
+<text text-anchor="middle" x="700" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">wan0</text>
+</g>
+
+<g id="v12-node-subnet_2001_db8_1_128" class="node">
+<path fill="#e0f2f1" stroke="#0f766e" stroke-width="1.2" d="M881,-36C881,-36 815,-36 815,-36 809,-36 803,-30 803,-24 803,-24 803,-12 803,-12 803,-6 809,0 815,0 815,0 881,0 881,0 887,0 893,-6 893,-12 893,-12 893,-24 893,-24 893,-30 887,-36 881,-36" />
+<text text-anchor="start" x="812" y="-23" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">2001:db8::1/128</text>
+<text text-anchor="start" x="819.5" y="-9" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[ipv6 subnet]</text>
+</g>
+
+<g id="v12-edge-routers_rtr-home_lo0_2001_db8_1_128" class="edge">
+<path fill="none" stroke="#0f766e" d="M671.95,-112.15C710.23,-91.9 776.23,-56.98 815.63,-36.13" />
+<text text-anchor="middle" x="768.5" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lo0</text>
+</g>
+
+<g id="v12-edge-routers_rtr-home_lan0_2001_db8_10_64" class="edge">
+<path fill="none" stroke="#0f766e" d="M610.03,-113.5C574.42,-97.99 514.77,-73.87 461,-61 402.24,-46.93 229.65,-30.48 145.8,-23.03" />
+<text text-anchor="middle" x="499" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">lan0</text>
+</g>
+
+<g id="v12-node-switches_sw-home" class="node">
+<polygon fill="#dcf0dc" stroke="#16a34a" stroke-width="1.2" points="492.5,-147 435.5,-147 431.5,-143 431.5,-111 488.5,-111 492.5,-115 492.5,-147" />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="488.5,-143 431.5,-143 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="488.5,-143 488.5,-111 " />
+<polyline fill="none" stroke="#16a34a" stroke-width="1.2" points="488.5,-143 492.5,-147 " />
+<text text-anchor="start" x="441" y="-134" font-family="Helvetica,Arial,sans-serif" font-weight="bold" font-size="10.00">sw-home</text>
+<text text-anchor="start" x="445" y="-120" font-family="Helvetica,Arial,sans-serif" font-size="10.00">[switch]</text>
+</g>
+
+<g id="v12-edge-switches_sw-home_Vlan10_192.168.10.0_24" class="edge">
+<path fill="none" stroke="#0f766e" d="M453.97,-110.86C446.6,-96.38 434.61,-75.71 420,-61 410.43,-51.36 398.26,-42.85 386.99,-36.05" />
+<text text-anchor="middle" x="439.5" y="-63.6" font-family="Helvetica,Arial,sans-serif" font-size="8.00">Vlan10</text>
+</g>
+</g>
+</svg></div>
+    </div>
+    <p class="hint">drag to pan &middot; scroll to zoom &middot; click an element for its configuration</p>
+  </div>
+
+  <aside class="panel">
+    <div class="panel-head">
+      <span>details</span>
+      <span id="ng-matches" class="hint-count" aria-live="polite"></span>
+    </div>
+    <ul id="ng-results" class="results"></ul>
+    <div id="ng-detail" class="detail" aria-live="polite"></div>
+  </aside>
+</main>
+
+<div id="ng-card" class="card" hidden aria-hidden="true"></div>
+
+<div id="ng-keys" class="keys" hidden>
+  <dl>
+    <dt>/</dt><dd>search</dd>
+    <dt>arrows</dt><dd>pan (Shift: faster)</dd>
+    <dt>+ &minus;</dt><dd>zoom</dd>
+    <dt>f, 0</dt><dd>fit the diagram in the window</dd>
+    <dt>Esc</dt><dd>clear the search and the selection</dd>
+  </dl>
+</div>
+
+<script id="netgraph-data" type="application/json">{"apiVersion":"netgraph.dev/v1alpha1","kind":"NetworkGraphPage","generator":"netgraph 0.1.0","title":"home-lab — every layer","options":{"showIps":true,"showVlans":true,"tooltips":true,"links":false},"layers":[{"layer":"l1","label":"l1 — physical","nodes":6,"edges":5,"views":[{"showIps":true,"showVlans":true,"view":"v1"},{"showIps":true,"showVlans":false,"view":"v2"},{"showIps":false,"showVlans":true,"view":"v3"},{"showIps":false,"showVlans":false,"view":"v4"}],"elements":{"edge-cables_cbl-rtr-sw":{"id":"cables/cbl-rtr-sw","kind":"cable","endpoints":[{"node":"routers/rtr-home","interface":"lan0","element":"node-routers_rtr-home"},{"node":"switches/sw-home","interface":"port1","element":"node-switches_sw-home"}],"medium":"copper","speed":1000000000,"speedText":"1Gbps","label":"H-001","lengthM":0.5,"vlans":[10],"element":"edge-cables_cbl-rtr-sw","type":"edge"},"edge-cables_cbl-sw-desk":{"id":"cables/cbl-sw-desk","kind":"cable","endpoints":[{"node":"hosts/pc-desk","interface":"eno1","element":"node-hosts_pc-desk"},{"node":"switches/sw-home","interface":"port2","element":"node-switches_sw-home"}],"medium":"copper","speed":1000000000,"speedText":"1Gbps","label":"H-002","lengthM":8.0,"vlans":[10],"element":"edge-cables_cbl-sw-desk","type":"edge"},"edge-cables_cbl-sw-nas":{"id":"cables/cbl-sw-nas","kind":"cable","endpoints":[{"node":"hosts/srv-nas","interface":"eth0","element":"node-hosts_srv-nas"},{"node":"switches/sw-home","interface":"port3","element":"node-switches_sw-home"}],"medium":"copper","speed":1000000000,"speedText":"1Gbps","label":"H-003","lengthM":0.5,"vlans":[10],"element":"edge-cables_cbl-sw-nas","type":"edge"},"edge-cables_cbl-sw-dongle":{"id":"cables/cbl-sw-dongle","kind":"cable","endpoints":[{"node":"hosts/adp-usb-eth","interface":"enx001122334455","element":"node-hosts_adp-usb-eth"},{"node":"switches/sw-home","interface":"port4","element":"node-switches_sw-home"}],"medium":"copper","speed":1000000000,"speedText":"1Gbps","label":"H-004","lengthM":10.0,"vlans":[10],"element":"edge-cables_cbl-sw-dongle","type":"edge"},"edge-hosts_adp-usb-eth_upstream":{"id":"hosts/adp-usb-eth#upstream","kind":"attachment","endpoints":[{"node":"hosts/laptop","element":"node-hosts_laptop"},{"node":"hosts/adp-usb-eth","interface":"usb0","element":"node-hosts_adp-usb-eth"}],"medium":"copper","speed":5000000000,"speedText":"5Gbps","label":"usb","vlans":[],"element":"edge-hosts_adp-usb-eth_upstream","type":"edge"},"node-hosts_adp-usb-eth":{"id":"hosts/adp-usb-eth","type":"element","name":"adp-usb-eth","kind":"adapter","namespace":"hosts","description":"USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the\nlaptop - there is deliberately no cable between the two (NG-X005).\n","labels":{"asset":"A-0001","site":"home"},"vlans":[10],"interfaces":[{"name":"enx001122334455","type":"ethernet","description":"Dongle Ethernet port","mac":"00:11:22:33:44:55","mtu":1500,"addresses":["192.168.10.30/24","2001:db8:10::30/64"]}],"element":"node-hosts_adp-usb-eth","links":[{"element":"edge-cables_cbl-sw-dongle","kind":"cable","interface":"enx001122334455","peer":"switches/sw-home","peerElement":"node-switches_sw-home","peerInterface":"port4","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-004","vlans":[10]},{"element":"edge-hosts_adp-usb-eth_upstream","kind":"attachment","interface":"usb0","peer":"hosts/laptop","peerElement":"node-hosts_laptop","peerInterface":null,"medium":"copper","stack":null,"speedText":"5Gbps","label":"usb","vlans":[]}]},"node-hosts_laptop":{"id":"hosts/laptop","type":"element","name":"laptop","kind":"computer","namespace":"hosts","description":"Ultrabook without a built-in Ethernet port. It reaches the wired network\nthrough the USB dongle declared in hosts/adp-usb-eth.yaml, so it owns no\ncabled interface of its own.\n","labels":{"owner":"sam","role":"laptop","site":"home"},"vlans":[10],"interfaces":[{"name":"lo","type":"loopback","addresses":["127.0.0.1/8","::1/128"]},{"name":"wlp0s20f3","type":"wifi","enabled":false,"description":"Disabled while docked","mac":"8c:8c:aa:30:01:01"}],"element":"node-hosts_laptop","links":[{"element":"edge-hosts_adp-usb-eth_upstream","kind":"attachment","interface":null,"peer":"hosts/adp-usb-eth","peerElement":"node-hosts_adp-usb-eth","peerInterface":"usb0","medium":"copper","stack":null,"speedText":"5Gbps","label":"usb","vlans":[]}]},"node-hosts_pc-desk":{"id":"hosts/pc-desk","type":"element","name":"pc-desk","kind":"computer","namespace":"hosts","description":"Desktop workstation in the study","labels":{"owner":"sam","role":"workstation","site":"home"},"vlans":[10],"interfaces":[{"name":"lo","type":"loopback","addresses":["127.0.0.1/8","::1/128"]},{"name":"eno1","type":"ethernet","description":"Onboard gigabit port","mac":"3c:97:0e:20:01:01","mtu":1500,"addresses":["192.168.10.20/24","2001:db8:10::20/64"]},{"name":"wlp1s0","type":"wifi","enabled":false,"description":"Disabled - the desk is wired","mac":"3c:97:0e:20:01:02"}],"element":"node-hosts_pc-desk","links":[{"element":"edge-cables_cbl-sw-desk","kind":"cable","interface":"eno1","peer":"switches/sw-home","peerElement":"node-switches_sw-home","peerInterface":"port2","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-002","vlans":[10]}]},"node-hosts_srv-nas":{"id":"hosts/srv-nas","type":"element","name":"srv-nas","kind":"server","namespace":"hosts","description":"Backup and media server","labels":{"env":"prod","role":"storage","site":"home"},"vlans":[10],"interfaces":[{"name":"lo","type":"loopback","addresses":["127.0.0.1/8","::1/128"]},{"name":"eth0","type":"ethernet","mac":"00:11:32:40:01:01","mtu":1500,"addresses":["192.168.10.10/24","2001:db8:10::10/64"]}],"element":"node-hosts_srv-nas","links":[{"element":"edge-cables_cbl-sw-nas","kind":"cable","interface":"eth0","peer":"switches/sw-home","peerElement":"node-switches_sw-home","peerInterface":"port3","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-003","vlans":[10]}]},"node-routers_rtr-home":{"id":"routers/rtr-home","type":"element","name":"rtr-home","kind":"router","namespace":"routers","description":"Home edge router. Terminates the ISP hand-off on wan0 and is the default\ngateway for the single home VLAN (10).\n","labels":{"env":"prod","role":"edge","site":"home"},"vlans":[10],"interfaces":[{"name":"lo0","type":"loopback","description":"Router ID and management target","addresses":["192.0.2.1/32","2001:db8::1/128"]},{"name":"wan0","type":"ethernet","description":"ISP hand-off","mac":"00:1e:8c:00:10:01","mtu":1500,"addresses":["203.0.113.2/30"]},{"name":"lan0","type":"ethernet","description":"Downlink to sw-home","mac":"00:1e:8c:00:10:02","mtu":1500,"addresses":["192.168.10.1/24","2001:db8:10::1/64"],"vlan":{"mode":"access","vlans":[10]}}],"element":"node-routers_rtr-home","links":[{"element":"edge-cables_cbl-rtr-sw","kind":"cable","interface":"lan0","peer":"switches/sw-home","peerElement":"node-switches_sw-home","peerInterface":"port1","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-001","vlans":[10]}]},"node-switches_sw-home":{"id":"switches/sw-home","type":"element","name":"sw-home","kind":"switch","namespace":"switches","description":"Eight-port desktop switch in the hallway cabinet","labels":{"role":"access","site":"home"},"vlans":[10],"interfaces":[{"name":"br0","type":"bridge","description":"Switching instance"},{"name":"Vlan10","type":"vlan","description":"In-band management address of the switch","addresses":["192.168.10.2/24"],"vlan":{"mode":"access","vlans":[10]}},{"name":"port1","type":"ethernet","description":"Uplink to rtr-home","mac":"00:22:07:aa:00:01","mtu":1500,"vlan":{"mode":"access","vlans":[10]}},{"name":"port2","type":"ethernet","description":"Desk - pc-desk","mac":"00:22:07:aa:00:02","mtu":1500,"vlan":{"mode":"access","vlans":[10]}},{"name":"port3","type":"ethernet","description":"NAS","mac":"00:22:07:aa:00:03","mtu":1500,"vlan":{"mode":"access","vlans":[10]}},{"name":"port4","type":"ethernet","description":"Patch to the desk, used by the laptop dongle","mac":"00:22:07:aa:00:04","mtu":1500,"vlan":{"mode":"access","vlans":[10]}},{"name":"port5","type":"ethernet","enabled":false,"description":"Spare","mac":"00:22:07:aa:00:05","vlan":{"mode":"access","vlans":[10]}}],"element":"node-switches_sw-home","links":[{"element":"edge-cables_cbl-rtr-sw","kind":"cable","interface":"port1","peer":"routers/rtr-home","peerElement":"node-routers_rtr-home","peerInterface":"lan0","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-001","vlans":[10]},{"element":"edge-cables_cbl-sw-desk","kind":"cable","interface":"port2","peer":"hosts/pc-desk","peerElement":"node-hosts_pc-desk","peerInterface":"eno1","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-002","vlans":[10]},{"element":"edge-cables_cbl-sw-nas","kind":"cable","interface":"port3","peer":"hosts/srv-nas","peerElement":"node-hosts_srv-nas","peerInterface":"eth0","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-003","vlans":[10]},{"element":"edge-cables_cbl-sw-dongle","kind":"cable","interface":"port4","peer":"hosts/adp-usb-eth","peerElement":"node-hosts_adp-usb-eth","peerInterface":"enx001122334455","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-004","vlans":[10]}]}}},{"layer":"l2","label":"l2 — VLANs","nodes":6,"edges":5,"views":[{"showIps":true,"showVlans":true,"view":"v5"},{"showIps":true,"showVlans":false,"view":"v6"},{"showIps":false,"showVlans":true,"view":"v7"},{"showIps":false,"showVlans":false,"view":"v8"}],"elements":{"edge-cables_cbl-rtr-sw":{"id":"cables/cbl-rtr-sw","kind":"cable","endpoints":[{"node":"routers/rtr-home","interface":"lan0","element":"node-routers_rtr-home"},{"node":"switches/sw-home","interface":"port1","element":"node-switches_sw-home"}],"medium":"copper","speed":1000000000,"speedText":"1Gbps","label":"H-001","lengthM":0.5,"vlans":[10],"element":"edge-cables_cbl-rtr-sw","type":"edge"},"edge-cables_cbl-sw-desk":{"id":"cables/cbl-sw-desk","kind":"cable","endpoints":[{"node":"hosts/pc-desk","interface":"eno1","element":"node-hosts_pc-desk"},{"node":"switches/sw-home","interface":"port2","element":"node-switches_sw-home"}],"medium":"copper","speed":1000000000,"speedText":"1Gbps","label":"H-002","lengthM":8.0,"vlans":[10],"element":"edge-cables_cbl-sw-desk","type":"edge"},"edge-cables_cbl-sw-nas":{"id":"cables/cbl-sw-nas","kind":"cable","endpoints":[{"node":"hosts/srv-nas","interface":"eth0","element":"node-hosts_srv-nas"},{"node":"switches/sw-home","interface":"port3","element":"node-switches_sw-home"}],"medium":"copper","speed":1000000000,"speedText":"1Gbps","label":"H-003","lengthM":0.5,"vlans":[10],"element":"edge-cables_cbl-sw-nas","type":"edge"},"edge-cables_cbl-sw-dongle":{"id":"cables/cbl-sw-dongle","kind":"cable","endpoints":[{"node":"hosts/adp-usb-eth","interface":"enx001122334455","element":"node-hosts_adp-usb-eth"},{"node":"switches/sw-home","interface":"port4","element":"node-switches_sw-home"}],"medium":"copper","speed":1000000000,"speedText":"1Gbps","label":"H-004","lengthM":10.0,"vlans":[10],"element":"edge-cables_cbl-sw-dongle","type":"edge"},"edge-hosts_adp-usb-eth_upstream":{"id":"hosts/adp-usb-eth#upstream","kind":"attachment","endpoints":[{"node":"hosts/laptop","element":"node-hosts_laptop"},{"node":"hosts/adp-usb-eth","interface":"usb0","element":"node-hosts_adp-usb-eth"}],"medium":"copper","speed":5000000000,"speedText":"5Gbps","label":"usb","vlans":[],"element":"edge-hosts_adp-usb-eth_upstream","type":"edge"},"node-hosts_adp-usb-eth":{"id":"hosts/adp-usb-eth","type":"element","name":"adp-usb-eth","kind":"adapter","namespace":"hosts","description":"USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the\nlaptop - there is deliberately no cable between the two (NG-X005).\n","labels":{"asset":"A-0001","site":"home"},"vlans":[10],"interfaces":[{"name":"enx001122334455","type":"ethernet","description":"Dongle Ethernet port","mac":"00:11:22:33:44:55","mtu":1500,"addresses":["192.168.10.30/24","2001:db8:10::30/64"]}],"element":"node-hosts_adp-usb-eth","links":[{"element":"edge-cables_cbl-sw-dongle","kind":"cable","interface":"enx001122334455","peer":"switches/sw-home","peerElement":"node-switches_sw-home","peerInterface":"port4","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-004","vlans":[10]},{"element":"edge-hosts_adp-usb-eth_upstream","kind":"attachment","interface":"usb0","peer":"hosts/laptop","peerElement":"node-hosts_laptop","peerInterface":null,"medium":"copper","stack":null,"speedText":"5Gbps","label":"usb","vlans":[]}]},"node-hosts_laptop":{"id":"hosts/laptop","type":"element","name":"laptop","kind":"computer","namespace":"hosts","description":"Ultrabook without a built-in Ethernet port. It reaches the wired network\nthrough the USB dongle declared in hosts/adp-usb-eth.yaml, so it owns no\ncabled interface of its own.\n","labels":{"owner":"sam","role":"laptop","site":"home"},"vlans":[10],"interfaces":[{"name":"lo","type":"loopback","addresses":["127.0.0.1/8","::1/128"]},{"name":"wlp0s20f3","type":"wifi","enabled":false,"description":"Disabled while docked","mac":"8c:8c:aa:30:01:01"}],"element":"node-hosts_laptop","links":[{"element":"edge-hosts_adp-usb-eth_upstream","kind":"attachment","interface":null,"peer":"hosts/adp-usb-eth","peerElement":"node-hosts_adp-usb-eth","peerInterface":"usb0","medium":"copper","stack":null,"speedText":"5Gbps","label":"usb","vlans":[]}]},"node-hosts_pc-desk":{"id":"hosts/pc-desk","type":"element","name":"pc-desk","kind":"computer","namespace":"hosts","description":"Desktop workstation in the study","labels":{"owner":"sam","role":"workstation","site":"home"},"vlans":[10],"interfaces":[{"name":"lo","type":"loopback","addresses":["127.0.0.1/8","::1/128"]},{"name":"eno1","type":"ethernet","description":"Onboard gigabit port","mac":"3c:97:0e:20:01:01","mtu":1500,"addresses":["192.168.10.20/24","2001:db8:10::20/64"]},{"name":"wlp1s0","type":"wifi","enabled":false,"description":"Disabled - the desk is wired","mac":"3c:97:0e:20:01:02"}],"element":"node-hosts_pc-desk","links":[{"element":"edge-cables_cbl-sw-desk","kind":"cable","interface":"eno1","peer":"switches/sw-home","peerElement":"node-switches_sw-home","peerInterface":"port2","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-002","vlans":[10]}]},"node-hosts_srv-nas":{"id":"hosts/srv-nas","type":"element","name":"srv-nas","kind":"server","namespace":"hosts","description":"Backup and media server","labels":{"env":"prod","role":"storage","site":"home"},"vlans":[10],"interfaces":[{"name":"lo","type":"loopback","addresses":["127.0.0.1/8","::1/128"]},{"name":"eth0","type":"ethernet","mac":"00:11:32:40:01:01","mtu":1500,"addresses":["192.168.10.10/24","2001:db8:10::10/64"]}],"element":"node-hosts_srv-nas","links":[{"element":"edge-cables_cbl-sw-nas","kind":"cable","interface":"eth0","peer":"switches/sw-home","peerElement":"node-switches_sw-home","peerInterface":"port3","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-003","vlans":[10]}]},"node-routers_rtr-home":{"id":"routers/rtr-home","type":"element","name":"rtr-home","kind":"router","namespace":"routers","description":"Home edge router. Terminates the ISP hand-off on wan0 and is the default\ngateway for the single home VLAN (10).\n","labels":{"env":"prod","role":"edge","site":"home"},"vlans":[10],"interfaces":[{"name":"lo0","type":"loopback","description":"Router ID and management target","addresses":["192.0.2.1/32","2001:db8::1/128"]},{"name":"wan0","type":"ethernet","description":"ISP hand-off","mac":"00:1e:8c:00:10:01","mtu":1500,"addresses":["203.0.113.2/30"]},{"name":"lan0","type":"ethernet","description":"Downlink to sw-home","mac":"00:1e:8c:00:10:02","mtu":1500,"addresses":["192.168.10.1/24","2001:db8:10::1/64"],"vlan":{"mode":"access","vlans":[10]}}],"element":"node-routers_rtr-home","links":[{"element":"edge-cables_cbl-rtr-sw","kind":"cable","interface":"lan0","peer":"switches/sw-home","peerElement":"node-switches_sw-home","peerInterface":"port1","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-001","vlans":[10]}]},"node-switches_sw-home":{"id":"switches/sw-home","type":"element","name":"sw-home","kind":"switch","namespace":"switches","description":"Eight-port desktop switch in the hallway cabinet","labels":{"role":"access","site":"home"},"vlans":[10],"interfaces":[{"name":"br0","type":"bridge","description":"Switching instance"},{"name":"Vlan10","type":"vlan","description":"In-band management address of the switch","addresses":["192.168.10.2/24"],"vlan":{"mode":"access","vlans":[10]}},{"name":"port1","type":"ethernet","description":"Uplink to rtr-home","mac":"00:22:07:aa:00:01","mtu":1500,"vlan":{"mode":"access","vlans":[10]}},{"name":"port2","type":"ethernet","description":"Desk - pc-desk","mac":"00:22:07:aa:00:02","mtu":1500,"vlan":{"mode":"access","vlans":[10]}},{"name":"port3","type":"ethernet","description":"NAS","mac":"00:22:07:aa:00:03","mtu":1500,"vlan":{"mode":"access","vlans":[10]}},{"name":"port4","type":"ethernet","description":"Patch to the desk, used by the laptop dongle","mac":"00:22:07:aa:00:04","mtu":1500,"vlan":{"mode":"access","vlans":[10]}},{"name":"port5","type":"ethernet","enabled":false,"description":"Spare","mac":"00:22:07:aa:00:05","vlan":{"mode":"access","vlans":[10]}}],"element":"node-switches_sw-home","links":[{"element":"edge-cables_cbl-rtr-sw","kind":"cable","interface":"port1","peer":"routers/rtr-home","peerElement":"node-routers_rtr-home","peerInterface":"lan0","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-001","vlans":[10]},{"element":"edge-cables_cbl-sw-desk","kind":"cable","interface":"port2","peer":"hosts/pc-desk","peerElement":"node-hosts_pc-desk","peerInterface":"eno1","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-002","vlans":[10]},{"element":"edge-cables_cbl-sw-nas","kind":"cable","interface":"port3","peer":"hosts/srv-nas","peerElement":"node-hosts_srv-nas","peerInterface":"eth0","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-003","vlans":[10]},{"element":"edge-cables_cbl-sw-dongle","kind":"cable","interface":"port4","peer":"hosts/adp-usb-eth","peerElement":"node-hosts_adp-usb-eth","peerInterface":"enx001122334455","medium":"copper","stack":null,"speedText":"1Gbps","label":"H-004","vlans":[10]}]}}},{"layer":"l3","label":"l3 — IP subnets","nodes":10,"edges":12,"views":[{"showIps":true,"showVlans":true,"view":"v9"},{"showIps":true,"showVlans":false,"view":"v10"},{"showIps":false,"showVlans":true,"view":"v11"},{"showIps":false,"showVlans":false,"view":"v12"}],"elements":{"edge-hosts_adp-usb-eth_enx001122334455_192.168.10.0_24":{"id":"hosts/adp-usb-eth:enx001122334455#192.168.10.0/24","kind":"subnet","endpoints":[{"node":"hosts/adp-usb-eth","interface":"enx001122334455","element":"node-hosts_adp-usb-eth"},{"node":"subnet:192.168.10.0/24","element":"node-subnet_192.168.10.0_24"}],"addresses":["192.168.10.30/24"],"vlans":[],"element":"edge-hosts_adp-usb-eth_enx001122334455_192.168.10.0_24","type":"edge"},"edge-hosts_adp-usb-eth_enx001122334455_2001_db8_10_64":{"id":"hosts/adp-usb-eth:enx001122334455#2001:db8:10::/64","kind":"subnet","endpoints":[{"node":"hosts/adp-usb-eth","interface":"enx001122334455","element":"node-hosts_adp-usb-eth"},{"node":"subnet:2001:db8:10::/64","element":"node-subnet_2001_db8_10_64"}],"addresses":["2001:db8:10::30/64"],"vlans":[],"element":"edge-hosts_adp-usb-eth_enx001122334455_2001_db8_10_64","type":"edge"},"edge-hosts_pc-desk_eno1_192.168.10.0_24":{"id":"hosts/pc-desk:eno1#192.168.10.0/24","kind":"subnet","endpoints":[{"node":"hosts/pc-desk","interface":"eno1","element":"node-hosts_pc-desk"},{"node":"subnet:192.168.10.0/24","element":"node-subnet_192.168.10.0_24"}],"addresses":["192.168.10.20/24"],"vlans":[],"element":"edge-hosts_pc-desk_eno1_192.168.10.0_24","type":"edge"},"edge-hosts_pc-desk_eno1_2001_db8_10_64":{"id":"hosts/pc-desk:eno1#2001:db8:10::/64","kind":"subnet","endpoints":[{"node":"hosts/pc-desk","interface":"eno1","element":"node-hosts_pc-desk"},{"node":"subnet:2001:db8:10::/64","element":"node-subnet_2001_db8_10_64"}],"addresses":["2001:db8:10::20/64"],"vlans":[],"element":"edge-hosts_pc-desk_eno1_2001_db8_10_64","type":"edge"},"edge-hosts_srv-nas_eth0_192.168.10.0_24":{"id":"hosts/srv-nas:eth0#192.168.10.0/24","kind":"subnet","endpoints":[{"node":"hosts/srv-nas","interface":"eth0","element":"node-hosts_srv-nas"},{"node":"subnet:192.168.10.0/24","element":"node-subnet_192.168.10.0_24"}],"addresses":["192.168.10.10/24"],"vlans":[],"element":"edge-hosts_srv-nas_eth0_192.168.10.0_24","type":"edge"},"edge-hosts_srv-nas_eth0_2001_db8_10_64":{"id":"hosts/srv-nas:eth0#2001:db8:10::/64","kind":"subnet","endpoints":[{"node":"hosts/srv-nas","interface":"eth0","element":"node-hosts_srv-nas"},{"node":"subnet:2001:db8:10::/64","element":"node-subnet_2001_db8_10_64"}],"addresses":["2001:db8:10::10/64"],"vlans":[],"element":"edge-hosts_srv-nas_eth0_2001_db8_10_64","type":"edge"},"edge-routers_rtr-home_lo0_192.0.2.1_32":{"id":"routers/rtr-home:lo0#192.0.2.1/32","kind":"subnet","endpoints":[{"node":"routers/rtr-home","interface":"lo0","element":"node-routers_rtr-home"},{"node":"subnet:192.0.2.1/32","element":"node-subnet_192.0.2.1_32"}],"addresses":["192.0.2.1/32"],"vlans":[],"element":"edge-routers_rtr-home_lo0_192.0.2.1_32","type":"edge"},"edge-routers_rtr-home_lo0_2001_db8_1_128":{"id":"routers/rtr-home:lo0#2001:db8::1/128","kind":"subnet","endpoints":[{"node":"routers/rtr-home","interface":"lo0","element":"node-routers_rtr-home"},{"node":"subnet:2001:db8::1/128","element":"node-subnet_2001_db8_1_128"}],"addresses":["2001:db8::1/128"],"vlans":[],"element":"edge-routers_rtr-home_lo0_2001_db8_1_128","type":"edge"},"edge-routers_rtr-home_wan0_203.0.113.0_30":{"id":"routers/rtr-home:wan0#203.0.113.0/30","kind":"subnet","endpoints":[{"node":"routers/rtr-home","interface":"wan0","element":"node-routers_rtr-home"},{"node":"subnet:203.0.113.0/30","element":"node-subnet_203.0.113.0_30"}],"addresses":["203.0.113.2/30"],"vlans":[],"element":"edge-routers_rtr-home_wan0_203.0.113.0_30","type":"edge"},"edge-routers_rtr-home_lan0_192.168.10.0_24":{"id":"routers/rtr-home:lan0#192.168.10.0/24","kind":"subnet","endpoints":[{"node":"routers/rtr-home","interface":"lan0","element":"node-routers_rtr-home"},{"node":"subnet:192.168.10.0/24","element":"node-subnet_192.168.10.0_24"}],"addresses":["192.168.10.1/24"],"vlans":[10],"element":"edge-routers_rtr-home_lan0_192.168.10.0_24","type":"edge"},"edge-routers_rtr-home_lan0_2001_db8_10_64":{"id":"routers/rtr-home:lan0#2001:db8:10::/64","kind":"subnet","endpoints":[{"node":"routers/rtr-home","interface":"lan0","element":"node-routers_rtr-home"},{"node":"subnet:2001:db8:10::/64","element":"node-subnet_2001_db8_10_64"}],"addresses":["2001:db8:10::1/64"],"vlans":[10],"element":"edge-routers_rtr-home_lan0_2001_db8_10_64","type":"edge"},"edge-switches_sw-home_Vlan10_192.168.10.0_24":{"id":"switches/sw-home:Vlan10#192.168.10.0/24","kind":"subnet","endpoints":[{"node":"switches/sw-home","interface":"Vlan10","element":"node-switches_sw-home"},{"node":"subnet:192.168.10.0/24","element":"node-subnet_192.168.10.0_24"}],"addresses":["192.168.10.2/24"],"vlans":[10],"element":"edge-switches_sw-home_Vlan10_192.168.10.0_24","type":"edge"},"node-hosts_adp-usb-eth":{"id":"hosts/adp-usb-eth","type":"element","name":"adp-usb-eth","kind":"adapter","namespace":"hosts","description":"USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the\nlaptop - there is deliberately no cable between the two (NG-X005).\n","labels":{"asset":"A-0001","site":"home"},"vlans":[10],"interfaces":[{"name":"enx001122334455","type":"ethernet","description":"Dongle Ethernet port","mac":"00:11:22:33:44:55","mtu":1500,"addresses":["192.168.10.30/24","2001:db8:10::30/64"]}],"element":"node-hosts_adp-usb-eth","links":[{"element":"edge-hosts_adp-usb-eth_enx001122334455_192.168.10.0_24","kind":"subnet","interface":"enx001122334455","peer":"subnet:192.168.10.0/24","peerElement":"node-subnet_192.168.10.0_24","peerInterface":null,"medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]},{"element":"edge-hosts_adp-usb-eth_enx001122334455_2001_db8_10_64","kind":"subnet","interface":"enx001122334455","peer":"subnet:2001:db8:10::/64","peerElement":"node-subnet_2001_db8_10_64","peerInterface":null,"medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]}]},"node-hosts_pc-desk":{"id":"hosts/pc-desk","type":"element","name":"pc-desk","kind":"computer","namespace":"hosts","description":"Desktop workstation in the study","labels":{"owner":"sam","role":"workstation","site":"home"},"vlans":[10],"interfaces":[{"name":"lo","type":"loopback","addresses":["127.0.0.1/8","::1/128"]},{"name":"eno1","type":"ethernet","description":"Onboard gigabit port","mac":"3c:97:0e:20:01:01","mtu":1500,"addresses":["192.168.10.20/24","2001:db8:10::20/64"]},{"name":"wlp1s0","type":"wifi","enabled":false,"description":"Disabled - the desk is wired","mac":"3c:97:0e:20:01:02"}],"element":"node-hosts_pc-desk","links":[{"element":"edge-hosts_pc-desk_eno1_192.168.10.0_24","kind":"subnet","interface":"eno1","peer":"subnet:192.168.10.0/24","peerElement":"node-subnet_192.168.10.0_24","peerInterface":null,"medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]},{"element":"edge-hosts_pc-desk_eno1_2001_db8_10_64","kind":"subnet","interface":"eno1","peer":"subnet:2001:db8:10::/64","peerElement":"node-subnet_2001_db8_10_64","peerInterface":null,"medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]}]},"node-hosts_srv-nas":{"id":"hosts/srv-nas","type":"element","name":"srv-nas","kind":"server","namespace":"hosts","description":"Backup and media server","labels":{"env":"prod","role":"storage","site":"home"},"vlans":[10],"interfaces":[{"name":"lo","type":"loopback","addresses":["127.0.0.1/8","::1/128"]},{"name":"eth0","type":"ethernet","mac":"00:11:32:40:01:01","mtu":1500,"addresses":["192.168.10.10/24","2001:db8:10::10/64"]}],"element":"node-hosts_srv-nas","links":[{"element":"edge-hosts_srv-nas_eth0_192.168.10.0_24","kind":"subnet","interface":"eth0","peer":"subnet:192.168.10.0/24","peerElement":"node-subnet_192.168.10.0_24","peerInterface":null,"medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]},{"element":"edge-hosts_srv-nas_eth0_2001_db8_10_64","kind":"subnet","interface":"eth0","peer":"subnet:2001:db8:10::/64","peerElement":"node-subnet_2001_db8_10_64","peerInterface":null,"medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]}]},"node-routers_rtr-home":{"id":"routers/rtr-home","type":"element","name":"rtr-home","kind":"router","namespace":"routers","description":"Home edge router. Terminates the ISP hand-off on wan0 and is the default\ngateway for the single home VLAN (10).\n","labels":{"env":"prod","role":"edge","site":"home"},"vlans":[10],"interfaces":[{"name":"lo0","type":"loopback","description":"Router ID and management target","addresses":["192.0.2.1/32","2001:db8::1/128"]},{"name":"wan0","type":"ethernet","description":"ISP hand-off","mac":"00:1e:8c:00:10:01","mtu":1500,"addresses":["203.0.113.2/30"]},{"name":"lan0","type":"ethernet","description":"Downlink to sw-home","mac":"00:1e:8c:00:10:02","mtu":1500,"addresses":["192.168.10.1/24","2001:db8:10::1/64"],"vlan":{"mode":"access","vlans":[10]}}],"element":"node-routers_rtr-home","links":[{"element":"edge-routers_rtr-home_lo0_192.0.2.1_32","kind":"subnet","interface":"lo0","peer":"subnet:192.0.2.1/32","peerElement":"node-subnet_192.0.2.1_32","peerInterface":null,"medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]},{"element":"edge-routers_rtr-home_lo0_2001_db8_1_128","kind":"subnet","interface":"lo0","peer":"subnet:2001:db8::1/128","peerElement":"node-subnet_2001_db8_1_128","peerInterface":null,"medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]},{"element":"edge-routers_rtr-home_wan0_203.0.113.0_30","kind":"subnet","interface":"wan0","peer":"subnet:203.0.113.0/30","peerElement":"node-subnet_203.0.113.0_30","peerInterface":null,"medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]},{"element":"edge-routers_rtr-home_lan0_192.168.10.0_24","kind":"subnet","interface":"lan0","peer":"subnet:192.168.10.0/24","peerElement":"node-subnet_192.168.10.0_24","peerInterface":null,"medium":null,"stack":null,"speedText":null,"label":null,"vlans":[10]},{"element":"edge-routers_rtr-home_lan0_2001_db8_10_64","kind":"subnet","interface":"lan0","peer":"subnet:2001:db8:10::/64","peerElement":"node-subnet_2001_db8_10_64","peerInterface":null,"medium":null,"stack":null,"speedText":null,"label":null,"vlans":[10]}]},"node-switches_sw-home":{"id":"switches/sw-home","type":"element","name":"sw-home","kind":"switch","namespace":"switches","description":"Eight-port desktop switch in the hallway cabinet","labels":{"role":"access","site":"home"},"vlans":[10],"interfaces":[{"name":"br0","type":"bridge","description":"Switching instance"},{"name":"Vlan10","type":"vlan","description":"In-band management address of the switch","addresses":["192.168.10.2/24"],"vlan":{"mode":"access","vlans":[10]}},{"name":"port1","type":"ethernet","description":"Uplink to rtr-home","mac":"00:22:07:aa:00:01","mtu":1500,"vlan":{"mode":"access","vlans":[10]}},{"name":"port2","type":"ethernet","description":"Desk - pc-desk","mac":"00:22:07:aa:00:02","mtu":1500,"vlan":{"mode":"access","vlans":[10]}},{"name":"port3","type":"ethernet","description":"NAS","mac":"00:22:07:aa:00:03","mtu":1500,"vlan":{"mode":"access","vlans":[10]}},{"name":"port4","type":"ethernet","description":"Patch to the desk, used by the laptop dongle","mac":"00:22:07:aa:00:04","mtu":1500,"vlan":{"mode":"access","vlans":[10]}},{"name":"port5","type":"ethernet","enabled":false,"description":"Spare","mac":"00:22:07:aa:00:05","vlan":{"mode":"access","vlans":[10]}}],"element":"node-switches_sw-home","links":[{"element":"edge-switches_sw-home_Vlan10_192.168.10.0_24","kind":"subnet","interface":"Vlan10","peer":"subnet:192.168.10.0/24","peerElement":"node-subnet_192.168.10.0_24","peerInterface":null,"medium":null,"stack":null,"speedText":null,"label":null,"vlans":[10]}]},"node-subnet_192.0.2.1_32":{"id":"subnet:192.0.2.1/32","type":"subnet","name":"192.0.2.1/32","kind":"subnet","namespace":"","subnet":{"prefix":"192.0.2.1/32","family":"ipv4","addresses":["192.0.2.1/32"],"elements":["routers/rtr-home"]},"vlans":[],"interfaces":[],"element":"node-subnet_192.0.2.1_32","links":[{"element":"edge-routers_rtr-home_lo0_192.0.2.1_32","kind":"subnet","interface":null,"peer":"routers/rtr-home","peerElement":"node-routers_rtr-home","peerInterface":"lo0","medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]}]},"node-subnet_192.168.10.0_24":{"id":"subnet:192.168.10.0/24","type":"subnet","name":"192.168.10.0/24","kind":"subnet","namespace":"","subnet":{"prefix":"192.168.10.0/24","family":"ipv4","addresses":["192.168.10.30/24","192.168.10.20/24","192.168.10.10/24","192.168.10.1/24","192.168.10.2/24"],"elements":["hosts/adp-usb-eth","hosts/pc-desk","hosts/srv-nas","routers/rtr-home","switches/sw-home"]},"vlans":[10],"interfaces":[],"element":"node-subnet_192.168.10.0_24","links":[{"element":"edge-hosts_adp-usb-eth_enx001122334455_192.168.10.0_24","kind":"subnet","interface":null,"peer":"hosts/adp-usb-eth","peerElement":"node-hosts_adp-usb-eth","peerInterface":"enx001122334455","medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]},{"element":"edge-hosts_pc-desk_eno1_192.168.10.0_24","kind":"subnet","interface":null,"peer":"hosts/pc-desk","peerElement":"node-hosts_pc-desk","peerInterface":"eno1","medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]},{"element":"edge-hosts_srv-nas_eth0_192.168.10.0_24","kind":"subnet","interface":null,"peer":"hosts/srv-nas","peerElement":"node-hosts_srv-nas","peerInterface":"eth0","medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]},{"element":"edge-routers_rtr-home_lan0_192.168.10.0_24","kind":"subnet","interface":null,"peer":"routers/rtr-home","peerElement":"node-routers_rtr-home","peerInterface":"lan0","medium":null,"stack":null,"speedText":null,"label":null,"vlans":[10]},{"element":"edge-switches_sw-home_Vlan10_192.168.10.0_24","kind":"subnet","interface":null,"peer":"switches/sw-home","peerElement":"node-switches_sw-home","peerInterface":"Vlan10","medium":null,"stack":null,"speedText":null,"label":null,"vlans":[10]}]},"node-subnet_203.0.113.0_30":{"id":"subnet:203.0.113.0/30","type":"subnet","name":"203.0.113.0/30","kind":"subnet","namespace":"","subnet":{"prefix":"203.0.113.0/30","family":"ipv4","addresses":["203.0.113.2/30"],"elements":["routers/rtr-home"]},"vlans":[],"interfaces":[],"element":"node-subnet_203.0.113.0_30","links":[{"element":"edge-routers_rtr-home_wan0_203.0.113.0_30","kind":"subnet","interface":null,"peer":"routers/rtr-home","peerElement":"node-routers_rtr-home","peerInterface":"wan0","medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]}]},"node-subnet_2001_db8_1_128":{"id":"subnet:2001:db8::1/128","type":"subnet","name":"2001:db8::1/128","kind":"subnet","namespace":"","subnet":{"prefix":"2001:db8::1/128","family":"ipv6","addresses":["2001:db8::1/128"],"elements":["routers/rtr-home"]},"vlans":[],"interfaces":[],"element":"node-subnet_2001_db8_1_128","links":[{"element":"edge-routers_rtr-home_lo0_2001_db8_1_128","kind":"subnet","interface":null,"peer":"routers/rtr-home","peerElement":"node-routers_rtr-home","peerInterface":"lo0","medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]}]},"node-subnet_2001_db8_10_64":{"id":"subnet:2001:db8:10::/64","type":"subnet","name":"2001:db8:10::/64","kind":"subnet","namespace":"","subnet":{"prefix":"2001:db8:10::/64","family":"ipv6","addresses":["2001:db8:10::30/64","2001:db8:10::20/64","2001:db8:10::10/64","2001:db8:10::1/64"],"elements":["hosts/adp-usb-eth","hosts/pc-desk","hosts/srv-nas","routers/rtr-home"]},"vlans":[10],"interfaces":[],"element":"node-subnet_2001_db8_10_64","links":[{"element":"edge-hosts_adp-usb-eth_enx001122334455_2001_db8_10_64","kind":"subnet","interface":null,"peer":"hosts/adp-usb-eth","peerElement":"node-hosts_adp-usb-eth","peerInterface":"enx001122334455","medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]},{"element":"edge-hosts_pc-desk_eno1_2001_db8_10_64","kind":"subnet","interface":null,"peer":"hosts/pc-desk","peerElement":"node-hosts_pc-desk","peerInterface":"eno1","medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]},{"element":"edge-hosts_srv-nas_eth0_2001_db8_10_64","kind":"subnet","interface":null,"peer":"hosts/srv-nas","peerElement":"node-hosts_srv-nas","peerInterface":"eth0","medium":null,"stack":null,"speedText":null,"label":null,"vlans":[]},{"element":"edge-routers_rtr-home_lan0_2001_db8_10_64","kind":"subnet","interface":null,"peer":"routers/rtr-home","peerElement":"node-routers_rtr-home","peerInterface":"lan0","medium":null,"stack":null,"speedText":null,"label":null,"vlans":[10]}]}}}]}</script>
+<script>/* One detail record, drawn.
+ *
+ * The records come from netgraph.render.details.build_details -- the JSON
+ * export plus an element id and a links cross-reference -- and two front ends
+ * show them: the info box of `netgraph web`, and the detail panel of the
+ * self-contained page `netgraph render -f html` writes. The records are built
+ * once in Python for exactly the reason this file exists in one copy: two
+ * views of one inventory that disagree about what a device is are worse than
+ * one view.
+ *
+ * Everything a record contains is inserted with textContent. This file assigns
+ * no markup at all -- not innerHTML, not insertAdjacentHTML -- so a name, a
+ * description or a label carrying markup is text wherever it lands, and there
+ * is no escaping contract for a caller to get wrong.
+ */
+
+var netgraphDetail = (function () {
+  "use strict";
+
+  /* -------------------------------------------------------------- helpers */
+
+  function element(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) { node.className = className; }
+    if (text !== undefined && text !== null) { node.textContent = String(text); }
+    return node;
+  }
+
+  function definitions(pairs) {
+    var list = document.createElement("dl");
+    pairs.forEach(function (pair) {
+      if (pair[1] === undefined || pair[1] === null || pair[1] === "") { return; }
+      list.appendChild(element("dt", null, pair[0]));
+      list.appendChild(element("dd", null, pair[1]));
+    });
+    return list.children.length ? list : null;
+  }
+
+  function section(title, body) {
+    if (!body) { return null; }
+    var wrapper = document.createElement("section");
+    wrapper.appendChild(element("h3", null, title));
+    wrapper.appendChild(body);
+    return wrapper;
+  }
+
+  function table(headings, rows) {
+    if (!rows.length) { return null; }
+    var node = document.createElement("table");
+    var head = document.createElement("tr");
+    headings.forEach(function (heading) { head.appendChild(element("th", null, heading)); });
+    node.appendChild(head);
+    rows.forEach(function (row) {
+      var line = document.createElement("tr");
+      if (row.muted) { line.className = "off"; }
+      row.cells.forEach(function (cell) { line.appendChild(element("td", null, cell)); });
+      node.appendChild(line);
+    });
+    return node;
+  }
+
+  function tags(values) {
+    if (!values || !values.length) { return null; }
+    var wrapper = document.createElement("div");
+    values.forEach(function (value) { wrapper.appendChild(element("span", "tag", value)); });
+    return wrapper;
+  }
+
+  function join(values) {
+    return values && values.length ? values.join(", ") : "";
+  }
+
+  function append(parent, child) {
+    if (child) { parent.appendChild(child); }
+  }
+
+  /* --------------------------------------------------------------- record */
+
+  /** Which columns to draw. The defaults are "everything the record holds":
+   *  a record was already narrowed in Python by the options the diagram was
+   *  rendered with, and a front end offering a live toggle narrows it again. */
+  function settings(options) {
+    var given = options || {};
+    return {
+      showIps: given.showIps !== false,
+      showVlans: given.showVlans !== false,
+      hint: given.hint || ""
+    };
+  }
+
+  function heading(record, name, kind, view) {
+    var head = element("h2", null, name);
+    head.appendChild(element("span", "kind", "[" + kind + "]"));
+    if (view.hint) { head.appendChild(element("span", "pinhint", view.hint)); }
+    return head;
+  }
+
+  // A tunnel is the one record where the interesting facts are neither
+  // physical nor addressing: what it encapsulates, what carries it, and -- the
+  // one a reader most needs -- whether anything in the stack encrypts.
+  function tunnelSection(tunnel) {
+    if (!tunnel) { return null; }
+    var protection = tunnel.encrypted
+      ? "yes" + (tunnel.cipher ? " (" + tunnel.cipher + ")" : "")
+      : (tunnel.encryptedBy ? "by " + tunnel.encryptedBy : "no — cleartext");
+    return section("tunnel", definitions([
+      ["stack", tunnel.stack.join(" over ")],
+      ["carries", "layer " + tunnel.layer],
+      ["transport", tunnel.transport + (tunnel.port ? "/" + tunnel.port : "")],
+      ["mode", tunnel.mode],
+      ["vni", tunnel.vni],
+      ["encrypted", protection],
+      ["auth", tunnel.auth],
+      ["mtu", tunnel.mtu ? tunnel.mtu + " (overhead " + tunnel.overheadBytes + " B)" : ""],
+      ["over", tunnel.over]
+    ]));
+  }
+
+  function describeNode(record, view) {
+    var box = document.createDocumentFragment();
+    box.appendChild(heading(record, record.name, record.kind, view));
+
+    var identity = [["id", record.id]];
+    if (record.namespace) { identity.push(["namespace", record.namespace]); }
+    if (record.description) { identity.push(["description", record.description.trim()]); }
+    Object.keys(record.labels || {}).forEach(function (key) {
+      identity.push(["label " + key, record.labels[key]]);
+    });
+    append(box, section("element", definitions(identity)));
+
+    if (record.subnet) {
+      append(box, section("subnet", definitions([
+        ["prefix", record.subnet.prefix],
+        ["family", record.subnet.family],
+        ["addresses", view.showIps ? join(record.subnet.addresses) : ""],
+        ["elements", join(record.subnet.elements)]
+      ])));
+    }
+
+    append(box, tunnelSection(record.tunnel));
+
+    if (view.showVlans) {
+      append(box, section("vlans", tags((record.vlans || []).map(function (id) {
+        return "vlan " + id;
+      }))));
+    }
+
+    append(box, section("interfaces", table(
+      ["interface", "type", "addresses", "vlan", "mac / mtu"],
+      (record.interfaces || []).map(function (port) {
+        return {
+          muted: port.enabled === false,
+          cells: [
+            port.name,
+            port.type,
+            view.showIps ? join(port.addresses) : "",
+            view.showVlans && port.vlan ? port.vlan.mode + " " + join(port.vlan.vlans) : "",
+            [port.mac, port.mtu ? "mtu " + port.mtu : ""].filter(Boolean).join(" / ")
+          ]
+        };
+      })
+    )));
+
+    append(box, section("links", table(
+      ["via", "to", "port", "medium", "vlan"],
+      (record.links || []).map(function (link) {
+        return {
+          cells: [
+            link.interface || "—",
+            link.peer,
+            link.peerInterface || "—",
+            [link.stack || link.medium || link.kind, link.speedText].filter(Boolean).join(" "),
+            view.showVlans ? join(link.vlans) : ""
+          ]
+        };
+      })
+    )));
+
+    if (!(record.interfaces || []).length && !(record.links || []).length) {
+      append(box, element("p", "note", "no interfaces and no links"));
+    }
+    return box;
+  }
+
+  function describeLink(record, view) {
+    var box = document.createDocumentFragment();
+    var ends = record.endpoints || [];
+    var name = ends.map(function (end) {
+      return end.node + (end.interface ? ":" + end.interface : "");
+    }).join("  —  ");
+    box.appendChild(heading(record, name, record.kind, view));
+
+    append(box, section("link", definitions([
+      ["id", record.id],
+      ["medium", record.medium],
+      ["speed", record.speedText],
+      ["label", record.label],
+      ["length", record.lengthM ? record.lengthM + " m" : ""],
+      ["addresses", view.showIps ? join(record.addresses) : ""]
+    ])));
+
+    append(box, tunnelSection(record.tunnel));
+
+    append(box, section("endpoints", table(["element", "interface"], ends.map(function (end) {
+      return { cells: [end.node, end.interface || "—"] };
+    }))));
+
+    if (view.showVlans) {
+      append(box, section("vlans", tags((record.vlans || []).map(function (id) {
+        return "vlan " + id;
+      }))));
+    }
+    return box;
+  }
+
+  /** The record, as a document fragment ready to be dropped into a box.
+   *
+   * options.showIps / options.showVlans narrow it the way the render flags of
+   * the same name do; options.hint adds a note to the heading.
+   */
+  function describe(record, options) {
+    var view = settings(options);
+    return record.type === "edge" ? describeLink(record, view) : describeNode(record, view);
+  }
+
+  /** Everything a search should look at, lower-cased, one string per record. */
+  function haystack(record) {
+    var parts = [record.id, record.name, record.kind, record.namespace, record.description];
+    (record.vlans || []).forEach(function (id) { parts.push("vlan " + id, String(id)); });
+    (record.interfaces || []).forEach(function (port) {
+      parts.push(port.name, port.type, port.mac, port.description);
+      (port.addresses || []).forEach(function (address) { parts.push(address); });
+      if (port.vlan) {
+        (port.vlan.vlans || []).forEach(function (id) { parts.push("vlan " + id, String(id)); });
+      }
+    });
+    (record.endpoints || []).forEach(function (end) {
+      parts.push(end.node, end.interface);
+    });
+    (record.addresses || []).forEach(function (address) { parts.push(address); });
+    Object.keys(record.labels || {}).forEach(function (key) {
+      parts.push(key, record.labels[key]);
+    });
+    if (record.subnet) {
+      parts.push(record.subnet.prefix, record.subnet.family);
+      (record.subnet.addresses || []).forEach(function (address) { parts.push(address); });
+    }
+    if (record.tunnel) {
+      parts.push(record.tunnel.type, record.tunnel.transport, record.tunnel.cipher);
+      (record.tunnel.stack || []).forEach(function (layer) { parts.push(layer); });
+    }
+    parts.push(record.medium, record.label, record.speedText);
+    return parts.filter(Boolean).join("\n").toLowerCase();
+  }
+
+  /** How a record should be listed: its name, and what sort of thing it is. */
+  function label(record) {
+    if (record.type !== "edge") { return record.name; }
+    return (record.endpoints || []).map(function (end) {
+      return end.node + (end.interface ? ":" + end.interface : "");
+    }).join(" — ");
+  }
+
+  return {
+    append: append,
+    definitions: definitions,
+    describe: describe,
+    element: element,
+    haystack: haystack,
+    join: join,
+    label: label,
+    section: section,
+    table: table,
+    tags: tags
+  };
+})();
+
+/* The client of the self-contained page `netgraph render -f html` writes.
+ *
+ * Hand-written, dependency-free and inlined into the document at render time.
+ * There is no build step and no framework on purpose: the output of this
+ * renderer is a file you email, commit or publish, and every byte of runtime
+ * in it is a byte the reader downloads to look at a network diagram.
+ *
+ * What is on the page when this runs:
+ *
+ *   - one <div class="view"> per rendering, each holding an <svg> Graphviz
+ *     laid out. Several exist when the document holds more than one layer, or
+ *     when the address and VLAN annotations can be turned off -- switching is
+ *     showing a different one, never a re-layout, because a browser cannot lay
+ *     a graph out and this page carries no layout engine;
+ *   - a <script type="application/json"> holding one record per drawn element,
+ *     keyed by the id the shape carries (--element-ids). That is the same
+ *     structure `netgraph render -f json` exports and the same one the web
+ *     preview's info boxes use.
+ *
+ * Everything below is reading those two and moving classes around. No markup
+ * is ever assigned -- no innerHTML, no document.write, no new Function -- so
+ * the page needs neither 'unsafe-inline' beyond its own hash nor 'unsafe-eval'
+ * in the Content-Security-Policy it ships with, and a device name carrying
+ * markup is text wherever it appears.
+ */
+
+(function () {
+  "use strict";
+
+  /** Zoom bounds. Below the first the diagram is a smudge; above the second a pixel. */
+  var MIN_SCALE = 0.1;
+  var MAX_SCALE = 12;
+  /** How far an arrow key pans, in screen pixels; Shift multiplies it. */
+  var PAN_STEP = 60;
+  var PAN_LEAP = 4;
+  /** Matches listed before the rest are counted off. A list longer than this is
+   *  not a result set, it is the inventory again. */
+  var MAX_RESULTS = 60;
+
+  var data = JSON.parse(document.getElementById("netgraph-data").textContent);
+
+  var el = {
+    stage: document.getElementById("ng-stage"),
+    viewport: document.getElementById("ng-viewport"),
+    layer: document.getElementById("ng-layer"),
+    namespace: document.getElementById("ng-namespace"),
+    ips: document.getElementById("ng-ips"),
+    vlans: document.getElementById("ng-vlans"),
+    search: document.getElementById("ng-search"),
+    results: document.getElementById("ng-results"),
+    matches: document.getElementById("ng-matches"),
+    detail: document.getElementById("ng-detail"),
+    counts: document.getElementById("ng-counts"),
+    card: document.getElementById("ng-card"),
+    keys: document.getElementById("ng-keys"),
+    fit: document.getElementById("ng-fit"),
+    reset: document.getElementById("ng-reset"),
+    help: document.getElementById("ng-help")
+  };
+
+  var state = {
+    layer: 0,
+    showIps: data.options.showIps,
+    showVlans: data.options.showVlans,
+    namespace: "",
+    query: "",
+    selected: null
+  };
+
+  var view = { x: 0, y: 0, k: 1 };
+  /** The id prefix every shape of the visible drawing carries; see html.py. */
+  var prefix = "";
+  /** Lazily built per layer: element id -> lower-cased searchable text. */
+  var indexes = {};
+
+  /* ----------------------------------------------------------------- data */
+
+  function layer() {
+    return data.layers[state.layer];
+  }
+
+  function records() {
+    return layer().elements;
+  }
+
+  function recordOf(id) {
+    return records()[id] || null;
+  }
+
+  function index() {
+    if (!indexes[state.layer]) {
+      var built = {};
+      var elements = records();
+      Object.keys(elements).forEach(function (id) {
+        built[id] = netgraphDetail.haystack(elements[id]);
+      });
+      indexes[state.layer] = built;
+    }
+    return indexes[state.layer];
+  }
+
+  /** The namespace a record belongs to. An edge has none of its own, so it
+   *  answers with its endpoints': a cable between two racks is in both. */
+  function namespacesOf(record) {
+    if (record.type !== "edge") { return [record.namespace || ""]; }
+    return (record.endpoints || []).map(function (end) {
+      var peer = end.element ? recordOf(end.element) : null;
+      return peer ? (peer.namespace || "") : "";
+    });
+  }
+
+  function inNamespace(record, wanted) {
+    if (!wanted) { return true; }
+    return namespacesOf(record).some(function (name) {
+      return name === wanted || name.indexOf(wanted + "/") === 0;
+    });
+  }
+
+  /* ----------------------------------------------------------------- view */
+
+  /** The drawing that matches the current toggles, exactly or as closely as
+   *  the document holds one. */
+  function viewId() {
+    var views = layer().views;
+    var best = views[0];
+    views.forEach(function (candidate) {
+      if (candidate.showIps === state.showIps && candidate.showVlans === state.showVlans) {
+        best = candidate;
+      }
+    });
+    return best.view;
+  }
+
+  function showView() {
+    var wanted = viewId();
+    prefix = wanted;
+    var panes = el.viewport.querySelectorAll(".view");
+    for (var i = 0; i < panes.length; i++) {
+      panes[i].hidden = panes[i].getAttribute("data-view") !== wanted;
+    }
+  }
+
+  function groups() {
+    var pane = el.viewport.querySelector('.view[data-view="' + prefix + '"]');
+    return pane ? pane.querySelectorAll("g.node, g.edge") : [];
+  }
+
+  function groupFor(id) {
+    return document.getElementById(prefix + "-" + id);
+  }
+
+  function idOf(group) {
+    return group.id.indexOf(prefix + "-") === 0 ? group.id.slice(prefix.length + 1) : "";
+  }
+
+  function applyView() {
+    el.viewport.style.transform =
+      "translate(" + view.x + "px, " + view.y + "px) scale(" + view.k + ")";
+  }
+
+  /** Fit the whole diagram in the window.
+   *
+   * The <svg> has no width or height of its own -- the renderer takes them off
+   * and leaves the viewBox -- so it already fills the stage at scale 1, and
+   * fitting is putting the transform back to nothing. */
+  function fit() {
+    view.x = 0;
+    view.y = 0;
+    view.k = 1;
+    applyView();
+  }
+
+  function zoomAt(clientX, clientY, factor) {
+    var box = el.stage.getBoundingClientRect();
+    var x = clientX - box.left;
+    var y = clientY - box.top;
+    var next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, view.k * factor));
+    // Keep the point under the pointer where it is: solve for the translation
+    // that maps it to the same screen position at the new scale.
+    view.x = x - (x - view.x) * (next / view.k);
+    view.y = y - (y - view.y) * (next / view.k);
+    view.k = next;
+    applyView();
+  }
+
+  function panBy(dx, dy) {
+    view.x += dx;
+    view.y += dy;
+    applyView();
+  }
+
+  /** Bring ``group`` into the window, if it is not already in it. */
+  function reveal(group) {
+    var stage = el.stage.getBoundingClientRect();
+    var box = group.getBoundingClientRect();
+    if (
+      box.left >= stage.left && box.right <= stage.right &&
+      box.top >= stage.top && box.bottom <= stage.bottom
+    ) {
+      return;
+    }
+    panBy(
+      stage.left + stage.width / 2 - (box.left + box.width / 2),
+      stage.top + stage.height / 2 - (box.top + box.height / 2)
+    );
+  }
+
+  /* --------------------------------------------------------------- search */
+
+  function matches() {
+    var query = state.query.trim().toLowerCase();
+    var text = index();
+    var found = [];
+    Object.keys(records()).forEach(function (id) {
+      var record = records()[id];
+      if (!inNamespace(record, state.namespace)) { return; }
+      if (query && text[id].indexOf(query) === -1) { return; }
+      found.push(id);
+    });
+    return found;
+  }
+
+  /** Dim everything the current query and namespace leave out. */
+  function paint(found) {
+    var filtering = Boolean(state.query.trim() || state.namespace);
+    var wanted = {};
+    found.forEach(function (id) { wanted[id] = true; });
+    // The drawing that was on screen a moment ago is still in the document,
+    // hidden, wearing the classes it was last painted with. Clearing them here
+    // rather than on the way out means there is one place where what a shape
+    // looks like is decided.
+    var stale = el.viewport.querySelectorAll("g.ng-dim, g.ng-match, g.ng-selected");
+    for (var s = 0; s < stale.length; s++) {
+      stale[s].classList.remove("ng-dim", "ng-match", "ng-selected");
+    }
+    var all = groups();
+    for (var i = 0; i < all.length; i++) {
+      var group = all[i];
+      var id = idOf(group);
+      var hit = Boolean(wanted[id]);
+      group.classList.toggle("ng-dim", filtering && !hit);
+      group.classList.toggle("ng-match", filtering && hit && Boolean(state.query.trim()));
+      group.classList.toggle("ng-selected", id === state.selected);
+    }
+  }
+
+  function listResults(found) {
+    el.results.replaceChildren();
+    var query = state.query.trim();
+    if (!query) {
+      el.matches.textContent = "";
+      return;
+    }
+    el.matches.textContent = found.length + (found.length === 1 ? " match" : " matches");
+    found.slice(0, MAX_RESULTS).forEach(function (id) {
+      var record = recordOf(id);
+      var item = document.createElement("li");
+      var button = document.createElement("button");
+      button.type = "button";
+      button.appendChild(netgraphDetail.element("span", "name", netgraphDetail.label(record)));
+      button.appendChild(document.createTextNode(" "));
+      button.appendChild(netgraphDetail.element("span", "kind", "[" + record.kind + "]"));
+      if (id === state.selected) { button.setAttribute("aria-current", "true"); }
+      button.addEventListener("click", function () { select(id, true); });
+      item.appendChild(button);
+      el.results.appendChild(item);
+    });
+    if (found.length > MAX_RESULTS) {
+      var note = document.createElement("li");
+      note.className = "empty";
+      note.textContent = found.length - MAX_RESULTS + " more not listed";
+      el.results.appendChild(note);
+    }
+  }
+
+  /* --------------------------------------------------------------- detail */
+
+  /** The document that declares this element, when --link-template built one.
+   *
+   * The URL is not in the records: it is an attribute of the drawing, on the
+   * anchor Graphviz wrapped the shape in, so it is read back off the shape
+   * rather than carried a second time. */
+  function sourceUrl(id) {
+    var group = groupFor(id);
+    var anchor = group ? group.querySelector("a") : null;
+    if (!anchor) { return ""; }
+    return anchor.getAttribute("href") ||
+      anchor.getAttributeNS("http://www.w3.org/1999/xlink", "href") || "";
+  }
+
+  function showDetail() {
+    el.detail.replaceChildren();
+    var record = state.selected ? recordOf(state.selected) : null;
+    if (!record) {
+      el.detail.appendChild(
+        netgraphDetail.element("p", "empty", "select an element to see its configuration")
+      );
+      return;
+    }
+    el.detail.appendChild(
+      netgraphDetail.describe(record, { showIps: state.showIps, showVlans: state.showVlans })
+    );
+    var url = sourceUrl(state.selected);
+    if (url) {
+      var link = netgraphDetail.element("a", "source", "open the document that declares it");
+      link.href = url;
+      link.rel = "noreferrer noopener";
+      el.detail.appendChild(link);
+    }
+  }
+
+  /* ------------------------------------------------------------ selection */
+
+  function select(id, bring) {
+    state.selected = records()[id] ? id : null;
+    if (state.selected && bring) {
+      var group = groupFor(state.selected);
+      if (group) { reveal(group); }
+    }
+    writeHash();
+    refresh();
+  }
+
+  /* ---------------------------------------------------------- deep links */
+
+  /** ``#node-office_sw-core`` in a one-layer document, ``#l3:node-...`` when
+   *  the page holds several: an id is only unique within its own layer. */
+  function fragmentFor(id) {
+    return data.layers.length > 1 ? layer().layer + ":" + id : id;
+  }
+
+  var writingHash = false;
+
+  function writeHash() {
+    writingHash = true;
+    try {
+      var wanted = state.selected ? "#" + fragmentFor(state.selected) : "";
+      if (wanted) {
+        if (window.location.hash !== wanted) { window.location.hash = wanted; }
+      } else if (window.location.hash) {
+        try {
+          // Clearing the fragment without a history entry for the empty one.
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        } catch (error) {
+          // A page opened from a file:// URL is the case this format exists
+          // for, and that is the one where some browsers refuse to rewrite the
+          // history entry. Leaving a stale "#" behind is a far better outcome
+          // than an exception halfway through deselecting.
+          window.location.hash = "";
+        }
+      }
+    } finally {
+      writingHash = false;
+    }
+  }
+
+  function readHash() {
+    if (writingHash) { return; }
+    var raw = decodeURIComponent(window.location.hash.replace(/^#/, ""));
+    if (!raw) { return; }
+    var wanted = raw;
+    var colon = raw.indexOf(":");
+    if (colon > 0) {
+      var named = raw.slice(0, colon);
+      data.layers.forEach(function (candidate, position) {
+        if (candidate.layer === named) {
+          state.layer = position;
+          if (el.layer) { el.layer.value = String(position); }
+        }
+      });
+      wanted = raw.slice(colon + 1);
+    } else {
+      // A fragment written before this page grew a layer switcher, or one
+      // copied from an SVG deep link: take the first layer that draws it.
+      data.layers.forEach(function (candidate, position) {
+        if (candidate.elements[wanted] && !data.layers[state.layer].elements[wanted]) {
+          state.layer = position;
+          if (el.layer) { el.layer.value = String(position); }
+        }
+      });
+    }
+    showView();
+    state.selected = records()[wanted] ? wanted : null;
+    refresh();
+    if (state.selected) {
+      var group = groupFor(state.selected);
+      if (group) { reveal(group); }
+    }
+  }
+
+  /* --------------------------------------------------------------- render */
+
+  function refresh() {
+    showView();
+    var found = matches();
+    paint(found);
+    listResults(found);
+    showDetail();
+    el.counts.textContent =
+      layer().nodes + (layer().nodes === 1 ? " node, " : " nodes, ") +
+      layer().edges + (layer().edges === 1 ? " edge" : " edges");
+  }
+
+  /* ----------------------------------------------------------- hover card */
+
+  function hideCard() {
+    el.card.hidden = true;
+    el.card.replaceChildren();
+  }
+
+  function showCard(id, event) {
+    var record = recordOf(id);
+    if (!record) { hideCard(); return; }
+    el.card.replaceChildren(
+      netgraphDetail.describe(record, { showIps: state.showIps, showVlans: state.showVlans })
+    );
+    el.card.hidden = false;
+    var margin = 14;
+    var box = el.card.getBoundingClientRect();
+    var x = event.clientX + margin;
+    var y = event.clientY + margin;
+    if (x + box.width > window.innerWidth - margin) { x = event.clientX - box.width - margin; }
+    if (y + box.height > window.innerHeight - margin) { y = event.clientY - box.height - margin; }
+    el.card.style.left = Math.max(margin, x) + "px";
+    el.card.style.top = Math.max(margin, y) + "px";
+  }
+
+  /* ------------------------------------------------------------- controls */
+
+  function groupAt(target) {
+    var group = target && target.closest ? target.closest("g.node, g.edge") : null;
+    return group ? idOf(group) : "";
+  }
+
+  if (el.layer) {
+    el.layer.addEventListener("change", function () {
+      state.layer = parseInt(el.layer.value, 10) || 0;
+      state.selected = null;
+      writeHash();
+      refresh();
+    });
+  }
+
+  if (el.namespace) {
+    el.namespace.addEventListener("change", function () {
+      state.namespace = el.namespace.value;
+      refresh();
+    });
+  }
+
+  if (el.ips) {
+    el.ips.addEventListener("change", function () {
+      state.showIps = el.ips.checked;
+      refresh();
+    });
+  }
+
+  if (el.vlans) {
+    el.vlans.addEventListener("change", function () {
+      state.showVlans = el.vlans.checked;
+      refresh();
+    });
+  }
+
+  el.search.addEventListener("input", function () {
+    state.query = el.search.value;
+    refresh();
+  });
+
+  el.search.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter") { return; }
+    var found = matches();
+    if (found.length) { select(found[0], true); }
+  });
+
+  el.fit.addEventListener("click", fit);
+
+  el.reset.addEventListener("click", function () {
+    state.query = "";
+    state.namespace = "";
+    state.selected = null;
+    state.showIps = data.options.showIps;
+    state.showVlans = data.options.showVlans;
+    el.search.value = "";
+    if (el.namespace) { el.namespace.value = ""; }
+    if (el.ips) { el.ips.checked = state.showIps; }
+    if (el.vlans) { el.vlans.checked = state.showVlans; }
+    fit();
+    writeHash();
+    refresh();
+  });
+
+  el.help.addEventListener("click", function () {
+    var hidden = !el.keys.hidden;
+    el.keys.hidden = hidden;
+    el.help.setAttribute("aria-expanded", hidden ? "false" : "true");
+  });
+
+  el.stage.addEventListener("click", function (event) {
+    var anchor = event.target.closest ? event.target.closest("a") : null;
+    if (anchor && (event.metaKey || event.ctrlKey || event.shiftKey)) {
+      return;  // a modified click follows the --link-template link
+    }
+    // A click always follows a drag, and letting go of the mouse over a device
+    // you happened to drag past is not a request to select it.
+    if (anchor) { event.preventDefault(); }
+    if (dragged) { dragged = false; return; }
+    select(groupAt(event.target), false);
+    el.stage.focus({ preventScroll: true });
+  });
+
+  el.stage.addEventListener("pointermove", function (event) {
+    if (!data.options.tooltips || event.pointerType !== "mouse" || pointers.size) { return; }
+    var id = groupAt(event.target);
+    if (id) { showCard(id, event); } else { hideCard(); }
+  });
+
+  el.stage.addEventListener("pointerleave", hideCard);
+
+  el.stage.addEventListener("wheel", function (event) {
+    event.preventDefault();
+    zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.12 : 1 / 1.12);
+  }, { passive: false });
+
+  el.stage.addEventListener("keydown", function (event) {
+    var step = PAN_STEP * (event.shiftKey ? PAN_LEAP : 1);
+    var handled = true;
+    switch (event.key) {
+      case "ArrowLeft": panBy(step, 0); break;
+      case "ArrowRight": panBy(-step, 0); break;
+      case "ArrowUp": panBy(0, step); break;
+      case "ArrowDown": panBy(0, -step); break;
+      case "+":
+      case "=": zoomAt(centreX(), centreY(), 1.2); break;
+      case "-":
+      case "_": zoomAt(centreX(), centreY(), 1 / 1.2); break;
+      case "0":
+      case "f": fit(); break;
+      default: handled = false;
+    }
+    if (handled) { event.preventDefault(); }
+  });
+
+  function centreX() {
+    var box = el.stage.getBoundingClientRect();
+    return box.left + box.width / 2;
+  }
+
+  function centreY() {
+    var box = el.stage.getBoundingClientRect();
+    return box.top + box.height / 2;
+  }
+
+  document.addEventListener("keydown", function (event) {
+    var typing = /^(input|textarea|select)$/i.test((event.target.tagName || ""));
+    if (event.key === "Escape") {
+      hideCard();
+      if (typing) { event.target.blur(); }
+      if (state.query || state.selected) {
+        state.query = "";
+        el.search.value = "";
+        state.selected = null;
+        writeHash();
+        refresh();
+      }
+      return;
+    }
+    if (typing || event.metaKey || event.ctrlKey || event.altKey) { return; }
+    if (event.key === "/") {
+      event.preventDefault();
+      el.search.focus();
+      el.search.select();
+    } else if (event.key === "?") {
+      el.help.click();
+    }
+  });
+
+  window.addEventListener("hashchange", readHash);
+
+  /* --------------------------------------------------- pointer: pan, pinch */
+
+  var pointers = new Map();
+  var origin = null;
+  var pinch = null;
+  /** Did the pointer move between going down and coming up? Read, and reset,
+   *  by the click that follows. */
+  var dragged = false;
+  /** How far a pointer may travel and still count as a click, in pixels. */
+  var SLOP = 4;
+
+  // Deliberately no setPointerCapture: a captured pointer retargets the click
+  // that follows it to the capturing element, and this page decides what was
+  // clicked by looking at the shape under the pointer. The move and up
+  // listeners are on the window instead, so a drag that leaves the diagram
+  // still pans.
+  el.stage.addEventListener("pointerdown", function (event) {
+    if (event.pointerType === "mouse" && event.button !== 0) { return; }
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 1) {
+      origin = { x: event.clientX - view.x, y: event.clientY - view.y, from: event.clientX };
+      dragged = false;
+      el.stage.classList.add("panning");
+    } else if (pointers.size === 2) {
+      origin = null;
+      pinch = spread();
+      hideCard();
+    }
+  });
+
+  window.addEventListener("pointermove", function (event) {
+    if (!pointers.has(event.pointerId)) { return; }
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size === 2 && pinch) {
+      var now = spread();
+      if (pinch.distance > 0 && now.distance > 0) {
+        zoomAt(now.x, now.y, now.distance / pinch.distance);
+      }
+      pinch = now;
+      return;
+    }
+    if (!origin) { return; }
+    var next = { x: event.clientX - origin.x, y: event.clientY - origin.y };
+    if (Math.abs(next.x - view.x) + Math.abs(next.y - view.y) > SLOP) { dragged = true; }
+    view.x = next.x;
+    view.y = next.y;
+    hideCard();
+    applyView();
+  });
+
+  function release(event) {
+    pointers.delete(event.pointerId);
+    if (pointers.size < 2) { pinch = null; }
+    if (!pointers.size) {
+      origin = null;
+      el.stage.classList.remove("panning");
+    }
+  }
+
+  window.addEventListener("pointerup", release);
+  window.addEventListener("pointercancel", release);
+
+  /** The distance between the two live pointers, and the point between them. */
+  function spread() {
+    var live = Array.from(pointers.values());
+    var dx = live[0].x - live[1].x;
+    var dy = live[0].y - live[1].y;
+    return {
+      distance: Math.sqrt(dx * dx + dy * dy),
+      x: (live[0].x + live[1].x) / 2,
+      y: (live[0].y + live[1].y) / 2
+    };
+  }
+
+  /* ----------------------------------------------------------------- boot */
+
+  showView();
+  refresh();
+  readHash();
+})();
+</script>
+</body>
+</html>

@@ -47,9 +47,9 @@ pip install -e '.[dev]'     # including the development tooling
 
 ### Graphviz is a system prerequisite
 
-The `svg`, `png` and `pdf` formats are produced by running the Graphviz `dot`
-binary, which is a system package rather than a Python one — so `pip` alone is
-not enough:
+The `svg`, `png`, `pdf` and `html` formats are produced by running the Graphviz
+`dot` binary, which is a system package rather than a Python one — so `pip` alone
+is not enough:
 
 ```bash
 sudo apt install graphviz        # Debian / Ubuntu
@@ -628,17 +628,17 @@ from an inventory with a dangling cable is worse than no diagram.
 
 | Option | Default | Effect |
 |---|---|---|
-| `-f, --format FORMAT` | `dot` | One of `dot`, `svg`, `png`, `pdf`, `mermaid`, `json`. `svg`, `png` and `pdf` need Graphviz; the other three do not. |
+| `-f, --format FORMAT` | `dot` | One of `dot`, `svg`, `html`, `png`, `pdf`, `mermaid`, `json`. `svg`, `html`, `png` and `pdf` need Graphviz; the other three do not. `html` is a self-contained interactive page — see [The interactive HTML page](#the-interactive-html-page). |
 | `-o, --output FILE` | stdout | Write to this file instead of stdout. Parent directories are created. Required for `png` and `pdf` when stdout is a terminal. |
-| `--layer l1\|l2\|l3\|overlay` | `l1` | Which view to draw — see [Layers](#layers-l1-l2-l3-and-overlay). `l1` is the physical topology, `l2` the same topology annotated with VLANs, `l3` the IP subnets and who is addressed in them, `overlay` the tunnels and what runs inside what. |
+| `--layer l1\|l2\|l3\|overlay` | `l1` | Which view to draw — see [Layers](#layers-l1-l2-l3-and-overlay). `l1` is the physical topology, `l2` the same topology annotated with VLANs, `l3` the IP subnets and who is addressed in them, `overlay` the tunnels and what runs inside what. Repeatable for `-f html`, which draws each layer and puts a switcher over them; every other format holds one layer, and asking for two is a usage error. |
 | `--title TEXT` | none | Caption for the diagram. |
 | `--show-ips` / `--no-show-ips` | on | Print configured IP addresses on the nodes. |
 | `--show-vlans` / `--no-show-vlans` | on | Annotate nodes and links with VLAN membership. |
 | `--group-by-namespace` | off | Draw each namespace as a visual group (a Graphviz cluster, a Mermaid subgraph). |
 | `--icons THEME\|DIR` | off | Draw each element as an icon instead of a plain shape — see [Icons](#icons). `cisco`, `none`, or a directory of your own. Graphviz formats only. |
-| `--tooltips` / `--no-tooltips` | on | Carry the full record of every element — interfaces, addresses, VLANs, cabling — as hover text. `dot` and `svg` only; see [Interactive SVG](#interactive-svg-tooltips-links-and-ids). |
-| `--link-template URL` | off | Link each element back to the YAML that declares it, e.g. `https://git.example.com/net/blob/main/{file}#L{line}`. `dot` and `svg` only. |
-| `--element-ids` | off | Give every node, edge and namespace a stable `id` derived from its name, so the diagram can be deep-linked and styled. `dot` and `svg` only. |
+| `--tooltips` / `--no-tooltips` | on | Carry the full record of every element — interfaces, addresses, VLANs, cabling — as hover text. `dot`, `svg` and `html` only; see [Interactive SVG](#interactive-svg-tooltips-links-and-ids). |
+| `--link-template URL` | off | Link each element back to the YAML that declares it, e.g. `https://git.example.com/net/blob/main/{file}#L{line}`. `dot`, `svg` and `html` only. |
+| `--element-ids` | off | Give every node, edge and namespace a stable `id` derived from its name, so the diagram can be deep-linked and styled. `dot` and `svg`; always on in `html`, which is built on them. |
 | `--strict` | off | Treat warnings as errors, which then also refuse the render. |
 | `--force` | off | Render even when validation failed. The diagram may not match the files. |
 
@@ -751,9 +751,9 @@ netgraph render -f svg --element-ids \
 
 | Flag | Honoured by | Ignored by | What it does |
 |---|---|---|---|
-| `--tooltips` (default on) | `svg`, `dot` | `png`, `pdf`, `mermaid`, `json` | Hover text on every node, edge and namespace box. |
-| `--link-template URL` | `svg`, `dot` | `png`, `pdf`, `mermaid`, `json` | Turns each element into a link to the document that declares it. |
-| `--element-ids` | `svg`, `dot` | `png`, `pdf`, `mermaid`, `json` | A stable `id` on every node, edge and cluster. |
+| `--tooltips` (default on) | `svg`, `dot`, `html` | `png`, `pdf`, `mermaid`, `json` | Hover text on every node, edge and namespace box. |
+| `--link-template URL` | `svg`, `dot`, `html` | `png`, `pdf`, `mermaid`, `json` | Turns each element into a link to the document that declares it. |
+| `--element-ids` | `svg`, `dot`, `html` | `png`, `pdf`, `mermaid`, `json` | A stable `id` on every node, edge and cluster. |
 
 `-f dot` writes the attributes because a DOT file is the input to somebody
 else's `dot`; `-f svg` is where they reach a reader. `png` and `pdf` are
@@ -839,6 +839,83 @@ One quirk worth knowing: Graphviz XML-escapes `-` as `&#45;` when it writes an
 `id`, so `grep id=\"node-sites_hq_sw-core\"` over the raw file finds nothing.
 Every XML parser, browser and stylesheet sees the id unescaped; only a text
 search does not.
+
+#### The interactive HTML page
+
+`-f html` writes **one file** that pans, zooms, searches and explains itself,
+with nothing to install and nothing to fetch:
+
+```bash
+netgraph render -f html --layer l1 --layer l2 --layer l3 \
+    --title "home-lab — every layer" -o docs/home-lab.html
+```
+
+[**docs/home-lab.html**](docs/home-lab.html) is that command's output, committed:
+the home-lab inventory at all three layers, 187 kB, no server. GitHub shows an
+`.html` file as source, so download it — or open it from a Pages site — to see
+the page itself.
+
+It is the format to reach for when the diagram is *for somebody else*: attach it
+to a change request, commit it next to the YAML, publish it to GitHub Pages, or
+open it from a `file://` URL on a machine that has never heard of Python. What
+you get:
+
+* **pan and zoom** — drag or arrow keys, scroll or `+`/`−`, pinch on a touch
+  screen; `f` or **Fit** puts the whole diagram back in the window and **Reset**
+  returns the page to how it opened;
+* **search** — type a name, an address, a MAC or a VLAN and the matches light up
+  while the rest dims, with a result list you can walk by keyboard (`/` focuses
+  the box, `Esc` clears it);
+* **a detail panel** — click an element for its full resolved configuration:
+  every interface, its addresses and VLANs, its MTU and MAC, every cable and
+  tunnel that lands on it, and where it sits in an encapsulation stack. These
+  are the same records `-f json` exports and `netgraph web` shows, rendered by
+  the same code;
+* **toggles** — the addresses and the VLAN annotations off and on, and a
+  namespace to focus while the rest of the network dims;
+* **a layer switcher**, when you passed `--layer` more than once;
+* **deep links** — selecting an element puts its id in the URL fragment, and
+  opening that URL selects it again. The ids are the `--element-ids` ones, so
+  `topology.html#node-sites_hq_sw-core` and `topology.svg#node-sites_hq_sw-core`
+  name the same switch.
+
+**Self-contained is meant literally.** The page makes no network requests of any
+kind — no CDN, no web font, no stylesheet, no analytics, no image URL. The style
+sheet and the client are hand-written vanilla CSS and JavaScript that ship
+inside the package and are inlined at render time; there is no bundler, and
+netgraph gained no runtime dependency for any of it. The only URLs a page can
+hold are the ones `--link-template` was asked for, and those are links a reader
+clicks rather than resources the page loads.
+
+The page enforces that on itself: it carries a strict
+`Content-Security-Policy` in a `<meta>`, built from the SHA-256 of each inline
+block, so it needs neither `'unsafe-inline'` nor `'unsafe-eval'` and a page that
+grew a fetch would be refused by the browser rather than quietly making one.
+Everything an inventory wrote reaches the page as text — the escaping battery
+covers a `</script>` in a description and in a `--title`.
+
+Two consequences of there being no layout engine in a browser are worth knowing:
+
+* **A toggle switches drawings, it does not re-flow one.** Graphviz decided
+  where every shape goes, so the page embeds one properly laid out drawing per
+  view — each layer, with and without the addresses and the VLANs — and shows
+  the one you asked for. Identical drawings are stored once, so an inventory
+  with no VLANs pays nothing for the VLAN toggle. That is also the size: expect
+  roughly 40 kB of client plus a drawing per view, or ~190 kB for the
+  three-layer example above.
+* **`--no-show-ips` and `--no-show-vlans` are a ceiling, not a starting state.**
+  Turning one off means the page holds no drawing that prints it *and* no record
+  that carries it, so a published page cannot be talked into giving up an
+  address by editing its JSON. Leaving it on means the page opens with it and
+  can turn it off.
+
+`--tooltips` is honoured as the hover card the page draws from those records;
+`--no-tooltips` leaves clicking as the way in. `--icons`, `--group-by-namespace`
+and every filter behave exactly as they do for `-f svg`, because it *is* the
+`-f svg` pipeline underneath.
+
+`netgraph watch -f html -o topology.html` keeps the file current while you edit,
+and `--serve` shows the page itself in the preview.
 
 #### The JSON export
 
@@ -1133,8 +1210,10 @@ target that no longer resolves are all statuses, not crashes.
 
 Every filter and display option of `netgraph render` applies here too —
 `--tooltips`, `--link-template` and `--element-ids` included, which is what
-makes `watch -f svg -o topology.svg` keep an interactive diagram up to date —
-plus:
+makes `watch -f svg -o topology.svg` keep an interactive diagram up to date.
+`-f html` works the same way, repeated `--layer` included, so
+`watch -f html -o topology.html --serve` gives you the whole
+[interactive page](#the-interactive-html-page), re-rendered as you type. Plus:
 
 | Option | Default | Effect |
 |---|---|---|
@@ -1601,12 +1680,16 @@ src/netgraph/
 ├── render/         graph construction and output renderers
 │   ├── graph.py    inventory -> nodes, edges, VLAN membership, subnets; filtering
 │   ├── dot.py      Graphviz DOT, and the SVG/PNG/PDF it produces
+│   ├── html.py     the self-contained interactive page (-f html)
+│   ├── fragment.py the Graphviz SVG made embeddable, for the page and the preview
+│   ├── assets/     the page's style sheet and client, and the record renderer
+│   │               netgraph web shares with it -- inlined, never fetched
 │   ├── details.py  per-element hover records, and the text a tooltip shows
 │   ├── ids.py      the stable id each drawn node, edge and cluster carries
 │   ├── links.py    --link-template: a URL back to the document behind an element
 │   ├── icons.py    icon themes: a directory of images named after element kinds
 │   ├── iconsets/   the bundled themes; one directory each, SVG and PNG
-│   ├── templates/  the Jinja2 template the DOT document is laid out by
+│   ├── templates/  the Jinja2 templates the DOT document and the page are laid out by
 │   ├── mermaid.py  Mermaid flowchart exporter
 │   ├── jsonexport.py  canonical JSON graph export
 │   └── registry.py    one entry per output format; the CLI reads it, never a list of names
@@ -1617,7 +1700,7 @@ src/netgraph/
 │   └── server.py   the loopback HTTP preview and its self-reloading page
 └── web/            the interactive interface (netgraph web)
     ├── preview.py  one parse -> validate -> render pass over a document stream
-    ├── svgdoc.py   the Graphviz SVG made safe to embed in a live page
+    ├── svgdoc.py   render/fragment.py, with the preview's answers filled in
     ├── server.py   five routes over all of it
     └── assets/     the page, its style sheet and its dependency-free client
 ```

@@ -14,8 +14,11 @@
  *   3. The canvas pans and zooms, which is CSS on a wrapper -- the SVG itself
  *      is never rewritten, so the ids the info box depends on stay put.
  *
- * Everything a record contains is inserted with textContent. The only markup
- * this file ever assigns is the SVG the server sanitised.
+ * What an info box looks like is not here: it is netgraphDetail, in
+ * netgraph/render/assets/detail.js, shared with the page `netgraph render
+ * -f html` writes. Everything a record contains is inserted with textContent
+ * there. The only markup this file ever assigns is the SVG the server
+ * sanitised.
  */
 
 (function () {
@@ -262,185 +265,20 @@
 
   /* ------------------------------------------------- info box: rendering */
 
-  function element(tag, className, text) {
-    var node = document.createElement(tag);
-    if (className) { node.className = className; }
-    if (text !== undefined && text !== null) { node.textContent = String(text); }
-    return node;
-  }
-
-  function definitions(pairs) {
-    var list = document.createElement("dl");
-    pairs.forEach(function (pair) {
-      if (pair[1] === undefined || pair[1] === null || pair[1] === "") { return; }
-      list.appendChild(element("dt", null, pair[0]));
-      list.appendChild(element("dd", null, pair[1]));
-    });
-    return list.children.length ? list : null;
-  }
-
-  function section(title, body) {
-    if (!body) { return null; }
-    var wrapper = document.createElement("section");
-    wrapper.appendChild(element("h3", null, title));
-    wrapper.appendChild(body);
-    return wrapper;
-  }
-
-  function table(headings, rows) {
-    if (!rows.length) { return null; }
-    var node = document.createElement("table");
-    var head = document.createElement("tr");
-    headings.forEach(function (heading) { head.appendChild(element("th", null, heading)); });
-    node.appendChild(head);
-    rows.forEach(function (row) {
-      var line = document.createElement("tr");
-      if (row.muted) { line.className = "off"; }
-      row.cells.forEach(function (cell) { line.appendChild(element("td", null, cell)); });
-      node.appendChild(line);
-    });
-    return node;
-  }
-
-  function tags(values) {
-    if (!values || !values.length) { return null; }
-    var wrapper = document.createElement("div");
-    values.forEach(function (value) { wrapper.appendChild(element("span", "tag", value)); });
-    return wrapper;
-  }
-
-  function join(values) {
-    return values && values.length ? values.join(", ") : "";
-  }
-
+  /* How a record is drawn is netgraphDetail's, in
+   * netgraph/render/assets/detail.js, and is shared with the self-contained
+   * page `netgraph render -f html` writes: the two front ends show the same
+   * records, and one of them quietly growing a column the other lacks is
+   * exactly the drift that file exists to prevent.
+   *
+   * The preview shows everything a record holds -- the diagram's own --show-ips
+   * and --show-vlans decide what the *picture* prints, and hiding an address
+   * from a label is a decision about legibility, not about secrecy -- so only
+   * the pin hint is passed. */
   function describe(record) {
-    return record.type === "edge" ? describeLink(record) : describeNode(record);
-  }
-
-  function heading(name, kind) {
-    var head = element("h2", null, name);
-    head.appendChild(element("span", "kind", "[" + kind + "]"));
-    var hint = element("span", "pinhint", pinned ? "click to unpin" : "click to pin");
-    head.appendChild(hint);
-    return head;
-  }
-
-  // A tunnel is the one record where the interesting facts are neither
-  // physical nor addressing: what it encapsulates, what carries it, and — the
-  // one a reader most needs — whether anything in the stack encrypts.
-  function tunnelSection(tunnel) {
-    if (!tunnel) { return null; }
-    var protection = tunnel.encrypted
-      ? "yes" + (tunnel.cipher ? " (" + tunnel.cipher + ")" : "")
-      : (tunnel.encryptedBy ? "by " + tunnel.encryptedBy : "no — cleartext");
-    return section("tunnel", definitions([
-      ["stack", tunnel.stack.join(" over ")],
-      ["carries", "layer " + tunnel.layer],
-      ["transport", tunnel.transport + (tunnel.port ? "/" + tunnel.port : "")],
-      ["mode", tunnel.mode],
-      ["vni", tunnel.vni],
-      ["encrypted", protection],
-      ["auth", tunnel.auth],
-      ["mtu", tunnel.mtu ? tunnel.mtu + " (overhead " + tunnel.overheadBytes + " B)" : ""],
-      ["over", tunnel.over]
-    ]));
-  }
-
-  function describeNode(record) {
-    var box = document.createDocumentFragment();
-    box.appendChild(heading(record.name, record.kind));
-
-    var identity = [["id", record.id]];
-    if (record.namespace) { identity.push(["namespace", record.namespace]); }
-    if (record.description) { identity.push(["description", record.description.trim()]); }
-    Object.keys(record.labels || {}).forEach(function (key) {
-      identity.push(["label " + key, record.labels[key]]);
+    return netgraphDetail.describe(record, {
+      hint: pinned ? "click to unpin" : "click to pin"
     });
-    append(box, section("element", definitions(identity)));
-
-    if (record.subnet) {
-      append(box, section("subnet", definitions([
-        ["prefix", record.subnet.prefix],
-        ["family", record.subnet.family],
-        ["addresses", join(record.subnet.addresses)],
-        ["elements", join(record.subnet.elements)]
-      ])));
-    }
-
-    append(box, tunnelSection(record.tunnel));
-
-    append(box, section("vlans", tags((record.vlans || []).map(function (id) {
-      return "vlan " + id;
-    }))));
-
-    append(box, section("interfaces", table(
-      ["interface", "type", "addresses", "vlan", "mac / mtu"],
-      (record.interfaces || []).map(function (port) {
-        return {
-          muted: port.enabled === false,
-          cells: [
-            port.name,
-            port.type,
-            join(port.addresses),
-            port.vlan ? port.vlan.mode + " " + join(port.vlan.vlans) : "",
-            [port.mac, port.mtu ? "mtu " + port.mtu : ""].filter(Boolean).join(" / ")
-          ]
-        };
-      })
-    )));
-
-    append(box, section("links", table(
-      ["via", "to", "port", "medium", "vlan"],
-      (record.links || []).map(function (link) {
-        return {
-          cells: [
-            link.interface || "—",
-            link.peer,
-            link.peerInterface || "—",
-            [link.stack || link.medium || link.kind, link.speedText].filter(Boolean).join(" "),
-            join(link.vlans)
-          ]
-        };
-      })
-    )));
-
-    if (!(record.interfaces || []).length && !(record.links || []).length) {
-      append(box, element("p", "note", "no interfaces and no links"));
-    }
-    return box;
-  }
-
-  function describeLink(record) {
-    var box = document.createDocumentFragment();
-    var ends = record.endpoints || [];
-    var name = ends.map(function (end) {
-      return end.node + (end.interface ? ":" + end.interface : "");
-    }).join("  —  ");
-    box.appendChild(heading(name, record.kind));
-
-    append(box, section("link", definitions([
-      ["id", record.id],
-      ["medium", record.medium],
-      ["speed", record.speedText],
-      ["label", record.label],
-      ["length", record.lengthM ? record.lengthM + " m" : ""],
-      ["addresses", join(record.addresses)]
-    ])));
-
-    append(box, tunnelSection(record.tunnel));
-
-    append(box, section("endpoints", table(["element", "interface"], ends.map(function (end) {
-      return { cells: [end.node, end.interface || "—"] };
-    }))));
-
-    append(box, section("vlans", tags((record.vlans || []).map(function (id) {
-      return "vlan " + id;
-    }))));
-    return box;
-  }
-
-  function append(parent, child) {
-    if (child) { parent.appendChild(child); }
   }
 
   /* --------------------------------------------------------- pan & zoom */

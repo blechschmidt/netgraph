@@ -125,10 +125,12 @@ from netgraph.render import (
     icon_theme,
     is_binary_format,
     render,
+    render_layers,
     resolve_tunnels,
     supports_highlight,
     supports_icons,
     supports_interaction,
+    supports_layers,
     theme_choices,
 )
 from netgraph.render.dot import DOT_EXECUTABLE
@@ -818,15 +820,23 @@ _DISPLAY_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
 #: Which view of the network to draw. ``path`` does not take it: the layer a
 #: trace is answered at is decided by where the path was *found*, and letting a
 #: flag contradict that would draw a diagram the report disagrees with.
+#:
+#: Repeatable, because one output format has somewhere to put a second layer: an
+#: HTML page draws each of them and puts a switcher over the set. Every other
+#: format holds one view of the network, and asking for two is a usage error
+#: rather than a file with two diagrams glued together.
 _LAYER_OPTION: Final[Callable[[Any], Any]] = click.option(
     "--layer",
+    "layers",
+    multiple=True,
     type=click.Choice([layer.value for layer in Layer]),
-    default=Layer.L1.value,
+    default=(Layer.L1.value,),
     show_default=True,
     shell_complete=complete_layer,
     help=(
         "l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets "
-        "and the elements addressed in them."
+        "and the elements addressed in them. Repeatable for -f html, which draws each layer "
+        "and puts a switcher over them."
     ),
 )
 
@@ -884,6 +894,24 @@ def _filter_spec(params: Mapping[str, Any]) -> FilterSpec:
         neighbors_of=params["neighbors_of"],
         depth=params["depth"],
     )
+
+
+def _layers(params: Mapping[str, Any], output_format: str) -> tuple[Layer, ...]:
+    """The layers to draw, in the order they were asked for, without repeats.
+
+    Raises:
+        click.UsageError: More than one layer was asked for in a format that
+            holds a single view of the network.
+    """
+    chosen = tuple(dict.fromkeys(Layer(value) for value in params["layers"])) or (Layer.L1,)
+    if len(chosen) > 1 and not supports_layers(output_format):
+        holds = ", ".join(name for name in FORMATS if supports_layers(name))
+        raise click.UsageError(
+            f"--layer was given {len(chosen)} times, but {output_format} output holds one "
+            f"layer; render each one to its own file, or use a format that holds several "
+            f"({holds})"
+        )
+    return chosen
 
 
 def _describe_formats() -> str:
@@ -969,22 +997,28 @@ def render_command(
     elif findings:
         _report_problems(console, (), findings)
 
-    layer, spec = Layer(params["layer"]), _filter_spec(params)
-    graph = _build_graph(app, inventory, layer=layer, spec=spec)
-    for problem in graph.dangling:
-        console.warn(f"dropped from the graph: {problem}")
-    if graph.is_empty:
-        console.warn(_empty_graph_reason(layer, spec))
-    _report_advisories(console, output_format, nodes=len(graph.nodes), edges=len(graph.edges))
+    layers, spec = _layers(params, output_format), _filter_spec(params)
+    graphs: list[Graph] = []
+    for layer in layers:
+        graph = _build_graph(app, inventory, layer=layer, spec=spec)
+        where = f" at layer {layer}" if len(layers) > 1 else ""
+        for problem in graph.dangling:
+            console.warn(f"dropped from the graph{where}: {problem}")
+        if graph.is_empty:
+            console.warn(_empty_graph_reason(layer, spec))
+        _report_advisories(console, output_format, nodes=len(graph.nodes), edges=len(graph.edges))
+        graphs.append(graph)
 
     options = _render_options(params)
     _report_icon_support(console, output_format, options)
     _report_interaction_support(ctx, console, output_format, options)
-    payload = render(graph, output_format, options)
+    payload = render_layers(graphs, output_format, options)
     _write_output(console, payload, output=output, output_format=output_format)
+    drawn = ", ".join(str(layer) for layer in layers)
     console.info(
-        f"rendered {len(graph.nodes)} node(s) and {len(graph.edges)} edge(s) "
-        f"as {output_format}" + (f" to {output}" if output is not None else "")
+        f"rendered {sum(len(graph.nodes) for graph in graphs)} node(s) and "
+        f"{sum(len(graph.edges) for graph in graphs)} edge(s) as {output_format} "
+        f"at layer {drawn}" + (f" to {output}" if output is not None else "")
     )
 
 
@@ -1451,7 +1485,7 @@ def watch_command(
     request = RenderRequest(
         inventory=app.inventory,
         output_format=output_format,
-        layer=Layer(params["layer"]),
+        layers=_layers(params, output_format),
         spec=_filter_spec(params),
         options=options,
         strict=bool(params["strict"]),

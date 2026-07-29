@@ -216,15 +216,26 @@ class LocalHandler(BaseHTTPRequestHandler):
         *,
         body: bool = True,
         headers: dict[str, str] | None = None,
+        csp: str | None = None,
     ) -> None:
-        """Send one complete response, with the fixed security headers."""
+        """Send one complete response, with the fixed security headers.
+
+        Args:
+            csp: Content-Security-Policy for this response, replacing the
+                server's. One response in one front end needs it — the
+                self-contained page ``netgraph watch -f html`` renders, which
+                carries a policy of its own that the server's would contradict
+                (:data:`~netgraph.render.registry.PAGE_CSP`) — and it is a
+                per-response decision rather than a per-server one because the
+                page *around* it keeps the strict default.
+        """
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(payload)))
         self.send_header("Cache-Control", "no-store, max-age=0")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "no-referrer")
-        self.send_header("Content-Security-Policy", self.content_security_policy)
+        self.send_header("Content-Security-Policy", csp or self.content_security_policy)
         for name, value in (headers or {}).items():
             self.send_header(name, value)
         self.end_headers()

@@ -70,19 +70,34 @@ MAX_SOURCE_BYTES: Final = 1_000_000
 ASSETS: Final[dict[str, tuple[str, str]]] = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
+    "/detail.js": ("detail.js", "text/javascript; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
 }
+
+#: Where an asset is looked for, in order. ``detail.js`` — how one detail record
+#: is drawn — lives with the renderer because the self-contained page
+#: ``netgraph render -f html`` writes inlines the same file; serving it from
+#: there is what keeps the preview and that page showing one thing rather than
+#: two that drift.
+_ASSET_ROOTS: Final[tuple[tuple[str, str], ...]] = (
+    ("netgraph.web", "assets"),
+    ("netgraph.render", "assets"),
+)
 
 
 @cache
 def asset(name: str) -> bytes:
-    """Read one of the files in ``netgraph/web/assets``.
+    """Read one of the page's static files.
 
     Cached, because the page is static: the process reads each file once and
     answers from memory afterwards. The name comes from :data:`ASSETS` and
     never from a request, so no path a client sends can reach this.
     """
-    return (resources.files("netgraph.web") / "assets" / name).read_bytes()
+    for package, directory in _ASSET_ROOTS:
+        resource = resources.files(package) / directory / name
+        if resource.is_file():
+            return resource.read_bytes()
+    raise FileNotFoundError(name)  # pragma: no cover - the name comes from ASSETS
 
 
 class _Handler(LocalHandler):

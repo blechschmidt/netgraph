@@ -174,7 +174,7 @@ def test_render_options_reach_the_renderer() -> None:
         RenderRequest(
             inventory=HOME_LAB,
             output_format="dot",
-            layer=Layer.L2,
+            layers=(Layer.L2,),
             options=RenderOptions(title="a caption", show_ips=False),
         )
     )
@@ -587,6 +587,8 @@ def test_every_registered_format_can_be_previewed(output_format: str) -> None:
             "svg": b"<img",
             "png": b"<img",
             "pdf": b"<object",
+            # A page is a document the browser renders, not source to print.
+            "html": b"<object",
         }[output_format]
         assert expected in page
 

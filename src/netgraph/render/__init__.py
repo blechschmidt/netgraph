@@ -19,8 +19,10 @@ listed a second time — see that module for how a backend is added.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Final
 
+from netgraph.errors import RenderError
 from netgraph.render.details import (
     DETAIL_OPTIONS,
     build_details,
@@ -51,6 +53,7 @@ from netgraph.render.graph import (
     resolve_tunnels,
 )
 from netgraph.render.highlight import Highlight
+from netgraph.render.html import PAGE_KIND, html_document, render_html, to_html
 from netgraph.render.icons import (
     BUNDLED_THEMES,
     ICON_KINDS,
@@ -69,13 +72,16 @@ from netgraph.render.mermaid import (
 )
 from netgraph.render.options import RenderOptions
 from netgraph.render.registry import (
+    PAGE_CSP,
     RENDERERS,
     Renderer,
+    content_security_policy_for,
     media_type_for,
     renderer_for,
     supports_highlight,
     supports_icons,
     supports_interaction,
+    supports_layers,
 )
 
 __all__ = [
@@ -87,6 +93,8 @@ __all__ = [
     "IMAGE_FORMATS",
     "LINK_FIELDS",
     "MERMAID_MAX_EDGES",
+    "PAGE_CSP",
+    "PAGE_KIND",
     "RENDERERS",
     "SUBNET_ID_PREFIX",
     "SUBNET_KIND",
@@ -114,10 +122,12 @@ __all__ = [
     "advisories_for",
     "build_details",
     "build_graph",
+    "content_security_policy_for",
     "detail_text",
     "element_ids",
     "filter_graph",
     "graph_to_dict",
+    "html_document",
     "icon_theme",
     "is_binary_format",
     "is_routable_address",
@@ -126,8 +136,10 @@ __all__ = [
     "namespace_text",
     "render",
     "render_dot",
+    "render_html",
     "render_image",
     "render_json",
+    "render_layers",
     "render_mermaid",
     "render_text",
     "renderer_for",
@@ -136,8 +148,10 @@ __all__ = [
     "supports_highlight",
     "supports_icons",
     "supports_interaction",
+    "supports_layers",
     "theme_choices",
     "to_dot",
+    "to_html",
     "to_image",
     "to_json",
     "to_mermaid",
@@ -198,3 +212,23 @@ def render(graph: Graph, format: str, options: RenderOptions | None = None) -> b
         RenderError: ``format`` is unknown, or Graphviz is needed and missing.
     """
     return renderer_for(format).bytes(graph, options)
+
+
+def render_layers(
+    graphs: Sequence[Graph], format: str, options: RenderOptions | None = None
+) -> bytes:
+    """Render one output holding ``graphs``, one per layer.
+
+    One graph is exactly :func:`render`, whatever the format; several need a
+    format with somewhere to put them, which is what
+    :func:`~netgraph.render.registry.supports_layers` answers and ``html`` is.
+
+    Raises:
+        RenderError: ``graphs`` is empty, ``format`` is unknown or holds one
+            layer only, or Graphviz is needed and missing.
+    """
+    if not graphs:
+        raise RenderError("nothing to render: no layer was selected")
+    if len(graphs) == 1:
+        return render(graphs[0], format, options)
+    return renderer_for(format).document(graphs, options)

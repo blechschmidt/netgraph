@@ -41,6 +41,7 @@ from netgraph.render import (
     render_text,
     supports_interaction,
     to_dot,
+    to_html,
     to_image,
 )
 from netgraph.render.details import MAX_DETAIL_LENGTH
@@ -675,3 +676,134 @@ def test_graphviz_renders_a_hostile_tooltip_as_text_rather_than_markup(tmp_path:
     assert any(href.startswith("https://git.invalid/") for href in hrefs)
     for href in hrefs:
         assert '"' not in href and "<" not in href and " " not in href
+
+
+# --------------------------------------------------------------------------- #
+# Hostile content, in the HTML page
+# --------------------------------------------------------------------------- #
+#
+# A fourth layer, and the one with the most ways to go wrong: an HTML document
+# has an element context, an attribute context, a ``<style>`` context and a
+# ``<script>`` context, and the last two end at a literal ``</script>`` or
+# ``</style>`` whatever the JSON or the CSS around them says.
+
+
+def _hostile_inventory(root: Path) -> Inventory:
+    """An inventory whose *description* is hostile, written as YAML would carry it.
+
+    The name is dealt with by ``_hostile_graph`` below the loader; a description
+    is free text the schema accepts, so it can be written into a document and
+    take the whole loader with it — which is the path a real inventory would
+    take.
+    """
+    import yaml
+
+    document = {
+        "apiVersion": "netgraph.dev/v1alpha1",
+        "kind": "computer",
+        "metadata": {"name": "pc-a", "description": HOSTILE_TEXT},
+        "spec": {"interfaces": [{"name": "eth0", "type": "ethernet", "ipv4": ["10.0.0.1/24"]}]},
+    }
+    (root / "inv.yaml").write_text(
+        yaml.safe_dump(document, allow_unicode=True)
+        + "---\n"
+        + "apiVersion: netgraph.dev/v1alpha1\n"
+        "kind: computer\n"
+        "metadata: {name: pc-b}\n"
+        "spec: {interfaces: [{name: eth0, type: ethernet, ipv4: [10.0.0.2/24]}]}\n"
+        "---\n"
+        "apiVersion: netgraph.dev/v1alpha1\n"
+        "kind: cable\n"
+        "metadata: {name: cbl}\n"
+        "spec: {endpoints: [pc-a:eth0, pc-b:eth0], medium: copper, label: plain}\n",
+        encoding="utf-8",
+    )
+    inventory = load_tree(root)
+    assert not inventory.errors, inventory.errors
+    return inventory
+
+
+def _elements(source: str) -> tuple[list[str], list[tuple[str, str, str | None]]]:
+    """Every element and attribute of ``source``, as a browser's parser sees them."""
+    from html.parser import HTMLParser
+
+    class _Reader(HTMLParser):
+        def __init__(self) -> None:
+            super().__init__(convert_charrefs=True)
+            self.tags: list[str] = []
+            self.attributes: list[tuple[str, str, str | None]] = []
+
+        def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+            self.tags.append(tag)
+            self.attributes.extend((tag, name, value) for name, value in attrs)
+
+        handle_startendtag = handle_starttag
+
+    reader = _Reader()
+    reader.feed(source)
+    return reader.tags, reader.attributes
+
+
+@requires_dot
+def test_a_hostile_name_cannot_add_an_element_to_the_html_page(tmp_path: Path) -> None:
+    """Layer four: the page, parsed as the HTML it claims to be."""
+    page = to_html(
+        _hostile_graph(tmp_path),
+        RenderOptions(
+            title=HOSTILE_TEXT, link_template=LinkTemplate.parse("https://x.invalid/{name}")
+        ),
+    )
+    tags, attributes = _elements(page)
+
+    # The hostile text holds ``<script>`` and ``</TABLE>>``; the document holds
+    # exactly the elements this renderer wrote.
+    assert tags.count("script") == 2, "the client and the records, and nothing else"
+    assert tags.count("style") == 1
+    assert not {"iframe", "object", "embed", "img", "form", "base"} & set(tags)
+    # No attribute anywhere can run anything.
+    assert not [name for _, name, _ in attributes if name.startswith("on")]
+    # The ``</script>`` in the name never appears as one: two elements, two
+    # closing tags, and the copies inside the JSON are \u-escaped.
+    assert page.count("</script>") == 2
+    assert page.count("</style>") == 1
+
+
+@requires_dot
+def test_a_hostile_description_stays_inside_the_record_block(tmp_path: Path) -> None:
+    """``</script>`` in a description ends the data block, unless it is escaped."""
+    import json
+
+    inventory = _hostile_inventory(tmp_path)
+    page = to_html(build_graph(inventory), RenderOptions())
+
+    raw = re.search(r'<script id="netgraph-data"[^>]*>(.*?)</script>', page, re.S)
+    assert raw is not None
+    assert "</script>" not in raw.group(1)
+    assert "\\u003c/script\\u003e" in raw.group(1)
+
+    # …and JSON.parse gives the reader's page the characters back, unchanged
+    # but for what cannot be printed at all.
+    records = json.loads(raw.group(1))["layers"][0]["elements"]
+    descriptions = [
+        record.get("description") for record in records.values() if record.get("description")
+    ]
+    assert descriptions, "the description reaches the records"
+    for description in descriptions:
+        assert '<script>alert("x")</script>' in description
+        assert "‮" not in description and "" not in description
+        assert "\U0001f4a3" in description
+
+
+@requires_dot
+def test_a_hostile_name_cannot_reach_an_id_or_a_link_in_the_page(tmp_path: Path) -> None:
+    page = to_html(
+        _hostile_graph(tmp_path),
+        RenderOptions(link_template=LinkTemplate.parse("https://git.invalid/{name}")),
+    )
+    _, attributes = _elements(page)
+    for tag, name, value in attributes:
+        if name == "id" and tag in ("g", "svg", "a", "polygon", "text", "path"):
+            assert re.fullmatch(r"v\d+-[A-Za-z0-9_.-]+", value or ""), value
+        if name in ("href", "xlink:href") and tag == "a":
+            assert (value or "").startswith("https://git.invalid/")
+            assert '"' not in (value or "") and "<" not in (value or "")

@@ -1,0 +1,349 @@
+/* The self-contained page `netgraph render -f html` writes.
+ *
+ * Inlined into the document at render time, so every rule here costs bytes in
+ * every published diagram: this is deliberately small, and it borrows the
+ * palette and the type of the web preview's style sheet so that the two look
+ * like one tool.
+ *
+ * Nothing here loads anything. No @import, no url() to a file, no web font --
+ * a page that fetched so much as a stylesheet would stop being something you
+ * can email, and the strict Content-Security-Policy in the document's own
+ * <meta> would refuse it anyway.
+ */
+
+:root {
+  color-scheme: light dark;
+  --edge: rgba(128, 128, 128, .35);
+  --accent: #0969da;
+  --warning: #9a6700;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --panel: 24rem;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
+
+body {
+  display: flex;
+  flex-direction: column;
+  font: 13px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: Canvas;
+  color: CanvasText;
+  overflow: hidden;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------- header */
+
+header {
+  display: flex;
+  gap: .6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: .45rem .7rem;
+  border-bottom: 1px solid var(--edge);
+}
+
+header h1 {
+  font: 600 14px/1.3 var(--mono);
+  margin: 0;
+  letter-spacing: .02em;
+  overflow-wrap: anywhere;
+}
+
+.counts { font-family: var(--mono); font-size: 12px; opacity: .7; }
+.spacer { flex: 1 1 auto; }
+
+.field, .check {
+  display: inline-flex;
+  gap: .35rem;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 12px;
+  opacity: .9;
+}
+
+select, input, button {
+  font: inherit;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: inherit;
+  background: Canvas;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  padding: .22rem .4rem;
+}
+
+input[type="search"] { min-width: 12rem; }
+button { cursor: pointer; }
+button:hover { border-color: currentColor; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* ------------------------------------------------------------------ body */
+
+main {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+
+.stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  cursor: grab;
+  /* Pointer events do the panning and the pinch-zoom, so the browser must not
+   * also scroll the page out from under them. */
+  touch-action: none;
+  background:
+    radial-gradient(circle at 1px 1px, var(--edge) 1px, transparent 0) 0 0 / 22px 22px;
+}
+
+.stage.panning { cursor: grabbing; }
+
+.viewport {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+.view { position: absolute; inset: 0; }
+.view[hidden] { display: none; }
+
+.view svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The hit area of a node is its shape; of an edge, its stroke -- which is a
+ * couple of pixels wide, so the pointer needs help finding it. */
+.view svg g.edge path { stroke-linecap: round; }
+.view svg g.edge { pointer-events: visibleStroke; }
+.view svg g.node, .view svg g.edge { cursor: pointer; }
+/* A --link-template anchor is a link in a picture the page itself navigates by
+ * clicking, so a plain click selects and only a modified one follows it; the
+ * pointer must not promise otherwise. */
+.view svg a { cursor: inherit; }
+
+.view svg g.ng-dim { opacity: .16; }
+.view svg g.ng-match > * { stroke-width: 2.2; }
+.view svg g.ng-match { filter: drop-shadow(0 0 2px currentColor); }
+.view svg g.ng-selected > * { stroke-width: 3; }
+.view svg g.ng-selected { filter: drop-shadow(0 0 4px var(--accent)); }
+
+.hint {
+  position: absolute;
+  left: 50%;
+  bottom: .6rem;
+  transform: translateX(-50%);
+  padding: .2rem .5rem;
+  border-radius: 999px;
+  border: 1px solid var(--edge);
+  background: Canvas;
+  font: 11px/1.5 var(--mono);
+  opacity: .7;
+  pointer-events: none;
+}
+
+/* ----------------------------------------------------------------- panel */
+
+.panel {
+  flex: 0 0 var(--panel);
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--edge);
+  overflow: auto;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.panel-head {
+  display: flex;
+  gap: .5rem;
+  align-items: baseline;
+  padding: .35rem .7rem;
+  border-bottom: 1px solid var(--edge);
+  font: 600 11px/1.6 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  opacity: .8;
+}
+
+.panel-head button { padding: 0 .3rem; border-color: transparent; opacity: .8; }
+
+.panel-head .hint-count {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  opacity: .7;
+}
+
+.results { list-style: none; margin: 0; padding: .2rem 0; border-bottom: 1px solid var(--edge); }
+.results li { margin: 0; }
+
+.results button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  padding: .2rem .7rem;
+  background: transparent;
+}
+
+.results button:hover, .results button:focus-visible {
+  background: color-mix(in srgb, CanvasText 8%, transparent);
+}
+
+.results .kind { opacity: .55; }
+.results button[aria-current="true"] { color: var(--accent); font-weight: 700; }
+
+.detail { padding: .55rem .7rem .9rem; }
+.empty { opacity: .55; margin: 0; padding: .6rem .7rem; }
+
+/* ------------------------------------------- one record, drawn (detail.js) */
+
+.detail h2, .card h2 {
+  font: 600 13px/1.35 var(--mono);
+  margin: 0;
+  display: flex;
+  gap: .4rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+  overflow-wrap: anywhere;
+}
+
+.detail h2 .kind, .card h2 .kind { font-weight: 400; opacity: .65; }
+
+/* A table may be wider than the panel and scroll: breaking "ethernet" across
+ * two lines to save a few pixels costs more than the scrollbar does. */
+.detail section, .card section { margin-top: .5rem; overflow-x: auto; }
+
+.detail h3, .card h3 {
+  font: 600 10px/1.6 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  opacity: .6;
+  margin: 0 0 .15rem;
+}
+
+.detail dl, .card dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: .05rem .6rem;
+  margin: 0;
+}
+
+.detail dt, .card dt { opacity: .6; }
+.detail dd, .card dd { margin: 0; overflow-wrap: anywhere; }
+
+.detail table, .card table { border-collapse: collapse; width: 100%; }
+
+.detail th, .card th {
+  text-align: left;
+  font: 600 10px/1.6 var(--mono);
+  opacity: .55;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding-right: .6rem;
+}
+
+.detail td, .card td {
+  vertical-align: top;
+  padding: .05rem .6rem .05rem 0;
+  white-space: nowrap;
+}
+
+.detail tr.off td, .card tr.off td { opacity: .5; text-decoration: line-through solid; }
+
+.detail .tag, .card .tag {
+  display: inline-block;
+  padding: 0 .3rem;
+  margin-right: .2rem;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  font-size: 11px;
+}
+
+.detail .note, .card .note { opacity: .65; }
+.detail .source { display: block; margin-top: .6rem; color: var(--accent); }
+
+/* ------------------------------------------------------------- hover card */
+
+.card {
+  position: fixed;
+  z-index: 10;
+  max-width: min(30rem, 46vw);
+  max-height: 60vh;
+  overflow: hidden;
+  padding: .5rem .65rem .6rem;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: Canvas;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .28);
+  font-family: var(--mono);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+/* --------------------------------------------------------------- keys box */
+
+.keys {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 11;
+  padding: .5rem .7rem;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: Canvas;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .28);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.keys dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: .1rem .7rem;
+  margin: 0;
+}
+
+.keys dt { opacity: .6; }
+.keys dd { margin: 0; }
+
+/* ------------------------------------------------------------ small, print */
+
+@media (max-width: 760px) {
+  main { flex-direction: column; }
+  .panel { flex: 0 0 45%; border-left: 0; border-top: 1px solid var(--edge); }
+  .hint { display: none; }
+}
+
+@media print {
+  body { overflow: visible; height: auto; }
+  header, .panel, .card, .keys, .hint { display: none; }
+  .stage { overflow: visible; background: none; }
+  .viewport { position: static; transform: none !important; }
+  .view { position: static; }
+  .view svg { height: auto; }
+  .view svg g.ng-dim { opacity: 1; }
+}

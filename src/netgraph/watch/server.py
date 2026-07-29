@@ -38,7 +38,12 @@ from netgraph.httpserve import (
     describe_exposure,
     is_loopback,
 )
-from netgraph.render import RENDERERS, media_type_for, suffix_for
+from netgraph.render import (
+    RENDERERS,
+    content_security_policy_for,
+    media_type_for,
+    suffix_for,
+)
 from netgraph.watch.pipeline import LiveRender, Snapshot
 
 __all__ = [
@@ -64,9 +69,13 @@ _STYLE_PATH: Final = "/watch.css"
 _POLL_INTERVAL_MS: Final = 1_000
 
 #: Formats shown as text in a ``<pre>`` rather than as an image. Taken from the
-#: renderer registry, so a text backend added later needs no change here.
+#: renderer registry, so a text backend added later needs no change here. HTML
+#: is text on the wire and a *document* to a browser: printing its source would
+#: show the reader the page instead of showing them the diagram.
 _TEXTUAL: Final[frozenset[str]] = frozenset(
-    name for name, renderer in RENDERERS.items() if renderer.is_text
+    name
+    for name, renderer in RENDERERS.items()
+    if renderer.is_text and not renderer.media_type.startswith("text/html")
 )
 
 # --------------------------------------------------------------------------- #
@@ -279,9 +288,17 @@ class _Handler(LocalHandler):
             self.send_text(HTTPStatus.SERVICE_UNAVAILABLE, "nothing has rendered yet", body=body)
             return
         # An unregistered format is served as a download, so that a browser
-        # cannot be talked into interpreting it as something else.
+        # cannot be talked into interpreting it as something else. A format
+        # that carries a policy of its own — the self-contained HTML page — is
+        # served under it rather than under the preview's, which is written for
+        # the preview's own page and would refuse both the page's inline blocks
+        # and the embedding it is here for.
         self.send_payload(
-            HTTPStatus.OK, snapshot.payload, media_type_for(self.output_format), body=body
+            HTTPStatus.OK,
+            snapshot.payload,
+            media_type_for(self.output_format),
+            body=body,
+            csp=content_security_policy_for(self.output_format),
         )
 
 

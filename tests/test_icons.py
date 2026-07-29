@@ -397,5 +397,6 @@ def test_the_same_warning_without_icons_is_left_alone(
 
 def test_only_the_graphviz_formats_claim_to_draw_icons() -> None:
     drawn = {name for name in FORMATS if supports_icons(name)}
-    assert drawn == {"dot", "svg", "png", "pdf"}
+    # ``html`` embeds an SVG Graphviz laid out, so it inherits the icons with it.
+    assert drawn == {"dot", "svg", "html", "png", "pdf"}
     assert not supports_icons("no-such-format")

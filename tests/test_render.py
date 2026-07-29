@@ -1426,7 +1426,7 @@ def test_the_format_lists_are_derived_from_the_registry() -> None:
     """One source of truth: nothing enumerates formats a second time."""
     assert tuple(RENDERERS) == FORMATS
     assert tuple(name for name, r in RENDERERS.items() if r.is_text) == TEXT_FORMATS
-    assert set(TEXT_FORMATS) == {"dot", "mermaid", "json"}
+    assert set(TEXT_FORMATS) == {"dot", "html", "mermaid", "json"}
 
 
 @pytest.mark.parametrize("output_format", FORMATS)
@@ -1477,7 +1477,7 @@ def test_renderer_for_refuses_an_unknown_format() -> None:
 def test_an_image_format_has_no_text_form(home_lab: Inventory) -> None:
     with pytest.raises(RenderError, match="not a text format") as caught:
         renderer_for("pdf").text(build_graph(home_lab))
-    assert "dot, mermaid, json" in str(caught.value)
+    assert "dot, html, mermaid, json" in str(caught.value)
 
 
 def test_an_unknown_format_is_served_as_a_download() -> None:
