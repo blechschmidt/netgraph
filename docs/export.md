@@ -609,8 +609,7 @@ inventory = load_tree(Path("inventory"))
 spec = FilterSpec(namespaces=("sites/north",))
 exporter = EXPORTERS["dns-zone"]
 graphs = {
-    layer: filter_graph(build_graph(inventory, layer=layer), spec)
-    for layer in exporter.layers
+    layer: filter_graph(build_graph(inventory, layer=layer), spec) for layer in exporter.layers
 }
 
 result = export(
