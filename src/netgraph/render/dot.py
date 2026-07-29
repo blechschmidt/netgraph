@@ -89,7 +89,7 @@ from typing import Final
 from jinja2 import Environment, PackageLoader, StrictUndefined
 from markupsafe import Markup
 
-from netgraph.errors import RenderError, clip_text
+from netgraph.errors import RenderError, clip_text, compact_ids
 from netgraph.loader.inventory import namespace_of
 from netgraph.render.details import (
     build_details,
@@ -108,6 +108,7 @@ from netgraph.render.graph import (
     Node,
     TunnelView,
 )
+from netgraph.render.highlight import Highlight
 from netgraph.render.icons import IconTheme, suffix_order
 from netgraph.render.ids import ElementIds, element_ids
 from netgraph.render.links import LinkTemplate
@@ -190,6 +191,28 @@ _CLEARTEXT_TUNNEL_STYLE: Final[tuple[str, str]] = ("#be123c", "dashed")
 #: another. Dotted and violet: the vocabulary of the tunnel it belongs to,
 #: with a line weight that keeps it behind the tunnels themselves.
 _ENCAPSULATION_STYLE: Final[tuple[str, str]] = ("#8b5cf6", "dotted")
+
+#: Outline and text colour of something a :class:`~netgraph.render.highlight.Highlight`
+#: emphasises. Crimson is the one accent no element kind and no medium already
+#: uses, so "on the traced path" cannot be misread as "fibre" or "cleartext
+#: tunnel"; the kind's own fill is kept, so a highlighted switch is still
+#: visibly a switch.
+_HIGHLIGHT_STROKE: Final = "#b91c1c"
+#: Pen width of a highlighted node outline or link. Wide enough to find on a
+#: page of forty devices without swamping the ``penwidth`` steps that encode
+#: link rate — a highlighted 1G link and a highlighted 100G link are both simply
+#: "on the path".
+_HIGHLIGHT_PENWIDTH: Final = "3.0"
+
+#: Fill, outline and text of everything a highlight leaves out. Light enough to
+#: read as background at a glance, dark enough that the labels are still legible
+#: when a reader goes looking for where the path *could* have gone.
+_DIM_FILL: Final = "#fafafa"
+_DIM_STROKE: Final = "#d4d4d8"
+_DIM_TEXT: Final = "#a1a1aa"
+#: Pen width of a dimmed link — the thinnest step, below every rate threshold,
+#: so the rate encoding never makes an off-path link louder than an on-path one.
+_DIM_PENWIDTH: Final = "0.7"
 
 #: Pen width per link rate, widest threshold first. A reader should be able to
 #: rank two links by rate without reading either label, which needs the steps to
@@ -279,6 +302,11 @@ class _NodeView:
     element_id: str | None = None
     #: ``URL`` attribute to emit; see :mod:`netgraph.render.links`.
     url: str | None = None
+    #: Outline width, and the colour of every label the node's HTML table does
+    #: not colour itself. Both are ``None`` unless a highlight is in force, so a
+    #: rendering without one is byte-identical to what it always was.
+    penwidth: str | None = None
+    fontcolor: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -294,6 +322,9 @@ class _EdgeView:
     element_id: str | None = None
     #: ``URL`` attribute to emit; see :mod:`netgraph.render.links`.
     url: str | None = None
+    #: Label colour; set only under a highlight, for the same reason as
+    #: :attr:`_NodeView.fontcolor`.
+    fontcolor: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -641,6 +672,9 @@ def _node_views(
 ) -> Iterator[_NodeView]:
     for node in nodes:
         shape, fill, stroke = _NODE_STYLE.get(node.kind, _DEFAULT_NODE_STYLE)
+        emphasis = _node_emphasis(node, options.highlight)
+        if emphasis is not None:
+            fill, stroke = emphasis.fill or fill, emphasis.stroke
         image = icons.get(node.kind)
         element = identity.node(node.fqn)
         record = details.get(element) if element is not None else None
@@ -663,7 +697,44 @@ def _node_views(
             image=image,
             element_id=element if options.element_ids else None,
             url=_node_url(graph, node, options.link_template),
+            penwidth=emphasis.penwidth if emphasis is not None else None,
+            fontcolor=emphasis.fontcolor if emphasis is not None else None,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class _Emphasis:
+    """How loudly to draw one node or link under a highlight."""
+
+    stroke: str
+    penwidth: str
+    #: Replacement fill for a dimmed node; ``None`` keeps the kind's own colour,
+    #: which is what an emphasised node wants — the reader should still be able
+    #: to tell a router from a switch on the traced path.
+    fill: str | None = None
+    fontcolor: str | None = None
+
+
+#: The two ways a highlight can draw something. Shared by nodes and links so the
+#: emphasised palette cannot drift between them.
+_EMPHASISED: Final = _Emphasis(stroke=_HIGHLIGHT_STROKE, penwidth=_HIGHLIGHT_PENWIDTH)
+_DIMMED: Final = _Emphasis(
+    stroke=_DIM_STROKE, penwidth=_DIM_PENWIDTH, fill=_DIM_FILL, fontcolor=_DIM_TEXT
+)
+
+
+def _node_emphasis(node: Node, highlight: Highlight | None) -> _Emphasis | None:
+    """How to draw ``node``, or ``None`` when no highlight is in force."""
+    if highlight is None:
+        return None
+    return _EMPHASISED if highlight.has_node(node.fqn) else _DIMMED
+
+
+def _edge_emphasis(edge: Edge, highlight: Highlight | None) -> _Emphasis | None:
+    """How to draw ``edge``, or ``None`` when no highlight is in force."""
+    if highlight is None:
+        return None
+    return _EMPHASISED if highlight.has_edge(edge.id) else _DIMMED
 
 
 def _node_url(graph: Graph, node: Node, template: LinkTemplate | None) -> str | None:
@@ -726,7 +797,7 @@ def _node_rows(node: Node, options: RenderOptions, layer: Layer) -> tuple[_Row, 
     """
     if node.subnet is not None:
         if options.show_vlans and node.vlans:
-            return (_Row(port=f"vlan {_compact_ids(node.vlans)}", spans=True),)
+            return (_Row(port=f"vlan {compact_ids(node.vlans)}", spans=True),)
         return ()
 
     if node.tunnel is not None:
@@ -744,7 +815,7 @@ def _node_rows(node: Node, options: RenderOptions, layer: Layer) -> tuple[_Row, 
             if with_addresses
             else ""
         )
-        vlans = f"vlan {_compact_ids(port.vlans)}" if options.show_vlans and port.vlans else ""
+        vlans = f"vlan {compact_ids(port.vlans)}" if options.show_vlans and port.vlans else ""
         if not addresses and not vlans:
             continue
         rows.append(_Row(port=_inline(port.name), addresses=addresses, vlans=vlans))
@@ -783,18 +854,27 @@ def _edge_views(
                 if edge.tunnel is None or edge.tunnel.protected
                 else _CLEARTEXT_TUNNEL_STYLE
             )
+        emphasis = _edge_emphasis(edge, options.highlight)
+        if emphasis is not None:
+            colour = emphasis.stroke
         element = identity.edge(index)
         record = details.get(element) if element is not None else None
         yield _EdgeView(
             source=edge.source,
             target=edge.target,
             color=colour,
+            # The medium keeps its line style even when the link is dimmed: a
+            # highlight says which links the answer runs over, not what they are.
             style=style,
-            penwidth=_penwidth(edge.speed),
+            # Under a highlight the width says "on the path" instead of "this
+            # fast", because a reader looking at a traced route is asking the
+            # first question; the rate is still on the label and in the tooltip.
+            penwidth=emphasis.penwidth if emphasis is not None else _penwidth(edge.speed),
             label=_edge_label(edge, graph.layer, options) or None,
             tooltip=detail_text(record) if record is not None else None,
             element_id=element if options.element_ids else None,
             url=_edge_url(graph, edge, options.link_template),
+            fontcolor=emphasis.fontcolor if emphasis is not None else None,
         )
 
 
@@ -860,19 +940,19 @@ def _edge_label(edge: Edge, layer: Layer, options: RenderOptions) -> str:
     if edge.kind is EdgeKind.TUNNEL and edge.tunnel is not None:
         parts.extend(_tunnel_label(edge.tunnel))
         if layer is Layer.L2 and options.show_vlans and edge.vlans:
-            parts.append(f"vlan {_compact_ids(edge.vlans)}")
+            parts.append(f"vlan {compact_ids(edge.vlans)}")
         return "\n".join(parts)
 
     if edge.kind is EdgeKind.SUBNET:
         if options.show_ips and edge.addresses:
             parts.extend(_address_lines(edge.addresses, options.max_addresses))
         if options.show_vlans and edge.vlans:
-            parts.append(f"vlan {_compact_ids(edge.vlans)}")
+            parts.append(f"vlan {compact_ids(edge.vlans)}")
         return "\n".join(parts)
 
     if layer is Layer.L2:
         if options.show_vlans and edge.vlans:
-            parts.append(f"vlan {_compact_ids(edge.vlans)}")
+            parts.append(f"vlan {compact_ids(edge.vlans)}")
         elif edge.kind is EdgeKind.ATTACHMENT and edge.label:
             parts.append(edge.label)
         return "\n".join(parts)
@@ -885,7 +965,7 @@ def _edge_label(edge: Edge, layer: Layer, options: RenderOptions) -> str:
     if speed:
         parts.append(speed)
     if options.show_vlans and edge.vlans and edge.kind is EdgeKind.CABLE:
-        parts.append(f"vlan {_compact_ids(edge.vlans)}")
+        parts.append(f"vlan {compact_ids(edge.vlans)}")
     return "\n".join(parts)
 
 
@@ -937,20 +1017,6 @@ def _address_lines(addresses: Sequence[str], limit: int) -> list[str]:
         return list(addresses)
     remaining = len(addresses) - limit
     return [*addresses[:limit], f"(+{remaining} more)"]
-
-
-def _compact_ids(ids: Iterable[int]) -> str:
-    """Render VLAN ids as coalesced ranges: ``10,20,100-110``."""
-    ordered = sorted(set(ids))
-    if not ordered:
-        return ""
-    ranges: list[tuple[int, int]] = []
-    for value in ordered:
-        if ranges and value == ranges[-1][1] + 1:
-            ranges[-1] = (ranges[-1][0], value)
-        else:
-            ranges.append((value, value))
-    return ",".join(str(low) if low == high else f"{low}-{high}" for low, high in ranges)
 
 
 def _count(number: int, noun: str, plural: str | None = None) -> str:

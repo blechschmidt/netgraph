@@ -8,7 +8,7 @@ print or call :func:`sys.exit` themselves.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Final
 
@@ -22,6 +22,7 @@ __all__ = [
     "SchemaIssue",
     "ValidationError",
     "clip_text",
+    "compact_ids",
     "echo_value",
     "format_path",
 ]
@@ -63,6 +64,30 @@ def echo_value(value: object, *, limit: int = MAX_ECHOED_VALUE_LENGTH) -> str:
     if len(value) <= limit:
         return repr(value)
     return f"{value[:limit]!r}… (+{len(value) - limit} more characters)"
+
+
+def compact_ids(ids: Iterable[int]) -> str:
+    """Render a set of numeric ids as coalesced ranges: ``10,20,100-110``.
+
+    VLAN membership is the only thing netgraph prints a set of numbers for, and
+    it prints one in four places — a diagram's node label, a diagram's edge
+    label, a table, a traced hop. A 48-port switch trunking 100 to 148 must read
+    the same in all four, so the coalescing lives here rather than being
+    reimplemented per consumer.
+
+    An empty set renders as the empty string, not as ``""`` with punctuation, so
+    a caller can use the result directly in a conditional.
+    """
+    ordered = sorted(set(ids))
+    if not ordered:
+        return ""
+    ranges: list[tuple[int, int]] = []
+    for value in ordered:
+        if ranges and value == ranges[-1][1] + 1:
+            ranges[-1] = (ranges[-1][0], value)
+        else:
+            ranges.append((value, value))
+    return ",".join(str(low) if low == high else f"{low}-{high}" for low, high in ranges)
 
 
 class NetgraphError(Exception):

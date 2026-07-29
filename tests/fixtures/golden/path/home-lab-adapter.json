@@ -1,0 +1,161 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkPath",
+  "source": {
+    "spec": "laptop",
+    "element": "hosts/laptop",
+    "name": "laptop",
+    "kind": "computer"
+  },
+  "destination": {
+    "spec": "pc-desk",
+    "element": "hosts/pc-desk",
+    "name": "pc-desk",
+    "kind": "computer"
+  },
+  "found": true,
+  "layer": "l2",
+  "maxHops": 16,
+  "pathCount": 1,
+  "truncated": false,
+  "paths": [
+    {
+      "hops": 3,
+      "layer": "l2",
+      "elements": [
+        "hosts/laptop",
+        "hosts/adp-usb-eth",
+        "switches/sw-home",
+        "hosts/pc-desk"
+      ],
+      "vlans": [
+        10
+      ],
+      "waypoints": [
+        {
+          "element": "hosts/laptop",
+          "name": "laptop",
+          "kind": "computer",
+          "vlans": [
+            10
+          ]
+        },
+        {
+          "element": "hosts/adp-usb-eth",
+          "name": "adp-usb-eth",
+          "kind": "adapter",
+          "ingress": {
+            "interface": "usb0",
+            "addresses": []
+          },
+          "egress": {
+            "interface": "enx001122334455",
+            "addresses": [
+              "192.168.10.30/24",
+              "2001:db8:10::30/64"
+            ]
+          },
+          "vlans": [
+            10
+          ]
+        },
+        {
+          "element": "switches/sw-home",
+          "name": "sw-home",
+          "kind": "switch",
+          "ingress": {
+            "interface": "port4",
+            "addresses": []
+          },
+          "egress": {
+            "interface": "port2",
+            "addresses": []
+          },
+          "vlans": [
+            10
+          ]
+        },
+        {
+          "element": "hosts/pc-desk",
+          "name": "pc-desk",
+          "kind": "computer",
+          "ingress": {
+            "interface": "eno1",
+            "addresses": [
+              "192.168.10.20/24",
+              "2001:db8:10::20/64"
+            ]
+          },
+          "vlans": [
+            10
+          ]
+        }
+      ],
+      "links": [
+        {
+          "id": "hosts/adp-usb-eth#upstream",
+          "kind": "attachment",
+          "name": "adp-usb-eth",
+          "endpoints": [
+            {
+              "node": "hosts/laptop",
+              "interface": ""
+            },
+            {
+              "node": "hosts/adp-usb-eth",
+              "interface": "usb0"
+            }
+          ],
+          "medium": "copper",
+          "speed": 5000000000,
+          "label": "usb",
+          "vlans": []
+        },
+        {
+          "id": "cables/cbl-sw-dongle",
+          "kind": "cable",
+          "name": "cbl-sw-dongle",
+          "endpoints": [
+            {
+              "node": "hosts/adp-usb-eth",
+              "interface": "enx001122334455"
+            },
+            {
+              "node": "switches/sw-home",
+              "interface": "port4"
+            }
+          ],
+          "medium": "copper",
+          "speed": 1000000000,
+          "label": "H-004",
+          "lengthM": 10.0,
+          "vlans": [
+            10
+          ]
+        },
+        {
+          "id": "cables/cbl-sw-desk",
+          "kind": "cable",
+          "name": "cbl-sw-desk",
+          "endpoints": [
+            {
+              "node": "switches/sw-home",
+              "interface": "port2"
+            },
+            {
+              "node": "hosts/pc-desk",
+              "interface": "eno1"
+            }
+          ],
+          "medium": "copper",
+          "speed": 1000000000,
+          "label": "H-002",
+          "lengthM": 8.0,
+          "vlans": [
+            10
+          ]
+        }
+      ]
+    }
+  ]
+}

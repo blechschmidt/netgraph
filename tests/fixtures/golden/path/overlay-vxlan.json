@@ -1,0 +1,98 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkPath",
+  "source": {
+    "spec": "rtr-hq",
+    "element": "sites/hq/rtr-hq",
+    "name": "rtr-hq",
+    "kind": "router"
+  },
+  "destination": {
+    "spec": "rtr-branch-b",
+    "element": "sites/branch-b/rtr-branch-b",
+    "name": "rtr-branch-b",
+    "kind": "router"
+  },
+  "found": true,
+  "layer": "l2",
+  "maxHops": 16,
+  "pathCount": 1,
+  "truncated": false,
+  "forcedVlan": 100,
+  "paths": [
+    {
+      "hops": 1,
+      "layer": "l2",
+      "elements": [
+        "sites/hq/rtr-hq",
+        "sites/branch-b/rtr-branch-b"
+      ],
+      "vlans": [
+        100
+      ],
+      "waypoints": [
+        {
+          "element": "sites/hq/rtr-hq",
+          "name": "rtr-hq",
+          "kind": "router",
+          "egress": {
+            "interface": "vxlan100",
+            "addresses": []
+          },
+          "vlans": [
+            100
+          ]
+        },
+        {
+          "element": "sites/branch-b/rtr-branch-b",
+          "name": "rtr-branch-b",
+          "kind": "router",
+          "ingress": {
+            "interface": "vxlan100",
+            "addresses": []
+          },
+          "vlans": [
+            100
+          ]
+        }
+      ],
+      "links": [
+        {
+          "id": "tunnels/vx-100",
+          "kind": "tunnel",
+          "name": "vx-100",
+          "endpoints": [
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "vxlan100"
+            },
+            {
+              "node": "sites/branch-b/rtr-branch-b",
+              "interface": "vxlan100"
+            }
+          ],
+          "vlans": [
+            100
+          ],
+          "tunnel": {
+            "id": "tunnels/vx-100",
+            "type": "vxlan",
+            "layer": 2,
+            "stack": [
+              "vxlan",
+              "ipsec"
+            ],
+            "encrypted": false,
+            "protected": true,
+            "vni": 100,
+            "over": "tunnels/ipsec-hq-b",
+            "encryptedBy": "tunnels/ipsec-hq-b"
+          }
+        }
+      ],
+      "tunnels": [
+        "tunnels/vx-100"
+      ]
+    }
+  ]
+}

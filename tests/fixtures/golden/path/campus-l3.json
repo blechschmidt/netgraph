@@ -1,0 +1,495 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkPath",
+  "source": {
+    "spec": "10.1.10.51",
+    "element": "sites/north/hosts/pc-north-01",
+    "name": "pc-north-01",
+    "kind": "computer",
+    "interface": "eno1",
+    "address": "10.1.10.51/24"
+  },
+  "destination": {
+    "spec": "10.2.20.11",
+    "element": "sites/south/hosts/srv-south-01",
+    "name": "srv-south-01",
+    "kind": "server",
+    "interface": "eth0",
+    "address": "10.2.20.11/24"
+  },
+  "found": true,
+  "layer": "l3",
+  "maxHops": 16,
+  "pathCount": 2,
+  "truncated": false,
+  "paths": [
+    {
+      "hops": 5,
+      "layer": "l3",
+      "elements": [
+        "sites/north/hosts/pc-north-01",
+        "sites/north/distribution/sw-north-dist-01",
+        "sites/north/core/rtr-north-core-01",
+        "sites/south/core/rtr-south-core-01",
+        "sites/south/distribution/sw-south-dist-01",
+        "sites/south/hosts/srv-south-01"
+      ],
+      "vlans": [],
+      "waypoints": [
+        {
+          "element": "sites/north/hosts/pc-north-01",
+          "name": "pc-north-01",
+          "kind": "computer",
+          "egress": {
+            "interface": "eno1",
+            "addresses": [
+              "10.1.10.51/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/north/distribution/sw-north-dist-01",
+          "name": "sw-north-dist-01",
+          "kind": "switch",
+          "ingress": {
+            "interface": "Vlan10",
+            "addresses": [
+              "10.1.10.1/24"
+            ]
+          },
+          "egress": {
+            "interface": "Ethernet52/1",
+            "addresses": [
+              "10.1.0.2/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/north/core/rtr-north-core-01",
+          "name": "rtr-north-core-01",
+          "kind": "router",
+          "ingress": {
+            "interface": "xe-0/0/0",
+            "addresses": [
+              "10.1.0.1/30"
+            ]
+          },
+          "egress": {
+            "interface": "xe-0/0/1",
+            "addresses": [
+              "198.51.100.1/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/south/core/rtr-south-core-01",
+          "name": "rtr-south-core-01",
+          "kind": "router",
+          "ingress": {
+            "interface": "xe-0/0/2",
+            "addresses": [
+              "198.51.100.2/30"
+            ]
+          },
+          "egress": {
+            "interface": "xe-0/0/0",
+            "addresses": [
+              "10.2.0.1/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/south/distribution/sw-south-dist-01",
+          "name": "sw-south-dist-01",
+          "kind": "switch",
+          "ingress": {
+            "interface": "Ethernet52/1",
+            "addresses": [
+              "10.2.0.2/30"
+            ]
+          },
+          "egress": {
+            "interface": "Vlan20",
+            "addresses": [
+              "10.2.20.1/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/south/hosts/srv-south-01",
+          "name": "srv-south-01",
+          "kind": "server",
+          "ingress": {
+            "interface": "eth0",
+            "addresses": [
+              "10.2.20.11/24"
+            ]
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "10.1.10.0/24",
+          "kind": "subnet",
+          "name": "10.1.10.0/24",
+          "endpoints": [
+            {
+              "node": "sites/north/hosts/pc-north-01",
+              "interface": "eno1"
+            },
+            {
+              "node": "sites/north/distribution/sw-north-dist-01",
+              "interface": "Vlan10"
+            }
+          ],
+          "subnet": "10.1.10.0/24",
+          "addresses": [
+            "10.1.10.51/24",
+            "10.1.10.1/24"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "10.1.0.0/30",
+          "kind": "subnet",
+          "name": "10.1.0.0/30",
+          "endpoints": [
+            {
+              "node": "sites/north/distribution/sw-north-dist-01",
+              "interface": "Ethernet52/1"
+            },
+            {
+              "node": "sites/north/core/rtr-north-core-01",
+              "interface": "xe-0/0/0"
+            }
+          ],
+          "subnet": "10.1.0.0/30",
+          "addresses": [
+            "10.1.0.2/30",
+            "10.1.0.1/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "198.51.100.0/30",
+          "kind": "subnet",
+          "name": "198.51.100.0/30",
+          "endpoints": [
+            {
+              "node": "sites/north/core/rtr-north-core-01",
+              "interface": "xe-0/0/1"
+            },
+            {
+              "node": "sites/south/core/rtr-south-core-01",
+              "interface": "xe-0/0/2"
+            }
+          ],
+          "subnet": "198.51.100.0/30",
+          "addresses": [
+            "198.51.100.1/30",
+            "198.51.100.2/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "10.2.0.0/30",
+          "kind": "subnet",
+          "name": "10.2.0.0/30",
+          "endpoints": [
+            {
+              "node": "sites/south/core/rtr-south-core-01",
+              "interface": "xe-0/0/0"
+            },
+            {
+              "node": "sites/south/distribution/sw-south-dist-01",
+              "interface": "Ethernet52/1"
+            }
+          ],
+          "subnet": "10.2.0.0/30",
+          "addresses": [
+            "10.2.0.1/30",
+            "10.2.0.2/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "10.2.20.0/24",
+          "kind": "subnet",
+          "name": "10.2.20.0/24",
+          "endpoints": [
+            {
+              "node": "sites/south/distribution/sw-south-dist-01",
+              "interface": "Vlan20"
+            },
+            {
+              "node": "sites/south/hosts/srv-south-01",
+              "interface": "eth0"
+            }
+          ],
+          "subnet": "10.2.20.0/24",
+          "addresses": [
+            "10.2.20.1/24",
+            "10.2.20.11/24"
+          ],
+          "vlans": []
+        }
+      ],
+      "family": "ipv4"
+    },
+    {
+      "hops": 6,
+      "layer": "l3",
+      "elements": [
+        "sites/north/hosts/pc-north-01",
+        "sites/north/distribution/sw-north-dist-01",
+        "sites/north/core/rtr-north-core-01",
+        "sites/west/core/rtr-west-core-01",
+        "sites/south/core/rtr-south-core-01",
+        "sites/south/distribution/sw-south-dist-01",
+        "sites/south/hosts/srv-south-01"
+      ],
+      "vlans": [],
+      "waypoints": [
+        {
+          "element": "sites/north/hosts/pc-north-01",
+          "name": "pc-north-01",
+          "kind": "computer",
+          "egress": {
+            "interface": "eno1",
+            "addresses": [
+              "10.1.10.51/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/north/distribution/sw-north-dist-01",
+          "name": "sw-north-dist-01",
+          "kind": "switch",
+          "ingress": {
+            "interface": "Vlan10",
+            "addresses": [
+              "10.1.10.1/24"
+            ]
+          },
+          "egress": {
+            "interface": "Ethernet52/1",
+            "addresses": [
+              "10.1.0.2/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/north/core/rtr-north-core-01",
+          "name": "rtr-north-core-01",
+          "kind": "router",
+          "ingress": {
+            "interface": "xe-0/0/0",
+            "addresses": [
+              "10.1.0.1/30"
+            ]
+          },
+          "egress": {
+            "interface": "xe-0/0/2",
+            "addresses": [
+              "198.51.100.10/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/west/core/rtr-west-core-01",
+          "name": "rtr-west-core-01",
+          "kind": "router",
+          "ingress": {
+            "interface": "xe-0/0/1",
+            "addresses": [
+              "198.51.100.9/30"
+            ]
+          },
+          "egress": {
+            "interface": "xe-0/0/2",
+            "addresses": [
+              "198.51.100.6/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/south/core/rtr-south-core-01",
+          "name": "rtr-south-core-01",
+          "kind": "router",
+          "ingress": {
+            "interface": "xe-0/0/1",
+            "addresses": [
+              "198.51.100.5/30"
+            ]
+          },
+          "egress": {
+            "interface": "xe-0/0/0",
+            "addresses": [
+              "10.2.0.1/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/south/distribution/sw-south-dist-01",
+          "name": "sw-south-dist-01",
+          "kind": "switch",
+          "ingress": {
+            "interface": "Ethernet52/1",
+            "addresses": [
+              "10.2.0.2/30"
+            ]
+          },
+          "egress": {
+            "interface": "Vlan20",
+            "addresses": [
+              "10.2.20.1/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/south/hosts/srv-south-01",
+          "name": "srv-south-01",
+          "kind": "server",
+          "ingress": {
+            "interface": "eth0",
+            "addresses": [
+              "10.2.20.11/24"
+            ]
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "10.1.10.0/24",
+          "kind": "subnet",
+          "name": "10.1.10.0/24",
+          "endpoints": [
+            {
+              "node": "sites/north/hosts/pc-north-01",
+              "interface": "eno1"
+            },
+            {
+              "node": "sites/north/distribution/sw-north-dist-01",
+              "interface": "Vlan10"
+            }
+          ],
+          "subnet": "10.1.10.0/24",
+          "addresses": [
+            "10.1.10.51/24",
+            "10.1.10.1/24"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "10.1.0.0/30",
+          "kind": "subnet",
+          "name": "10.1.0.0/30",
+          "endpoints": [
+            {
+              "node": "sites/north/distribution/sw-north-dist-01",
+              "interface": "Ethernet52/1"
+            },
+            {
+              "node": "sites/north/core/rtr-north-core-01",
+              "interface": "xe-0/0/0"
+            }
+          ],
+          "subnet": "10.1.0.0/30",
+          "addresses": [
+            "10.1.0.2/30",
+            "10.1.0.1/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "198.51.100.8/30",
+          "kind": "subnet",
+          "name": "198.51.100.8/30",
+          "endpoints": [
+            {
+              "node": "sites/north/core/rtr-north-core-01",
+              "interface": "xe-0/0/2"
+            },
+            {
+              "node": "sites/west/core/rtr-west-core-01",
+              "interface": "xe-0/0/1"
+            }
+          ],
+          "subnet": "198.51.100.8/30",
+          "addresses": [
+            "198.51.100.10/30",
+            "198.51.100.9/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "198.51.100.4/30",
+          "kind": "subnet",
+          "name": "198.51.100.4/30",
+          "endpoints": [
+            {
+              "node": "sites/west/core/rtr-west-core-01",
+              "interface": "xe-0/0/2"
+            },
+            {
+              "node": "sites/south/core/rtr-south-core-01",
+              "interface": "xe-0/0/1"
+            }
+          ],
+          "subnet": "198.51.100.4/30",
+          "addresses": [
+            "198.51.100.6/30",
+            "198.51.100.5/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "10.2.0.0/30",
+          "kind": "subnet",
+          "name": "10.2.0.0/30",
+          "endpoints": [
+            {
+              "node": "sites/south/core/rtr-south-core-01",
+              "interface": "xe-0/0/0"
+            },
+            {
+              "node": "sites/south/distribution/sw-south-dist-01",
+              "interface": "Ethernet52/1"
+            }
+          ],
+          "subnet": "10.2.0.0/30",
+          "addresses": [
+            "10.2.0.1/30",
+            "10.2.0.2/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "10.2.20.0/24",
+          "kind": "subnet",
+          "name": "10.2.20.0/24",
+          "endpoints": [
+            {
+              "node": "sites/south/distribution/sw-south-dist-01",
+              "interface": "Vlan20"
+            },
+            {
+              "node": "sites/south/hosts/srv-south-01",
+              "interface": "eth0"
+            }
+          ],
+          "subnet": "10.2.20.0/24",
+          "addresses": [
+            "10.2.20.1/24",
+            "10.2.20.11/24"
+          ],
+          "vlans": []
+        }
+      ],
+      "family": "ipv4"
+    }
+  ],
+  "notes": [
+    "no layer-2 path: the two elements are in no common broadcast domain, so the trace looked for a routed one"
+  ]
+}

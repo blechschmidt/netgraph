@@ -1,0 +1,12 @@
+sites/hq/rtr-hq -> sites/branch-b/rtr-branch-b: 1 path
+  source       sites/hq/rtr-hq  [router]
+  destination  sites/branch-b/rtr-branch-b  [router]
+  layer        2, switched
+  vlan         100 (forced with --vlan)
+
+path 1 of 1 · 1 hop · vlan 100
+   1  sites/hq/rtr-hq  [router]
+      out vxlan100
+      ->  tunnel vx-100  vlan 100  [vxlan over ipsec, vni 100, encrypted by tunnels/ipsec-hq-b]
+   2  sites/branch-b/rtr-branch-b  [router]
+      in  vxlan100

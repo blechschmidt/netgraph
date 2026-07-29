@@ -1,0 +1,24 @@
+sites/north/hosts/pc-north-01 -> sites/north/hosts/pc-north-02: 1 path
+  source       sites/north/hosts/pc-north-01  [computer]
+  destination  sites/north/hosts/pc-north-02  [computer]
+  layer        2, switched
+  vlan         10 (assumed by the trace)
+
+path 1 of 1 · 4 hops · vlan 10
+   1  sites/north/hosts/pc-north-01  [computer]
+      out eno1                  10.1.10.51/24, 2001:db8:1:10::51/64
+      ->  cable cbl-north-acc01-pc01  (copper, 1Gbps, C-101, 22m)  vlan 10
+   2  sites/north/access/sw-north-acc-01  [switch]
+      in  GigabitEthernet1/0/1
+      out TenGigabitEthernet1/1/1
+      ->  cable cbl-north-dist-acc01  (fiber, 10Gbps, F-102, 45m)  vlan 10
+   3  sites/north/distribution/sw-north-dist-01  [switch]
+      in  Ethernet49/1
+      out Ethernet50/1
+      ->  cable cbl-north-dist-acc02  (fiber, 10Gbps, F-103, 78m)  vlan 10
+   4  sites/north/access/sw-north-acc-02  [switch]
+      in  TenGigabitEthernet1/1/1
+      out GigabitEthernet1/0/1
+      ->  cable cbl-north-acc02-pc02  (copper, 1Gbps, C-103, 18m)  vlan 10
+   5  sites/north/hosts/pc-north-02  [computer]
+      in  eno1                  10.1.10.52/24, 2001:db8:1:10::52/64

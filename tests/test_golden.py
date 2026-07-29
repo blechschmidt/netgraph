@@ -418,7 +418,9 @@ def test_every_case_has_a_golden_for_every_format() -> None:
 def test_no_stray_golden_files() -> None:
     """Every committed golden belongs to a case, so renames leave no orphans."""
     expected = {case.golden(format) for case in CASES for format in case.formats}
-    actual = {path for path in GOLDEN_DIR.iterdir() if path.suffix != ".md"}
+    # ``path/`` holds the trace snapshots, which ``tests/test_path.py`` owns and
+    # guards the same way.
+    actual = {path for path in GOLDEN_DIR.iterdir() if path.is_file() and path.suffix != ".md"}
     assert actual == expected
 
 

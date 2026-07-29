@@ -1,0 +1,1654 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkPath",
+  "source": {
+    "spec": "pc-branch-a",
+    "element": "sites/branch-a/pc-branch-a",
+    "name": "pc-branch-a",
+    "kind": "computer"
+  },
+  "destination": {
+    "spec": "srv-hq",
+    "element": "sites/hq/srv-hq",
+    "name": "srv-hq",
+    "kind": "server"
+  },
+  "found": true,
+  "layer": "l3",
+  "maxHops": 16,
+  "pathCount": 8,
+  "truncated": false,
+  "paths": [
+    {
+      "hops": 3,
+      "layer": "l3",
+      "elements": [
+        "sites/branch-a/pc-branch-a",
+        "sites/branch-a/rtr-branch-a",
+        "sites/hq/rtr-hq",
+        "sites/hq/srv-hq"
+      ],
+      "vlans": [],
+      "waypoints": [
+        {
+          "element": "sites/branch-a/pc-branch-a",
+          "name": "pc-branch-a",
+          "kind": "computer",
+          "egress": {
+            "interface": "enp3s0",
+            "addresses": [
+              "10.20.0.10/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/branch-a/rtr-branch-a",
+          "name": "rtr-branch-a",
+          "kind": "router",
+          "ingress": {
+            "interface": "ether2",
+            "addresses": [
+              "10.20.0.1/24"
+            ]
+          },
+          "egress": {
+            "interface": "wg0",
+            "addresses": [
+              "10.255.0.2/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/rtr-hq",
+          "name": "rtr-hq",
+          "kind": "router",
+          "ingress": {
+            "interface": "wg0",
+            "addresses": [
+              "10.255.0.1/24"
+            ]
+          },
+          "egress": {
+            "interface": "eth1",
+            "addresses": [
+              "10.10.0.1/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/srv-hq",
+          "name": "srv-hq",
+          "kind": "server",
+          "ingress": {
+            "interface": "eno1",
+            "addresses": [
+              "10.10.0.10/24"
+            ]
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "10.20.0.0/24",
+          "kind": "subnet",
+          "name": "10.20.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/pc-branch-a",
+              "interface": "enp3s0"
+            },
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "ether2"
+            }
+          ],
+          "subnet": "10.20.0.0/24",
+          "addresses": [
+            "10.20.0.10/24",
+            "10.20.0.1/24"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "10.255.0.0/24",
+          "kind": "subnet",
+          "name": "10.255.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "wg0"
+            },
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "wg0"
+            }
+          ],
+          "subnet": "10.255.0.0/24",
+          "addresses": [
+            "10.255.0.2/24",
+            "10.255.0.1/24"
+          ],
+          "vlans": [],
+          "tunnel": {
+            "id": "tunnels/wg-mesh",
+            "type": "wireguard",
+            "layer": 3,
+            "stack": [
+              "wireguard"
+            ],
+            "encrypted": true,
+            "protected": true
+          }
+        },
+        {
+          "id": "10.10.0.0/24",
+          "kind": "subnet",
+          "name": "10.10.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "eth1"
+            },
+            {
+              "node": "sites/hq/srv-hq",
+              "interface": "eno1"
+            }
+          ],
+          "subnet": "10.10.0.0/24",
+          "addresses": [
+            "10.10.0.1/24",
+            "10.10.0.10/24"
+          ],
+          "vlans": []
+        }
+      ],
+      "family": "ipv4",
+      "tunnels": [
+        "tunnels/wg-mesh"
+      ]
+    },
+    {
+      "hops": 4,
+      "layer": "l3",
+      "elements": [
+        "sites/branch-a/pc-branch-a",
+        "sites/branch-a/rtr-branch-a",
+        "sites/branch-b/rtr-branch-b",
+        "sites/hq/rtr-hq",
+        "sites/hq/srv-hq"
+      ],
+      "vlans": [],
+      "waypoints": [
+        {
+          "element": "sites/branch-a/pc-branch-a",
+          "name": "pc-branch-a",
+          "kind": "computer",
+          "egress": {
+            "interface": "enp3s0",
+            "addresses": [
+              "10.20.0.10/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/branch-a/rtr-branch-a",
+          "name": "rtr-branch-a",
+          "kind": "router",
+          "ingress": {
+            "interface": "ether2",
+            "addresses": [
+              "10.20.0.1/24"
+            ]
+          },
+          "egress": {
+            "interface": "wg0",
+            "addresses": [
+              "10.255.0.2/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/branch-b/rtr-branch-b",
+          "name": "rtr-branch-b",
+          "kind": "router",
+          "ingress": {
+            "interface": "wg0",
+            "addresses": [
+              "10.255.0.3/24"
+            ]
+          },
+          "egress": {
+            "interface": "gre1",
+            "addresses": [
+              "10.252.0.2/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/rtr-hq",
+          "name": "rtr-hq",
+          "kind": "router",
+          "ingress": {
+            "interface": "gre1",
+            "addresses": [
+              "10.252.0.1/30"
+            ]
+          },
+          "egress": {
+            "interface": "eth1",
+            "addresses": [
+              "10.10.0.1/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/srv-hq",
+          "name": "srv-hq",
+          "kind": "server",
+          "ingress": {
+            "interface": "eno1",
+            "addresses": [
+              "10.10.0.10/24"
+            ]
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "10.20.0.0/24",
+          "kind": "subnet",
+          "name": "10.20.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/pc-branch-a",
+              "interface": "enp3s0"
+            },
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "ether2"
+            }
+          ],
+          "subnet": "10.20.0.0/24",
+          "addresses": [
+            "10.20.0.10/24",
+            "10.20.0.1/24"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "10.255.0.0/24",
+          "kind": "subnet",
+          "name": "10.255.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "wg0"
+            },
+            {
+              "node": "sites/branch-b/rtr-branch-b",
+              "interface": "wg0"
+            }
+          ],
+          "subnet": "10.255.0.0/24",
+          "addresses": [
+            "10.255.0.2/24",
+            "10.255.0.3/24"
+          ],
+          "vlans": [],
+          "tunnel": {
+            "id": "tunnels/wg-mesh",
+            "type": "wireguard",
+            "layer": 3,
+            "stack": [
+              "wireguard"
+            ],
+            "encrypted": true,
+            "protected": true
+          }
+        },
+        {
+          "id": "10.252.0.0/30",
+          "kind": "subnet",
+          "name": "10.252.0.0/30",
+          "endpoints": [
+            {
+              "node": "sites/branch-b/rtr-branch-b",
+              "interface": "gre1"
+            },
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "gre1"
+            }
+          ],
+          "subnet": "10.252.0.0/30",
+          "addresses": [
+            "10.252.0.2/30",
+            "10.252.0.1/30"
+          ],
+          "vlans": [],
+          "tunnel": {
+            "id": "tunnels/gre-mgmt",
+            "type": "gre",
+            "layer": 3,
+            "stack": [
+              "gre",
+              "ipsec"
+            ],
+            "encrypted": false,
+            "protected": true,
+            "over": "tunnels/ipsec-hq-b",
+            "encryptedBy": "tunnels/ipsec-hq-b"
+          }
+        },
+        {
+          "id": "10.10.0.0/24",
+          "kind": "subnet",
+          "name": "10.10.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "eth1"
+            },
+            {
+              "node": "sites/hq/srv-hq",
+              "interface": "eno1"
+            }
+          ],
+          "subnet": "10.10.0.0/24",
+          "addresses": [
+            "10.10.0.1/24",
+            "10.10.0.10/24"
+          ],
+          "vlans": []
+        }
+      ],
+      "family": "ipv4",
+      "tunnels": [
+        "tunnels/wg-mesh",
+        "tunnels/gre-mgmt"
+      ]
+    },
+    {
+      "hops": 4,
+      "layer": "l3",
+      "elements": [
+        "sites/branch-a/pc-branch-a",
+        "sites/branch-a/rtr-branch-a",
+        "sites/branch-b/rtr-branch-b",
+        "sites/hq/rtr-hq",
+        "sites/hq/srv-hq"
+      ],
+      "vlans": [],
+      "waypoints": [
+        {
+          "element": "sites/branch-a/pc-branch-a",
+          "name": "pc-branch-a",
+          "kind": "computer",
+          "egress": {
+            "interface": "enp3s0",
+            "addresses": [
+              "10.20.0.10/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/branch-a/rtr-branch-a",
+          "name": "rtr-branch-a",
+          "kind": "router",
+          "ingress": {
+            "interface": "ether2",
+            "addresses": [
+              "10.20.0.1/24"
+            ]
+          },
+          "egress": {
+            "interface": "wg0",
+            "addresses": [
+              "10.255.0.2/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/branch-b/rtr-branch-b",
+          "name": "rtr-branch-b",
+          "kind": "router",
+          "ingress": {
+            "interface": "wg0",
+            "addresses": [
+              "10.255.0.3/24"
+            ]
+          },
+          "egress": {
+            "interface": "ipsec0",
+            "addresses": [
+              "10.254.0.2/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/rtr-hq",
+          "name": "rtr-hq",
+          "kind": "router",
+          "ingress": {
+            "interface": "ipsec0",
+            "addresses": [
+              "10.254.0.1/30"
+            ]
+          },
+          "egress": {
+            "interface": "eth1",
+            "addresses": [
+              "10.10.0.1/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/srv-hq",
+          "name": "srv-hq",
+          "kind": "server",
+          "ingress": {
+            "interface": "eno1",
+            "addresses": [
+              "10.10.0.10/24"
+            ]
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "10.20.0.0/24",
+          "kind": "subnet",
+          "name": "10.20.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/pc-branch-a",
+              "interface": "enp3s0"
+            },
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "ether2"
+            }
+          ],
+          "subnet": "10.20.0.0/24",
+          "addresses": [
+            "10.20.0.10/24",
+            "10.20.0.1/24"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "10.255.0.0/24",
+          "kind": "subnet",
+          "name": "10.255.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "wg0"
+            },
+            {
+              "node": "sites/branch-b/rtr-branch-b",
+              "interface": "wg0"
+            }
+          ],
+          "subnet": "10.255.0.0/24",
+          "addresses": [
+            "10.255.0.2/24",
+            "10.255.0.3/24"
+          ],
+          "vlans": [],
+          "tunnel": {
+            "id": "tunnels/wg-mesh",
+            "type": "wireguard",
+            "layer": 3,
+            "stack": [
+              "wireguard"
+            ],
+            "encrypted": true,
+            "protected": true
+          }
+        },
+        {
+          "id": "10.254.0.0/30",
+          "kind": "subnet",
+          "name": "10.254.0.0/30",
+          "endpoints": [
+            {
+              "node": "sites/branch-b/rtr-branch-b",
+              "interface": "ipsec0"
+            },
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "ipsec0"
+            }
+          ],
+          "subnet": "10.254.0.0/30",
+          "addresses": [
+            "10.254.0.2/30",
+            "10.254.0.1/30"
+          ],
+          "vlans": [],
+          "tunnel": {
+            "id": "tunnels/ipsec-hq-b",
+            "type": "ipsec",
+            "layer": 3,
+            "stack": [
+              "ipsec"
+            ],
+            "encrypted": true,
+            "protected": true
+          }
+        },
+        {
+          "id": "10.10.0.0/24",
+          "kind": "subnet",
+          "name": "10.10.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "eth1"
+            },
+            {
+              "node": "sites/hq/srv-hq",
+              "interface": "eno1"
+            }
+          ],
+          "subnet": "10.10.0.0/24",
+          "addresses": [
+            "10.10.0.1/24",
+            "10.10.0.10/24"
+          ],
+          "vlans": []
+        }
+      ],
+      "family": "ipv4",
+      "tunnels": [
+        "tunnels/wg-mesh",
+        "tunnels/ipsec-hq-b"
+      ]
+    },
+    {
+      "hops": 4,
+      "layer": "l3",
+      "elements": [
+        "sites/branch-a/pc-branch-a",
+        "sites/branch-a/rtr-branch-a",
+        "wan/wan-core",
+        "sites/hq/rtr-hq",
+        "sites/hq/srv-hq"
+      ],
+      "vlans": [],
+      "waypoints": [
+        {
+          "element": "sites/branch-a/pc-branch-a",
+          "name": "pc-branch-a",
+          "kind": "computer",
+          "egress": {
+            "interface": "enp3s0",
+            "addresses": [
+              "10.20.0.10/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/branch-a/rtr-branch-a",
+          "name": "rtr-branch-a",
+          "kind": "router",
+          "ingress": {
+            "interface": "ether2",
+            "addresses": [
+              "10.20.0.1/24"
+            ]
+          },
+          "egress": {
+            "interface": "ether1",
+            "addresses": [
+              "198.51.100.6/30"
+            ]
+          }
+        },
+        {
+          "element": "wan/wan-core",
+          "name": "wan-core",
+          "kind": "router",
+          "ingress": {
+            "interface": "ge-0/0/1",
+            "addresses": [
+              "198.51.100.5/30"
+            ]
+          },
+          "egress": {
+            "interface": "ge-0/0/0",
+            "addresses": [
+              "198.51.100.1/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/rtr-hq",
+          "name": "rtr-hq",
+          "kind": "router",
+          "ingress": {
+            "interface": "eth0",
+            "addresses": [
+              "198.51.100.2/30"
+            ]
+          },
+          "egress": {
+            "interface": "eth1",
+            "addresses": [
+              "10.10.0.1/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/srv-hq",
+          "name": "srv-hq",
+          "kind": "server",
+          "ingress": {
+            "interface": "eno1",
+            "addresses": [
+              "10.10.0.10/24"
+            ]
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "10.20.0.0/24",
+          "kind": "subnet",
+          "name": "10.20.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/pc-branch-a",
+              "interface": "enp3s0"
+            },
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "ether2"
+            }
+          ],
+          "subnet": "10.20.0.0/24",
+          "addresses": [
+            "10.20.0.10/24",
+            "10.20.0.1/24"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "198.51.100.4/30",
+          "kind": "subnet",
+          "name": "198.51.100.4/30",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "ether1"
+            },
+            {
+              "node": "wan/wan-core",
+              "interface": "ge-0/0/1"
+            }
+          ],
+          "subnet": "198.51.100.4/30",
+          "addresses": [
+            "198.51.100.6/30",
+            "198.51.100.5/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "198.51.100.0/30",
+          "kind": "subnet",
+          "name": "198.51.100.0/30",
+          "endpoints": [
+            {
+              "node": "wan/wan-core",
+              "interface": "ge-0/0/0"
+            },
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "eth0"
+            }
+          ],
+          "subnet": "198.51.100.0/30",
+          "addresses": [
+            "198.51.100.1/30",
+            "198.51.100.2/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "10.10.0.0/24",
+          "kind": "subnet",
+          "name": "10.10.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "eth1"
+            },
+            {
+              "node": "sites/hq/srv-hq",
+              "interface": "eno1"
+            }
+          ],
+          "subnet": "10.10.0.0/24",
+          "addresses": [
+            "10.10.0.1/24",
+            "10.10.0.10/24"
+          ],
+          "vlans": []
+        }
+      ],
+      "family": "ipv4"
+    },
+    {
+      "hops": 5,
+      "layer": "l3",
+      "elements": [
+        "sites/branch-a/pc-branch-a",
+        "sites/branch-a/rtr-branch-a",
+        "sites/branch-b/rtr-branch-b",
+        "wan/wan-core",
+        "sites/hq/rtr-hq",
+        "sites/hq/srv-hq"
+      ],
+      "vlans": [],
+      "waypoints": [
+        {
+          "element": "sites/branch-a/pc-branch-a",
+          "name": "pc-branch-a",
+          "kind": "computer",
+          "egress": {
+            "interface": "enp3s0",
+            "addresses": [
+              "10.20.0.10/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/branch-a/rtr-branch-a",
+          "name": "rtr-branch-a",
+          "kind": "router",
+          "ingress": {
+            "interface": "ether2",
+            "addresses": [
+              "10.20.0.1/24"
+            ]
+          },
+          "egress": {
+            "interface": "wg0",
+            "addresses": [
+              "10.255.0.2/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/branch-b/rtr-branch-b",
+          "name": "rtr-branch-b",
+          "kind": "router",
+          "ingress": {
+            "interface": "wg0",
+            "addresses": [
+              "10.255.0.3/24"
+            ]
+          },
+          "egress": {
+            "interface": "ether1",
+            "addresses": [
+              "198.51.100.10/30"
+            ]
+          }
+        },
+        {
+          "element": "wan/wan-core",
+          "name": "wan-core",
+          "kind": "router",
+          "ingress": {
+            "interface": "ge-0/0/2",
+            "addresses": [
+              "198.51.100.9/30"
+            ]
+          },
+          "egress": {
+            "interface": "ge-0/0/0",
+            "addresses": [
+              "198.51.100.1/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/rtr-hq",
+          "name": "rtr-hq",
+          "kind": "router",
+          "ingress": {
+            "interface": "eth0",
+            "addresses": [
+              "198.51.100.2/30"
+            ]
+          },
+          "egress": {
+            "interface": "eth1",
+            "addresses": [
+              "10.10.0.1/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/srv-hq",
+          "name": "srv-hq",
+          "kind": "server",
+          "ingress": {
+            "interface": "eno1",
+            "addresses": [
+              "10.10.0.10/24"
+            ]
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "10.20.0.0/24",
+          "kind": "subnet",
+          "name": "10.20.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/pc-branch-a",
+              "interface": "enp3s0"
+            },
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "ether2"
+            }
+          ],
+          "subnet": "10.20.0.0/24",
+          "addresses": [
+            "10.20.0.10/24",
+            "10.20.0.1/24"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "10.255.0.0/24",
+          "kind": "subnet",
+          "name": "10.255.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "wg0"
+            },
+            {
+              "node": "sites/branch-b/rtr-branch-b",
+              "interface": "wg0"
+            }
+          ],
+          "subnet": "10.255.0.0/24",
+          "addresses": [
+            "10.255.0.2/24",
+            "10.255.0.3/24"
+          ],
+          "vlans": [],
+          "tunnel": {
+            "id": "tunnels/wg-mesh",
+            "type": "wireguard",
+            "layer": 3,
+            "stack": [
+              "wireguard"
+            ],
+            "encrypted": true,
+            "protected": true
+          }
+        },
+        {
+          "id": "198.51.100.8/30",
+          "kind": "subnet",
+          "name": "198.51.100.8/30",
+          "endpoints": [
+            {
+              "node": "sites/branch-b/rtr-branch-b",
+              "interface": "ether1"
+            },
+            {
+              "node": "wan/wan-core",
+              "interface": "ge-0/0/2"
+            }
+          ],
+          "subnet": "198.51.100.8/30",
+          "addresses": [
+            "198.51.100.10/30",
+            "198.51.100.9/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "198.51.100.0/30",
+          "kind": "subnet",
+          "name": "198.51.100.0/30",
+          "endpoints": [
+            {
+              "node": "wan/wan-core",
+              "interface": "ge-0/0/0"
+            },
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "eth0"
+            }
+          ],
+          "subnet": "198.51.100.0/30",
+          "addresses": [
+            "198.51.100.1/30",
+            "198.51.100.2/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "10.10.0.0/24",
+          "kind": "subnet",
+          "name": "10.10.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "eth1"
+            },
+            {
+              "node": "sites/hq/srv-hq",
+              "interface": "eno1"
+            }
+          ],
+          "subnet": "10.10.0.0/24",
+          "addresses": [
+            "10.10.0.1/24",
+            "10.10.0.10/24"
+          ],
+          "vlans": []
+        }
+      ],
+      "family": "ipv4",
+      "tunnels": [
+        "tunnels/wg-mesh"
+      ]
+    },
+    {
+      "hops": 5,
+      "layer": "l3",
+      "elements": [
+        "sites/branch-a/pc-branch-a",
+        "sites/branch-a/rtr-branch-a",
+        "wan/wan-core",
+        "sites/branch-b/rtr-branch-b",
+        "sites/hq/rtr-hq",
+        "sites/hq/srv-hq"
+      ],
+      "vlans": [],
+      "waypoints": [
+        {
+          "element": "sites/branch-a/pc-branch-a",
+          "name": "pc-branch-a",
+          "kind": "computer",
+          "egress": {
+            "interface": "enp3s0",
+            "addresses": [
+              "10.20.0.10/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/branch-a/rtr-branch-a",
+          "name": "rtr-branch-a",
+          "kind": "router",
+          "ingress": {
+            "interface": "ether2",
+            "addresses": [
+              "10.20.0.1/24"
+            ]
+          },
+          "egress": {
+            "interface": "ether1",
+            "addresses": [
+              "198.51.100.6/30"
+            ]
+          }
+        },
+        {
+          "element": "wan/wan-core",
+          "name": "wan-core",
+          "kind": "router",
+          "ingress": {
+            "interface": "ge-0/0/1",
+            "addresses": [
+              "198.51.100.5/30"
+            ]
+          },
+          "egress": {
+            "interface": "ge-0/0/2",
+            "addresses": [
+              "198.51.100.9/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/branch-b/rtr-branch-b",
+          "name": "rtr-branch-b",
+          "kind": "router",
+          "ingress": {
+            "interface": "ether1",
+            "addresses": [
+              "198.51.100.10/30"
+            ]
+          },
+          "egress": {
+            "interface": "gre1",
+            "addresses": [
+              "10.252.0.2/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/rtr-hq",
+          "name": "rtr-hq",
+          "kind": "router",
+          "ingress": {
+            "interface": "gre1",
+            "addresses": [
+              "10.252.0.1/30"
+            ]
+          },
+          "egress": {
+            "interface": "eth1",
+            "addresses": [
+              "10.10.0.1/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/srv-hq",
+          "name": "srv-hq",
+          "kind": "server",
+          "ingress": {
+            "interface": "eno1",
+            "addresses": [
+              "10.10.0.10/24"
+            ]
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "10.20.0.0/24",
+          "kind": "subnet",
+          "name": "10.20.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/pc-branch-a",
+              "interface": "enp3s0"
+            },
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "ether2"
+            }
+          ],
+          "subnet": "10.20.0.0/24",
+          "addresses": [
+            "10.20.0.10/24",
+            "10.20.0.1/24"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "198.51.100.4/30",
+          "kind": "subnet",
+          "name": "198.51.100.4/30",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "ether1"
+            },
+            {
+              "node": "wan/wan-core",
+              "interface": "ge-0/0/1"
+            }
+          ],
+          "subnet": "198.51.100.4/30",
+          "addresses": [
+            "198.51.100.6/30",
+            "198.51.100.5/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "198.51.100.8/30",
+          "kind": "subnet",
+          "name": "198.51.100.8/30",
+          "endpoints": [
+            {
+              "node": "wan/wan-core",
+              "interface": "ge-0/0/2"
+            },
+            {
+              "node": "sites/branch-b/rtr-branch-b",
+              "interface": "ether1"
+            }
+          ],
+          "subnet": "198.51.100.8/30",
+          "addresses": [
+            "198.51.100.9/30",
+            "198.51.100.10/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "10.252.0.0/30",
+          "kind": "subnet",
+          "name": "10.252.0.0/30",
+          "endpoints": [
+            {
+              "node": "sites/branch-b/rtr-branch-b",
+              "interface": "gre1"
+            },
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "gre1"
+            }
+          ],
+          "subnet": "10.252.0.0/30",
+          "addresses": [
+            "10.252.0.2/30",
+            "10.252.0.1/30"
+          ],
+          "vlans": [],
+          "tunnel": {
+            "id": "tunnels/gre-mgmt",
+            "type": "gre",
+            "layer": 3,
+            "stack": [
+              "gre",
+              "ipsec"
+            ],
+            "encrypted": false,
+            "protected": true,
+            "over": "tunnels/ipsec-hq-b",
+            "encryptedBy": "tunnels/ipsec-hq-b"
+          }
+        },
+        {
+          "id": "10.10.0.0/24",
+          "kind": "subnet",
+          "name": "10.10.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "eth1"
+            },
+            {
+              "node": "sites/hq/srv-hq",
+              "interface": "eno1"
+            }
+          ],
+          "subnet": "10.10.0.0/24",
+          "addresses": [
+            "10.10.0.1/24",
+            "10.10.0.10/24"
+          ],
+          "vlans": []
+        }
+      ],
+      "family": "ipv4",
+      "tunnels": [
+        "tunnels/gre-mgmt"
+      ]
+    },
+    {
+      "hops": 5,
+      "layer": "l3",
+      "elements": [
+        "sites/branch-a/pc-branch-a",
+        "sites/branch-a/rtr-branch-a",
+        "wan/wan-core",
+        "sites/branch-b/rtr-branch-b",
+        "sites/hq/rtr-hq",
+        "sites/hq/srv-hq"
+      ],
+      "vlans": [],
+      "waypoints": [
+        {
+          "element": "sites/branch-a/pc-branch-a",
+          "name": "pc-branch-a",
+          "kind": "computer",
+          "egress": {
+            "interface": "enp3s0",
+            "addresses": [
+              "10.20.0.10/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/branch-a/rtr-branch-a",
+          "name": "rtr-branch-a",
+          "kind": "router",
+          "ingress": {
+            "interface": "ether2",
+            "addresses": [
+              "10.20.0.1/24"
+            ]
+          },
+          "egress": {
+            "interface": "ether1",
+            "addresses": [
+              "198.51.100.6/30"
+            ]
+          }
+        },
+        {
+          "element": "wan/wan-core",
+          "name": "wan-core",
+          "kind": "router",
+          "ingress": {
+            "interface": "ge-0/0/1",
+            "addresses": [
+              "198.51.100.5/30"
+            ]
+          },
+          "egress": {
+            "interface": "ge-0/0/2",
+            "addresses": [
+              "198.51.100.9/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/branch-b/rtr-branch-b",
+          "name": "rtr-branch-b",
+          "kind": "router",
+          "ingress": {
+            "interface": "ether1",
+            "addresses": [
+              "198.51.100.10/30"
+            ]
+          },
+          "egress": {
+            "interface": "ipsec0",
+            "addresses": [
+              "10.254.0.2/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/rtr-hq",
+          "name": "rtr-hq",
+          "kind": "router",
+          "ingress": {
+            "interface": "ipsec0",
+            "addresses": [
+              "10.254.0.1/30"
+            ]
+          },
+          "egress": {
+            "interface": "eth1",
+            "addresses": [
+              "10.10.0.1/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/srv-hq",
+          "name": "srv-hq",
+          "kind": "server",
+          "ingress": {
+            "interface": "eno1",
+            "addresses": [
+              "10.10.0.10/24"
+            ]
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "10.20.0.0/24",
+          "kind": "subnet",
+          "name": "10.20.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/pc-branch-a",
+              "interface": "enp3s0"
+            },
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "ether2"
+            }
+          ],
+          "subnet": "10.20.0.0/24",
+          "addresses": [
+            "10.20.0.10/24",
+            "10.20.0.1/24"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "198.51.100.4/30",
+          "kind": "subnet",
+          "name": "198.51.100.4/30",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "ether1"
+            },
+            {
+              "node": "wan/wan-core",
+              "interface": "ge-0/0/1"
+            }
+          ],
+          "subnet": "198.51.100.4/30",
+          "addresses": [
+            "198.51.100.6/30",
+            "198.51.100.5/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "198.51.100.8/30",
+          "kind": "subnet",
+          "name": "198.51.100.8/30",
+          "endpoints": [
+            {
+              "node": "wan/wan-core",
+              "interface": "ge-0/0/2"
+            },
+            {
+              "node": "sites/branch-b/rtr-branch-b",
+              "interface": "ether1"
+            }
+          ],
+          "subnet": "198.51.100.8/30",
+          "addresses": [
+            "198.51.100.9/30",
+            "198.51.100.10/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "10.254.0.0/30",
+          "kind": "subnet",
+          "name": "10.254.0.0/30",
+          "endpoints": [
+            {
+              "node": "sites/branch-b/rtr-branch-b",
+              "interface": "ipsec0"
+            },
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "ipsec0"
+            }
+          ],
+          "subnet": "10.254.0.0/30",
+          "addresses": [
+            "10.254.0.2/30",
+            "10.254.0.1/30"
+          ],
+          "vlans": [],
+          "tunnel": {
+            "id": "tunnels/ipsec-hq-b",
+            "type": "ipsec",
+            "layer": 3,
+            "stack": [
+              "ipsec"
+            ],
+            "encrypted": true,
+            "protected": true
+          }
+        },
+        {
+          "id": "10.10.0.0/24",
+          "kind": "subnet",
+          "name": "10.10.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "eth1"
+            },
+            {
+              "node": "sites/hq/srv-hq",
+              "interface": "eno1"
+            }
+          ],
+          "subnet": "10.10.0.0/24",
+          "addresses": [
+            "10.10.0.1/24",
+            "10.10.0.10/24"
+          ],
+          "vlans": []
+        }
+      ],
+      "family": "ipv4",
+      "tunnels": [
+        "tunnels/ipsec-hq-b"
+      ]
+    },
+    {
+      "hops": 5,
+      "layer": "l3",
+      "elements": [
+        "sites/branch-a/pc-branch-a",
+        "sites/branch-a/rtr-branch-a",
+        "wan/wan-core",
+        "sites/branch-b/rtr-branch-b",
+        "sites/hq/rtr-hq",
+        "sites/hq/srv-hq"
+      ],
+      "vlans": [],
+      "waypoints": [
+        {
+          "element": "sites/branch-a/pc-branch-a",
+          "name": "pc-branch-a",
+          "kind": "computer",
+          "egress": {
+            "interface": "enp3s0",
+            "addresses": [
+              "10.20.0.10/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/branch-a/rtr-branch-a",
+          "name": "rtr-branch-a",
+          "kind": "router",
+          "ingress": {
+            "interface": "ether2",
+            "addresses": [
+              "10.20.0.1/24"
+            ]
+          },
+          "egress": {
+            "interface": "ether1",
+            "addresses": [
+              "198.51.100.6/30"
+            ]
+          }
+        },
+        {
+          "element": "wan/wan-core",
+          "name": "wan-core",
+          "kind": "router",
+          "ingress": {
+            "interface": "ge-0/0/1",
+            "addresses": [
+              "198.51.100.5/30"
+            ]
+          },
+          "egress": {
+            "interface": "ge-0/0/2",
+            "addresses": [
+              "198.51.100.9/30"
+            ]
+          }
+        },
+        {
+          "element": "sites/branch-b/rtr-branch-b",
+          "name": "rtr-branch-b",
+          "kind": "router",
+          "ingress": {
+            "interface": "ether1",
+            "addresses": [
+              "198.51.100.10/30"
+            ]
+          },
+          "egress": {
+            "interface": "wg0",
+            "addresses": [
+              "10.255.0.3/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/rtr-hq",
+          "name": "rtr-hq",
+          "kind": "router",
+          "ingress": {
+            "interface": "wg0",
+            "addresses": [
+              "10.255.0.1/24"
+            ]
+          },
+          "egress": {
+            "interface": "eth1",
+            "addresses": [
+              "10.10.0.1/24"
+            ]
+          }
+        },
+        {
+          "element": "sites/hq/srv-hq",
+          "name": "srv-hq",
+          "kind": "server",
+          "ingress": {
+            "interface": "eno1",
+            "addresses": [
+              "10.10.0.10/24"
+            ]
+          }
+        }
+      ],
+      "links": [
+        {
+          "id": "10.20.0.0/24",
+          "kind": "subnet",
+          "name": "10.20.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/pc-branch-a",
+              "interface": "enp3s0"
+            },
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "ether2"
+            }
+          ],
+          "subnet": "10.20.0.0/24",
+          "addresses": [
+            "10.20.0.10/24",
+            "10.20.0.1/24"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "198.51.100.4/30",
+          "kind": "subnet",
+          "name": "198.51.100.4/30",
+          "endpoints": [
+            {
+              "node": "sites/branch-a/rtr-branch-a",
+              "interface": "ether1"
+            },
+            {
+              "node": "wan/wan-core",
+              "interface": "ge-0/0/1"
+            }
+          ],
+          "subnet": "198.51.100.4/30",
+          "addresses": [
+            "198.51.100.6/30",
+            "198.51.100.5/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "198.51.100.8/30",
+          "kind": "subnet",
+          "name": "198.51.100.8/30",
+          "endpoints": [
+            {
+              "node": "wan/wan-core",
+              "interface": "ge-0/0/2"
+            },
+            {
+              "node": "sites/branch-b/rtr-branch-b",
+              "interface": "ether1"
+            }
+          ],
+          "subnet": "198.51.100.8/30",
+          "addresses": [
+            "198.51.100.9/30",
+            "198.51.100.10/30"
+          ],
+          "vlans": []
+        },
+        {
+          "id": "10.255.0.0/24",
+          "kind": "subnet",
+          "name": "10.255.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/branch-b/rtr-branch-b",
+              "interface": "wg0"
+            },
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "wg0"
+            }
+          ],
+          "subnet": "10.255.0.0/24",
+          "addresses": [
+            "10.255.0.3/24",
+            "10.255.0.1/24"
+          ],
+          "vlans": [],
+          "tunnel": {
+            "id": "tunnels/wg-mesh",
+            "type": "wireguard",
+            "layer": 3,
+            "stack": [
+              "wireguard"
+            ],
+            "encrypted": true,
+            "protected": true
+          }
+        },
+        {
+          "id": "10.10.0.0/24",
+          "kind": "subnet",
+          "name": "10.10.0.0/24",
+          "endpoints": [
+            {
+              "node": "sites/hq/rtr-hq",
+              "interface": "eth1"
+            },
+            {
+              "node": "sites/hq/srv-hq",
+              "interface": "eno1"
+            }
+          ],
+          "subnet": "10.10.0.0/24",
+          "addresses": [
+            "10.10.0.1/24",
+            "10.10.0.10/24"
+          ],
+          "vlans": []
+        }
+      ],
+      "family": "ipv4",
+      "tunnels": [
+        "tunnels/wg-mesh"
+      ]
+    }
+  ],
+  "notes": [
+    "no layer-2 path: the two elements are in no common broadcast domain, so the trace looked for a routed one"
+  ]
+}

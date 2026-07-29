@@ -1,0 +1,40 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkPath",
+  "source": {
+    "spec": "pc-north-01",
+    "element": "sites/north/hosts/pc-north-01",
+    "name": "pc-north-01",
+    "kind": "computer"
+  },
+  "destination": {
+    "spec": "sw-north-acc-01:GigabitEthernet1/0/3",
+    "element": "sites/north/access/sw-north-acc-01",
+    "name": "sw-north-acc-01",
+    "kind": "switch",
+    "interface": "GigabitEthernet1/0/3"
+  },
+  "found": false,
+  "layer": null,
+  "maxHops": 16,
+  "pathCount": 0,
+  "truncated": false,
+  "paths": [],
+  "frontiers": [
+    {
+      "layer": "l2",
+      "reached": 2,
+      "furthest": "sites/north/access/sw-north-acc-01",
+      "depth": 1
+    },
+    {
+      "layer": "l3",
+      "reached": 22,
+      "furthest": "sites/south/access/sw-south-acc-01",
+      "depth": 5
+    }
+  ],
+  "notes": [
+    "no layer-2 path: the two elements are in no common broadcast domain, so the trace looked for a routed one"
+  ]
+}

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from netgraph.render.highlight import Highlight
 from netgraph.render.icons import IconTheme
 from netgraph.render.links import LinkTemplate
 
@@ -49,3 +50,10 @@ class RenderOptions:
     #: be deep-linked and styled from outside. Off by default: a hand-read DOT
     #: file is better without them.
     element_ids: bool = False
+    #: Draw part of the graph emphasised and the rest dimmed
+    #: (:mod:`netgraph.render.highlight`). ``None`` — the default — draws every
+    #: node and link at full weight. This changes no topology: what is *drawn*
+    #: is decided by :class:`~netgraph.render.graph.FilterSpec` before a
+    #: renderer runs, and a highlight only decides how loudly. Honoured by the
+    #: Graphviz backends; Mermaid and JSON have no visual weight to vary.
+    highlight: Highlight | None = None

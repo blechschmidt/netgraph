@@ -37,6 +37,7 @@ __all__ = [
     "Renderer",
     "media_type_for",
     "renderer_for",
+    "supports_highlight",
     "supports_icons",
     "supports_interaction",
 ]
@@ -91,6 +92,12 @@ class Renderer:
     #: the one laid-out format with somewhere to put them: a PNG and a PDF are
     #: pictures, and Mermaid and JSON have an interaction model of their own.
     interactive: bool = False
+    #: Can this backend draw part of the graph emphasised and the rest dimmed
+    #: (:mod:`netgraph.render.highlight`)? Emphasis is *visual weight* — a bold
+    #: outline, a dimmed fill — so it needs a backend that decides how things
+    #: look. Mermaid and JSON have no such vocabulary, so ``netgraph path
+    #: --highlight`` does not offer them rather than silently ignoring the flag.
+    supports_highlight: bool = False
 
     @property
     def is_text(self) -> bool:
@@ -124,6 +131,7 @@ def _text_renderer(
     *,
     supports_icons: bool = False,
     interactive: bool = False,
+    supports_highlight: bool = False,
 ) -> Renderer:
     """A text backend, with its UTF-8 encoding wired up once."""
 
@@ -141,13 +149,18 @@ def _text_renderer(
         advise=advise,
         supports_icons=supports_icons,
         interactive=interactive,
+        supports_highlight=supports_highlight,
     )
 
 
 def _image_renderer(
     name: str, description: str, media_type: str, *, binary: bool, interactive: bool = False
 ) -> Renderer:
-    """A Graphviz image backend. ``to_image`` validates the format itself."""
+    """A Graphviz image backend. ``to_image`` validates the format itself.
+
+    Every one of them lays the graph out through the DOT backend, so all three
+    inherit its icon and highlight support without being told.
+    """
     return Renderer(
         name=name,
         description=description,
@@ -157,6 +170,7 @@ def _image_renderer(
         to_bytes=partial(to_image, format=name),
         supports_icons=True,
         interactive=interactive,
+        supports_highlight=True,
     )
 
 
@@ -173,6 +187,7 @@ RENDERERS: Final[Mapping[str, Renderer]] = MappingProxyType(
                 to_dot,
                 supports_icons=True,
                 interactive=True,
+                supports_highlight=True,
             ),
             _image_renderer(
                 "svg",
@@ -211,6 +226,16 @@ def supports_icons(format: str) -> bool:
     """
     renderer = RENDERERS.get(format)
     return renderer is not None and renderer.supports_icons
+
+
+def supports_highlight(format: str) -> bool:
+    """Would ``format`` draw a :class:`~netgraph.render.highlight.Highlight`?
+
+    An unknown format answers ``False``; the render call that follows is where
+    a bad format name is reported.
+    """
+    renderer = RENDERERS.get(format)
+    return renderer is not None and renderer.supports_highlight
 
 
 def supports_interaction(format: str) -> bool:

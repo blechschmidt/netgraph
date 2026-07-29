@@ -50,6 +50,7 @@ from netgraph.render.graph import (
     is_routable_address,
     resolve_tunnels,
 )
+from netgraph.render.highlight import Highlight
 from netgraph.render.icons import (
     BUNDLED_THEMES,
     ICON_KINDS,
@@ -72,6 +73,7 @@ from netgraph.render.registry import (
     Renderer,
     media_type_for,
     renderer_for,
+    supports_highlight,
     supports_icons,
     supports_interaction,
 )
@@ -96,6 +98,7 @@ __all__ = [
     "ElementIds",
     "FilterSpec",
     "Graph",
+    "Highlight",
     "IconTheme",
     "Layer",
     "LinkTemplate",
@@ -130,6 +133,7 @@ __all__ = [
     "renderer_for",
     "resolve_tunnels",
     "suffix_for",
+    "supports_highlight",
     "supports_icons",
     "supports_interaction",
     "theme_choices",

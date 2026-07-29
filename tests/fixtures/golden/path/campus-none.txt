@@ -1,0 +1,8 @@
+sites/north/hosts/pc-north-01 -> sites/north/access/sw-north-acc-01:GigabitEthernet1/0/3: no path
+  source       sites/north/hosts/pc-north-01  [computer]
+  destination  sites/north/access/sw-north-acc-01:GigabitEthernet1/0/3  [switch]
+  note         no layer-2 path: the two elements are in no common broadcast domain, so the trace looked for a routed one
+
+no path from sites/north/hosts/pc-north-01 to sites/north/access/sw-north-acc-01 within 16 hops.
+  layer 2: reached 2 elements; the furthest was sites/north/access/sw-north-acc-01 at 1 hop
+  layer 3: reached 22 elements; the furthest was sites/south/access/sw-south-acc-01 at 5 hops

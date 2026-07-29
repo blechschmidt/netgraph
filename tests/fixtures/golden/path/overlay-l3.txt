@@ -1,0 +1,21 @@
+sites/branch-a/pc-branch-a -> sites/hq/srv-hq: 8 paths
+  source       sites/branch-a/pc-branch-a  [computer]
+  destination  sites/hq/srv-hq  [server]
+  layer        3, routed (ipv4)
+  showing      the shortest; pass --all for the rest
+  note         no layer-2 path: the two elements are in no common broadcast domain, so the trace looked for a routed one
+
+path 1 of 8 · 3 hops · ipv4
+   1  sites/branch-a/pc-branch-a  [computer]
+      out enp3s0                10.20.0.10/24
+      ->  subnet 10.20.0.0/24  10.20.0.10/24 -> 10.20.0.1/24
+   2  sites/branch-a/rtr-branch-a  [router]
+      in  ether2                10.20.0.1/24
+      out wg0                   10.255.0.2/24
+      ->  subnet 10.255.0.0/24  10.255.0.2/24 -> 10.255.0.1/24  [wireguard, encrypted]
+   3  sites/hq/rtr-hq  [router]
+      in  wg0                   10.255.0.1/24
+      out eth1                  10.10.0.1/24
+      ->  subnet 10.10.0.0/24  10.10.0.1/24 -> 10.10.0.10/24
+   4  sites/hq/srv-hq  [server]
+      in  eno1                  10.10.0.10/24

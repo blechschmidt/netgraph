@@ -1,0 +1,55 @@
+sites/north/hosts/pc-north-01:eno1 -> sites/south/hosts/srv-south-01:eth0: 2 paths
+  source       sites/north/hosts/pc-north-01:eno1  [computer]  10.1.10.51/24
+  destination  sites/south/hosts/srv-south-01:eth0  [server]  10.2.20.11/24
+  layer        3, routed (ipv4)
+  note         no layer-2 path: the two elements are in no common broadcast domain, so the trace looked for a routed one
+
+path 1 of 2 · 5 hops · ipv4
+   1  sites/north/hosts/pc-north-01  [computer]
+      out eno1                  10.1.10.51/24
+      ->  subnet 10.1.10.0/24  10.1.10.51/24 -> 10.1.10.1/24
+   2  sites/north/distribution/sw-north-dist-01  [switch]
+      in  Vlan10                10.1.10.1/24
+      out Ethernet52/1          10.1.0.2/30
+      ->  subnet 10.1.0.0/30  10.1.0.2/30 -> 10.1.0.1/30
+   3  sites/north/core/rtr-north-core-01  [router]
+      in  xe-0/0/0              10.1.0.1/30
+      out xe-0/0/1              198.51.100.1/30
+      ->  subnet 198.51.100.0/30  198.51.100.1/30 -> 198.51.100.2/30
+   4  sites/south/core/rtr-south-core-01  [router]
+      in  xe-0/0/2              198.51.100.2/30
+      out xe-0/0/0              10.2.0.1/30
+      ->  subnet 10.2.0.0/30  10.2.0.1/30 -> 10.2.0.2/30
+   5  sites/south/distribution/sw-south-dist-01  [switch]
+      in  Ethernet52/1          10.2.0.2/30
+      out Vlan20                10.2.20.1/24
+      ->  subnet 10.2.20.0/24  10.2.20.1/24 -> 10.2.20.11/24
+   6  sites/south/hosts/srv-south-01  [server]
+      in  eth0                  10.2.20.11/24
+
+path 2 of 2 · 6 hops · ipv4
+   1  sites/north/hosts/pc-north-01  [computer]
+      out eno1                  10.1.10.51/24
+      ->  subnet 10.1.10.0/24  10.1.10.51/24 -> 10.1.10.1/24
+   2  sites/north/distribution/sw-north-dist-01  [switch]
+      in  Vlan10                10.1.10.1/24
+      out Ethernet52/1          10.1.0.2/30
+      ->  subnet 10.1.0.0/30  10.1.0.2/30 -> 10.1.0.1/30
+   3  sites/north/core/rtr-north-core-01  [router]
+      in  xe-0/0/0              10.1.0.1/30
+      out xe-0/0/2              198.51.100.10/30
+      ->  subnet 198.51.100.8/30  198.51.100.10/30 -> 198.51.100.9/30
+   4  sites/west/core/rtr-west-core-01  [router]
+      in  xe-0/0/1              198.51.100.9/30
+      out xe-0/0/2              198.51.100.6/30
+      ->  subnet 198.51.100.4/30  198.51.100.6/30 -> 198.51.100.5/30
+   5  sites/south/core/rtr-south-core-01  [router]
+      in  xe-0/0/1              198.51.100.5/30
+      out xe-0/0/0              10.2.0.1/30
+      ->  subnet 10.2.0.0/30  10.2.0.1/30 -> 10.2.0.2/30
+   6  sites/south/distribution/sw-south-dist-01  [switch]
+      in  Ethernet52/1          10.2.0.2/30
+      out Vlan20                10.2.20.1/24
+      ->  subnet 10.2.20.0/24  10.2.20.1/24 -> 10.2.20.11/24
+   7  sites/south/hosts/srv-south-01  [server]
+      in  eth0                  10.2.20.11/24

@@ -39,6 +39,22 @@ capture() {
                     || echo "exit=$?" >>"$dir/render_${fmt}_${layer}.out"
             done
         done
+        # A trace between the first and the last element the inventory declares.
+        # Which two they are does not matter -- what is being captured is that
+        # the answer did not change -- but they must be picked the same way on
+        # both runs, and load order is deterministic.
+        names=$(NETGRAPH_YAML_LOADER=$loader "$netgraph" --no-color -i "$inventory" \
+                list devices 2>/dev/null | awk 'NR>2 {print $1}')
+        first=$(echo "$names" | head -n 1)
+        last=$(echo "$names" | tail -n 1)
+        if [ -n "$first" ] && [ -n "$last" ] && [ "$first" != "$last" ]; then
+            for fmt in text json; do
+                NETGRAPH_YAML_LOADER=$loader "$netgraph" --no-color -i "$inventory" \
+                    path --all --force -F "$fmt" "$first" "$last" \
+                    >"$dir/path_${fmt}.out" 2>"$dir/path_${fmt}.err" \
+                    || echo "exit=$?" >>"$dir/path_${fmt}.out"
+            done
+        fi
     done
 }
 

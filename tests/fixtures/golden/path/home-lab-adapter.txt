@@ -1,0 +1,19 @@
+hosts/laptop -> hosts/pc-desk: 1 path
+  source       hosts/laptop  [computer]
+  destination  hosts/pc-desk  [computer]
+  layer        2, switched
+  vlan         10 (assumed by the trace)
+
+path 1 of 1 · 3 hops · vlan 10
+   1  hosts/laptop  [computer]
+      ->  attachment adp-usb-eth  (copper, 5Gbps, usb)
+   2  hosts/adp-usb-eth  [adapter]
+      in  usb0
+      out enx001122334455       192.168.10.30/24, 2001:db8:10::30/64
+      ->  cable cbl-sw-dongle  (copper, 1Gbps, H-004, 10m)  vlan 10
+   3  switches/sw-home  [switch]
+      in  port4
+      out port2
+      ->  cable cbl-sw-desk  (copper, 1Gbps, H-002, 8m)  vlan 10
+   4  hosts/pc-desk  [computer]
+      in  eno1                  192.168.10.20/24, 2001:db8:10::20/64

@@ -19,6 +19,11 @@ One contract per command:
     inventory is refused unless ``--force``, because the whole point of the tool
     is that the picture agrees with the files — a diagram silently drawn from an
     inventory with a dangling cable is worse than no diagram.
+``path``
+    Answer the question an engineer actually asks: how does A reach B, and what
+    does the traffic cross on the way? Hop by hop, layer-aware, with the VLAN or
+    the subnet in force at each step — and, with ``--highlight``, the same
+    answer drawn over the whole inventory.
 ``watch``
     ``render`` on a loop, driven by the filesystem, optionally with a local
     preview served over HTTP. Whatever ``render`` would refuse, ``watch``
@@ -83,7 +88,7 @@ from netgraph.completion import (
 )
 from netgraph.config import Config, ValidationConfig, load_config
 from netgraph.console import Align, Console
-from netgraph.errors import NetgraphError, RenderError, format_path
+from netgraph.errors import NetgraphError, RenderError, compact_ids, format_path
 from netgraph.importer import (
     DIALECTS,
     Draft,
@@ -108,6 +113,7 @@ from netgraph.render import (
     RENDERERS,
     FilterSpec,
     Graph,
+    Highlight,
     IconTheme,
     Layer,
     LinkTemplate,
@@ -120,6 +126,7 @@ from netgraph.render import (
     is_binary_format,
     render,
     resolve_tunnels,
+    supports_highlight,
     supports_icons,
     supports_interaction,
     theme_choices,
@@ -131,6 +138,8 @@ from netgraph.rules import RULES, Severity
 from netgraph.scaffold import SCHEMA_FILE_NAME, build_scaffold, write_scaffold
 from netgraph.schema import build_schema
 from netgraph.subnets import subnets_of
+from netgraph.trace import DEFAULT_MAX_HOPS, TraceError, TraceResult, render_trace, trace
+from netgraph.trace import REPORT_FORMATS as TRACE_FORMATS
 from netgraph.validate import Finding
 from netgraph.validate import validate as run_validation
 from netgraph.watch import (
@@ -690,11 +699,10 @@ def _resolve_link_template(
         raise click.BadParameter(str(exc), ctx=ctx, param=param) from exc
 
 
-#: The filter and display options ``render`` and ``watch`` have in common,
-#: listed in the order they should appear in ``--help``. They are applied by
-#: :func:`_graph_options` rather than repeated on both commands: two copies of
-#: fourteen options would diverge on the first one that gained a new default.
-_GRAPH_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
+#: Which *elements* a rendering covers. Only the commands that draw the whole
+#: inventory take these: ``path`` draws the route it traced, so narrowing the
+#: graph underneath it would hide the very thing the reader is being shown.
+_FILTER_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
     click.option(
         "--namespace",
         "namespaces",
@@ -739,6 +747,13 @@ _GRAPH_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
         show_default=True,
         help="How many hops --neighbors-of reaches.",
     ),
+)
+
+#: How much detail a rendering carries. Shared by every command that produces a
+#: diagram — ``render``, ``watch`` and ``path --highlight`` — so a highlighted
+#: trace is styled by exactly the options a plain render is, and the three
+#: cannot drift apart on the first one that gains a new default.
+_DISPLAY_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
     click.option(
         "--show-ips/--no-show-ips",
         default=True,
@@ -766,17 +781,6 @@ _GRAPH_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
             "Draw each element as an icon instead of a plain shape. "
             f"Built in: {', '.join(theme_choices())}. A directory of images named after "
             "element kinds (router.svg, switch.png, ...) also works. Graphviz formats only."
-        ),
-    ),
-    click.option(
-        "--layer",
-        type=click.Choice([layer.value for layer in Layer]),
-        default=Layer.L1.value,
-        show_default=True,
-        shell_complete=complete_layer,
-        help=(
-            "l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets "
-            "and the elements addressed in them."
         ),
     ),
     click.option(
@@ -809,28 +813,65 @@ _GRAPH_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
         ),
     ),
     click.option("--title", default=None, metavar="TEXT", help="Caption for the diagram."),
+)
+
+#: Which view of the network to draw. ``path`` does not take it: the layer a
+#: trace is answered at is decided by where the path was *found*, and letting a
+#: flag contradict that would draw a diagram the report disagrees with.
+_LAYER_OPTION: Final[Callable[[Any], Any]] = click.option(
+    "--layer",
+    type=click.Choice([layer.value for layer in Layer]),
+    default=Layer.L1.value,
+    show_default=True,
+    shell_complete=complete_layer,
+    help=(
+        "l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets "
+        "and the elements addressed in them."
+    ),
+)
+
+#: How an inventory with problems in it is treated. Shared by every command
+#: that loads one before doing work on it.
+_VALIDATION_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
     click.option("--strict", is_flag=True, default=False, help="Treat warnings as errors."),
     click.option(
         "--force",
         is_flag=True,
         default=False,
-        help="Render even when validation failed. The diagram may not match the files.",
+        help="Proceed even when validation failed. The result may not match the files.",
     ),
+)
+
+#: Everything ``render`` and ``watch`` have in common, in ``--help`` order.
+_GRAPH_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
+    *_FILTER_OPTIONS,
+    *_DISPLAY_OPTIONS,
+    _LAYER_OPTION,
+    *_VALIDATION_OPTIONS,
 )
 
 _Command = TypeVar("_Command", bound=Callable[..., Any])
 
 
-def _graph_options(command: _Command) -> _Command:
-    """Apply :data:`_GRAPH_OPTIONS` to ``command``.
+def _apply(options: Sequence[Callable[[Any], Any]], command: _Command) -> _Command:
+    """Apply ``options`` to ``command``, keeping their written order in ``--help``.
 
-    Decorators are applied bottom-up, so reversing the list reproduces the
-    order the options are written in — and therefore the order ``--help``
-    shows them in.
+    Decorators are applied bottom-up, so reversing the list reproduces the order
+    the options are written in.
     """
-    for option in reversed(_GRAPH_OPTIONS):
+    for option in reversed(options):
         command = option(command)
     return command
+
+
+def _graph_options(command: _Command) -> _Command:
+    """Apply :data:`_GRAPH_OPTIONS` to ``command``."""
+    return _apply(_GRAPH_OPTIONS, command)
+
+
+def _path_options(command: _Command) -> _Command:
+    """Apply the options ``path --highlight`` shares with ``render``."""
+    return _apply((*_DISPLAY_OPTIONS, *_VALIDATION_OPTIONS), command)
 
 
 def _filter_spec(params: Mapping[str, Any]) -> FilterSpec:
@@ -857,8 +898,10 @@ def _describe_formats() -> str:
     )
 
 
-def _render_options(params: Mapping[str, Any]) -> RenderOptions:
-    """Build the display options from the parsed :data:`_GRAPH_OPTIONS`."""
+def _render_options(
+    params: Mapping[str, Any], *, highlight: Highlight | None = None
+) -> RenderOptions:
+    """Build the display options from the parsed :data:`_DISPLAY_OPTIONS`."""
     return RenderOptions(
         show_ips=params["show_ips"],
         show_vlans=params["show_vlans"],
@@ -868,6 +911,7 @@ def _render_options(params: Mapping[str, Any]) -> RenderOptions:
         tooltips=params["tooltips"],
         link_template=params["link_template"],
         element_ids=params["element_ids"],
+        highlight=highlight,
     )
 
 
@@ -1089,6 +1133,233 @@ def _is_a_terminal(stream: Any) -> bool:
         return bool(stream.isatty())
     except (AttributeError, ValueError):  # pragma: no cover - detached stream
         return False
+
+
+# --------------------------------------------------------------------------- #
+# path
+# --------------------------------------------------------------------------- #
+
+#: Formats ``--highlight`` can draw. Emphasis is a *visual* weight — a bold
+#: outline, a dimmed fill — so only the backends that lay a picture out can
+#: carry it; Mermaid and JSON have no such vocabulary and are left out rather
+#: than silently ignoring the flag.
+HIGHLIGHT_FORMATS: Final[tuple[str, ...]] = tuple(
+    name for name in FORMATS if supports_highlight(name)
+)
+
+
+@cli.command("path")
+@click.argument("src", shell_complete=complete_element)
+@click.argument("dst", shell_complete=complete_element)
+@click.option(
+    "--vlan",
+    type=click.IntRange(1, 4094),
+    default=None,
+    metavar="VID",
+    help=(
+        "Trace inside this VLAN instead of letting the trace derive one. Forces a layer-2 "
+        "answer: a VLAN is a layer-2 fact, so no routed path is looked for."
+    ),
+)
+@click.option(
+    "--all",
+    "all_paths",
+    is_flag=True,
+    default=False,
+    help="Report every distinct path, not only the shortest. A redundant pair is the point.",
+)
+@click.option(
+    "--max-hops",
+    type=click.IntRange(1, 64),
+    default=DEFAULT_MAX_HOPS,
+    show_default=True,
+    help="Abandon a route that crosses more links than this.",
+)
+@click.option(
+    "-F",
+    "--output-format",
+    type=click.Choice(TRACE_FORMATS),
+    default="text",
+    show_default=True,
+    help="text is the hop-by-hop report; json is the same trace for tooling.",
+)
+@click.option(
+    "--highlight",
+    is_flag=True,
+    default=False,
+    help=(
+        "Also render the whole inventory with the traced path emphasised and everything else "
+        "dimmed. Choose the format with -f and the destination with -o."
+    ),
+)
+@click.option(
+    "-f",
+    "--format",
+    "output_image",
+    type=click.Choice(HIGHLIGHT_FORMATS),
+    default="dot",
+    show_default=True,
+    shell_complete=complete_format,
+    help="Format of the --highlight diagram.",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
+    default=None,
+    help="Write the --highlight diagram to this file instead of stdout.",
+)
+@_path_options
+@click.pass_context
+def path_command(
+    ctx: click.Context,
+    /,
+    src: str,
+    dst: str,
+    vlan: int | None,
+    all_paths: bool,
+    max_hops: int,
+    output_format: str,
+    highlight: bool,
+    output_image: str,
+    output: Path | None,
+    **_options: Any,
+) -> None:
+    """Trace how SRC reaches DST, and what the traffic crosses on the way.
+
+    SRC and DST are each an element name, an 'element:interface' selector, or an
+    IP address configured somewhere in the inventory — an address is usually
+    what a ticket or a packet capture gives you.
+
+    \b
+    netgraph path pc-north-01 srv-south-01
+    netgraph path 10.1.10.51 10.2.20.11 --all
+    netgraph path sw-hq:Ethernet49/1 sw-hq:Ethernet50/1 --vlan 10
+    netgraph path rtr-hq rtr-branch-b --highlight -f svg -o path.svg
+
+    The trace is layer-aware. It first walks the physical topology through
+    cables, hubs, adapters and switches, honouring VLAN membership — a route
+    that would have to cross an access port in another VLAN is not a route — and
+    reports the VLAN it assumed. When the two ends are in no common broadcast
+    domain it looks for a routed path instead, matching interface subnets across
+    the elements that forward, and reports each hop's ingress and egress
+    interface and address. A tunnel on the path is named with the encapsulation
+    entered and left, nesting included, and a tunnel nothing in its 'over' chain
+    encrypts is called out the way W127 calls it out.
+
+    Exits 1 when there is no path, so a reachability assertion drops straight
+    into CI.
+    """
+    app: AppContext = ctx.obj
+    params = ctx.params
+    _reject_diagram_options_without_highlight(ctx, highlight)
+
+    # With --highlight and no --output the diagram owns stdout, so the report
+    # moves to stderr; ``render`` splits its output the same way.
+    diagram_to_stdout = highlight and output is None
+    console = app.console(err=diagram_to_stdout)
+    notes = app.console(err=True)
+
+    inventory = app.load()
+    findings = _run_validation(app, inventory, strict=bool(params["strict"]))
+    if _is_rejected(inventory, findings):
+        _report_problems(notes, inventory.errors, findings)
+        if not params["force"]:
+            notes.error(
+                "refusing to trace an inventory with errors; a dangling cable is exactly the "
+                "kind of thing that makes a path wrong. Fix them, or pass --force"
+            )
+            raise click.exceptions.Exit(EXIT_INVALID)
+        notes.warn("tracing despite errors (--force): the path may not match the inventory")
+
+    try:
+        result = trace(inventory, src, dst, vlan=vlan, max_hops=max_hops)
+    except TraceError as exc:
+        raise click.BadParameter(str(exc), param_hint="'SRC' / 'DST'") from exc
+
+    console.print(render_trace(result, output_format, all_paths=all_paths).rstrip("\n"))
+    _report_cleartext_tunnels(notes, result)
+
+    if highlight:
+        _write_highlight(
+            notes,
+            inventory,
+            result,
+            params,
+            all_paths=all_paths,
+            output_format=output_image,
+            output=output,
+        )
+    if not result.found:
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+
+def _reject_diagram_options_without_highlight(ctx: click.Context, highlight: bool) -> None:
+    """Fail on ``-f``/``-o`` without ``--highlight`` instead of ignoring them.
+
+    Both name properties of a diagram this command only draws when asked to. A
+    user who typed ``-o path.svg`` and got the text report on stdout and no file
+    would reasonably conclude the command is broken.
+    """
+    if highlight:
+        return
+    given = [
+        f"--{name.replace('_', '-')}"
+        for name, flag in (("format", "output_image"), ("output", "output"))
+        if ctx.get_parameter_source(flag) is ParameterSource.COMMANDLINE
+    ]
+    if given:
+        raise click.UsageError(
+            f"{given[0]} describes the diagram --highlight draws; add --highlight to draw one.",
+            ctx=ctx,
+        )
+
+
+def _report_cleartext_tunnels(console: Console, result: TraceResult) -> None:
+    """Say when the traced route crosses a tunnel that protects nothing.
+
+    ``W127`` reports this about an *inventory*; here it is reported about a
+    *route*, which is the form that matters — a cleartext VXLAN inside a data
+    centre is fine, and the same tunnel on the path between two branch offices
+    is not, and only a trace can tell the two apart.
+    """
+    for view in result.cleartext_tunnels:
+        console.warn(
+            f"the path crosses tunnel {view.fqn!r}, which is {view.type} and encrypts nothing, "
+            f"and no tunnel in its 'over' chain does either; everything it carries crosses the "
+            f"underlay in the clear (W127)"
+        )
+
+
+def _write_highlight(
+    console: Console,
+    inventory: Inventory,
+    result: TraceResult,
+    params: Mapping[str, Any],
+    *,
+    all_paths: bool,
+    output_format: str,
+    output: Path | None,
+) -> None:
+    """Draw the whole inventory with the traced route emphasised.
+
+    The diagram is built at the layer the path was *found* at, so a switched
+    answer is drawn over cables and a routed one over prefixes — the two views
+    of the same trace, and neither of them a picture the report disagrees with.
+    A trace that found nothing still draws: the diagram is then the topology the
+    path was looked for in, dimmed, which is where the reader has to look.
+    """
+    layer = result.layer if result.layer is not None else Layer.L1
+    graph = build_graph(inventory, layer=layer)
+    options = _render_options(params, highlight=result.highlight(all_paths=all_paths))
+    _report_icon_support(console, output_format, options)
+    payload = render(graph, output_format, options)
+    _write_output(console, payload, output=output, output_format=output_format)
+    console.info(
+        f"highlighted {_plural(len(result.selected(all_paths=all_paths)), 'path')} over "
+        f"{_plural(len(graph.nodes), 'node')} at layer {layer}"
+        + (f", written to {output}" if output is not None else "")
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -1556,7 +1827,7 @@ def _list_devices(inventory: Inventory) -> _Listing:
                 node.kind,
                 str(len(node.ports)),
                 addresses[0] if addresses else "-",
-                _compact_ids(node.vlans) or "-",
+                compact_ids(node.vlans) or "-",
             ]
         )
         records.append(
@@ -1719,7 +1990,7 @@ def _list_subnets(inventory: Inventory) -> _Listing:
                 str(subnet.version),
                 str(len(subnet.addresses)),
                 str(len(subnet.elements)),
-                _compact_ids(vlans) or "-",
+                compact_ids(vlans) or "-",
             ]
         )
         records.append(
@@ -2058,20 +2329,6 @@ def _serialise(payload: Any, output_format: str) -> str:
     if output_format == "json":
         return json.dumps(payload, indent=2, ensure_ascii=False)
     return yaml.safe_dump(payload, sort_keys=False, default_flow_style=False, allow_unicode=True)
-
-
-def _compact_ids(ids: Iterable[int]) -> str:
-    """Render ids as coalesced ranges: ``10,20,100-110``."""
-    ordered = sorted(set(ids))
-    if not ordered:
-        return ""
-    ranges: list[tuple[int, int]] = []
-    for value in ordered:
-        if ranges and value == ranges[-1][1] + 1:
-            ranges[-1] = (ranges[-1][0], value)
-        else:
-            ranges.append((value, value))
-    return ",".join(str(low) if low == high else f"{low}-{high}" for low, high in ranges)
 
 
 def _length(metres: float | None) -> str:

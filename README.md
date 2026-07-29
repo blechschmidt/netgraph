@@ -263,6 +263,32 @@ SUBNET           IP  ADDRESSES  ELEMENTS  VLANS
 203.0.113.0/30    4          1         1  -
 ```
 
+And the question the diagram cannot answer on its own:
+
+<!-- path-example -->
+
+```console
+$ netgraph path pc-alice rtr-gw
+devices/pc-alice -> devices/rtr-gw: 1 path
+  source       devices/pc-alice  [computer]
+  destination  devices/rtr-gw  [router]
+  layer        2, switched
+  vlan         10 (assumed by the trace)
+
+path 1 of 1 · 2 hops · vlan 10
+   1  devices/pc-alice  [computer]
+      out eno1                  192.168.10.20/24
+      ->  cable cbl-sw-alice  (copper, 1Gbps)  vlan 10
+   2  devices/sw-office  [switch]
+      in  port2
+      out port1
+      ->  cable cbl-rtr-sw  (copper, 1Gbps)  vlan 10
+   3  devices/rtr-gw  [router]
+      in  lan0                  192.168.10.1/24
+```
+
+See [`netgraph path`](#netgraph-path).
+
 That is the whole loop: write YAML, validate, render. Everything below is
 detail.
 
@@ -923,6 +949,164 @@ Two problems are visible only from here, and `netgraph validate` reports both:
 (`element` or `subnet`) so a consumer can tell a derived prefix from a declared
 device.
 
+### `netgraph path`
+
+Trace how one element reaches another, and what the traffic crosses on the way.
+Hop by hop, layer-aware, over the topology the files declare — nothing is pinged
+and no device is contacted, which is the point: it tells you what your
+documentation says should happen, and that is exactly the thing to compare
+against what does.
+
+```
+netgraph path [OPTIONS] SRC DST
+```
+
+`SRC` and `DST` are each an **element name**, an **`element:interface`**
+selector, or an **IP address** configured somewhere in the inventory. An address
+is usually the right spelling, because an address is what a ticket or a packet
+capture actually carries; a prefix length is accepted and ignored, so you can
+paste straight out of `ip addr`.
+
+```console
+$ netgraph -i examples/home-lab path laptop srv-nas
+hosts/laptop -> hosts/srv-nas: 1 path
+  source       hosts/laptop  [computer]
+  destination  hosts/srv-nas  [server]
+  layer        2, switched
+  vlan         10 (assumed by the trace)
+
+path 1 of 1 · 3 hops · vlan 10
+   1  hosts/laptop  [computer]
+      ->  attachment adp-usb-eth  (copper, 5Gbps, usb)
+   2  hosts/adp-usb-eth  [adapter]
+      in  usb0
+      out enx001122334455       192.168.10.30/24, 2001:db8:10::30/64
+      ->  cable cbl-sw-dongle  (copper, 1Gbps, H-004, 10m)  vlan 10
+   3  switches/sw-home  [switch]
+      in  port4
+      out port3
+      ->  cable cbl-sw-nas  (copper, 1Gbps, H-003, 0.5m)  vlan 10
+   4  hosts/srv-nas  [server]
+      in  eth0                  192.168.10.10/24, 2001:db8:10::10/64
+```
+
+**The trace is layer-aware, and tries the layers in the order traffic does.**
+
+*Layer 2* walks the physical topology — cables, adapter attachments and layer-2
+tunnels — relaying only where the kind of element says it does: a hub repeats, an
+adapter is transparent (§8.2), a switch forwards between two of its ports, and a
+router, computer or server is where a frame **stops**. VLAN membership prunes the
+walk: an untagged host port narrows nothing, a trunk narrows to what it carries,
+and an access port in the wrong VLAN is a wall. Whatever survives is the VLAN the
+trace *assumed*, and is reported as such. `--vlan` forces one instead.
+
+*Layer 3* takes over when the two ends are in no common broadcast domain. Two
+elements are one hop apart when they hold an address in the same prefix — the
+same grouping `list subnets` prints and `render --layer l3` draws — and an
+element in the middle is only crossed when `spec.forwarding` says it forwards.
+The whole route stays in one address family, and each hop names the prefix and
+the address at both ends of it:
+
+```console
+$ netgraph -i examples/campus path 10.1.10.51 10.1.20.11
+…
+  layer        3, routed (ipv4)
+  note         no layer-2 path: the two elements are in no common broadcast domain, so the trace looked for a routed one
+
+path 1 of 1 · 2 hops · ipv4
+   1  sites/north/hosts/pc-north-01  [computer]
+      out eno1                  10.1.10.51/24
+      ->  subnet 10.1.10.0/24  10.1.10.51/24 -> 10.1.10.1/24
+   2  sites/north/distribution/sw-north-dist-01  [switch]
+      in  Vlan10                10.1.10.1/24
+      out Vlan20                10.1.20.1/24
+      ->  subnet 10.1.20.0/24  10.1.20.1/24 -> 10.1.20.11/24
+   3  sites/north/hosts/srv-north-01  [server]
+      in  eth0                  10.1.20.11/24
+```
+
+Both hosts hang off the *same access switch* — one hop apart physically, and in
+VLAN 10 and VLAN 20 — so the traffic goes up to the distribution switch's SVIs
+and back down. That is the answer a diagram alone will not give you.
+
+**Overlays need no special case.** A layer-2 tunnel carries its VLANs, so the
+layer-2 walk crosses it exactly as it crosses a trunk; a layer-3 tunnel has both
+ends in one prefix, so the routed walk crosses it exactly as it crosses a link.
+Either way the hop is labelled with the encapsulation entered and left, nesting
+included, and with what protects it:
+
+```console
+$ netgraph -i examples/overlay path rtr-hq rtr-branch-b --vlan 100
+…
+path 1 of 1 · 1 hop · vlan 100
+   1  sites/hq/rtr-hq  [router]
+      out vxlan100
+      ->  tunnel vx-100  vlan 100  [vxlan over ipsec, vni 100, encrypted by tunnels/ipsec-hq-b]
+   2  sites/branch-b/rtr-branch-b  [router]
+      in  vxlan100
+```
+
+A tunnel that encrypts nothing, and that nothing in its `over` chain encrypts
+either, is marked `CLEARTEXT` on the hop and warned about on stderr — the same
+fact [`W127`](docs/validation-rules.md#w127--tunnel-carries-traffic-in-the-clear)
+reports about an inventory, reported about a *route*. A cleartext VXLAN inside
+one data centre is fine; the same tunnel between two branch offices is not, and
+only a trace can tell the two apart.
+
+**Every distinct path is found**, where distinct means the sequence of elements
+*and links* differs — so two cables in a LAG are two paths, not one, and the
+redundant pair you were checking for is visible. The shortest is printed by
+default and `--all` prints the rest.
+
+**No path is an answer, not an error.** It comes back with the layers that were
+searched and how far each got, so the break is locatable, and the command exits
+1 — a reachability assertion drops straight into CI:
+
+```console
+$ netgraph -i examples/campus path pc-north-01 sw-north-acc-01:GigabitEthernet1/0/3
+…
+no path from sites/north/hosts/pc-north-01 to sites/north/access/sw-north-acc-01 within 16 hops.
+  layer 2: reached 2 elements; the furthest was sites/north/access/sw-north-acc-01 at 1 hop
+  layer 3: reached 22 elements; the furthest was sites/south/access/sw-south-acc-01 at 5 hops
+```
+
+| Option | Default | Effect |
+|---|---|---|
+| `--vlan VID` | derived | Trace inside this VLAN instead of deriving one. Forces a layer-2 answer and skips layer 3: a VLAN is a layer-2 fact. |
+| `--all` | off | Report every distinct path, not only the shortest. |
+| `--max-hops N` | 16 | Abandon a route that crosses more links than this (1–64). |
+| `-F, --output-format` | `text` | `text` is the hop-by-hop report; `json` is the same trace for tooling, and always carries every path. |
+| `--highlight` | off | Also render the whole inventory with the traced path emphasised. |
+| `-f, --format` | `dot` | Format of the `--highlight` diagram: `dot`, `svg`, `png`, `pdf`. Requires `--highlight`. |
+| `-o, --output PATH` | stdout | Where the `--highlight` diagram goes. Requires `--highlight`. |
+| `--strict` | off | Treat warnings as errors when validating first. |
+| `--force` | off | Trace even when validation failed. The path may not match the files. |
+
+![Layer-2 diagram of the campus example with one traced path emphasised: the four elements and three cables between pc-north-01 and pc-north-02 drawn bold and crimson, the other eighteen devices and nineteen cables dimmed to grey](docs/images/campus-path.svg)
+
+<sub>`netgraph -i examples/campus path pc-north-01 pc-north-02 --highlight -f svg -o docs/images/campus-path.svg --group-by-namespace --no-show-ips --title "campus — pc-north-01 to pc-north-02, the traced path"`.</sub>
+
+`--highlight` draws path elements and links bold and crimson and dims everything
+else. Nothing is removed — a traced path is visibly *one route through* a
+topology rather than the topology itself, which is what `--neighbors-of` cannot
+show you. The diagram is built at the layer the path was found at, and every
+display option `render` takes applies to it (`--show-ips`, `--group-by-namespace`,
+`--icons`, `--tooltips`, `--link-template`, `--element-ids`, `--title`) — it is
+the same renderer, not a fork of it.
+
+```bash
+netgraph path pc-alice srv-backup                        # the shortest route
+netgraph path 10.1.10.51 10.2.20.11 --all                # every route, by address
+netgraph path sw-hq:Ethernet49/1 sw-hq:Ethernet50/1      # can one switch bridge these?
+netgraph path rtr-hq rtr-branch-b --vlan 100             # inside one broadcast domain
+netgraph path pc-alice srv-backup --highlight -f svg -o path.svg
+netgraph path pc-alice srv-backup -F json | jq '.paths[0].links[].id'
+```
+
+[`docs/paths.md`](docs/paths.md) has the full treatment: how each layer decides,
+the JSON contract, and what the trace deliberately does not model (no routing
+table, no spanning tree, no ACLs).
+
 ### `netgraph watch`
 
 Re-render whenever a file in the inventory changes, optionally serving the
@@ -1193,7 +1377,7 @@ to each candidate; bash lists the values alone, as it does for everything.
 | Code | Meaning |
 |---|---|
 | 0 | Success. |
-| 1 | The inventory was rejected: `validate` found errors, `render` refused to draw, `init` refused to write into an occupied directory, or `import` produced a tree that does not validate. |
+| 1 | The inventory was rejected: `validate` found errors, `render` refused to draw, `init` refused to write into an occupied directory, or `import` produced a tree that does not validate. Also: `path` found no path. |
 | 2 | Usage error, or an unusable `netgraph.toml`. |
 | 3 | The inventory could not be discovered or read at all; or an `import` input was missing, unreadable or malformed, or would have clobbered an existing file without `--force`. |
 | 5 | The rendering could not be produced (Graphviz missing, output not writable, binary format to a terminal). |
@@ -1326,6 +1510,7 @@ netgraph -i examples/campus render --namespace sites/north --layer l2 -f svg -o 
 | [`docs/schema.md`](docs/schema.md) | The specification. Why the schema looks the way it does, with three complete worked examples, and the editor setup in §13. |
 | [`docs/schema-reference.md`](docs/schema-reference.md) | Every field, its type, whether it is required, its default and its YANG path. Generated from the models. |
 | [`docs/validation-rules.md`](docs/validation-rules.md) | Every rule, its severity, why it matters and how to suppress it. |
+| [`docs/paths.md`](docs/paths.md) | `netgraph path`: how the layer-2 and layer-3 traces decide, the JSON contract, and what is deliberately not modelled. |
 | [`docs/ci.md`](docs/ci.md) | Running `validate` in CI: the json/sarif/github output formats, the GitHub Action, the pre-commit hook. |
 | [`docs/yang-mapping.md`](docs/yang-mapping.md) | The relationship to RFC 8343, RFC 8344 and IEEE 802.1Q — including what is deliberately not covered. |
 | [`docs/follow-ups.md`](docs/follow-ups.md) | Known gaps, deferred deliberately: what was measured, why it was left, and what a fix would have to do. |
