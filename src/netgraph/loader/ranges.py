@@ -191,12 +191,27 @@ def parse_range(pattern: Any) -> RangePattern:
     return RangePattern(literals=tuple(literals), spans=tuple(spans))
 
 
+#: Digits a span bound may carry. ``MAX_INTERFACES_PER_DOCUMENT`` is four
+#: digits, so anything past this is already out of range — and the bound has to
+#: be applied *before* :func:`int`, which refuses a literal of more than 4300
+#: digits with a ``ValueError`` about ``sys.set_int_max_str_digits`` that no
+#: reader of an inventory can act on.
+_MAX_SPAN_DIGITS: Final = 10
+
+
 def _span_from(match: re.Match[str], pattern: str) -> Span:
     low_text, high_text = match.group(1), match.group(2)
+    if max(len(low_text), len(high_text)) > _MAX_SPAN_DIGITS:
+        raise RangeError(
+            f"span {echo_value(match.group())} of {echo_value(pattern)} names a number of "
+            f"more than {_MAX_SPAN_DIGITS} digits; a document expands to at most "
+            f"{MAX_INTERFACES_PER_DOCUMENT} interfaces",
+            rule="NG-R003",
+        )
     low, high = int(low_text), int(high_text)
     if low > high:
         raise RangeError(
-            f"span {match.group()!r} of {echo_value(pattern)} is inverted: {low} > {high}",
+            f"span {echo_value(match.group())} of {echo_value(pattern)} is inverted: {low} > {high}",
             rule="NG-R002",
         )
     # The low bound fixes the width: '[01-12]' is a two-digit port number, and
@@ -408,7 +423,7 @@ def _claim(
         SchemaIssue(
             path=source,
             message=(
-                f"interface name {name!r} is produced twice: by "
+                f"interface name {echo_value(name)} is produced twice: by "
                 f"{_describe(previous_path, previous_was_range, provenance)} and by "
                 f"{_describe(source, is_range, provenance)}"
             ),

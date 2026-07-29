@@ -53,6 +53,9 @@ dev = [
     # an independent second opinion: tests/test_examples.py lays every example
     # out through it, which would not prove much if it shared our code path.
     "graphviz>=0.20",
+    # Property-based and fuzz testing (tests/strategies.py, tests/test_properties.py,
+    # tests/test_fuzz_loader.py). Test-only: nothing under src/ imports it.
+    "hypothesis>=6.100",
     "ruff>=0.5",
     "mypy>=1.10",
     "types-PyYAML>=6.0",
@@ -169,6 +172,12 @@ addopts = [
     "--strict-config",
     "--cov=netgraph",
     "--cov-report=term-missing:skip-covered",
+    # Pin the property tests' seed so a run is reproducible. Hypothesis refuses
+    # ``derandomize`` alongside an explicit example database (see
+    # tests/conftest.py), and the database is the half that makes a discovered
+    # failure cheap to re-run -- so determinism is spelled here instead, where a
+    # later ``--hypothesis-seed`` on the command line still overrides it.
+    "--hypothesis-seed=0",
 ]
 xfail_strict = true
 

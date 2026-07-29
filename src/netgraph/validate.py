@@ -53,7 +53,7 @@ from __future__ import annotations
 import ipaddress
 import itertools
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Final, TypeAlias
 
 from netgraph.config import ValidationConfig
@@ -644,7 +644,36 @@ def _build_context(inventory: Inventory) -> _Context:
         by_name=by_name,
         aggregated_by={fqn: _aggregated_by(owner) for fqn, owner in owners.items()},
         suppressions=_collect_suppressions(inventory),
-        subnets=subnets_of(inventory),
+        subnets=_stable_subnets(subnets_of(inventory)),
+    )
+
+
+def _stable_subnets(subnets: Sequence[Subnet]) -> tuple[Subnet, ...]:
+    """The same subnets with each member list in ``element:interface`` order.
+
+    :func:`~netgraph.subnets.subnets_of` keeps members in inventory load order
+    on purpose, so that a subnet's member list and the nodes of a rendering
+    agree about sequence. A *diagnostic* wants the opposite: load order is
+    directory order, so "address 10.0.0.1 is claimed by 'a:eth0', 'b:eth0'"
+    becomes "'b:eth0', 'a:eth0'" — and anchors itself to a different file — when
+    two documents are merged into one or a file is renamed. Nothing about the
+    network changed, but a SARIF baseline and a committed report both say
+    something did.
+
+    Every rule that reads ``ctx.subnets`` reports a *symmetric* fact — two
+    claimants of one address, two broadcast domains in one prefix — where the
+    members are interchangeable and the order is therefore free to be chosen for
+    stability. Reordering the copy the validator sees keeps that away from
+    everything else that derives a subnet.
+    """
+    return tuple(
+        replace(
+            subnet,
+            members=tuple(
+                sorted(subnet.members, key=lambda member: (member.element, member.interface))
+            ),
+        )
+        for subnet in subnets
     )
 
 
@@ -932,11 +961,12 @@ def _check_duplicate_mac(ctx: _Context) -> Iterator[_Draft]:
 
         if len(distinct) < 2:
             continue
-        ports = [f"{fqn}:{interface.name}" for fqn, interface in distinct]
+        ordered = _by_port(distinct)
+        ports = [f"{fqn}:{interface.name}" for fqn, interface in ordered]
         yield _Draft(
             f"MAC address {mac} is used by {len(ports)} interfaces: {_join(ports)}",
-            tuple(dict.fromkeys(fqn for fqn, _ in distinct)),
-            _interface_path(ctx.owners[distinct[0][0]], distinct[0][1], "mac"),
+            tuple(dict.fromkeys(fqn for fqn, _ in ordered)),
+            _interface_path(ctx.owners[ordered[0][0]], ordered[0][1], "mac"),
         )
 
 
@@ -962,13 +992,14 @@ def _check_duplicate_ip(ctx: _Context) -> Iterator[_Draft]:
     for (ip, network, scope), entries in groups.items():
         if len(entries) < 2:
             continue
-        ports = [f"{fqn}:{interface.name}" for fqn, interface in entries]
+        ordered = _by_port(entries)
+        ports = [f"{fqn}:{interface.name}" for fqn, interface in ordered]
         domain = _describe_scope(scope)
         yield _Draft(
             f"IP address {ip} in {network} is assigned to {len(ports)} interfaces in "
             f"{domain}: {_join(ports)}",
-            tuple(dict.fromkeys(fqn for fqn, _ in entries)),
-            _interface_path(ctx.owners[entries[0][0]], entries[0][1]),
+            tuple(dict.fromkeys(fqn for fqn, _ in ordered)),
+            _interface_path(ctx.owners[ordered[0][0]], ordered[0][1]),
         )
 
 
@@ -2202,10 +2233,16 @@ def _check_disconnected_topology(ctx: _Context) -> Iterator[_Draft]:
     ]
     if len(islands) < 2:
         return
-    representatives = [min(island) for island in islands]
+    # Sorted by representative rather than left in the order the components were
+    # discovered: that order is inventory load order, which is directory order,
+    # so packing two documents into one file would reorder the islands in the
+    # message and in ``elements`` without anything about the network changing.
+    # Which island comes first says nothing anyway — they are, by definition,
+    # not connected to each other.
+    ordered = sorted((min(island), len(island)) for island in islands)
+    representatives = [representative for representative, _ in ordered]
     described = ", ".join(
-        f"{_q(representative)} ({count_text(len(island), 'element')})"
-        for representative, island in zip(representatives, islands, strict=True)
+        f"{_q(representative)} ({count_text(size, 'element')})" for representative, size in ordered
     )
     yield _Draft(
         f"the topology is disconnected: {count_text(len(islands), 'island')} with no link between "
@@ -2320,15 +2357,19 @@ def _check_hub_subnets(ctx: _Context) -> Iterator[_Draft]:
                 continue
             if frozenset.intersection(*(prefixes for _, _, prefixes in addressed)):
                 continue
+            # By port name, not by the order the cables happened to load: every
+            # port on a hub is equally a member of the one collision domain, so
+            # nothing distinguishes a "first" one except which file it came from.
+            addressed.sort(key=lambda entry: (entry[0], entry[1]))
             described = ", ".join(
                 f"{_q(port)} in {_join_plain(sorted(str(net) for net in prefixes))}"
                 for _, port, prefixes in addressed
             )
             yield _Draft(
-                f"hub {_q(hubs[0])} joins {count_text(len(addressed), f'IPv{version} port')} that "
-                f"share no prefix: {described}. A hub is one broadcast domain, so its ports "
-                f"cannot reach each other from different subnets.",
-                (*hubs, *dict.fromkeys(owner_fqn for owner_fqn, _, _ in addressed)),
+                f"hub {_q(min(hubs))} joins {count_text(len(addressed), f'IPv{version} port')} "
+                f"that share no prefix: {described}. A hub is one broadcast domain, so its "
+                f"ports cannot reach each other from different subnets.",
+                (*sorted(hubs), *dict.fromkeys(owner_fqn for owner_fqn, _, _ in addressed)),
                 ("spec", "interfaces"),
             )
 
@@ -3034,7 +3075,16 @@ def _check_rack_overlap(ctx: _Context) -> Iterator[_Draft]:
     above it.
     """
     for key, members in _by_rack(ctx):
-        placed = [member for member in members if member.location.is_placed]
+        # Ordered bottom of the rack upwards, and by name within a unit, rather
+        # than in the order the documents loaded: a collision is symmetric —
+        # neither occupant is the intruder — so reporting it in load order made
+        # the wording, the ``elements`` list and the anchored file all move when
+        # two documents were packed into one. Bottom-up is also how an elevation
+        # is read.
+        placed = sorted(
+            (member for member in members if member.location.is_placed),
+            key=lambda member: (member.location.position or 0, member.fqn),
+        )
         for index, first in enumerate(placed):
             for second in placed[index + 1 :]:
                 overlap = sorted(set(first.location.units) & set(second.location.units))
@@ -3279,6 +3329,25 @@ def _describe_port(endpoint: _Endpoint, effective: Interface) -> str:
     if endpoint.interface is not None and effective.name != endpoint.interface.name:
         return f"{text} (aggregated by {_q(effective.name)})"
     return text
+
+
+def _by_port(entries: Sequence[tuple[str, Interface]]) -> list[tuple[str, Interface]]:
+    """Order the members of a *symmetric* clash by name rather than by load order.
+
+    Two interfaces claiming one address are equally guilty: neither is "the
+    original" and neither is "the duplicate". Reported in the order the
+    inventory happened to load, the finding's wording, its ``elements`` list and
+    the file it is anchored to would all move when an unrelated file is renamed
+    or two documents are merged into one — because load order is directory
+    order. That churn lands in a SARIF baseline and in ``git diff`` on a
+    committed report, saying a network changed when only a filename did.
+
+    Sorting by ``element:interface`` makes all three a function of what the
+    inventory *says* and of nothing else. Only use it where the members really
+    are interchangeable; a rule with a genuine "first declaration wins" ordering
+    (``NG-N002``) must keep it.
+    """
+    return sorted(entries, key=lambda entry: (entry[0], entry[1].name))
 
 
 def _interface_path(

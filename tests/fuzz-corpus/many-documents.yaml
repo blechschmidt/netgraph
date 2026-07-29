@@ -1,0 +1,450 @@
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n0
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n1
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n2
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n3
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n4
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n5
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n6
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n7
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n8
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n9
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n10
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n11
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n12
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n13
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n14
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n15
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n16
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n17
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n18
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n19
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n20
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n21
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n22
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n23
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n24
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n25
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n26
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n27
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n28
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n29
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n30
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n31
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n32
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n33
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n34
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n35
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n36
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n37
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n38
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n39
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n40
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n41
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n42
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n43
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n44
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n45
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n46
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n47
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n48
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: n49
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet

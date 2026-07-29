@@ -1,0 +1,13 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: template
+metadata:
+  name: t1
+spec:
+  from: t2
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: template
+metadata:
+  name: t2
+spec:
+  from: t1

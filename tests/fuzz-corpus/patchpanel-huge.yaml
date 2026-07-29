@@ -1,0 +1,6 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: patchpanel
+metadata:
+  name: p
+spec:
+  ports: 1-999999999

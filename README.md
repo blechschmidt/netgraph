@@ -2007,6 +2007,7 @@ netgraph -i examples/campus render --namespace sites/north --layer l2 -f svg -o 
 | [`docs/ipam.md`](docs/ipam.md) | `netgraph ipam`: how a prefix is sized, how free space is computed, and which existing rule each address-plan conflict is. |
 | [`docs/export.md`](docs/export.md) | `netgraph export`: the five artefacts, the skip manifest, how names are folded into each format's grammar, and what each format drops. |
 | [`docs/ci.md`](docs/ci.md) | Running `validate` in CI: the json/sarif/github output formats, the GitHub Action, the pre-commit hooks. |
+| [`docs/testing.md`](docs/testing.md) | How the suite is split into example tests and property tests, the Hypothesis profiles, and how to reproduce a property failure. |
 | [`docs/yang-mapping.md`](docs/yang-mapping.md) | The relationship to RFC 8343, RFC 8344 and IEEE 802.1Q — including what is deliberately not covered. |
 | [`docs/follow-ups.md`](docs/follow-ups.md) | Known gaps, deferred deliberately: what was measured, why it was left, and what a fix would have to do. |
 
@@ -2131,6 +2132,12 @@ pre-commit install                       # optional, runs the checks on commit
 pytest                                   # tests, with coverage configured in pyproject.toml
 ruff check . && ruff format --check .     # lint and format
 mypy                                     # static type check (strict)
+
+# The property and fuzz tests search harder the more you ask of them. `dev` (25
+# examples) is the default; CI runs `ci` (50) and the nightly workflow runs
+# `deep` (1000). See docs/testing.md.
+NETGRAPH_HYPOTHESIS_PROFILE=deep pytest tests/test_properties.py --no-cov
+NETGRAPH_HYPOTHESIS_PROFILE=deep pytest tests/test_fuzz_loader.py --no-cov
 
 python tools/gen_schema_reference.py     # regenerate docs/schema-reference.md
 python tools/gen_json_schema.py          # regenerate schema/netgraph.schema.json

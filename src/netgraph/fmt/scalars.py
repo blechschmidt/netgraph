@@ -55,7 +55,7 @@ from ruamel.yaml.scalarstring import (
     SingleQuotedScalarString,
 )
 
-from netgraph.loader.documents import StrictSafeLoader
+from netgraph.loader.documents import StrictSafeLoader, scan_tokens
 
 __all__ = [
     "QUOTE",
@@ -67,6 +67,7 @@ __all__ = [
     "plain",
     "plain_survives",
     "quote_style",
+    "scalar_lines",
 ]
 
 _STR_TAG: Final = "tag:yaml.org,2002:str"
@@ -252,3 +253,45 @@ def canonical_string(value: str, *, in_flow: bool = False) -> str:
 def is_quoted(value: object) -> bool:
     """Was ``value`` given a quoted style? Used to measure a rendered width."""
     return isinstance(value, SingleQuotedScalarString | DoubleQuotedScalarString)
+
+
+def scalar_lines(text: str) -> frozenset[int]:
+    """Line numbers whose *start* lies inside a scalar rather than in the layout.
+
+    Two of the formatter's jobs are line-level — strip trailing whitespace,
+    collapse runs of blank lines — and both are wrong when applied to the
+    continuation of a multi-line scalar, where a blank line is a ``\n`` in
+    somebody's description and a trailing space in a ``|`` block is a character
+    they typed. The same question comes up in :mod:`netgraph.fmt.verify`, where
+    a ``#`` at the start of such a line is text and not a comment.
+
+    Nothing in the text can answer it, so this asks the scanner, which already
+    knows. The end of a scalar is exclusive when it lands in column 0 — exactly
+    the case of a block scalar followed by a real comment or the next key —
+    so the line the end mark points at is only counted when the scalar reaches
+    into it.
+
+    Returns:
+        The zero-based line numbers, or an empty set for text the scanner
+        refuses. That fallback is the conservative one for every caller: it
+        means "assume nothing is protected", which is the behaviour these rules
+        had before they knew about scalars at all.
+    """
+    covered: set[int] = set()
+    try:
+        # The same loader everything else reads with, so the fast scanner is
+        # used where PyYAML has it: this runs three times per formatted file
+        # (once in ``_tidy``, once per side in ``verify``) and libyaml scans
+        # about seven times quicker. Both scanners produce identical marks --
+        # ``tests/test_yaml_loader.py`` is where that is pinned down.
+        tokens = list(scan_tokens(text))
+    except yaml.YAMLError:
+        return frozenset()
+    for token in tokens:
+        if not isinstance(token, yaml.ScalarToken):
+            continue
+        start, end = token.start_mark, token.end_mark
+        covered.update(range(start.line + 1, end.line))
+        if end.line > start.line and end.column > 0:
+            covered.add(end.line)
+    return frozenset(covered)

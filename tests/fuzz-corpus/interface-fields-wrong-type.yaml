@@ -1,0 +1,13 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: a
+spec:
+  interfaces:
+    - name: {}
+      type: 9
+      mtu: '1500'
+      mac: 12:34:56:12:34:56
+      ipv4: 10.0.0.1/24
+      vlan: trunk
+      members: eth0

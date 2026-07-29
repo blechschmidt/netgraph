@@ -1,0 +1,147 @@
+name: Nightly property search
+
+# CI runs the properties in ``tests/test_properties.py`` at 50 examples, which
+# is what a push can afford and is not what finds anything interesting. This
+# workflow runs them at 1000, and runs the loader fuzz target under four
+# different seeds -- overnight, where an hour costs nobody anything.
+#
+# A failure here is a real failure. It means the property is false and the
+# ``ci`` profile was simply not looking hard enough; the fix is a fix in
+# ``src/`` plus a plain regression example, never a narrower property. See
+# ``docs/testing.md``.
+
+on:
+  schedule:
+    # 03:20 UTC. Off the hour, because every scheduled workflow on GitHub that
+    # asks for :00 is queued behind every other one that did.
+    - cron: "20 3 * * *"
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "Hypothesis seed (blank picks one from the run id)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-${{ github.workflow }}
+  cancel-in-progress: false
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PIP_NO_INPUT: "1"
+  PYTHONUNBUFFERED: "1"
+  FORCE_COLOR: "1"
+
+jobs:
+  properties:
+    name: properties (yaml ${{ matrix.yaml-loader }})
+    runs-on: ubuntu-24.04
+    # A single property at 1000 examples takes about three minutes on this
+    # hardware, and there are fifteen of them plus four fuzz passes. Generous
+    # rather than tight: a nightly run that is cancelled half way through has
+    # searched less than the push workflow it exists to go beyond.
+    timeout-minutes: 180
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # Both parsers. They differ in exactly the places a property test
+        # notices -- what raises, at what depth, with which mark -- which is why
+        # the loader hardening in ``netgraph.loader.documents`` had to be
+        # written for both.
+        yaml-loader: ["auto", "python"]
+
+    env:
+      NETGRAPH_YAML_LOADER: ${{ matrix.yaml-loader }}
+      NETGRAPH_HYPOTHESIS_PROFILE: deep
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Install Graphviz
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes graphviz
+          dot -V
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install netgraph and its dev extras
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install --editable ".[dev]"
+
+      # Restored so that yesterday's counterexample is the first thing tried,
+      # and saved so that today's is there tomorrow. Shared with the push
+      # workflow's ``auto`` entry by the fallback key, on purpose: a failure
+      # found at 1000 examples should replay on the very next push.
+      - name: Restore the Hypothesis example database
+        uses: actions/cache@v4
+        with:
+          path: .hypothesis
+          key: hypothesis-nightly-${{ matrix.yaml-loader }}-${{ github.run_id }}
+          restore-keys: |
+            hypothesis-nightly-${{ matrix.yaml-loader }}-
+            hypothesis-3.12-${{ matrix.yaml-loader }}-
+
+      # A pinned seed searches the same region of the input space every night,
+      # which is exactly what a nightly run should not do -- the push workflow
+      # already covers that region. This one varies it and prints what it used,
+      # so a failure can be reproduced exactly.
+      - name: Choose a seed
+        id: seed
+        env:
+          REQUESTED: ${{ inputs.seed }}
+        run: |
+          set -euo pipefail
+          seed="${REQUESTED:-$(( GITHUB_RUN_ID % 100000 ))}"
+          echo "seed=${seed}" >>"$GITHUB_OUTPUT"
+          echo "::notice::searching with --hypothesis-seed=${seed}"
+
+      - name: Property tests, deep profile
+        run: |
+          pytest tests/test_properties.py \
+            --no-cov \
+            --hypothesis-seed="${{ steps.seed.outputs.seed }}" \
+            --hypothesis-show-statistics \
+            --junitxml=properties.xml
+
+      # Several seeds rather than one long run: the fuzz target's strategy picks
+      # a corpus seed and then mutates it, so a fresh seed reaches a different
+      # part of the corpus far more cheaply than more examples of the same one.
+      - name: Loader fuzzing, several seeds
+        run: |
+          set -euo pipefail
+          status=0
+          for offset in 0 1 2 3; do
+            seed=$(( ${{ steps.seed.outputs.seed }} + offset ))
+            echo "::group::fuzz seed ${seed}"
+            pytest tests/test_fuzz_loader.py \
+              --no-cov \
+              --hypothesis-seed="${seed}" \
+              --hypothesis-show-statistics || status=1
+            echo "::endgroup::"
+          done
+          exit "$status"
+
+      - name: Upload the test report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-properties-${{ matrix.yaml-loader }}
+          path: |
+            properties.xml
+            .hypothesis/
+          if-no-files-found: warn
+          retention-days: 14

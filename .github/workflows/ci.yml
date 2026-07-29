@@ -130,8 +130,33 @@ jobs:
             exit 1
           fi
 
+      # Hypothesis writes the shrunk counterexample of every property failure to
+      # this directory and replays it *first* on the next run. Caching it is
+      # what makes that worth anything across jobs: a property that failed
+      # yesterday re-runs that exact inventory today, before spending any budget
+      # searching for it again. The key rotates per run so each job saves what
+      # it learned; the restore keys fall back to whatever the most recent run
+      # of the same matrix entry left behind.
+      #
+      # It is a cache and not an artefact on purpose: losing it costs search
+      # time and nothing else, so a miss must never fail the job.
+      - name: Restore the Hypothesis example database
+        uses: actions/cache@v4
+        with:
+          path: .hypothesis
+          key: hypothesis-${{ matrix.python-version }}-${{ matrix.yaml-loader }}-${{ github.run_id }}
+          restore-keys: |
+            hypothesis-${{ matrix.python-version }}-${{ matrix.yaml-loader }}-
+            hypothesis-${{ matrix.python-version }}-
+
       - name: pytest
         id: pytest
+        env:
+          # 50 examples per property: enough to be worth running on a push,
+          # small enough not to dominate a job that also lints and type-checks.
+          # The nightly workflow runs the same properties at 1000; see
+          # docs/testing.md.
+          NETGRAPH_HYPOTHESIS_PROFILE: ci
         # ``--cov=netgraph`` and the coverage floor also live in pyproject.toml
         # (addopts / fail_under); they are repeated here so this command is
         # correct on its own and a local edit cannot silently lower the gate.

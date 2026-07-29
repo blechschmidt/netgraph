@@ -365,7 +365,12 @@ def test_e003_duplicate_mac_across_devices(tmp_path: Path) -> None:
     assert len(findings) == 1
     # Both spellings normalise to the same address, so the clash is still found.
     assert "00:11:22:33:44:55 is used by 2 interfaces" in findings[0].message
-    assert findings[0].elements == ("sw1", "pc1")
+    # Named in ``element:interface`` order, not in the order the two documents
+    # happened to load: a duplicate MAC is symmetric, and reporting it in load
+    # order made the wording and the anchor move whenever a file was renamed.
+    # See ``test_a_duplicate_address_is_reported_in_the_same_order_whatever_the_layout``.
+    assert findings[0].elements == ("pc1", "sw1")
+    assert "'pc1:eth0', 'sw1:Gi0/1'" in findings[0].message
 
 
 def test_e003_exempts_a_lag_and_its_members(tmp_path: Path) -> None:

@@ -31,21 +31,22 @@ from __future__ import annotations
 
 import os
 import re
-from collections.abc import Generator, Sequence
+from collections.abc import Generator, Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from typing import Any, Final, Protocol
+from typing import Any, Final, Protocol, cast
 
 import yaml
 from yaml.constructor import ConstructorError, SafeConstructor
 
-from netgraph.errors import LoaderError, echo_value
+from netgraph.errors import LoaderError, clip_text, echo_value
 
 __all__ = [
     "BOOL_TAG",
     "HAVE_LIBYAML",
     "LOADER_ENV_VAR",
     "LOADER_MODES",
+    "MAX_NESTING_DEPTH",
     "MERGE_TAG",
     "STR_TAG",
     "NodeLoader",
@@ -56,6 +57,7 @@ __all__ = [
     "libyaml_loader",
     "parse_documents",
     "read_documents",
+    "scan_tokens",
     "select_loader",
 ]
 
@@ -382,6 +384,7 @@ def parse_documents(
         YamlSyntaxError: The stream is not well-formed YAML, uses an
             unsupported tag, or repeats a mapping key.
     """
+    _guard_depth(text, path)
     # Constructing the loader can itself fail: the pure-Python ``Reader`` scans
     # the whole string for unprintable characters up front, where libyaml only
     # trips over one when it reaches it. Translating here keeps the two paths
@@ -404,12 +407,98 @@ def parse_documents(
         loader.dispose()
 
 
+#: Deepest structure netgraph will hand to a YAML parser.
+#:
+#: Not a limit anyone writing an inventory can reach — the schema is seven
+#: levels deep — and not a limit either parser needs help with at ordinary
+#: depths. It exists because the two parsers fail *differently* past their own:
+#: the pure-Python composer recurses once per level and raises a catchable
+#: ``RecursionError`` after a few hundred, while libyaml's composer recurses in
+#: C and takes the process down with a segmentation fault at around thirty
+#: thousand. Which of the two is in use depends on the PyYAML wheel, so an
+#: inventory that is a diagnostic on one machine would be a killed process on
+#: another. Refusing here makes them agree.
+MAX_NESTING_DEPTH: Final = 1024
+
+_OPENING_TOKENS: Final = (
+    yaml.FlowSequenceStartToken,
+    yaml.FlowMappingStartToken,
+    yaml.BlockSequenceStartToken,
+    yaml.BlockMappingStartToken,
+)
+_CLOSING_TOKENS: Final = (
+    yaml.FlowSequenceEndToken,
+    yaml.FlowMappingEndToken,
+    yaml.BlockEndToken,
+)
+
+
+def _guard_depth(text: str, path: Path) -> None:
+    """Refuse a document nested deeper than :data:`MAX_NESTING_DEPTH`.
+
+    Measured with the *scanner*, which is iterative in both implementations —
+    it tracks a flow level as an integer — rather than with the composer, which
+    is the recursive half and the one the depth is being kept away from.
+
+    The count of ``[`` and ``{`` is a C-speed string scan and bounds the depth
+    from above, so a document with no more openers than the limit cannot exceed
+    it and is never scanned. Every example inventory this repository ships has
+    fewer than 110 openers *in total*, so in practice the scan runs only for a
+    document that is already trying something.
+
+    Raises:
+        YamlSyntaxError: The document nests too deeply. A stream the scanner
+            itself refuses is left alone: the parse that follows reports the
+            syntax error properly, and a guard has no business producing a
+            worse diagnostic than the thing it guards.
+    """
+    if text.count("[") + text.count("{") <= MAX_NESTING_DEPTH:
+        return
+    depth = 0
+    try:
+        for token in scan_tokens(text):
+            if isinstance(token, _OPENING_TOKENS):
+                depth += 1
+                if depth > MAX_NESTING_DEPTH:
+                    raise YamlSyntaxError(
+                        f"the document nests more than {MAX_NESTING_DEPTH} levels deep; "
+                        f"no netgraph document is, and a YAML parser handed one that deep "
+                        f"may not survive it",
+                        path=path,
+                        line=token.start_mark.line + 1,
+                        column=token.start_mark.column + 1,
+                    )
+            elif isinstance(token, _CLOSING_TOKENS):
+                depth -= 1
+    except yaml.YAMLError:
+        return
+
+
+def scan_tokens(text: str) -> Iterator[yaml.Token]:
+    """Tokenise ``text`` with the selected loader.
+
+    Exposed because two callers need the token stream rather than the documents:
+    :func:`_guard_depth` here, and
+    :func:`netgraph.fmt.scalars.scalar_lines`, which has to know which lines are
+    the continuation of a scalar. Both want the *scanner*, which is iterative in
+    both implementations and produces identical marks, and both want the fast
+    one where PyYAML has it.
+
+    The cast is the price of :class:`NodeLoader` being a Protocol: PyYAML's stubs
+    name the ten concrete loader classes, and the whole point of the protocol is
+    that netgraph's loader is none of them.
+    """
+    yield from yaml.scan(text, Loader=cast(Any, StrictSafeLoader))
+
+
 def _open(text: str, path: Path) -> NodeLoader:
     """Instantiate the selected loader with YAML errors translated."""
     try:
         return StrictSafeLoader(text)
     except yaml.YAMLError as exc:
         raise _syntax_error(exc, path) from exc
+    except _FOREIGN as exc:
+        raise _foreign_error(exc, path) from exc
 
 
 def _check_node(loader: NodeLoader, path: Path) -> bool:
@@ -418,6 +507,8 @@ def _check_node(loader: NodeLoader, path: Path) -> bool:
         return bool(loader.check_node())
     except yaml.YAMLError as exc:
         raise _syntax_error(exc, path) from exc
+    except _FOREIGN as exc:
+        raise _foreign_error(exc, path) from exc
 
 
 def _get_node(loader: NodeLoader, path: Path) -> yaml.Node | None:
@@ -426,6 +517,8 @@ def _get_node(loader: NodeLoader, path: Path) -> yaml.Node | None:
         return loader.get_node()
     except yaml.YAMLError as exc:
         raise _syntax_error(exc, path) from exc
+    except _FOREIGN as exc:
+        raise _foreign_error(exc, path) from exc
 
 
 def _construct(loader: NodeLoader, node: yaml.Node | None, path: Path) -> Any:
@@ -434,6 +527,50 @@ def _construct(loader: NodeLoader, node: yaml.Node | None, path: Path) -> Any:
         return loader.construct_document(node)
     except yaml.YAMLError as exc:
         raise _syntax_error(exc, path) from exc
+    except _FOREIGN as exc:
+        raise _foreign_error(exc, path, node) from exc
+
+
+#: What a YAML implementation raises that is *not* a :class:`yaml.YAMLError`.
+#:
+#: Two of these are reachable from an ordinary hostile document and neither is a
+#: bug in netgraph:
+#:
+#: * ``ValueError`` — PyYAML's constructors call :func:`int` and :func:`float` on
+#:   whatever the resolver matched, and CPython refuses to convert an integer
+#:   literal of more than 4300 digits (:pep:`0` / CVE-2020-10735). Eight
+#:   kilobytes of digits in a ``mtu:`` is therefore a ``ValueError`` raised from
+#:   inside the parser.
+#: * ``RecursionError`` — the pure-Python composer recurses once per level of
+#:   nesting, so a few thousand ``[`` exhausts the interpreter stack. libyaml
+#:   does not, which is exactly why this has to be handled rather than assumed
+#:   away: which parser is in use depends on the PyYAML wheel.
+#:
+#: Both are translated into the same :class:`YamlSyntaxError` every other
+#: malformed document produces, because a caller of :func:`load_tree` is
+#: promised a diagnostic and not a traceback.
+_FOREIGN: Final = (ValueError, RecursionError)
+
+
+def _foreign_error(exc: Exception, path: Path, node: yaml.Node | None = None) -> YamlSyntaxError:
+    """Turn a non-YAML exception out of the parser into a syntax error."""
+    if isinstance(exc, RecursionError):
+        message = (
+            "the document nests deeper than this YAML parser can follow; the usual cause is "
+            "a runaway run of '[' or '{'"
+        )
+    else:
+        message = (
+            "a scalar could not be read as the value its form implies: "
+            f"{clip_text(str(exc))}. Quote it if it is meant to be text."
+        )
+    mark = getattr(node, "start_mark", None)
+    return YamlSyntaxError(
+        message,
+        path=path,
+        line=None if mark is None else mark.line + 1,
+        column=None if mark is None else mark.column + 1,
+    )
 
 
 def _syntax_error(exc: yaml.YAMLError, path: Path) -> YamlSyntaxError:

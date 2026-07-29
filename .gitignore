@@ -33,6 +33,10 @@ coverage.xml
 htmlcov/
 # Written by the --junitxml in .github/workflows/ci.yml.
 junit.xml
+# Hypothesis's example database: the shrunk counterexample of every property
+# failure. Machine-written and machine-read, cached between CI runs rather than
+# committed -- see tests/conftest.py.
+.hypothesis/
 .tox/
 .nox/
 

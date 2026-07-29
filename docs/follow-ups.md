@@ -1240,6 +1240,52 @@ to reimplement against.
 
 ---
 
+## 11. A YAML parser can still be crashed from outside netgraph's control
+
+**Status:** bounded 2026-07-29, not eliminated. Raised by the loader fuzz target
+added with the property tests (`tests/test_fuzz_loader.py`).
+
+Fuzzing the loader found three ways a document could get past every diagnostic
+netgraph writes and reach a failure netgraph does not own. All three are fixed;
+what is *not* fixed is the underlying reason they were possible, which is that
+the parser is a dependency and its limits are not netgraph's.
+
+**What was found and fixed.**
+
+- **An integer literal of more than 4300 digits.** CPython refuses to convert
+  one (CVE-2020-10735), and PyYAML's constructors call `int()` on whatever the
+  resolver matched — so `mtu: 999…9` came out of the *parser* as a bare
+  `ValueError` about `sys.set_int_max_str_digits`, past a `try` that caught only
+  `yaml.YAMLError`. `netgraph.loader.documents` now translates it, and the three
+  places netgraph itself calls `int()` on document text — an interface range, a
+  patch-panel port range, a prefix length — bound the digit count first.
+- **Nesting deeper than the parser's stack.** The pure-Python composer recurses
+  once per level and raised an uncatchable-in-practice `RecursionError` at a few
+  thousand; libyaml's composer recurses in C and **segfaults** at around thirty
+  thousand, which no `except` clause can catch at all. Which of the two runs
+  depends on the PyYAML wheel, so one file was a traceback on one machine and a
+  killed process on another. `MAX_NESTING_DEPTH` now bounds it before either
+  parser sees the text, measured with the *scanner*, which is iterative in both.
+- **A patch-panel port range expanded before it was counted.** `ports:
+  1-999999999` built a billion strings and then checked the limit. The check is
+  arithmetic now.
+
+**What remains.** The nesting guard is netgraph putting a fence in front of
+somebody else's cliff. It costs a C-speed `str.count` on every document and a
+full scan only for one carrying more than `MAX_NESTING_DEPTH` flow openers —
+every example inventory in this repository has fewer than 110 in total — so the
+price is right, but the guard exists because *libyaml crashes the process*
+rather than because 1024 levels of nesting is a meaningful schema limit. A
+document that nests 1025 deep is refused with an accurate diagnostic that
+describes netgraph's limit and not the real one.
+
+**What would justify revisiting this.** libyaml growing a depth limit of its
+own, or PyYAML exposing one. Either would let the guard be dropped in favour of
+translating whatever error the parser produced, which is what every other
+malformed document already gets.
+
+---
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

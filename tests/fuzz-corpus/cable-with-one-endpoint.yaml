@@ -1,0 +1,7 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: c
+spec:
+  endpoints: [a:e0]
+  medium: copper

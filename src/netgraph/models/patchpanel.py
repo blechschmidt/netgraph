@@ -89,6 +89,10 @@ _SPAN_RE: Final = re.compile(r"^(\d+)(?:-(\d+))?$")
 #: What a normalised ``ports`` value looks like, for the JSON Schema.
 PORT_RANGE_PATTERN: Final = r"^\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*$"
 
+#: Digits one span bound may carry. :data:`MAX_PANEL_PORTS` is four digits, so
+#: anything past this is out of range twice over; see :func:`parse_port_range`.
+_MAX_PORT_DIGITS: Final = 10
+
 
 def parse_port_range(value: Any) -> tuple[str, ...]:
     """Expand a ``ports`` shorthand into the port numbers it names.
@@ -131,10 +135,30 @@ def parse_port_range(value: Any) -> tuple[str, ...]:
                 rule="NG-P006",
             )
         low_text, high_text = match.group(1), match.group(2) or match.group(1)
+        # Bounded before ``int``, which refuses a literal of more than 4300
+        # digits with a ``ValueError`` about ``sys.set_int_max_str_digits`` --
+        # true, and of no use to somebody reading a patch record.
+        if max(len(low_text), len(high_text)) > _MAX_PORT_DIGITS:
+            raise field_error(
+                f"port range {echo_value(span)} names a number of more than "
+                f"{_MAX_PORT_DIGITS} digits; a panel has at most {MAX_PANEL_PORTS} positions",
+                rule="NG-P006",
+            )
         low, high = int(low_text), int(high_text)
         if low > high:
             raise field_error(
                 f"port range {echo_value(span)} is inverted: {low} > {high}", rule="NG-P006"
+            )
+        # Counted before it is expanded, not after. ``ports: 1-999999999`` is
+        # eight keystrokes and a billion strings, and a check that ran once the
+        # span had been built would be reached only by a process that had
+        # already been killed for asking. Arithmetic answers the same question
+        # for free; see ``test_an_amplifying_document_costs_bounded_time_and_memory``.
+        if len(numbers) + (high - low + 1) > MAX_PANEL_PORTS:
+            raise field_error(
+                f"'ports' names more than {MAX_PANEL_PORTS} positions; a patch panel that "
+                f"large is a typo, and a rack of them is a document each",
+                rule="NG-P006",
             )
         width = len(low_text)
         for number in range(low, high + 1):
@@ -142,12 +166,6 @@ def parse_port_range(value: Any) -> tuple[str, ...]:
                 raise field_error(f"port {number} is declared twice by 'ports'", rule="NG-P006")
             seen.add(number)
             numbers.append(f"{number:0{width}d}")
-        if len(numbers) > MAX_PANEL_PORTS:
-            raise field_error(
-                f"'ports' names more than {MAX_PANEL_PORTS} positions; a patch panel that "
-                f"large is a typo, and a rack of them is a document each",
-                rule="NG-P006",
-            )
     return tuple(numbers)
 
 

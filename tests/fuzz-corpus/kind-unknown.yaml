@@ -1,0 +1,5 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: firewall
+metadata:
+  name: a
+spec: {}

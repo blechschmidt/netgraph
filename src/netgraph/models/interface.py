@@ -140,8 +140,11 @@ def _plain_address(text: str, family: int) -> dict[str, Any] | None:
     """
     address, separator, prefix = text.partition("/")
     # ``isascii`` matters: ``ipaddress`` rejects non-ASCII digits, ``isdigit``
-    # alone accepts them, and ``int`` would then quietly convert one.
-    if not separator or not prefix.isascii() or not prefix.isdigit():
+    # alone accepts them, and ``int`` would then quietly convert one. The length
+    # bound matters for the opposite reason: ``int`` *refuses* a literal of more
+    # than 4300 digits, with a message about ``sys.set_int_max_str_digits`` that
+    # would replace ``ipaddress``'s perfectly good one.
+    if not separator or len(prefix) > 3 or not prefix.isascii() or not prefix.isdigit():
         return None
     length = int(prefix)
     if length > (32 if family == 4 else 128):

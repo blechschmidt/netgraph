@@ -1,0 +1,8 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: a
+spec:
+  interfaces:
+    - range: e[1-99999999]
+      type: ethernet

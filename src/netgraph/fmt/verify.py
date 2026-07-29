@@ -42,6 +42,7 @@ from typing import Any
 from pydantic import ValidationError as PydanticValidationError
 
 from netgraph.errors import SchemaError
+from netgraph.fmt.scalars import scalar_lines
 from netgraph.loader.documents import YamlSyntaxError, parse_documents
 from netgraph.models import parse_document, parse_template
 from netgraph.models.element import TEMPLATE_KIND
@@ -113,15 +114,31 @@ def comments(text: str) -> Counter[str]:
     quoted scalar without parsing, and quoting is something the formatter is
     entitled to change — so counting those would produce false alarms about the
     one thing this check exists to be trusted on. A comment on its own line is
-    unambiguous, and it is also the kind that goes missing: reordering moves
-    whole lines around, it does not strip text off the end of one.
+    the kind that goes missing anyway: reordering moves whole lines around, it
+    does not strip text off the end of one.
+
+    A line that *begins* with ``#`` is still not a comment when it is the
+    continuation of a multi-line scalar, which is why
+    :func:`~netgraph.fmt.scalars.scalar_lines` is consulted rather than the text
+    alone. Counting one of those produced a false "the formatter dropped a
+    comment" — and so a refusal to format a perfectly legal file — for any
+    document with a ``#`` at the start of a continuation line; see
+    ``test_a_hash_inside_a_multiline_scalar_is_not_a_comment``.
 
     Counted rather than collected as a set, so that deleting one of two
     identical comments is still a difference.
     """
-    return Counter(
-        stripped for line in text.splitlines() if (stripped := line.strip()).startswith("#")
-    )
+    candidates = [
+        (number, stripped)
+        for number, line in enumerate(text.splitlines())
+        if (stripped := line.strip()).startswith("#")
+    ]
+    if not candidates:
+        # Nothing to classify, so nothing to scan for. Worth the branch: this
+        # runs twice per formatted file and a scan is not free.
+        return Counter()
+    inside = scalar_lines(text)
+    return Counter(stripped for number, stripped in candidates if number not in inside)
 
 
 def verify(before: str, after: str, *, name: str) -> str | None:

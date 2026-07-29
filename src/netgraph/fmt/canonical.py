@@ -46,6 +46,7 @@ from netgraph.fmt.scalars import (
     plain,
     plain_survives,
     quote_style,
+    scalar_lines,
 )
 
 __all__ = [
@@ -165,20 +166,31 @@ def _tidy(text: str) -> str:
     live in ruamel's comment tokens, spread across whichever node happens to
     precede them, and reaching into that to express "no blank line after a
     separator" would be a much longer way of writing four ``if``\\ s.
+
+    All four are about *layout*, so none of them may touch a line that is the
+    continuation of a scalar: a blank line inside a description is a ``\\n`` in
+    somebody's prose, and a trailing space inside a ``|`` block is a character
+    they typed. Collapsing those silently rewrote the value — caught, at least,
+    by :func:`~netgraph.fmt.verify.verify` refusing the result, so a description
+    with a blank line in it made ``fmt`` refuse the file rather than corrupt
+    it. :func:`~netgraph.fmt.scalars.scalar_lines` says which lines those are.
     """
-    lines = [line.rstrip() for line in text.splitlines()]
-    kept: list[str] = []
-    for line in lines:
-        if line:
-            kept.append(line)
+    protected = scalar_lines(text)
+    # Each kept line, with whether it came from inside a scalar.
+    kept: list[tuple[str, bool]] = []
+    for number, raw in enumerate(text.splitlines()):
+        guarded = number in protected
+        line = raw if guarded else raw.rstrip()
+        if guarded or line:
+            kept.append((line, guarded))
             continue
         # A blank line, dropped when what precedes it is nothing, another blank
         # line, or a document separator.
-        if kept and kept[-1] and kept[-1] != _SEPARATOR:
-            kept.append(line)
-    while kept and not kept[-1]:
+        if kept and kept[-1][0] and kept[-1][0] != _SEPARATOR:
+            kept.append((line, False))
+    while kept and not kept[-1][0] and not kept[-1][1]:
         kept.pop()
-    return "".join(f"{line}\n" for line in kept)
+    return "".join(f"{line}\n" for line, _ in kept)
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,11 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: a
+  colour: red
+spec:
+  interfaces:
+    - name: e0
+      type: ethernet
+      speed: fast
+  wibble: 1
