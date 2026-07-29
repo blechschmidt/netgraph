@@ -77,13 +77,14 @@ class Scaffold:
 # --------------------------------------------------------------------------- #
 
 _CONFIG: Final = f"""\
-# {CONFIG_FILE_NAME} — how netgraph validates *this* inventory.
+# {CONFIG_FILE_NAME} — how netgraph validates and draws *this* inventory.
 #
 # Everything here is optional, and what is commented out below is exactly what
 # netgraph does without it; the file is generated fully commented on purpose.
 # Rules are named by their short id (E001, W103, I002), by the NG-* alias from
 # the specification, or by "*" for all of them. Run 'netgraph rules' for the
-# catalogue.
+# catalogue, and 'netgraph config show' for the settings as netgraph resolves
+# them, each with the place it came from.
 
 # [validate]
 #
@@ -100,6 +101,32 @@ _CONFIG: Final = f"""\
 # Re-grade a rule instead of silencing it: "error", "warning" or "info".
 # [validate.severity]
 # E004 = "warning"
+
+# How this inventory is drawn, when the command line does not say otherwise.
+# Every key is a long flag of 'netgraph render' without its leading dashes, so
+# '--collapse-depth 1' is 'collapse-depth = 1' and '--no-show-ips' is
+# 'show-ips = false'. An explicit flag always wins over this file.
+
+# [render]
+# layer = "l2"                    # or ["l1", "l2", "l3"] for -f html
+# format = "svg"
+# icons = "cisco"                 # a bundled theme, "none", or a directory
+# group-by-namespace = true
+# rankdir = "LR"                  # TB, LR, BT or RL
+# link-template = "https://git.example.com/net/blob/main/{{file}}#L{{line}}"
+
+# A named profile inherits [render] and overrides what it names; select it with
+# 'netgraph render --profile poster'. One per diagram you produce regularly.
+
+# [profile.poster]
+# layer = ["l1", "l2", "l3"]
+# format = "html"
+# title = "The network, every layer"
+
+# [profile.review]
+# collapse-depth = 1              # one node per site, for a pull request
+# bundle-links = true
+# show-ips = false
 """
 
 _GITIGNORE: Final = """\

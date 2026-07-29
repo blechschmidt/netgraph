@@ -113,6 +113,7 @@ if TYPE_CHECKING:  # pragma: no cover - imported for typing only
     from netgraph.render.aggregate import AggregateView, BundleView
 
 __all__ = [
+    "NODE_KINDS",
     "PATCHPANEL_KIND",
     "RACK_ID_PREFIX",
     "RACK_KIND",
@@ -1703,6 +1704,26 @@ def _propagate_through_adapters(membership: dict[str, set[int]], edges: Sequence
 # --------------------------------------------------------------------------- #
 # Filtering
 # --------------------------------------------------------------------------- #
+
+
+#: The element kinds that become graph *nodes*, and therefore the kinds a filter
+#: may select. A cable is an edge, and a tunnel is one too below the ``overlay``
+#: layer — where it does become a node it is derived from the elements it joins,
+#: exactly as a subnet is, so it is kept whenever one of them survives rather
+#: than selected in its own right.
+#:
+#: Lives here rather than in the CLI because :class:`FilterSpec` is what
+#: consumes it: ``--kind``, ``[render] kind`` and the completion of both read
+#: this one tuple.
+NODE_KINDS: Final[tuple[str, ...]] = (
+    "switch",
+    "router",
+    "hub",
+    "computer",
+    "server",
+    "adapter",
+    "patchpanel",
+)
 
 
 @dataclass(frozen=True, slots=True)

@@ -3012,7 +3012,7 @@ def test_unusable_configuration_is_rejected(data: dict[str, Any], expected: str)
 def test_unknown_top_level_tables_are_left_alone(tmp_path: Path) -> None:
     """A file shared with a newer netgraph must not break this one."""
     (tmp_path / CONFIG_FILE_NAME).write_text(
-        "[render]\nengine = 'dot'\n[validate]\nstrict = true\n", encoding="utf-8"
+        "[experimental]\nengine = 'neato'\n[validate]\nstrict = true\n", encoding="utf-8"
     )
     assert load_config(tmp_path).validation.strict is True
 

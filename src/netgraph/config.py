@@ -16,6 +16,12 @@ promotes every surviving warning to an error. Rules may be named by their short
 id (``E004``) or by the ``NG-*`` id used in ``docs/schema.md`` §10; the two are
 interchangeable (see :mod:`netgraph.rules`).
 
+The other half of the file says how this inventory is *drawn* — a ``[render]``
+table of defaults and any number of ``[profile.<name>]`` blocks that inherit
+from it. Those live in :mod:`netgraph.settings`, which owns the setting
+registry, the precedence ladder and the provenance report; this module only
+reads the tables and hands them over.
+
 Unknown keys *inside* a known table are rejected rather than ignored: a
 misspelt ``ingore = [...]`` that silently did nothing would be worse than a
 failed run. Unknown *top-level* tables are left alone, so a configuration file
@@ -33,6 +39,13 @@ from typing import Any, Final
 
 from netgraph.errors import ConfigurationError
 from netgraph.rules import RULE_IDS, WILDCARD, Severity, resolve_rule_id
+from netgraph.settings import (
+    PROFILE_TABLE,
+    RENDER_TABLE,
+    RenderConfig,
+    parse_profiles,
+    parse_render,
+)
 
 if sys.version_info >= (3, 11):  # pragma: no cover - trivial version fork
     import tomllib
@@ -55,6 +68,8 @@ CONFIG_FILE_NAME: Final = "netgraph.toml"
 _VALIDATE_KEYS: Final[frozenset[str]] = frozenset({"strict", "ignore", "severity"})
 
 _EMPTY_SEVERITIES: Final[Mapping[str, Severity]] = MappingProxyType({})
+
+_EMPTY_PROFILES: Final[Mapping[str, RenderConfig]] = MappingProxyType({})
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,11 +126,44 @@ class Config:
     path: Path | None = None
     #: The ``[validate]`` table.
     validation: ValidationConfig = field(default_factory=ValidationConfig)
+    #: The ``[render]`` table: defaults for every diagram of this inventory.
+    render: RenderConfig = field(default_factory=RenderConfig)
+    #: The ``[profile.<name>]`` blocks, in the order the file declares them.
+    profiles: Mapping[str, RenderConfig] = field(default_factory=lambda: _EMPTY_PROFILES)
 
     @property
     def is_default(self) -> bool:
         """Were the settings synthesised rather than read from a file?"""
         return self.path is None
+
+    @property
+    def profile_names(self) -> tuple[str, ...]:
+        """The declared profile names, in file order."""
+        return tuple(self.profiles)
+
+    def profile(self, name: str | None) -> RenderConfig | None:
+        """The named profile block, or ``None`` when none was asked for.
+
+        Raises:
+            ConfigurationError: No such profile. The message lists the ones the
+                file does declare — a mistyped ``--profile`` that silently
+                rendered the defaults would be a diagram the user never asked
+                for, and would look exactly like the one they wanted.
+        """
+        if name is None:
+            return None
+        block = self.profiles.get(name)
+        if block is not None:
+            return block
+        where = f"{self.path}: " if self.path is not None else ""
+        if not self.profiles:
+            raise ConfigurationError(
+                f"{where}no profile {name!r}: this inventory declares no [{PROFILE_TABLE}.<name>] "
+                f"block. Add one to {CONFIG_FILE_NAME} at the inventory root"
+            )
+        raise ConfigurationError(
+            f"{where}no profile {name!r}; this inventory declares {', '.join(self.profile_names)}"
+        )
 
 
 def load_config(source: Path, *, name: str = CONFIG_FILE_NAME) -> Config:
@@ -170,6 +218,7 @@ def parse_config(data: Mapping[str, Any], *, path: Path | None = None) -> Config
             f"{where}unknown key(s) in [validate]: {', '.join(unknown)}; expected one of {known}"
         )
 
+    base = path.parent if path is not None else None
     return Config(
         path=path,
         validation=ValidationConfig(
@@ -177,6 +226,8 @@ def parse_config(data: Mapping[str, Any], *, path: Path | None = None) -> Config
             severity=MappingProxyType(_parse_severity(section.get("severity", {}), where=where)),
             strict=_parse_bool(section.get("strict", False), key="validate.strict", where=where),
         ),
+        render=parse_render(data.get(RENDER_TABLE, {}), prefix=where, base=base),
+        profiles=parse_profiles(data.get(PROFILE_TABLE, {}), prefix=where, base=base),
     )
 
 

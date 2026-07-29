@@ -14,6 +14,11 @@ completers below close that gap:
 ``--disable``
     Rule ids with their summaries, plus the ``NG-*`` aliases once the typed
     prefix looks like one, and the ``*`` wildcard.
+``--profile``
+    The names of the ``[profile.<name>]`` blocks in the inventory's
+    ``netgraph.toml``, each described by the settings it overrides. A profile
+    exists only in *this* tree, so this is the one option Click could never
+    complete on its own.
 ``--kind``, ``-f/--format``, ``--layer``
     Static value spaces, but each candidate is offered *with its description*,
     which zsh and fish display next to it. ``click.Choice`` alone would list
@@ -48,6 +53,7 @@ __all__ = [
     "complete_layer",
     "complete_namespace",
     "complete_node",
+    "complete_profile",
     "complete_rule",
     "completion_script",
 ]
@@ -209,6 +215,27 @@ def complete_namespace(
     return _items(
         ((namespace, count_text(counts[namespace], "element")) for namespace in ordered), incomplete
     )
+
+
+def complete_profile(
+    ctx: click.Context, param: click.Parameter, incomplete: str
+) -> list[CompletionItem]:
+    """The profiles declared by the inventory's ``netgraph.toml``.
+
+    Like every completer here it answers with nothing rather than failing: a
+    configuration file with a typo in it is exactly the state a user is in when
+    they reach for <TAB>, and a traceback in the middle of a command line is
+    not an improvement on an empty list.
+    """
+    from netgraph.config import load_config  # imported late: completion must start fast
+    from netgraph.settings import profile_summaries
+
+    root = _inventory_path(ctx)
+    try:
+        config = load_config(root if root.is_dir() else root.parent)
+    except Exception:  # see the docstring: a completer never fails, it offers nothing
+        return []
+    return _items(profile_summaries(config.profiles), incomplete)
 
 
 def _element_items(

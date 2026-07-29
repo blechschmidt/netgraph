@@ -682,8 +682,16 @@ from an inventory with a dangling cable is worse than no diagram.
 | `--tooltips` / `--no-tooltips` | on | Carry the full record of every element — interfaces, addresses, VLANs, cabling — as hover text. `dot`, `svg` and `html` only; see [Interactive SVG](#interactive-svg-tooltips-links-and-ids). |
 | `--link-template URL` | off | Link each element back to the YAML that declares it, e.g. `https://git.example.com/net/blob/main/{file}#L{line}`. `dot`, `svg` and `html` only. |
 | `--element-ids` | off | Give every node, edge and namespace a stable `id` derived from its name, so the diagram can be deep-linked and styled. `dot` and `svg`; always on in `html`, which is built on them. |
+| `--max-addresses N` | `4` | Longest address list spelled out under a node before it is abbreviated to "and N more". |
+| `--rankdir TB\|LR\|BT\|RL` | `TB` | Layout direction. A wide network reads better left to right, a deep one top to bottom. Graphviz backends and `mermaid`. |
+| `--profile NAME` | none | Apply the `[profile.NAME]` block of `netgraph.toml` — see [Configuration](#configuration). |
+| `--show-config` | off | Print the settings this invocation resolves to, and where each came from, then exit. |
 | `--strict` | off | Treat warnings as errors, which then also refuse the render. |
 | `--force` | off | Render even when validation failed. The diagram may not match the files. |
+
+Every option above except `-o/--output`, `--force` and `--show-config` can be
+given a default in `netgraph.toml`, so a team retypes none of them; see
+[Configuration](#configuration).
 
 **Filters** narrow what is drawn. Values *within* one option are alternatives;
 different options are combined with AND, so `--namespace sites/north --kind
@@ -1692,6 +1700,34 @@ found by the next `netgraph validate` — see
 [editor setup](#editor-setup-autocompletion-and-inline-errors) below, or let
 [`netgraph init`](#netgraph-init) wire it up for you.
 
+### `netgraph config show`
+
+Print the settings a command resolves to, with the place each value came from —
+a flag, a profile, the `[render]` table, or netgraph's own default.
+
+| Option | Default | Effect |
+|---|---|---|
+| `COMMAND` | `render` | Whose settings to resolve: `render`, `watch`, `path` or `web`. Each shows the settings it actually takes. |
+| `--profile NAME` | none | Resolve as if `--profile NAME` had been given. |
+
+```console
+$ netgraph config show render --profile review
+settings for 'netgraph render'
+configuration: /net/inventory/netgraph.toml
+profiles declared: poster, review
+
+SETTING             VALUE   SOURCE
+------------------  ------  --------------
+layer               l2      file [render]
+collapse-depth      1       profile review
+show-ips            false   profile review
+```
+
+No flags are in play here, so what is shown is what the file does to a bare
+`netgraph COMMAND`. To see one *invocation* resolved, flags included, pass
+`--show-config` to the command itself. [`docs/configuration.md`](docs/configuration.md)
+is the full reference.
+
 ### `netgraph completion`
 
 Print the shell completion script for `bash`, `zsh` or `fish` on stdout. Needs
@@ -1726,6 +1762,7 @@ completing do too:
 | `--layer <TAB>` | `l1`, `l2`, `l3`, with what each one draws. |
 | `--kind <TAB>` | The element kinds the option accepts — no `cable` on a filter, `cable` included on `netgraph schema`. |
 | `--disable <TAB>` | Rule ids with their summaries, `*` included; type `NG-` for the schema aliases. |
+| `--profile <TAB>` | The `[profile.<name>]` blocks of the inventory's `netgraph.toml`, each described by the settings it overrides. |
 
 The inventory-aware completers read the tree pointed at by `-i`, so
 `netgraph -i examples/campus show sites/north/<TAB>` completes that site. They
@@ -1804,7 +1841,8 @@ comparison and the per-kind setup.
 
 ## Configuration
 
-An optional `netgraph.toml` at the inventory root re-grades or silences rules:
+An optional `netgraph.toml` at the inventory root says two things: how findings
+are graded, and how the inventory is drawn.
 
 ```toml
 [validate]
@@ -1813,7 +1851,44 @@ ignore = ["W103", "NG-C010"]      # never report these at all
 
 [validate.severity]
 E004 = "warning"                  # re-grade rather than silence
+
+[render]                          # defaults for every diagram of this tree
+layer = "l2"
+icons = "cisco"
+group-by-namespace = true
+
+[profile.review]                  # a named variation, inheriting [render]
+collapse-depth = 1
+bundle-links = true
+show-ips = false
 ```
+
+Every `[render]` key is a long flag of `netgraph render` without its leading
+dashes, so `--collapse-depth 1` is `collapse-depth = 1` and `--no-show-ips` is
+`show-ips = false`. A profile is applied on top with `--profile`:
+
+```bash
+netgraph render --profile review -f svg -o review.svg
+```
+
+An explicit flag always beats the profile, which beats `[render]`, which beats
+netgraph's own default — and *explicit* means typed, not different, so
+`--depth 1` wins over the file even though `1` is also the built-in default.
+`netgraph config show` prints the resolved settings with the place each one came
+from, and `--show-config` does the same for one invocation, flags included:
+
+```console
+$ netgraph render --profile review --title "Q3" --show-config
+SETTING             VALUE   SOURCE
+------------------  ------  --------------
+layer               l2      file [render]
+collapse-depth      1       profile review
+show-ips            false   profile review
+title               Q3      flag --title
+```
+
+[`docs/configuration.md`](docs/configuration.md) is the full reference: every
+key of both tables, the precedence ladder, and what a bad file reports.
 
 Individual elements can opt out with an annotation:
 
@@ -1871,6 +1946,7 @@ netgraph -i examples/campus render --namespace sites/north --layer l2 -f svg -o 
 | [`docs/schema.md`](docs/schema.md) | The specification. Why the schema looks the way it does, with three complete worked examples, and the editor setup in §13. |
 | [`docs/schema-reference.md`](docs/schema-reference.md) | Every field, its type, whether it is required, its default and its YANG path. Generated from the models. |
 | [`docs/validation-rules.md`](docs/validation-rules.md) | Every rule, its severity, why it matters and how to suppress it. |
+| [`docs/configuration.md`](docs/configuration.md) | `netgraph.toml`: the `[validate]` and `[render]` tables, named profiles, and how a flag, a profile and the file are resolved against each other. |
 | [`docs/format.md`](docs/format.md) | The canonical form `netgraph fmt` writes: layout, key order, quoting, and the two properties that make rewriting files safe. |
 | [`docs/paths.md`](docs/paths.md) | `netgraph path`: how the layer-2 and layer-3 traces decide, the JSON contract, and what is deliberately not modelled. |
 | [`docs/ipam.md`](docs/ipam.md) | `netgraph ipam`: how a prefix is sized, how free space is computed, and which existing rule each address-plan conflict is. |
@@ -1942,6 +2018,7 @@ src/netgraph/
 ├── console.py      terminal output: tables, colour, TTY detection
 ├── errors.py       shared exception hierarchy
 ├── config.py       per-inventory settings (netgraph.toml)
+├── settings.py     the [render] table, named profiles and the precedence ladder
 ├── scaffold.py     the starter inventory netgraph init writes
 ├── importer/       netgraph import: a first inventory from live-network output
 │   ├── run.py      reading the inputs, sniffing each dialect, writing the tree

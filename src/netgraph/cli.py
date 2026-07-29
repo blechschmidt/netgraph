@@ -86,10 +86,11 @@ from netgraph.completion import (
     complete_layer,
     complete_namespace,
     complete_node,
+    complete_profile,
     complete_rule,
     completion_script,
 )
-from netgraph.config import Config, ValidationConfig, load_config
+from netgraph.config import CONFIG_FILE_NAME, Config, ValidationConfig, load_config
 from netgraph.console import Align, Console
 from netgraph.errors import LoaderError, NetgraphError, RenderError, compact_ids, format_path
 from netgraph.importer import (
@@ -125,8 +126,11 @@ from netgraph.loader import (
 )
 from netgraph.models import DOCUMENT_KINDS, Element, format_bitrate
 from netgraph.render import (
+    DEFAULT_RANKDIR,
     FORMATS,
     LINK_FIELDS,
+    NODE_KINDS,
+    RANKDIRS,
     RENDERERS,
     AggregateSpec,
     BundleMode,
@@ -162,6 +166,12 @@ from netgraph.report import Diagnostic, build_report, render_report
 from netgraph.rules import RULES, Severity
 from netgraph.scaffold import SCHEMA_FILE_NAME, build_scaffold, write_scaffold
 from netgraph.schema import build_schema
+from netgraph.settings import (
+    RENDER_TABLE,
+    Origin,
+    Resolution,
+    resolve_settings,
+)
 from netgraph.subnets import IPNetwork, subnets_of
 from netgraph.trace import DEFAULT_MAX_HOPS, TraceError, TraceResult, render_trace, trace
 from netgraph.trace import REPORT_FORMATS as TRACE_FORMATS
@@ -199,20 +209,6 @@ CONTEXT_SETTINGS = {
     "max_content_width": 100,
 }
 
-#: Element kinds ``--kind`` can select. A cable is an edge, and a tunnel is one
-#: too below the ``overlay`` layer — where it does become a node it is derived
-#: from the elements it joins, exactly as a subnet is, so it is kept whenever one
-#: of them survives rather than selected in its own right.
-NODE_KINDS: Final[tuple[str, ...]] = (
-    "switch",
-    "router",
-    "hub",
-    "computer",
-    "server",
-    "adapter",
-    "patchpanel",
-)
-
 #: Exit status when an inventory is rejected. The task of every command that
 #: checks an inventory is to answer "is this usable?", so they share one answer.
 EXIT_INVALID: Final = 1
@@ -237,6 +233,11 @@ class AppContext:
     verbosity: int = 0
     #: Force colour on or off; ``None`` auto-detects from the stream.
     color: bool | None = None
+    #: ``netgraph.toml``, read at most once per run. A command may ask for it
+    #: twice — once to resolve its render defaults, once to grade findings — and
+    #: reading the file twice could answer the two questions differently if it
+    #: were edited in between.
+    _config: Config | None = field(default=None, repr=False)
 
     def log(self, message: str, *, level: int = 1) -> None:
         """Write ``message`` to stderr when the verbosity level allows it."""
@@ -281,12 +282,15 @@ class AppContext:
         Raises:
             ConfigurationError: The file exists but cannot be used.
         """
+        if self._config is not None:
+            return self._config
         # ``load_config`` reads a *file* argument as TOML directly, so a
         # single-file inventory must be redirected to its directory.
         root = self.inventory if self.inventory.is_dir() else self.inventory.parent
         config = load_config(root)
         if config.path is not None:
             self.log(f"using configuration {config.path}", level=1)
+        self._config = config
         return config
 
 
@@ -1019,7 +1023,54 @@ _DISPLAY_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
             "diagram can be deep-linked and styled from outside. dot and svg only."
         ),
     ),
+    click.option(
+        "--max-addresses",
+        type=click.IntRange(0),
+        default=4,
+        show_default=True,
+        metavar="N",
+        help=(
+            "Longest address list spelled out under a node before it is abbreviated to "
+            "'and N more'. 0 prints the count alone."
+        ),
+    ),
+    click.option(
+        "--rankdir",
+        type=click.Choice(RANKDIRS, case_sensitive=False),
+        default=None,
+        show_default=f"{DEFAULT_RANKDIR}, top to bottom",
+        help=(
+            "Layout direction. A wide network reads better left to right; a deep one "
+            "top to bottom. Honoured by the Graphviz backends and by mermaid."
+        ),
+    ),
     click.option("--title", default=None, metavar="TEXT", help="Caption for the diagram."),
+)
+
+#: How the file decides what the flags do not. Shared by every command that
+#: reads render defaults out of ``netgraph.toml``; see :mod:`netgraph.settings`
+#: for the precedence ladder these two select and report on.
+_CONFIG_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
+    click.option(
+        "--profile",
+        "profile",
+        default=None,
+        metavar="NAME",
+        shell_complete=complete_profile,
+        help=(
+            f"Apply the [profile.NAME] block of {CONFIG_FILE_NAME} on top of its "
+            f"[{RENDER_TABLE}] table. Explicit flags still win over both."
+        ),
+    ),
+    click.option(
+        "--show-config",
+        is_flag=True,
+        default=False,
+        help=(
+            "Print the settings this invocation resolves to, and where each one came "
+            "from, then exit without doing any work."
+        ),
+    ),
 )
 
 #: Which view of the network to draw. ``path`` does not take it: the layer a
@@ -1065,6 +1116,7 @@ _GRAPH_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
     *_DISPLAY_OPTIONS,
     _LAYER_OPTION,
     *_VALIDATION_OPTIONS,
+    *_CONFIG_OPTIONS,
 )
 
 _Command = TypeVar("_Command", bound=Callable[..., Any])
@@ -1086,9 +1138,14 @@ def _graph_options(command: _Command) -> _Command:
     return _apply(_GRAPH_OPTIONS, command)
 
 
+def _config_options(command: _Command) -> _Command:
+    """Apply :data:`_CONFIG_OPTIONS` to ``command``."""
+    return _apply(_CONFIG_OPTIONS, command)
+
+
 def _path_options(command: _Command) -> _Command:
     """Apply the options ``path --highlight`` shares with ``render``."""
-    return _apply((*_DISPLAY_OPTIONS, *_VALIDATION_OPTIONS), command)
+    return _apply((*_DISPLAY_OPTIONS, *_VALIDATION_OPTIONS, *_CONFIG_OPTIONS), command)
 
 
 def _filter_spec(params: Mapping[str, Any]) -> FilterSpec:
@@ -1168,11 +1225,116 @@ def _render_options(
         show_vlans=params["show_vlans"],
         group_by_namespace=params["group_by_namespace"],
         title=params["title"],
+        max_addresses=params["max_addresses"],
         icons=params["icons"],
         tooltips=params["tooltips"],
         link_template=params["link_template"],
         element_ids=params["element_ids"],
+        rankdir=params["rankdir"],
         highlight=highlight,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# netgraph.toml: render defaults and named profiles
+# --------------------------------------------------------------------------- #
+
+
+def _explicit(ctx: click.Context) -> frozenset[str]:
+    """The parameters the user actually supplied on this command line.
+
+    Click stores a parsed value whether or not one was typed, so
+    ``ctx.params["depth"] == 1`` cannot distinguish an absent ``--depth`` from
+    an explicit ``--depth 1``. The parameter *source* can, and it is the only
+    thing that can, which is why the top rung of the precedence ladder is built
+    from it rather than by comparing values against defaults: a user who types
+    the default value still beats the file.
+
+    An environment variable counts as explicit for the same reason a flag does —
+    the user put it there — while Click's own default and any default map do
+    not.
+    """
+    supplied = (ParameterSource.COMMANDLINE, ParameterSource.ENVIRONMENT, ParameterSource.PROMPT)
+    return frozenset(name for name in ctx.params if ctx.get_parameter_source(name) in supplied)
+
+
+def _apply_settings(ctx: click.Context) -> tuple[Resolution, ...]:
+    """Fold the inventory's render defaults into ``ctx.params``.
+
+    Everything downstream — :func:`_render_options`, :func:`_filter_spec`,
+    :func:`_layers` — keeps reading ``ctx.params`` and cannot tell whether a
+    value was typed or configured, which is the point: there is one place where
+    precedence is decided and no command can implement it differently.
+
+    Returns:
+        One :class:`~netgraph.settings.Resolution` per setting the command
+        takes, for ``--show-config``.
+
+    Raises:
+        ConfigurationError: The file is unusable, or ``--profile`` names a
+            block it does not declare.
+    """
+    app: AppContext = ctx.obj
+    config = app.config()
+    profile = config.profile(ctx.params.get("profile"))
+    resolutions = resolve_settings(
+        params=ctx.params,
+        given=_explicit(ctx),
+        render=config.render,
+        profile=profile,
+        path=config.path,
+    )
+    for resolution in resolutions:
+        ctx.params[resolution.setting.param] = resolution.value
+    configured = [item for item in resolutions if item.origin in (Origin.FILE, Origin.PROFILE)]
+    if configured:
+        app.log(
+            f"applied {_plural(len(configured), 'setting')} from {config.path}"
+            + (f" via profile {profile.name}" if profile is not None else ""),
+            level=1,
+        )
+    return resolutions
+
+
+def _settings_for(
+    command: click.Command, config: Config, *, profile: str | None
+) -> tuple[Resolution, ...]:
+    """Resolve ``command``'s settings without running it, for ``config show``.
+
+    No flags are in play here, so the report shows what the *file* does to a
+    bare invocation: the top rung of the ladder is simply unoccupied.
+    """
+    # Parsed rather than read off the parameters: a repeatable option's default
+    # only becomes the empty tuple the command body sees once Click has
+    # processed it, and ``path`` has required arguments that an empty command
+    # line does not supply — which resilient parsing is exactly for.
+    context = click.Context(command, resilient_parsing=True)
+    command.parse_args(context, [])
+    return resolve_settings(
+        params=context.params,
+        given=(),
+        render=config.render,
+        profile=config.profile(profile),
+        path=config.path,
+    )
+
+
+def _print_settings(
+    console: Console, resolutions: Sequence[Resolution], *, config: Config, command: str
+) -> None:
+    """The resolved settings of one command, with a provenance column."""
+    console.info(f"settings for 'netgraph {command}'")
+    console.info(
+        f"configuration: {config.path}"
+        if config.path is not None
+        else f"configuration: none ({CONFIG_FILE_NAME} not found; built-in defaults in use)"
+    )
+    if config.profiles:
+        console.info(f"profiles declared: {', '.join(config.profile_names)}")
+    console.print()
+    console.table(
+        ("SETTING", "VALUE", "SOURCE"),
+        [[item.setting.key, item.display, item.source] for item in resolutions],
     )
 
 
@@ -1211,10 +1373,15 @@ def render_command(
     """
     app: AppContext = ctx.obj
     params = ctx.params
-    strict, force = bool(params["strict"]), bool(params["force"])
 
     # stdout may be the diagram itself, so every diagnostic goes to stderr.
     console = app.console(err=True)
+    resolutions = _apply_settings(ctx)
+    if params["show_config"]:
+        _print_settings(app.console(), resolutions, config=app.config(), command="render")
+        return
+    output_format = params["output_format"]
+    strict, force = bool(params["strict"]), bool(params["force"])
     inventory = app.load()
 
     findings = _run_validation(app, inventory, strict=strict)
@@ -1509,6 +1676,7 @@ HIGHLIGHT_FORMATS: Final[tuple[str, ...]] = tuple(
 @click.option(
     "-F",
     "--output-format",
+    "report_format",
     type=click.Choice(TRACE_FORMATS),
     default="text",
     show_default=True,
@@ -1550,7 +1718,7 @@ def path_command(
     vlan: int | None,
     all_paths: bool,
     max_hops: int,
-    output_format: str,
+    report_format: str,
     highlight: bool,
     output_image: str,
     output: Path | None,
@@ -1584,6 +1752,10 @@ def path_command(
     app: AppContext = ctx.obj
     params = ctx.params
     _reject_diagram_options_without_highlight(ctx, highlight)
+    resolutions = _apply_settings(ctx)
+    if params["show_config"]:
+        _print_settings(app.console(), resolutions, config=app.config(), command="path")
+        return
 
     # With --highlight and no --output the diagram owns stdout, so the report
     # moves to stderr; ``render`` splits its output the same way.
@@ -1608,7 +1780,7 @@ def path_command(
     except TraceError as exc:
         raise click.BadParameter(str(exc), param_hint="'SRC' / 'DST'") from exc
 
-    console.print(render_trace(result, output_format, all_paths=all_paths).rstrip("\n"))
+    console.print(render_trace(result, report_format, all_paths=all_paths).rstrip("\n"))
     _report_cleartext_tunnels(notes, result)
 
     if highlight:
@@ -1775,6 +1947,11 @@ def watch_command(
     console = app.console(err=True)
 
     _reject_serve_options_without_serve(ctx, serve)
+    resolutions = _apply_settings(ctx)
+    if params["show_config"]:
+        _print_settings(console, resolutions, config=app.config(), command="watch")
+        return
+    output_format = params["output_format"]
 
     options = _render_options(params)
     _report_icon_support(console, output_format, options)
@@ -1975,14 +2152,18 @@ _STATUS_COLOUR: Final[dict[Status, str]] = {
         "because it names a directory on this machine."
     ),
 )
-@click.pass_obj
+@_config_options
+@click.pass_context
 def web_command(
-    app: AppContext,
+    ctx: click.Context,
+    /,
     source: Path | None,
     host: str,
     port: int,
     open_browser: bool,
     icons: IconTheme | None,
+    profile: str | None,
+    show_config: bool,
 ) -> None:
     """Edit a YAML document stream in a browser and see it drawn as you type.
 
@@ -2000,9 +2181,21 @@ def web_command(
     Note that a stream has no folders and therefore no namespaces: every element
     seeded from a tree lands in the root namespace.
 
+    Render defaults and --profile are read from the netgraph.toml of the
+    inventory named by -i, the current directory by default. The stream being
+    edited has no folder of its own to look in, so that file decides how this
+    machine draws rather than what this text means.
+
     Press Ctrl-C to stop.
     """
+    app: AppContext = ctx.obj
     console = app.console(err=True)
+
+    resolutions = _apply_settings(ctx)
+    if show_config:
+        _print_settings(app.console(), resolutions, config=app.config(), command="web")
+        return
+    icons = ctx.params["icons"]
 
     text = _web_source(console, source)
     exposure = describe_exposure(host, subject="the web interface")
@@ -2844,6 +3037,89 @@ def _resolve_element(inventory: Inventory, name: str) -> tuple[str, Element]:
 # --------------------------------------------------------------------------- #
 # rules
 # --------------------------------------------------------------------------- #
+
+
+# --------------------------------------------------------------------------- #
+# config
+# --------------------------------------------------------------------------- #
+
+#: The commands whose settings ``config show`` can resolve. Each one applies the
+#: ``[render]`` table; which settings it *takes* is decided by the options it
+#: declares, so ``web`` shows the two it has rather than a table of twenty
+#: settings it would ignore.
+CONFIGURABLE: Final[tuple[str, ...]] = ("render", "watch", "path", "web")
+
+
+@cli.group("config")
+def config_command() -> None:
+    """Inspect the per-inventory netgraph.toml."""
+
+
+@config_command.command("show")
+@click.argument("command", type=click.Choice(CONFIGURABLE), default="render", required=False)
+@click.option(
+    "--profile",
+    default=None,
+    metavar="NAME",
+    shell_complete=complete_profile,
+    help="Resolve as if --profile NAME had been given.",
+)
+@click.pass_obj
+def config_show_command(app: AppContext, command: str, profile: str | None) -> None:
+    """Print the settings COMMAND resolves to, and where each one comes from.
+
+    No flags are in play, so what is shown is what the file does to a bare
+    'netgraph COMMAND': every value is the profile's, the [render] table's, or
+    netgraph's own. Add --show-config to the command itself to see a particular
+    invocation resolved, flags included.
+    """
+    console = app.console()
+    config = app.config()
+    target = cli.commands[command]
+    _print_validation(console, config)
+    console.print()
+    _print_settings(
+        console,
+        _settings_for(target, config, profile=profile),
+        config=config,
+        command=command,
+    )
+
+
+def _print_validation(console: Console, config: Config) -> None:
+    """The ``[validate]`` half of the file, which has no per-command shape."""
+    validation = config.validation
+    console.info("validation")
+    console.table(
+        ("SETTING", "VALUE", "SOURCE"),
+        [
+            [
+                "strict",
+                "true" if validation.strict else "false",
+                _validate_source(config, "strict"),
+            ],
+            [
+                "ignore",
+                ", ".join(sorted(validation.ignore)) or "(none)",
+                _validate_source(config, "ignore"),
+            ],
+            [
+                "severity",
+                ", ".join(f"{rule}={grade}" for rule, grade in sorted(validation.severity.items()))
+                or "(none)",
+                _validate_source(config, "severity"),
+            ],
+        ],
+    )
+
+
+def _validate_source(config: Config, key: str) -> str:
+    """Whether the file said anything about this validation setting."""
+    if config.path is None:
+        return "default"
+    default = ValidationConfig()
+    current = getattr(config.validation, {"severity": "severity"}.get(key, key))
+    return "file [validate]" if current != getattr(default, key) else "default"
 
 
 @cli.command("rules")

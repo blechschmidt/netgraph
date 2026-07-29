@@ -37,7 +37,7 @@ from netgraph.render.graph import (
     Node,
     TunnelView,
 )
-from netgraph.render.options import RenderOptions
+from netgraph.render.options import DEFAULT_RANKDIR, RenderOptions
 
 __all__ = ["MERMAID_MAX_EDGES", "mermaid_advisories", "render_mermaid", "to_mermaid"]
 
@@ -141,7 +141,8 @@ def to_mermaid(graph: Graph, options: RenderOptions | None = None) -> str:
     if opts.title:
         # A YAML front-matter block is Mermaid's own way of carrying a title.
         lines.extend(["---", f"title: {_front_matter(opts.title)}", "---"])
-    lines.append("flowchart TB")
+    direction = opts.rankdir or DEFAULT_RANKDIR
+    lines.append(f"flowchart {direction}")
 
     if opts.group_by_namespace:
         lines.extend(_grouped_nodes(graph, ids, opts))
@@ -172,7 +173,7 @@ def _grouped_nodes(graph: Graph, ids: Mapping[str, str], options: RenderOptions)
             yield from (f"{_INDENT}{line}" for line in _nodes(members, ids, options, graph.layer))
             continue
         yield f"{_INDENT}subgraph ns{index}[{_label(namespace)}]"
-        yield f"{_INDENT * 2}direction TB"
+        yield f"{_INDENT * 2}direction {options.rankdir or DEFAULT_RANKDIR}"
         yield from (f"{_INDENT * 2}{line}" for line in _nodes(members, ids, options, graph.layer))
         yield f"{_INDENT}end"
 

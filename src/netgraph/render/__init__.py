@@ -43,6 +43,7 @@ from netgraph.render.details import (
 )
 from netgraph.render.dot import IMAGE_FORMATS, render_dot, render_image, to_dot, to_image
 from netgraph.render.graph import (
+    NODE_KINDS,
     PATCHPANEL_KIND,
     RACK_ID_PREFIX,
     RACK_KIND,
@@ -91,7 +92,7 @@ from netgraph.render.mermaid import (
     render_mermaid,
     to_mermaid,
 )
-from netgraph.render.options import RenderOptions
+from netgraph.render.options import DEFAULT_RANKDIR, RANKDIRS, RenderOptions
 from netgraph.render.registry import (
     PAGE_CSP,
     RENDERERS,
@@ -111,6 +112,7 @@ __all__ = [
     "AGGREGATE_ID_PREFIX",
     "AGGREGATE_KIND",
     "BUNDLED_THEMES",
+    "DEFAULT_RANKDIR",
     "DETAIL_OPTIONS",
     "FORMATS",
     "GRAPH_KIND",
@@ -118,11 +120,13 @@ __all__ = [
     "IMAGE_FORMATS",
     "LINK_FIELDS",
     "MERMAID_MAX_EDGES",
+    "NODE_KINDS",
     "PAGE_CSP",
     "PAGE_KIND",
     "PATCHPANEL_KIND",
     "RACK_ID_PREFIX",
     "RACK_KIND",
+    "RANKDIRS",
     "RENDERERS",
     "SUBNET_ID_PREFIX",
     "SUBNET_KIND",

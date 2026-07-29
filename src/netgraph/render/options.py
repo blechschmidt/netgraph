@@ -9,12 +9,22 @@ turning a label off can never change the topology a reader sees.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Final
 
 from netgraph.render.highlight import Highlight
 from netgraph.render.icons import IconTheme
 from netgraph.render.links import LinkTemplate
 
-__all__ = ["RenderOptions"]
+__all__ = ["DEFAULT_RANKDIR", "RANKDIRS", "RenderOptions"]
+
+#: Layout directions, spelled as Graphviz spells them. Mermaid happens to use
+#: the same four tokens, so one value serves both backends and there is no
+#: mapping table to keep in step.
+RANKDIRS: Final[tuple[str, ...]] = ("TB", "LR", "BT", "RL")
+
+#: What both backends lay out as when nothing asks otherwise. Top-to-bottom
+#: suits the tree a network usually is: core at the top, access below it.
+DEFAULT_RANKDIR: Final = "TB"
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +41,11 @@ class RenderOptions:
     title: str | None = None
     #: Longest address list spelled out under a node before it is abbreviated.
     max_addresses: int = 4
+    #: Layout direction, one of :data:`RANKDIRS`. ``None`` means
+    #: :data:`DEFAULT_RANKDIR`, which is what the backends laid out as before
+    #: this option existed. Honoured by the Graphviz backends and by Mermaid
+    #: (which spells the same four tokens the same way); JSON carries no layout.
+    rankdir: str | None = None
     #: Draw each node as its kind's icon instead of a plain Graphviz shape.
     #: ``None`` keeps the shapes. Honoured by the Graphviz backends; Mermaid and
     #: JSON have no picture to put an icon in, and ignore it.

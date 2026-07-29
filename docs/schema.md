@@ -2250,9 +2250,13 @@ their absence:
   devices, which would let `upstream.attached_to` name a specific receptacle
   (§8.1).
 * **Wireless detail**: SSIDs, bands, channels, and BSS-to-SSID mapping.
-* **Per-inventory configuration** beyond validation: `netgraph.toml` at the
-  inventory root already carries rule suppression and severity overrides
-  (§10.11); default labels and renderer settings are still deferred.
+* **Per-inventory configuration** beyond validation and rendering:
+  `netgraph.toml` at the inventory root carries rule suppression and severity
+  overrides (§10.11), a `[render]` table of renderer defaults and any number of
+  named `[profile.<name>]` blocks — see
+  [`docs/configuration.md`](configuration.md). What remains deferred is
+  configuration of the *model*: per-inventory defaults for a document's own
+  fields, such as a default `medium` for every cable.
 * **Templating**: reusable device profiles (`kind: profile`) to remove
   repetition across identically-configured switches.
 

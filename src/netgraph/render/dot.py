@@ -116,7 +116,7 @@ from netgraph.render.highlight import Highlight
 from netgraph.render.icons import IconTheme, suffix_order
 from netgraph.render.ids import ElementIds, element_ids
 from netgraph.render.links import LinkTemplate
-from netgraph.render.options import RenderOptions
+from netgraph.render.options import DEFAULT_RANKDIR, RenderOptions
 
 __all__ = [
     "DOT_EXECUTABLE",
@@ -394,6 +394,7 @@ def to_dot(graph: Graph, options: RenderOptions | None = None, *, target: str = 
     template = _environment().get_template(_TEMPLATE_NAME)
     return template.render(
         title=opts.title,
+        rankdir=opts.rankdir or DEFAULT_RANKDIR,
         groups=_groups(graph, opts, icons, identity, details),
         edges=tuple(_edge_views(graph, opts, identity, details)),
         imagepath=str(opts.icons.directory) if icons and opts.icons is not None else None,
