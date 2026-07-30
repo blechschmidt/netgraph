@@ -32,6 +32,7 @@ from click.testing import CliRunner
 from netgraph.cli import cli
 from netgraph.config import CacheConfig, parse_cache, parse_config
 from netgraph.errors import ConfigurationError
+from netgraph.fsio import _temporary_for
 from netgraph.loader import Inventory, load_tree
 from netgraph.loader.cache import (
     CACHE_DIR_ENV_VAR,
@@ -587,16 +588,42 @@ def test_concurrent_processes_do_not_corrupt_the_cache(tmp_path: Path) -> None:
     inventory = load_tree(root, cache=store)
     assert fingerprint_of(inventory) == fingerprint_of(load_tree(root))
     assert store.stats.rejected == 0, "a torn entry would show up here"
-    assert store.stats.hits == 40
+    assert store.stats.hits == 40, "a key no process managed to write shows up here"
+
+
+def test_two_writers_of_one_destination_do_not_share_a_scratch_file(tmp_path: Path) -> None:
+    """The half of the race above that no amount of retrying could fix.
+
+    Two processes filling one cache aim at the same destination routinely, and
+    that is fine — the key is the content, so they write identical bytes. What
+    they cannot survive is sharing the file they write *through*: on Windows one
+    opening it while the other holds it open is a sharing violation, and one
+    renaming it away mid-write leaves the other renaming a file that is gone.
+    Either way the entry is never written at all, which is a cache miss forever
+    and not a torn entry any reader could notice.
+    """
+    destination = tmp_path / "entry.ngc"
+    names = {_temporary_for(destination).name for _ in range(100)}
+
+    assert len(names) == 100, "two writers would collide on the same scratch file"
+    for name in names:
+        assert name.startswith("."), "a leftover must be a file the loader skips"
+        assert name.endswith(".tmp")
+        assert destination.name in name, "and must say what it was on its way to being"
 
 
 def test_a_half_written_entry_is_not_visible(tree: Path, tmp_path: Path) -> None:
-    """The temporary file a killed process leaves is not mistaken for an entry."""
+    """The temporary file a killed process leaves is not mistaken for an entry.
+
+    Named through :func:`~netgraph.fsio._temporary_for` rather than spelled out,
+    so this stages what a killed process would actually have left behind and not
+    a name that used to be right.
+    """
     directory = tmp_path / "cache"
     store = DocumentCache(directory)
     load_tree(tree, cache=store)
     entry = entries(directory)[0]
-    temporary = entry.with_name(f".{entry.name}.netgraph.tmp")
+    temporary = _temporary_for(entry)
     temporary.write_bytes(b"half a")
 
     reader = DocumentCache(directory)

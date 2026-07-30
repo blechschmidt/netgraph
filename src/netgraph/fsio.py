@@ -38,6 +38,7 @@ device reported as ``con`` would produce a path that cannot be created at all.
 
 from __future__ import annotations
 
+import itertools
 import os
 import time
 from pathlib import Path
@@ -131,6 +132,34 @@ def write_text_atomically(path: Path, text: str, *, encoding: str = "utf-8") -> 
     write_bytes_atomically(path, text.encode(encoding))
 
 
+#: Serial number of the next temporary file this process creates. See
+#: :func:`_temporary_for`.
+_temporary_serial = itertools.count()
+
+
+def _temporary_for(path: Path) -> Path:
+    """The scratch file ``path`` is written through before being renamed onto.
+
+    Three things are true of the name at once, and each is load-bearing:
+
+    * It **starts with a dot**, which is the loader's own rule for "do not read
+      this" (``NG-L002``), so a leftover from a killed process is inert rather
+      than a phantom element with a syntax error.
+    * It **ends in .tmp**, for a human looking at the directory.
+    * It is **unique to this writer**. Two processes filling one parse cache aim
+      at the same destination routinely — the key is the content, so they write
+      identical bytes and neither cares who wins. Sharing a scratch file is what
+      they cannot survive: on Windows, one opening it while the other holds it
+      open is a sharing violation, and one renaming it away mid-write leaves the
+      other renaming a file that is no longer there. Either way the entry is
+      simply never written, which is how a four-process race over forty files
+      came back with thirty-nine of them cached. POSIX tolerates the sharing;
+      the fix is not POSIX-specific because the bug was never really about
+      Windows, only visible there.
+    """
+    return path.with_name(f".{path.name}.{os.getpid()}-{next(_temporary_serial)}.netgraph.tmp")
+
+
 def write_bytes_atomically(
     path: Path, payload: bytes, *, mode: int | None = None, sync: bool = True
 ) -> None:
@@ -141,6 +170,9 @@ def write_bytes_atomically(
     It is hidden (a leading dot) and suffixed ``.tmp`` so that a run interrupted
     between the write and the rename leaves something the loader skips rather
     than a stray document.
+
+    Its name also carries the writer's process id and a counter, so that two
+    writers aiming at one destination never share it (:func:`_temporary_for`).
 
     Args:
         mode: Permission bits to set before the replacement, or ``None`` to leave
@@ -165,7 +197,7 @@ def write_bytes_atomically(
         OSError: The file cannot be written, or the replacement failed.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(f".{path.name}.netgraph.tmp")
+    temporary = _temporary_for(path)
     try:
         with temporary.open("wb") as handle:
             handle.write(payload)
