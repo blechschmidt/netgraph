@@ -1,0 +1,237 @@
+/* The one style sheet of an HTML report bundle, inlined into every page.
+ *
+ * Three constraints shaped it. It has to be *readable on paper*, because an
+ * as-built record is printed and signed -- so the print rules are not an
+ * afterthought and links keep their target visible. It has to be readable on a
+ * phone in a plant room, so the wide tables scroll rather than reflow into
+ * illegibility. And it has to fetch nothing: no font, no image, no reset,
+ * because the page ships its own Content-Security-Policy that refuses all three.
+ */
+
+:root {
+  --ink: #10151b;
+  --muted: #5a6672;
+  --line: #d8dee5;
+  --accent: #1c5f9e;
+  --wash: #f6f8fa;
+  --warn: #8a4b00;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0 auto;
+  max-width: 62rem;
+  padding: 1.5rem 1.25rem 4rem;
+  color: var(--ink);
+  background: #fff;
+  font: 16px/1.55 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+a {
+  color: var(--accent);
+}
+
+code {
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  background: var(--wash);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+
+header.page {
+  border-bottom: 2px solid var(--line);
+  margin-bottom: 1.5rem;
+}
+
+h1 {
+  font-size: 1.7rem;
+  margin: 0.2rem 0 0.4rem;
+}
+
+h2 {
+  font-size: 1.25rem;
+  margin: 2rem 0 0.5rem;
+}
+
+h3 {
+  font-size: 1rem;
+  margin: 1.4rem 0 0.4rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+h2 a.self {
+  color: inherit;
+  text-decoration: none;
+}
+
+p.summary {
+  color: var(--muted);
+  margin: 0 0 1rem;
+}
+
+p.blurb {
+  margin: 0.2rem 0 0.8rem;
+}
+
+p.note {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0.4rem 0 0;
+}
+
+p.empty {
+  color: var(--muted);
+  font-style: italic;
+  margin: 0.3rem 0;
+}
+
+nav.breadcrumb,
+footer {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+footer {
+  border-top: 1px solid var(--line);
+  margin-top: 3rem;
+  padding-top: 0.8rem;
+}
+
+nav.contents ul,
+ul.links {
+  margin: 0.3rem 0 1rem;
+  padding-left: 1.2rem;
+}
+
+nav.contents {
+  background: var(--wash);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+}
+
+nav.contents h2 {
+  font-size: 0.85rem;
+  margin: 0.2rem 0 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+dl.fields,
+dl.provenance {
+  display: grid;
+  grid-template-columns: minmax(9rem, 14rem) 1fr;
+  gap: 0.15rem 1rem;
+  margin: 0.5rem 0 1rem;
+}
+
+dl.fields dt,
+dl.provenance dt {
+  color: var(--muted);
+}
+
+dl.fields dd,
+dl.provenance dd {
+  margin: 0;
+}
+
+div.scroll {
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.92rem;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 0.3rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  background: var(--wash);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+td.right,
+th.right {
+  text-align: right;
+}
+
+tbody tr:hover {
+  background: var(--wash);
+}
+
+figure {
+  margin: 0.8rem 0 1.4rem;
+}
+
+figcaption {
+  color: var(--muted);
+  font-size: 0.88rem;
+  margin-top: 0.3rem;
+}
+
+div.diagram svg,
+figure img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+}
+
+/* The diagrams link into the bundle: make that visible without hover. */
+div.diagram a:hover text {
+  text-decoration: underline;
+}
+
+@media print {
+  body {
+    max-width: none;
+    padding: 0;
+    font-size: 10.5pt;
+  }
+
+  nav.contents,
+  tbody tr:hover {
+    background: none;
+  }
+
+  a {
+    color: inherit;
+  }
+
+  /* On paper a link is a dead end unless the page says where it went. Only the
+   * cross-references outside tables get their target printed: doing it inside
+   * one would double the width of every schedule. */
+  ul.links a::after,
+  nav.breadcrumb a::after {
+    content: " (" attr(href) ")";
+    color: var(--muted);
+    font-size: 0.85em;
+  }
+
+  section.block {
+    break-inside: avoid;
+  }
+
+  figure {
+    break-inside: avoid;
+  }
+}

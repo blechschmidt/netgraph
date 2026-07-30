@@ -121,7 +121,7 @@ from netgraph.render.graph import (
 from netgraph.render.highlight import Highlight
 from netgraph.render.icons import IconTheme, suffix_order
 from netgraph.render.ids import ElementIds, element_ids
-from netgraph.render.links import LinkTemplate
+from netgraph.render.links import Linker
 from netgraph.render.options import DEFAULT_RANKDIR, RenderOptions
 
 __all__ = [
@@ -959,7 +959,7 @@ def _edge_emphasis(edge: Edge, highlight: Highlight | None) -> _Emphasis | None:
     return _EMPHASISED if highlight.has_edge(edge.id) else _DIMMED
 
 
-def _node_url(graph: Graph, node: Node, template: LinkTemplate | None) -> str | None:
+def _node_url(graph: Graph, node: Node, template: Linker | None) -> str | None:
     """Where the document behind ``node`` lives, expanded through ``template``.
 
     A tunnel node stands for a ``tunnel`` document, so it links to that; a
@@ -974,7 +974,7 @@ def _node_url(graph: Graph, node: Node, template: LinkTemplate | None) -> str | 
     return _expand(template, graph, fqn, kind=node.kind)
 
 
-def _expand(template: LinkTemplate, graph: Graph, fqn: str, *, kind: str) -> str | None:
+def _expand(template: Linker, graph: Graph, fqn: str, *, kind: str) -> str | None:
     """One element's link, or ``None`` when the graph cannot place it."""
     source = graph.source_of(fqn)
     return template.expand(
@@ -1140,7 +1140,7 @@ def _edge_views(
         )
 
 
-def _edge_url(graph: Graph, edge: Edge, template: LinkTemplate | None) -> str | None:
+def _edge_url(graph: Graph, edge: Edge, template: Linker | None) -> str | None:
     """The document behind a link, expanded through ``template``.
 
     An adapter attachment is declared by the adapter (§8.2) and a tunnel leg by

@@ -18,6 +18,22 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **`netgraph report`, the as-built documentation.** One command writes the document an
+  engineer is asked to hand over: an overview, a page per site and a page per device, with
+  the layer diagrams, the address plan and its utilisation, a VLAN-to-subnet-to-device
+  matrix, the cable schedule with the patch panels named, the port map of every panel, the
+  BSS and SSID plan, the PDU load schedule, each device's interfaces, placement, links and
+  routing, and the open validation findings — so a report never presents an invalid
+  inventory as authoritative. `--format markdown` (the default) is committed next to the
+  inventory and reviewed as a diff; `--format html` is one self-contained site where every
+  device in every diagram links to its own page; `--format json` is the whole document in
+  one file. Every table comes from the same derivation the matching command prints, so no
+  two pages can disagree. The output is byte-identical between runs, `--generated-at` pins
+  the one part that is not, and every page carries the netgraph version and the inventory's
+  git revision. `--template DIR` overrides the page templates one file at a time. See
+  [`docs/commands/report.md`](docs/commands/report.md) and
+  [`docs/example-report/`](docs/example-report/), which is one, committed.
+
 - **Power as a modelled layer.** A `pdu` element kind with numbered outlets, a `spec.power`
   block on every device (draw, redundant inputs naming `<pdu>:<outlet>`, PoE budget and
   per-port PoE), a `power` layer that draws which strip feeds what, `netgraph list power`

@@ -19,7 +19,7 @@ Loading never raises for a bad document: problems are collected as
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Container, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
@@ -35,6 +35,7 @@ __all__ = [
     "namespace_of",
     "qualify",
     "short_name",
+    "subset",
 ]
 
 
@@ -356,3 +357,62 @@ class Inventory:
             f"patchpanels={len(self.patchpanels)}, pdus={len(self.pdus)}, "
             f"errors={len(self.errors)})"
         )
+
+
+def subset(inventory: Inventory, names: Container[str]) -> Inventory:
+    """``inventory`` narrowed to the elements in ``names``, links included.
+
+    The point of this is that a *scoped* view of an inventory — one site of a
+    campus, or whatever a set of ``--namespace``/``--kind`` filters selected —
+    should be the same derivation over less input rather than a second
+    derivation with a filter threaded through it. ``netgraph report`` builds a
+    per-site address plan, VLAN table, cable schedule and power schedule by
+    handing this to :mod:`netgraph.listing`, :mod:`netgraph.ipam` and
+    :mod:`netgraph.power` unchanged, which is what makes a site page and the
+    overview provably consistent.
+
+    A **link is kept only when everything it joins is kept**. A cable with one
+    end outside the selection is not a cable of this site: emitting it would put
+    a row in the site's schedule naming an element that has no page in it, and
+    :func:`~netgraph.render.graph.build_graph` would report the far end as
+    dangling — which is a broken inventory, not a narrowed one. The same rule
+    applies to a tunnel, which may have more than two ends. Endpoints are
+    resolved the way the loader resolves them (:meth:`Inventory.lookup`, from the
+    link's own namespace), so a reference written as a short name is understood.
+
+    An adapter's ``upstream`` is deliberately *not* treated as such a link. An
+    adapter is a piece of hardware that sits in the selection or does not, and
+    dropping the dongles of a site because the switch they hang off is in another
+    one would lose the elements the site actually holds.
+
+    Load errors are dropped: they are facts about files rather than about
+    elements, and a narrowed inventory cannot say which of them still apply.
+    Ask the full inventory for those.
+    """
+    narrowed = Inventory(root=inventory.root)
+    for fqn, element in inventory.elements.items():
+        if fqn not in names:
+            continue
+        if not _links_within(inventory, fqn, element, names):
+            continue
+        source = inventory.sources.get(fqn)
+        if source is None:  # pragma: no cover - every indexed element has one
+            continue
+        narrowed.add(element, namespace=namespace_of(fqn), source=source)
+    return narrowed
+
+
+def _links_within(inventory: Inventory, fqn: str, element: Element, names: Container[str]) -> bool:
+    """Does every element this one joins survive the selection?
+
+    True for everything that is not a link, which is what keeps a device, an
+    adapter or a panel in the subset on its own account.
+    """
+    if not isinstance(element, (Cable, Tunnel)):
+        return True
+    namespace = namespace_of(fqn)
+    return all(
+        (resolved := inventory.resolve_fqn(endpoint.device, namespace=namespace)) is not None
+        and resolved in names
+        for endpoint in element.spec.endpoints
+    )

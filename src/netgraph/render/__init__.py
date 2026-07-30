@@ -34,6 +34,7 @@ from netgraph.render.aggregate import (
     bundle_links,
     collapse_namespaces,
     collapse_targets,
+    common_prefix,
 )
 from netgraph.render.details import (
     DETAIL_OPTIONS,
@@ -75,7 +76,14 @@ from netgraph.render.graph import (
     splice_patch_panels,
 )
 from netgraph.render.highlight import Highlight
-from netgraph.render.html import PAGE_KIND, html_document, render_html, to_html
+from netgraph.render.html import (
+    PAGE_KIND,
+    asset_text,
+    html_document,
+    policy,
+    render_html,
+    to_html,
+)
 from netgraph.render.icons import (
     BUNDLED_THEMES,
     ICON_KINDS,
@@ -85,7 +93,7 @@ from netgraph.render.icons import (
 )
 from netgraph.render.ids import ElementIds, element_ids
 from netgraph.render.jsonexport import GRAPH_KIND, graph_to_dict, render_json, to_json
-from netgraph.render.links import LINK_FIELDS, LinkTemplate
+from netgraph.render.links import LINK_FIELDS, Linker, LinkMap, LinkTemplate
 from netgraph.render.mermaid import (
     MERMAID_MAX_EDGES,
     mermaid_advisories,
@@ -145,7 +153,9 @@ __all__ = [
     "Highlight",
     "IconTheme",
     "Layer",
+    "LinkMap",
     "LinkTemplate",
+    "Linker",
     "Node",
     "NodeType",
     "PatchHop",
@@ -161,11 +171,13 @@ __all__ = [
     "UnknownElementError",
     "advisories_for",
     "aggregate_graph",
+    "asset_text",
     "build_details",
     "build_graph",
     "bundle_links",
     "collapse_namespaces",
     "collapse_targets",
+    "common_prefix",
     "content_security_policy_for",
     "detail_text",
     "draws_racks",
@@ -179,6 +191,7 @@ __all__ = [
     "media_type_for",
     "mermaid_advisories",
     "namespace_text",
+    "policy",
     "rack_elevations",
     "rack_formats",
     "render",

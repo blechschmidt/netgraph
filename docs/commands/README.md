@@ -24,6 +24,7 @@ a flag that is documented exists. The prose around them is written by hand.
 | [`netgraph list`](list.md) | Tabulate devices, cables, tunnels, VLANs, BSSs or subnets. | [list.md](list.md) |
 | [`netgraph ipam`](ipam.md) | Report utilisation, free space, overlaps and aggregates. | [ipam.md](ipam.md) |
 | [`netgraph export`](export.md) | Emit hosts files, DNS zones, Ansible, Prometheus, cable lists. | [export.md](export.md) |
+| [`netgraph report`](report.md) | Write the as-built documentation: a page per site and per device. | [report.md](report.md) |
 | [`netgraph show`](show.md) | Print one element as it was resolved, expansions included. | [show.md](show.md) |
 | [`netgraph rules`](rules.md) | List the validation rules and their ids. | [rules.md](rules.md) |
 | [`netgraph schema`](schema.md) | Write the JSON Schema for editor completion. | [schema.md](schema.md) |

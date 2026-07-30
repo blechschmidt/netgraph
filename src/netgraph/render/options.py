@@ -13,7 +13,7 @@ from typing import Final
 
 from netgraph.render.highlight import Highlight
 from netgraph.render.icons import IconTheme
-from netgraph.render.links import LinkTemplate
+from netgraph.render.links import Linker
 
 __all__ = ["DEFAULT_RANKDIR", "RANKDIRS", "RenderOptions"]
 
@@ -56,10 +56,12 @@ class RenderOptions:
     #: format. Turn it off for a diagram that must carry nothing the picture
     #: itself does not show.
     tooltips: bool = True
-    #: Link each drawn element back to the document that declares it. Emitted as
+    #: Where each drawn element links to. ``--link-template`` builds a URL from
+    #: the document that declares it; ``netgraph report`` hands over a
+    #: :class:`~netgraph.render.links.LinkMap` of page URLs instead. Emitted as
     #: Graphviz ``URL`` attributes; SVG turns them into anchors, the raster
     #: formats drop them.
-    link_template: LinkTemplate | None = None
+    link_template: Linker | None = None
     #: Give every node, edge and cluster a stable ``id`` derived from its
     #: fully-qualified name (:mod:`netgraph.render.ids`), so an SVG rendering can
     #: be deep-linked and styled from outside. Off by default: a hand-read DOT

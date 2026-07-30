@@ -106,6 +106,14 @@ _INLINE_IMAGE_PREFIX: Final = "data:image/"
 #: spelled like.
 _LINK_SCHEMES: Final[tuple[str, ...]] = ("https://", "http://", "mailto:")
 
+#: A link to another file of the same bundle, which is what the diagrams in a
+#: ``netgraph report`` carry: ``../devices/sw-core.html`` and nothing cleverer.
+#: Deliberately not "anything without a scheme" — a relative reference is
+#: matched positively, character by character, so no spelling of a scheme, an
+#: authority (``//host``) or a control character can be mistaken for one. The
+#: leading character rules out an absolute path, which would leave the bundle.
+_RELATIVE_LINK: Final = re.compile(r"[A-Za-z0-9._~-][A-Za-z0-9._~/-]*(#[A-Za-z0-9._~-]+)?")
+
 #: The element form of a native tooltip. Graphviz writes one per node and edge.
 _TITLE_TAG: Final = f"{{{SVG_NAMESPACE}}}title"
 
@@ -235,6 +243,7 @@ def fragment(
     *,
     tooltips: bool = False,
     links: bool = False,
+    local_links: bool = False,
     prefix: str = "",
     icons: IconLibrary | None = None,
 ) -> str:
@@ -244,8 +253,14 @@ def fragment(
         payload: An SVG rendering, as Graphviz produced it.
         tooltips: Keep the native ``<title>`` tooltips. Off for an embedder
             that shows the same detail itself and would otherwise show it twice.
-        links: Keep the anchors ``--link-template`` produced. Off for an
-            embedder that must not let a diagram navigate the page around it.
+        links: Keep the anchors ``--link-template`` produced — absolute
+            ``https``, ``http`` and ``mailto`` URLs. Off for an embedder that
+            must not let a diagram navigate the page around it.
+        local_links: Also keep anchors pointing at another file of the same
+            bundle (:data:`_RELATIVE_LINK`). This is how a device in a
+            ``netgraph report`` diagram reaches its own page; it stays off by
+            default because a relative link means nothing in a document whose
+            location the renderer does not know.
         prefix: Prepended to every ``id`` in the document, with internal
             references rewritten to match. Empty leaves the ids alone.
         icons: Where the inline pictures are hoisted to. Pass one shared
@@ -281,10 +296,10 @@ def fragment(
         raise RenderError("Graphviz produced an SVG with no viewBox to scale against")
     root.set("preserveAspectRatio", "xMidYMid meet")
 
-    _sanitise(root, links=links, tooltips=tooltips)
+    _sanitise(root, links=links, local_links=local_links, tooltips=tooltips)
     if not tooltips:
         _drop(root, _TITLE_TAG)
-    if not links:
+    if not (links or local_links):
         _unwrap_anchors(root)
     if prefix:
         _prefix_ids(root, prefix)
@@ -301,7 +316,7 @@ def fragment(
     return ElementTree.tostring(root, encoding="unicode")
 
 
-def _sanitise(root: ElementTree.Element, *, links: bool, tooltips: bool) -> None:
+def _sanitise(root: ElementTree.Element, *, links: bool, local_links: bool, tooltips: bool) -> None:
     """Remove every element and attribute that could run or navigate."""
     for parent in list(root.iter()):
         for child in [child for child in parent if child.tag in _FORBIDDEN_TAGS]:
@@ -310,7 +325,14 @@ def _sanitise(root: ElementTree.Element, *, links: bool, tooltips: bool) -> None
         for name in [
             name
             for name, value in element.attrib.items()
-            if _is_unsafe(name, str(value), tag=element.tag, links=links, tooltips=tooltips)
+            if _is_unsafe(
+                name,
+                str(value),
+                tag=element.tag,
+                links=links,
+                local_links=local_links,
+                tooltips=tooltips,
+            )
         ]:
             del element.attrib[name]
 
@@ -338,7 +360,9 @@ def _unwrap_anchors(root: ElementTree.Element) -> None:
         parent[:] = children
 
 
-def _is_unsafe(name: str, value: str, *, tag: str, links: bool, tooltips: bool) -> bool:
+def _is_unsafe(
+    name: str, value: str, *, tag: str, links: bool, local_links: bool, tooltips: bool
+) -> bool:
     """Is this attribute one no embedded diagram has any business carrying?
 
     Event handlers are matched by shape rather than by name: ``onload`` and
@@ -347,13 +371,15 @@ def _is_unsafe(name: str, value: str, *, tag: str, links: bool, tooltips: bool) 
     layout engine ever needed to emit.
     """
     if name in _REFERENCE_ATTRIBUTES:
-        return not _is_safe_reference(value, links=links, anchor=tag == _ANCHOR_TAG)
+        return not _is_safe_reference(
+            value, links=links, local_links=local_links, anchor=tag == _ANCHOR_TAG
+        )
     if name == _TITLE_ATTRIBUTE:
         return not tooltips
     return name in _STRIPPED_ATTRIBUTES or name.lower().startswith("on")
 
 
-def _is_safe_reference(value: str, *, links: bool, anchor: bool) -> bool:
+def _is_safe_reference(value: str, *, links: bool, local_links: bool, anchor: bool) -> bool:
     """May this ``href`` stay?
 
     An inline picture always: a browser runs nothing inside an image, and this
@@ -362,13 +388,17 @@ def _is_safe_reference(value: str, *, links: bool, anchor: bool) -> bool:
     it fetches nothing and goes nowhere — *unless* it is on an anchor, where
     ``#`` is navigation like any other and would move the embedding page's
     fragment out from under it. Everything else is a link, and links are kept
-    only when the caller asked for them.
+    only when the caller asked for them: ``links`` for an absolute URL and
+    ``local_links`` for a relative reference to a sibling file, which are two
+    different questions — one leaves the site, the other cannot.
     """
     if value.startswith(_INLINE_IMAGE_PREFIX):
         return True
     if value.startswith("#"):
         return not anchor
-    return links and value.lower().startswith(_LINK_SCHEMES)
+    if links and value.lower().startswith(_LINK_SCHEMES):
+        return True
+    return local_links and _RELATIVE_LINK.fullmatch(value) is not None
 
 
 def _hoist_text_attributes(root: ElementTree.Element) -> None:

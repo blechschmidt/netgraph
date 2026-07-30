@@ -23,6 +23,7 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
 | stop retyping the same flags | [configuration.md](configuration.md) |
 | run it without installing Python or Graphviz | [docker.md](docker.md) |
 | turn the inventory into hosts files, DNS zones, Ansible or Prometheus | [export.md](export.md) |
+| hand over as-built documentation: a page per site and per device | [commands/report.md](commands/report.md) |
 | look up a command's flags | [commands/](commands/README.md) |
 | see how an inventory maps onto RFC 8343, RFC 8344 and 802.1Q | [yang-mapping.md](yang-mapping.md) |
 | work on netgraph itself | [architecture.md](architecture.md), [../CONTRIBUTING.md](../CONTRIBUTING.md) |
@@ -56,6 +57,9 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
   none, and how to draw the answer.
 * **[export.md](export.md)** — the six operational artefacts, what each guarantees, what
   each drops, and how names are folded.
+* **[commands/report.md](commands/report.md)** — the as-built document: what each page
+  carries, how a namespace becomes a site, why the output is byte-stable, and how to edit
+  the layout. [example-report/](example-report/) is one, committed and browsable.
 * **[configuration.md](configuration.md)** — `netgraph.toml`: per-inventory render
   defaults, named profiles, precedence, and how to see what resolved.
 * **[docker.md](docker.md)** — the image and the compose file: the CLI, the live preview and

@@ -1,4 +1,14 @@
-"""``--link-template``: linking a drawn element back to the YAML that declares it.
+"""Where a drawn element links to: the YAML that declares it, or a page about it.
+
+Two implementations of one interface. :class:`LinkTemplate` is
+``--link-template``, described below. :class:`LinkMap` is the other case: a front
+end that already knows the URL of every element — ``netgraph report``, whose
+diagrams link each device to its own page in the bundle — and needs nothing
+expanded. Both satisfy :class:`Linker`, which is all
+:mod:`netgraph.render.dot` asks for, so the backend has one code path for
+"give this shape a link" whoever decided what the link is.
+
+``--link-template``: linking a drawn element back to the YAML that declares it.
 
 A diagram in a wiki is a dead end. The reader who wants to know *why* a link is
 drawn the way it is has to go and find the file, and the file is exactly what
@@ -24,12 +34,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from string import Formatter
-from typing import Final
+from typing import Final, Protocol, runtime_checkable
 from urllib.parse import quote
 
 from netgraph.errors import RenderError
 
-__all__ = ["LINK_FIELDS", "LinkTemplate"]
+__all__ = ["LINK_FIELDS", "LinkMap", "LinkTemplate", "Linker"]
 
 #: Every placeholder a template may use, with what it expands to. Anything else
 #: is a usage error; see :meth:`LinkTemplate.parse`.
@@ -44,6 +54,29 @@ LINK_FIELDS: Final[Mapping[str, str]] = {
 #: Characters left un-encoded in a substituted value. A path separator is
 #: structure, not content: encoding it would break the URL it is part of.
 _SAFE: Final = "/"
+
+
+@runtime_checkable
+class Linker(Protocol):
+    """What :mod:`netgraph.render.dot` asks for the URL of one element.
+
+    Every argument is optional and keyword-only, so an implementation may ignore
+    the facts it does not need: a template that only substitutes ``{file}`` and
+    a mapping keyed by name both satisfy this without either having to pretend
+    to care about the other's inputs. ``None`` means "this element gets no
+    link", which is a real answer rather than a failure — see
+    :meth:`LinkTemplate.expand`.
+    """
+
+    def expand(
+        self,
+        *,
+        file: str | None = None,
+        line: int | None = None,
+        name: str = "",
+        namespace: str = "",
+        kind: str = "",
+    ) -> str | None: ...  # pragma: no cover - a structural type
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +162,38 @@ class LinkTemplate:
         # Every field was validated at parse time and every one of them is in
         # ``values``, so this cannot raise.
         return self.template.format_map(values)
+
+
+@dataclass(frozen=True, slots=True)
+class LinkMap:
+    """Per-element URLs the caller decided, keyed by fully-qualified name.
+
+    ``netgraph report`` writes a page per device and wants the diagrams to link
+    to them. Those URLs are relative paths inside the bundle whose shape depends
+    on which page embeds the drawing, so they cannot be a format string over the
+    element's own fields — but they *are* known before the graph is laid out,
+    which is everything the backend needs.
+
+    An element the mapping does not hold gets no link, exactly as a template
+    that cannot be expanded does: a report scoped to one site draws no shape it
+    has no page for, and a subnet node has no page at all.
+    """
+
+    #: Fully-qualified name → URL. Values are used verbatim: the caller built
+    #: them and is the only party that knows what they are relative to.
+    urls: Mapping[str, str]
+
+    def expand(
+        self,
+        *,
+        file: str | None = None,
+        line: int | None = None,
+        name: str = "",
+        namespace: str = "",
+        kind: str = "",
+    ) -> str | None:
+        """The URL recorded for ``name``, or ``None`` when there is none."""
+        return self.urls.get(name)
 
 
 def _value(

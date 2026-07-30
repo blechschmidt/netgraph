@@ -1,0 +1,4563 @@
+=== report.json ===
+{
+  "meta": {
+    "title": "home-lab — as-built network documentation",
+    "inventory": "home-lab",
+    "netgraph": "0.0.0-test",
+    "generatedAt": "2026-01-31T09:00:00Z",
+    "revision": null,
+    "revisionState": null,
+    "scope": "the whole inventory",
+    "format": "json",
+    "counts": {
+      "elements": 14,
+      "sites": 1,
+      "adapter": 1,
+      "cable": 6,
+      "computer": 3,
+      "router": 1,
+      "server": 1,
+      "switch": 2
+    }
+  },
+  "pages": [
+    {
+      "path": "index",
+      "kind": "overview",
+      "title": "home-lab — as-built network documentation",
+      "summary": "14 element(s) across 1 site page(s), covering the whole inventory.",
+      "parent": "",
+      "sections": [
+        {
+          "key": "contents",
+          "title": "Sites",
+          "blurb": "One page per site. A site is a namespace; see --group-depth.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "sites",
+              "title": "Site pages",
+              "columns": [
+                {
+                  "header": "SITE",
+                  "align": "left"
+                },
+                {
+                  "header": "ELEMENTS",
+                  "align": "right"
+                },
+                {
+                  "header": "CABLES",
+                  "align": "right"
+                },
+                {
+                  "header": "TUNNELS",
+                  "align": "right"
+                },
+                {
+                  "header": "SUBNETS",
+                  "align": "right"
+                }
+              ],
+              "rows": [
+                [
+                  {
+                    "text": "(inventory root)",
+                    "page": "sites/root"
+                  },
+                  "8",
+                  "6",
+                  "0",
+                  "5"
+                ]
+              ],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "diagrams",
+          "title": "Diagrams",
+          "blurb": "One drawing per layer, from the same inventory as the tables below.",
+          "fields": [],
+          "diagrams": [
+            {
+              "layer": "l1",
+              "title": "Physical topology",
+              "path": "",
+              "nodes": 8,
+              "edges": 7,
+              "note": "This format records the layer rather than drawing it; render the report as markdown or html for the picture."
+            },
+            {
+              "layer": "l2",
+              "title": "VLANs",
+              "path": "",
+              "nodes": 8,
+              "edges": 7,
+              "note": "This format records the layer rather than drawing it; render the report as markdown or html for the picture."
+            },
+            {
+              "layer": "l3",
+              "title": "IP subnets",
+              "path": "",
+              "nodes": 12,
+              "edges": 15,
+              "note": "This format records the layer rather than drawing it; render the report as markdown or html for the picture."
+            }
+          ],
+          "tables": [],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "findings",
+          "title": "Validation findings",
+          "blurb": "",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "findings",
+              "title": "Findings",
+              "columns": [
+                {
+                  "header": "SEVERITY",
+                  "align": "left"
+                },
+                {
+                  "header": "RULE",
+                  "align": "left"
+                },
+                {
+                  "header": "ELEMENT",
+                  "align": "left"
+                },
+                {
+                  "header": "LOCATION",
+                  "align": "left"
+                },
+                {
+                  "header": "MESSAGE",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": "These are the findings 'netgraph validate' reports for this inventory. A report is only as authoritative as the inventory behind it, so they are documented here rather than left out."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "devices",
+          "title": "Every element",
+          "blurb": "One row per element, linked to its page.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "devices",
+              "title": "Elements",
+              "columns": [
+                {
+                  "header": "NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "KIND",
+                  "align": "left"
+                },
+                {
+                  "header": "PORTS",
+                  "align": "right"
+                },
+                {
+                  "header": "ADDRESS",
+                  "align": "left"
+                },
+                {
+                  "header": "VLANS",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  {
+                    "text": "hosts/adp-usb-eth",
+                    "page": "devices/hosts_adp-usb-eth"
+                  },
+                  "adapter",
+                  "1",
+                  "192.168.10.30/24",
+                  "10"
+                ],
+                [
+                  {
+                    "text": "hosts/laptop",
+                    "page": "devices/hosts_laptop"
+                  },
+                  "computer",
+                  "2",
+                  "-",
+                  "10"
+                ],
+                [
+                  {
+                    "text": "hosts/pc-desk",
+                    "page": "devices/hosts_pc-desk"
+                  },
+                  "computer",
+                  "3",
+                  "192.168.10.20/24",
+                  "10"
+                ],
+                [
+                  {
+                    "text": "hosts/phone",
+                    "page": "devices/hosts_phone"
+                  },
+                  "computer",
+                  "1",
+                  "192.168.10.40/24",
+                  "-"
+                ],
+                [
+                  {
+                    "text": "hosts/srv-nas",
+                    "page": "devices/hosts_srv-nas"
+                  },
+                  "server",
+                  "2",
+                  "192.168.10.10/24",
+                  "10"
+                ],
+                [
+                  {
+                    "text": "routers/rtr-home",
+                    "page": "devices/routers_rtr-home"
+                  },
+                  "router",
+                  "3",
+                  "192.0.2.1/32",
+                  "10"
+                ],
+                [
+                  {
+                    "text": "switches/sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "switch",
+                  "7",
+                  "192.168.10.2/24",
+                  "10,20"
+                ],
+                [
+                  {
+                    "text": "wireless/ap-home",
+                    "page": "devices/wireless_ap-home"
+                  },
+                  "switch",
+                  "4",
+                  "192.168.10.3/24",
+                  "10,20"
+                ]
+              ],
+              "note": "PORTS counts declared interfaces; ADDRESS is the address that places the element on the network, of however many it has."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "addressing",
+          "title": "Address plan",
+          "blurb": "Every prefix an address sits in, and how full it is.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "subnets",
+              "title": "Subnets",
+              "columns": [
+                {
+                  "header": "PREFIX",
+                  "align": "left"
+                },
+                {
+                  "header": "IP",
+                  "align": "right"
+                },
+                {
+                  "header": "VLANS",
+                  "align": "left"
+                },
+                {
+                  "header": "HOSTS",
+                  "align": "right"
+                },
+                {
+                  "header": "USED",
+                  "align": "right"
+                },
+                {
+                  "header": "FREE",
+                  "align": "right"
+                },
+                {
+                  "header": "UTIL",
+                  "align": "right"
+                },
+                {
+                  "header": "DEVICES",
+                  "align": "right"
+                }
+              ],
+              "rows": [
+                [
+                  "192.0.2.1/32",
+                  "4",
+                  "-",
+                  "1",
+                  "1",
+                  "0",
+                  "100.0%",
+                  "1"
+                ],
+                [
+                  "192.168.10.0/24",
+                  "4",
+                  "10",
+                  "254",
+                  "7",
+                  "247",
+                  "2.8%",
+                  "7"
+                ],
+                [
+                  "203.0.113.0/30",
+                  "4",
+                  "-",
+                  "2",
+                  "1",
+                  "1",
+                  "50.0%",
+                  "1"
+                ],
+                [
+                  "2001:db8::1/128",
+                  "6",
+                  "-",
+                  "1",
+                  "1",
+                  "0",
+                  "100.0%",
+                  "1"
+                ],
+                [
+                  "2001:db8:10::/64",
+                  "6",
+                  "10",
+                  "2^64",
+                  "5",
+                  "2^64",
+                  "<0.1%",
+                  "5"
+                ]
+              ],
+              "note": "HOSTS is the usable capacity of the prefix, USED the distinct addresses declared in it. Loopback and link-local prefixes are left out: they are scoped to one host or one link and say nothing about the plan."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "vlans",
+          "title": "VLANs",
+          "blurb": "Every VLAN, the prefixes carried in it and the elements that are in it.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "vlan-summary",
+              "title": "VLANs",
+              "columns": [
+                {
+                  "header": "VLAN",
+                  "align": "right"
+                },
+                {
+                  "header": "NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "ELEMENTS",
+                  "align": "right"
+                },
+                {
+                  "header": "PORTS",
+                  "align": "right"
+                }
+              ],
+              "rows": [
+                [
+                  "10",
+                  "home",
+                  "7",
+                  "9"
+                ],
+                [
+                  "20",
+                  "guest",
+                  "2",
+                  "2"
+                ]
+              ],
+              "note": "Membership is derived: a host on an untagged access port counts as a member even though it declares no VLAN itself."
+            },
+            {
+              "key": "vlan-matrix",
+              "title": "VLAN, subnet and element matrix",
+              "columns": [
+                {
+                  "header": "VLAN",
+                  "align": "right"
+                },
+                {
+                  "header": "NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "ELEMENT",
+                  "align": "left"
+                },
+                {
+                  "header": "PORTS",
+                  "align": "left"
+                },
+                {
+                  "header": "MODE",
+                  "align": "left"
+                },
+                {
+                  "header": "SUBNETS",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "10",
+                  "home",
+                  {
+                    "text": "adp-usb-eth",
+                    "page": "devices/hosts_adp-usb-eth"
+                  },
+                  "—",
+                  "—",
+                  "192.168.10.0/24, 2001:db8:10::/64"
+                ],
+                [
+                  "10",
+                  "home",
+                  {
+                    "text": "laptop",
+                    "page": "devices/hosts_laptop"
+                  },
+                  "—",
+                  "—",
+                  "—"
+                ],
+                [
+                  "10",
+                  "home",
+                  {
+                    "text": "pc-desk",
+                    "page": "devices/hosts_pc-desk"
+                  },
+                  "—",
+                  "—",
+                  "192.168.10.0/24, 2001:db8:10::/64"
+                ],
+                [
+                  "10",
+                  "home",
+                  {
+                    "text": "srv-nas",
+                    "page": "devices/hosts_srv-nas"
+                  },
+                  "—",
+                  "—",
+                  "192.168.10.0/24, 2001:db8:10::/64"
+                ],
+                [
+                  "10",
+                  "home",
+                  {
+                    "text": "rtr-home",
+                    "page": "devices/routers_rtr-home"
+                  },
+                  "lan0",
+                  "access",
+                  "192.168.10.0/24, 2001:db8:10::/64"
+                ],
+                [
+                  "10",
+                  "home",
+                  {
+                    "text": "sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "Vlan10, port1, port2, port3, port4, port5",
+                  "access, trunk",
+                  "192.168.10.0/24"
+                ],
+                [
+                  "10",
+                  "home",
+                  {
+                    "text": "ap-home",
+                    "page": "devices/wireless_ap-home"
+                  },
+                  "Vlan10, eth0",
+                  "access, trunk",
+                  "192.168.10.0/24"
+                ],
+                [
+                  "20",
+                  "guest",
+                  {
+                    "text": "sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "port5",
+                  "trunk",
+                  "—"
+                ],
+                [
+                  "20",
+                  "guest",
+                  {
+                    "text": "ap-home",
+                    "page": "devices/wireless_ap-home"
+                  },
+                  "eth0",
+                  "trunk",
+                  "—"
+                ]
+              ],
+              "note": "A row with no port is an element that reaches the VLAN over a link rather than by configuring it — a host behind an access port, or a hub."
+            }
+          ],
+          "links": [],
+          "notes": []
+        }
+      ]
+    },
+    {
+      "path": "sites/root",
+      "kind": "site",
+      "title": "(inventory root)",
+      "summary": "As-built record of the inventory root.",
+      "parent": "index",
+      "sections": [
+        {
+          "key": "summary",
+          "title": "Summary",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Namespace",
+              "value": "(inventory root)"
+            },
+            {
+              "label": "Elements",
+              "value": "8"
+            },
+            {
+              "label": "Cables",
+              "value": "6"
+            },
+            {
+              "label": "Tunnels",
+              "value": "0"
+            },
+            {
+              "label": "Subnets",
+              "value": "5"
+            }
+          ],
+          "diagrams": [],
+          "tables": [],
+          "links": [
+            {
+              "text": "Report overview",
+              "page": "index"
+            }
+          ],
+          "notes": []
+        },
+        {
+          "key": "diagrams",
+          "title": "Diagrams",
+          "blurb": "One drawing per layer, from the same inventory as the tables below.",
+          "fields": [],
+          "diagrams": [
+            {
+              "layer": "l1",
+              "title": "Physical topology",
+              "path": "",
+              "nodes": 8,
+              "edges": 7,
+              "note": "This format records the layer rather than drawing it; render the report as markdown or html for the picture."
+            },
+            {
+              "layer": "l2",
+              "title": "VLANs",
+              "path": "",
+              "nodes": 8,
+              "edges": 7,
+              "note": "This format records the layer rather than drawing it; render the report as markdown or html for the picture."
+            },
+            {
+              "layer": "l3",
+              "title": "IP subnets",
+              "path": "",
+              "nodes": 12,
+              "edges": 15,
+              "note": "This format records the layer rather than drawing it; render the report as markdown or html for the picture."
+            }
+          ],
+          "tables": [],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "devices",
+          "title": "Elements",
+          "blurb": "Everything documented on this page, with a page each.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "devices",
+              "title": "Elements",
+              "columns": [
+                {
+                  "header": "NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "KIND",
+                  "align": "left"
+                },
+                {
+                  "header": "PORTS",
+                  "align": "right"
+                },
+                {
+                  "header": "ADDRESS",
+                  "align": "left"
+                },
+                {
+                  "header": "VLANS",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  {
+                    "text": "hosts/adp-usb-eth",
+                    "page": "devices/hosts_adp-usb-eth"
+                  },
+                  "adapter",
+                  "1",
+                  "192.168.10.30/24",
+                  "10"
+                ],
+                [
+                  {
+                    "text": "hosts/laptop",
+                    "page": "devices/hosts_laptop"
+                  },
+                  "computer",
+                  "2",
+                  "-",
+                  "10"
+                ],
+                [
+                  {
+                    "text": "hosts/pc-desk",
+                    "page": "devices/hosts_pc-desk"
+                  },
+                  "computer",
+                  "3",
+                  "192.168.10.20/24",
+                  "10"
+                ],
+                [
+                  {
+                    "text": "hosts/phone",
+                    "page": "devices/hosts_phone"
+                  },
+                  "computer",
+                  "1",
+                  "192.168.10.40/24",
+                  "-"
+                ],
+                [
+                  {
+                    "text": "hosts/srv-nas",
+                    "page": "devices/hosts_srv-nas"
+                  },
+                  "server",
+                  "2",
+                  "192.168.10.10/24",
+                  "10"
+                ],
+                [
+                  {
+                    "text": "routers/rtr-home",
+                    "page": "devices/routers_rtr-home"
+                  },
+                  "router",
+                  "3",
+                  "192.0.2.1/32",
+                  "10"
+                ],
+                [
+                  {
+                    "text": "switches/sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "switch",
+                  "7",
+                  "192.168.10.2/24",
+                  "10,20"
+                ],
+                [
+                  {
+                    "text": "wireless/ap-home",
+                    "page": "devices/wireless_ap-home"
+                  },
+                  "switch",
+                  "4",
+                  "192.168.10.3/24",
+                  "10,20"
+                ]
+              ],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "addressing",
+          "title": "Address plan",
+          "blurb": "Every prefix an address sits in, and how full it is.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "subnets",
+              "title": "Subnets",
+              "columns": [
+                {
+                  "header": "PREFIX",
+                  "align": "left"
+                },
+                {
+                  "header": "IP",
+                  "align": "right"
+                },
+                {
+                  "header": "VLANS",
+                  "align": "left"
+                },
+                {
+                  "header": "HOSTS",
+                  "align": "right"
+                },
+                {
+                  "header": "USED",
+                  "align": "right"
+                },
+                {
+                  "header": "FREE",
+                  "align": "right"
+                },
+                {
+                  "header": "UTIL",
+                  "align": "right"
+                },
+                {
+                  "header": "DEVICES",
+                  "align": "right"
+                }
+              ],
+              "rows": [
+                [
+                  "192.0.2.1/32",
+                  "4",
+                  "-",
+                  "1",
+                  "1",
+                  "0",
+                  "100.0%",
+                  "1"
+                ],
+                [
+                  "192.168.10.0/24",
+                  "4",
+                  "10",
+                  "254",
+                  "7",
+                  "247",
+                  "2.8%",
+                  "7"
+                ],
+                [
+                  "203.0.113.0/30",
+                  "4",
+                  "-",
+                  "2",
+                  "1",
+                  "1",
+                  "50.0%",
+                  "1"
+                ],
+                [
+                  "2001:db8::1/128",
+                  "6",
+                  "-",
+                  "1",
+                  "1",
+                  "0",
+                  "100.0%",
+                  "1"
+                ],
+                [
+                  "2001:db8:10::/64",
+                  "6",
+                  "10",
+                  "2^64",
+                  "5",
+                  "2^64",
+                  "<0.1%",
+                  "5"
+                ]
+              ],
+              "note": "HOSTS is the usable capacity of the prefix, USED the distinct addresses declared in it. Loopback and link-local prefixes are left out: they are scoped to one host or one link and say nothing about the plan."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "vlans",
+          "title": "VLANs",
+          "blurb": "Every VLAN, the prefixes carried in it and the elements that are in it.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "vlan-summary",
+              "title": "VLANs",
+              "columns": [
+                {
+                  "header": "VLAN",
+                  "align": "right"
+                },
+                {
+                  "header": "NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "ELEMENTS",
+                  "align": "right"
+                },
+                {
+                  "header": "PORTS",
+                  "align": "right"
+                }
+              ],
+              "rows": [
+                [
+                  "10",
+                  "home",
+                  "7",
+                  "9"
+                ],
+                [
+                  "20",
+                  "guest",
+                  "2",
+                  "2"
+                ]
+              ],
+              "note": "Membership is derived: a host on an untagged access port counts as a member even though it declares no VLAN itself."
+            },
+            {
+              "key": "vlan-matrix",
+              "title": "VLAN, subnet and element matrix",
+              "columns": [
+                {
+                  "header": "VLAN",
+                  "align": "right"
+                },
+                {
+                  "header": "NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "ELEMENT",
+                  "align": "left"
+                },
+                {
+                  "header": "PORTS",
+                  "align": "left"
+                },
+                {
+                  "header": "MODE",
+                  "align": "left"
+                },
+                {
+                  "header": "SUBNETS",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "10",
+                  "home",
+                  {
+                    "text": "adp-usb-eth",
+                    "page": "devices/hosts_adp-usb-eth"
+                  },
+                  "—",
+                  "—",
+                  "192.168.10.0/24, 2001:db8:10::/64"
+                ],
+                [
+                  "10",
+                  "home",
+                  {
+                    "text": "laptop",
+                    "page": "devices/hosts_laptop"
+                  },
+                  "—",
+                  "—",
+                  "—"
+                ],
+                [
+                  "10",
+                  "home",
+                  {
+                    "text": "pc-desk",
+                    "page": "devices/hosts_pc-desk"
+                  },
+                  "—",
+                  "—",
+                  "192.168.10.0/24, 2001:db8:10::/64"
+                ],
+                [
+                  "10",
+                  "home",
+                  {
+                    "text": "srv-nas",
+                    "page": "devices/hosts_srv-nas"
+                  },
+                  "—",
+                  "—",
+                  "192.168.10.0/24, 2001:db8:10::/64"
+                ],
+                [
+                  "10",
+                  "home",
+                  {
+                    "text": "rtr-home",
+                    "page": "devices/routers_rtr-home"
+                  },
+                  "lan0",
+                  "access",
+                  "192.168.10.0/24, 2001:db8:10::/64"
+                ],
+                [
+                  "10",
+                  "home",
+                  {
+                    "text": "sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "Vlan10, port1, port2, port3, port4, port5",
+                  "access, trunk",
+                  "192.168.10.0/24"
+                ],
+                [
+                  "10",
+                  "home",
+                  {
+                    "text": "ap-home",
+                    "page": "devices/wireless_ap-home"
+                  },
+                  "Vlan10, eth0",
+                  "access, trunk",
+                  "192.168.10.0/24"
+                ],
+                [
+                  "20",
+                  "guest",
+                  {
+                    "text": "sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "port5",
+                  "trunk",
+                  "—"
+                ],
+                [
+                  "20",
+                  "guest",
+                  {
+                    "text": "ap-home",
+                    "page": "devices/wireless_ap-home"
+                  },
+                  "eth0",
+                  "trunk",
+                  "—"
+                ]
+              ],
+              "note": "A row with no port is an element that reaches the VLAN over a link rather than by configuring it — a host behind an access port, or a hub."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "cabling",
+          "title": "Cabling",
+          "blurb": "What an installer would carry into the room.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "cable-schedule",
+              "title": "Cable schedule",
+              "columns": [
+                {
+                  "header": "RUN",
+                  "align": "left"
+                },
+                {
+                  "header": "SEGMENT",
+                  "align": "left"
+                },
+                {
+                  "header": "CABLE",
+                  "align": "left"
+                },
+                {
+                  "header": "LABEL",
+                  "align": "left"
+                },
+                {
+                  "header": "MEDIUM",
+                  "align": "left"
+                },
+                {
+                  "header": "CATEGORY",
+                  "align": "left"
+                },
+                {
+                  "header": "SPEED",
+                  "align": "right"
+                },
+                {
+                  "header": "LENGTH",
+                  "align": "right"
+                },
+                {
+                  "header": "A END",
+                  "align": "left"
+                },
+                {
+                  "header": "A PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "A POSITION",
+                  "align": "left"
+                },
+                {
+                  "header": "B END",
+                  "align": "left"
+                },
+                {
+                  "header": "B PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "B POSITION",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "—",
+                  "—",
+                  "cbl-sw-dongle",
+                  "H-004",
+                  "copper",
+                  "cat6",
+                  "1Gbps",
+                  "10m",
+                  {
+                    "text": "adp-usb-eth",
+                    "page": "devices/hosts_adp-usb-eth"
+                  },
+                  "enx001122334455",
+                  "—",
+                  {
+                    "text": "sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "port4",
+                  "—"
+                ],
+                [
+                  "—",
+                  "—",
+                  "cbl-sw-desk",
+                  "H-002",
+                  "copper",
+                  "cat6",
+                  "1Gbps",
+                  "8m",
+                  {
+                    "text": "pc-desk",
+                    "page": "devices/hosts_pc-desk"
+                  },
+                  "eno1",
+                  "—",
+                  {
+                    "text": "sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "port2",
+                  "—"
+                ],
+                [
+                  "—",
+                  "—",
+                  "cbl-sw-nas",
+                  "H-003",
+                  "copper",
+                  "cat6a",
+                  "1Gbps",
+                  "0.5m",
+                  {
+                    "text": "srv-nas",
+                    "page": "devices/hosts_srv-nas"
+                  },
+                  "eth0",
+                  "—",
+                  {
+                    "text": "sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "port3",
+                  "—"
+                ],
+                [
+                  "—",
+                  "—",
+                  "cbl-rtr-sw",
+                  "H-001",
+                  "copper",
+                  "cat6",
+                  "1Gbps",
+                  "0.5m",
+                  {
+                    "text": "rtr-home",
+                    "page": "devices/routers_rtr-home"
+                  },
+                  "lan0",
+                  "—",
+                  {
+                    "text": "sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "port1",
+                  "—"
+                ],
+                [
+                  "—",
+                  "—",
+                  "cbl-sw-ap",
+                  "H-005",
+                  "copper",
+                  "cat6",
+                  "1Gbps",
+                  "6m",
+                  {
+                    "text": "ap-home",
+                    "page": "devices/wireless_ap-home"
+                  },
+                  "eth0",
+                  "—",
+                  {
+                    "text": "sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "port5",
+                  "—"
+                ],
+                [
+                  "—",
+                  "—",
+                  "wl-ap-phone",
+                  "—",
+                  "wireless",
+                  "—",
+                  "—",
+                  "—",
+                  {
+                    "text": "ap-home",
+                    "page": "devices/wireless_ap-home"
+                  },
+                  "wlan0",
+                  "—",
+                  {
+                    "text": "phone",
+                    "page": "devices/hosts_phone"
+                  },
+                  "en0",
+                  "—"
+                ]
+              ],
+              "note": "One row per cable document, which is one run somebody pulls: a link through a patch panel is several. RUN names the end-to-end link and SEGMENT which leg of it this is. 'netgraph export cable-list' writes the same rows as CSV, with the full location of both ends."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "wireless",
+          "title": "Wireless",
+          "blurb": "Every BSS: which radio beacons which SSID, on what channel, into which VLAN.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "bss",
+              "title": "BSS and SSID plan",
+              "columns": [
+                {
+                  "header": "SSID",
+                  "align": "left"
+                },
+                {
+                  "header": "RADIO",
+                  "align": "left"
+                },
+                {
+                  "header": "ROLE",
+                  "align": "left"
+                },
+                {
+                  "header": "CHANNEL",
+                  "align": "left"
+                },
+                {
+                  "header": "BSSID",
+                  "align": "left"
+                },
+                {
+                  "header": "VLAN",
+                  "align": "right"
+                },
+                {
+                  "header": "SECURITY",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "home",
+                  {
+                    "text": "hosts/phone:en0",
+                    "page": "devices/hosts_phone"
+                  },
+                  "station",
+                  "36/5GHz",
+                  "78:8a:20:aa:00:11",
+                  "-",
+                  "wpa3-psk"
+                ],
+                [
+                  "home",
+                  {
+                    "text": "wireless/ap-home:wlan0",
+                    "page": "devices/wireless_ap-home"
+                  },
+                  "ap",
+                  "36/5GHz",
+                  "78:8a:20:aa:00:11",
+                  "10",
+                  "wpa3-psk"
+                ],
+                [
+                  "home-guest",
+                  {
+                    "text": "wireless/ap-home:wlan0",
+                    "page": "devices/wireless_ap-home"
+                  },
+                  "ap",
+                  "36/5GHz",
+                  "78:8a:20:aa:00:12",
+                  "20",
+                  "wpa2-psk"
+                ]
+              ],
+              "note": "One row per SSID per radio: a dual-band AP serving three networks has six."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "external",
+          "title": "Links leaving this page",
+          "blurb": "Where this part of the network is joined to the rest of it.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "external-links",
+              "title": "External links",
+              "columns": [
+                {
+                  "header": "KIND",
+                  "align": "left"
+                },
+                {
+                  "header": "LINK",
+                  "align": "left"
+                },
+                {
+                  "header": "LOCAL END",
+                  "align": "left"
+                },
+                {
+                  "header": "LOCAL PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "FAR END",
+                  "align": "left"
+                },
+                {
+                  "header": "FAR PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "DOCUMENTED ON",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": "These links are deliberately absent from the diagrams and the cable schedule above, which cover this page's elements only. A far end with no page of its own is outside what this report documents at all."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "findings",
+          "title": "Validation findings",
+          "blurb": "",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "findings",
+              "title": "Findings",
+              "columns": [
+                {
+                  "header": "SEVERITY",
+                  "align": "left"
+                },
+                {
+                  "header": "RULE",
+                  "align": "left"
+                },
+                {
+                  "header": "ELEMENT",
+                  "align": "left"
+                },
+                {
+                  "header": "LOCATION",
+                  "align": "left"
+                },
+                {
+                  "header": "MESSAGE",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": "Findings anchored to an element of this site."
+            }
+          ],
+          "links": [],
+          "notes": []
+        }
+      ]
+    },
+    {
+      "path": "devices/hosts_adp-usb-eth",
+      "kind": "device",
+      "title": "adp-usb-eth",
+      "summary": "adapter hosts/adp-usb-eth",
+      "parent": "sites/root",
+      "sections": [
+        {
+          "key": "identity",
+          "title": "Identity",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Name",
+              "value": "adp-usb-eth"
+            },
+            {
+              "label": "Qualified name",
+              "value": "hosts/adp-usb-eth"
+            },
+            {
+              "label": "Kind",
+              "value": "adapter"
+            },
+            {
+              "label": "Site",
+              "value": {
+                "text": "(inventory root)",
+                "page": "sites/root"
+              }
+            },
+            {
+              "label": "Description",
+              "value": "USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the\nlaptop - there is deliberately no cable between the two (NG-X005).\n"
+            },
+            {
+              "label": "Vendor",
+              "value": "Anker"
+            },
+            {
+              "label": "Model",
+              "value": "A83130A1"
+            },
+            {
+              "label": "Serial",
+              "value": "AK2231007744"
+            },
+            {
+              "label": "Declared in",
+              "value": "hosts/adp-usb-eth.yaml#0:1"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "labels",
+              "title": "Labels",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "asset",
+                  "A-0001"
+                ],
+                [
+                  "site",
+                  "home"
+                ]
+              ],
+              "note": ""
+            },
+            {
+              "key": "annotations",
+              "title": "Annotations",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "placement",
+          "title": "Placement and power",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Site",
+              "value": "—"
+            },
+            {
+              "label": "Room",
+              "value": "—"
+            },
+            {
+              "label": "Rack",
+              "value": "—"
+            },
+            {
+              "label": "Position",
+              "value": "—"
+            },
+            {
+              "label": "Height",
+              "value": "1U"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "feeds",
+              "title": "Power feeds",
+              "columns": [
+                {
+                  "header": "KIND",
+                  "align": "left"
+                },
+                {
+                  "header": "SOURCE",
+                  "align": "left"
+                },
+                {
+                  "header": "OUTLET",
+                  "align": "left"
+                },
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "RESERVED",
+                  "align": "right"
+                }
+              ],
+              "rows": [],
+              "note": "A dual-corded element has one row per cord."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "interfaces",
+          "title": "Interfaces",
+          "blurb": "",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "interfaces",
+              "title": "Interfaces",
+              "columns": [
+                {
+                  "header": "NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "TYPE",
+                  "align": "left"
+                },
+                {
+                  "header": "UP",
+                  "align": "left"
+                },
+                {
+                  "header": "MAC",
+                  "align": "left"
+                },
+                {
+                  "header": "MTU",
+                  "align": "right"
+                },
+                {
+                  "header": "ADDRESSES",
+                  "align": "left"
+                },
+                {
+                  "header": "VLANS",
+                  "align": "left"
+                },
+                {
+                  "header": "VRF",
+                  "align": "left"
+                },
+                {
+                  "header": "AGGREGATION",
+                  "align": "left"
+                },
+                {
+                  "header": "DESCRIPTION",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "enx001122334455",
+                  "ethernet",
+                  "yes",
+                  "00:11:22:33:44:55",
+                  "1500",
+                  "192.168.10.30/24, 2001:db8:10::30/64",
+                  "—",
+                  "—",
+                  "—",
+                  "Dongle Ethernet port"
+                ]
+              ],
+              "note": "Addresses are as configured, prefix length included. VLANS reads 'mode: ids', with the native VLAN named where a trunk has one."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "links",
+          "title": "Links",
+          "blurb": "What is plugged into this element, and what runs over it.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "cables",
+              "title": "Cables",
+              "columns": [
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "CABLE",
+                  "align": "left"
+                },
+                {
+                  "header": "LABEL",
+                  "align": "left"
+                },
+                {
+                  "header": "MEDIUM",
+                  "align": "left"
+                },
+                {
+                  "header": "SPEED",
+                  "align": "right"
+                },
+                {
+                  "header": "LENGTH",
+                  "align": "right"
+                },
+                {
+                  "header": "FAR END",
+                  "align": "left"
+                },
+                {
+                  "header": "FAR PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "VIA",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "enx001122334455",
+                  "cbl-sw-dongle",
+                  "H-004",
+                  "copper",
+                  "1Gbps",
+                  "10m",
+                  {
+                    "text": "sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "port4",
+                  "—"
+                ],
+                [
+                  "usb0",
+                  "adp-usb-eth#upstream",
+                  "usb",
+                  "copper",
+                  "5Gbps",
+                  "—",
+                  {
+                    "text": "laptop",
+                    "page": "devices/hosts_laptop"
+                  },
+                  "—",
+                  "—"
+                ]
+              ],
+              "note": "One row per cable that physically terminates here. VIA names the panels the run this cable is a segment of crosses, and the two ends of that run; the site page's cable schedule has every segment of it. An attachment row is an adapter's upstream rather than a cable somebody pulled."
+            },
+            {
+              "key": "tunnels",
+              "title": "Tunnels",
+              "columns": [
+                {
+                  "header": "TUNNEL",
+                  "align": "left"
+                },
+                {
+                  "header": "STACK",
+                  "align": "left"
+                },
+                {
+                  "header": "INTERFACE",
+                  "align": "left"
+                },
+                {
+                  "header": "OTHER ENDS",
+                  "align": "left"
+                },
+                {
+                  "header": "ENCRYPTED",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "diagrams",
+          "title": "Diagrams",
+          "blurb": "The drawings this element is in.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [],
+          "links": [],
+          "notes": [
+            "This element is not drawn in any of the diagrams this report holds."
+          ]
+        }
+      ]
+    },
+    {
+      "path": "devices/hosts_laptop",
+      "kind": "device",
+      "title": "laptop",
+      "summary": "computer hosts/laptop",
+      "parent": "sites/root",
+      "sections": [
+        {
+          "key": "identity",
+          "title": "Identity",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Name",
+              "value": "laptop"
+            },
+            {
+              "label": "Qualified name",
+              "value": "hosts/laptop"
+            },
+            {
+              "label": "Kind",
+              "value": "computer"
+            },
+            {
+              "label": "Site",
+              "value": {
+                "text": "(inventory root)",
+                "page": "sites/root"
+              }
+            },
+            {
+              "label": "Description",
+              "value": "Ultrabook without a built-in Ethernet port. It reaches the wired network\nthrough the USB dongle declared in hosts/adp-usb-eth.yaml, so it owns no\ncabled interface of its own.\n"
+            },
+            {
+              "label": "Vendor",
+              "value": "Lenovo"
+            },
+            {
+              "label": "Model",
+              "value": "X1 Carbon Gen 11"
+            },
+            {
+              "label": "Serial",
+              "value": "—"
+            },
+            {
+              "label": "Declared in",
+              "value": "hosts/laptop.yaml#0:1"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "labels",
+              "title": "Labels",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "owner",
+                  "sam"
+                ],
+                [
+                  "role",
+                  "laptop"
+                ],
+                [
+                  "site",
+                  "home"
+                ]
+              ],
+              "note": ""
+            },
+            {
+              "key": "annotations",
+              "title": "Annotations",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "placement",
+          "title": "Placement and power",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Site",
+              "value": "—"
+            },
+            {
+              "label": "Room",
+              "value": "—"
+            },
+            {
+              "label": "Rack",
+              "value": "—"
+            },
+            {
+              "label": "Position",
+              "value": "—"
+            },
+            {
+              "label": "Height",
+              "value": "1U"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "feeds",
+              "title": "Power feeds",
+              "columns": [
+                {
+                  "header": "KIND",
+                  "align": "left"
+                },
+                {
+                  "header": "SOURCE",
+                  "align": "left"
+                },
+                {
+                  "header": "OUTLET",
+                  "align": "left"
+                },
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "RESERVED",
+                  "align": "right"
+                }
+              ],
+              "rows": [],
+              "note": "A dual-corded element has one row per cord."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "interfaces",
+          "title": "Interfaces",
+          "blurb": "",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "interfaces",
+              "title": "Interfaces",
+              "columns": [
+                {
+                  "header": "NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "TYPE",
+                  "align": "left"
+                },
+                {
+                  "header": "UP",
+                  "align": "left"
+                },
+                {
+                  "header": "MAC",
+                  "align": "left"
+                },
+                {
+                  "header": "MTU",
+                  "align": "right"
+                },
+                {
+                  "header": "ADDRESSES",
+                  "align": "left"
+                },
+                {
+                  "header": "VLANS",
+                  "align": "left"
+                },
+                {
+                  "header": "VRF",
+                  "align": "left"
+                },
+                {
+                  "header": "AGGREGATION",
+                  "align": "left"
+                },
+                {
+                  "header": "DESCRIPTION",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "lo",
+                  "loopback",
+                  "yes",
+                  "—",
+                  "—",
+                  "127.0.0.1/8, ::1/128",
+                  "—",
+                  "—",
+                  "—",
+                  "—"
+                ],
+                [
+                  "wlp0s20f3",
+                  "wifi",
+                  "no",
+                  "8c:8c:aa:30:01:01",
+                  "—",
+                  "—",
+                  "—",
+                  "—",
+                  "—",
+                  "Disabled while docked"
+                ]
+              ],
+              "note": "Addresses are as configured, prefix length included. VLANS reads 'mode: ids', with the native VLAN named where a trunk has one."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "links",
+          "title": "Links",
+          "blurb": "What is plugged into this element, and what runs over it.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "cables",
+              "title": "Cables",
+              "columns": [
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "CABLE",
+                  "align": "left"
+                },
+                {
+                  "header": "LABEL",
+                  "align": "left"
+                },
+                {
+                  "header": "MEDIUM",
+                  "align": "left"
+                },
+                {
+                  "header": "SPEED",
+                  "align": "right"
+                },
+                {
+                  "header": "LENGTH",
+                  "align": "right"
+                },
+                {
+                  "header": "FAR END",
+                  "align": "left"
+                },
+                {
+                  "header": "FAR PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "VIA",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "—",
+                  "adp-usb-eth#upstream",
+                  "usb",
+                  "copper",
+                  "5Gbps",
+                  "—",
+                  {
+                    "text": "adp-usb-eth",
+                    "page": "devices/hosts_adp-usb-eth"
+                  },
+                  "usb0",
+                  "—"
+                ]
+              ],
+              "note": "One row per cable that physically terminates here. VIA names the panels the run this cable is a segment of crosses, and the two ends of that run; the site page's cable schedule has every segment of it. An attachment row is an adapter's upstream rather than a cable somebody pulled."
+            },
+            {
+              "key": "tunnels",
+              "title": "Tunnels",
+              "columns": [
+                {
+                  "header": "TUNNEL",
+                  "align": "left"
+                },
+                {
+                  "header": "STACK",
+                  "align": "left"
+                },
+                {
+                  "header": "INTERFACE",
+                  "align": "left"
+                },
+                {
+                  "header": "OTHER ENDS",
+                  "align": "left"
+                },
+                {
+                  "header": "ENCRYPTED",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "diagrams",
+          "title": "Diagrams",
+          "blurb": "The drawings this element is in.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [],
+          "links": [],
+          "notes": [
+            "This element is not drawn in any of the diagrams this report holds."
+          ]
+        }
+      ]
+    },
+    {
+      "path": "devices/hosts_pc-desk",
+      "kind": "device",
+      "title": "pc-desk",
+      "summary": "computer hosts/pc-desk",
+      "parent": "sites/root",
+      "sections": [
+        {
+          "key": "identity",
+          "title": "Identity",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Name",
+              "value": "pc-desk"
+            },
+            {
+              "label": "Qualified name",
+              "value": "hosts/pc-desk"
+            },
+            {
+              "label": "Kind",
+              "value": "computer"
+            },
+            {
+              "label": "Site",
+              "value": {
+                "text": "(inventory root)",
+                "page": "sites/root"
+              }
+            },
+            {
+              "label": "Description",
+              "value": "Desktop workstation in the study"
+            },
+            {
+              "label": "Vendor",
+              "value": "Dell"
+            },
+            {
+              "label": "Model",
+              "value": "OptiPlex 7010"
+            },
+            {
+              "label": "Serial",
+              "value": "—"
+            },
+            {
+              "label": "Declared in",
+              "value": "hosts/pc-desk.yaml#0:1"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "labels",
+              "title": "Labels",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "owner",
+                  "sam"
+                ],
+                [
+                  "role",
+                  "workstation"
+                ],
+                [
+                  "site",
+                  "home"
+                ]
+              ],
+              "note": ""
+            },
+            {
+              "key": "annotations",
+              "title": "Annotations",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "placement",
+          "title": "Placement and power",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Site",
+              "value": "—"
+            },
+            {
+              "label": "Room",
+              "value": "—"
+            },
+            {
+              "label": "Rack",
+              "value": "—"
+            },
+            {
+              "label": "Position",
+              "value": "—"
+            },
+            {
+              "label": "Height",
+              "value": "1U"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "feeds",
+              "title": "Power feeds",
+              "columns": [
+                {
+                  "header": "KIND",
+                  "align": "left"
+                },
+                {
+                  "header": "SOURCE",
+                  "align": "left"
+                },
+                {
+                  "header": "OUTLET",
+                  "align": "left"
+                },
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "RESERVED",
+                  "align": "right"
+                }
+              ],
+              "rows": [],
+              "note": "A dual-corded element has one row per cord."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "interfaces",
+          "title": "Interfaces",
+          "blurb": "",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "interfaces",
+              "title": "Interfaces",
+              "columns": [
+                {
+                  "header": "NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "TYPE",
+                  "align": "left"
+                },
+                {
+                  "header": "UP",
+                  "align": "left"
+                },
+                {
+                  "header": "MAC",
+                  "align": "left"
+                },
+                {
+                  "header": "MTU",
+                  "align": "right"
+                },
+                {
+                  "header": "ADDRESSES",
+                  "align": "left"
+                },
+                {
+                  "header": "VLANS",
+                  "align": "left"
+                },
+                {
+                  "header": "VRF",
+                  "align": "left"
+                },
+                {
+                  "header": "AGGREGATION",
+                  "align": "left"
+                },
+                {
+                  "header": "DESCRIPTION",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "lo",
+                  "loopback",
+                  "yes",
+                  "—",
+                  "—",
+                  "127.0.0.1/8, ::1/128",
+                  "—",
+                  "—",
+                  "—",
+                  "—"
+                ],
+                [
+                  "eno1",
+                  "ethernet",
+                  "yes",
+                  "3c:97:0e:20:01:01",
+                  "1500",
+                  "192.168.10.20/24, 2001:db8:10::20/64",
+                  "—",
+                  "—",
+                  "—",
+                  "Onboard gigabit port"
+                ],
+                [
+                  "wlp1s0",
+                  "wifi",
+                  "no",
+                  "3c:97:0e:20:01:02",
+                  "—",
+                  "—",
+                  "—",
+                  "—",
+                  "—",
+                  "Disabled - the desk is wired"
+                ]
+              ],
+              "note": "Addresses are as configured, prefix length included. VLANS reads 'mode: ids', with the native VLAN named where a trunk has one."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "links",
+          "title": "Links",
+          "blurb": "What is plugged into this element, and what runs over it.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "cables",
+              "title": "Cables",
+              "columns": [
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "CABLE",
+                  "align": "left"
+                },
+                {
+                  "header": "LABEL",
+                  "align": "left"
+                },
+                {
+                  "header": "MEDIUM",
+                  "align": "left"
+                },
+                {
+                  "header": "SPEED",
+                  "align": "right"
+                },
+                {
+                  "header": "LENGTH",
+                  "align": "right"
+                },
+                {
+                  "header": "FAR END",
+                  "align": "left"
+                },
+                {
+                  "header": "FAR PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "VIA",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "eno1",
+                  "cbl-sw-desk",
+                  "H-002",
+                  "copper",
+                  "1Gbps",
+                  "8m",
+                  {
+                    "text": "sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "port2",
+                  "—"
+                ]
+              ],
+              "note": "One row per cable that physically terminates here. VIA names the panels the run this cable is a segment of crosses, and the two ends of that run; the site page's cable schedule has every segment of it. An attachment row is an adapter's upstream rather than a cable somebody pulled."
+            },
+            {
+              "key": "tunnels",
+              "title": "Tunnels",
+              "columns": [
+                {
+                  "header": "TUNNEL",
+                  "align": "left"
+                },
+                {
+                  "header": "STACK",
+                  "align": "left"
+                },
+                {
+                  "header": "INTERFACE",
+                  "align": "left"
+                },
+                {
+                  "header": "OTHER ENDS",
+                  "align": "left"
+                },
+                {
+                  "header": "ENCRYPTED",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "diagrams",
+          "title": "Diagrams",
+          "blurb": "The drawings this element is in.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [],
+          "links": [],
+          "notes": [
+            "This element is not drawn in any of the diagrams this report holds."
+          ]
+        }
+      ]
+    },
+    {
+      "path": "devices/hosts_phone",
+      "kind": "device",
+      "title": "phone",
+      "summary": "computer hosts/phone",
+      "parent": "sites/root",
+      "sections": [
+        {
+          "key": "identity",
+          "title": "Identity",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Name",
+              "value": "phone"
+            },
+            {
+              "label": "Qualified name",
+              "value": "hosts/phone"
+            },
+            {
+              "label": "Kind",
+              "value": "computer"
+            },
+            {
+              "label": "Site",
+              "value": {
+                "text": "(inventory root)",
+                "page": "sites/root"
+              }
+            },
+            {
+              "label": "Description",
+              "value": "Wireless-only client. It reaches the network through its association to\nap-home, which is declared as a `medium: wireless` cable - the association\nis the link.\n"
+            },
+            {
+              "label": "Vendor",
+              "value": "Apple"
+            },
+            {
+              "label": "Model",
+              "value": "iPhone 15"
+            },
+            {
+              "label": "Serial",
+              "value": "—"
+            },
+            {
+              "label": "Declared in",
+              "value": "hosts/phone.yaml#0:1"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "labels",
+              "title": "Labels",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "owner",
+                  "sam"
+                ],
+                [
+                  "role",
+                  "mobile"
+                ],
+                [
+                  "site",
+                  "home"
+                ]
+              ],
+              "note": ""
+            },
+            {
+              "key": "annotations",
+              "title": "Annotations",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "placement",
+          "title": "Placement and power",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Site",
+              "value": "—"
+            },
+            {
+              "label": "Room",
+              "value": "—"
+            },
+            {
+              "label": "Rack",
+              "value": "—"
+            },
+            {
+              "label": "Position",
+              "value": "—"
+            },
+            {
+              "label": "Height",
+              "value": "1U"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "feeds",
+              "title": "Power feeds",
+              "columns": [
+                {
+                  "header": "KIND",
+                  "align": "left"
+                },
+                {
+                  "header": "SOURCE",
+                  "align": "left"
+                },
+                {
+                  "header": "OUTLET",
+                  "align": "left"
+                },
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "RESERVED",
+                  "align": "right"
+                }
+              ],
+              "rows": [],
+              "note": "A dual-corded element has one row per cord."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "interfaces",
+          "title": "Interfaces",
+          "blurb": "",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "interfaces",
+              "title": "Interfaces",
+              "columns": [
+                {
+                  "header": "NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "TYPE",
+                  "align": "left"
+                },
+                {
+                  "header": "UP",
+                  "align": "left"
+                },
+                {
+                  "header": "MAC",
+                  "align": "left"
+                },
+                {
+                  "header": "MTU",
+                  "align": "right"
+                },
+                {
+                  "header": "ADDRESSES",
+                  "align": "left"
+                },
+                {
+                  "header": "VLANS",
+                  "align": "left"
+                },
+                {
+                  "header": "VRF",
+                  "align": "left"
+                },
+                {
+                  "header": "AGGREGATION",
+                  "align": "left"
+                },
+                {
+                  "header": "DESCRIPTION",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "en0",
+                  "wifi",
+                  "yes",
+                  "f0:18:98:11:22:33",
+                  "1500",
+                  "192.168.10.40/24, 2001:db8:10::40/64",
+                  "—",
+                  "—",
+                  "—",
+                  "Associated to the home SSID on 5 GHz"
+                ]
+              ],
+              "note": "Addresses are as configured, prefix length included. VLANS reads 'mode: ids', with the native VLAN named where a trunk has one."
+            },
+            {
+              "key": "radios",
+              "title": "Radios and BSSs",
+              "columns": [
+                {
+                  "header": "SSID",
+                  "align": "left"
+                },
+                {
+                  "header": "RADIO",
+                  "align": "left"
+                },
+                {
+                  "header": "ROLE",
+                  "align": "left"
+                },
+                {
+                  "header": "CHANNEL",
+                  "align": "left"
+                },
+                {
+                  "header": "BSSID",
+                  "align": "left"
+                },
+                {
+                  "header": "VLAN",
+                  "align": "right"
+                },
+                {
+                  "header": "SECURITY",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "home",
+                  {
+                    "text": "hosts/phone:en0",
+                    "page": "devices/hosts_phone"
+                  },
+                  "station",
+                  "36/5GHz",
+                  "78:8a:20:aa:00:11",
+                  "-",
+                  "wpa3-psk"
+                ]
+              ],
+              "note": "The wireless detail of this element, one row per SSID per radio."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "links",
+          "title": "Links",
+          "blurb": "What is plugged into this element, and what runs over it.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "cables",
+              "title": "Cables",
+              "columns": [
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "CABLE",
+                  "align": "left"
+                },
+                {
+                  "header": "LABEL",
+                  "align": "left"
+                },
+                {
+                  "header": "MEDIUM",
+                  "align": "left"
+                },
+                {
+                  "header": "SPEED",
+                  "align": "right"
+                },
+                {
+                  "header": "LENGTH",
+                  "align": "right"
+                },
+                {
+                  "header": "FAR END",
+                  "align": "left"
+                },
+                {
+                  "header": "FAR PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "VIA",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "en0",
+                  "wl-ap-phone",
+                  "—",
+                  "wireless",
+                  "—",
+                  "—",
+                  {
+                    "text": "ap-home",
+                    "page": "devices/wireless_ap-home"
+                  },
+                  "wlan0",
+                  "—"
+                ]
+              ],
+              "note": "One row per cable that physically terminates here. VIA names the panels the run this cable is a segment of crosses, and the two ends of that run; the site page's cable schedule has every segment of it. An attachment row is an adapter's upstream rather than a cable somebody pulled."
+            },
+            {
+              "key": "tunnels",
+              "title": "Tunnels",
+              "columns": [
+                {
+                  "header": "TUNNEL",
+                  "align": "left"
+                },
+                {
+                  "header": "STACK",
+                  "align": "left"
+                },
+                {
+                  "header": "INTERFACE",
+                  "align": "left"
+                },
+                {
+                  "header": "OTHER ENDS",
+                  "align": "left"
+                },
+                {
+                  "header": "ENCRYPTED",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "diagrams",
+          "title": "Diagrams",
+          "blurb": "The drawings this element is in.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [],
+          "links": [],
+          "notes": [
+            "This element is not drawn in any of the diagrams this report holds."
+          ]
+        }
+      ]
+    },
+    {
+      "path": "devices/hosts_srv-nas",
+      "kind": "device",
+      "title": "srv-nas",
+      "summary": "server hosts/srv-nas",
+      "parent": "sites/root",
+      "sections": [
+        {
+          "key": "identity",
+          "title": "Identity",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Name",
+              "value": "srv-nas"
+            },
+            {
+              "label": "Qualified name",
+              "value": "hosts/srv-nas"
+            },
+            {
+              "label": "Kind",
+              "value": "server"
+            },
+            {
+              "label": "Site",
+              "value": {
+                "text": "(inventory root)",
+                "page": "sites/root"
+              }
+            },
+            {
+              "label": "Description",
+              "value": "Backup and media server"
+            },
+            {
+              "label": "Vendor",
+              "value": "Synology"
+            },
+            {
+              "label": "Model",
+              "value": "DS923+"
+            },
+            {
+              "label": "Serial",
+              "value": "—"
+            },
+            {
+              "label": "Declared in",
+              "value": "hosts/srv-nas.yaml#0:1"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "labels",
+              "title": "Labels",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "env",
+                  "prod"
+                ],
+                [
+                  "role",
+                  "storage"
+                ],
+                [
+                  "site",
+                  "home"
+                ]
+              ],
+              "note": ""
+            },
+            {
+              "key": "annotations",
+              "title": "Annotations",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "placement",
+          "title": "Placement and power",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Site",
+              "value": "—"
+            },
+            {
+              "label": "Room",
+              "value": "—"
+            },
+            {
+              "label": "Rack",
+              "value": "—"
+            },
+            {
+              "label": "Position",
+              "value": "—"
+            },
+            {
+              "label": "Height",
+              "value": "1U"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "feeds",
+              "title": "Power feeds",
+              "columns": [
+                {
+                  "header": "KIND",
+                  "align": "left"
+                },
+                {
+                  "header": "SOURCE",
+                  "align": "left"
+                },
+                {
+                  "header": "OUTLET",
+                  "align": "left"
+                },
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "RESERVED",
+                  "align": "right"
+                }
+              ],
+              "rows": [],
+              "note": "A dual-corded element has one row per cord."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "interfaces",
+          "title": "Interfaces",
+          "blurb": "",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "interfaces",
+              "title": "Interfaces",
+              "columns": [
+                {
+                  "header": "NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "TYPE",
+                  "align": "left"
+                },
+                {
+                  "header": "UP",
+                  "align": "left"
+                },
+                {
+                  "header": "MAC",
+                  "align": "left"
+                },
+                {
+                  "header": "MTU",
+                  "align": "right"
+                },
+                {
+                  "header": "ADDRESSES",
+                  "align": "left"
+                },
+                {
+                  "header": "VLANS",
+                  "align": "left"
+                },
+                {
+                  "header": "VRF",
+                  "align": "left"
+                },
+                {
+                  "header": "AGGREGATION",
+                  "align": "left"
+                },
+                {
+                  "header": "DESCRIPTION",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "lo",
+                  "loopback",
+                  "yes",
+                  "—",
+                  "—",
+                  "127.0.0.1/8, ::1/128",
+                  "—",
+                  "—",
+                  "—",
+                  "—"
+                ],
+                [
+                  "eth0",
+                  "ethernet",
+                  "yes",
+                  "00:11:32:40:01:01",
+                  "1500",
+                  "192.168.10.10/24, 2001:db8:10::10/64",
+                  "—",
+                  "—",
+                  "—",
+                  "—"
+                ]
+              ],
+              "note": "Addresses are as configured, prefix length included. VLANS reads 'mode: ids', with the native VLAN named where a trunk has one."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "links",
+          "title": "Links",
+          "blurb": "What is plugged into this element, and what runs over it.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "cables",
+              "title": "Cables",
+              "columns": [
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "CABLE",
+                  "align": "left"
+                },
+                {
+                  "header": "LABEL",
+                  "align": "left"
+                },
+                {
+                  "header": "MEDIUM",
+                  "align": "left"
+                },
+                {
+                  "header": "SPEED",
+                  "align": "right"
+                },
+                {
+                  "header": "LENGTH",
+                  "align": "right"
+                },
+                {
+                  "header": "FAR END",
+                  "align": "left"
+                },
+                {
+                  "header": "FAR PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "VIA",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "eth0",
+                  "cbl-sw-nas",
+                  "H-003",
+                  "copper",
+                  "1Gbps",
+                  "0.5m",
+                  {
+                    "text": "sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "port3",
+                  "—"
+                ]
+              ],
+              "note": "One row per cable that physically terminates here. VIA names the panels the run this cable is a segment of crosses, and the two ends of that run; the site page's cable schedule has every segment of it. An attachment row is an adapter's upstream rather than a cable somebody pulled."
+            },
+            {
+              "key": "tunnels",
+              "title": "Tunnels",
+              "columns": [
+                {
+                  "header": "TUNNEL",
+                  "align": "left"
+                },
+                {
+                  "header": "STACK",
+                  "align": "left"
+                },
+                {
+                  "header": "INTERFACE",
+                  "align": "left"
+                },
+                {
+                  "header": "OTHER ENDS",
+                  "align": "left"
+                },
+                {
+                  "header": "ENCRYPTED",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "diagrams",
+          "title": "Diagrams",
+          "blurb": "The drawings this element is in.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [],
+          "links": [],
+          "notes": [
+            "This element is not drawn in any of the diagrams this report holds."
+          ]
+        }
+      ]
+    },
+    {
+      "path": "devices/routers_rtr-home",
+      "kind": "device",
+      "title": "rtr-home",
+      "summary": "router routers/rtr-home",
+      "parent": "sites/root",
+      "sections": [
+        {
+          "key": "identity",
+          "title": "Identity",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Name",
+              "value": "rtr-home"
+            },
+            {
+              "label": "Qualified name",
+              "value": "routers/rtr-home"
+            },
+            {
+              "label": "Kind",
+              "value": "router"
+            },
+            {
+              "label": "Site",
+              "value": {
+                "text": "(inventory root)",
+                "page": "sites/root"
+              }
+            },
+            {
+              "label": "Description",
+              "value": "Home edge router. Terminates the ISP hand-off on wan0 and is the default\ngateway for the single home VLAN (10).\n"
+            },
+            {
+              "label": "Vendor",
+              "value": "MikroTik"
+            },
+            {
+              "label": "Model",
+              "value": "hEX S"
+            },
+            {
+              "label": "Serial",
+              "value": "—"
+            },
+            {
+              "label": "Declared in",
+              "value": "routers/rtr-home.yaml#0:1"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "labels",
+              "title": "Labels",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "env",
+                  "prod"
+                ],
+                [
+                  "role",
+                  "edge"
+                ],
+                [
+                  "site",
+                  "home"
+                ]
+              ],
+              "note": ""
+            },
+            {
+              "key": "annotations",
+              "title": "Annotations",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "netgraph/ignore",
+                  "NG-C015"
+                ]
+              ],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "placement",
+          "title": "Placement and power",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Site",
+              "value": "—"
+            },
+            {
+              "label": "Room",
+              "value": "—"
+            },
+            {
+              "label": "Rack",
+              "value": "—"
+            },
+            {
+              "label": "Position",
+              "value": "—"
+            },
+            {
+              "label": "Height",
+              "value": "1U"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "feeds",
+              "title": "Power feeds",
+              "columns": [
+                {
+                  "header": "KIND",
+                  "align": "left"
+                },
+                {
+                  "header": "SOURCE",
+                  "align": "left"
+                },
+                {
+                  "header": "OUTLET",
+                  "align": "left"
+                },
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "RESERVED",
+                  "align": "right"
+                }
+              ],
+              "rows": [],
+              "note": "A dual-corded element has one row per cord."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "interfaces",
+          "title": "Interfaces",
+          "blurb": "",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "interfaces",
+              "title": "Interfaces",
+              "columns": [
+                {
+                  "header": "NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "TYPE",
+                  "align": "left"
+                },
+                {
+                  "header": "UP",
+                  "align": "left"
+                },
+                {
+                  "header": "MAC",
+                  "align": "left"
+                },
+                {
+                  "header": "MTU",
+                  "align": "right"
+                },
+                {
+                  "header": "ADDRESSES",
+                  "align": "left"
+                },
+                {
+                  "header": "VLANS",
+                  "align": "left"
+                },
+                {
+                  "header": "VRF",
+                  "align": "left"
+                },
+                {
+                  "header": "AGGREGATION",
+                  "align": "left"
+                },
+                {
+                  "header": "DESCRIPTION",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "lo0",
+                  "loopback",
+                  "yes",
+                  "—",
+                  "—",
+                  "192.0.2.1/32, 2001:db8::1/128",
+                  "—",
+                  "—",
+                  "—",
+                  "Router ID and management target"
+                ],
+                [
+                  "wan0",
+                  "ethernet",
+                  "yes",
+                  "00:1e:8c:00:10:01",
+                  "1500",
+                  "203.0.113.2/30",
+                  "—",
+                  "—",
+                  "—",
+                  "ISP hand-off"
+                ],
+                [
+                  "lan0",
+                  "ethernet",
+                  "yes",
+                  "00:1e:8c:00:10:02",
+                  "1500",
+                  "192.168.10.1/24, 2001:db8:10::1/64",
+                  "access 10",
+                  "—",
+                  "—",
+                  "Downlink to sw-home"
+                ]
+              ],
+              "note": "Addresses are as configured, prefix length included. VLANS reads 'mode: ids', with the native VLAN named where a trunk has one."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "links",
+          "title": "Links",
+          "blurb": "What is plugged into this element, and what runs over it.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "cables",
+              "title": "Cables",
+              "columns": [
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "CABLE",
+                  "align": "left"
+                },
+                {
+                  "header": "LABEL",
+                  "align": "left"
+                },
+                {
+                  "header": "MEDIUM",
+                  "align": "left"
+                },
+                {
+                  "header": "SPEED",
+                  "align": "right"
+                },
+                {
+                  "header": "LENGTH",
+                  "align": "right"
+                },
+                {
+                  "header": "FAR END",
+                  "align": "left"
+                },
+                {
+                  "header": "FAR PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "VIA",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "lan0",
+                  "cbl-rtr-sw",
+                  "H-001",
+                  "copper",
+                  "1Gbps",
+                  "0.5m",
+                  {
+                    "text": "sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "port1",
+                  "—"
+                ]
+              ],
+              "note": "One row per cable that physically terminates here. VIA names the panels the run this cable is a segment of crosses, and the two ends of that run; the site page's cable schedule has every segment of it. An attachment row is an adapter's upstream rather than a cable somebody pulled."
+            },
+            {
+              "key": "tunnels",
+              "title": "Tunnels",
+              "columns": [
+                {
+                  "header": "TUNNEL",
+                  "align": "left"
+                },
+                {
+                  "header": "STACK",
+                  "align": "left"
+                },
+                {
+                  "header": "INTERFACE",
+                  "align": "left"
+                },
+                {
+                  "header": "OTHER ENDS",
+                  "align": "left"
+                },
+                {
+                  "header": "ENCRYPTED",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "diagrams",
+          "title": "Diagrams",
+          "blurb": "The drawings this element is in.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [],
+          "links": [],
+          "notes": [
+            "This element is not drawn in any of the diagrams this report holds."
+          ]
+        }
+      ]
+    },
+    {
+      "path": "devices/switches_sw-home",
+      "kind": "device",
+      "title": "sw-home",
+      "summary": "switch switches/sw-home",
+      "parent": "sites/root",
+      "sections": [
+        {
+          "key": "identity",
+          "title": "Identity",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Name",
+              "value": "sw-home"
+            },
+            {
+              "label": "Qualified name",
+              "value": "switches/sw-home"
+            },
+            {
+              "label": "Kind",
+              "value": "switch"
+            },
+            {
+              "label": "Site",
+              "value": {
+                "text": "(inventory root)",
+                "page": "sites/root"
+              }
+            },
+            {
+              "label": "Description",
+              "value": "Eight-port desktop switch in the hallway cabinet"
+            },
+            {
+              "label": "Vendor",
+              "value": "TP-Link"
+            },
+            {
+              "label": "Model",
+              "value": "TL-SG108E"
+            },
+            {
+              "label": "Serial",
+              "value": "—"
+            },
+            {
+              "label": "Declared in",
+              "value": "switches/sw-home.yaml#0:1"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "labels",
+              "title": "Labels",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "role",
+                  "access"
+                ],
+                [
+                  "site",
+                  "home"
+                ]
+              ],
+              "note": ""
+            },
+            {
+              "key": "annotations",
+              "title": "Annotations",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "placement",
+          "title": "Placement and power",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Site",
+              "value": "—"
+            },
+            {
+              "label": "Room",
+              "value": "—"
+            },
+            {
+              "label": "Rack",
+              "value": "—"
+            },
+            {
+              "label": "Position",
+              "value": "—"
+            },
+            {
+              "label": "Height",
+              "value": "1U"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "feeds",
+              "title": "Power feeds",
+              "columns": [
+                {
+                  "header": "KIND",
+                  "align": "left"
+                },
+                {
+                  "header": "SOURCE",
+                  "align": "left"
+                },
+                {
+                  "header": "OUTLET",
+                  "align": "left"
+                },
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "RESERVED",
+                  "align": "right"
+                }
+              ],
+              "rows": [],
+              "note": "A dual-corded element has one row per cord."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "interfaces",
+          "title": "Interfaces",
+          "blurb": "",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "interfaces",
+              "title": "Interfaces",
+              "columns": [
+                {
+                  "header": "NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "TYPE",
+                  "align": "left"
+                },
+                {
+                  "header": "UP",
+                  "align": "left"
+                },
+                {
+                  "header": "MAC",
+                  "align": "left"
+                },
+                {
+                  "header": "MTU",
+                  "align": "right"
+                },
+                {
+                  "header": "ADDRESSES",
+                  "align": "left"
+                },
+                {
+                  "header": "VLANS",
+                  "align": "left"
+                },
+                {
+                  "header": "VRF",
+                  "align": "left"
+                },
+                {
+                  "header": "AGGREGATION",
+                  "align": "left"
+                },
+                {
+                  "header": "DESCRIPTION",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "br0",
+                  "bridge",
+                  "yes",
+                  "—",
+                  "—",
+                  "—",
+                  "—",
+                  "—",
+                  "members: port1, port2, port3, port4, port5",
+                  "Switching instance"
+                ],
+                [
+                  "Vlan10",
+                  "vlan",
+                  "yes",
+                  "—",
+                  "—",
+                  "192.168.10.2/24",
+                  "access 10",
+                  "—",
+                  "under br0",
+                  "In-band management address of the switch"
+                ],
+                [
+                  "port1",
+                  "ethernet",
+                  "yes",
+                  "00:22:07:aa:00:01",
+                  "1500",
+                  "—",
+                  "access 10",
+                  "—",
+                  "member of br0",
+                  "Uplink to rtr-home"
+                ],
+                [
+                  "port2",
+                  "ethernet",
+                  "yes",
+                  "00:22:07:aa:00:02",
+                  "1500",
+                  "—",
+                  "access 10",
+                  "—",
+                  "member of br0",
+                  "Desk - pc-desk"
+                ],
+                [
+                  "port3",
+                  "ethernet",
+                  "yes",
+                  "00:22:07:aa:00:03",
+                  "1500",
+                  "—",
+                  "access 10",
+                  "—",
+                  "member of br0",
+                  "NAS"
+                ],
+                [
+                  "port4",
+                  "ethernet",
+                  "yes",
+                  "00:22:07:aa:00:04",
+                  "1500",
+                  "—",
+                  "access 10",
+                  "—",
+                  "member of br0",
+                  "Patch to the desk, used by the laptop dongle"
+                ],
+                [
+                  "port5",
+                  "ethernet",
+                  "yes",
+                  "00:22:07:aa:00:05",
+                  "1500",
+                  "—",
+                  "trunk 10,20 (native 10)",
+                  "—",
+                  "member of br0",
+                  "PoE injector for ap-home; trunks the guest VLAN up to it"
+                ]
+              ],
+              "note": "Addresses are as configured, prefix length included. VLANS reads 'mode: ids', with the native VLAN named where a trunk has one."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "links",
+          "title": "Links",
+          "blurb": "What is plugged into this element, and what runs over it.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "cables",
+              "title": "Cables",
+              "columns": [
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "CABLE",
+                  "align": "left"
+                },
+                {
+                  "header": "LABEL",
+                  "align": "left"
+                },
+                {
+                  "header": "MEDIUM",
+                  "align": "left"
+                },
+                {
+                  "header": "SPEED",
+                  "align": "right"
+                },
+                {
+                  "header": "LENGTH",
+                  "align": "right"
+                },
+                {
+                  "header": "FAR END",
+                  "align": "left"
+                },
+                {
+                  "header": "FAR PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "VIA",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "port1",
+                  "cbl-rtr-sw",
+                  "H-001",
+                  "copper",
+                  "1Gbps",
+                  "0.5m",
+                  {
+                    "text": "rtr-home",
+                    "page": "devices/routers_rtr-home"
+                  },
+                  "lan0",
+                  "—"
+                ],
+                [
+                  "port2",
+                  "cbl-sw-desk",
+                  "H-002",
+                  "copper",
+                  "1Gbps",
+                  "8m",
+                  {
+                    "text": "pc-desk",
+                    "page": "devices/hosts_pc-desk"
+                  },
+                  "eno1",
+                  "—"
+                ],
+                [
+                  "port3",
+                  "cbl-sw-nas",
+                  "H-003",
+                  "copper",
+                  "1Gbps",
+                  "0.5m",
+                  {
+                    "text": "srv-nas",
+                    "page": "devices/hosts_srv-nas"
+                  },
+                  "eth0",
+                  "—"
+                ],
+                [
+                  "port4",
+                  "cbl-sw-dongle",
+                  "H-004",
+                  "copper",
+                  "1Gbps",
+                  "10m",
+                  {
+                    "text": "adp-usb-eth",
+                    "page": "devices/hosts_adp-usb-eth"
+                  },
+                  "enx001122334455",
+                  "—"
+                ],
+                [
+                  "port5",
+                  "cbl-sw-ap",
+                  "H-005",
+                  "copper",
+                  "1Gbps",
+                  "6m",
+                  {
+                    "text": "ap-home",
+                    "page": "devices/wireless_ap-home"
+                  },
+                  "eth0",
+                  "—"
+                ]
+              ],
+              "note": "One row per cable that physically terminates here. VIA names the panels the run this cable is a segment of crosses, and the two ends of that run; the site page's cable schedule has every segment of it. An attachment row is an adapter's upstream rather than a cable somebody pulled."
+            },
+            {
+              "key": "tunnels",
+              "title": "Tunnels",
+              "columns": [
+                {
+                  "header": "TUNNEL",
+                  "align": "left"
+                },
+                {
+                  "header": "STACK",
+                  "align": "left"
+                },
+                {
+                  "header": "INTERFACE",
+                  "align": "left"
+                },
+                {
+                  "header": "OTHER ENDS",
+                  "align": "left"
+                },
+                {
+                  "header": "ENCRYPTED",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "diagrams",
+          "title": "Diagrams",
+          "blurb": "The drawings this element is in.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [],
+          "links": [],
+          "notes": [
+            "This element is not drawn in any of the diagrams this report holds."
+          ]
+        }
+      ]
+    },
+    {
+      "path": "devices/wireless_ap-home",
+      "kind": "device",
+      "title": "ap-home",
+      "summary": "switch wireless/ap-home",
+      "parent": "sites/root",
+      "sections": [
+        {
+          "key": "identity",
+          "title": "Identity",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Name",
+              "value": "ap-home"
+            },
+            {
+              "label": "Qualified name",
+              "value": "wireless/ap-home"
+            },
+            {
+              "label": "Kind",
+              "value": "switch"
+            },
+            {
+              "label": "Site",
+              "value": {
+                "text": "(inventory root)",
+                "page": "sites/root"
+              }
+            },
+            {
+              "label": "Description",
+              "value": "Ceiling access point in the hallway, powered over the uplink. It is a\nswitch: the radio is a bridge port like any other, and the two SSIDs are\nwhat it bridges the air into.\n"
+            },
+            {
+              "label": "Vendor",
+              "value": "Ubiquiti"
+            },
+            {
+              "label": "Model",
+              "value": "U6-Lite"
+            },
+            {
+              "label": "Serial",
+              "value": "—"
+            },
+            {
+              "label": "Declared in",
+              "value": "wireless/ap-home.yaml#0:1"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "labels",
+              "title": "Labels",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "role",
+                  "wireless"
+                ],
+                [
+                  "site",
+                  "home"
+                ]
+              ],
+              "note": ""
+            },
+            {
+              "key": "annotations",
+              "title": "Annotations",
+              "columns": [
+                {
+                  "header": "KEY",
+                  "align": "left"
+                },
+                {
+                  "header": "VALUE",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "placement",
+          "title": "Placement and power",
+          "blurb": "",
+          "fields": [
+            {
+              "label": "Site",
+              "value": "—"
+            },
+            {
+              "label": "Room",
+              "value": "—"
+            },
+            {
+              "label": "Rack",
+              "value": "—"
+            },
+            {
+              "label": "Position",
+              "value": "—"
+            },
+            {
+              "label": "Height",
+              "value": "1U"
+            }
+          ],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "feeds",
+              "title": "Power feeds",
+              "columns": [
+                {
+                  "header": "KIND",
+                  "align": "left"
+                },
+                {
+                  "header": "SOURCE",
+                  "align": "left"
+                },
+                {
+                  "header": "OUTLET",
+                  "align": "left"
+                },
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "RESERVED",
+                  "align": "right"
+                }
+              ],
+              "rows": [],
+              "note": "A dual-corded element has one row per cord."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "interfaces",
+          "title": "Interfaces",
+          "blurb": "",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "interfaces",
+              "title": "Interfaces",
+              "columns": [
+                {
+                  "header": "NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "TYPE",
+                  "align": "left"
+                },
+                {
+                  "header": "UP",
+                  "align": "left"
+                },
+                {
+                  "header": "MAC",
+                  "align": "left"
+                },
+                {
+                  "header": "MTU",
+                  "align": "right"
+                },
+                {
+                  "header": "ADDRESSES",
+                  "align": "left"
+                },
+                {
+                  "header": "VLANS",
+                  "align": "left"
+                },
+                {
+                  "header": "VRF",
+                  "align": "left"
+                },
+                {
+                  "header": "AGGREGATION",
+                  "align": "left"
+                },
+                {
+                  "header": "DESCRIPTION",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "br0",
+                  "bridge",
+                  "yes",
+                  "—",
+                  "—",
+                  "—",
+                  "—",
+                  "—",
+                  "members: eth0, wlan0",
+                  "Bridges the radio onto the wired uplink"
+                ],
+                [
+                  "Vlan10",
+                  "vlan",
+                  "yes",
+                  "—",
+                  "—",
+                  "192.168.10.3/24",
+                  "access 10",
+                  "—",
+                  "under br0",
+                  "In-band management address of the access point"
+                ],
+                [
+                  "eth0",
+                  "ethernet",
+                  "yes",
+                  "78:8a:20:aa:00:01",
+                  "1500",
+                  "—",
+                  "trunk 10,20 (native 10)",
+                  "—",
+                  "member of br0",
+                  "PoE uplink to sw-home"
+                ],
+                [
+                  "wlan0",
+                  "wifi",
+                  "yes",
+                  "78:8a:20:aa:00:10",
+                  "1500",
+                  "—",
+                  "—",
+                  "—",
+                  "member of br0",
+                  "5 GHz radio, two SSIDs"
+                ]
+              ],
+              "note": "Addresses are as configured, prefix length included. VLANS reads 'mode: ids', with the native VLAN named where a trunk has one."
+            },
+            {
+              "key": "radios",
+              "title": "Radios and BSSs",
+              "columns": [
+                {
+                  "header": "SSID",
+                  "align": "left"
+                },
+                {
+                  "header": "RADIO",
+                  "align": "left"
+                },
+                {
+                  "header": "ROLE",
+                  "align": "left"
+                },
+                {
+                  "header": "CHANNEL",
+                  "align": "left"
+                },
+                {
+                  "header": "BSSID",
+                  "align": "left"
+                },
+                {
+                  "header": "VLAN",
+                  "align": "right"
+                },
+                {
+                  "header": "SECURITY",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "home",
+                  {
+                    "text": "wireless/ap-home:wlan0",
+                    "page": "devices/wireless_ap-home"
+                  },
+                  "ap",
+                  "36/5GHz",
+                  "78:8a:20:aa:00:11",
+                  "10",
+                  "wpa3-psk"
+                ],
+                [
+                  "home-guest",
+                  {
+                    "text": "wireless/ap-home:wlan0",
+                    "page": "devices/wireless_ap-home"
+                  },
+                  "ap",
+                  "36/5GHz",
+                  "78:8a:20:aa:00:12",
+                  "20",
+                  "wpa2-psk"
+                ]
+              ],
+              "note": "The wireless detail of this element, one row per SSID per radio."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "links",
+          "title": "Links",
+          "blurb": "What is plugged into this element, and what runs over it.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "cables",
+              "title": "Cables",
+              "columns": [
+                {
+                  "header": "PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "CABLE",
+                  "align": "left"
+                },
+                {
+                  "header": "LABEL",
+                  "align": "left"
+                },
+                {
+                  "header": "MEDIUM",
+                  "align": "left"
+                },
+                {
+                  "header": "SPEED",
+                  "align": "right"
+                },
+                {
+                  "header": "LENGTH",
+                  "align": "right"
+                },
+                {
+                  "header": "FAR END",
+                  "align": "left"
+                },
+                {
+                  "header": "FAR PORT",
+                  "align": "left"
+                },
+                {
+                  "header": "VIA",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "eth0",
+                  "cbl-sw-ap",
+                  "H-005",
+                  "copper",
+                  "1Gbps",
+                  "6m",
+                  {
+                    "text": "sw-home",
+                    "page": "devices/switches_sw-home"
+                  },
+                  "port5",
+                  "—"
+                ],
+                [
+                  "wlan0",
+                  "wl-ap-phone",
+                  "—",
+                  "wireless",
+                  "—",
+                  "—",
+                  {
+                    "text": "phone",
+                    "page": "devices/hosts_phone"
+                  },
+                  "en0",
+                  "—"
+                ]
+              ],
+              "note": "One row per cable that physically terminates here. VIA names the panels the run this cable is a segment of crosses, and the two ends of that run; the site page's cable schedule has every segment of it. An attachment row is an adapter's upstream rather than a cable somebody pulled."
+            },
+            {
+              "key": "tunnels",
+              "title": "Tunnels",
+              "columns": [
+                {
+                  "header": "TUNNEL",
+                  "align": "left"
+                },
+                {
+                  "header": "STACK",
+                  "align": "left"
+                },
+                {
+                  "header": "INTERFACE",
+                  "align": "left"
+                },
+                {
+                  "header": "OTHER ENDS",
+                  "align": "left"
+                },
+                {
+                  "header": "ENCRYPTED",
+                  "align": "left"
+                }
+              ],
+              "rows": [],
+              "note": ""
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "diagrams",
+          "title": "Diagrams",
+          "blurb": "The drawings this element is in.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [],
+          "links": [],
+          "notes": [
+            "This element is not drawn in any of the diagrams this report holds."
+          ]
+        }
+      ]
+    }
+  ]
+}

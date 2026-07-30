@@ -19,7 +19,7 @@ import yaml
 from click.testing import CliRunner
 
 from netgraph.cli import cli
-from netgraph.report import FORMATS
+from netgraph.diagnostics import FORMATS
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HOOKS_FILE = REPO_ROOT / ".pre-commit-hooks.yaml"

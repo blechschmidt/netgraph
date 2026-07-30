@@ -18,7 +18,7 @@ Three formats, one for each place the answer is read:
     shrinks. An element with nothing but blind spots is *skipped*, which is the
     word JUnit already has for "not run".
 
-The document skeleton for the latter two lives in :mod:`netgraph.report`, so
+The document skeleton for the latter two lives in :mod:`netgraph.diagnostics`, so
 ``drift`` and ``validate`` cannot disagree about JSON indentation or XML
 escaping.
 """
@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from netgraph.console import Console
+from netgraph.diagnostics import JUnitCase, as_junit, dump_json
 from netgraph.drift.model import (
     DIRECTION_SYMBOLS,
     Change,
@@ -38,7 +39,6 @@ from netgraph.drift.model import (
     ElementDrift,
     Unobserved,
 )
-from netgraph.report import JUnitCase, as_junit, dump_json
 
 __all__ = ["FORMATS", "as_json", "as_junit_report", "render_drift", "write_text"]
 

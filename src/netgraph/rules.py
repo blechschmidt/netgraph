@@ -96,7 +96,7 @@ class Rule:
     title: str = ""
     #: Anchor to link to instead of the one :attr:`anchor` derives. Only for a
     #: pseudo-rule whose write-up is a whole section rather than a heading of
-    #: its own — see :data:`netgraph.report.LOAD_RULE`.
+    #: its own — see :data:`netgraph.diagnostics.LOAD_RULE`.
     section: str = ""
 
     @property

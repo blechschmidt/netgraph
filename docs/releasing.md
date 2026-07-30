@@ -130,6 +130,8 @@ local Docker login — the workflow publishes, and it authenticates with OIDC.
 # 2. Set it in pyproject.toml.
 # 3. Rename '## [Unreleased]' to '## [X.Y.Z] - YYYY-MM-DD' and open a fresh Unreleased
 #    above it, then update the two link definitions at the bottom of CHANGELOG.md.
+# 4. Regenerate the committed artefacts that name the version:
+python tools/gen_example_report.py   # docs/example-report/ carries it on every page
 ```
 
 Check it locally before pushing anything — this is the same code the workflow's first job

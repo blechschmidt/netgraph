@@ -197,6 +197,7 @@ report.txt` both do what they look like they do.
 | [`netgraph list`](docs/commands/list.md) | Tabulate devices, cables, tunnels, VLANs, BSSs or subnets. | [list.md](docs/commands/list.md) |
 | [`netgraph ipam`](docs/commands/ipam.md) | Report utilisation, free space, overlaps and aggregates. | [ipam.md](docs/commands/ipam.md) |
 | [`netgraph export`](docs/commands/export.md) | Emit hosts files, DNS zones, Ansible, Prometheus, cable lists. | [export.md](docs/commands/export.md) |
+| [`netgraph report`](docs/commands/report.md) | Write the as-built documentation: a page per site and per device. | [report.md](docs/commands/report.md) |
 | [`netgraph show`](docs/commands/show.md) | Print one element as it was resolved, expansions included. | [show.md](docs/commands/show.md) |
 | [`netgraph rules`](docs/commands/rules.md) | List the validation rules and their ids. | [rules.md](docs/commands/rules.md) |
 | [`netgraph schema`](docs/commands/schema.md) | Write the JSON Schema for editor completion. | [schema.md](docs/commands/schema.md) |
@@ -225,6 +226,7 @@ The files describe the network once; each command asks something different of th
 | how does this host reach that one, hop by hop? | [`netgraph path`](docs/paths.md) |
 | how full is that /24, and where is the next free /28? | [`netgraph ipam`](docs/ipam.md) |
 | what should `/etc/hosts`, the DNS zone, the Ansible inventory, the pull list or the routing script say? | [`netgraph export`](docs/export.md) |
+| what do I hand over as the as-built documentation? | [`netgraph report`](docs/commands/report.md), and [an example of what it writes](docs/example-report/) |
 | what did that template and that interface range actually expand to? | [`netgraph show`](docs/commands/show.md) |
 
 Two of them are worth seeing. Nothing in the YAML declares a subnet: the layer-3 view and

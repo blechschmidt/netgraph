@@ -70,6 +70,7 @@ from netgraph.loader.inventory import (
     namespace_of,
     qualify,
     short_name,
+    subset,
 )
 from netgraph.loader.provenance import FieldPath, Provenance, Site
 from netgraph.loader.ranges import (
@@ -160,5 +161,6 @@ __all__ = [
     "resolved_spec",
     "select_loader",
     "short_name",
+    "subset",
     "substitute",
 ]

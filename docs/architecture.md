@@ -33,7 +33,7 @@ the whole contract between one stage and the next.
   Inventory ───────► validate.validate ───────► list[Finding]
       │                                              │
       │                                              ▼
-      │                                      report.build_report
+      │                                   diagnostics.build_report
       │                               (text | json | sarif | github)
       │   render.graph.build_graph
       │   resolve names, VLANs, tunnels, panels, prefixes — exactly once
@@ -214,12 +214,14 @@ Everything else hangs off one of the five stages and adds no sixth.
 
 | Branch | Attaches after | Entry point |
 |---|---|---|
-| `report.py` | stage 2 | `build_report(inventory, findings, *, base=None)`, then `render_report(report, output_format)` |
+| `diagnostics.py` | stage 2 | `build_report(inventory, findings, *, base=None)`, then `render_report(report, output_format)` |
 | `subnets.py` | stage 1 | `subnets_of(inventory) -> tuple[Subnet, ...]` — the prefixes the configured addresses imply, one group per `(vrf, prefix)` |
 | `ipam.py` | stage 1, via `subnets.py` | `build_report(inventory, config=None, *, aggregated=False)`; `conflicts()` calls `validate` rather than re-deriving anything |
 | `graph.py` (top level) | stage 3 | `to_networkx(source, *, layer=None) -> nx.MultiGraph`, then its own `filter_graph`, `layers`, `broadcast_domains`, `stats` |
 | `trace/` | stage 3 | `trace(inventory, source, destination, *, vlan=None, …) -> TraceResult` |
 | `export/` | stage 4 | `export(export_format, context_factory) -> ExportResult`, over the same filtered `Graph` a diagram is drawn from |
+| `listing.py` | stage 3 | `LISTINGS[subject](inventory) -> Listing` — the tables `netgraph list` prints, and the ones a report shows |
+| `report/` | stages 2, 3 and 4 | `generate(inventory, *, options, diagnostics, …) -> (Bundle, Diagrams)` — the as-built document, built from `listing.py`, `ipam.py`, `export/cables.py`, `power.py` and the layer graphs |
 | `fmt/` | before stage 1 | `format_paths(roots, *, mode) -> Summary` — its own round-trip parser, never on the loading path |
 | `importer/` | before stage 1 | `read_inputs` → `build_draft` → `build_files` → `write_files`, producing a tree stage 1 then loads |
 | `schema.py` | stage 1's models | `build_schema(kind=None) -> dict[str, Any]` — the JSON Schema an editor consumes |
@@ -241,13 +243,13 @@ to a diagram and to a hosts file, and each emitter records what it had to drop
 
 ## Cross-cutting pieces
 
-**`errors.py` and `report.py` — diagnostics.** `errors.py` holds the exception hierarchy:
+**`errors.py` and `diagnostics.py` — diagnostics.** `errors.py` holds the exception hierarchy:
 `NetgraphError` and its subclasses `ConfigurationError`, `LoaderError` (with
 `SchemaError`/`SchemaIssue`), `ValidationError` and `RenderError`. The CLI catches the
 base class, so a new failure mode gets a clean message by inheriting from it rather than
 by adding a `try` in `cli.py`. It also owns the text helpers every diagnostic uses —
 `count_text`, `clip_text`, `echo_value`, `compact_ids` — which is why no message
-concatenates an unbounded value into itself. `report.py` turns load errors *and* findings
+concatenates an unbounded value into itself. `diagnostics.py` turns load errors *and* findings
 into one sorted stream of `Diagnostic` records and serialises it as JSON, SARIF 2.1.0 or
 GitHub workflow commands; its `LOAD_RULE` pseudo-rule gives a *load* error a rule id and
 a documented section too, so no diagnostic reaches a user without one.
@@ -310,7 +312,7 @@ Verified against the tree: every path below exists.
 | `src/netgraph/httpserve.py` | what the two local servers promise: loopback, headers, host check, and the socket options that differ by platform |
 | `src/netgraph/fsio.py` | one newline policy, one atomic replace, one reserved-file-name rule, for every platform |
 | `src/netgraph/rules.py` | catalogue of validation rules and severities |
-| `src/netgraph/report.py` | `validate` as json, SARIF 2.1.0 and GitHub workflow commands |
+| `src/netgraph/diagnostics.py` | `validate` as json, SARIF 2.1.0 and GitHub workflow commands |
 | `src/netgraph/schema.py` | JSON Schema emitted for editors (`netgraph schema`) |
 | `src/netgraph/subnets.py` | IP prefixes derived from the configured addresses, partitioned by routing instance; `ipam.py` adds utilisation, free space and conflicts over them |
 | `src/netgraph/validate.py` | semantic validation engine |
@@ -323,6 +325,8 @@ Verified against the tree: every path below exists.
 | `src/netgraph/render/fragment.py` | the Graphviz SVG made embeddable, for the page and the preview; `assets/` holds the style sheet, the client and the record renderer `netgraph web` shares with it — inlined, never fetched |
 | `src/netgraph/trace/` | reachability tracing (`netgraph path`): `endpoints.py` resolves what the user typed, `engine.py` searches layer 2 then layer 3, `model.py` holds the result, `report.py` renders it as text or JSON |
 | `src/netgraph/export/` | `netgraph export`: six operational artefacts, with `context.py` for the values every emitter reads, `names.py` for folding a name into each target grammar, `manifest.py` for what was dropped |
+| `src/netgraph/listing.py` | the tables of `netgraph list`, in a form a report can show: headers, alignment, formatted cells and the same rows as records |
+| `src/netgraph/report/` | `netgraph report`: the as-built document. `collect.py` works out the scopes and the shared derivations, `pages.py` says what each page carries, `model.py` is the format-independent document, `layout.py` the file names and cross-references, `diagrams.py` the drawings and the links inside them, `write.py` the templates and the escaping, `bundle.py` the files and how they are written, `stamp.py` the timestamp and the git revision; `templates/` and `assets/` are the editable layout (`--template DIR`) |
 | `src/netgraph/fmt/` | the canonical form of an inventory file (`netgraph fmt`): `canonical.py` shapes it, `order.py` holds the key order, `verify.py` re-reads it strictly, `runner.py` walks the paths |
 | `src/netgraph/importer/` | `netgraph import`: a first inventory from live-network output. `run.py` reads the inputs, sniffs each dialect and writes the tree; `lldp.py` turns `lldpctl`/`lldpcli` neighbour records into cables, both ends at once; `iproute.py` turns `ip -j link`/`addr` into one host's interfaces, bridges, bonds and VLANs; `csvlinks.py` reads `device,port,device,port` rows (and says why not NetJSON); `draft.py` is the neutral inventory every reader appends to, and the dedup; `emit.py` writes it as commented YAML in `docs/schema.md` field order |
 | `src/netgraph/watch/` | live re-rendering (`netgraph watch`): `pipeline.py` is one load → validate → render cycle and its published state, `loop.py` decides what counts as a change, `server.py` is the loopback preview and its self-reloading page |

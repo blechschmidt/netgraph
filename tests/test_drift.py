@@ -37,6 +37,7 @@ import pytest
 from click.testing import CliRunner, Result
 
 from netgraph.cli import cli, main
+from netgraph.diagnostics import JUnitCase, as_junit
 from netgraph.drift import (
     CAPABILITIES,
     Capability,
@@ -62,7 +63,6 @@ from netgraph.importer import (
     ImportSourceError,
 )
 from netgraph.loader import Inventory, load_tree
-from netgraph.report import JUnitCase, as_junit
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HOME_LAB = REPO_ROOT / "examples" / "home-lab"

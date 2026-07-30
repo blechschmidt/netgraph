@@ -1,0 +1,16 @@
+{% extends "layout.html.j2" %}
+{% import "macros.html.j2" as m %}
+{% block breadcrumb %}
+<nav class="breadcrumb">
+<a href="{{ link(report.overview.path) }}">{{ meta.title }}</a>
+{% if page.parent and page.parent != report.overview.path %}
+· <a href="{{ link(page.parent) }}">site</a>
+{% endif %}
+</nav>
+{% endblock %}
+{% block body %}
+{{ m.contents(page) }}
+{% for section in page.sections %}
+{{ m.section(section, link) }}
+{% endfor %}
+{% endblock %}

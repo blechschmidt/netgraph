@@ -100,6 +100,7 @@ __all__ = [
     "bundle_links",
     "collapse_namespaces",
     "collapse_targets",
+    "common_prefix",
 ]
 
 #: ``kind`` reported for a collapsed-namespace node. The eight element kinds of
@@ -321,7 +322,7 @@ def _depth_targets(graph: Graph, depth: int | None) -> tuple[str, ...]:
     namespaces = [node.namespace for node in graph.nodes.values() if _has_namespace(node)]
     if not namespaces:
         return ()
-    wanted = len(_common_prefix(namespaces)) + depth
+    wanted = len(common_prefix(namespaces)) + depth
     targets = [
         "/".join(parts[:wanted])
         for namespace in namespaces
@@ -339,7 +340,7 @@ def _has_namespace(node: Node) -> bool:
     return not node.is_subnet
 
 
-def _common_prefix(namespaces: Sequence[str]) -> tuple[str, ...]:
+def common_prefix(namespaces: Sequence[str]) -> tuple[str, ...]:
     """The namespace components every one of ``namespaces`` starts with.
 
     A namespace that *is* the whole prefix contributes no target of its own —

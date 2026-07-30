@@ -74,7 +74,6 @@ from __future__ import annotations
 
 import csv
 import io
-import itertools
 import json
 import sys
 import threading
@@ -111,6 +110,10 @@ from netgraph.config import (
     load_config,
 )
 from netgraph.console import Align, Console
+from netgraph.diagnostics import FORMATS as DIAGNOSTIC_FORMATS
+from netgraph.diagnostics import Diagnostic
+from netgraph.diagnostics import build_report as build_diagnostics
+from netgraph.diagnostics import render_report as render_diagnostics
 from netgraph.drift import FORMATS as DRIFT_FORMATS
 from netgraph.drift import CompareSpec, DriftReport, check_drift, render_drift
 from netgraph.drift import write_text as write_drift
@@ -119,7 +122,6 @@ from netgraph.errors import (
     LoaderError,
     NetgraphError,
     RenderError,
-    compact_ids,
     format_path,
 )
 from netgraph.export import (
@@ -156,6 +158,9 @@ from netgraph.ipam import (
 )
 from netgraph.ipam import Report as IpamReport
 from netgraph.ipam import build_report as build_ipam_report
+from netgraph.listing import LISTINGS
+from netgraph.listing import SUBJECTS as LISTING_SUBJECTS
+from netgraph.listing import utilisation as utilisation_listing
 from netgraph.loader import (
     DISABLE_ENV_VAR,
     YAML_SUFFIXES,
@@ -171,10 +176,9 @@ from netgraph.loader import (
     load_tree,
     open_cache,
     read_documents,
+    subset,
 )
-from netgraph.loader.inventory import short_name
-from netgraph.models import DOCUMENT_KINDS, Adapter, Device, Element, format_bitrate, format_watts
-from netgraph.power import format_utilisation_percent, power_plan
+from netgraph.models import DOCUMENT_KINDS, Element
 from netgraph.render import (
     DEFAULT_RANKDIR,
     FORMATS,
@@ -203,7 +207,6 @@ from netgraph.render import (
     rack_formats,
     render,
     render_layers,
-    resolve_tunnels,
     supports_highlight,
     supports_icons,
     supports_interaction,
@@ -216,8 +219,11 @@ from netgraph.render.dot import (
     find_dot,
     graphviz_install_hint,
 )
+from netgraph.report import EPOCH_ENV_VAR, Bundle, git_revision, resolve_timestamp
 from netgraph.report import FORMATS as REPORT_FORMATS
-from netgraph.report import Diagnostic, build_report, render_report
+from netgraph.report import JSON_FILE as REPORT_JSON_FILE
+from netgraph.report import Options as ReportOptions
+from netgraph.report import generate as generate_report
 from netgraph.rules import RULES, Severity
 from netgraph.scaffold import SCHEMA_FILE_NAME, build_scaffold, write_scaffold
 from netgraph.schema import build_schema
@@ -939,7 +945,7 @@ def _drift_summary(report: DriftReport) -> str:
 @click.option(
     "-F",
     "--output-format",
-    type=click.Choice(REPORT_FORMATS),
+    type=click.Choice(DIAGNOSTIC_FORMATS),
     default="text",
     show_default=True,
     help="text is for reading; json, sarif and github are for CI.",
@@ -967,11 +973,11 @@ def validate_command(
     if output_format == "text":
         _report_problems(app.console(), inventory.errors, findings)
     else:
-        report = build_report(inventory, findings)
+        report = build_diagnostics(inventory, findings)
         # The summary is commentary once the document is the output, so it goes
         # to stderr through ``info`` -- which is what ``--quiet`` silences.
         _report_problems(app.console(), inventory.errors, findings, commentary=True)
-        document = render_report(report, output_format)
+        document = render_diagnostics(report, output_format)
         # A clean inventory emits no workflow commands at all; printing the
         # empty string would put a stray blank line in the build log.
         if document:
@@ -1459,6 +1465,11 @@ def _path_options(command: _Command) -> _Command:
     return _apply((*_DISPLAY_OPTIONS, *_VALIDATION_OPTIONS, *_CONFIG_OPTIONS), command)
 
 
+def _report_flags(command: _Command) -> _Command:
+    """Apply the options ``report`` shares: the filters, then the validation flags."""
+    return _apply((*_FILTER_OPTIONS, *_VALIDATION_OPTIONS), command)
+
+
 def _filter_spec(params: Mapping[str, Any]) -> FilterSpec:
     """Build the element filter from the parsed :data:`_GRAPH_OPTIONS`."""
     return FilterSpec(
@@ -1863,15 +1874,7 @@ def _build_graph(
     try:
         filtered = filter_graph(graph, spec)
     except UnknownElementError as exc:
-        hint = (
-            f" Did you mean one of: {', '.join(exc.candidates)}?"
-            if exc.candidates
-            else " Run 'netgraph list devices' to see what is declared."
-        )
-        raise click.BadParameter(
-            f"no element named {exc.name!r} in this inventory.{hint}",
-            param_hint="'--neighbors-of'",
-        ) from exc
+        raise _unknown_element(exc) from exc
 
     if aggregate is not None and not aggregate.is_empty:
         app.log(f"aggregating: {aggregate.describe()}", level=1)
@@ -1884,6 +1887,23 @@ def _build_graph(
         level=1,
     )
     return filtered
+
+
+def _unknown_element(exc: UnknownElementError) -> click.BadParameter:
+    """The usage error for a ``--neighbors-of`` that names nothing.
+
+    One wording for every command that filters a graph, so a typo is explained
+    the same way whether it was typed at ``render`` or at ``report``.
+    """
+    hint = (
+        f" Did you mean one of: {', '.join(exc.candidates)}?"
+        if exc.candidates
+        else " Run 'netgraph list devices' to see what is declared."
+    )
+    return click.BadParameter(
+        f"no element named {exc.name!r} in this inventory.{hint}",
+        param_hint="'--neighbors-of'",
+    )
 
 
 def _report_collapse(console: Console, graph: Graph, spec: AggregateSpec) -> None:
@@ -2663,7 +2683,7 @@ def _open_browser(app: AppContext, url: str) -> None:
 @cli.command("list")
 @click.argument(
     "what",
-    type=click.Choice(["devices", "cables", "tunnels", "vlans", "bss", "subnets", "power"]),
+    type=click.Choice(LISTING_SUBJECTS),
     default="devices",
     required=False,
 )
@@ -2682,378 +2702,13 @@ def list_command(app: AppContext, what: str, output_format: str) -> None:
     inventory = app.load()
     _warn_about_load_errors(console, inventory)
 
-    headers, aligns, rows, records = _LISTINGS[what](inventory)
+    listing = LISTINGS[what](inventory)
     if output_format == "table":
-        console.table(headers, rows, aligns=aligns, empty=f"no {what} declared")
+        console.table(
+            listing.headers, listing.rows, aligns=listing.aligns, empty=f"no {what} declared"
+        )
     else:
-        console.print(_serialise(records, output_format).rstrip("\n"))
-
-
-#: One listing: column headers, alignment, table rows, and the same data as
-#: records for the machine-readable formats.
-_Listing = tuple[
-    tuple[str, ...],
-    tuple[Align, ...],
-    list[list[str]],
-    list[dict[str, Any]],
-]
-
-
-def _list_devices(inventory: Inventory) -> _Listing:
-    graph = build_graph(inventory)
-    rows: list[list[str]] = []
-    records: list[dict[str, Any]] = []
-    for node in graph.nodes.values():
-        # The table has room for one address, so it shows the one that says
-        # where the element sits: every host also has 127.0.0.1 and ::1.
-        addresses = node.routable_addresses
-        rows.append(
-            [
-                node.fqn,
-                node.kind,
-                str(len(node.ports)),
-                addresses[0] if addresses else "-",
-                compact_ids(node.vlans) or "-",
-            ]
-        )
-        records.append(
-            {
-                "name": node.fqn,
-                "shortName": node.name,
-                "kind": node.kind,
-                "namespace": node.namespace,
-                "interfaces": len(node.ports),
-                "addresses": list(addresses),
-                "vlans": sorted(node.vlans),
-                "source": str(inventory.source_of(node.fqn) or ""),
-            }
-        )
-    headers = ("NAME", "KIND", "PORTS", "ADDRESS", "VLANS")
-    aligns: tuple[Align, ...] = ("left", "left", "right", "left", "left")
-    return headers, aligns, rows, records
-
-
-def _list_cables(inventory: Inventory) -> _Listing:
-    rows: list[list[str]] = []
-    records: list[dict[str, Any]] = []
-    for fqn, cable in inventory.cables.items():
-        left, right = cable.endpoints
-        speed = format_bitrate(cable.spec.speed) if cable.spec.speed is not None else "-"
-        rows.append(
-            [
-                fqn,
-                cable.spec.medium.value,
-                speed,
-                str(left),
-                str(right),
-                _length(cable.spec.length_m),
-            ]
-        )
-        records.append(
-            {
-                "name": fqn,
-                "medium": cable.spec.medium.value,
-                "speed": cable.spec.speed,
-                "duplex": cable.spec.duplex.value,
-                "endpoints": [str(left), str(right)],
-                "lengthM": cable.spec.length_m,
-                "label": cable.spec.label,
-                "source": str(inventory.source_of(fqn) or ""),
-            }
-        )
-    headers = ("NAME", "MEDIUM", "SPEED", "A END", "B END", "LENGTH")
-    aligns: tuple[Align, ...] = ("left", "left", "right", "left", "left", "right")
-    return headers, aligns, rows, records
-
-
-def _list_tunnels(inventory: Inventory) -> _Listing:
-    """Every tunnel, with its encapsulation stack and what protects it.
-
-    The stack comes from :func:`~netgraph.render.graph.resolve_tunnels`, the
-    same resolution ``render --layer overlay`` draws, so the listing and the
-    diagram cannot disagree about what runs inside what. A tunnel whose
-    endpoints do not resolve is still listed — the reader is most likely running
-    this command *because* something is wrong — with its stack left at its own
-    type.
-    """
-    views = {view.fqn: view for view in resolve_tunnels(inventory)[0]}
-    rows: list[list[str]] = []
-    records: list[dict[str, Any]] = []
-    for fqn, tunnel in inventory.tunnels.items():
-        spec = tunnel.spec
-        view = views.get(fqn)
-        stack = view.stack_text if view is not None else spec.type.value
-        protection = "yes" if tunnel.encrypts else ("underlay" if view and view.protected else "no")
-        rows.append(
-            [
-                fqn,
-                stack,
-                str(spec.vni) if spec.vni is not None else "-",
-                protection,
-                str(len(spec.endpoints)),
-                ", ".join(str(ref) for ref in spec.endpoints),
-            ]
-        )
-        records.append(
-            {
-                "name": fqn,
-                "type": spec.type.value,
-                "stack": list(view.stack) if view is not None else [spec.type.value],
-                "layer": spec.type.layer,
-                "over": view.over if view is not None else spec.over,
-                "vni": spec.vni,
-                "encrypted": tunnel.encrypts,
-                "protected": view.protected if view is not None else tunnel.encrypts,
-                "transport": spec.type.transport.value,
-                "port": spec.port,
-                "mtu": spec.mtu,
-                "endpoints": [str(ref) for ref in spec.endpoints],
-                "source": str(inventory.source_of(fqn) or ""),
-            }
-        )
-    headers = ("NAME", "STACK", "VNI", "ENCRYPTED", "ENDS", "ENDPOINTS")
-    aligns: tuple[Align, ...] = ("left", "left", "right", "left", "right", "left")
-    return headers, aligns, rows, records
-
-
-def _list_bss(inventory: Inventory) -> _Listing:
-    """Every BSS the inventory declares: the wireless side of ``list vlans``.
-
-    One row per SSID per radio, because that is the unit an operator works with
-    — a dual-band access point serving three networks has six of them, and each
-    has its own BSSID, its own VLAN and possibly its own security. Client radios
-    are listed too, with their role, so that "who is on the guest network?" is a
-    question the listing can answer.
-    """
-    rows: list[list[str]] = []
-    records: list[dict[str, Any]] = []
-    owners: Iterable[tuple[str, Device | Adapter]] = itertools.chain(
-        inventory.devices.items(), inventory.adapters.items()
-    )
-    for fqn, owner in owners:
-        for interface in owner.interfaces:
-            wireless = interface.wireless
-            if wireless is None:
-                continue
-            for entry in wireless.bss:
-                rows.append(
-                    [
-                        entry.ssid + (" (hidden)" if entry.hidden else ""),
-                        f"{fqn}:{interface.name}",
-                        wireless.role.value,
-                        wireless.channel_text or "-",
-                        entry.bssid or "-",
-                        str(entry.vlan) if entry.vlan is not None else "-",
-                        entry.security.value if entry.security is not None else "-",
-                    ]
-                )
-                records.append(
-                    {
-                        "ssid": entry.ssid,
-                        "element": fqn,
-                        "interface": interface.name,
-                        "role": wireless.role.value,
-                        "band": wireless.band.value if wireless.band is not None else None,
-                        "channel": wireless.channel,
-                        "widthMhz": wireless.width_mhz,
-                        "txPowerDbm": wireless.tx_power_dbm,
-                        "bssid": entry.bssid,
-                        "vlan": entry.vlan,
-                        "security": entry.security.value if entry.security is not None else None,
-                        "hidden": entry.hidden,
-                        "source": str(inventory.source_of(fqn) or ""),
-                    }
-                )
-    headers = ("SSID", "RADIO", "ROLE", "CHANNEL", "BSSID", "VLAN", "SECURITY")
-    aligns: tuple[Align, ...] = ("left", "left", "left", "left", "left", "right", "left")
-    return headers, aligns, rows, records
-
-
-def _list_vlans(inventory: Inventory) -> _Listing:
-    """Every VLAN, with the elements that participate in it.
-
-    Membership comes from the graph, so a host on an untagged access port counts
-    as a member of that VLAN even though it declares no ``vlan`` block itself.
-    """
-    graph = build_graph(inventory)
-    names: dict[int, str] = {}
-    for device in inventory.devices.values():
-        for definition in device.spec.vlans:
-            if definition.name and definition.id not in names:
-                names[definition.id] = definition.name
-
-    members: dict[int, list[str]] = {}
-    ports: dict[int, int] = {}
-    for node in graph.nodes.values():
-        for vlan in node.vlans:
-            members.setdefault(vlan, []).append(node.fqn)
-        for port in node.ports:
-            for vlan in port.vlans:
-                ports[vlan] = ports.get(vlan, 0) + 1
-
-    rows: list[list[str]] = []
-    records: list[dict[str, Any]] = []
-    for vlan in sorted(members):
-        elements = members[vlan]
-        rows.append([str(vlan), names.get(vlan, "-"), str(len(elements)), str(ports.get(vlan, 0))])
-        records.append(
-            {
-                "id": vlan,
-                "name": names.get(vlan),
-                "elements": elements,
-                "interfaces": ports.get(vlan, 0),
-            }
-        )
-    headers = ("VLAN", "NAME", "ELEMENTS", "PORTS")
-    aligns: tuple[Align, ...] = ("right", "left", "right", "right")
-    return headers, aligns, rows, records
-
-
-def _list_subnets(inventory: Inventory) -> _Listing:
-    """Every prefix an address sits in, with the elements holding one.
-
-    The grouping is :func:`~netgraph.subnets.subnets_of`, the same one
-    ``render --layer l3`` draws and the same one ``W105``/``W106`` are about, so
-    the listing and the diagram cannot disagree. Loopback and link-local
-    prefixes are left out there: they are scoped to a single host or a single
-    link, so listing ``127.0.0.0/8`` once per machine would say nothing about
-    the addressing plan this command exists to show.
-
-    A ``VRF`` column appears only when something is in one (§16.1). Two routing
-    instances may hold the same prefix, and without the column the two rows would
-    be indistinguishable; adding it unconditionally would put an empty column in
-    front of every inventory that has no VRF, which is nearly all of them.
-    """
-    subnets = subnets_of(inventory)
-    partitioned = any(subnet.vrf for subnet in subnets)
-    rows: list[list[str]] = []
-    records: list[dict[str, Any]] = []
-    for subnet in subnets:
-        vlans = sorted(subnet.vlans)
-        rows.append(
-            [
-                *([subnet.vrf or "-"] if partitioned else []),
-                subnet.prefix,
-                str(subnet.version),
-                str(len(subnet.addresses)),
-                str(len(subnet.elements)),
-                compact_ids(vlans) or "-",
-            ]
-        )
-        record: dict[str, Any] = {
-            "subnet": subnet.prefix,
-            "family": subnet.family,
-            "addresses": list(subnet.addresses),
-            "elements": list(subnet.elements),
-            "vlans": vlans,
-        }
-        if subnet.vrf:
-            record["vrf"] = subnet.vrf
-        records.append(record)
-    headers = (
-        *(("VRF",) if partitioned else ()),
-        "SUBNET",
-        "IP",
-        "ADDRESSES",
-        "ELEMENTS",
-        "VLANS",
-    )
-    aligns: tuple[Align, ...] = (
-        *(("left",) if partitioned else ()),
-        "left",
-        "right",
-        "right",
-        "right",
-        "left",
-    )
-    return headers, aligns, rows, records
-
-
-def _list_power(inventory: Inventory) -> _Listing:
-    """One row per PDU: its outlets, its load and how full it is (§17.6).
-
-    Shaped after the ``netgraph ipam`` utilisation table, and for the same
-    reason: the question is capacity planning, so the columns are what is there,
-    what is used, what is left, and the percentage that decides whether anybody
-    has to act.
-
-    Two load columns rather than one. ``LOAD`` is the normal-operation figure —
-    each dual-corded device drawing half its watts through each cord — and is what
-    ``E039`` grades. ``FAILOVER`` is what this unit carries when the other one in
-    the pair dies, each load counted whole. A single-fed rack has the two the
-    same; an A/B pair does not, and the gap between them *is* the redundancy plan.
-    """
-    plan = power_plan(inventory)
-    rows: list[list[str]] = []
-    records: list[dict[str, Any]] = []
-    for load in plan.pdus:
-        rows.append(
-            [
-                short_name(load.pdu),
-                load.input_feed or "-",
-                str(load.outlet_count),
-                str(load.used_outlets),
-                str(load.free_outlets),
-                format_watts(load.capacity_watts) if load.capacity_watts is not None else "-",
-                format_watts(load.load_watts),
-                format_watts(load.failover_watts),
-                format_utilisation_percent(load.utilisation),
-                str(len(load.elements)),
-            ]
-        )
-        record: dict[str, Any] = {
-            "pdu": load.pdu,
-            "name": load.name,
-            "inputFeed": load.input_feed,
-            "outlets": load.outlet_count,
-            "usedOutlets": load.used_outlets,
-            "freeOutlets": load.free_outlets,
-            "loadWatts": round(load.load_watts, 3),
-            "failoverWatts": round(load.failover_watts, 3),
-            "elements": list(load.elements),
-        }
-        if load.capacity_watts is not None:
-            record["capacityWatts"] = load.capacity_watts
-            record["freeWatts"] = round(load.capacity_watts - load.load_watts, 3)
-        if load.utilisation is not None:
-            record["utilisation"] = round(load.utilisation, 6)
-        records.append(record)
-    headers = (
-        "PDU",
-        "FEED",
-        "OUTLETS",
-        "USED",
-        "FREE",
-        "CAPACITY",
-        "LOAD",
-        "FAILOVER",
-        "UTIL",
-        "LOADS",
-    )
-    aligns: tuple[Align, ...] = (
-        "left",
-        "left",
-        "right",
-        "right",
-        "right",
-        "right",
-        "right",
-        "right",
-        "right",
-        "right",
-    )
-    return headers, aligns, rows, records
-
-
-_LISTINGS: Final[dict[str, Any]] = {
-    "devices": _list_devices,
-    "cables": _list_cables,
-    "tunnels": _list_tunnels,
-    "vlans": _list_vlans,
-    "bss": _list_bss,
-    "subnets": _list_subnets,
-    "power": _list_power,
-}
+        console.print(_serialise(listing.records, output_format).rstrip("\n"))
 
 
 # --------------------------------------------------------------------------- #
@@ -3352,43 +3007,19 @@ def _report_ipam(
 def _print_utilisation_table(
     console: Console, rows: Sequence[Utilisation], *, aggregated: bool
 ) -> None:
-    # A VRF column only when something is in one; see ``_list_subnets``.
-    partitioned = any(row.vrf for row in rows)
-    headers = ["PREFIX", "IP", "VLANS", "HOSTS", "USED", "FREE", "UTIL", "DEVICES"]
-    aligns: list[Align] = [
-        "left",
-        "right",
-        "left",
-        "right",
-        "right",
-        "right",
-        "right",
-        "right",
-    ]
-    if partitioned:
-        headers.insert(0, "VRF")
-        aligns.insert(0, "left")
-    if aggregated:
-        headers.append("PARTS")
-        aligns.append("right")
+    """The utilisation table, from the shared column set, coloured for a terminal.
 
-    table: list[list[str]] = []
-    for row in rows:
-        cells = [
-            *([row.vrf or "-"] if partitioned else []),
-            row.prefix,
-            str(row.version),
-            compact_ids(row.vlans) or "-",
-            format_capacity(row.capacity, host_bits=row.host_bits),
-            str(row.assigned),
-            format_capacity(row.free, host_bits=row.host_bits),
-            _utilisation_cell(console, row),
-            str(row.devices),
-        ]
-        if aggregated:
-            cells.append(str(len(row.members)) if row.is_aggregate else "-")
-        table.append(cells)
-    console.table(headers, table, aligns=aligns, empty="no addresses declared")
+    The columns and the cells are :func:`netgraph.listing.utilisation` — the same
+    ones a report's address plan carries. All this adds is the colour, which is
+    the one part that has no meaning outside a terminal.
+    """
+    listing = utilisation_listing(rows, aggregated=aggregated)
+    util = listing.headers.index("UTIL")
+    for cells, row in zip(listing.rows, rows, strict=True):
+        cells[util] = _utilisation_cell(console, row)
+    console.table(
+        listing.headers, listing.rows, aligns=listing.aligns, empty="no addresses declared"
+    )
 
 
 def _utilisation_cell(console: Console, row: Utilisation) -> str:
@@ -3868,6 +3499,276 @@ def _report_manifest(console: Console, result: ExportResult, *, manifest_path: P
         console.info(f"manifest written to {manifest_path}")
         return
     console.info(document.rstrip("\n"))
+
+
+# --------------------------------------------------------------------------- #
+# report
+# --------------------------------------------------------------------------- #
+
+#: Which layers a report draws. Deliberately not :data:`_LAYER_OPTION`: that one
+#: defaults to layer 1, and a report's default is "every layer this inventory has
+#: earned" — an inventory with no patch panel gets no cabling diagram — which is
+#: a decision :func:`~netgraph.report.layers_for` makes from the documents.
+_REPORT_LAYER_OPTION: Final[Callable[[Any], Any]] = click.option(
+    "--layer",
+    "layers",
+    multiple=True,
+    type=click.Choice([layer.value for layer in Layer]),
+    default=(),
+    shell_complete=complete_layer,
+    show_default="every layer the inventory declares something for",
+    help=(
+        "Draw this layer on every page, instead of the ones the inventory has earned. "
+        "Repeatable, and honoured verbatim: a layer with nothing in it is reported as empty "
+        "rather than dropped."
+    ),
+)
+
+
+@cli.command("report")
+@click.option(
+    "-f",
+    "--format",
+    "report_format",
+    type=click.Choice(REPORT_FORMATS),
+    default="markdown",
+    show_default=True,
+    help=(
+        "markdown is committed next to the inventory and diffed; html is one "
+        "self-contained site, where a device in a diagram links to its page; json is the "
+        "whole document in one file, for downstream tooling."
+    ),
+)
+@click.option(
+    "-o",
+    "--out",
+    "out",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help=(
+        "Directory to write the bundle into; created if absent. Required for markdown and "
+        "html, which write several files. json writes one document, and goes to stdout "
+        "when no directory is named."
+    ),
+)
+@click.option(
+    "--template",
+    "template_dir",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    default=None,
+    metavar="DIR",
+    help=(
+        "Take page templates from this directory before the bundled ones. A directory "
+        "holding only 'device.md.j2' overrides the device page and nothing else."
+    ),
+)
+@_REPORT_LAYER_OPTION
+@click.option("--title", default=None, metavar="TEXT", help="Title for the overview page.")
+@click.option(
+    "--group-depth",
+    type=click.IntRange(0),
+    default=None,
+    metavar="N",
+    show_default="1 when the namespace tree branches below the site level, else 0",
+    help=(
+        "How many namespace levels below the shared prefix one site page covers. "
+        "0 puts the whole selection on a single site page."
+    ),
+)
+@click.option(
+    "--diagrams/--no-diagrams",
+    default=True,
+    show_default=True,
+    help=(
+        "Draw the layer diagrams. Off writes the tables alone, which is faster and needs "
+        "no Graphviz; each figure then says so rather than going missing."
+    ),
+)
+@click.option(
+    "--generated-at",
+    default=None,
+    metavar="WHEN",
+    show_default=f"${EPOCH_ENV_VAR} if set, otherwise the current time",
+    help=(
+        "Pin the generated-at stamp to this ISO-8601 timestamp, or to 'none' to leave it "
+        "out. The stamp is the only part of a report that is not a function of the "
+        "inventory, so pinning it is what makes two runs byte-identical."
+    ),
+)
+@click.option(
+    "--revision",
+    default=None,
+    metavar="REV",
+    show_default="the inventory's git commit, when it is in a work tree",
+    help="Record this as the inventory's revision instead of asking git for it.",
+)
+@click.option(
+    "--prune",
+    is_flag=True,
+    default=False,
+    help=(
+        "Delete the .md, .html, .svg and .json files in --out that this report does not "
+        "write — the pages of an element that has since been deleted. They are reported "
+        "either way."
+    ),
+)
+@_report_flags
+@click.pass_context
+def report_command(
+    ctx: click.Context,
+    /,
+    report_format: str,
+    out: Path | None,
+    template_dir: Path | None,
+    title: str | None,
+    group_depth: int | None,
+    diagrams: bool,
+    generated_at: str | None,
+    revision: str | None,
+    prune: bool,
+    **_options: Any,
+) -> None:
+    """Write the as-built documentation of an inventory.
+
+    An overview, a page per site and a page per element: identity and placement,
+    interfaces with their addresses and VLANs, the cables and tunnels that
+    terminate on the element, its routing, the address plan with utilisation, the
+    VLAN matrix, the cable schedule, the patch-panel port maps, the wireless plan
+    and the open validation findings — every table from the same derivation the
+    matching command prints, so no two pages can disagree.
+
+    The output is deterministic: two runs over one inventory produce the same
+    bytes, so a report can be committed and reviewed as a diff. Pin
+    --generated-at to make that literally true.
+    """
+    app: AppContext = ctx.obj
+    params = ctx.params
+    console = app.console(err=True)
+
+    if out is None and report_format != "json":
+        raise click.UsageError(
+            f"{report_format} output is a directory of pages; name one with '--out DIR'. "
+            "Only '-f json' writes a single document and can go to stdout."
+        )
+
+    inventory = app.load()
+    findings = _run_validation(app, inventory, strict=bool(params["strict"]))
+    if _is_rejected(inventory, findings):
+        _report_problems(console, inventory.errors, findings, commentary=True)
+        if not params["force"]:
+            console.error(
+                "refusing to document an inventory with errors; fix them, or pass --force to "
+                "write the report anyway (the findings are part of it either way)"
+            )
+            raise click.exceptions.Exit(EXIT_INVALID)
+        console.warn("documenting despite errors (--force): the report may not match the network")
+    elif findings:
+        _report_problems(console, (), findings, commentary=True)
+
+    spec = _filter_spec(params)
+    selection = _report_selection(app, inventory, spec)
+    found_revision, revision_state = _revision(app, inventory.root, revision)
+    options = ReportOptions(
+        format=report_format,
+        layers=tuple(dict.fromkeys(Layer(value) for value in params["layers"])),
+        title=title or "",
+        group_depth=group_depth,
+        diagrams=diagrams,
+        generated_at=resolve_timestamp(generated_at or ""),
+        scope=spec.describe() if not spec.is_empty else "the whole inventory",
+        revision=found_revision,
+        revision_state=revision_state,
+    )
+    bundle, drawings = generate_report(
+        selection,
+        options=options,
+        diagnostics=build_diagnostics(inventory, findings).diagnostics,
+        full=inventory,
+        templates=template_dir,
+    )
+
+    for problem in drawings.problems:
+        console.warn(f"a layer could not be drawn: {problem}")
+    if out is None:
+        _write_output(bundle.files[REPORT_JSON_FILE], output=None)
+        return
+    stale = bundle.write(out, prune=prune)
+    _report_bundle(console, bundle, out=out, stale=stale, pruned=prune)
+
+
+def _revision(app: AppContext, root: Path, given: str | None) -> tuple[str, str]:
+    """``(revision, state)``: ``--revision``, or what git says about the inventory.
+
+    An explicit value is trusted as written and its state is ``given``: it usually
+    comes from a pipeline that knows the commit better than a work tree does — a
+    tag, or the revision the checkout was made from. An empty ``--revision``
+    suppresses the line, which is what a report generated outside version control
+    wants to say.
+    """
+    if given is not None:
+        return (given, "given" if given else "")
+    # ``git -C`` wants a directory: a single-file inventory is still in whatever
+    # work tree its file sits in.
+    found = git_revision(root if root.is_dir() else root.parent)
+    if found is None:
+        app.log("no git revision for the inventory; the report will say so", level=1)
+        return ("", "")
+    return (found.commit, found.state)
+
+
+def _report_selection(app: AppContext, inventory: Inventory, spec: FilterSpec) -> Inventory:
+    """The inventory narrowed to what the filters select.
+
+    The filters are graph filters (``--vlan`` and ``--neighbors-of`` are only
+    answerable from a topology), and a report documents *elements* — so they are
+    applied to the graphs and the surviving elements become the inventory every
+    page is then built from. The union of three layers, because no single one
+    holds every kind of element: a patch panel is spliced out above the cabling, a
+    PDU only exists in the power view, and a tunnel's endpoints only meet in the
+    overlay.
+
+    Raises:
+        click.BadParameter: ``--neighbors-of`` names no element in any layer.
+    """
+    if spec.is_empty:
+        return inventory
+
+    app.log(f"applying filters: {spec.describe()}", level=1)
+    selected: set[str] = set()
+    unknown: UnknownElementError | None = None
+    for layer in (Layer.PHYSICAL, Layer.OVERLAY, Layer.POWER):
+        try:
+            filtered = filter_graph(build_graph(inventory, layer=layer), spec)
+        except UnknownElementError as exc:
+            unknown = unknown or exc
+            continue
+        selected.update(fqn for fqn, node in filtered.nodes.items() if node.is_element)
+    if not selected and unknown is not None:
+        raise _unknown_element(unknown)
+    app.log(f"the filters select {len(selected)} element(s)", level=1)
+    # The cables and tunnels are offered rather than selected: ``subset`` keeps
+    # each one only where everything it joins survived, which is the same rule a
+    # site page is built with. Selecting them by name instead would leave a
+    # scoped report with no cabling record at all.
+    return subset(inventory, selected | set(inventory.cables) | set(inventory.tunnels))
+
+
+def _report_bundle(
+    console: Console, bundle: Bundle, *, out: Path, stale: Sequence[str], pruned: bool
+) -> None:
+    """Say what was written, and what was already there and is not part of it."""
+    console.info(
+        f"wrote {_plural(len(bundle.files), 'file')} ({format_bytes(bundle.size)}) to {out}"
+    )
+    if not stale:
+        return
+    verb = "deleted" if pruned else "left in place"
+    console.warn(
+        f"{_plural(len(stale), 'file')} in {out} {'is' if len(stale) == 1 else 'are'} not part "
+        f"of this report and {verb}: {', '.join(stale[:5])}"
+        + (f" and {len(stale) - 5} more" if len(stale) > 5 else "")
+        + ("" if pruned else ". Pass --prune to remove them.")
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -4415,12 +4316,6 @@ def _serialise(payload: Any, output_format: str) -> str:
     if output_format == "json":
         return json.dumps(payload, indent=2, ensure_ascii=False)
     return yaml.safe_dump(payload, sort_keys=False, default_flow_style=False, allow_unicode=True)
-
-
-def _length(metres: float | None) -> str:
-    if metres is None:
-        return "-"
-    return f"{int(metres)}m" if float(metres).is_integer() else f"{metres}m"
 
 
 def _plural(count: int, noun: str) -> str:

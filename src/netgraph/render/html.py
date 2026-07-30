@@ -21,7 +21,7 @@ The only URLs a page can hold are the ones ``--link-template`` was asked for,
 and those are links a reader clicks, not resources the page loads.
 
 That is enforced rather than promised: the document ships its own strict
-:func:`Content-Security-Policy <_policy>` in a ``<meta>``, built from the
+:func:`Content-Security-Policy <policy>` in a ``<meta>``, built from the
 SHA-256 of each inline block, so a page that grew a fetch would be refused by
 the browser rather than quietly making one. Nothing in the client needs ``eval``
 or ``new Function``, and no markup is ever assigned from a record — see
@@ -121,7 +121,7 @@ from netgraph.render.graph import Graph, Layer
 from netgraph.render.ids import element_ids
 from netgraph.render.options import RenderOptions
 
-__all__ = ["PAGE_KIND", "html_document", "to_html"]
+__all__ = ["PAGE_KIND", "asset_text", "html_document", "policy", "to_html"]
 
 #: ``kind`` of the document embedded in the page, mirroring the element
 #: envelope of §3 and the ``NetworkGraph`` of the JSON exporter. A consumer
@@ -234,8 +234,8 @@ def html_document(graphs: Sequence[Graph], options: RenderOptions | None = None)
         layers.append(entry)
 
     title = printable(opts.title or graphs[0].root.name or _FALLBACK_TITLE)
-    style = _asset_text(_STYLES)
-    script = _asset_text(_SCRIPTS)
+    style = asset_text(_STYLES)
+    script = asset_text(_SCRIPTS)
     data = _script_json(
         {
             "apiVersion": API_VERSION,
@@ -257,7 +257,7 @@ def html_document(graphs: Sequence[Graph], options: RenderOptions | None = None)
         _environment()
         .get_template("page.html.j2")
         .render(
-            csp=_policy(style, (data, script)),
+            csp=policy(style, (data, script)),
             generator=_generator(),
             title=title,
             style=Markup(style),
@@ -404,8 +404,8 @@ def _generator() -> str:
     return f"netgraph {__version__}"
 
 
-def _policy(style: str, scripts: Iterable[str]) -> str:
-    """The page's own Content-Security-Policy, by hash of what it inlines.
+def policy(style: str, scripts: Iterable[str] = ()) -> str:
+    """A page's own Content-Security-Policy, by hash of what it inlines.
 
     A self-contained page has to inline its script and its style, and the usual
     way to allow that — ``'unsafe-inline'`` — allows *any* inline script,
@@ -418,7 +418,11 @@ def _policy(style: str, scripts: Iterable[str]) -> str:
     page genuinely holds — inline pictures (an ``--icons`` theme, embedded as
     ``data:`` URIs) and its own two blocks.
     """
-    sources = " ".join(_hash(text) for text in scripts)
+    hashes = [_hash(text) for text in scripts]
+    # A page with no script at all -- every page ``netgraph report`` writes --
+    # says so, rather than emitting an empty ``script-src`` an implementation
+    # would be free to read as "no restriction".
+    sources = " ".join(hashes) if hashes else "'none'"
     return (
         f"default-src 'none'; img-src data:; style-src {_hash(style)}; "
         f"script-src {sources}; base-uri 'none'; form-action 'none'"
@@ -432,15 +436,16 @@ def _hash(text: str) -> str:
 
 
 @cache
-def _asset_text(names: tuple[str, ...]) -> str:
-    """The named files in ``netgraph/render/assets``, concatenated.
+def asset_text(names: tuple[str, ...], *, package: str = "netgraph.render") -> str:
+    """The named files in ``<package>/assets``, concatenated.
 
     Cached: ``netgraph watch -f html`` re-renders on every save, and the files
-    do not change between two of them.
+    do not change between two of them. ``package`` is a parameter because
+    ``netgraph report`` inlines its own style sheet the same way, out of its own
+    package, and the caching and the joining are the parts worth sharing.
     """
     return "\n".join(
-        (resources.files("netgraph.render") / "assets" / name).read_text(encoding="utf-8")
-        for name in names
+        (resources.files(package) / "assets" / name).read_text(encoding="utf-8") for name in names
     )
 
 

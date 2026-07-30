@@ -35,7 +35,7 @@ from typing import Any
 
 import pytest
 
-from netgraph.report import LOAD_RULE
+from netgraph.diagnostics import LOAD_RULE
 from netgraph.rules import RULES
 
 REPO_ROOT = Path(__file__).resolve().parent.parent

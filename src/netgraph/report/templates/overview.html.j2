@@ -1,0 +1,9 @@
+{% extends "layout.html.j2" %}
+{% import "macros.html.j2" as m %}
+{% block body %}
+{{ m.provenance(meta) }}
+{{ m.contents(page) }}
+{% for section in page.sections %}
+{{ m.section(section, link) }}
+{% endfor %}
+{% endblock %}

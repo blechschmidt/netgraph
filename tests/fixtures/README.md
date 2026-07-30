@@ -16,7 +16,7 @@ check the document `netgraph validate --output-format sarif` emits.
 
 * **Source:** <https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json>
   — the same URL netgraph puts in the `$schema` of every log it emits
-  (`netgraph.report.SARIF_SCHEMA_URL`), so the tests check the document against
+  (`netgraph.diagnostics.SARIF_SCHEMA_URL`), so the tests check the document against
   what it claims to be. Byte-identical to the copy in the
   [OASIS SARIF TC](https://github.com/oasis-tcs/sarif-spec) repository.
 * **Licence:** the [OASIS IPR Policy](https://www.oasis-open.org/policies-guidelines/ipr/).

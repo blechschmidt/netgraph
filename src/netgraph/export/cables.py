@@ -49,7 +49,7 @@ from netgraph.loader.inventory import namespace_of, short_name
 from netgraph.models import Cable
 from netgraph.render.graph import Edge, EdgeKind, Graph, Layer, Node
 
-__all__ = ["COLUMNS", "emit"]
+__all__ = ["COLUMNS", "End", "Row", "emit", "schedule"]
 
 #: The columns, in the one order both output styles use. ``A`` and ``B`` are the
 #: cable's two endpoints in the canonical order §7.1 stores them in, so a run
@@ -87,7 +87,7 @@ _PANEL_KINDS: Final = frozenset({"patchpanel"})
 
 
 @dataclass(frozen=True, slots=True)
-class _End:
+class End:
     """One end of a run, as far as the inventory places it."""
 
     element: str
@@ -122,7 +122,7 @@ class _End:
 
 
 @dataclass(frozen=True, slots=True)
-class _Row:
+class Row:
     """One line of the pull list."""
 
     run: str
@@ -134,8 +134,8 @@ class _Row:
     connector: str
     speed: str
     length: str
-    a: _End
-    b: _End
+    a: End
+    b: End
 
     def cells(self) -> tuple[str, ...]:
         return (
@@ -169,8 +169,19 @@ class _Row:
         return (self.a.sort_key, self.b.sort_key, self.cable)
 
 
-def emit(context: ExportContext) -> str:
-    """Render the pull list as CSV or as a Markdown table."""
+def schedule(context: ExportContext) -> tuple[Row, ...]:
+    """The pull list as rows, in rack order, before any of it is formatted.
+
+    Split out of :func:`emit` because the cable schedule of a site page in a
+    ``netgraph report`` is this same list of runs in this same order — the whole
+    point of the artefact is that an installer and a document agree about which
+    cable goes where, and they can only agree if there is one derivation of it.
+    What each front end differs in is the *serialisation*: CSV for a spreadsheet,
+    a Markdown table for a ticket, a styled table for a report page.
+
+    The recorder is filled in as a side effect, so a caller that wants to know
+    what the list does not hold reads ``context.recorder`` afterwards.
+    """
     physical = context.at(Layer.PHYSICAL)
     runs = _runs(context.at(Layer.L1))
     recorder = context.recorder
@@ -187,7 +198,12 @@ def emit(context: ExportContext) -> str:
     recorder.considered = len(context.inventory.cables)
     recorder.emitted = len(rows)
     _record_missing(context, physical, {row.cable for row in rows})
+    return tuple(rows)
 
+
+def emit(context: ExportContext) -> str:
+    """Render the pull list as CSV or as a Markdown table."""
+    rows = schedule(context)
     if context.options.table_format == "markdown":
         return _markdown(rows, context)
     return _csv(rows)
@@ -198,11 +214,11 @@ def emit(context: ExportContext) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def _row(edge: Edge, nodes: Mapping[str, Node], runs: Mapping[str, tuple[str, str]]) -> _Row:
+def _row(edge: Edge, nodes: Mapping[str, Node], runs: Mapping[str, tuple[str, str]]) -> Row:
     cable = edge.cable
     spec = cable.spec if cable is not None else None
     run, segment = runs.get(edge.id, ("", ""))
-    return _Row(
+    return Row(
         run=run,
         segment=segment,
         cable=edge.id,
@@ -222,11 +238,11 @@ def _unit(position: int | None) -> str:
     return "" if position is None else str(position)
 
 
-def _end(node: Node | None, fqn: str, port: str) -> _End:
+def _end(node: Node | None, fqn: str, port: str) -> End:
     if node is None:  # pragma: no cover - filter_graph keeps both ends or neither
-        return _End(element=fqn, port=port, kind="", site="", room="", rack="", unit=None)
+        return End(element=fqn, port=port, kind="", site="", room="", rack="", unit=None)
     site, room, rack, position, _ = location_of(node)
-    return _End(
+    return End(
         element=fqn, port=port, kind=node.kind, site=site, room=room, rack=rack, unit=position
     )
 
@@ -332,7 +348,7 @@ def _both_ends_present(
 # --------------------------------------------------------------------------- #
 
 
-def _csv(rows: Sequence[_Row]) -> str:
+def _csv(rows: Sequence[Row]) -> str:
     """RFC 4180 CSV, with ``\\n`` line endings.
 
     Quoting is :mod:`csv`'s job — it is the one implementation worth trusting
@@ -352,7 +368,7 @@ def _csv(rows: Sequence[_Row]) -> str:
     return buffer.getvalue()
 
 
-def _markdown(rows: Sequence[_Row], context: ExportContext) -> str:
+def _markdown(rows: Sequence[Row], context: ExportContext) -> str:
     """A GitHub-flavoured Markdown table, for a ticket or a printed sheet.
 
     Columns are padded to their widest cell so the source is readable before it

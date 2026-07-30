@@ -1,0 +1,1379 @@
+=== README.md ===
+# overlay — as-built network documentation
+
+18 element(s) across 2 site page(s), covering the whole inventory.
+
+| Fact | Value |
+|:---|:---|
+| Inventory | `overlay` |
+| Scope | the whole inventory |
+| Generated | 2026-01-31T09:00:00Z |
+| netgraph | 0.0.0-test |
+| Inventory revision | not under version control |
+
+
+<a id="contents"></a>
+
+## Sites
+
+One page per site. A site is a namespace; see --group-depth.
+
+<a id="table-sites"></a>
+
+**Site pages**
+
+| SITE | ELEMENTS | CABLES | TUNNELS | SUBNETS |
+|:---|---:|---:|---:|---:|
+| [sites](sites/sites.md) | 6 | 3 | 5 | 10 |
+| [wan](sites/wan.md) | 1 | 0 | 0 | 3 |
+
+
+<a id="diagrams"></a>
+
+## Diagrams
+
+One drawing per layer, from the same inventory as the tables below.
+
+**Physical topology** — 8 node(s), 13 link(s)
+
+![Physical topology (l1)](diagrams/overview-l1.svg)
+
+**VLANs** — 8 node(s), 13 link(s)
+
+![VLANs (l2)](diagrams/overview-l2.svg)
+
+**IP subnets** — 17 node(s), 21 link(s)
+
+![IP subnets (l3)](diagrams/overview-l3.svg)
+
+**Tunnels** — 9 node(s), 13 link(s)
+
+![Tunnels (overlay)](diagrams/overview-overlay.svg)
+
+
+<a id="findings"></a>
+
+## Validation findings
+
+<a id="table-findings"></a>
+
+**Findings**
+
+_The validator reports nothing about this inventory._
+
+These are the findings 'netgraph validate' reports for this inventory. A report is only as authoritative as the inventory behind it, so they are documented here rather than left out.
+
+
+<a id="devices"></a>
+
+## Every element
+
+One row per element, linked to its page.
+
+<a id="table-devices"></a>
+
+**Elements**
+
+| NAME | KIND | PORTS | ADDRESS | VLANS |
+|:---|:---|---:|:---|:---|
+| [sites/branch-a/pc-branch-a](devices/sites_branch-a_pc-branch-a.md) | computer | 1 | 10.20.0.10/24 | - |
+| [sites/branch-a/rtr-branch-a](devices/sites_branch-a_rtr-branch-a.md) | router | 3 | 198.51.100.6/30 | - |
+| [sites/branch-b/pc-branch-b](devices/sites_branch-b_pc-branch-b.md) | computer | 2 | 10.30.0.10/24 | - |
+| [sites/branch-b/rtr-branch-b](devices/sites_branch-b_rtr-branch-b.md) | router | 6 | 198.51.100.10/30 | 100 |
+| [sites/hq/rtr-hq](devices/sites_hq_rtr-hq.md) | router | 7 | 198.51.100.2/30 | 100 |
+| [sites/hq/srv-hq](devices/sites_hq_srv-hq.md) | server | 1 | 10.10.0.10/24 | - |
+| [wan/wan-core](devices/wan_wan-core.md) | router | 3 | 198.51.100.1/30 | - |
+| tunnel:tunnels/wg-mesh | tunnel | 0 | - | - |
+
+PORTS counts declared interfaces; ADDRESS is the address that places the element on the network, of however many it has.
+
+
+<a id="addressing"></a>
+
+## Address plan
+
+Every prefix an address sits in, and how full it is.
+
+<a id="table-subnets"></a>
+
+**Subnets**
+
+| PREFIX | IP | VLANS | HOSTS | USED | FREE | UTIL | DEVICES |
+|:---|---:|:---|---:|---:|---:|---:|---:|
+| 10.10.0.0/24 | 4 | - | 254 | 2 | 252 | 0.8% | 2 |
+| 10.20.0.0/24 | 4 | - | 254 | 2 | 252 | 0.8% | 2 |
+| 10.30.0.0/24 | 4 | - | 254 | 2 | 252 | 0.8% | 2 |
+| 10.252.0.0/30 | 4 | - | 2 | 2 | 0 | 100.0% | 2 |
+| 10.253.0.0/24 | 4 | - | 254 | 2 | 252 | 0.8% | 2 |
+| 10.254.0.0/30 | 4 | - | 2 | 2 | 0 | 100.0% | 2 |
+| 10.255.0.0/24 | 4 | - | 254 | 3 | 251 | 1.2% | 3 |
+| 198.51.100.0/30 | 4 | - | 2 | 2 | 0 | 100.0% | 2 |
+| 198.51.100.4/30 | 4 | - | 2 | 2 | 0 | 100.0% | 2 |
+| 198.51.100.8/30 | 4 | - | 2 | 2 | 0 | 100.0% | 2 |
+
+HOSTS is the usable capacity of the prefix, USED the distinct addresses declared in it. Loopback and link-local prefixes are left out: they are scoped to one host or one link and say nothing about the plan.
+
+
+<a id="vlans"></a>
+
+## VLANs
+
+Every VLAN, the prefixes carried in it and the elements that are in it.
+
+<a id="table-vlan-summary"></a>
+
+**VLANs**
+
+| VLAN | NAME | ELEMENTS | PORTS |
+|---:|:---|---:|---:|
+| 100 | overlay | 2 | 2 |
+
+Membership is derived: a host on an untagged access port counts as a member even though it declares no VLAN itself.
+
+<a id="table-vlan-matrix"></a>
+
+**VLAN, subnet and element matrix**
+
+| VLAN | NAME | ELEMENT | PORTS | MODE | SUBNETS |
+|---:|:---|:---|:---|:---|:---|
+| 100 | overlay | [rtr-branch-b](devices/sites_branch-b_rtr-branch-b.md) | vxlan100 | access | — |
+| 100 | overlay | [rtr-hq](devices/sites_hq_rtr-hq.md) | vxlan100 | access | — |
+
+A row with no port is an element that reaches the VLAN over a link rather than by configuring it — a host behind an access port, or a hub.
+
+
+<a id="tunnels"></a>
+
+## Tunnels
+
+Every overlay, with what it runs inside and what protects it.
+
+<a id="table-tunnels"></a>
+
+**Tunnels**
+
+| NAME | STACK | VNI | ENCRYPTED | ENDS | ENDPOINTS |
+|:---|:---|---:|:---|---:|:---|
+| tunnels/wg-mesh | wireguard | - | yes | 3 | rtr-branch-a:wg0, rtr-branch-b:wg0, rtr-hq:wg0 |
+| tunnels/ipsec-hq-b | ipsec | - | yes | 2 | rtr-branch-b:ipsec0, rtr-hq:ipsec0 |
+| tunnels/vx-100 | vxlan over ipsec | 100 | underlay | 2 | rtr-branch-b:vxlan100, rtr-hq:vxlan100 |
+| tunnels/gre-mgmt | gre over ipsec | - | underlay | 2 | rtr-branch-b:gre1, rtr-hq:gre1 |
+| tunnels/ovpn-admin | openvpn | - | yes | 2 | pc-branch-b:tun0, rtr-hq:ovpn0 |
+
+STACK reads outwards: 'vxlan over ipsec' is VXLAN carried inside the IPsec tunnel.
+
+
+---
+
+Generated by [netgraph](https://github.com/blechschmidt/netgraph) 0.0.0-test with
+`netgraph report`. Every table on these pages comes from the same inventory as the
+diagrams, so the two cannot disagree.
+
+=== devices/sites_branch-a_pc-branch-a.md ===
+# pc-branch-a
+
+computer sites/branch-a/pc-branch-a
+
+[← overlay — as-built network documentation](../README.md) · [site](../sites/sites.md)
+
+<a id="identity"></a>
+
+## Identity
+
+| Field | Value |
+|:---|:---|
+| Name | pc-branch-a |
+| Qualified name | sites/branch-a/pc-branch-a |
+| Kind | computer |
+| Site | [sites](../sites/sites.md) |
+| Description | Workstation, Branch A. |
+| Vendor | — |
+| Model | — |
+| Serial | — |
+| Declared in | sites/branch-a/host.yaml#0:1 |
+
+<a id="table-labels"></a>
+
+**Labels**
+
+| KEY | VALUE |
+|:---|:---|
+| site | branch-a |
+
+<a id="table-annotations"></a>
+
+**Annotations**
+
+_This element carries no annotation._
+
+
+<a id="placement"></a>
+
+## Placement and power
+
+| Field | Value |
+|:---|:---|
+| Site | — |
+| Room | — |
+| Rack | — |
+| Position | — |
+| Height | 1U |
+
+<a id="table-feeds"></a>
+
+**Power feeds**
+
+_No power feed is declared for this element._
+
+A dual-corded element has one row per cord.
+
+
+<a id="interfaces"></a>
+
+## Interfaces
+
+<a id="table-interfaces"></a>
+
+**Interfaces**
+
+| NAME | TYPE | UP | MAC | MTU | ADDRESSES | VLANS | VRF | AGGREGATION | DESCRIPTION |
+|:---|:---|:---|:---|---:|:---|:---|:---|:---|:---|
+| enp3s0 | ethernet | yes | — | 1500 | 10.20.0.10/24 | — | — | — | — |
+
+Addresses are as configured, prefix length included. VLANS reads 'mode: ids', with the native VLAN named where a trunk has one.
+
+
+<a id="links"></a>
+
+## Links
+
+What is plugged into this element, and what runs over it.
+
+<a id="table-cables"></a>
+
+**Cables**
+
+| PORT | CABLE | LABEL | MEDIUM | SPEED | LENGTH | FAR END | FAR PORT | VIA |
+|:---|:---|:---|:---|---:|---:|:---|:---|:---|
+| enp3s0 | cbl-branch-a-pc | — | copper | 1Gbps | — | [rtr-branch-a](sites_branch-a_rtr-branch-a.md) | ether2 | — |
+
+One row per cable that physically terminates here. VIA names the panels the run this cable is a segment of crosses, and the two ends of that run; the site page's cable schedule has every segment of it. An attachment row is an adapter's upstream rather than a cable somebody pulled.
+
+<a id="table-tunnels"></a>
+
+**Tunnels**
+
+_No tunnel terminates on this element._
+
+
+<a id="diagrams"></a>
+
+## Diagrams
+
+The drawings this element is in.
+
+- [Physical topology (l1)](../sites/sites.md#diagrams)
+- [VLANs (l2)](../sites/sites.md#diagrams)
+- [IP subnets (l3)](../sites/sites.md#diagrams)
+
+
+---
+
+netgraph 0.0.0-test, generated 2026-01-31T09:00:00Z.
+
+=== devices/sites_branch-a_rtr-branch-a.md ===
+# rtr-branch-a
+
+router sites/branch-a/rtr-branch-a
+
+[← overlay — as-built network documentation](../README.md) · [site](../sites/sites.md)
+
+<a id="identity"></a>
+
+## Identity
+
+| Field | Value |
+|:---|:---|
+| Name | rtr-branch-a |
+| Qualified name | sites/branch-a/rtr-branch-a |
+| Kind | router |
+| Site | [sites](../sites/sites.md) |
+| Description | Branch A edge router. Mesh member only. |
+| Vendor | MikroTik |
+| Model | RB5009 |
+| Serial | — |
+| Declared in | sites/branch-a/router.yaml#0:1 |
+
+<a id="table-labels"></a>
+
+**Labels**
+
+| KEY | VALUE |
+|:---|:---|
+| role | edge |
+| site | branch-a |
+
+<a id="table-annotations"></a>
+
+**Annotations**
+
+_This element carries no annotation._
+
+
+<a id="placement"></a>
+
+## Placement and power
+
+| Field | Value |
+|:---|:---|
+| Site | — |
+| Room | — |
+| Rack | — |
+| Position | — |
+| Height | 1U |
+
+<a id="table-feeds"></a>
+
+**Power feeds**
+
+_No power feed is declared for this element._
+
+A dual-corded element has one row per cord.
+
+
+<a id="interfaces"></a>
+
+## Interfaces
+
+<a id="table-interfaces"></a>
+
+**Interfaces**
+
+| NAME | TYPE | UP | MAC | MTU | ADDRESSES | VLANS | VRF | AGGREGATION | DESCRIPTION |
+|:---|:---|:---|:---|---:|:---|:---|:---|:---|:---|
+| ether1 | ethernet | yes | — | 1500 | 198.51.100.6/30 | — | — | — | uplink to wan-core |
+| ether2 | ethernet | yes | — | 1500 | 10.20.0.1/24 | — | — | — | branch LAN |
+| wg0 | tunnel | yes | — | 1420 | 10.255.0.2/24 | — | — | under ether1 | site-to-site mesh |
+
+Addresses are as configured, prefix length included. VLANS reads 'mode: ids', with the native VLAN named where a trunk has one.
+
+
+<a id="links"></a>
+
+## Links
+
+What is plugged into this element, and what runs over it.
+
+<a id="table-cables"></a>
+
+**Cables**
+
+| PORT | CABLE | LABEL | MEDIUM | SPEED | LENGTH | FAR END | FAR PORT | VIA |
+|:---|:---|:---|:---|---:|---:|:---|:---|:---|
+| ether2 | cbl-branch-a-pc | — | copper | 1Gbps | — | [pc-branch-a](sites_branch-a_pc-branch-a.md) | enp3s0 | — |
+| ether1 | cbl-wan-branch-a | PE-02 | fiber | 1Gbps | — | [wan-core](wan_wan-core.md) | ge-0/0/1 | — |
+
+One row per cable that physically terminates here. VIA names the panels the run this cable is a segment of crosses, and the two ends of that run; the site page's cable schedule has every segment of it. An attachment row is an adapter's upstream rather than a cable somebody pulled.
+
+<a id="table-tunnels"></a>
+
+**Tunnels**
+
+| TUNNEL | STACK | INTERFACE | OTHER ENDS | ENCRYPTED |
+|:---|:---|:---|:---|:---|
+| wg-mesh | wireguard | wg0 | rtr-branch-b, rtr-hq | yes |
+
+
+<a id="diagrams"></a>
+
+## Diagrams
+
+The drawings this element is in.
+
+- [Physical topology (l1)](../sites/sites.md#diagrams)
+- [VLANs (l2)](../sites/sites.md#diagrams)
+- [IP subnets (l3)](../sites/sites.md#diagrams)
+- [Tunnels (overlay)](../sites/sites.md#diagrams)
+
+
+---
+
+netgraph 0.0.0-test, generated 2026-01-31T09:00:00Z.
+
+=== devices/sites_branch-b_pc-branch-b.md ===
+# pc-branch-b
+
+computer sites/branch-b/pc-branch-b
+
+[← overlay — as-built network documentation](../README.md) · [site](../sites/sites.md)
+
+<a id="identity"></a>
+
+## Identity
+
+| Field | Value |
+|:---|:---|
+| Name | pc-branch-b |
+| Qualified name | sites/branch-b/pc-branch-b |
+| Kind | computer |
+| Site | [sites](../sites/sites.md) |
+| Description | Administrator's workstation. Dials into HQ over OpenVPN. |
+| Vendor | — |
+| Model | — |
+| Serial | — |
+| Declared in | sites/branch-b/host.yaml#0:1 |
+
+<a id="table-labels"></a>
+
+**Labels**
+
+| KEY | VALUE |
+|:---|:---|
+| site | branch-b |
+
+<a id="table-annotations"></a>
+
+**Annotations**
+
+_This element carries no annotation._
+
+
+<a id="placement"></a>
+
+## Placement and power
+
+| Field | Value |
+|:---|:---|
+| Site | — |
+| Room | — |
+| Rack | — |
+| Position | — |
+| Height | 1U |
+
+<a id="table-feeds"></a>
+
+**Power feeds**
+
+_No power feed is declared for this element._
+
+A dual-corded element has one row per cord.
+
+
+<a id="interfaces"></a>
+
+## Interfaces
+
+<a id="table-interfaces"></a>
+
+**Interfaces**
+
+| NAME | TYPE | UP | MAC | MTU | ADDRESSES | VLANS | VRF | AGGREGATION | DESCRIPTION |
+|:---|:---|:---|:---|---:|:---|:---|:---|:---|:---|
+| enp3s0 | ethernet | yes | — | 1500 | 10.30.0.10/24 | — | — | — | — |
+| tun0 | tunnel | yes | — | 1431 | 10.253.0.10/24 | — | — | under enp3s0 | remote access to HQ |
+
+Addresses are as configured, prefix length included. VLANS reads 'mode: ids', with the native VLAN named where a trunk has one.
+
+
+<a id="links"></a>
+
+## Links
+
+What is plugged into this element, and what runs over it.
+
+<a id="table-cables"></a>
+
+**Cables**
+
+| PORT | CABLE | LABEL | MEDIUM | SPEED | LENGTH | FAR END | FAR PORT | VIA |
+|:---|:---|:---|:---|---:|---:|:---|:---|:---|
+| enp3s0 | cbl-branch-b-pc | — | copper | 1Gbps | — | [rtr-branch-b](sites_branch-b_rtr-branch-b.md) | ether2 | — |
+
+One row per cable that physically terminates here. VIA names the panels the run this cable is a segment of crosses, and the two ends of that run; the site page's cable schedule has every segment of it. An attachment row is an adapter's upstream rather than a cable somebody pulled.
+
+<a id="table-tunnels"></a>
+
+**Tunnels**
+
+| TUNNEL | STACK | INTERFACE | OTHER ENDS | ENCRYPTED |
+|:---|:---|:---|:---|:---|
+| ovpn-admin | openvpn | tun0 | rtr-hq | yes |
+
+
+<a id="diagrams"></a>
+
+## Diagrams
+
+The drawings this element is in.
+
+- [Physical topology (l1)](../sites/sites.md#diagrams)
+- [VLANs (l2)](../sites/sites.md#diagrams)
+- [IP subnets (l3)](../sites/sites.md#diagrams)
+- [Tunnels (overlay)](../sites/sites.md#diagrams)
+
+
+---
+
+netgraph 0.0.0-test, generated 2026-01-31T09:00:00Z.
+
+=== devices/sites_branch-b_rtr-branch-b.md ===
+# rtr-branch-b
+
+router sites/branch-b/rtr-branch-b
+
+[← overlay — as-built network documentation](../README.md) · [site](../sites/sites.md)
+
+<a id="identity"></a>
+
+## Identity
+
+| Field | Value |
+|:---|:---|
+| Name | rtr-branch-b |
+| Qualified name | sites/branch-b/rtr-branch-b |
+| Kind | router |
+| Site | [sites](../sites/sites.md) |
+| Description | Branch B edge router. Mesh member, and the far end of the IPsec stack. |
+| Vendor | MikroTik |
+| Model | RB5009 |
+| Serial | — |
+| Declared in | sites/branch-b/router.yaml#0:1 |
+
+<a id="table-labels"></a>
+
+**Labels**
+
+| KEY | VALUE |
+|:---|:---|
+| role | edge |
+| site | branch-b |
+
+<a id="table-annotations"></a>
+
+**Annotations**
+
+_This element carries no annotation._
+
+
+<a id="placement"></a>
+
+## Placement and power
+
+| Field | Value |
+|:---|:---|
+| Site | — |
+| Room | — |
+| Rack | — |
+| Position | — |
+| Height | 1U |
+
+<a id="table-feeds"></a>
+
+**Power feeds**
+
+_No power feed is declared for this element._
+
+A dual-corded element has one row per cord.
+
+
+<a id="interfaces"></a>
+
+## Interfaces
+
+<a id="table-interfaces"></a>
+
+**Interfaces**
+
+| NAME | TYPE | UP | MAC | MTU | ADDRESSES | VLANS | VRF | AGGREGATION | DESCRIPTION |
+|:---|:---|:---|:---|---:|:---|:---|:---|:---|:---|
+| ether1 | ethernet | yes | — | 1500 | 198.51.100.10/30 | — | — | — | uplink to wan-core |
+| ether2 | ethernet | yes | — | 1500 | 10.30.0.1/24 | — | — | — | branch LAN |
+| wg0 | tunnel | yes | — | 1420 | 10.255.0.3/24 | — | — | under ether1 | site-to-site mesh |
+| ipsec0 | tunnel | yes | — | 1427 | 10.254.0.2/30 | — | — | under ether1 | encrypted transport to hq |
+| vxlan100 | tunnel | yes | — | 1377 | — | access 100 | — | under ipsec0 | stretched VLAN 100, inside ipsec0 |
+| gre1 | tunnel | yes | — | 1403 | 10.252.0.2/30 | — | — | under ipsec0 | management GRE, inside ipsec0 |
+
+Addresses are as configured, prefix length included. VLANS reads 'mode: ids', with the native VLAN named where a trunk has one.
+
+
+<a id="links"></a>
+
+## Links
+
+What is plugged into this element, and what runs over it.
+
+<a id="table-cables"></a>
+
+**Cables**
+
+| PORT | CABLE | LABEL | MEDIUM | SPEED | LENGTH | FAR END | FAR PORT | VIA |
+|:---|:---|:---|:---|---:|---:|:---|:---|:---|
+| ether2 | cbl-branch-b-pc | — | copper | 1Gbps | — | [pc-branch-b](sites_branch-b_pc-branch-b.md) | enp3s0 | — |
+| ether1 | cbl-wan-branch-b | PE-03 | fiber | 1Gbps | — | [wan-core](wan_wan-core.md) | ge-0/0/2 | — |
+
+One row per cable that physically terminates here. VIA names the panels the run this cable is a segment of crosses, and the two ends of that run; the site page's cable schedule has every segment of it. An attachment row is an adapter's upstream rather than a cable somebody pulled.
+
+<a id="table-tunnels"></a>
+
+**Tunnels**
+
+| TUNNEL | STACK | INTERFACE | OTHER ENDS | ENCRYPTED |
+|:---|:---|:---|:---|:---|
+| wg-mesh | wireguard | wg0 | rtr-branch-a, rtr-hq | yes |
+| ipsec-hq-b | ipsec | ipsec0 | rtr-hq | yes |
+| vx-100 | vxlan over ipsec | vxlan100 | rtr-hq | underlay |
+| gre-mgmt | gre over ipsec | gre1 | rtr-hq | underlay |
+
+
+<a id="diagrams"></a>
+
+## Diagrams
+
+The drawings this element is in.
+
+- [Physical topology (l1)](../sites/sites.md#diagrams)
+- [VLANs (l2)](../sites/sites.md#diagrams)
+- [IP subnets (l3)](../sites/sites.md#diagrams)
+- [Tunnels (overlay)](../sites/sites.md#diagrams)
+
+
+---
+
+netgraph 0.0.0-test, generated 2026-01-31T09:00:00Z.
+
+=== devices/sites_hq_rtr-hq.md ===
+# rtr-hq
+
+router sites/hq/rtr-hq
+
+[← overlay — as-built network documentation](../README.md) · [site](../sites/sites.md)
+
+<a id="identity"></a>
+
+## Identity
+
+| Field | Value |
+|:---|:---|
+| Name | rtr-hq |
+| Qualified name | sites/hq/rtr-hq |
+| Kind | router |
+| Site | [sites](../sites/sites.md) |
+| Description | HQ edge router and overlay hub. |
+| Vendor | Ubiquiti |
+| Model | EdgeRouter 4 |
+| Serial | — |
+| Declared in | sites/hq/router.yaml#0:7 |
+
+<a id="table-labels"></a>
+
+**Labels**
+
+| KEY | VALUE |
+|:---|:---|
+| role | edge |
+| site | hq |
+
+<a id="table-annotations"></a>
+
+**Annotations**
+
+_This element carries no annotation._
+
+
+<a id="placement"></a>
+
+## Placement and power
+
+| Field | Value |
+|:---|:---|
+| Site | — |
+| Room | — |
+| Rack | — |
+| Position | — |
+| Height | 1U |
+
+<a id="table-feeds"></a>
+
+**Power feeds**
+
+_No power feed is declared for this element._
+
+A dual-corded element has one row per cord.
+
+
+<a id="interfaces"></a>
+
+## Interfaces
+
+<a id="table-interfaces"></a>
+
+**Interfaces**
+
+| NAME | TYPE | UP | MAC | MTU | ADDRESSES | VLANS | VRF | AGGREGATION | DESCRIPTION |
+|:---|:---|:---|:---|---:|:---|:---|:---|:---|:---|
+| eth0 | ethernet | yes | — | 1500 | 198.51.100.2/30 | — | — | — | uplink to wan-core |
+| eth1 | ethernet | yes | — | 1500 | 10.10.0.1/24 | — | — | — | HQ LAN |
+| wg0 | tunnel | yes | — | 1420 | 10.255.0.1/24 | — | — | under eth0 | site-to-site mesh |
+| ipsec0 | tunnel | yes | — | 1427 | 10.254.0.1/30 | — | — | under eth0 | encrypted transport to branch-b |
+| vxlan100 | tunnel | yes | — | 1377 | — | access 100 | — | under ipsec0 | stretched VLAN 100, inside ipsec0 |
+| gre1 | tunnel | yes | — | 1403 | 10.252.0.1/30 | — | — | under ipsec0 | management GRE, inside ipsec0 |
+| ovpn0 | tunnel | yes | — | 1431 | 10.253.0.1/24 | — | — | under eth0 | remote-access concentrator |
+
+Addresses are as configured, prefix length included. VLANS reads 'mode: ids', with the native VLAN named where a trunk has one.
+
+
+<a id="links"></a>
+
+## Links
+
+What is plugged into this element, and what runs over it.
+
+<a id="table-cables"></a>
+
+**Cables**
+
+| PORT | CABLE | LABEL | MEDIUM | SPEED | LENGTH | FAR END | FAR PORT | VIA |
+|:---|:---|:---|:---|---:|---:|:---|:---|:---|
+| eth1 | cbl-hq-srv | — | copper | 1Gbps | — | [srv-hq](sites_hq_srv-hq.md) | eno1 | — |
+| eth0 | cbl-wan-hq | PE-01 | fiber | 1Gbps | — | [wan-core](wan_wan-core.md) | ge-0/0/0 | — |
+
+One row per cable that physically terminates here. VIA names the panels the run this cable is a segment of crosses, and the two ends of that run; the site page's cable schedule has every segment of it. An attachment row is an adapter's upstream rather than a cable somebody pulled.
+
+<a id="table-tunnels"></a>
+
+**Tunnels**
+
+| TUNNEL | STACK | INTERFACE | OTHER ENDS | ENCRYPTED |
+|:---|:---|:---|:---|:---|
+| wg-mesh | wireguard | wg0 | rtr-branch-a, rtr-branch-b | yes |
+| ipsec-hq-b | ipsec | ipsec0 | rtr-branch-b | yes |
+| vx-100 | vxlan over ipsec | vxlan100 | rtr-branch-b | underlay |
+| gre-mgmt | gre over ipsec | gre1 | rtr-branch-b | underlay |
+| ovpn-admin | openvpn | ovpn0 | pc-branch-b | yes |
+
+
+<a id="diagrams"></a>
+
+## Diagrams
+
+The drawings this element is in.
+
+- [Physical topology (l1)](../sites/sites.md#diagrams)
+- [VLANs (l2)](../sites/sites.md#diagrams)
+- [IP subnets (l3)](../sites/sites.md#diagrams)
+- [Tunnels (overlay)](../sites/sites.md#diagrams)
+
+
+---
+
+netgraph 0.0.0-test, generated 2026-01-31T09:00:00Z.
+
+=== devices/sites_hq_srv-hq.md ===
+# srv-hq
+
+server sites/hq/srv-hq
+
+[← overlay — as-built network documentation](../README.md) · [site](../sites/sites.md)
+
+<a id="identity"></a>
+
+## Identity
+
+| Field | Value |
+|:---|:---|
+| Name | srv-hq |
+| Qualified name | sites/hq/srv-hq |
+| Kind | server |
+| Site | [sites](../sites/sites.md) |
+| Description | File server, HQ. |
+| Vendor | Dell |
+| Model | PowerEdge R350 |
+| Serial | — |
+| Declared in | sites/hq/server.yaml#0:1 |
+
+<a id="table-labels"></a>
+
+**Labels**
+
+| KEY | VALUE |
+|:---|:---|
+| site | hq |
+
+<a id="table-annotations"></a>
+
+**Annotations**
+
+_This element carries no annotation._
+
+
+<a id="placement"></a>
+
+## Placement and power
+
+| Field | Value |
+|:---|:---|
+| Site | — |
+| Room | — |
+| Rack | — |
+| Position | — |
+| Height | 1U |
+
+<a id="table-feeds"></a>
+
+**Power feeds**
+
+_No power feed is declared for this element._
+
+A dual-corded element has one row per cord.
+
+
+<a id="interfaces"></a>
+
+## Interfaces
+
+<a id="table-interfaces"></a>
+
+**Interfaces**
+
+| NAME | TYPE | UP | MAC | MTU | ADDRESSES | VLANS | VRF | AGGREGATION | DESCRIPTION |
+|:---|:---|:---|:---|---:|:---|:---|:---|:---|:---|
+| eno1 | ethernet | yes | — | 1500 | 10.10.0.10/24 | — | — | — | — |
+
+Addresses are as configured, prefix length included. VLANS reads 'mode: ids', with the native VLAN named where a trunk has one.
+
+
+<a id="links"></a>
+
+## Links
+
+What is plugged into this element, and what runs over it.
+
+<a id="table-cables"></a>
+
+**Cables**
+
+| PORT | CABLE | LABEL | MEDIUM | SPEED | LENGTH | FAR END | FAR PORT | VIA |
+|:---|:---|:---|:---|---:|---:|:---|:---|:---|
+| eno1 | cbl-hq-srv | — | copper | 1Gbps | — | [rtr-hq](sites_hq_rtr-hq.md) | eth1 | — |
+
+One row per cable that physically terminates here. VIA names the panels the run this cable is a segment of crosses, and the two ends of that run; the site page's cable schedule has every segment of it. An attachment row is an adapter's upstream rather than a cable somebody pulled.
+
+<a id="table-tunnels"></a>
+
+**Tunnels**
+
+_No tunnel terminates on this element._
+
+
+<a id="diagrams"></a>
+
+## Diagrams
+
+The drawings this element is in.
+
+- [Physical topology (l1)](../sites/sites.md#diagrams)
+- [VLANs (l2)](../sites/sites.md#diagrams)
+- [IP subnets (l3)](../sites/sites.md#diagrams)
+
+
+---
+
+netgraph 0.0.0-test, generated 2026-01-31T09:00:00Z.
+
+=== devices/wan_wan-core.md ===
+# wan-core
+
+router wan/wan-core
+
+[← overlay — as-built network documentation](../README.md) · [site](../sites/wan.md)
+
+<a id="identity"></a>
+
+## Identity
+
+| Field | Value |
+|:---|:---|
+| Name | wan-core |
+| Qualified name | wan/wan-core |
+| Kind | router |
+| Site | [wan](../sites/wan.md) |
+| Description | Provider edge. Three /30 hand-offs, one per site. |
+| Vendor | Juniper |
+| Model | MX204 |
+| Serial | — |
+| Declared in | wan/core.yaml#0:3 |
+
+<a id="table-labels"></a>
+
+**Labels**
+
+| KEY | VALUE |
+|:---|:---|
+| role | wan |
+
+<a id="table-annotations"></a>
+
+**Annotations**
+
+_This element carries no annotation._
+
+
+<a id="placement"></a>
+
+## Placement and power
+
+| Field | Value |
+|:---|:---|
+| Site | — |
+| Room | — |
+| Rack | — |
+| Position | — |
+| Height | 1U |
+
+<a id="table-feeds"></a>
+
+**Power feeds**
+
+_No power feed is declared for this element._
+
+A dual-corded element has one row per cord.
+
+
+<a id="interfaces"></a>
+
+## Interfaces
+
+<a id="table-interfaces"></a>
+
+**Interfaces**
+
+| NAME | TYPE | UP | MAC | MTU | ADDRESSES | VLANS | VRF | AGGREGATION | DESCRIPTION |
+|:---|:---|:---|:---|---:|:---|:---|:---|:---|:---|
+| ge-0/0/0 | ethernet | yes | — | 1500 | 198.51.100.1/30 | — | — | — | hand-off to hq |
+| ge-0/0/1 | ethernet | yes | — | 1500 | 198.51.100.5/30 | — | — | — | hand-off to branch-a |
+| ge-0/0/2 | ethernet | yes | — | 1500 | 198.51.100.9/30 | — | — | — | hand-off to branch-b |
+
+Addresses are as configured, prefix length included. VLANS reads 'mode: ids', with the native VLAN named where a trunk has one.
+
+
+<a id="links"></a>
+
+## Links
+
+What is plugged into this element, and what runs over it.
+
+<a id="table-cables"></a>
+
+**Cables**
+
+| PORT | CABLE | LABEL | MEDIUM | SPEED | LENGTH | FAR END | FAR PORT | VIA |
+|:---|:---|:---|:---|---:|---:|:---|:---|:---|
+| ge-0/0/0 | cbl-wan-hq | PE-01 | fiber | 1Gbps | — | [rtr-hq](sites_hq_rtr-hq.md) | eth0 | — |
+| ge-0/0/1 | cbl-wan-branch-a | PE-02 | fiber | 1Gbps | — | [rtr-branch-a](sites_branch-a_rtr-branch-a.md) | ether1 | — |
+| ge-0/0/2 | cbl-wan-branch-b | PE-03 | fiber | 1Gbps | — | [rtr-branch-b](sites_branch-b_rtr-branch-b.md) | ether1 | — |
+
+One row per cable that physically terminates here. VIA names the panels the run this cable is a segment of crosses, and the two ends of that run; the site page's cable schedule has every segment of it. An attachment row is an adapter's upstream rather than a cable somebody pulled.
+
+<a id="table-tunnels"></a>
+
+**Tunnels**
+
+_No tunnel terminates on this element._
+
+
+<a id="diagrams"></a>
+
+## Diagrams
+
+The drawings this element is in.
+
+- [Physical topology (l1)](../sites/wan.md#diagrams)
+- [VLANs (l2)](../sites/wan.md#diagrams)
+- [IP subnets (l3)](../sites/wan.md#diagrams)
+
+
+---
+
+netgraph 0.0.0-test, generated 2026-01-31T09:00:00Z.
+
+=== diagrams/overview-l1.svg (drawing, not compared) ===
+
+=== diagrams/overview-l2.svg (drawing, not compared) ===
+
+=== diagrams/overview-l3.svg (drawing, not compared) ===
+
+=== diagrams/overview-overlay.svg (drawing, not compared) ===
+
+=== diagrams/sites-l1.svg (drawing, not compared) ===
+
+=== diagrams/sites-l2.svg (drawing, not compared) ===
+
+=== diagrams/sites-l3.svg (drawing, not compared) ===
+
+=== diagrams/sites-overlay.svg (drawing, not compared) ===
+
+=== diagrams/wan-l1.svg (drawing, not compared) ===
+
+=== diagrams/wan-l2.svg (drawing, not compared) ===
+
+=== diagrams/wan-l3.svg (drawing, not compared) ===
+
+=== sites/sites.md ===
+# sites
+
+As-built record of sites.
+
+[← overlay — as-built network documentation](../README.md)
+
+
+<a id="summary"></a>
+
+## Summary
+
+| Field | Value |
+|:---|:---|
+| Namespace | sites |
+| Elements | 6 |
+| Cables | 3 |
+| Tunnels | 5 |
+| Subnets | 10 |
+
+- [Report overview](../README.md)
+
+
+<a id="diagrams"></a>
+
+## Diagrams
+
+One drawing per layer, from the same inventory as the tables below.
+
+**Physical topology** — 7 node(s), 10 link(s)
+
+![Physical topology (l1)](../diagrams/sites-l1.svg)
+
+**VLANs** — 7 node(s), 10 link(s)
+
+![VLANs (l2)](../diagrams/sites-l2.svg)
+
+**IP subnets** — 16 node(s), 18 link(s)
+
+![IP subnets (l3)](../diagrams/sites-l3.svg)
+
+**Tunnels** — 9 node(s), 13 link(s)
+
+![Tunnels (overlay)](../diagrams/sites-overlay.svg)
+
+
+<a id="devices"></a>
+
+## Elements
+
+Everything documented on this page, with a page each.
+
+<a id="table-devices"></a>
+
+**Elements**
+
+| NAME | KIND | PORTS | ADDRESS | VLANS |
+|:---|:---|---:|:---|:---|
+| [sites/branch-a/pc-branch-a](../devices/sites_branch-a_pc-branch-a.md) | computer | 1 | 10.20.0.10/24 | - |
+| [sites/branch-a/rtr-branch-a](../devices/sites_branch-a_rtr-branch-a.md) | router | 3 | 198.51.100.6/30 | - |
+| [sites/branch-b/pc-branch-b](../devices/sites_branch-b_pc-branch-b.md) | computer | 2 | 10.30.0.10/24 | - |
+| [sites/branch-b/rtr-branch-b](../devices/sites_branch-b_rtr-branch-b.md) | router | 6 | 198.51.100.10/30 | 100 |
+| [sites/hq/rtr-hq](../devices/sites_hq_rtr-hq.md) | router | 7 | 198.51.100.2/30 | 100 |
+| [sites/hq/srv-hq](../devices/sites_hq_srv-hq.md) | server | 1 | 10.10.0.10/24 | - |
+| tunnel:tunnels/wg-mesh | tunnel | 0 | - | - |
+
+
+<a id="addressing"></a>
+
+## Address plan
+
+Every prefix an address sits in, and how full it is.
+
+<a id="table-subnets"></a>
+
+**Subnets**
+
+| PREFIX | IP | VLANS | HOSTS | USED | FREE | UTIL | DEVICES |
+|:---|---:|:---|---:|---:|---:|---:|---:|
+| 10.10.0.0/24 | 4 | - | 254 | 2 | 252 | 0.8% | 2 |
+| 10.20.0.0/24 | 4 | - | 254 | 2 | 252 | 0.8% | 2 |
+| 10.30.0.0/24 | 4 | - | 254 | 2 | 252 | 0.8% | 2 |
+| 10.252.0.0/30 | 4 | - | 2 | 2 | 0 | 100.0% | 2 |
+| 10.253.0.0/24 | 4 | - | 254 | 2 | 252 | 0.8% | 2 |
+| 10.254.0.0/30 | 4 | - | 2 | 2 | 0 | 100.0% | 2 |
+| 10.255.0.0/24 | 4 | - | 254 | 3 | 251 | 1.2% | 3 |
+| 198.51.100.0/30 | 4 | - | 2 | 1 | 1 | 50.0% | 1 |
+| 198.51.100.4/30 | 4 | - | 2 | 1 | 1 | 50.0% | 1 |
+| 198.51.100.8/30 | 4 | - | 2 | 1 | 1 | 50.0% | 1 |
+
+HOSTS is the usable capacity of the prefix, USED the distinct addresses declared in it. Loopback and link-local prefixes are left out: they are scoped to one host or one link and say nothing about the plan.
+
+
+<a id="vlans"></a>
+
+## VLANs
+
+Every VLAN, the prefixes carried in it and the elements that are in it.
+
+<a id="table-vlan-summary"></a>
+
+**VLANs**
+
+| VLAN | NAME | ELEMENTS | PORTS |
+|---:|:---|---:|---:|
+| 100 | overlay | 2 | 2 |
+
+Membership is derived: a host on an untagged access port counts as a member even though it declares no VLAN itself.
+
+<a id="table-vlan-matrix"></a>
+
+**VLAN, subnet and element matrix**
+
+| VLAN | NAME | ELEMENT | PORTS | MODE | SUBNETS |
+|---:|:---|:---|:---|:---|:---|
+| 100 | overlay | [rtr-branch-b](../devices/sites_branch-b_rtr-branch-b.md) | vxlan100 | access | — |
+| 100 | overlay | [rtr-hq](../devices/sites_hq_rtr-hq.md) | vxlan100 | access | — |
+
+A row with no port is an element that reaches the VLAN over a link rather than by configuring it — a host behind an access port, or a hub.
+
+
+<a id="cabling"></a>
+
+## Cabling
+
+What an installer would carry into the room.
+
+<a id="table-cable-schedule"></a>
+
+**Cable schedule**
+
+| RUN | SEGMENT | CABLE | LABEL | MEDIUM | CATEGORY | SPEED | LENGTH | A END | A PORT | A POSITION | B END | B PORT | B POSITION |
+|:---|:---|:---|:---|:---|:---|---:|---:|:---|:---|:---|:---|:---|:---|
+| — | — | cbl-branch-a-pc | — | copper | cat6 | 1Gbps | — | [pc-branch-a](../devices/sites_branch-a_pc-branch-a.md) | enp3s0 | — | [rtr-branch-a](../devices/sites_branch-a_rtr-branch-a.md) | ether2 | — |
+| — | — | cbl-branch-b-pc | — | copper | cat6 | 1Gbps | — | [pc-branch-b](../devices/sites_branch-b_pc-branch-b.md) | enp3s0 | — | [rtr-branch-b](../devices/sites_branch-b_rtr-branch-b.md) | ether2 | — |
+| — | — | cbl-hq-srv | — | copper | cat6 | 1Gbps | — | [rtr-hq](../devices/sites_hq_rtr-hq.md) | eth1 | — | [srv-hq](../devices/sites_hq_srv-hq.md) | eno1 | — |
+
+One row per cable document, which is one run somebody pulls: a link through a patch panel is several. RUN names the end-to-end link and SEGMENT which leg of it this is. 'netgraph export cable-list' writes the same rows as CSV, with the full location of both ends.
+
+
+<a id="wireless"></a>
+
+## Wireless
+
+Every BSS: which radio beacons which SSID, on what channel, into which VLAN.
+
+<a id="table-bss"></a>
+
+**BSS and SSID plan**
+
+_No radio is declared here._
+
+One row per SSID per radio: a dual-band AP serving three networks has six.
+
+
+<a id="external"></a>
+
+## Links leaving this page
+
+Where this part of the network is joined to the rest of it.
+
+<a id="table-external-links"></a>
+
+**External links**
+
+| KIND | LINK | LOCAL END | LOCAL PORT | FAR END | FAR PORT | DOCUMENTED ON |
+|:---|:---|:---|:---|:---|:---|:---|
+| cable | cbl-wan-hq | [rtr-hq](../devices/sites_hq_rtr-hq.md) | eth0 | [wan-core](../devices/wan_wan-core.md) | ge-0/0/0 | [wan](wan.md) |
+| cable | cbl-wan-branch-a | [rtr-branch-a](../devices/sites_branch-a_rtr-branch-a.md) | ether1 | [wan-core](../devices/wan_wan-core.md) | ge-0/0/1 | [wan](wan.md) |
+| cable | cbl-wan-branch-b | [rtr-branch-b](../devices/sites_branch-b_rtr-branch-b.md) | ether1 | [wan-core](../devices/wan_wan-core.md) | ge-0/0/2 | [wan](wan.md) |
+
+These links are deliberately absent from the diagrams and the cable schedule above, which cover this page's elements only. A far end with no page of its own is outside what this report documents at all.
+
+
+<a id="findings"></a>
+
+## Validation findings
+
+<a id="table-findings"></a>
+
+**Findings**
+
+_The validator reports nothing about this inventory._
+
+Findings anchored to an element of this site.
+
+
+---
+
+netgraph 0.0.0-test, generated 2026-01-31T09:00:00Z.
+
+=== sites/wan.md ===
+# wan
+
+As-built record of wan.
+
+[← overlay — as-built network documentation](../README.md)
+
+
+<a id="summary"></a>
+
+## Summary
+
+| Field | Value |
+|:---|:---|
+| Namespace | wan |
+| Elements | 1 |
+| Cables | 0 |
+| Tunnels | 0 |
+| Subnets | 3 |
+
+- [Report overview](../README.md)
+
+
+<a id="diagrams"></a>
+
+## Diagrams
+
+One drawing per layer, from the same inventory as the tables below.
+
+**Physical topology** — 1 node(s), 0 link(s)
+
+![Physical topology (l1)](../diagrams/wan-l1.svg)
+
+**VLANs** — 1 node(s), 0 link(s)
+
+![VLANs (l2)](../diagrams/wan-l2.svg)
+
+**IP subnets** — 4 node(s), 3 link(s)
+
+![IP subnets (l3)](../diagrams/wan-l3.svg)
+
+**Tunnels** — 0 node(s), 0 link(s)
+
+_Nothing in this report is drawn at this layer._
+
+
+<a id="devices"></a>
+
+## Elements
+
+Everything documented on this page, with a page each.
+
+<a id="table-devices"></a>
+
+**Elements**
+
+| NAME | KIND | PORTS | ADDRESS | VLANS |
+|:---|:---|---:|:---|:---|
+| [wan/wan-core](../devices/wan_wan-core.md) | router | 3 | 198.51.100.1/30 | - |
+
+
+<a id="addressing"></a>
+
+## Address plan
+
+Every prefix an address sits in, and how full it is.
+
+<a id="table-subnets"></a>
+
+**Subnets**
+
+| PREFIX | IP | VLANS | HOSTS | USED | FREE | UTIL | DEVICES |
+|:---|---:|:---|---:|---:|---:|---:|---:|
+| 198.51.100.0/30 | 4 | - | 2 | 1 | 1 | 50.0% | 1 |
+| 198.51.100.4/30 | 4 | - | 2 | 1 | 1 | 50.0% | 1 |
+| 198.51.100.8/30 | 4 | - | 2 | 1 | 1 | 50.0% | 1 |
+
+HOSTS is the usable capacity of the prefix, USED the distinct addresses declared in it. Loopback and link-local prefixes are left out: they are scoped to one host or one link and say nothing about the plan.
+
+
+<a id="vlans"></a>
+
+## VLANs
+
+Every VLAN, the prefixes carried in it and the elements that are in it.
+
+<a id="table-vlan-summary"></a>
+
+**VLANs**
+
+_No VLAN is declared here._
+
+Membership is derived: a host on an untagged access port counts as a member even though it declares no VLAN itself.
+
+<a id="table-vlan-matrix"></a>
+
+**VLAN, subnet and element matrix**
+
+_No VLAN is declared here._
+
+A row with no port is an element that reaches the VLAN over a link rather than by configuring it — a host behind an access port, or a hub.
+
+
+<a id="cabling"></a>
+
+## Cabling
+
+What an installer would carry into the room.
+
+<a id="table-cable-schedule"></a>
+
+**Cable schedule**
+
+_No cable is declared here._
+
+One row per cable document, which is one run somebody pulls: a link through a patch panel is several. RUN names the end-to-end link and SEGMENT which leg of it this is. 'netgraph export cable-list' writes the same rows as CSV, with the full location of both ends.
+
+
+<a id="wireless"></a>
+
+## Wireless
+
+Every BSS: which radio beacons which SSID, on what channel, into which VLAN.
+
+<a id="table-bss"></a>
+
+**BSS and SSID plan**
+
+_No radio is declared here._
+
+One row per SSID per radio: a dual-band AP serving three networks has six.
+
+
+<a id="external"></a>
+
+## Links leaving this page
+
+Where this part of the network is joined to the rest of it.
+
+<a id="table-external-links"></a>
+
+**External links**
+
+| KIND | LINK | LOCAL END | LOCAL PORT | FAR END | FAR PORT | DOCUMENTED ON |
+|:---|:---|:---|:---|:---|:---|:---|
+| cable | cbl-wan-hq | [wan-core](../devices/wan_wan-core.md) | ge-0/0/0 | [rtr-hq](../devices/sites_hq_rtr-hq.md) | eth0 | [sites](sites.md) |
+| cable | cbl-wan-branch-a | [wan-core](../devices/wan_wan-core.md) | ge-0/0/1 | [rtr-branch-a](../devices/sites_branch-a_rtr-branch-a.md) | ether1 | [sites](sites.md) |
+| cable | cbl-wan-branch-b | [wan-core](../devices/wan_wan-core.md) | ge-0/0/2 | [rtr-branch-b](../devices/sites_branch-b_rtr-branch-b.md) | ether1 | [sites](sites.md) |
+
+These links are deliberately absent from the diagrams and the cable schedule above, which cover this page's elements only. A far end with no page of its own is outside what this report documents at all.
+
+
+<a id="findings"></a>
+
+## Validation findings
+
+<a id="table-findings"></a>
+
+**Findings**
+
+_The validator reports nothing about this inventory._
+
+Findings anchored to an element of this site.
+
+
+---
+
+netgraph 0.0.0-test, generated 2026-01-31T09:00:00Z.
