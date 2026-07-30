@@ -36,6 +36,20 @@ Sizing
 An IPv6 prefix is also far too large to print. Anything with 20 or more host
 bits is rendered as a power of two by :func:`format_capacity`, so a ``/64``
 occupies six columns instead of twenty.
+
+Routing instances
+-----------------
+
+A VRF is a routing table of its own, so it is an address *space* of its own
+(§16.1). Every function here therefore works per instance: a prefix in ``blue``
+and the same prefix in the global table are two rows with two utilisations, and
+:func:`aggregate` never merges across instances — two halves of a supernet in
+different tables do not fill it, they are two plans that happen to be adjacent on
+paper. :func:`free_space` and :func:`next_free` take a ``vrf`` argument for the
+same reason: "what is free in 10.0.0.0/8" has a different answer per instance, and
+the default — every instance at once — is the conservative one, because a block
+free in one table but used in another is not a block anyone should hand out
+without knowing which table they meant.
 """
 
 from __future__ import annotations
@@ -47,6 +61,7 @@ from typing import Final, TypeAlias
 
 from netgraph.config import ValidationConfig
 from netgraph.loader.inventory import Inventory
+from netgraph.models import GLOBAL_VRF
 from netgraph.subnets import IPNetwork, Subnet, subnets_of
 from netgraph.validate import Finding
 from netgraph.validate import validate as run_validation
@@ -170,6 +185,9 @@ class Utilisation:
     network: IPNetwork
     #: Every VLAN an interface addressed here is a member of, ascending.
     vlans: tuple[int, ...] = ()
+    #: The routing instance the prefix is in (§16.1); empty for the global one.
+    #: With :attr:`prefix`, the identity of the row.
+    vrf: str = GLOBAL_VRF
     #: Distinct addresses configured inside the prefix.
     assigned: int = 0
     #: Distinct elements holding one of them.
@@ -206,13 +224,19 @@ class Utilisation:
         return bool(self.members)
 
     @property
-    def sort_key(self) -> tuple[int, int, int]:
-        """Family, then network address, then prefix length — as :mod:`netgraph.subnets`."""
-        return (self.network.version, int(self.network.network_address), self.network.prefixlen)
+    def sort_key(self) -> tuple[str, int, int, int]:
+        """Instance, family, network address, prefix length — as :mod:`netgraph.subnets`."""
+        return (
+            self.vrf,
+            self.network.version,
+            int(self.network.network_address),
+            self.network.prefixlen,
+        )
 
     def record(self) -> dict[str, object]:
         """The row as a mapping, for ``--format json`` and ``--format csv``."""
         return {
+            "vrf": self.vrf,
             "prefix": self.prefix,
             "family": self.family,
             "vlans": list(self.vlans),
@@ -238,6 +262,7 @@ def utilisation_of(subnets: Iterable[Subnet]) -> tuple[Utilisation, ...]:
             prefix=subnet.prefix,
             network=subnet.network,
             vlans=tuple(sorted(subnet.vlans)),
+            vrf=subnet.vrf,
             assigned=len({member.ip for member in subnet.members}),
             devices=len(subnet.elements),
             capacity=usable_addresses(subnet.network),
@@ -274,24 +299,29 @@ def aggregate(rows: Iterable[Utilisation]) -> tuple[Utilisation, ...]:
 
 
 def _merge_siblings(rows: Sequence[Utilisation]) -> list[Utilisation] | None:
-    """One pass of :func:`aggregate`, or ``None`` when nothing merged."""
-    by_supernet: dict[IPNetwork, list[Utilisation]] = {}
+    """One pass of :func:`aggregate`, or ``None`` when nothing merged.
+
+    Keyed on ``(vrf, supernet)``: two halves of one supernet in two routing
+    instances are not siblings, however identical their prefixes look, so
+    collapsing them would summarise a supernet neither instance holds.
+    """
+    by_supernet: dict[tuple[str, IPNetwork], list[Utilisation]] = {}
     for row in rows:
         if row.network.prefixlen == 0:  # nothing contains a default route
             continue
-        by_supernet.setdefault(row.network.supernet(), []).append(row)
+        by_supernet.setdefault((row.vrf, row.network.supernet()), []).append(row)
 
     pairs = {
-        supernet: group
-        for supernet, group in by_supernet.items()
+        key: group
+        for key, group in by_supernet.items()
         if len(group) == 2 and group[0].network != group[1].network
     }
     if not pairs:
         return None
 
-    consumed = {row.prefix for group in pairs.values() for row in group}
-    result = [row for row in rows if row.prefix not in consumed]
-    result.extend(_combine(supernet, group) for supernet, group in pairs.items())
+    consumed = {(row.vrf, row.prefix) for group in pairs.values() for row in group}
+    result = [row for row in rows if (row.vrf, row.prefix) not in consumed]
+    result.extend(_combine(supernet, group) for (_, supernet), group in pairs.items())
     result.sort(key=lambda row: row.sort_key)
     return result
 
@@ -310,6 +340,8 @@ def _combine(supernet: IPNetwork, group: Sequence[Utilisation]) -> Utilisation:
         prefix=str(supernet),
         network=supernet,
         vlans=tuple(sorted({vlan for row in group for vlan in row.vlans})),
+        # Every member is in one instance by construction; see _merge_siblings.
+        vrf=group[0].vrf,
         assigned=sum(row.assigned for row in group),
         # Elements are counted per row, so an element addressed in both halves
         # is counted twice. Summing is the honest option available here: the
@@ -326,7 +358,9 @@ def _combine(supernet: IPNetwork, group: Sequence[Utilisation]) -> Utilisation:
 # --------------------------------------------------------------------------- #
 
 
-def allocations_within(prefix: IPNetwork, subnets: Iterable[Subnet]) -> tuple[IPNetwork, ...]:
+def allocations_within(
+    prefix: IPNetwork, subnets: Iterable[Subnet], *, vrf: str | None = None
+) -> tuple[IPNetwork, ...]:
     """What ``prefix`` has already been carved up into, in address order.
 
     A subnet nested inside ``prefix`` consumes the whole of itself: allocation
@@ -337,10 +371,18 @@ def allocations_within(prefix: IPNetwork, subnets: Iterable[Subnet]) -> tuple[IP
     a summary route configured as ``10.0.0.1/8`` inside a ``10.0.0.0/16``
     plan — cannot consume its prefix without consuming the whole plan, so it
     consumes a host route instead.
+
+    Args:
+        vrf: Count only what this routing instance has allocated — ``""`` for the
+            global one. ``None``, the default, counts every instance, which is the
+            conservative answer: a block free in one table and used in another is
+            not free to hand out without saying which table.
     """
     ranges: list[tuple[int, int]] = []
     for subnet in subnets:
         if subnet.network.version != prefix.version:
+            continue
+        if vrf is not None and subnet.vrf != vrf:
             continue
         if _contains(prefix, subnet.network):
             ranges.append(
@@ -379,14 +421,19 @@ def _merge_ranges(ranges: Sequence[tuple[int, int]]) -> Iterator[tuple[int, int]
     yield start, end
 
 
-def free_space(prefix: IPNetwork, subnets: Iterable[Subnet]) -> tuple[IPNetwork, ...]:
+def free_space(
+    prefix: IPNetwork, subnets: Iterable[Subnet], *, vrf: str | None = None
+) -> tuple[IPNetwork, ...]:
     """The unallocated ranges inside ``prefix``, as the fewest CIDR blocks.
 
     Ascending, and already collapsed: two adjacent free ``/25``s are reported
     as the ``/24`` they form, because that is the block an operator can
     actually hand out.
+
+    Args:
+        vrf: Which routing instance to answer for; see :func:`allocations_within`.
     """
-    allocated = allocations_within(prefix, subnets)
+    allocated = allocations_within(prefix, subnets, vrf=vrf)
     first = int(prefix.network_address)
     last = int(prefix.broadcast_address)
     version = prefix.version
@@ -403,7 +450,9 @@ def free_space(prefix: IPNetwork, subnets: Iterable[Subnet]) -> tuple[IPNetwork,
     return tuple(free)
 
 
-def next_free(prefix: IPNetwork, size: int, subnets: Iterable[Subnet]) -> IPNetwork | None:
+def next_free(
+    prefix: IPNetwork, size: int, subnets: Iterable[Subnet], *, vrf: str | None = None
+) -> IPNetwork | None:
     """The first free block of ``/size`` inside ``prefix``, or ``None``.
 
     ``free_space`` hands back CIDR blocks, so a free block can hold a ``/size``
@@ -414,7 +463,7 @@ def next_free(prefix: IPNetwork, size: int, subnets: Iterable[Subnet]) -> IPNetw
     """
     if not 0 <= size <= prefix.max_prefixlen or size < prefix.prefixlen:
         return None
-    for block in free_space(prefix, subnets):
+    for block in free_space(prefix, subnets, vrf=vrf):
         if block.prefixlen <= size:
             return ipaddress.ip_network((block.network_address, size))
     return None

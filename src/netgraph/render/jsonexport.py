@@ -10,6 +10,16 @@ Every reference is a fully-qualified name, every collection is ordered
 deterministically, and enums appear as their schema spelling — so two runs over
 the same inventory produce byte-identical output.
 
+Routing
+-------
+
+A ``--layer routing`` document is element nodes only, each with a ``routing``
+object naming the AS, the router id, the OSPF area, the VRFs and the static
+routes, and each carrying ``cluster`` — the VRF box it is drawn in. Its edges are
+``bgp`` and ``ospf``, and both carry an ``adjacency`` object with the AS pair or
+the area. Like ``subnet`` and ``tunnel``, none of it is gated on a display flag:
+at this layer the control plane *is* the topology.
+
 Node types
 ----------
 
@@ -59,6 +69,7 @@ from typing import Any, Final
 from netgraph.models import API_VERSION
 from netgraph.render.aggregate import AggregateView, BundleView
 from netgraph.render.graph import (
+    AdjacencyView,
     Edge,
     EdgeKind,
     Graph,
@@ -66,6 +77,7 @@ from netgraph.render.graph import (
     PatchView,
     PortView,
     RackView,
+    RoutingView,
     Subnet,
     TunnelView,
     WirelessView,
@@ -157,6 +169,10 @@ def _node(node: Node, options: RenderOptions) -> dict[str, Any]:
         payload["aggregate"] = _aggregate(node.aggregate)
     if node.rack is not None:
         payload["rack"] = _rack(node.rack)
+    if node.routing is not None:
+        payload["routing"] = _routing(node.routing)
+    if node.cluster:
+        payload["cluster"] = node.cluster
     payload["vlans"] = sorted(node.vlans)
     payload["interfaces"] = [_port(port, options) for port in node.ports]
     return payload
@@ -236,12 +252,62 @@ def _subnet(subnet: Subnet) -> dict[str, Any]:
     layer 3 the addresses *are* the topology, exactly as VLAN membership is, and
     a consumer filtering by prefix would otherwise have to recompute them.
     """
-    return {
+    payload: dict[str, Any] = {
         "prefix": subnet.prefix,
         "family": subnet.family,
         "addresses": list(subnet.addresses),
         "elements": list(subnet.elements),
     }
+    if subnet.vrf:
+        # Absent for the global instance, so a consumer reading a document from
+        # an inventory with no VRF in it sees exactly what it saw before (§16.1).
+        payload["vrf"] = subnet.vrf
+    return payload
+
+
+def _routing(view: RoutingView) -> dict[str, Any]:
+    """What one element contributes to the control plane (§16.6).
+
+    Only what the inventory states is emitted, so a consumer can tell "runs no
+    OSPF" from "runs OSPF in area 0.0.0.0" — which a defaulted area would not
+    allow. ``routes`` is the rendered form (``0.0.0.0/0 via 203.0.113.1``), the
+    same string the diagram prints; a consumer that wants the fields reads the
+    inventory, which is where they are declared.
+    """
+    payload: dict[str, Any] = {}
+    if view.asn is not None:
+        payload["asn"] = view.asn
+    if view.router_id is not None:
+        payload["routerId"] = view.router_id
+    if view.area is not None:
+        payload["ospfArea"] = view.area
+        payload["ospfInterfaces"] = list(view.ospf_interfaces)
+    if view.vrfs:
+        payload["vrfs"] = [{"name": name, "rd": rd} for name, rd in view.vrfs]
+    if view.routes:
+        payload["routes"] = list(view.routes)
+    return payload
+
+
+def _adjacency(view: AdjacencyView) -> dict[str, Any]:
+    """One protocol adjacency: which protocol, and what it is between.
+
+    ``internal`` is stated rather than left to be derived from the AS pair: iBGP
+    versus eBGP is the first question anybody asks of a session, and a consumer
+    should not have to know that equal AS numbers mean one.
+    """
+    payload: dict[str, Any] = {"protocol": view.protocol}
+    if view.peer_address:
+        payload["peerAddress"] = view.peer_address
+    if view.asns:
+        payload["asns"] = list(view.asns)
+        if len(view.asns) == 2:
+            payload["internal"] = view.is_internal
+    if view.area is not None:
+        payload["area"] = view.area
+    if view.description:
+        payload["description"] = view.description
+    return payload
 
 
 def _tunnel(view: TunnelView) -> dict[str, Any]:
@@ -314,6 +380,9 @@ def _edge(edge: Edge) -> dict[str, Any]:
     if edge.kind is EdgeKind.SUBNET:
         # A membership runs over no medium; the addresses are what it *is*.
         payload["addresses"] = list(edge.addresses)
+    elif edge.adjacency is not None:
+        # Nor does a routing session: it runs over the rest of the diagram.
+        payload["adjacency"] = _adjacency(edge.adjacency)
     elif edge.tunnel is not None:
         # Neither does a tunnel: what it runs over is the rest of the diagram.
         payload["tunnel"] = _tunnel(edge.tunnel)

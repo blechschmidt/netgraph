@@ -211,21 +211,24 @@ def detail_text(record: Mapping[str, Any]) -> str:
     return clip_text("\n".join(line for line in lines if line), limit=MAX_DETAIL_LENGTH)
 
 
-def namespace_text(namespace: str, records: Iterable[Mapping[str, Any]]) -> str:
+def namespace_text(
+    namespace: str, records: Iterable[Mapping[str, Any]], *, kind: str = "namespace"
+) -> str:
     """The tooltip of the cluster drawn around ``namespace``.
 
     ``records`` are the node records inside it — what the box is a box *of*,
-    which is the one thing its label does not say.
+    which is the one thing its label does not say. ``kind`` names what sort of box
+    it is: a namespace, or the ``vrf`` of the routing view (§16.6).
     """
     members = list(records)
     kinds: dict[str, int] = {}
     vlans: set[int] = set()
     for record in members:
-        kind = plain_text(str(record.get("kind") or "element"))
-        kinds[kind] = kinds.get(kind, 0) + 1
+        member_kind = plain_text(str(record.get("kind") or "element"))
+        kinds[member_kind] = kinds.get(member_kind, 0) + 1
         vlans.update(record.get("vlans", ()))
     lines = [
-        f"namespace {plain_text(namespace)}",
+        f"{kind} {plain_text(namespace)}",
         count_text(len(members), "element")
         + (
             ": " + ", ".join(count_text(count, kind) for kind, count in sorted(kinds.items()))
@@ -258,6 +261,9 @@ def _node_lines(record: Mapping[str, Any]) -> Iterator[str]:
         yield from _subnet_lines(subnet)
     if isinstance(tunnel, Mapping):
         yield from _tunnel_lines(tunnel)
+    routing = record.get("routing")
+    if isinstance(routing, Mapping):
+        yield from _routing_lines(routing)
     aggregate = record.get("aggregate")
     if isinstance(aggregate, Mapping):
         yield from _aggregate_lines(aggregate)
@@ -281,7 +287,13 @@ def _subtitle(record: Mapping[str, Any]) -> str:
         return f"{tunnel.get('type', 'tunnel')} tunnel"
     if isinstance(record.get("aggregate"), Mapping):
         return "namespace"
-    return plain_text(str(record.get("kind", "element")))
+    kind = plain_text(str(record.get("kind", "element")))
+    routing = record.get("routing")
+    if isinstance(routing, Mapping) and routing.get("asn") is not None:
+        # The AS is what a routing diagram identifies a router by, so it belongs
+        # in the one line a reader sees before any detail.
+        return f"{kind}, AS {routing['asn']}"
+    return kind
 
 
 def _rack_lines(rack: Mapping[str, Any]) -> Iterator[str]:
@@ -337,10 +349,42 @@ def _aggregate_lines(aggregate: Mapping[str, Any]) -> Iterator[str]:
         yield "elements: " + _listed(plain_text(str(element)) for element in elements)
 
 
+def _routing_lines(routing: Mapping[str, Any]) -> Iterator[str]:
+    """A router's control plane: who it is, what it holds, what it routes."""
+    identity: list[str] = []
+    if routing.get("asn") is not None:
+        identity.append(f"AS {routing['asn']}")
+    if routing.get("routerId"):
+        identity.append(f"router id {plain_text(str(routing['routerId']))}")
+    if identity:
+        yield ", ".join(identity)
+    if routing.get("ospfArea"):
+        interfaces = [plain_text(str(name)) for name in routing.get("ospfInterfaces", ())]
+        area = plain_text(str(routing["ospfArea"]))
+        yield f"ospf area {area} on " + (_listed(interfaces) if interfaces else "no interface")
+    vrfs = [entry for entry in routing.get("vrfs", ()) if isinstance(entry, Mapping)]
+    if vrfs:
+        yield "vrfs: " + _listed(
+            f"{plain_text(str(entry.get('name', '')))} (rd {plain_text(str(entry.get('rd', '')))})"
+            for entry in vrfs
+        )
+    yield from _rows(
+        "routes", [{"route": route} for route in routing.get("routes", ())], _route_row
+    )
+
+
+def _route_row(entry: Mapping[str, Any]) -> str:
+    """``0.0.0.0/0 via 203.0.113.1 dev wan0`` — already rendered by the graph."""
+    return plain_text(str(entry.get("route", "")))
+
+
 def _subnet_lines(subnet: Mapping[str, Any]) -> Iterator[str]:
     """A derived prefix: how populated it is, and by whom."""
     addresses = list(subnet.get("addresses", ()))
     elements = list(subnet.get("elements", ()))
+    vrf = subnet.get("vrf")
+    if vrf:
+        yield f"vrf {plain_text(str(vrf))}"
     yield (
         f"prefix {plain_text(str(subnet.get('prefix', '')))}: "
         f"{count_text(len(elements), 'element')}, {count_text(len(addresses), 'address', 'addresses')}"
@@ -381,6 +425,23 @@ def _tunnel_lines(tunnel: Mapping[str, Any]) -> Iterator[str]:
     yield ", ".join(parts)
 
     yield from _rows("endpoints", tunnel.get("endpoints", ()), _endpoint_row)
+
+
+def _adjacency_lines(adjacency: Mapping[str, Any]) -> Iterator[str]:
+    """A routing session: which protocol, between which AS or in which area."""
+    protocol = plain_text(str(adjacency.get("protocol", "")))
+    asns = [str(number) for number in adjacency.get("asns", ())]
+    if adjacency.get("area"):
+        yield f"{protocol} area {plain_text(str(adjacency['area']))}"
+    elif len(asns) == 2:
+        internal = " (iBGP)" if adjacency.get("internal") else " (eBGP)"
+        yield f"{protocol} AS {asns[0]} to AS {asns[1]}{internal}"
+    elif asns:
+        yield f"{protocol} AS {asns[0]}"
+    if adjacency.get("peerAddress"):
+        yield f"neighbour {plain_text(str(adjacency['peerAddress']))}"
+    if adjacency.get("description"):
+        yield plain_text(str(adjacency["description"]))
 
 
 def _bundle_lines(bundle: Mapping[str, Any]) -> Iterator[str]:
@@ -470,9 +531,17 @@ def _edge_lines(record: Mapping[str, Any]) -> Iterator[str]:
     if isinstance(patch, Mapping):
         yield from _patch_lines(patch)
 
+    adjacency = record.get("adjacency")
+    if isinstance(adjacency, Mapping):
+        yield from _adjacency_lines(adjacency)
+
     tunnel = record.get("tunnel")
     if isinstance(tunnel, Mapping):
         yield from _tunnel_lines(tunnel)
+    elif isinstance(adjacency, Mapping):
+        # A session runs over the rest of the diagram, so it has no medium, no
+        # rate and no length to report — the adjacency lines are the whole record.
+        return
     else:
         parts: list[str] = []
         if record.get("medium"):

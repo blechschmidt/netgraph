@@ -1,0 +1,46 @@
+# W135 (NG-F013) - a BGP neighbour address is nowhere in the inventory.
+#
+# A warning, not an error: an eBGP session towards a transit provider points at
+# an address on their router, which is not an element of this inventory and
+# never will be. What it costs is the check - and the edge on the diagram.
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+  routing:
+    bgp:
+      asn: 65001
+      router_id: 192.0.2.1
+      neighbors:
+        - address: 198.51.100.9
+          remote_asn: 65002
+          description: transit
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - rtr-a:eth0
+    - rtr-b:eth0
+  medium: copper

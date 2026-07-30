@@ -657,6 +657,8 @@ _KIND_PRECEDENCE: Final[tuple[EdgeKind, ...]] = (
     EdgeKind.TUNNEL,
     EdgeKind.ENCAPSULATION,
     EdgeKind.SUBNET,
+    EdgeKind.BGP,
+    EdgeKind.OSPF,
 )
 
 

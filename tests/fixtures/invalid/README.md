@@ -59,6 +59,13 @@ id in `netgraph.rules.RULE_IDS` has a file here.
 | `w128-unused-tunnel-interface.yaml` | `W128` | `NG-T013` | `pc-a:wg0` exists; no `tunnel` document names it. |
 | `w129-vni-clash.yaml` | `W129` | `NG-T014` | Two VXLANs on `pc-a` both claim VNI 100. |
 | `i003-nonstandard-tunnel-port.yaml` | `I003` | `NG-T015` | WireGuard on 51821 rather than 51820. |
+| `e032-next-hop-off-link.yaml` | `E032` | `NG-F008` | A route via `10.9.9.1`; the router is only in `10.0.0.0/30`. |
+| `e033-route-device-unknown.yaml` | `E033` | `NG-F009` | `dev: eth9`, a typo for `eth0`. |
+| `e034-ospf-interface-unknown.yaml` | `E034` | `NG-F010` | OSPF is enabled on `eth9`, which the router has not got. |
+| `e035-bgp-asn-mismatch.yaml` | `E035` | `NG-F011` | `remote_asn: 65002` towards a router that declares AS 65003. |
+| `e036-duplicate-router-id.yaml` | `E036` | `NG-F012` | Both routers claim router id `192.0.2.1`. |
+| `w135-bgp-neighbour-unresolved.yaml` | `W135` | `NG-F013` | A peer at `198.51.100.9`, which nothing here is addressed at. |
+| `w136-vrf-with-no-interface.yaml` | `W136` | `NG-F014` | VRF `blue` is declared; no interface binds to it. |
 
 ## Load them one at a time
 
@@ -105,6 +112,8 @@ warnings interact. Two rules bite in particular:
   is not about encryption should use `wireguard`, `ipsec` or `openvpn`.
 * **W128** fires for every enabled `tunnel` interface no `tunnel` document names,
   so a fixture that declares one has to use it — or say `enabled: false`.
+* **W136** fires for every declared VRF with no interface bound to it, so a
+  fixture that needs a VRF for something else has to bind one.
 
 Keep the file to the smallest set of documents that still triggers the rule,
 and add a comment at the top saying what makes it fire.

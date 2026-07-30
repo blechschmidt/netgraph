@@ -53,7 +53,7 @@ from __future__ import annotations
 import ipaddress
 import itertools
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from typing import Final, TypeAlias
 
 from netgraph.config import ValidationConfig
@@ -62,8 +62,11 @@ from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of
 from netgraph.loader.provenance import Site
 from netgraph.models import (
     AGGREGATE_TYPES,
+    GLOBAL_VRF,
     PATCHPANEL_KIND,
     Adapter,
+    BgpConfig,
+    BgpNeighbor,
     Bss,
     Cable,
     Computer,
@@ -79,11 +82,14 @@ from netgraph.models import (
     Medium,
     PanelSide,
     PatchPanel,
+    RoutingConfig,
     Server,
+    StaticRoute,
     Switch,
     Tunnel,
     VlanConfig,
     VlanMode,
+    VrfDefinition,
     WirelessConfig,
 )
 from netgraph.models.metadata import Location
@@ -149,11 +155,17 @@ _NOT_A_HOST_TYPES: Final = (Hub, Switch)
 #: owns it, the port as ``element:interface``, and the prefixes it is in.
 _HubPeer: TypeAlias = tuple[str, str, frozenset["IPNetwork"]]
 
-#: What ``E004`` groups an address by: the address, its prefix and its broadcast
-#: domain, as the objects the model layer already built rather than their text.
+#: What ``E004`` groups an address by: the routing instance it is in, the
+#: address, its prefix and its broadcast domain — as the objects the model layer
+#: already built rather than their text. The VRF leads because it is the coarsest
+#: partition: two addresses in different instances are never in conflict (§16.1).
 _AddressKey: TypeAlias = tuple[
-    "ipaddress.IPv4Address | ipaddress.IPv6Address", "IPNetwork", int | None
+    str, "ipaddress.IPv4Address | ipaddress.IPv6Address", "IPNetwork", int | None
 ]
+
+#: Either family's host address, as :mod:`ipaddress` models it. Spelled out here
+#: rather than imported from :mod:`netgraph.ipam`, which imports *this* module.
+_IPAddress: TypeAlias = "ipaddress.IPv4Address | ipaddress.IPv6Address"
 
 
 # --------------------------------------------------------------------------- #
@@ -444,6 +456,88 @@ class _Placement:
 
 
 @dataclass(frozen=True, slots=True)
+class _RouteEntry:
+    """One static route, tied to the device that configures it (§16.2)."""
+
+    owner_fqn: str
+    owner: Device
+    #: Position in ``spec.routes``, for the field path of a finding.
+    index: int
+    route: StaticRoute
+
+    @property
+    def vrf(self) -> str:
+        """The routing instance the route is in; global when it names none."""
+        return self.route.vrf or GLOBAL_VRF
+
+    @property
+    def where(self) -> str:
+        """``'rtr-a' route 0.0.0.0/0 via 203.0.113.1`` — the subject of a message."""
+        return f"{_q(self.owner_fqn)} route {self.route.describe()}"
+
+    def path(self, *suffix: str | int) -> tuple[str | int, ...]:
+        return ("spec", "routes", self.index, *suffix)
+
+
+@dataclass(frozen=True, slots=True)
+class _Session:
+    """One configured BGP session, with its far end resolved by address (§16.4).
+
+    Resolution is by *address*, which is what the device is configured with. A
+    session whose address matches nothing in the inventory is not an error — an
+    eBGP peer may be a transit provider nobody declares here — so ``peer_fqn``
+    is ``None`` rather than the check refusing to build.
+    """
+
+    owner_fqn: str
+    owner: Device
+    #: Position in ``spec.routing.bgp.neighbors``.
+    index: int
+    neighbor: BgpNeighbor
+    #: The element holding the neighbour address, when one does.
+    peer_fqn: str | None = None
+    #: The interface of that element the address sits on.
+    peer_interface: str | None = None
+
+    @property
+    def local_asn(self) -> int:
+        """The AS the configuring device declares itself in."""
+        bgp = self.owner.spec.routing.bgp if self.owner.spec.routing is not None else None
+        # A neighbour can only be reached through a ``bgp`` block, so there is one.
+        assert bgp is not None
+        return bgp.asn
+
+    @property
+    def resolved(self) -> bool:
+        return self.peer_fqn is not None
+
+    @property
+    def peer_port(self) -> str:
+        """``rtr-b:lo0`` — where the neighbour address was found."""
+        return f"{self.peer_fqn}:{self.peer_interface}"
+
+    def path(self, *suffix: str | int) -> tuple[str | int, ...]:
+        return ("spec", "routing", "bgp", "neighbors", self.index, *suffix)
+
+
+@dataclass(frozen=True, slots=True)
+class _Vrf:
+    """One VRF a device declares, with the interfaces bound to it (§16.1)."""
+
+    owner_fqn: str
+    owner: Device
+    index: int
+    vrf: VrfDefinition
+    #: Names of the interfaces that bind to it, in declaration order.
+    interfaces: tuple[str, ...] = ()
+    #: Positions in ``spec.routes`` of the routes placed in it.
+    routes: tuple[int, ...] = ()
+
+    def path(self, *suffix: str | int) -> tuple[str | int, ...]:
+        return ("spec", "vrfs", self.index, *suffix)
+
+
+@dataclass(frozen=True, slots=True)
 class _Context:
     """Everything the checks need, computed once.
 
@@ -497,6 +591,19 @@ class _Context:
     #: order. This is the same grouping the layer-3 graph draws, so a finding
     #: about a subnet and the diagram of it can never disagree.
     subnets: tuple[Subnet, ...] = ()
+    #: Every static route of every device, in load then declaration order (§16.2).
+    routes: tuple[_RouteEntry, ...] = ()
+    #: Every configured BGP session, with its far end resolved by address (§16.4).
+    sessions: tuple[_Session, ...] = ()
+    #: Every VRF any device declares, with what is bound and placed in it (§16.1).
+    vrfs: tuple[_Vrf, ...] = ()
+    #: Devices that declare ``spec.routing``, in load order.
+    routing: Mapping[str, RoutingConfig] = field(default_factory=dict)
+    #: Every address the inventory configures -> where it is, first declaration
+    #: winning. This is what resolves a BGP neighbour: a peer is an address in
+    #: the real world, so it is looked up as one here rather than by name. A
+    #: duplicate address is ``E004``'s business, not this index's.
+    address_owners: Mapping[_IPAddress, tuple[str, str]] = field(default_factory=dict)
 
     def source_of(self, fqn: str | None) -> SourceLocation | None:
         return self.inventory.source_of(fqn) if fqn is not None else None
@@ -533,6 +640,35 @@ class _Context:
             for end in self.tunnel_ends
             if end.tunnel_fqn == tunnel_fqn and end.owner_fqn is not None
         )
+
+    def on_link(
+        self, owner_fqn: str, *, vrf: str, version: int, dev: str | None = None
+    ) -> tuple[IPNetwork, ...]:
+        """The prefixes ``owner_fqn`` can reach without routing (§16.2).
+
+        A next hop is resolved by ARP or neighbour discovery, so it has to sit in
+        a prefix the device holds *itself* — in the right family, and in the right
+        routing instance, because a VRF is a routing table of its own and an
+        address in another one is not reachable from this one at all.
+
+        ``dev`` narrows it to one interface, which is what a route naming an
+        egress means: the next hop is on *that* link or nowhere.
+        """
+        owner = self.owners.get(owner_fqn)
+        if owner is None:  # pragma: no cover - callers iterate the owner map
+            return ()
+        prefixes: list[IPNetwork] = []
+        for interface in owner.interfaces:
+            if dev is not None and interface.name != dev:
+                continue
+            if (interface.vrf or GLOBAL_VRF) != vrf:
+                continue
+            prefixes.extend(
+                address.network
+                for address in interface.addresses()
+                if address.network.version == version and is_routable_address(address)
+            )
+        return tuple(prefixes)
 
     def is_suppressed(self, rule_id: str, elements: Sequence[str]) -> bool:
         """Does any element involved carry an annotation silencing ``rule_id``?"""
@@ -623,6 +759,7 @@ def _build_context(inventory: Inventory) -> _Context:
                 _resolve_encapsulation(inventory, tunnel_fqn, tunnel, over, namespace)
             )
 
+    routing = _collect_routing(owners)
     return _Context(
         inventory=inventory,
         owners=owners,
@@ -647,7 +784,128 @@ def _build_context(inventory: Inventory) -> _Context:
         aggregated_by={fqn: _aggregated_by(owner) for fqn, owner in owners.items()},
         suppressions=_collect_suppressions(inventory),
         subnets=_stable_subnets(subnets_of(inventory)),
+        routes=routing.routes,
+        sessions=routing.sessions,
+        vrfs=routing.vrfs,
+        routing=routing.routing,
+        address_owners=routing.address_owners,
     )
+
+
+@dataclass(frozen=True, slots=True)
+class _Routing:
+    """Everything §16 contributes to the context, collected in one pass.
+
+    One walk rather than four, and no walk at all for an inventory that declares
+    no routing — which is every inventory written before §16 existed. The
+    per-rule cost of the routing group is nil (``tools/profile_validate.py``);
+    what would have shown up is four more traversals of every device in
+    :func:`_build_context`, so there is one.
+    """
+
+    routes: tuple[_RouteEntry, ...] = ()
+    sessions: tuple[_Session, ...] = ()
+    vrfs: tuple[_Vrf, ...] = ()
+    routing: Mapping[str, RoutingConfig] = field(default_factory=dict)
+    address_owners: Mapping[_IPAddress, tuple[str, str]] = field(default_factory=dict)
+
+
+def _collect_routing(owners: Mapping[str, InterfaceOwner]) -> _Routing:
+    """Flatten the routing state of every device (§16), or nothing at all.
+
+    Two short-circuits, because most inventories say nothing about routing and
+    ``_build_context`` is a third of ``validate``:
+
+    * :func:`_routes_anything` decides in one comparison per device whether there
+      is anything to flatten at all, so an inventory written before §16 existed
+      pays one generator pass and nothing else;
+    * the address index is built only when a session needs resolving, since it is
+      a pass over every address in the inventory.
+    """
+    if not _routes_anything(owners):
+        return _Routing()
+
+    routes: list[_RouteEntry] = []
+    vrfs: list[_Vrf] = []
+    routing: dict[str, RoutingConfig] = {}
+    peers: list[tuple[str, Device, BgpConfig]] = []
+
+    for fqn, owner in owners.items():
+        if not isinstance(owner, Device):
+            continue
+        spec = owner.spec
+        for index, route in enumerate(spec.routes):
+            routes.append(_RouteEntry(owner_fqn=fqn, owner=owner, index=index, route=route))
+        for index, vrf in enumerate(spec.vrfs):
+            vrfs.append(
+                _Vrf(
+                    owner_fqn=fqn,
+                    owner=owner,
+                    index=index,
+                    vrf=vrf,
+                    interfaces=tuple(
+                        interface.name
+                        for interface in owner.interfaces
+                        if interface.vrf == vrf.name
+                    ),
+                    routes=tuple(
+                        position
+                        for position, route in enumerate(spec.routes)
+                        if route.vrf == vrf.name
+                    ),
+                )
+            )
+        if spec.routing is not None:
+            routing[fqn] = spec.routing
+            if spec.routing.bgp is not None and spec.routing.bgp.neighbors:
+                peers.append((fqn, owner, spec.routing.bgp))
+
+    addresses = _index_addresses(owners) if peers else {}
+    sessions = [
+        _Session(
+            owner_fqn=fqn,
+            owner=owner,
+            index=index,
+            neighbor=neighbor,
+            peer_fqn=peer[0] if (peer := addresses.get(neighbor.address)) else None,
+            peer_interface=peer[1] if peer else None,
+        )
+        for fqn, owner, bgp in peers
+        for index, neighbor in enumerate(bgp.neighbors)
+    ]
+    return _Routing(
+        routes=tuple(routes),
+        sessions=tuple(sessions),
+        vrfs=tuple(vrfs),
+        routing=routing,
+        address_owners=addresses,
+    )
+
+
+def _routes_anything(owners: Mapping[str, InterfaceOwner]) -> bool:
+    """Does any device declare routing state at all (§16)?"""
+    return any(
+        isinstance(owner, Device)
+        and (owner.spec.routes or owner.spec.vrfs or owner.spec.routing is not None)
+        for owner in owners.values()
+    )
+
+
+def _index_addresses(owners: Mapping[str, InterfaceOwner]) -> dict[_IPAddress, tuple[str, str]]:
+    """Every configured address -> ``(element, interface)``, first one winning.
+
+    Loopback and link-local addresses are left out: ``127.0.0.1`` is on every
+    machine and ``fe80::1`` on every link, so neither identifies an element — and
+    a BGP session pointed at one would be pointed at the local box.
+    """
+    index: dict[_IPAddress, tuple[str, str]] = {}
+    for fqn, owner in owners.items():
+        for interface in owner.interfaces:
+            for address in interface.addresses():
+                if not is_routable_address(address):
+                    continue
+                index.setdefault(address.ip, (fqn, interface.name))
+    return index
 
 
 def _stable_subnets(subnets: Sequence[Subnet]) -> tuple[Subnet, ...]:
@@ -973,7 +1231,14 @@ def _check_duplicate_mac(ctx: _Context) -> Iterator[_Draft]:
 
 
 def _check_duplicate_ip(ctx: _Context) -> Iterator[_Draft]:
-    """E004 — one IP address is assigned twice inside a subnet and VLAN."""
+    """E004 — one IP address is assigned twice inside a subnet, VLAN and VRF.
+
+    A **VRF** partitions the namespace (§16.1): a routing instance is a routing
+    table of its own, so the same address in ``blue`` and in the global instance
+    is the ordinary way to give two customers the same plan, and reporting it
+    would report the feature. Two addresses only collide when they are in one
+    instance, one prefix and one broadcast domain.
+    """
     # Grouped on the :mod:`ipaddress` objects rather than on their text: they
     # compare and hash exactly as their spellings do, so the groups are the
     # same, and the only two that are ever rendered are the ones a finding
@@ -982,6 +1247,7 @@ def _check_duplicate_ip(ctx: _Context) -> Iterator[_Draft]:
     for fqn, owner in ctx.owners.items():
         for interface in owner.interfaces:
             scope = interface.vlan.pvid if interface.vlan is not None else None
+            vrf = interface.vrf or GLOBAL_VRF
             for address in interface.addresses():
                 # A loopback address is scoped to the host that holds it
                 # (RFC 1122 §3.2.1.3, RFC 4291 §2.5.3) and never appears on a
@@ -989,17 +1255,20 @@ def _check_duplicate_ip(ctx: _Context) -> Iterator[_Draft]:
                 # than in conflict.
                 if address.ip.is_loopback:
                     continue
-                groups.setdefault((address.ip, address.network, scope), []).append((fqn, interface))
+                groups.setdefault((vrf, address.ip, address.network, scope), []).append(
+                    (fqn, interface)
+                )
 
-    for (ip, network, scope), entries in groups.items():
+    for (vrf, ip, network, scope), entries in groups.items():
         if len(entries) < 2:
             continue
         ordered = _by_port(entries)
         ports = [f"{fqn}:{interface.name}" for fqn, interface in ordered]
         domain = _describe_scope(scope)
+        instance = "" if not vrf else f" of VRF {_q(vrf)}"
         yield _Draft(
-            f"IP address {ip} in {network} is assigned to {len(ports)} interfaces in "
-            f"{domain}: {_join(ports)}",
+            f"IP address {ip} in {network}{instance} is assigned to {len(ports)} interfaces "
+            f"in {domain}: {_join(ports)}",
             tuple(dict.fromkeys(fqn for fqn, _ in ordered)),
             _interface_path(ctx.owners[ordered[0][0]], ordered[0][1]),
         )
@@ -1043,6 +1312,218 @@ def _check_gateway_on_link(ctx: _Context) -> Iterator[_Draft]:
                     (fqn,),
                     _index_path(owner, interface.name, f"ipv{version}", "gateway"),
                 )
+
+
+# --------------------------------------------------------------------------- #
+# Routing (§16)
+# --------------------------------------------------------------------------- #
+
+
+def _check_route_next_hop(ctx: _Context) -> Iterator[_Draft]:
+    """E032 — a route's next hop is in no prefix the device holds (``NG-F008``).
+
+    A next hop is reached by ARP or neighbour discovery, never by routing, so it
+    has to be on-link: inside a prefix configured on an interface of this device,
+    of the next hop's own family, in the route's own **routing instance**. A VRF
+    is a routing table of its own (§16.1), so an address in another one is not
+    merely a different subnet — it is unreachable from here by construction.
+
+    Three exemptions, each for a next hop that is on-link *by definition* rather
+    than by a prefix anybody wrote down:
+
+    * an IPv6 link-local next hop (``fe80::1``), the normal way to write a
+      next hop on an unnumbered link;
+    * a route that names a ``dev`` the device does not have, which is ``E033``
+      and would otherwise be reported twice;
+    * a blackhole route, which has no next hop at all.
+    """
+    for entry in ctx.routes:
+        via = entry.route.via
+        if via is None or via.is_link_local:
+            continue
+        dev = entry.route.dev
+        if dev is not None and dev not in ctx.by_name.get(entry.owner_fqn, {}):
+            continue
+        prefixes = ctx.on_link(entry.owner_fqn, vrf=entry.vrf, version=via.version, dev=dev)
+        if any(via in prefix for prefix in prefixes):
+            continue
+        yield _Draft(
+            f"{entry.where} has a next hop that is not on-link: {_describe_reach(prefixes, via, dev, entry.vrf)}. "
+            f"A next hop is resolved by neighbour discovery, so an off-link one is never "
+            f"reachable.",
+            (entry.owner_fqn,),
+            entry.path("via"),
+        )
+
+
+def _describe_reach(
+    prefixes: Sequence[IPNetwork], via: _IPAddress, dev: str | None, vrf: str
+) -> str:
+    """Why ``via`` is not on-link: what the device does hold, and where."""
+    scope = f"interface {_q(dev)}" if dev is not None else "the device"
+    instance = "the global instance" if not vrf else f"VRF {_q(vrf)}"
+    if not prefixes:
+        return (
+            f"{scope} configures no IPv{via.version} address in {instance} at all, so "
+            f"{via} sits on no link of it"
+        )
+    listed = _join_plain([str(prefix) for prefix in prefixes])
+    return f"{scope} is in {listed} in {instance}, and {via} is in none of them"
+
+
+def _check_route_device(ctx: _Context) -> Iterator[_Draft]:
+    """E033 — a route's ``dev`` names an interface the device has not got.
+
+    ``dev`` is how a route is pointed at an egress rather than at an address: an
+    unnumbered point-to-point link, or a route into a tunnel. A name that
+    resolves to nothing is a route the device would refuse to install, which
+    makes the destination unreachable while the inventory says it is served.
+    """
+    for entry in ctx.routes:
+        dev = entry.route.dev
+        if dev is None:
+            continue
+        known = ctx.by_name.get(entry.owner_fqn, {})
+        if dev in known:
+            continue
+        yield _Draft(
+            f"{entry.where} sends out of interface {_q(dev)}, which "
+            f"{_q(entry.owner_fqn)} does not have; it has {_join(sorted(known))}",
+            (entry.owner_fqn,),
+            entry.path("dev"),
+        )
+
+
+def _check_ospf_interfaces(ctx: _Context) -> Iterator[_Draft]:
+    """E034 — OSPF is enabled on an interface the device does not have (``NG-F010``).
+
+    An area is only as big as the interfaces that run it, so a name that resolves
+    to nothing is an adjacency that will never come up — and, in an inventory,
+    a link that looks like it is in the IGP and is not.
+    """
+    for fqn, routing in ctx.routing.items():
+        ospf = routing.ospf
+        if ospf is None:
+            continue
+        known = ctx.by_name.get(fqn, {})
+        missing = [name for name in ospf.interfaces if name not in known]
+        if not missing:
+            continue
+        yield _Draft(
+            f"element {_q(fqn)} runs OSPF area {ospf.area} on {_join(missing)}, which it "
+            f"does not have; it has {_join(sorted(known))}",
+            (fqn,),
+            ("spec", "routing", "ospf", "interfaces"),
+        )
+
+
+def _check_bgp_asn(ctx: _Context) -> Iterator[_Draft]:
+    """E035 — the two ends of a resolved session disagree about an AS (``NG-F011``).
+
+    ``remote_asn`` is a claim about the peer, and the peer states its own
+    ``asn``: when the two differ, the OPEN message carries an AS the far end does
+    not recognise and the session never establishes. Reported per *claim*, from
+    the document that makes it, because a typo on one side is one mistake and
+    two sides typed differently are two.
+
+    A peer that declares no ``routing.bgp`` at all is silent rather than
+    reported: an inventory may model the box without modelling its control plane,
+    and inventing a disagreement from an absent block would fire on every
+    partially-described network.
+    """
+    for session in ctx.sessions:
+        peer_fqn = session.peer_fqn
+        if peer_fqn is None:
+            continue
+        peer = ctx.owners.get(peer_fqn)
+        peer_routing = peer.spec.routing if isinstance(peer, Device) else None
+        peer_bgp = peer_routing.bgp if peer_routing is not None else None
+        if peer_bgp is None:
+            continue
+        claimed = session.neighbor.remote_asn
+        if claimed != peer_bgp.asn:
+            yield _Draft(
+                f"element {_q(session.owner_fqn)} peers with {session.neighbor.address} "
+                f"({_q(session.peer_port)}) as AS {claimed}, but {_q(peer_fqn)} declares "
+                f"AS {peer_bgp.asn}; the session would never establish",
+                (session.owner_fqn, peer_fqn),
+                session.path("remote_asn"),
+            )
+
+
+def _check_router_ids(ctx: _Context) -> Iterator[_Draft]:
+    """E036 — two elements claim the same router id (``NG-F012``).
+
+    A router id names the router itself: OSPF drops adjacencies with a neighbour
+    that claims the local id (RFC 2328 §10.5) and BGP refuses a session with a
+    duplicate identifier (RFC 4271 §6.8). One device declaring the same value for
+    OSPF and BGP is *one* identity, which is why the ids of a device are
+    de-duplicated before they are counted.
+    """
+    claims: dict[ipaddress.IPv4Address, list[str]] = {}
+    for fqn, routing in ctx.routing.items():
+        for router_id in routing.router_ids:
+            claims.setdefault(router_id, []).append(fqn)
+    for router_id, holders in claims.items():
+        if len(holders) < 2:
+            continue
+        ordered = sorted(holders)
+        yield _Draft(
+            f"router id {router_id} is claimed by {len(ordered)} elements: {_join(ordered)}. "
+            f"A router id identifies the router, so a duplicate keeps every adjacency "
+            f"between them down.",
+            tuple(ordered),
+            ("spec", "routing"),
+        )
+
+
+def _check_bgp_neighbour_resolves(ctx: _Context) -> Iterator[_Draft]:
+    """W135 — a neighbour address is nowhere in the inventory (``NG-F013``).
+
+    A warning, not an error, and deliberately so: an eBGP session towards a
+    transit provider points at an address on *their* router, which is not an
+    element of this inventory and never will be. What the warning is worth
+    saying is that netgraph cannot check the far end of this session, and that
+    the routing view has nothing to draw the edge to.
+    """
+    for session in ctx.sessions:
+        if session.resolved:
+            continue
+        described = f" ({session.neighbor.description})" if session.neighbor.description else ""
+        yield _Draft(
+            f"element {_q(session.owner_fqn)} peers with {session.neighbor.address} in "
+            f"AS {session.neighbor.remote_asn}{described}, which no element of this "
+            f"inventory is addressed at; the session is drawn to nothing and its far end "
+            f"cannot be checked",
+            (session.owner_fqn,),
+            session.path("address"),
+        )
+
+
+def _check_empty_vrf(ctx: _Context) -> Iterator[_Draft]:
+    """W136 — a VRF nothing is bound to (``NG-F014``).
+
+    A routing instance is a table plus the interfaces that feed it. With no
+    interface bound, it holds no address and no connected route, so every address
+    and every static route placed in it is unreachable — and the partition it was
+    declared to create does not exist: the addresses an operator meant to isolate
+    are all still in the global instance.
+    """
+    for entry in ctx.vrfs:
+        if entry.interfaces:
+            continue
+        placed = (
+            f"; {count_text(len(entry.routes), 'route')} placed in it can never resolve a next hop"
+            if entry.routes
+            else ""
+        )
+        yield _Draft(
+            f"element {_q(entry.owner_fqn)} declares VRF {_q(entry.vrf.name)} "
+            f"(rd {entry.vrf.rd}), but no interface is bound to it, so it holds no "
+            f"address{placed}",
+            (entry.owner_fqn,),
+            entry.path("name"),
+        )
 
 
 def _check_vlan_mismatch(ctx: _Context) -> Iterator[_Draft]:
@@ -1754,25 +2235,33 @@ def _check_overlapping_prefixes(ctx: _Context) -> Iterator[_Draft]:
     every port is how link-local works rather than a clash.
 
     Two addresses on **one** interface are exempt by §10.3's own wording: a
-    secondary address inside the primary's prefix is an ordinary alias.
+    secondary address inside the primary's prefix is an ordinary alias. So are
+    two interfaces in **different VRFs** (§16.1): each instance has a routing
+    table of its own, so there is no single egress to be ambiguous about — which
+    is the entire reason to put two overlapping plans on one router.
     """
     for fqn, owner in ctx.owners.items():
-        placements = [
-            (interface.name, address.network)
-            for interface in owner.interfaces
-            for address in interface.addresses()
-            if is_routable_address(address)
-        ]
-        for first, second in _overlapping_pairs(placements):
-            (left_port, left_net), (right_port, right_net) = first, second
-            yield _Draft(
-                f"element {_q(fqn)} has overlapping prefixes on two interfaces: "
-                f"{_q(f'{fqn}:{left_port}')} is in {left_net} and "
-                f"{_q(f'{fqn}:{right_port}')} is in {right_net}; traffic for the overlap has "
-                f"no single egress",
-                (fqn,),
-                _index_path(owner, left_port),
-            )
+        # Grouped by routing instance rather than compared pairwise inside the
+        # loop below: an inventory with no VRF in it has exactly one group, so
+        # the quadratic part is the same walk it was before instances existed.
+        by_instance: dict[str, list[tuple[str, IPNetwork]]] = {}
+        for interface in owner.interfaces:
+            for address in interface.addresses():
+                if is_routable_address(address):
+                    key = interface.vrf or GLOBAL_VRF
+                    by_instance.setdefault(key, []).append((interface.name, address.network))
+
+        for vrf, placements in by_instance.items():
+            instance = "" if not vrf else f" of VRF {_q(vrf)}"
+            for (left_port, left_net), (right_port, right_net) in _overlapping_pairs(placements):
+                yield _Draft(
+                    f"element {_q(fqn)} has overlapping prefixes on two interfaces{instance}: "
+                    f"{_q(f'{fqn}:{left_port}')} is in {left_net} and "
+                    f"{_q(f'{fqn}:{right_port}')} is in {right_net}; traffic for the overlap has "
+                    f"no single egress",
+                    (fqn,),
+                    _index_path(owner, left_port),
+                )
 
 
 def _overlapping_pairs(
@@ -1781,7 +2270,10 @@ def _overlapping_pairs(
     """Each pair of placements on distinct interfaces whose prefixes overlap.
 
     A pair of *prefixes* is reported once per pair of interfaces, however many
-    addresses each interface holds in them.
+    addresses each interface holds in them. The caller passes one routing
+    instance at a time, so two interfaces in different instances are never a
+    pair — each instance has a routing table, so there is no single egress to be
+    ambiguous about.
     """
     seen: set[tuple[str, str, str, str]] = set()
     for index, (left_port, left_net) in enumerate(placements):
@@ -3524,6 +4016,11 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("E029", _check_duplicate_bssid),
     ("E030", _check_bss_vlan_carried),
     ("E031", _check_associated_ssid),
+    ("E032", _check_route_next_hop),
+    ("E033", _check_route_device),
+    ("E034", _check_ospf_interfaces),
+    ("E035", _check_bgp_asn),
+    ("E036", _check_router_ids),
     ("W101", _check_unaddressed_interface),
     ("W102", _check_mtu_mismatch),
     ("W103", _check_orphan_device),
@@ -3558,6 +4055,8 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("W132", _check_link_prefixes),
     ("W133", _check_dangling_patch),
     ("W134", _check_cochannel_aps),
+    ("W135", _check_bgp_neighbour_resolves),
+    ("W136", _check_empty_vrf),
     ("I001", _check_local_mac),
     ("I002", _check_uncabled_interface),
     ("I003", _check_nonstandard_port),

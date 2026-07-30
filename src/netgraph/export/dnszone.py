@@ -208,6 +208,12 @@ def _reverse_zones(context: ExportContext, hosts: Mapping[str, _Host]) -> Iterat
     """One section per delegation boundary, in address order."""
     options = context.options
     grouped: dict[str, list[Subnet]] = {}
+    # Ordered by *address*, not by ``Subnet.sort_key``, which leads with the
+    # routing instance: the DNS has no VRF column, so two instances using one
+    # prefix (§16.1) land in one zone, and a zone file that jumped between
+    # instances would list 10.1.99 after 198.51.100 for a reason no reader of it
+    # could see. The lowest key of any subnet mapping to a zone decides where the
+    # section goes.
     order: dict[str, tuple[int, int, int]] = {}
 
     for subnet in subnets_of(context.inventory):
@@ -215,8 +221,13 @@ def _reverse_zones(context: ExportContext, hosts: Mapping[str, _Host]) -> Iterat
         if not narrowed.members:
             continue
         zone = reverse_zone_of(subnet.network)
+        key = (
+            subnet.network.version,
+            int(subnet.network.network_address),
+            subnet.network.prefixlen,
+        )
         grouped.setdefault(zone, []).append(narrowed)
-        order[zone] = min(order.get(zone, subnet.sort_key), subnet.sort_key)
+        order[zone] = min(order.get(zone, key), key)
 
     for zone in sorted(grouped, key=lambda name: order[name]):
         records = _pointers(grouped[zone], zone, hosts, options)

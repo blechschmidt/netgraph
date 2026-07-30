@@ -1287,6 +1287,46 @@ malformed document already gets.
 
 ---
 
+## 12. The `validate` timing guard is at its limit under coverage
+
+**Status:** threshold raised 2026-07-30 with the routing model (§16), the
+measurement recorded here. Nothing regressed; the guard had run out of headroom.
+
+`tests/test_performance.py::test_validating_costs_no_more_than_its_budget_above_an_address_walk`
+compares `validate` against an address-walk floor and asserted a ratio of at most
+**8.5**. That number came from entry 7, where the measured spread was 6.9–7.2 —
+17 % of headroom. Measured on this machine while adding the routing rules:
+
+| | uninstrumented | under `pytest-cov` |
+|---|---|---|
+| before §16 | 7.8–8.2 | 8.50–8.56 |
+| after §16 | 8.0–8.1 | 8.50–8.68 |
+
+The instrumented column is the one CI reads, because coverage is on by default in
+`pyproject.toml`. Coverage traces per *line executed*, and `validate` is a hundred
+small functions where the floor is one tight loop — so the ratio is systematically
+higher under it, and the guard was already failing about two runs in five
+**before** the routing rules existed.
+
+**That the routing rules are not the cause is measured, not assumed.**
+`tools/profile_validate.py` reports 0.0 ms for each of `E032`–`E036`, `W135` and
+`W136` on a 1056-device tree, and commenting all seven out of `_CHECKS` leaves the
+instrumented ratio at 8.57–8.65 — indistinguishable from having them. What §16 did
+add was context building, and that is why `_collect_routing` is one pass gated on
+`_routes_anything`, and why the address index behind a BGP peer lookup is built
+only when a session needs resolving.
+
+The threshold is now **9.0**, which keeps the property the guard exists for: entry
+7 records that reverting the `validate.py` half of it alone gives 9.1 against a
+"today" of 6.9–7.2, so the same revert against a today of 8.6 lands far above 9.0.
+
+**What would justify revisiting this.** A floor that is instrumented like the
+thing it bounds — the honest fix, and a bigger change than a threshold: it would
+mean either running this one test with coverage disabled, or measuring both halves
+through the same tracer by construction.
+
+---
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

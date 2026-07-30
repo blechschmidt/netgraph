@@ -206,7 +206,7 @@ Everything else hangs off one of the five stages and adds no sixth.
 | Branch | Attaches after | Entry point |
 |---|---|---|
 | `report.py` | stage 2 | `build_report(inventory, findings, *, base=None)`, then `render_report(report, output_format)` |
-| `subnets.py` | stage 1 | `subnets_of(inventory) -> tuple[Subnet, ...]` — the prefixes the configured addresses imply |
+| `subnets.py` | stage 1 | `subnets_of(inventory) -> tuple[Subnet, ...]` — the prefixes the configured addresses imply, one group per `(vrf, prefix)` |
 | `ipam.py` | stage 1, via `subnets.py` | `build_report(inventory, config=None, *, aggregated=False)`; `conflicts()` calls `validate` rather than re-deriving anything |
 | `graph.py` (top level) | stage 3 | `to_networkx(source, *, layer=None) -> nx.MultiGraph`, then its own `filter_graph`, `layers`, `broadcast_domains`, `stats` |
 | `trace/` | stage 3 | `trace(inventory, source, destination, *, vlan=None, …) -> TraceResult` |
@@ -292,7 +292,7 @@ Verified against the tree: every path below exists.
 | `src/netgraph/rules.py` | catalogue of validation rules and severities |
 | `src/netgraph/report.py` | `validate` as json, SARIF 2.1.0 and GitHub workflow commands |
 | `src/netgraph/schema.py` | JSON Schema emitted for editors (`netgraph schema`) |
-| `src/netgraph/subnets.py` | IP prefixes derived from the configured addresses; `ipam.py` adds utilisation, free space and conflicts over them |
+| `src/netgraph/subnets.py` | IP prefixes derived from the configured addresses, partitioned by routing instance; `ipam.py` adds utilisation, free space and conflicts over them |
 | `src/netgraph/validate.py` | semantic validation engine |
 | `src/netgraph/graph.py` | the same resolved topology as a `networkx.MultiGraph`, for analysis |
 | `src/netgraph/models/` | pydantic models for every element kind; `fielddocs.py` holds one prose description and YANG path per field, for both generators |
@@ -302,7 +302,7 @@ Verified against the tree: every path below exists.
 | `src/netgraph/render/details.py` | per-element hover records and tooltip text; `ids.py` the stable id each drawn node, edge and cluster carries; `links.py` the `--link-template` URL back to the document; `highlight.py` the emphasis a reader asked for; `icons.py` icon themes (a directory of images named after element kinds, the bundled ones under `iconsets/`) |
 | `src/netgraph/render/fragment.py` | the Graphviz SVG made embeddable, for the page and the preview; `assets/` holds the style sheet, the client and the record renderer `netgraph web` shares with it — inlined, never fetched |
 | `src/netgraph/trace/` | reachability tracing (`netgraph path`): `endpoints.py` resolves what the user typed, `engine.py` searches layer 2 then layer 3, `model.py` holds the result, `report.py` renders it as text or JSON |
-| `src/netgraph/export/` | `netgraph export`: five operational artefacts, with `context.py` for the values every emitter reads, `names.py` for folding a name into each target grammar, `manifest.py` for what was dropped |
+| `src/netgraph/export/` | `netgraph export`: six operational artefacts, with `context.py` for the values every emitter reads, `names.py` for folding a name into each target grammar, `manifest.py` for what was dropped |
 | `src/netgraph/fmt/` | the canonical form of an inventory file (`netgraph fmt`): `canonical.py` shapes it, `order.py` holds the key order, `verify.py` re-reads it strictly, `runner.py` walks the paths |
 | `src/netgraph/importer/` | `netgraph import`: a first inventory from live-network output. `run.py` reads the inputs, sniffs each dialect and writes the tree; `lldp.py` turns `lldpctl`/`lldpcli` neighbour records into cables, both ends at once; `iproute.py` turns `ip -j link`/`addr` into one host's interfaces, bridges, bonds and VLANs; `csvlinks.py` reads `device,port,device,port` rows (and says why not NetJSON); `draft.py` is the neutral inventory every reader appends to, and the dedup; `emit.py` writes it as commented YAML in `docs/schema.md` field order |
 | `src/netgraph/watch/` | live re-rendering (`netgraph watch`): `pipeline.py` is one load → validate → render cycle and its published state, `loop.py` decides what counts as a change, `server.py` is the loopback preview and its self-reloading page |

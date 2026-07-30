@@ -130,7 +130,7 @@ netgraph watch --serve --host 0.0.0.0 --port 9000        # deliberate, and warne
 | `--max-addresses` | `N` | `4` | Longest address list spelled out under a node before it is abbreviated to 'and N more'. 0 prints the count alone. |
 | `--rankdir` | `[tb\|lr\|bt\|rl]` | TB, top to bottom | Layout direction. A wide network reads better left to right; a deep one top to bottom. Honoured by the Graphviz backends and by mermaid. |
 | `--title` | `TEXT` | — | Caption for the diagram. |
-| `--layer` | `[physical\|l1\|l2\|l3\|overlay\|rack]` | `l1` | l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets and the elements addressed in them; physical adds the patch panels l1 splices out; rack draws a front elevation per rack. Repeatable for -f html, which draws each layer and puts a switcher over them. |
+| `--layer` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack]` | `l1` | l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets and the elements addressed in them; overlay draws the tunnels; routing draws the BGP sessions and OSPF adjacencies, clustered by VRF; physical adds the patch panels l1 splices out; rack draws a front elevation per rack. Repeatable for -f html, which draws each layer and puts a switcher over them. |
 | `--strict` | — | off | Treat warnings as errors. |
 | `--force` | — | off | Proceed even when validation failed. The result may not match the files. |
 | `--profile` | `NAME` | — | Apply the [profile.NAME] block of netgraph.toml on top of its [render] table. Explicit flags still win over both. |

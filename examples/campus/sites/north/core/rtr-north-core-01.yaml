@@ -55,3 +55,36 @@ spec:
   forwarding:
     ipv4: true
     ipv6: true
+  routes:
+    # A discard route for the site summary: every connected /24 is more specific
+    # and still wins, so this catches only the parts of 10.1.0.0/16 that are
+    # not deployed yet -- which is what stops them following a default route back
+    # out over the backbone (RFC 4632 section 5.1).
+    - prefix: 10.1.0.0/16
+      blackhole: true
+      metric: 250
+    # The management prefix of the next site round the ring, pinned to the
+    # clockwise fibre rather than left to the IGP.
+    - prefix: 10.2.99.0/24
+      via: 198.51.100.2
+      dev: xe-0/0/1
+      metric: 200
+  routing:
+    ospf:
+      area: 0.0.0.0
+      router_id: 192.0.2.1
+      interfaces:
+        - lo0
+        - xe-0/0/0
+        - xe-0/0/1
+        - xe-0/0/2
+    bgp:
+      asn: 65001
+      router_id: 192.0.2.1
+      neighbors:
+        - address: 192.0.2.2
+          remote_asn: 65001
+          description: iBGP to rtr-south-core-01
+        - address: 192.0.2.3
+          remote_asn: 65001
+          description: iBGP to rtr-west-core-01

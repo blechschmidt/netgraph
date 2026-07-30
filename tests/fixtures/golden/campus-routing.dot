@@ -1,0 +1,138 @@
+graph netgraph {
+  graph [
+    rankdir=TB,
+    splines=true,
+    overlap=false,
+    nodesep=0.5,
+    ranksep=0.7,
+    fontname="Helvetica,Arial,sans-serif",
+    fontsize=12,
+    label="Campus, routing",
+    labelloc=t,
+    fontsize=16,
+  ];
+  node [fontname="Helvetica,Arial,sans-serif", fontsize=10, style=filled, penwidth=1.2];
+  edge [fontname="Helvetica,Arial,sans-serif", fontsize=8];
+
+  "sites/north/core/rtr-north-core-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-north-core-01 [router, AS 65001]\nnamespace: sites/north/core\nLayer-3 core router for the North campus. It routes between the campus VLANs (whose gateways sit on sw-north-dist-01) and carries the two backbone fibres of the inter-site ring.\nlabels: env=prod, role=core, site=north\nAS 65001, router id 192.0.2.1\nospf area 0.0.0.0 on lo0, xe-0/0/0, xe-0/0/1, xe-0/0/2\nroutes (2):\n  10.1.0.0/16 blackhole metric 250\n  10.2.99.0/24 via 198.51.100.2 dev xe-0/0/1 metric 200\ninterfaces (4):\n  lo0  loopback  192.0.2.1/32, 2001:db8::1/128\n  xe-0/0/0  ethernet  10.1.0.1/30, 2001:db8:1::1/64  00:05:86:01:c0:00\n  xe-0/0/1  ethernet  198.51.100.1/30, 2001:db8:ff:1::1/64  00:05:86:01:c0:01\n  xe-0/0/2  ethernet  198.51.100.10/30, 2001:db8:ff:3::2/64  00:05:86:01:c0:02\nlinks (5):\n  sites/south/core/rtr-south-core-01:lo0  (bgp)\n  sites/west/core/rtr-west-core-01:lo0  (bgp)\n  xe-0/0/0 — sites/north/distribution/sw-north-dist-01:Ethernet52/1  (ospf)\n  xe-0/0/1 — sites/south/core/rtr-south-core-01:xe-0/0/2  (ospf)\n  xe-0/0/2 — sites/west/core/rtr-west-core-01:xe-0/0/1  (ospf)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-north-core-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[router, AS 65001, id 192.0.2.1, ospf area 0.0.0.0]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">10.1.0.0/16 blackhole metric 250</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">10.2.99.0/24 via 198.51.100.2 dev xe-0/0/1 metric 200</TD></TR>
+    </TABLE>
+  >];
+  "sites/south/core/rtr-south-core-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-south-core-01 [router, AS 65001]\nnamespace: sites/south/core\nLayer-3 core router for the South campus. It routes between the campus VLANs (whose gateways sit on sw-south-dist-01) and carries the two backbone fibres of the inter-site ring.\nlabels: env=prod, role=core, site=south\nAS 65001, router id 192.0.2.2\nospf area 0.0.0.0 on lo0, xe-0/0/0, xe-0/0/1, xe-0/0/2\nroutes (2):\n  10.2.0.0/16 blackhole metric 250\n  10.3.99.0/24 via 198.51.100.6 dev xe-0/0/1 metric 200\ninterfaces (4):\n  lo0  loopback  192.0.2.2/32, 2001:db8::2/128\n  xe-0/0/0  ethernet  10.2.0.1/30, 2001:db8:2::1/64  00:05:86:02:c0:00\n  xe-0/0/1  ethernet  198.51.100.5/30, 2001:db8:ff:2::1/64  00:05:86:02:c0:01\n  xe-0/0/2  ethernet  198.51.100.2/30, 2001:db8:ff:1::2/64  00:05:86:02:c0:02\nlinks (5):\n  lo0 — sites/north/core/rtr-north-core-01  (bgp)\n  sites/west/core/rtr-west-core-01:lo0  (bgp)\n  xe-0/0/0 — sites/south/distribution/sw-south-dist-01:Ethernet52/1  (ospf)\n  xe-0/0/2 — sites/north/core/rtr-north-core-01:xe-0/0/1  (ospf)\n  xe-0/0/1 — sites/west/core/rtr-west-core-01:xe-0/0/2  (ospf)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-south-core-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[router, AS 65001, id 192.0.2.2, ospf area 0.0.0.0]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">10.2.0.0/16 blackhole metric 250</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">10.3.99.0/24 via 198.51.100.6 dev xe-0/0/1 metric 200</TD></TR>
+    </TABLE>
+  >];
+  "sites/west/core/rtr-west-core-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-west-core-01 [router, AS 65001]\nnamespace: sites/west/core\nLayer-3 core router for the West annexe. It routes between the campus VLANs (whose gateways sit on sw-west-dist-01) and carries the two backbone fibres of the inter-site ring.\nlabels: env=prod, role=core, site=west\nAS 65001, router id 192.0.2.3\nospf area 0.0.0.0 on lo0, xe-0/0/0, xe-0/0/1, xe-0/0/2\nroutes (2):\n  10.3.0.0/16 blackhole metric 250\n  10.1.99.0/24 via 198.51.100.10 dev xe-0/0/1 metric 200\ninterfaces (4):\n  lo0  loopback  192.0.2.3/32, 2001:db8::3/128\n  xe-0/0/0  ethernet  10.3.0.1/30, 2001:db8:3::1/64  00:05:86:03:c0:00\n  xe-0/0/1  ethernet  198.51.100.9/30, 2001:db8:ff:3::1/64  00:05:86:03:c0:01\n  xe-0/0/2  ethernet  198.51.100.6/30, 2001:db8:ff:2::2/64  00:05:86:03:c0:02\nlinks (5):\n  lo0 — sites/north/core/rtr-north-core-01  (bgp)\n  lo0 — sites/south/core/rtr-south-core-01  (bgp)\n  xe-0/0/0 — sites/west/distribution/sw-west-dist-01:Ethernet52/1  (ospf)\n  xe-0/0/2 — sites/south/core/rtr-south-core-01:xe-0/0/1  (ospf)\n  xe-0/0/1 — sites/north/core/rtr-north-core-01:xe-0/0/2  (ospf)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-west-core-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[router, AS 65001, id 192.0.2.3, ospf area 0.0.0.0]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">10.3.0.0/16 blackhole metric 250</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">10.1.99.0/24 via 198.51.100.10 dev xe-0/0/1 metric 200</TD></TR>
+    </TABLE>
+  >];
+
+  subgraph cluster_vrf_0 {
+    label="vrf mgmt";
+    tooltip="vrf mgmt\n10 elements: 10 switches\nvlans: 1,10,20,30,99";
+    style=rounded;
+    color="#9ca3af";
+    fontcolor="#4b5563";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+    "sites/north/access/sw-north-acc-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-north-acc-01 [switch]\nnamespace: sites/north/access\nAccess switch 01, North campus. Layer-2 only: the ports are untagged access ports, and the switch's own management address lives on the Vlan99 SVI rather than on a port (NG-V009).\nlabels: env=prod, role=access, site=north\nvrfs: mgmt (rd 65001:99)\nvlans: 1,10,20,30,99\ninterfaces (6):\n  br0  bridge\n  Vlan99  vlan  10.1.99.11/24  vlan 99 (access)\n  GigabitEthernet1/0/1  ethernet  vlan 10 (access)  00:1b:0d:01:a1:01\n  GigabitEthernet1/0/2  ethernet  vlan 20 (access)  00:1b:0d:01:a1:02\n  GigabitEthernet1/0/3  ethernet  disabled  vlan 10 (access)  00:1b:0d:01:a1:03\n  TenGigabitEthernet1/1/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1b:0d:01:a1:11", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-north-acc-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">vrf mgmt</TD><TD ALIGN="LEFT">65001:99</TD><TD ALIGN="LEFT"></TD></TR>
+      </TABLE>
+    >];
+    "sites/north/access/sw-north-acc-02" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-north-acc-02 [switch]\nnamespace: sites/north/access\nAccess switch 02, North campus - second floor riser.\nlabels: env=prod, role=access, site=north\nvrfs: mgmt (rd 65001:99)\nvlans: 1,10,20,30,99\ninterfaces (5):\n  br0  bridge\n  Vlan99  vlan  10.1.99.12/24  vlan 99 (access)\n  GigabitEthernet1/0/1  ethernet  vlan 10 (access)  00:1b:0d:01:a2:01\n  GigabitEthernet1/0/2  ethernet  disabled  vlan 20 (access)  00:1b:0d:01:a2:02\n  TenGigabitEthernet1/1/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1b:0d:01:a2:11", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-north-acc-02</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">vrf mgmt</TD><TD ALIGN="LEFT">65001:99</TD><TD ALIGN="LEFT"></TD></TR>
+      </TABLE>
+    >];
+    "sites/north/access/sw-north-acc-03" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-north-acc-03 [switch]\nnamespace: sites/north/access\nAccess switch 03, North campus - third floor riser.\nlabels: env=prod, role=access, site=north\nvrfs: mgmt (rd 65001:99)\nvlans: 1,10,20,30,99\ninterfaces (51):\n  br0  bridge\n  Vlan99  vlan  10.1.99.13/24  vlan 99 (access)\n  GigabitEthernet1/0/1  ethernet  disabled  vlan 10 (access)\n  GigabitEthernet1/0/2  ethernet  disabled  vlan 10 (access)\n  GigabitEthernet1/0/3  ethernet  disabled  vlan 10 (access)\n  GigabitEthernet1/0/4  ethernet  disabled  vlan 10 (access)\n  GigabitEthernet1/0/5  ethernet  disabled  vlan 10 (access)\n  GigabitEthernet1/0/6  ethernet  disabled  vlan 10 (access)\n  (+43 more)", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-north-acc-03</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">vrf mgmt</TD><TD ALIGN="LEFT">65001:99</TD><TD ALIGN="LEFT"></TD></TR>
+      </TABLE>
+    >];
+    "sites/north/distribution/sw-north-dist-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-north-dist-01 [switch]\nnamespace: sites/north/distribution\nDistribution switch for the North campus. It aggregates the access-layer trunks, hosts the SVI gateway for every campus VLAN, and reaches the core router over a routed (untagged) fibre uplink.\nlabels: env=prod, role=distribution, site=north\nrouter id 10.1.0.2\nospf area 0.0.0.0 on Ethernet52/1, Vlan10, Vlan20\nvrfs: mgmt (rd 65001:99)\nroutes (2):\n  0.0.0.0/0 via 10.1.0.1 dev Ethernet52/1 metric 10\n  0.0.0.0/0 blackhole vrf mgmt\nvlans: 1,10,20,30,99\ninterfaces (8):\n  br0  bridge\n  Vlan10  vlan  10.1.10.1/24, 2001:db8:1:10::1/64  vlan 10 (access)\n  Vlan20  vlan  10.1.20.1/24, 2001:db8:1:20::1/64  vlan 20 (access)\n  Vlan99  vlan  10.1.99.1/24  vlan 99 (access)\n  Ethernet49/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1c:73:01:d0:01\n  Ethernet50/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1c:73:01:d0:02\n  Ethernet51/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1c:73:01:d0:03\n  Ethernet52/1  ethernet  10.1.0.2/30, 2001:db8:1::2/64  00:1c:73:01:d0:04\nlinks (1):\n  Ethernet52/1 — sites/north/core/rtr-north-core-01:xe-0/0/0  (ospf)", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-north-dist-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch, id 10.1.0.2, ospf area 0.0.0.0]</TD></TR>
+        <TR><TD ALIGN="LEFT">vrf mgmt</TD><TD ALIGN="LEFT">65001:99</TD><TD ALIGN="LEFT"></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">0.0.0.0/0 via 10.1.0.1 dev Ethernet52/1 metric 10</TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">0.0.0.0/0 blackhole vrf mgmt</TD></TR>
+      </TABLE>
+    >];
+    "sites/south/access/sw-south-acc-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-south-acc-01 [switch]\nnamespace: sites/south/access\nAccess switch 01, South campus. Layer-2 only: the ports are untagged access ports, and the switch's own management address lives on the Vlan99 SVI rather than on a port (NG-V009).\nlabels: env=prod, role=access, site=south\nvrfs: mgmt (rd 65001:99)\nvlans: 1,10,20,30,99\ninterfaces (6):\n  br0  bridge\n  Vlan99  vlan  10.2.99.11/24  vlan 99 (access)\n  GigabitEthernet1/0/1  ethernet  vlan 10 (access)  00:1b:0d:02:a1:01\n  GigabitEthernet1/0/2  ethernet  vlan 20 (access)  00:1b:0d:02:a1:02\n  GigabitEthernet1/0/3  ethernet  disabled  vlan 10 (access)  00:1b:0d:02:a1:03\n  TenGigabitEthernet1/1/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1b:0d:02:a1:11", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-south-acc-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">vrf mgmt</TD><TD ALIGN="LEFT">65001:99</TD><TD ALIGN="LEFT"></TD></TR>
+      </TABLE>
+    >];
+    "sites/south/access/sw-south-acc-02" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-south-acc-02 [switch]\nnamespace: sites/south/access\nAccess switch 02, South campus - second floor riser.\nlabels: env=prod, role=access, site=south\nvrfs: mgmt (rd 65001:99)\nvlans: 1,10,20,30,99\ninterfaces (5):\n  br0  bridge\n  Vlan99  vlan  10.2.99.12/24  vlan 99 (access)\n  GigabitEthernet1/0/1  ethernet  vlan 10 (access)  00:1b:0d:02:a2:01\n  GigabitEthernet1/0/2  ethernet  disabled  vlan 20 (access)  00:1b:0d:02:a2:02\n  TenGigabitEthernet1/1/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1b:0d:02:a2:11", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-south-acc-02</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">vrf mgmt</TD><TD ALIGN="LEFT">65001:99</TD><TD ALIGN="LEFT"></TD></TR>
+      </TABLE>
+    >];
+    "sites/south/distribution/sw-south-dist-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-south-dist-01 [switch]\nnamespace: sites/south/distribution\nDistribution switch for the South campus. It aggregates the access-layer trunks, hosts the SVI gateway for every campus VLAN, and reaches the core router over a routed (untagged) fibre uplink.\nlabels: env=prod, role=distribution, site=south\nrouter id 10.2.0.2\nospf area 0.0.0.0 on Ethernet52/1, Vlan10, Vlan20\nvrfs: mgmt (rd 65001:99)\nroutes (2):\n  0.0.0.0/0 via 10.2.0.1 dev Ethernet52/1 metric 10\n  0.0.0.0/0 blackhole vrf mgmt\nvlans: 1,10,20,30,99\ninterfaces (7):\n  br0  bridge\n  Vlan10  vlan  10.2.10.1/24, 2001:db8:2:10::1/64  vlan 10 (access)\n  Vlan20  vlan  10.2.20.1/24, 2001:db8:2:20::1/64  vlan 20 (access)\n  Vlan99  vlan  10.2.99.1/24  vlan 99 (access)\n  Ethernet49/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1c:73:02:d0:01\n  Ethernet50/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1c:73:02:d0:02\n  Ethernet52/1  ethernet  10.2.0.2/30, 2001:db8:2::2/64  00:1c:73:02:d0:04\nlinks (1):\n  Ethernet52/1 — sites/south/core/rtr-south-core-01:xe-0/0/0  (ospf)", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-south-dist-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch, id 10.2.0.2, ospf area 0.0.0.0]</TD></TR>
+        <TR><TD ALIGN="LEFT">vrf mgmt</TD><TD ALIGN="LEFT">65001:99</TD><TD ALIGN="LEFT"></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">0.0.0.0/0 via 10.2.0.1 dev Ethernet52/1 metric 10</TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">0.0.0.0/0 blackhole vrf mgmt</TD></TR>
+      </TABLE>
+    >];
+    "sites/west/access/sw-west-acc-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-west-acc-01 [switch]\nnamespace: sites/west/access\nAccess switch 01, West annexe. Layer-2 only: the ports are untagged access ports, and the switch's own management address lives on the Vlan99 SVI rather than on a port (NG-V009).\nlabels: env=prod, role=access, site=west\nvrfs: mgmt (rd 65001:99)\nvlans: 1,10,20,30,99\ninterfaces (6):\n  br0  bridge\n  Vlan99  vlan  10.3.99.11/24  vlan 99 (access)\n  GigabitEthernet1/0/1  ethernet  vlan 10 (access)  00:1b:0d:03:a1:01\n  GigabitEthernet1/0/2  ethernet  vlan 20 (access)  00:1b:0d:03:a1:02\n  GigabitEthernet1/0/3  ethernet  disabled  vlan 10 (access)  00:1b:0d:03:a1:03\n  TenGigabitEthernet1/1/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1b:0d:03:a1:11", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-west-acc-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">vrf mgmt</TD><TD ALIGN="LEFT">65001:99</TD><TD ALIGN="LEFT"></TD></TR>
+      </TABLE>
+    >];
+    "sites/west/access/sw-west-acc-02" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-west-acc-02 [switch]\nnamespace: sites/west/access\nAccess switch 02, West annexe - second floor riser.\nlabels: env=prod, role=access, site=west\nvrfs: mgmt (rd 65001:99)\nvlans: 1,10,20,30,99\ninterfaces (5):\n  br0  bridge\n  Vlan99  vlan  10.3.99.12/24  vlan 99 (access)\n  GigabitEthernet1/0/1  ethernet  vlan 10 (access)  00:1b:0d:03:a2:01\n  GigabitEthernet1/0/2  ethernet  disabled  vlan 20 (access)  00:1b:0d:03:a2:02\n  TenGigabitEthernet1/1/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1b:0d:03:a2:11", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-west-acc-02</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+        <TR><TD ALIGN="LEFT">vrf mgmt</TD><TD ALIGN="LEFT">65001:99</TD><TD ALIGN="LEFT"></TD></TR>
+      </TABLE>
+    >];
+    "sites/west/distribution/sw-west-dist-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-west-dist-01 [switch]\nnamespace: sites/west/distribution\nDistribution switch for the West annexe. It aggregates the access-layer trunks, hosts the SVI gateway for every campus VLAN, and reaches the core router over a routed (untagged) fibre uplink.\nlabels: env=prod, role=distribution, site=west\nrouter id 10.3.0.2\nospf area 0.0.0.0 on Ethernet52/1, Vlan10, Vlan20\nvrfs: mgmt (rd 65001:99)\nroutes (2):\n  0.0.0.0/0 via 10.3.0.1 dev Ethernet52/1 metric 10\n  0.0.0.0/0 blackhole vrf mgmt\nvlans: 1,10,20,30,99\ninterfaces (7):\n  br0  bridge\n  Vlan10  vlan  10.3.10.1/24, 2001:db8:3:10::1/64  vlan 10 (access)\n  Vlan20  vlan  10.3.20.1/24, 2001:db8:3:20::1/64  vlan 20 (access)\n  Vlan99  vlan  10.3.99.1/24  vlan 99 (access)\n  Ethernet49/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1c:73:03:d0:01\n  Ethernet50/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1c:73:03:d0:02\n  Ethernet52/1  ethernet  10.3.0.2/30, 2001:db8:3::2/64  00:1c:73:03:d0:04\nlinks (1):\n  Ethernet52/1 — sites/west/core/rtr-west-core-01:xe-0/0/0  (ospf)", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-west-dist-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[switch, id 10.3.0.2, ospf area 0.0.0.0]</TD></TR>
+        <TR><TD ALIGN="LEFT">vrf mgmt</TD><TD ALIGN="LEFT">65001:99</TD><TD ALIGN="LEFT"></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">0.0.0.0/0 via 10.3.0.1 dev Ethernet52/1 metric 10</TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">0.0.0.0/0 blackhole vrf mgmt</TD></TR>
+      </TABLE>
+    >];
+  }
+
+  "sites/north/core/rtr-north-core-01" -- "sites/south/core/rtr-south-core-01" [color="#0369a1", style=solid, label="iBGP 65001\niBGP to rtr-south-core-01", tooltip="bgp sites/north/core/rtr-north-core-01#bgp#192.0.2.2\nsites/north/core/rtr-north-core-01 — sites/south/core/rtr-south-core-01:lo0\nbgp AS 65001 to AS 65001 (iBGP)\nneighbour 192.0.2.2\niBGP to rtr-south-core-01"];
+  "sites/north/core/rtr-north-core-01" -- "sites/west/core/rtr-west-core-01" [color="#0369a1", style=solid, label="iBGP 65001\niBGP to rtr-west-core-01", tooltip="bgp sites/north/core/rtr-north-core-01#bgp#192.0.2.3\nsites/north/core/rtr-north-core-01 — sites/west/core/rtr-west-core-01:lo0\nbgp AS 65001 to AS 65001 (iBGP)\nneighbour 192.0.2.3\niBGP to rtr-west-core-01"];
+  "sites/south/core/rtr-south-core-01" -- "sites/west/core/rtr-west-core-01" [color="#0369a1", style=solid, label="iBGP 65001\niBGP to rtr-west-core-01", tooltip="bgp sites/south/core/rtr-south-core-01#bgp#192.0.2.3\nsites/south/core/rtr-south-core-01 — sites/west/core/rtr-west-core-01:lo0\nbgp AS 65001 to AS 65001 (iBGP)\nneighbour 192.0.2.3\niBGP to rtr-west-core-01"];
+  "sites/north/core/rtr-north-core-01" -- "sites/north/distribution/sw-north-dist-01" [color="#0f766e", style=dotted, label="area 0.0.0.0", tooltip="ospf sites/north/core/rtr-north-core-01#ospf#sites/north/distribution/sw-north-dist-01\nsites/north/core/rtr-north-core-01:xe-0/0/0 — sites/north/distribution/sw-north-dist-01:Ethernet52/1\nospf area 0.0.0.0"];
+  "sites/south/core/rtr-south-core-01" -- "sites/south/distribution/sw-south-dist-01" [color="#0f766e", style=dotted, label="area 0.0.0.0", tooltip="ospf sites/south/core/rtr-south-core-01#ospf#sites/south/distribution/sw-south-dist-01\nsites/south/core/rtr-south-core-01:xe-0/0/0 — sites/south/distribution/sw-south-dist-01:Ethernet52/1\nospf area 0.0.0.0"];
+  "sites/west/core/rtr-west-core-01" -- "sites/west/distribution/sw-west-dist-01" [color="#0f766e", style=dotted, label="area 0.0.0.0", tooltip="ospf sites/west/core/rtr-west-core-01#ospf#sites/west/distribution/sw-west-dist-01\nsites/west/core/rtr-west-core-01:xe-0/0/0 — sites/west/distribution/sw-west-dist-01:Ethernet52/1\nospf area 0.0.0.0"];
+  "sites/north/core/rtr-north-core-01" -- "sites/south/core/rtr-south-core-01" [color="#0f766e", style=dotted, label="area 0.0.0.0", tooltip="ospf sites/north/core/rtr-north-core-01#ospf#sites/south/core/rtr-south-core-01\nsites/north/core/rtr-north-core-01:xe-0/0/1 — sites/south/core/rtr-south-core-01:xe-0/0/2\nospf area 0.0.0.0"];
+  "sites/south/core/rtr-south-core-01" -- "sites/west/core/rtr-west-core-01" [color="#0f766e", style=dotted, label="area 0.0.0.0", tooltip="ospf sites/south/core/rtr-south-core-01#ospf#sites/west/core/rtr-west-core-01\nsites/south/core/rtr-south-core-01:xe-0/0/1 — sites/west/core/rtr-west-core-01:xe-0/0/2\nospf area 0.0.0.0"];
+  "sites/north/core/rtr-north-core-01" -- "sites/west/core/rtr-west-core-01" [color="#0f766e", style=dotted, label="area 0.0.0.0", tooltip="ospf sites/north/core/rtr-north-core-01#ospf#sites/west/core/rtr-west-core-01\nsites/north/core/rtr-north-core-01:xe-0/0/2 — sites/west/core/rtr-west-core-01:xe-0/0/1\nospf area 0.0.0.0"];
+}

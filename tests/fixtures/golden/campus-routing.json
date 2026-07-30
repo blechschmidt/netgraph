@@ -1,0 +1,2137 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkGraph",
+  "layer": "routing",
+  "nodes": [
+    {
+      "id": "sites/north/access/sw-north-acc-01",
+      "type": "element",
+      "name": "sw-north-acc-01",
+      "kind": "switch",
+      "namespace": "sites/north/access",
+      "description": "Access switch 01, North campus. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "north"
+      },
+      "routing": {
+        "vrfs": [
+          {
+            "name": "mgmt",
+            "rd": "65001:99"
+          }
+        ]
+      },
+      "cluster": "mgmt",
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "In-band management",
+          "addresses": [
+            "10.1.99.11/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              99
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "Desk - pc-north-01",
+          "mac": "00:1b:0d:01:a1:01",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "description": "Teaching lab - srv-north-01",
+          "mac": "00:1b:0d:01:a1:02",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              20
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/3",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Spare desk port",
+          "mac": "00:1b:0d:01:a1:03",
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "TenGigabitEthernet1/1/1",
+          "type": "ethernet",
+          "description": "Fibre trunk uplink to sw-north-dist-01",
+          "mac": "00:1b:0d:01:a1:11",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sites/north/access/sw-north-acc-02",
+      "type": "element",
+      "name": "sw-north-acc-02",
+      "kind": "switch",
+      "namespace": "sites/north/access",
+      "description": "Access switch 02, North campus - second floor riser.",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "north"
+      },
+      "routing": {
+        "vrfs": [
+          {
+            "name": "mgmt",
+            "rd": "65001:99"
+          }
+        ]
+      },
+      "cluster": "mgmt",
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "In-band management",
+          "addresses": [
+            "10.1.99.12/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              99
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "Desk - pc-north-02",
+          "mac": "00:1b:0d:01:a2:01",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Spare lab port",
+          "mac": "00:1b:0d:01:a2:02",
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              20
+            ]
+          }
+        },
+        {
+          "name": "TenGigabitEthernet1/1/1",
+          "type": "ethernet",
+          "description": "Fibre trunk uplink to sw-north-dist-01",
+          "mac": "00:1b:0d:01:a2:11",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sites/north/access/sw-north-acc-03",
+      "type": "element",
+      "name": "sw-north-acc-03",
+      "kind": "switch",
+      "namespace": "sites/north/access",
+      "description": "Access switch 03, North campus - third floor riser.",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "north"
+      },
+      "routing": {
+        "vrfs": [
+          {
+            "name": "mgmt",
+            "rd": "65001:99"
+          }
+        ]
+      },
+      "cluster": "mgmt",
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "In-band management",
+          "addresses": [
+            "10.1.99.13/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              99
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 1 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 2 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/3",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 3 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/4",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 4 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/5",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 5 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/6",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 6 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/7",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 7 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/8",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 8 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/9",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 9 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/10",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 10 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/11",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 11 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/12",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 12 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/13",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 13 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/14",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 14 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/15",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 15 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/16",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 16 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/17",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 17 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/18",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 18 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/19",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 19 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/20",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 20 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/21",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 21 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/22",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 22 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/23",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 23 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/24",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 24 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/25",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 25 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/26",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 26 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/27",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 27 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/28",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 28 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/29",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 29 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/30",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 30 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/31",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 31 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/32",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 32 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/33",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 33 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/34",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 34 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/35",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 35 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/36",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 36 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/37",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 37 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/38",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 38 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/39",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 39 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/40",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 40 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/41",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 41 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/42",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 42 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/43",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 43 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/44",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 44 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/45",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 45 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/46",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 46 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/47",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 47 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/48",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Access port 48 - staff",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "TenGigabitEthernet1/1/1",
+          "type": "ethernet",
+          "description": "Fibre trunk uplink to the distribution layer",
+          "mac": "00:1b:0d:01:a3:11",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sites/north/core/rtr-north-core-01",
+      "type": "element",
+      "name": "rtr-north-core-01",
+      "kind": "router",
+      "namespace": "sites/north/core",
+      "description": "Layer-3 core router for the North campus. It routes between the campus VLANs\n(whose gateways sit on sw-north-dist-01) and carries the two backbone\nfibres of the inter-site ring.\n",
+      "labels": {
+        "env": "prod",
+        "role": "core",
+        "site": "north"
+      },
+      "routing": {
+        "asn": 65001,
+        "routerId": "192.0.2.1",
+        "ospfArea": "0.0.0.0",
+        "ospfInterfaces": [
+          "lo0",
+          "xe-0/0/0",
+          "xe-0/0/1",
+          "xe-0/0/2"
+        ],
+        "routes": [
+          "10.1.0.0/16 blackhole metric 250",
+          "10.2.99.0/24 via 198.51.100.2 dev xe-0/0/1 metric 200"
+        ]
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "lo0",
+          "type": "loopback",
+          "description": "Router ID, IGP and management target",
+          "addresses": [
+            "192.0.2.1/32",
+            "2001:db8::1/128"
+          ]
+        },
+        {
+          "name": "xe-0/0/0",
+          "type": "ethernet",
+          "description": "Routed fibre downlink to sw-north-dist-01",
+          "mac": "00:05:86:01:c0:00",
+          "mtu": 9000,
+          "addresses": [
+            "10.1.0.1/30",
+            "2001:db8:1::1/64"
+          ]
+        },
+        {
+          "name": "xe-0/0/1",
+          "type": "ethernet",
+          "description": "Backbone fibre to rtr-south-core-01",
+          "mac": "00:05:86:01:c0:01",
+          "mtu": 9000,
+          "addresses": [
+            "198.51.100.1/30",
+            "2001:db8:ff:1::1/64"
+          ]
+        },
+        {
+          "name": "xe-0/0/2",
+          "type": "ethernet",
+          "description": "Backbone fibre to rtr-west-core-01",
+          "mac": "00:05:86:01:c0:02",
+          "mtu": 9000,
+          "addresses": [
+            "198.51.100.10/30",
+            "2001:db8:ff:3::2/64"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sites/north/distribution/sw-north-dist-01",
+      "type": "element",
+      "name": "sw-north-dist-01",
+      "kind": "switch",
+      "namespace": "sites/north/distribution",
+      "description": "Distribution switch for the North campus. It aggregates the access-layer\ntrunks, hosts the SVI gateway for every campus VLAN, and reaches the core\nrouter over a routed (untagged) fibre uplink.\n",
+      "labels": {
+        "env": "prod",
+        "role": "distribution",
+        "site": "north"
+      },
+      "routing": {
+        "routerId": "10.1.0.2",
+        "ospfArea": "0.0.0.0",
+        "ospfInterfaces": [
+          "Ethernet52/1",
+          "Vlan10",
+          "Vlan20"
+        ],
+        "vrfs": [
+          {
+            "name": "mgmt",
+            "rd": "65001:99"
+          }
+        ],
+        "routes": [
+          "0.0.0.0/0 via 10.1.0.1 dev Ethernet52/1 metric 10",
+          "0.0.0.0/0 blackhole vrf mgmt"
+        ]
+      },
+      "cluster": "mgmt",
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance carrying the access-layer trunks"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "Staff gateway",
+          "addresses": [
+            "10.1.10.1/24",
+            "2001:db8:1:10::1/64"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "Vlan20",
+          "type": "vlan",
+          "description": "Teaching-lab gateway",
+          "addresses": [
+            "10.1.20.1/24",
+            "2001:db8:1:20::1/64"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              20
+            ]
+          }
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "Management gateway",
+          "addresses": [
+            "10.1.99.1/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              99
+            ]
+          }
+        },
+        {
+          "name": "Ethernet49/1",
+          "type": "ethernet",
+          "description": "Fibre trunk to sw-north-acc-01",
+          "mac": "00:1c:73:01:d0:01",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        },
+        {
+          "name": "Ethernet50/1",
+          "type": "ethernet",
+          "description": "Fibre trunk to sw-north-acc-02",
+          "mac": "00:1c:73:01:d0:02",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        },
+        {
+          "name": "Ethernet51/1",
+          "type": "ethernet",
+          "description": "Fibre trunk to sw-north-acc-03",
+          "mac": "00:1c:73:01:d0:03",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        },
+        {
+          "name": "Ethernet52/1",
+          "type": "ethernet",
+          "description": "Routed fibre uplink to rtr-north-core-01. No 'vlan' block: this port\nis a layer-3 interface, not a bridge port.\n",
+          "mac": "00:1c:73:01:d0:04",
+          "mtu": 9000,
+          "addresses": [
+            "10.1.0.2/30",
+            "2001:db8:1::2/64"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sites/south/access/sw-south-acc-01",
+      "type": "element",
+      "name": "sw-south-acc-01",
+      "kind": "switch",
+      "namespace": "sites/south/access",
+      "description": "Access switch 01, South campus. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "south"
+      },
+      "routing": {
+        "vrfs": [
+          {
+            "name": "mgmt",
+            "rd": "65001:99"
+          }
+        ]
+      },
+      "cluster": "mgmt",
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "In-band management",
+          "addresses": [
+            "10.2.99.11/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              99
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "Desk - pc-south-01",
+          "mac": "00:1b:0d:02:a1:01",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "description": "Teaching lab - srv-south-01",
+          "mac": "00:1b:0d:02:a1:02",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              20
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/3",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Spare desk port",
+          "mac": "00:1b:0d:02:a1:03",
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "TenGigabitEthernet1/1/1",
+          "type": "ethernet",
+          "description": "Fibre trunk uplink to sw-south-dist-01",
+          "mac": "00:1b:0d:02:a1:11",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sites/south/access/sw-south-acc-02",
+      "type": "element",
+      "name": "sw-south-acc-02",
+      "kind": "switch",
+      "namespace": "sites/south/access",
+      "description": "Access switch 02, South campus - second floor riser.",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "south"
+      },
+      "routing": {
+        "vrfs": [
+          {
+            "name": "mgmt",
+            "rd": "65001:99"
+          }
+        ]
+      },
+      "cluster": "mgmt",
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "In-band management",
+          "addresses": [
+            "10.2.99.12/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              99
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "Desk - pc-south-02",
+          "mac": "00:1b:0d:02:a2:01",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Spare lab port",
+          "mac": "00:1b:0d:02:a2:02",
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              20
+            ]
+          }
+        },
+        {
+          "name": "TenGigabitEthernet1/1/1",
+          "type": "ethernet",
+          "description": "Fibre trunk uplink to sw-south-dist-01",
+          "mac": "00:1b:0d:02:a2:11",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sites/south/core/rtr-south-core-01",
+      "type": "element",
+      "name": "rtr-south-core-01",
+      "kind": "router",
+      "namespace": "sites/south/core",
+      "description": "Layer-3 core router for the South campus. It routes between the campus VLANs\n(whose gateways sit on sw-south-dist-01) and carries the two backbone\nfibres of the inter-site ring.\n",
+      "labels": {
+        "env": "prod",
+        "role": "core",
+        "site": "south"
+      },
+      "routing": {
+        "asn": 65001,
+        "routerId": "192.0.2.2",
+        "ospfArea": "0.0.0.0",
+        "ospfInterfaces": [
+          "lo0",
+          "xe-0/0/0",
+          "xe-0/0/1",
+          "xe-0/0/2"
+        ],
+        "routes": [
+          "10.2.0.0/16 blackhole metric 250",
+          "10.3.99.0/24 via 198.51.100.6 dev xe-0/0/1 metric 200"
+        ]
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "lo0",
+          "type": "loopback",
+          "description": "Router ID, IGP and management target",
+          "addresses": [
+            "192.0.2.2/32",
+            "2001:db8::2/128"
+          ]
+        },
+        {
+          "name": "xe-0/0/0",
+          "type": "ethernet",
+          "description": "Routed fibre downlink to sw-south-dist-01",
+          "mac": "00:05:86:02:c0:00",
+          "mtu": 9000,
+          "addresses": [
+            "10.2.0.1/30",
+            "2001:db8:2::1/64"
+          ]
+        },
+        {
+          "name": "xe-0/0/1",
+          "type": "ethernet",
+          "description": "Backbone fibre to rtr-west-core-01",
+          "mac": "00:05:86:02:c0:01",
+          "mtu": 9000,
+          "addresses": [
+            "198.51.100.5/30",
+            "2001:db8:ff:2::1/64"
+          ]
+        },
+        {
+          "name": "xe-0/0/2",
+          "type": "ethernet",
+          "description": "Backbone fibre to rtr-north-core-01",
+          "mac": "00:05:86:02:c0:02",
+          "mtu": 9000,
+          "addresses": [
+            "198.51.100.2/30",
+            "2001:db8:ff:1::2/64"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sites/south/distribution/sw-south-dist-01",
+      "type": "element",
+      "name": "sw-south-dist-01",
+      "kind": "switch",
+      "namespace": "sites/south/distribution",
+      "description": "Distribution switch for the South campus. It aggregates the access-layer\ntrunks, hosts the SVI gateway for every campus VLAN, and reaches the core\nrouter over a routed (untagged) fibre uplink.\n",
+      "labels": {
+        "env": "prod",
+        "role": "distribution",
+        "site": "south"
+      },
+      "routing": {
+        "routerId": "10.2.0.2",
+        "ospfArea": "0.0.0.0",
+        "ospfInterfaces": [
+          "Ethernet52/1",
+          "Vlan10",
+          "Vlan20"
+        ],
+        "vrfs": [
+          {
+            "name": "mgmt",
+            "rd": "65001:99"
+          }
+        ],
+        "routes": [
+          "0.0.0.0/0 via 10.2.0.1 dev Ethernet52/1 metric 10",
+          "0.0.0.0/0 blackhole vrf mgmt"
+        ]
+      },
+      "cluster": "mgmt",
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance carrying the access-layer trunks"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "Staff gateway",
+          "addresses": [
+            "10.2.10.1/24",
+            "2001:db8:2:10::1/64"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "Vlan20",
+          "type": "vlan",
+          "description": "Teaching-lab gateway",
+          "addresses": [
+            "10.2.20.1/24",
+            "2001:db8:2:20::1/64"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              20
+            ]
+          }
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "Management gateway",
+          "addresses": [
+            "10.2.99.1/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              99
+            ]
+          }
+        },
+        {
+          "name": "Ethernet49/1",
+          "type": "ethernet",
+          "description": "Fibre trunk to sw-south-acc-01",
+          "mac": "00:1c:73:02:d0:01",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        },
+        {
+          "name": "Ethernet50/1",
+          "type": "ethernet",
+          "description": "Fibre trunk to sw-south-acc-02",
+          "mac": "00:1c:73:02:d0:02",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        },
+        {
+          "name": "Ethernet52/1",
+          "type": "ethernet",
+          "description": "Routed fibre uplink to rtr-south-core-01. No 'vlan' block: this port\nis a layer-3 interface, not a bridge port.\n",
+          "mac": "00:1c:73:02:d0:04",
+          "mtu": 9000,
+          "addresses": [
+            "10.2.0.2/30",
+            "2001:db8:2::2/64"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sites/west/access/sw-west-acc-01",
+      "type": "element",
+      "name": "sw-west-acc-01",
+      "kind": "switch",
+      "namespace": "sites/west/access",
+      "description": "Access switch 01, West annexe. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "west"
+      },
+      "routing": {
+        "vrfs": [
+          {
+            "name": "mgmt",
+            "rd": "65001:99"
+          }
+        ]
+      },
+      "cluster": "mgmt",
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "In-band management",
+          "addresses": [
+            "10.3.99.11/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              99
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "Desk - pc-west-01",
+          "mac": "00:1b:0d:03:a1:01",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "description": "Teaching lab - srv-west-01",
+          "mac": "00:1b:0d:03:a1:02",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              20
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/3",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Spare desk port",
+          "mac": "00:1b:0d:03:a1:03",
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "TenGigabitEthernet1/1/1",
+          "type": "ethernet",
+          "description": "Fibre trunk uplink to sw-west-dist-01",
+          "mac": "00:1b:0d:03:a1:11",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sites/west/access/sw-west-acc-02",
+      "type": "element",
+      "name": "sw-west-acc-02",
+      "kind": "switch",
+      "namespace": "sites/west/access",
+      "description": "Access switch 02, West annexe - second floor riser.",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "west"
+      },
+      "routing": {
+        "vrfs": [
+          {
+            "name": "mgmt",
+            "rd": "65001:99"
+          }
+        ]
+      },
+      "cluster": "mgmt",
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "In-band management",
+          "addresses": [
+            "10.3.99.12/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              99
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "Desk - pc-west-02",
+          "mac": "00:1b:0d:03:a2:01",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "enabled": false,
+          "description": "Spare lab port",
+          "mac": "00:1b:0d:03:a2:02",
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              20
+            ]
+          }
+        },
+        {
+          "name": "TenGigabitEthernet1/1/1",
+          "type": "ethernet",
+          "description": "Fibre trunk uplink to sw-west-dist-01",
+          "mac": "00:1b:0d:03:a2:11",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "sites/west/core/rtr-west-core-01",
+      "type": "element",
+      "name": "rtr-west-core-01",
+      "kind": "router",
+      "namespace": "sites/west/core",
+      "description": "Layer-3 core router for the West annexe. It routes between the campus VLANs\n(whose gateways sit on sw-west-dist-01) and carries the two backbone\nfibres of the inter-site ring.\n",
+      "labels": {
+        "env": "prod",
+        "role": "core",
+        "site": "west"
+      },
+      "routing": {
+        "asn": 65001,
+        "routerId": "192.0.2.3",
+        "ospfArea": "0.0.0.0",
+        "ospfInterfaces": [
+          "lo0",
+          "xe-0/0/0",
+          "xe-0/0/1",
+          "xe-0/0/2"
+        ],
+        "routes": [
+          "10.3.0.0/16 blackhole metric 250",
+          "10.1.99.0/24 via 198.51.100.10 dev xe-0/0/1 metric 200"
+        ]
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "lo0",
+          "type": "loopback",
+          "description": "Router ID, IGP and management target",
+          "addresses": [
+            "192.0.2.3/32",
+            "2001:db8::3/128"
+          ]
+        },
+        {
+          "name": "xe-0/0/0",
+          "type": "ethernet",
+          "description": "Routed fibre downlink to sw-west-dist-01",
+          "mac": "00:05:86:03:c0:00",
+          "mtu": 9000,
+          "addresses": [
+            "10.3.0.1/30",
+            "2001:db8:3::1/64"
+          ]
+        },
+        {
+          "name": "xe-0/0/1",
+          "type": "ethernet",
+          "description": "Backbone fibre to rtr-north-core-01",
+          "mac": "00:05:86:03:c0:01",
+          "mtu": 9000,
+          "addresses": [
+            "198.51.100.9/30",
+            "2001:db8:ff:3::1/64"
+          ]
+        },
+        {
+          "name": "xe-0/0/2",
+          "type": "ethernet",
+          "description": "Backbone fibre to rtr-south-core-01",
+          "mac": "00:05:86:03:c0:02",
+          "mtu": 9000,
+          "addresses": [
+            "198.51.100.6/30",
+            "2001:db8:ff:2::2/64"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sites/west/distribution/sw-west-dist-01",
+      "type": "element",
+      "name": "sw-west-dist-01",
+      "kind": "switch",
+      "namespace": "sites/west/distribution",
+      "description": "Distribution switch for the West annexe. It aggregates the access-layer\ntrunks, hosts the SVI gateway for every campus VLAN, and reaches the core\nrouter over a routed (untagged) fibre uplink.\n",
+      "labels": {
+        "env": "prod",
+        "role": "distribution",
+        "site": "west"
+      },
+      "routing": {
+        "routerId": "10.3.0.2",
+        "ospfArea": "0.0.0.0",
+        "ospfInterfaces": [
+          "Ethernet52/1",
+          "Vlan10",
+          "Vlan20"
+        ],
+        "vrfs": [
+          {
+            "name": "mgmt",
+            "rd": "65001:99"
+          }
+        ],
+        "routes": [
+          "0.0.0.0/0 via 10.3.0.1 dev Ethernet52/1 metric 10",
+          "0.0.0.0/0 blackhole vrf mgmt"
+        ]
+      },
+      "cluster": "mgmt",
+      "vlans": [
+        1,
+        10,
+        20,
+        30,
+        99
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance carrying the access-layer trunks"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "Staff gateway",
+          "addresses": [
+            "10.3.10.1/24",
+            "2001:db8:3:10::1/64"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "Vlan20",
+          "type": "vlan",
+          "description": "Teaching-lab gateway",
+          "addresses": [
+            "10.3.20.1/24",
+            "2001:db8:3:20::1/64"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              20
+            ]
+          }
+        },
+        {
+          "name": "Vlan99",
+          "type": "vlan",
+          "description": "Management gateway",
+          "addresses": [
+            "10.3.99.1/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              99
+            ]
+          }
+        },
+        {
+          "name": "Ethernet49/1",
+          "type": "ethernet",
+          "description": "Fibre trunk to sw-west-acc-01",
+          "mac": "00:1c:73:03:d0:01",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        },
+        {
+          "name": "Ethernet50/1",
+          "type": "ethernet",
+          "description": "Fibre trunk to sw-west-acc-02",
+          "mac": "00:1c:73:03:d0:02",
+          "mtu": 9000,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              1,
+              10,
+              20,
+              30,
+              99
+            ]
+          }
+        },
+        {
+          "name": "Ethernet52/1",
+          "type": "ethernet",
+          "description": "Routed fibre uplink to rtr-west-core-01. No 'vlan' block: this port\nis a layer-3 interface, not a bridge port.\n",
+          "mac": "00:1c:73:03:d0:04",
+          "mtu": 9000,
+          "addresses": [
+            "10.3.0.2/30",
+            "2001:db8:3::2/64"
+          ]
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "sites/north/core/rtr-north-core-01#bgp#192.0.2.2",
+      "kind": "bgp",
+      "endpoints": [
+        {
+          "node": "sites/north/core/rtr-north-core-01"
+        },
+        {
+          "node": "sites/south/core/rtr-south-core-01",
+          "interface": "lo0"
+        }
+      ],
+      "adjacency": {
+        "protocol": "bgp",
+        "peerAddress": "192.0.2.2",
+        "asns": [
+          65001,
+          65001
+        ],
+        "internal": true,
+        "description": "iBGP to rtr-south-core-01"
+      },
+      "label": "iBGP 65001",
+      "vlans": []
+    },
+    {
+      "id": "sites/north/core/rtr-north-core-01#bgp#192.0.2.3",
+      "kind": "bgp",
+      "endpoints": [
+        {
+          "node": "sites/north/core/rtr-north-core-01"
+        },
+        {
+          "node": "sites/west/core/rtr-west-core-01",
+          "interface": "lo0"
+        }
+      ],
+      "adjacency": {
+        "protocol": "bgp",
+        "peerAddress": "192.0.2.3",
+        "asns": [
+          65001,
+          65001
+        ],
+        "internal": true,
+        "description": "iBGP to rtr-west-core-01"
+      },
+      "label": "iBGP 65001",
+      "vlans": []
+    },
+    {
+      "id": "sites/south/core/rtr-south-core-01#bgp#192.0.2.3",
+      "kind": "bgp",
+      "endpoints": [
+        {
+          "node": "sites/south/core/rtr-south-core-01"
+        },
+        {
+          "node": "sites/west/core/rtr-west-core-01",
+          "interface": "lo0"
+        }
+      ],
+      "adjacency": {
+        "protocol": "bgp",
+        "peerAddress": "192.0.2.3",
+        "asns": [
+          65001,
+          65001
+        ],
+        "internal": true,
+        "description": "iBGP to rtr-west-core-01"
+      },
+      "label": "iBGP 65001",
+      "vlans": []
+    },
+    {
+      "id": "sites/north/core/rtr-north-core-01#ospf#sites/north/distribution/sw-north-dist-01",
+      "kind": "ospf",
+      "endpoints": [
+        {
+          "node": "sites/north/core/rtr-north-core-01",
+          "interface": "xe-0/0/0"
+        },
+        {
+          "node": "sites/north/distribution/sw-north-dist-01",
+          "interface": "Ethernet52/1"
+        }
+      ],
+      "adjacency": {
+        "protocol": "ospf",
+        "area": "0.0.0.0"
+      },
+      "label": "area 0.0.0.0",
+      "vlans": []
+    },
+    {
+      "id": "sites/south/core/rtr-south-core-01#ospf#sites/south/distribution/sw-south-dist-01",
+      "kind": "ospf",
+      "endpoints": [
+        {
+          "node": "sites/south/core/rtr-south-core-01",
+          "interface": "xe-0/0/0"
+        },
+        {
+          "node": "sites/south/distribution/sw-south-dist-01",
+          "interface": "Ethernet52/1"
+        }
+      ],
+      "adjacency": {
+        "protocol": "ospf",
+        "area": "0.0.0.0"
+      },
+      "label": "area 0.0.0.0",
+      "vlans": []
+    },
+    {
+      "id": "sites/west/core/rtr-west-core-01#ospf#sites/west/distribution/sw-west-dist-01",
+      "kind": "ospf",
+      "endpoints": [
+        {
+          "node": "sites/west/core/rtr-west-core-01",
+          "interface": "xe-0/0/0"
+        },
+        {
+          "node": "sites/west/distribution/sw-west-dist-01",
+          "interface": "Ethernet52/1"
+        }
+      ],
+      "adjacency": {
+        "protocol": "ospf",
+        "area": "0.0.0.0"
+      },
+      "label": "area 0.0.0.0",
+      "vlans": []
+    },
+    {
+      "id": "sites/north/core/rtr-north-core-01#ospf#sites/south/core/rtr-south-core-01",
+      "kind": "ospf",
+      "endpoints": [
+        {
+          "node": "sites/north/core/rtr-north-core-01",
+          "interface": "xe-0/0/1"
+        },
+        {
+          "node": "sites/south/core/rtr-south-core-01",
+          "interface": "xe-0/0/2"
+        }
+      ],
+      "adjacency": {
+        "protocol": "ospf",
+        "area": "0.0.0.0"
+      },
+      "label": "area 0.0.0.0",
+      "vlans": []
+    },
+    {
+      "id": "sites/south/core/rtr-south-core-01#ospf#sites/west/core/rtr-west-core-01",
+      "kind": "ospf",
+      "endpoints": [
+        {
+          "node": "sites/south/core/rtr-south-core-01",
+          "interface": "xe-0/0/1"
+        },
+        {
+          "node": "sites/west/core/rtr-west-core-01",
+          "interface": "xe-0/0/2"
+        }
+      ],
+      "adjacency": {
+        "protocol": "ospf",
+        "area": "0.0.0.0"
+      },
+      "label": "area 0.0.0.0",
+      "vlans": []
+    },
+    {
+      "id": "sites/north/core/rtr-north-core-01#ospf#sites/west/core/rtr-west-core-01",
+      "kind": "ospf",
+      "endpoints": [
+        {
+          "node": "sites/north/core/rtr-north-core-01",
+          "interface": "xe-0/0/2"
+        },
+        {
+          "node": "sites/west/core/rtr-west-core-01",
+          "interface": "xe-0/0/1"
+        }
+      ],
+      "adjacency": {
+        "protocol": "ospf",
+        "area": "0.0.0.0"
+      },
+      "label": "area 0.0.0.0",
+      "vlans": []
+    }
+  ],
+  "title": "Campus, routing"
+}

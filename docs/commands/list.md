@@ -30,7 +30,7 @@ about one element:
 | `tunnels` | `NAME`, `STACK`, `VNI`, `ENCRYPTED`, `ENDS`, `ENDPOINTS` |
 | `vlans` | `VLAN`, `NAME`, `ELEMENTS`, `PORTS` |
 | `bss` | `SSID`, `RADIO`, `ROLE`, `CHANNEL`, `BSSID`, `VLAN`, `SECURITY` |
-| `subnets` | `SUBNET`, `IP`, `ADDRESSES`, `ELEMENTS`, `VLANS` |
+| `subnets` | `SUBNET`, `IP`, `ADDRESSES`, `ELEMENTS`, `VLANS`, and `VRF` when anything is in one |
 
 The columns that are not self-evident:
 
@@ -46,6 +46,7 @@ The columns that are not self-evident:
 | `ENCRYPTED` | `tunnels` | `yes`, `no`, or `underlay` — see below. |
 | `ENDS` | `tunnels` | How many endpoints the tunnel has; a mesh has more than two. |
 | `IP` | `subnets` | The address family, as `4` or `6`. |
+| `VRF` | `subnets` | The routing instance the prefix is in, `-` for the global one. Present only when something is in a VRF: two instances may hold one prefix, and without the column the two rows would be indistinguishable ([schema §16.1](../schema.md#161-vrfs--routing-instances)). |
 | `ADDRESSES`, `ELEMENTS` | `subnets` | How many addresses are claimed in the prefix, and how many elements hold one. |
 | `ELEMENTS`, `PORTS` | `vlans` | How many elements are members, and how many of their interfaces carry the VLAN. |
 | `RADIO` | `bss` | The `element:interface` of the radio serving or joining the BSS. |
@@ -190,7 +191,7 @@ own: validation is not run and findings do not change the code.
   name.
 * [`netgraph ipam`](ipam.md) and [`docs/ipam.md`](../ipam.md) — `list subnets`
   says which prefixes exist; `ipam` says whether the plan is healthy.
-* [`docs/rendering.md`](../rendering.md#layers-one-inventory-six-questions) — the
+* [`docs/rendering.md`](../rendering.md#layers-one-inventory-seven-questions) — the
   layers whose groupings `subnets` and `tunnels` print as tables.
 * [`docs/validation.md`](../validation.md) — the command to run when `list` warns
   that a document is missing from its output.

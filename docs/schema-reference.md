@@ -90,6 +90,9 @@ The five device kinds share one spec shape. They differ in which fields they per
 | `bridge` | [BridgeConfig](#specbridge) | no | *unset* | The 802.1Q bridge component this device implements. Absent means the device is not a bridge. | `/dot1q:bridges/dot1q:bridge` |
 | `vlans` | [VlanDefinition](#specvlans) list | no | `[]` | The device VLAN database: which VLANs exist on this device, and what they are called. | `…/dot1q:bridge-vlan/dot1q:vlan` |
 | `forwarding` | [Forwarding](#specforwarding) | no | *unset* | Device-wide default for per-interface IP forwarding. Defaults to true/true on a `router` and false/false on every other kind; a `hub` must not declare it. | — |
+| `vrfs` | [VrfDefinition](#specvrfs) list | no | `[]` | The routing instances (VRFs) this device implements. An interface binds to one with `vrf`, and that binding is what partitions the address namespace. | `/ni:network-instances/ni:network-instance` |
+| `routes` | [StaticRoute](#specroutes) list | no | `[]` | Configured static routes, in the order the device holds them. | `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rt:static-routes` |
+| `routing` | [RoutingConfig](#specrouting) | no | *unset* | The dynamic routing protocols the device takes part in: an OSPF area, a BGP autonomous system, or both. | `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol` |
 | `from` | element reference | no | *unset* | Names a `kind: template` document whose partial spec is merged underneath this one. Consumed by the loader: it is gone before validation, the graph or any renderer sees the device. `interfaces` is required only when `from` is absent. | — |
 
 * `from` merges a template underneath the device: the device's own keys win, `interfaces` merge by `name`, and every other list the device declares replaces the template's outright. See §6.6 of [`schema.md`](schema.md).
@@ -138,6 +141,7 @@ One entry per port or logical interface. Used by both devices and adapters.
 | `ipv4` | [IPv4Config](#specinterfacesipv4) | no | *unset* | IPv4 configuration. Absent means the interface has no IPv4 stack. | `…/ip:ipv4` |
 | `ipv6` | [IPv6Config](#specinterfacesipv6) | no | *unset* | IPv6 configuration. Absent means the interface has no IPv6 stack. | `…/ip:ipv6` |
 | `vlan` | [VlanConfig](#specinterfacesvlan) | no | *unset* | 802.1Q bridge-port configuration. Absent means the port is not VLAN-aware; a host port facing an access port normally omits it. | `…/dot1q:bridge-port` |
+| `vrf` | element name | no | *unset* | The routing instance this interface is in. Names an entry of the device's `spec.vrfs` (`NG-F002`); unset means the global instance. An address only collides with another address in the same VRF. | `/ni:network-instances/ni:network-instance/ni:name` |
 | `wireless` | [WirelessConfig](#specinterfaceswireless) | no | *unset* | Radio configuration of a `type: wifi` interface: which side of the association it is, which frequency it uses and which BSSs it beacons or joins. Forbidden on every other type (`NG-W002`). | `…/dot11:wireless-interface` |
 | `parent` | interface name | no | *unset* | The interface this one is stacked on. Required for `type: vlan`, forbidden otherwise (`NG-I002`). | `…/if:lower-layer-if` |
 | `members` | interface name list | no | *unset* | The interfaces aggregated by this one. Required for `type: lag` and `type: bridge`, forbidden otherwise (`NG-I003`). | `…/if:lower-layer-if` |
@@ -243,6 +247,79 @@ One basic service set: an SSID the radio beacons, or — on a client radio — t
 
 * An `ap` radio lists one entry per SSID it serves; a `station` or `mesh` radio lists at most one (`NG-W006`).
 * `vlan` is where the SSID's traffic goes on the wired side. It has to be a VLAN the access point carries somewhere (`NG-W009`), or clients associate and reach nothing.
+
+## `spec.vrfs[]`
+
+One routing instance — a VRF (§16.1). An interface joins it with `vrf`, and that binding is what makes an address private to the instance.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `name` | element name | **yes** | — | Name of the routing instance. Unique within the device (`NG-F001`), and what an interface's `vrf` and a route's `vrf` refer to. Two devices using one name mean one VRF. | `/ni:network-instances/ni:network-instance/ni:name` |
+| `rd` | route distinguisher | **yes** | — | Route distinguisher, in one of the three RFC 4364 §4.2 encodings: `65000:1`, `192.0.2.1:1` or `4200000000:1`. Quote it — an unquoted `65000:1` is a number to YAML. | — |
+| `description` | string | no | *unset* | Free text: what the instance is for. | `/ni:network-instances/ni:network-instance/ni:description` |
+
+* Two devices that use the same `name` are taken to mean the same VRF; the route distinguisher is recorded because MPLS needs it, not to identify the instance.
+* A VRF no interface binds to holds nothing, which is `NG-F014`.
+
+## `spec.routes[]`
+
+One configured static route (§16.2).
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `prefix` | IPv4 prefix \| IPv6 prefix | **yes** | — | Destination prefix, either family, in canonical CIDR form. Host bits are rejected: a destination with them set is a typo or a host route, and netgraph will not guess which. | `…/rt:static-routes/v4ur:ipv4/v4ur:route/v4ur:destination-prefix` |
+| `via` | IPv4 address \| IPv6 address | no | *unset* | Next-hop address. Same family as `prefix` (`NG-F003`), and on a prefix the device configures (`NG-F008`). | `…/v4ur:route/v4ur:next-hop/v4ur:next-hop-address` |
+| `dev` | interface name | no | *unset* | Egress interface, for an unnumbered next hop or a route pointed at an interface. Names an interface of this device (`NG-F009`). | `…/v4ur:route/v4ur:next-hop/v4ur:outgoing-interface` |
+| `vrf` | element name | no | *unset* | The routing instance holding the route. Names an entry of `spec.vrfs` (`NG-F005`); unset means the global instance. | `/ni:network-instances/ni:network-instance/ni:name` |
+| `metric` | integer, 0–4294967295 | no | *unset* | Administrative distance or cost, as this device counts it. Documentation only: netgraph does not compute a best path. | — |
+| `blackhole` | boolean | no | `false` | Discard matching packets. Excludes `via` and `dev` (`NG-F004`). | `…/v4ur:route/v4ur:next-hop/v4ur:special-next-hop` |
+
+* At least one of `via`, `dev` and `blackhole` is required, and `blackhole` excludes the other two (`NG-F004`).
+* `via` is of the same family as `prefix` (`NG-F003`) and must be on-link: inside a prefix the device configures, in the same VRF (`NG-F008`).
+
+## `spec.routing`
+
+The dynamic routing protocols the device takes part in (§16.3). Both blocks are optional and neither implies the other.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `ospf` | [OspfConfig](#specroutingospf) | no | *unset* | The OSPF area this device runs, and on which interfaces. | `…/rt:control-plane-protocol[type='ospf']` |
+| `bgp` | [BgpConfig](#specroutingbgp) | no | *unset* | The BGP autonomous system this device is in, and its neighbours. | `…/rt:control-plane-protocol[type='bgp']` |
+
+## `spec.routing.ospf`
+
+One OSPF area, and the interfaces that run it.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `area` | OSPF area | no | `0.0.0.0` | Area identifier, written as a dotted quad or as a plain number; `0` and `0.0.0.0` are the same backbone area and both normalise to `0.0.0.0`. | — |
+| `router_id` | IPv4 address | no | *unset* | Router identifier — a dotted quad even in an IPv6-only network. Unique across the inventory (`NG-F012`). | — |
+| `interfaces` | interface name list, ≥ 1 entry | **yes** | — | The interfaces OSPF runs on. Non-empty, free of duplicates (`NG-F006`), and each one an interface of this device (`NG-F010`). | `/if:interfaces/if:interface/if:name` |
+
+* `area` accepts `0` and `0.0.0.0` for the backbone and stores the dotted quad, so two documents that spell one area differently still compare equal.
+* One area per device: per-interface areas, and therefore area border routers, are deferred (§16.5).
+
+## `spec.routing.bgp`
+
+The autonomous system this device is in, and the sessions it configures.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `asn` | integer, 1–4294967295 | **yes** | — | Local autonomous system number, 1 to 4294967295. AS 0 is reserved (RFC 7607). | — |
+| `router_id` | IPv4 address | no | *unset* | BGP identifier — a dotted quad. Unique across the inventory (`NG-F012`); commonly the same value as the OSPF router id, which is one identity rather than a duplicate. | — |
+| `neighbors` | [BgpNeighbor](#specroutingbgpneighbors) list | no | `[]` | The sessions this device configures. Peers are named by address, never by element name. | — |
+
+## `spec.routing.bgp.neighbors[]`
+
+One BGP session. The peer is an **address**, which is what the device is configured with — never an element name (§16.4).
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `address` | IPv4 address \| IPv6 address | **yes** | — | Peer address. Resolved against every address the inventory configures; a peer that resolves to nothing is `NG-F013`, a warning, because an eBGP peer may be external. | — |
+| `remote_asn` | integer, 1–4294967295 | **yes** | — | The AS the peer is in. Checked against the peer's own `asn` when the address resolves (`NG-F011`). | — |
+| `description` | string | no | *unset* | Free text: what the session is for. | — |
+
+* The address is resolved against every address the inventory configures. A peer that resolves to nothing is a warning (`NG-F013`), because an eBGP peer may be a transit provider nobody declares here; a peer whose own `asn` contradicts `remote_asn` is an error (`NG-F011`).
 
 ## `spec` — cable
 

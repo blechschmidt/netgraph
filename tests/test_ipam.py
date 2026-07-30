@@ -236,6 +236,9 @@ def test_a_utilisation_row_records_itself_for_json(dual_stack: Inventory) -> Non
         entry for entry in utilisation_of(subnets_of(dual_stack)) if entry.prefix == "10.10.20.0/24"
     ]
     assert row.record() == {
+        # Always present, even for the global instance: a CSV needs a stable
+        # header, and an absent column would shift every field after it.
+        "vrf": "",
         "prefix": "10.10.20.0/24",
         "family": "ipv4",
         "vlans": [],

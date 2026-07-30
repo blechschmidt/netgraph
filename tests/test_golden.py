@@ -129,6 +129,15 @@ CASES = (
         options=RenderOptions(group_by_namespace=True, title="Campus, layer 3"),
     ),
     Case(
+        # The control plane: an iBGP mesh, six OSPF adjacencies nobody declared,
+        # and the management VRF as a cluster. ``group_by_namespace`` is on to
+        # pin down that the layer's own grouping wins over it (§16.6).
+        name="campus-routing",
+        example="campus",
+        layer=Layer.ROUTING,
+        options=RenderOptions(group_by_namespace=True, title="Campus, routing"),
+    ),
+    Case(
         # Tunnels over the physical topology: the point-to-point ones as edges,
         # the three-ended mesh as a node, and the two nested tunnels labelled
         # with the stack they run in.
@@ -517,8 +526,12 @@ def test_the_l3_json_golden_separates_subnets_from_elements(case: Case) -> None:
         assert node["kind"] == "subnet"
         assert node["interfaces"] == []
         subnet = node["subnet"]
-        assert node["id"] == f"subnet:{subnet['prefix']}"
-        assert node["name"] == subnet["prefix"]
+        # A routing instance is part of the identity: two VRFs may hold one
+        # prefix, and the two nodes have to stay distinguishable (§16.1).
+        instance = f"{subnet['vrf']}/" if subnet.get("vrf") else ""
+        suffix = f" (vrf {subnet['vrf']})" if subnet.get("vrf") else ""
+        assert node["id"] == f"subnet:{instance}{subnet['prefix']}"
+        assert node["name"] == f"{subnet['prefix']}{suffix}"
         assert subnet["family"] in ("ipv4", "ipv6")
         assert subnet["elements"], "an empty subnet must not be drawn at all"
         assert set(subnet["elements"]) <= {node["id"] for node in elements}
@@ -607,9 +620,14 @@ def test_the_mermaid_golden_declares_a_flowchart(case: Case) -> None:
 
     # Identifiers are positional (n0, n1, …) because a fully-qualified name is
     # not a legal Mermaid id. They must be dense and start at zero, or the
-    # ``class nN kind`` lines at the foot would style the wrong nodes.
+    # ``class nN kind`` lines at the foot would style the wrong nodes. They are
+    # *numbered* in graph order rather than in emission order, so a layer that
+    # groups its nodes — a VRF cluster at ``--layer routing``, §16.6 — declares
+    # them out of sequence; what has to hold is that the set is exactly n0..nN.
     declared = re.findall(r"^ +(n\d+)[(\[>{]", text, re.MULTILINE)
-    assert declared == [f"n{index}" for index in range(len(declared))]
+    assert sorted(declared, key=lambda name: int(name[1:])) == [
+        f"n{index}" for index in range(len(declared))
+    ]
 
     # Every link joins two declared ids.
     for left, right in re.findall(r"^ +(n\d+) +(?:--|==|-\.).*? (n\d+)$", text, re.MULTILINE):

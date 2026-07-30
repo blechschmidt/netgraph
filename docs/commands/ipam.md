@@ -66,18 +66,24 @@ With no options, `ipam` prints how full every prefix is, then the conflicts:
 <!-- run: -->
 ```console
 $ netgraph -i examples/campus ipam --family ipv4
-PREFIX           IP  VLANS  HOSTS  USED  FREE    UTIL  DEVICES
----------------  --  -----  -----  ----  ----  ------  -------
-10.1.0.0/30       4  -          2     2     0  100.0%        2
-10.1.10.0/24      4  10       254     3   251    1.2%        3
-10.1.20.0/24      4  20       254     2   252    0.8%        2
-10.1.99.0/24      4  99       254     4   250    1.6%        4
+VRF   PREFIX           IP  VLANS  HOSTS  USED  FREE    UTIL  DEVICES
+----  ---------------  --  -----  -----  ----  ----  ------  -------
+-     10.1.0.0/30       4  -          2     2     0  100.0%        2
+-     10.1.10.0/24      4  10       254     3   251    1.2%        3
+-     10.1.20.0/24      4  20       254     2   252    0.8%        2
 ...
-198.51.100.8/30   4  -          2     2     0  100.0%        2
+-     198.51.100.8/30   4  -          2     2     0  100.0%        2
+mgmt  10.1.99.0/24      4  99       254     4   250    1.6%        4
+mgmt  10.2.99.0/24      4  99       254     3   251    1.2%        3
+mgmt  10.3.99.0/24      4  99       254     3   251    1.2%        3
 
 conflicts
 no problems found
 ```
+
+The `VRF` column appears only when something is in one: two routing instances may
+hold the same prefix, and without it the two rows would be indistinguishable
+(schema §16.1). `-` is the global instance.
 
 `HOSTS` is what the prefix can actually hold, not `2^n`: IPv4 spends two
 addresses on the network and the broadcast, except on a `/31` (RFC 3021) and a

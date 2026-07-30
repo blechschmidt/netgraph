@@ -111,9 +111,9 @@ spec:
 ```
 
 And the same switch resolved: 51 interfaces, the vendor and model the template
-supplied, the VLAN database, and every one of the forty-eight access ports the
-template's one `range` entry stood for. The middle is elided here, not by the
-command:
+supplied, the VLAN database, the management VRF, and every one of the
+forty-eight access ports the template's one `range` entry stood for. The middle
+is elided here, not by the command:
 
 <!-- run: -->
 ```console
@@ -161,6 +161,11 @@ spec:
   forwarding:
     ipv4: false
     ipv6: false
+  vrfs:
+  - name: mgmt
+    rd: 65001:99
+    description: In-band management
+  routes: []
 ```
 
 The `description: Access port 1 - staff` is worth pausing on: the template wrote
@@ -228,6 +233,8 @@ spec:
   forwarding:
     ipv4: false
     ipv6: false
+  vrfs: []
+  routes: []
 ```
 
 `192.168.10.20/24` is one string in the file and two fields in the model, and it

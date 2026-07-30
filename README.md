@@ -188,7 +188,7 @@ The files describe the network once; each command asks something different of th
 | what is in rack 3, and at which units? | [`netgraph render --layer rack`](docs/rendering.md#rack-a-front-elevation-per-cabinet) |
 | how does this host reach that one, hop by hop? | [`netgraph path`](docs/paths.md) |
 | how full is that /24, and where is the next free /28? | [`netgraph ipam`](docs/ipam.md) |
-| what should `/etc/hosts`, the DNS zone, the Ansible inventory or the pull list say? | [`netgraph export`](docs/export.md) |
+| what should `/etc/hosts`, the DNS zone, the Ansible inventory, the pull list or the routing script say? | [`netgraph export`](docs/export.md) |
 | what did that template and that interface range actually expand to? | [`netgraph show`](docs/commands/show.md) |
 
 Two of them are worth seeing. Nothing in the YAML declares a subnet: the layer-3 view and
@@ -231,7 +231,7 @@ over the whole set. The pages a new reader wants first:
 |---|---|
 | [`docs/getting-started.md`](docs/getting-started.md) | Install it, build a three-device inventory by hand, validate, render, interrogate. Ends with the editor wiring. |
 | [`docs/inventory-layout.md`](docs/inventory-layout.md) | How to organise the files: namespaces, references, templates, interface ranges, and a layout for a multi-site estate. |
-| [`docs/rendering.md`](docs/rendering.md) | The six layers, the filters, namespace collapsing, link bundling, icon themes, and what each output format is for. |
+| [`docs/rendering.md`](docs/rendering.md) | The seven layers, the filters, namespace collapsing, link bundling, icon themes, and what each output format is for. |
 | [`docs/validation.md`](docs/validation.md) | What the checks are, what a finding means, and the four ways to say "not here". |
 | [`docs/schema-reference.md`](docs/schema-reference.md) | Every field of every kind, with its type, default and YANG counterpart. |
 | [`docs/schema.md`](docs/schema.md) | The normative specification, if you want the reasoning as well as the rules. |

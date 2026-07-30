@@ -89,6 +89,16 @@ class AdapterSpec(NetgraphModel):
                     rule="NG-X003",
                     path=("interfaces", index, "type"),
                 )
+            if interface.vrf is not None:
+                # An adapter has no ``spec.vrfs`` to name (§16.1): the routing
+                # instance belongs to the host the adapter hangs off, which is
+                # where the binding has to be written to mean anything.
+                raise field_error(
+                    f"{interface.name!r} binds to a VRF, but an adapter declares no VRF "
+                    f"table; bind the VRF on the host it is attached to",
+                    rule="NG-F002",
+                    path=("interfaces", index, "vrf"),
+                )
         return self
 
     def interface(self, name: str) -> Interface | None:

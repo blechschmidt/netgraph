@@ -1,10 +1,10 @@
 # `netgraph export`
 
-`netgraph export` turns the inventory into files other tools consume: five
+`netgraph export` turns the inventory into files other tools consume: six
 deterministic, text-diffable emitters driven by the same resolved inventory and
 the same graph a diagram is drawn from — so the files that draw the picture also
-write the hosts file, the zone, the Ansible inventory, the monitoring targets and
-the cabling pull-list. This page is the reference for the command;
+write the hosts file, the zone, the Ansible inventory, the monitoring targets,
+the cabling pull-list and the static-route script. This page is the reference for the command;
 [`docs/export.md`](../export.md) is the full treatment of every column, every
 option and exactly what each format drops.
 
@@ -13,7 +13,7 @@ option and exactly what each format drops.
 ## Contents
 
 - [Synopsis](#synopsis)
-- [The five formats](#the-five-formats)
+- [The six formats](#the-six-formats)
 - [Validation runs first](#validation-runs-first)
 - [Where the artefact goes, and the manifest](#where-the-artefact-goes-and-the-manifest)
 - [Scoping an export: the filters `render` takes](#scoping-an-export-the-filters-render-takes)
@@ -30,7 +30,7 @@ netgraph [GLOBAL OPTIONS] export [OPTIONS] FORMAT
 ```
 <!-- /generated -->
 
-## The five formats
+## The six formats
 
 `FORMAT` is the one required argument. Every emitter is lossy in its own way, and
 which way is the thing to know before you pick one:
@@ -42,6 +42,7 @@ which way is the thing to know before you pick one:
 | [`ansible-inventory`](../export.md#ansible-inventory) | Ansible's JSON inventory, grouped by namespace, kind, vendor and role | The topology — an inventory has no concept of a cable |
 | [`prometheus-sd`](../export.md#prometheus-sd) | Prometheus `file_sd` targets with namespace/kind/vendor/site labels | Everything but one address and a few labels |
 | [`cable-list`](../export.md#cable-list) | A CSV or Markdown pull-list, one row per physical run | Adapter attachments, tunnels and addressing |
+| [`routes`](../export.md#routes) | An iproute2 script, one shell function per device, of the static routes it declares | Everything that is not a static route: BGP and OSPF configuration is vendor syntax and is not invented |
 
 What they have in common — a generated-by header, stable ordering, and no clock
 or hostname anywhere in the output, so re-exporting an unchanged inventory

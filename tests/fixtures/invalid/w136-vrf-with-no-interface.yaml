@@ -1,0 +1,41 @@
+# W136 (NG-F014) - a VRF nothing is bound to.
+#
+# The instance holds no address and no connected route, so the isolation it was
+# declared to create does not exist: everything is still in the global table.
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+  vrfs:
+    - name: blue
+      rd: '65001:1'
+      description: customer blue, not wired up yet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - rtr-a:eth0
+    - rtr-b:eth0
+  medium: copper

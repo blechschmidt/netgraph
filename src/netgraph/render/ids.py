@@ -102,7 +102,10 @@ class ElementIds:
     nodes: Mapping[str, str] = field(default_factory=dict)
     #: One id per edge, indexed as :attr:`~netgraph.render.graph.Graph.edges` is.
     edges: tuple[str, ...] = ()
-    #: Namespace to cluster id; the root namespace is never a cluster.
+    #: Namespace to cluster id; the root namespace is never a cluster. A layer
+    #: that groups its nodes itself (the VRFs of :attr:`Layer.ROUTING`) puts its
+    #: boxes here too, keyed by the same string :attr:`Node.cluster` holds — the
+    #: two groupings are never both in force, so one map holds both.
     clusters: Mapping[str, str] = field(default_factory=dict)
 
     def node(self, fqn: str) -> str | None:
@@ -111,8 +114,9 @@ class ElementIds:
     def edge(self, index: int) -> str | None:
         return self.edges[index] if 0 <= index < len(self.edges) else None
 
-    def cluster(self, namespace: str) -> str | None:
-        return self.clusters.get(namespace)
+    def cluster(self, name: str) -> str | None:
+        """The id of the box called ``name`` — a namespace, or a VRF."""
+        return self.clusters.get(name)
 
 
 def element_ids(graph: Graph) -> ElementIds:
@@ -127,9 +131,9 @@ def element_ids(graph: Graph) -> ElementIds:
     nodes = {fqn: _unique(f"{NODE_ID_PREFIX}{slug(fqn)}", taken) for fqn in graph.nodes}
     edges = tuple(_unique(f"{EDGE_ID_PREFIX}{slug(edge.id)}", taken) for edge in graph.edges)
     clusters = {
-        namespace: _unique(f"{CLUSTER_ID_PREFIX}{slug(namespace)}", taken)
-        for namespace in graph.namespaces
-        if namespace
+        name: _unique(f"{CLUSTER_ID_PREFIX}{slug(name)}", taken)
+        for name in (*graph.namespaces, *graph.clusters)
+        if name
     }
     return ElementIds(nodes=nodes, edges=edges, clusters=clusters)
 

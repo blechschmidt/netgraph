@@ -35,6 +35,8 @@ reasoning around both.
 | dot1q-bridge | `ieee802-dot1q-bridge` | `dot1q` | IEEE Std 802.1Q-2018 (the 802.1Qcp YANG modules) |
 | dot1q-types | `ieee802-dot1q-types` | `dot1qtypes` | IEEE Std 802.1Q-2018 |
 | dot11 | `ieee802-dot11` | `dot11` | IEEE Std 802.11-2020, Annex C (the MIB the module renders) |
+| ietf-routing | `ietf-routing` (rev. 2018-03-13) | `rt`, `v4ur`, `v6ur` | [RFC 8349](https://www.rfc-editor.org/rfc/rfc8349) |
+| ietf-network-instance | `ietf-network-instance` | `ni` | [RFC 8529](https://www.rfc-editor.org/rfc/rfc8529) |
 
 Borrowing has three concrete benefits, and they are the reason the schema looks
 the way it does rather than like a drawing tool's file format:
@@ -339,14 +341,56 @@ are the scope boundary, and every entry falls into one of three buckets:
    differing only in that node would render identically, the node is not
    modelled.
 
-netgraph also models no routing at all — no `ietf-routing`, static routes, or
-VRFs. It draws what is *connected*, not what is *reachable*; the two questions
-have different right answers and answering both in one picture makes both
-worse.
+Routing is the one boundary that has moved. netgraph now borrows the *intent*
+half of `ietf-routing` — static routes, and enough of a control-plane protocol to
+say which AS and which OSPF area a router is in — plus the network instance of
+RFC 8529 for VRFs; see [RFC 8349 — routing](#rfc-8349--routing) below. What stays
+out is everything on the far side of the same three buckets: a **routing table**
+is operational state (`rt:routes` is `config false`, and comparing it with the
+inventory is a job for a tool that can read a live device), protocol *behaviour*
+is protocol behaviour — timers, BFD, LSA flooding, best-path selection — and route
+policy is a language, of which half would be worse than none.
 
 A tool that stored everything would be a configuration-management system with
 an inventory attached, and it would rot for exactly the reason the diagrams it
 replaced did: nobody would keep the parts nobody reads correct.
+
+## RFC 8349 — routing
+
+Routing intent hangs off a device's `spec`, because that is where RFC 8349 puts
+it: a `rt:control-plane-protocol` and a `rt:static-routes` container live inside
+a routing instance, and a routing instance is what RFC 8529 calls a network
+instance and everybody else calls a VRF.
+
+| netgraph | YANG |
+|---|---|
+| `spec.vrfs[].name` | `/ni:network-instances/ni:network-instance/ni:name` |
+| `spec.vrfs[].description` | `…/ni:network-instance/ni:description` |
+| `spec.vrfs[].rd` | — (RFC 4364 §4.2; `ietf-network-instance` has no node for it) |
+| `spec.interfaces[].vrf` | `…/ni:network-instance/ni:vrf-root` — which instance the interface is bound into |
+| `spec.routes[].prefix` | `…/rt:static-routes/v4ur:ipv4/v4ur:route/v4ur:destination-prefix` |
+| `spec.routes[].via` | `…/v4ur:route/v4ur:next-hop/v4ur:next-hop-address` |
+| `spec.routes[].dev` | `…/v4ur:route/v4ur:next-hop/v4ur:outgoing-interface` |
+| `spec.routes[].blackhole` | `…/v4ur:route/v4ur:next-hop/v4ur:special-next-hop` = `blackhole` |
+| `spec.routes[].metric` | — (`ietf-routing` leaves the metric to each protocol) |
+| `spec.routing.ospf` | `…/rt:control-plane-protocols/rt:control-plane-protocol` with `type: ospf` |
+| `spec.routing.bgp` | the same list entry with `type: bgp` |
+| `spec.routing.*.router_id` | — (`ietf-ospf` and `ietf-bgp` model it per protocol instance) |
+
+IPv6 routes use the `v6ur:` paths of the same module; only the IPv4 ones are
+written out.
+
+### What netgraph does not model from RFC 8349
+
+| Node | Why not |
+|---|---|
+| `rt:routing-state`, `rt:routes` | Operational state: the table a router *computed*. The inventory holds what somebody configured. |
+| `rt:route/rt:source-protocol`, `rt:active`, `rt:last-updated` | The same — properties of a route in a running table. |
+| `rt:ribs`, `rt:default-rib` | A device's internal organisation of tables netgraph does not model the contents of. |
+| `rt:next-hop-list` (ECMP), `rt:next-hop/rt:recurse` | A multi-path or recursive next hop is a forwarding decision; the schema records one hop per route (§16.5). |
+| `ietf-ospf` areas, interfaces, costs, network types | One area per device, deliberately (§16.5). Per-interface areas, costs and DR priorities describe how the IGP behaves rather than who is in it. |
+| `ietf-bgp` policy, capabilities, timers, route reflection | Policy is a language and the rest is behaviour; both are on the far side of the boundary above. |
+| `ni:vrf-root` sub-trees | RFC 8529 mounts a whole per-instance configuration tree under each instance. netgraph binds interfaces to instances and stops there. |
 
 ## Things with no YANG home
 

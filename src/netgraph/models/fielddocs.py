@@ -40,6 +40,14 @@ from netgraph.models.interface import (
 )
 from netgraph.models.metadata import Location, Metadata
 from netgraph.models.patchpanel import PatchPanelSpec
+from netgraph.models.routing import (
+    BgpConfig,
+    BgpNeighbor,
+    OspfConfig,
+    RoutingConfig,
+    StaticRoute,
+    VrfDefinition,
+)
 from netgraph.models.tunnel import TunnelSpec
 
 __all__ = [
@@ -84,6 +92,12 @@ DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
     VlanConfig,
     WirelessConfig,
     Bss,
+    VrfDefinition,
+    StaticRoute,
+    RoutingConfig,
+    OspfConfig,
+    BgpConfig,
+    BgpNeighbor,
     CableSpec,
     InterfaceRef,
     AdapterSpec,
@@ -178,6 +192,20 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "The device VLAN database: which VLANs exist on this device, and what they are called.",
         "…/dot1q:bridge-vlan/dot1q:vlan",
     ),
+    ("DeviceSpec", "vrfs"): Doc(
+        "The routing instances (VRFs) this device implements. An interface binds to one with "
+        "`vrf`, and that binding is what partitions the address namespace.",
+        "/ni:network-instances/ni:network-instance",
+    ),
+    ("DeviceSpec", "routes"): Doc(
+        "Configured static routes, in the order the device holds them.",
+        "…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rt:static-routes",
+    ),
+    ("DeviceSpec", "routing"): Doc(
+        "The dynamic routing protocols the device takes part in: an OSPF area, a BGP autonomous "
+        "system, or both.",
+        "…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol",
+    ),
     ("DeviceSpec", "forwarding"): Doc(
         "Device-wide default for per-interface IP forwarding. Defaults to true/true on a "
         "`router` and false/false on every other kind; a `hub` must not declare it.",
@@ -214,6 +242,97 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "…/dot1q:bridge-vlan/dot1q:vlan/dot1q:name",
     ),
     ("VlanDefinition", "description"): Doc("Free text. netgraph-only; 802.1Q has no such node."),
+    # -- routing (§16) -----------------------------------------------------
+    ("VrfDefinition", "name"): Doc(
+        "Name of the routing instance. Unique within the device (`NG-F001`), and what an "
+        "interface's `vrf` and a route's `vrf` refer to. Two devices using one name mean one VRF.",
+        "/ni:network-instances/ni:network-instance/ni:name",
+    ),
+    ("VrfDefinition", "rd"): Doc(
+        "Route distinguisher, in one of the three RFC 4364 §4.2 encodings: `65000:1`, "
+        "`192.0.2.1:1` or `4200000000:1`. Quote it — an unquoted `65000:1` is a number to YAML.",
+        NONE,
+    ),
+    ("VrfDefinition", "description"): Doc(
+        "Free text: what the instance is for.",
+        "/ni:network-instances/ni:network-instance/ni:description",
+    ),
+    ("StaticRoute", "prefix"): Doc(
+        "Destination prefix, either family, in canonical CIDR form. Host bits are rejected: a "
+        "destination with them set is a typo or a host route, and netgraph will not guess which.",
+        "…/rt:static-routes/v4ur:ipv4/v4ur:route/v4ur:destination-prefix",
+    ),
+    ("StaticRoute", "via"): Doc(
+        "Next-hop address. Same family as `prefix` (`NG-F003`), and on a prefix the device "
+        "configures (`NG-F008`).",
+        "…/v4ur:route/v4ur:next-hop/v4ur:next-hop-address",
+    ),
+    ("StaticRoute", "dev"): Doc(
+        "Egress interface, for an unnumbered next hop or a route pointed at an interface. Names "
+        "an interface of this device (`NG-F009`).",
+        "…/v4ur:route/v4ur:next-hop/v4ur:outgoing-interface",
+    ),
+    ("StaticRoute", "vrf"): Doc(
+        "The routing instance holding the route. Names an entry of `spec.vrfs` (`NG-F005`); "
+        "unset means the global instance.",
+        "/ni:network-instances/ni:network-instance/ni:name",
+    ),
+    ("StaticRoute", "metric"): Doc(
+        "Administrative distance or cost, as this device counts it. Documentation only: netgraph "
+        "does not compute a best path.",
+        NONE,
+    ),
+    ("StaticRoute", "blackhole"): Doc(
+        "Discard matching packets. Excludes `via` and `dev` (`NG-F004`).",
+        "…/v4ur:route/v4ur:next-hop/v4ur:special-next-hop",
+    ),
+    ("RoutingConfig", "ospf"): Doc(
+        "The OSPF area this device runs, and on which interfaces.",
+        "…/rt:control-plane-protocol[type='ospf']",
+    ),
+    ("RoutingConfig", "bgp"): Doc(
+        "The BGP autonomous system this device is in, and its neighbours.",
+        "…/rt:control-plane-protocol[type='bgp']",
+    ),
+    ("OspfConfig", "area"): Doc(
+        "Area identifier, written as a dotted quad or as a plain number; `0` and `0.0.0.0` are "
+        "the same backbone area and both normalise to `0.0.0.0`.",
+        NONE,
+    ),
+    ("OspfConfig", "router_id"): Doc(
+        "Router identifier — a dotted quad even in an IPv6-only network. Unique across the "
+        "inventory (`NG-F012`).",
+        NONE,
+    ),
+    ("OspfConfig", "interfaces"): Doc(
+        "The interfaces OSPF runs on. Non-empty, free of duplicates (`NG-F006`), and each one an "
+        "interface of this device (`NG-F010`).",
+        "/if:interfaces/if:interface/if:name",
+    ),
+    ("BgpConfig", "asn"): Doc(
+        "Local autonomous system number, 1 to 4294967295. AS 0 is reserved (RFC 7607).",
+        NONE,
+    ),
+    ("BgpConfig", "router_id"): Doc(
+        "BGP identifier — a dotted quad. Unique across the inventory (`NG-F012`); commonly the "
+        "same value as the OSPF router id, which is one identity rather than a duplicate.",
+        NONE,
+    ),
+    ("BgpConfig", "neighbors"): Doc(
+        "The sessions this device configures. Peers are named by address, never by element name.",
+        NONE,
+    ),
+    ("BgpNeighbor", "address"): Doc(
+        "Peer address. Resolved against every address the inventory configures; a peer that "
+        "resolves to nothing is `NG-F013`, a warning, because an eBGP peer may be external.",
+        NONE,
+    ),
+    ("BgpNeighbor", "remote_asn"): Doc(
+        "The AS the peer is in. Checked against the peer's own `asn` when the address resolves "
+        "(`NG-F011`).",
+        NONE,
+    ),
+    ("BgpNeighbor", "description"): Doc("Free text: what the session is for."),
     # -- interface ---------------------------------------------------------
     ("Interface", "name"): Doc(
         "Interface name as the device itself spells it (`eth0`, `GigabitEthernet0/2`). Unique "
@@ -253,6 +372,12 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "802.1Q bridge-port configuration. Absent means the port is not VLAN-aware; a host port "
         "facing an access port normally omits it.",
         "…/dot1q:bridge-port",
+    ),
+    ("Interface", "vrf"): Doc(
+        "The routing instance this interface is in. Names an entry of the device's `spec.vrfs` "
+        "(`NG-F002`); unset means the global instance. An address only collides with another "
+        "address in the same VRF.",
+        "/ni:network-instances/ni:network-instance/ni:name",
     ),
     ("Interface", "wireless"): Doc(
         "Radio configuration of a `type: wifi` interface: which side of the association it is, "

@@ -110,6 +110,7 @@ from netgraph.render.graph import (
     Layer,
     Node,
     RackView,
+    RoutingView,
     TunnelView,
 )
 from netgraph.render.highlight import Highlight
@@ -209,6 +210,15 @@ _CLEARTEXT_TUNNEL_STYLE: Final[tuple[str, str]] = ("#be123c", "dashed")
 #: another. Dotted and violet: the vocabulary of the tunnel it belongs to,
 #: with a line weight that keeps it behind the tunnels themselves.
 _ENCAPSULATION_STYLE: Final[tuple[str, str]] = ("#8b5cf6", "dotted")
+
+#: The two adjacencies of the routing view (§16.6). A BGP session is a
+#: configured, point-to-point relationship, so it is drawn *solid*; an OSPF
+#: adjacency is discovered and belongs to an area rather than to a pair, so it is
+#: dotted. Both are blue-green — the colour of the routed layers here — and the
+#: difference in line style survives a greyscale print, which the difference in
+#: hue would not.
+_BGP_STYLE: Final[tuple[str, str]] = ("#0369a1", "solid")
+_OSPF_STYLE: Final[tuple[str, str]] = ("#0f766e", "dotted")
 
 #: Outline and text colour of something a :class:`~netgraph.render.highlight.Highlight`
 #: emphasises. Crimson is the one accent no element kind and no medium already
@@ -643,7 +653,14 @@ def _groups(
     cluster — a prefix spanning two sites belongs to neither of them. The root
     namespace is never boxed either: drawing a frame labelled ``/`` around half
     the diagram helps nobody.
+
+    A layer that groups its own nodes wins over ``--group-by-namespace``: the
+    routing view boxes each VRF (§16.6), and that is the grouping the reader asked
+    for by choosing the layer.
     """
+    if graph.clusters:
+        return _cluster_groups(graph, options, icons, identity, details)
+
     if not options.group_by_namespace:
         nodes = _node_views(graph, graph.nodes.values(), options, icons, identity, details)
         return (_GroupView(nodes=tuple(nodes)),)
@@ -671,12 +688,54 @@ def _groups(
     return tuple(groups)
 
 
+def _cluster_groups(
+    graph: Graph,
+    options: RenderOptions,
+    icons: Mapping[str, str],
+    identity: ElementIds,
+    details: Mapping[str, Mapping[str, object]],
+) -> tuple[_GroupView, ...]:
+    """One box per cluster the *layer* asked for, unboxed nodes first.
+
+    Unboxed nodes lead so that a router straddling two instances is laid out
+    between their boxes rather than after them, which is where it belongs — and
+    so that a diagram with no VRF at all is identical to an ungrouped one.
+    """
+    loose = tuple(
+        _node_views(
+            graph,
+            [node for node in graph.nodes.values() if not node.cluster],
+            options,
+            icons,
+            identity,
+            details,
+        )
+    )
+    groups: list[_GroupView] = [_GroupView(nodes=loose)] if loose else []
+    for index, cluster in enumerate(graph.clusters):
+        members = graph.nodes_in_cluster(cluster)
+        groups.append(
+            _GroupView(
+                nodes=tuple(_node_views(graph, members, options, icons, identity, details)),
+                # Offset past the namespace clusters' numbering space so the two
+                # groupings can never mint the same subgraph name.
+                id=f"cluster_vrf_{index}",
+                label=f"vrf {cluster}",
+                tooltip=_cluster_tooltip(cluster, members, options, identity, details, kind="vrf"),
+                element_id=identity.cluster(cluster) if options.element_ids else None,
+            )
+        )
+    return tuple(groups)
+
+
 def _cluster_tooltip(
     namespace: str,
     members: Iterable[Node],
     options: RenderOptions,
     identity: ElementIds,
     details: Mapping[str, Mapping[str, object]],
+    *,
+    kind: str = "namespace",
 ) -> str | None:
     """What the box around a namespace holds, or ``None`` with tooltips off."""
     if not options.tooltips:
@@ -687,7 +746,7 @@ def _cluster_tooltip(
         if (element := identity.node(node.fqn)) is not None
         and (record := details.get(element)) is not None
     ]
-    return namespace_text(namespace, records)
+    return namespace_text(namespace, records, kind=kind)
 
 
 def _node_views(
@@ -795,7 +854,8 @@ def _expand(template: LinkTemplate, graph: Graph, fqn: str, *, kind: str) -> str
 def _subtitle(node: Node) -> str:
     """The bracketed line under a node's name: what sort of thing it is."""
     if node.subnet is not None:
-        return f"[{node.subnet.family} subnet]"
+        vrf = f", vrf {node.subnet.vrf}" if node.subnet.vrf else ""
+        return f"[{node.subnet.family} subnet{vrf}]"
     if node.tunnel is not None:
         return f"[{node.tunnel.type} tunnel]"
     if node.aggregate is not None:
@@ -805,6 +865,11 @@ def _subtitle(node: Node) -> str:
     if node.rack is not None:
         used = f"{node.rack.used_units}/{node.rack.height}U used"
         return f"[rack, {used}]" if not node.rack.inferred_height else f"[rack, {used}, inferred]"
+    if node.routing is not None:
+        # The identity its peers know it by, which is what every edge here is
+        # labelled against; the kind is still readable from the shape.
+        detail = ", ".join(node.routing.describe())
+        return f"[{node.kind}, {detail}]" if detail else f"[{node.kind}]"
     return f"[{node.kind}]"
 
 
@@ -849,6 +914,9 @@ def _node_rows(node: Node, options: RenderOptions, layer: Layer) -> tuple[_Row, 
 
     if node.rack is not None:
         return _rack_rows(node.rack)
+
+    if node.routing is not None:
+        return _routing_rows(node.routing)
 
     # At layer 3 each address is printed on the edge that puts the element in a
     # subnet, which also says which interface holds it; repeating the list under
@@ -895,6 +963,10 @@ def _edge_views(
             colour, style = _SUBNET_EDGE_STYLE
         elif edge.kind is EdgeKind.ENCAPSULATION:
             colour, style = _ENCAPSULATION_STYLE
+        elif edge.kind is EdgeKind.BGP:
+            colour, style = _BGP_STYLE
+        elif edge.kind is EdgeKind.OSPF:
+            colour, style = _OSPF_STYLE
         elif edge.kind is EdgeKind.TUNNEL:
             colour, style = (
                 _TUNNEL_STYLE
@@ -981,6 +1053,16 @@ def _edge_label(edge: Edge, layer: Layer, options: RenderOptions) -> str:
         # The edge *is* the sentence "this runs inside that"; naming the inner
         # tunnel's type is what tells the reader which way round it goes.
         return f"{edge.label} over" if edge.label else "over"
+
+    if edge.adjacency is not None:
+        # The AS pair, or the area: which side of the routing plane the edge is
+        # on is the whole content of a routing diagram, so it takes the label and
+        # the ports go to the tooltip. A session's description follows it, because
+        # "transit" beside ``65001 → 65002`` is what makes the picture readable.
+        adjacency = [edge.adjacency.label]
+        if edge.adjacency.description:
+            adjacency.append(_inline(edge.adjacency.description))
+        return "\n".join(adjacency)
 
     parts: list[str] = []
     ports = _port_pair(edge)
@@ -1102,6 +1184,27 @@ def _aggregate_rows(view: AggregateView, options: RenderOptions) -> tuple[_Row, 
     if options.show_ips and view.subnets:
         for line in _address_lines(view.subnets, options.max_addresses):
             rows.append(_Row(port=line, spans=True))
+    return tuple(rows)
+
+
+def _routing_rows(view: RoutingView) -> tuple[_Row, ...]:
+    """The record rows of a router in the routing view: its VRFs, then its routes.
+
+    The AS, the router id and the area are already in the subtitle — they say
+    *who this router is*, which is what the node is for. What the rows add is what
+    it carries: the instances it holds, and the routes it holds them in.
+    """
+    rows: list[_Row] = []
+    for name, rd in view.vrfs[:_MAX_PORT_ROWS]:
+        rows.append(_Row(port=f"vrf {_inline(name)}", addresses=_inline(rd)))
+    hidden_vrfs = len(view.vrfs) - _MAX_PORT_ROWS
+    if hidden_vrfs > 0:
+        rows.append(_Row(port=f"(+{count_text(hidden_vrfs, 'more vrf')})", spans=True))
+    for route in view.routes[:_MAX_PORT_ROWS]:
+        rows.append(_Row(port=_inline(route), spans=True))
+    hidden_routes = len(view.routes) - _MAX_PORT_ROWS
+    if hidden_routes > 0:
+        rows.append(_Row(port=f"(+{count_text(hidden_routes, 'more route')})", spans=True))
     return tuple(rows)
 
 

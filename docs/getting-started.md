@@ -429,6 +429,8 @@ spec:
   forwarding:
     ipv4: false
     ipv6: false
+  vrfs: []
+  routes: []
 ```
 
 `192.168.10.20/24` came back as `{ip: ..., prefix_length: 24}`, and

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator
 from enum import Enum
-from typing import ClassVar, Literal
+from typing import ClassVar, Final, Literal
 
 from pydantic import Field, model_validator
 
@@ -16,10 +16,12 @@ from netgraph.models.base import NetgraphModel
 from netgraph.models.diagnostics import field_error
 from netgraph.models.element import ElementBase
 from netgraph.models.interface import Interface, InterfaceList, InterfaceType
+from netgraph.models.routing import RoutingConfig, StaticRoute, VrfDefinition
 from netgraph.models.scalars import Boolean, ElementName, MacAddress, VlanId
 
 __all__ = [
     "DEVICE_KINDS",
+    "GLOBAL_VRF",
     "BridgeConfig",
     "BridgeType",
     "Computer",
@@ -32,6 +34,13 @@ __all__ = [
     "Switch",
     "VlanDefinition",
 ]
+
+#: The name of the instance an interface that binds to no VRF is in. The empty
+#: string rather than ``"default"`` or ``None``: it is not a name anybody may
+#: declare (``ElementName`` requires at least one character), so it cannot be
+#: shadowed by a VRF called ``global``, and it sorts before every real name — so
+#: the global instance leads every listing that groups by VRF.
+GLOBAL_VRF: Final = ""
 
 
 class BridgeType(str, Enum):
@@ -87,10 +96,55 @@ class DeviceSpec(NetgraphModel):
     vlans: list[VlanDefinition] = Field(default_factory=list)
     #: ``None`` until the per-kind default of §6.1.1 is applied by the element.
     forwarding: Forwarding | None = None
+    #: The routing instances this device implements (§16.1).
+    vrfs: list[VrfDefinition] = Field(default_factory=list)
+    #: Configured static routes (§16.2).
+    routes: list[StaticRoute] = Field(default_factory=list)
+    #: The dynamic routing protocols the device takes part in (§16.3).
+    routing: RoutingConfig | None = None
 
     @model_validator(mode="after")
     def _check_interfaces(self) -> DeviceSpec:
         check_interface_set(self.interfaces)
+        return self
+
+    @model_validator(mode="after")
+    def _check_vrf_table(self) -> DeviceSpec:
+        """``NG-F001``/``NG-F002``/``NG-F005``: the VRF table and its references.
+
+        A VRF is referred to by name from two places in the same ``spec`` — an
+        interface binds to one, a route is placed in one — so the reference is
+        resolved here, where both are in view. Everything that reaches *outside*
+        the document (an interface a route sends out of, an OSPF interface, a BGP
+        peer) is the validator's business instead.
+        """
+        declared: set[str] = set()
+        for index, vrf in enumerate(self.vrfs):
+            if vrf.name in declared:
+                raise field_error(
+                    f"VRF {vrf.name!r} is declared twice",
+                    rule="NG-F001",
+                    path=("vrfs", index, "name"),
+                )
+            declared.add(vrf.name)
+
+        for index, interface in enumerate(self.interfaces):
+            if interface.vrf is not None and interface.vrf not in declared:
+                raise field_error(
+                    f"{interface.name!r} binds to VRF {interface.vrf!r}, which "
+                    f"{_vrf_table(declared)}",
+                    rule="NG-F002",
+                    path=("interfaces", index, "vrf"),
+                )
+
+        for index, route in enumerate(self.routes):
+            if route.vrf is not None and route.vrf not in declared:
+                raise field_error(
+                    f"route {route.prefix} is placed in VRF {route.vrf!r}, which "
+                    f"{_vrf_table(declared)}",
+                    rule="NG-F005",
+                    path=("routes", index, "vrf"),
+                )
         return self
 
     @model_validator(mode="after")
@@ -114,6 +168,27 @@ class DeviceSpec(NetgraphModel):
     def vlan(self, vlan_id: int) -> VlanDefinition | None:
         """Look a VLAN up in the device VLAN database."""
         return next((vlan for vlan in self.vlans if vlan.id == vlan_id), None)
+
+    def vrf(self, name: str) -> VrfDefinition | None:
+        """Look a routing instance up by name (§16.1)."""
+        return next((vrf for vrf in self.vrfs if vrf.name == name), None)
+
+    def interfaces_in(self, vrf: str) -> tuple[Interface, ...]:
+        """Every interface bound to ``vrf``, in declaration order.
+
+        :data:`GLOBAL_VRF` selects the interfaces that bind to no VRF at all,
+        which is the instance every address is in until something says otherwise.
+        """
+        wanted = vrf or None
+        return tuple(interface for interface in self.interfaces if interface.vrf == wanted)
+
+
+def _vrf_table(declared: Iterable[str]) -> str:
+    """``is not declared in 'spec.vrfs' (which holds …)`` — the tail of NG-F002."""
+    names = sorted(declared)
+    if not names:
+        return "is not declared: the device declares no 'spec.vrfs' at all"
+    return f"is not declared in 'spec.vrfs'; it holds {', '.join(repr(name) for name in names)}"
 
 
 def check_interface_set(interfaces: Iterable[Interface], *, reserved: Iterable[str] = ()) -> None:
@@ -200,12 +275,13 @@ class Device(ElementBase):
                     )
 
         if not self.layer3_aware:
-            if self.spec.forwarding is not None:
-                raise field_error(
-                    f"a {self.kind} has no IP stack and must not declare 'forwarding'",
-                    rule="NG-H003",
-                    path=("spec", "forwarding"),
-                )
+            for key in ("forwarding", "vrfs", "routes", "routing"):
+                if getattr(self.spec, key):
+                    raise field_error(
+                        f"a {self.kind} has no IP stack and must not declare {key!r}",
+                        rule="NG-H003",
+                        path=("spec", key),
+                    )
             for index, interface in enumerate(self.spec.interfaces):
                 for family in ("ipv4", "ipv6"):
                     if getattr(interface, family) is not None:
@@ -214,6 +290,12 @@ class Device(ElementBase):
                             rule="NG-H002",
                             path=("spec", "interfaces", index, family),
                         )
+                if interface.vrf is not None:
+                    raise field_error(
+                        f"a {self.kind} interface has no IP stack, so it is in no VRF",
+                        rule="NG-H002",
+                        path=("spec", "interfaces", index, "vrf"),
+                    )
 
         allowed = self.allowed_interface_types
         if allowed is not None:

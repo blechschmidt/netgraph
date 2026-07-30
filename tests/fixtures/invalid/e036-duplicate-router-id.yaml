@@ -1,0 +1,47 @@
+# E036 (NG-F012) - two routers claim the same router id.
+#
+# A router id names the router itself: OSPF drops an adjacency with a neighbour
+# claiming the local id (RFC 2328 section 10.5), so this pair never forms one.
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+  routing:
+    ospf:
+      area: 0.0.0.0
+      router_id: 192.0.2.1
+      interfaces: [eth0]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+  routing:
+    ospf:
+      area: 0.0.0.0
+      router_id: 192.0.2.1
+      interfaces: [eth0]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - rtr-a:eth0
+    - rtr-b:eth0
+  medium: copper

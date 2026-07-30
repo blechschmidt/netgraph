@@ -1,0 +1,41 @@
+# E033 (NG-F009) - a route sends out of an interface the device has not got.
+#
+# 'eth9' is a typo for 'eth0'. The device would refuse to install the route, so
+# 192.168.0.0/16 is unreachable while the inventory says it is served.
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+  routes:
+    - prefix: 192.168.0.0/16
+      via: 10.0.0.2
+      dev: eth9
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - rtr-a:eth0
+    - rtr-b:eth0
+  medium: copper

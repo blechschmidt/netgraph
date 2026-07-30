@@ -18,10 +18,12 @@ Format             What it is
                    namespace, kind, vendor and site.
 ``cable-list``     The pull list: one row per physical run, both ends
                    located by rack, unit and panel port.
+``routes``         An iproute2 script, one function per device, holding the
+                   static routes that device declares (§16.2).
 =================  =========================================================
 
-Four promises hold across all five, and they are why this is a package rather
-than five ad-hoc printers:
+Four promises hold across all six, and they are why this is a package rather
+than six ad-hoc printers:
 
 **Deterministic.** Every collection is sorted by an explicit canonical key —
 never by dict order, never by the loader's directory traversal. Two runs over an
@@ -34,7 +36,8 @@ switch`` means the same thing to both.
 
 **Loud about what it drops.** Every format is lossy, in ways specific to it: a
 hosts file has nowhere to put a VLAN, a zone file has nowhere to put a cable,
-an Ansible inventory has nowhere to put a device with no address. Each emitter
+an Ansible inventory has nowhere to put a device with no address, and a routing
+script has nowhere to put a protocol. Each emitter
 records what it left out and why (:mod:`netgraph.export.manifest`) and the CLI
 prints that record as JSON on stderr, leaving stdout for the artefact.
 
@@ -59,7 +62,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Final
 
-from netgraph.export import ansible, cables, dnszone, hosts, prometheus
+from netgraph.export import ansible, cables, dnszone, hosts, prometheus, routes
 from netgraph.export.context import ExportContext, ExportOptions
 from netgraph.export.manifest import MANIFEST_KIND, Manifest, Reason, Recorder, Skip
 from netgraph.export.names import ansible_identifier, domain_name, is_domain_name, sanitise_label
@@ -153,6 +156,17 @@ EXPORTERS: Final[Mapping[str, Exporter]] = {
         suffix=".csv",
         lossy="physical runs only: adapter attachments, tunnels and addressing are absent",
         emit=cables.emit,
+    ),
+    "routes": Exporter(
+        name="routes",
+        description="an iproute2 script of the static routes each device declares",
+        layers=(Layer.L1,),
+        suffix=".sh",
+        lossy=(
+            "static routes only: BGP and OSPF configuration is vendor syntax and is not "
+            "invented here"
+        ),
+        emit=routes.emit,
     ),
 }
 

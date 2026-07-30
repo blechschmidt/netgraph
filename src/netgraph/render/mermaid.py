@@ -96,9 +96,11 @@ _THICK: Final = ("===", "== {label} ===")
 _DOTTED: Final = ("-.-", "-. {label} .-")
 
 #: Edge kinds with no physical line to encode: they take the dotted style and
-#: rely on their label. See :func:`_edges`.
+#: rely on their label. See :func:`_edges`. A BGP session is deliberately *not*
+#: one of them — it is drawn solid, as it is in DOT, because the whole point of
+#: the routing view is telling a configured session from a discovered adjacency.
 _LOGICAL_EDGE_KINDS: Final[frozenset[EdgeKind]] = frozenset(
-    {EdgeKind.TUNNEL, EdgeKind.ENCAPSULATION}
+    {EdgeKind.TUNNEL, EdgeKind.ENCAPSULATION, EdgeKind.OSPF}
 )
 
 _INDENT: Final = "    "
@@ -144,7 +146,11 @@ def to_mermaid(graph: Graph, options: RenderOptions | None = None) -> str:
     direction = opts.rankdir or DEFAULT_RANKDIR
     lines.append(f"flowchart {direction}")
 
-    if opts.group_by_namespace:
+    if graph.clusters:
+        # A layer that groups its own nodes wins over ``--group-by-namespace``;
+        # see ``netgraph.render.dot._groups``.
+        lines.extend(_clustered_nodes(graph, ids, opts))
+    elif opts.group_by_namespace:
         lines.extend(_grouped_nodes(graph, ids, opts))
     else:
         lines.extend(
@@ -173,6 +179,18 @@ def _grouped_nodes(graph: Graph, ids: Mapping[str, str], options: RenderOptions)
             yield from (f"{_INDENT}{line}" for line in _nodes(members, ids, options, graph.layer))
             continue
         yield f"{_INDENT}subgraph ns{index}[{_label(namespace)}]"
+        yield f"{_INDENT * 2}direction {options.rankdir or DEFAULT_RANKDIR}"
+        yield from (f"{_INDENT * 2}{line}" for line in _nodes(members, ids, options, graph.layer))
+        yield f"{_INDENT}end"
+
+
+def _clustered_nodes(graph: Graph, ids: Mapping[str, str], options: RenderOptions) -> Iterator[str]:
+    """One ``subgraph`` per box the layer asked for: the VRFs of §16.6."""
+    loose = [node for node in graph.nodes.values() if not node.cluster]
+    yield from (f"{_INDENT}{line}" for line in _nodes(loose, ids, options, graph.layer))
+    for index, cluster in enumerate(graph.clusters):
+        members = graph.nodes_in_cluster(cluster)
+        yield f"{_INDENT}subgraph vrf{index}[{_label(f'vrf {cluster}')}]"
         yield f"{_INDENT * 2}direction {options.rankdir or DEFAULT_RANKDIR}"
         yield from (f"{_INDENT * 2}{line}" for line in _nodes(members, ids, options, graph.layer))
         yield f"{_INDENT}end"
@@ -237,7 +255,8 @@ def _class_definitions(graph: Graph, ids: Mapping[str, str]) -> list[str]:
 def _node_text(node: Node, options: RenderOptions, layer: Layer) -> str:
     subnet = node.subnet
     if subnet is not None:
-        parts = [subnet.prefix, f"[{subnet.family} subnet]"]
+        vrf = f", vrf {subnet.vrf}" if subnet.vrf else ""
+        parts = [subnet.prefix, f"[{subnet.family} subnet{vrf}]"]
         if options.show_vlans and node.vlans:
             parts.append(f"vlans: {_compact_ids(node.vlans)}")
         return "\n".join(parts)
@@ -252,6 +271,14 @@ def _node_text(node: Node, options: RenderOptions, layer: Layer) -> str:
 
     if node.aggregate is not None:
         return "\n".join(_aggregate_text(node.aggregate, options))
+
+    if node.routing is not None:
+        # Who this router is to its peers, then what it carries: the same content
+        # the DOT record holds, flattened into the lines a Mermaid node allows.
+        routing = [node.name, f"[{node.kind}]", *node.routing.describe()]
+        routing.extend(f"vrf {name} ({rd})" for name, rd in node.routing.vrfs)
+        routing.extend(node.routing.routes)
+        return "\n".join(routing)
 
     parts = [node.name, f"[{node.kind}]"]
     # At layer 3 the addresses live on the edges, where they say which interface
@@ -280,6 +307,12 @@ def _edge_text(edge: Edge, layer: Layer, options: RenderOptions) -> str:
     """
     if edge.kind is EdgeKind.ENCAPSULATION:
         return f"{edge.label} over" if edge.label else "over"
+
+    if edge.adjacency is not None:
+        adjacency = [edge.adjacency.label]
+        if edge.adjacency.description:
+            adjacency.append(edge.adjacency.description)
+        return " · ".join(adjacency)
 
     parts: list[str] = []
     ports = _port_text(edge)

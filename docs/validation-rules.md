@@ -190,7 +190,7 @@ one mistake.
 ## Pass 3 — semantics
 
 Every document has parsed. Do they agree with **each other**? These
-fifty-one rules are the only ones that can be suppressed, re-graded or
+seventy-five rules are the only ones that can be suppressed, re-graded or
 disabled — they are judgements about a whole inventory rather than facts about
 one document.
 
@@ -783,6 +783,100 @@ the air.
 
 **Suppress with** `E031` / `NG-W010`, or an annotation on either element.
 
+#### `E032` — next hop is not on-link
+
+*Alias: `NG-F008`. Severity: error.*
+
+A static route's `via` lies outside every prefix the device configures in the
+route's own routing instance, on the interface the route names if it names one.
+Three exemptions, each for a next hop that is on-link *by definition* rather
+than by a prefix somebody wrote down: an IPv6 link-local next hop (`fe80::1`),
+which is how an unnumbered link is written; a blackhole route, which has no next
+hop; and a route whose `dev` the device has not got, which is `E033` and would
+otherwise be reported twice.
+
+**Why it matters.** A next hop is resolved by ARP or neighbour discovery, never
+by routing, so an off-link one has no way of being reached: the router would
+have to route in order to reach the address that tells it how to route. The
+usual causes are a prefix length that was shortened without the next hop moving,
+and a next hop copied from a neighbouring subnet.
+
+The **VRF** half of the check is the part that is easy to miss. A routing
+instance is a routing table of its own (schema §16.1), so a next hop that sits
+on an interface in a *different* instance is not merely in another subnet — it is
+unreachable from this table by construction, however adjacent the two addresses
+look on the page.
+
+**Suppress with** `E032` / `NG-F008`, or an annotation on the device.
+
+#### `E033` — route sends out of an unknown interface
+
+*Alias: `NG-F009`. Severity: error.*
+
+A route's `dev` names an interface the device does not have. The finding lists
+the interfaces it does have, because the cause is nearly always a typo or a port
+that was renamed.
+
+**Why it matters.** `dev` is how a route is pointed at an egress rather than at
+an address — an unnumbered point-to-point link, or a route into a tunnel. A name
+that resolves to nothing is a route the device would refuse to install, which
+leaves the destination unreachable while the inventory says it is served.
+
+**Suppress with** `E033` / `NG-F009`, or an annotation on the device.
+
+#### `E034` — OSPF runs on an interface the device does not have
+
+*Alias: `NG-F010`. Severity: error.*
+
+An entry of `routing.ospf.interfaces` names no interface of the device.
+
+**Why it matters.** An area is only as wide as the interfaces that run it, so a
+name that resolves to nothing is an adjacency that will never come up. In an
+inventory it is worse than that: the link *looks* like it is in the IGP, so a
+reader of the routing view counts on a path that does not exist.
+
+**Suppress with** `E034` / `NG-F010`, or an annotation on the device.
+
+#### `E035` — BGP session disagrees about an AS number
+
+*Alias: `NG-F011`. Severity: error.*
+
+A `neighbors[].remote_asn` contradicts the `asn` the peer declares for itself.
+The peer is found by resolving the neighbour address against every address the
+inventory configures (schema §16.4), so the check only applies to a session
+whose far end is an element here; a peer that declares no `routing.bgp` at all is
+silent, because an inventory may model the box without modelling its control
+plane.
+
+Reported per *claim*, from the document that makes it: a typo on one side is one
+mistake, and two sides typed differently are two.
+
+**Why it matters.** The OPEN message carries the local AS, and a peer that
+expected a different one closes the session (RFC 4271 §6.2). The result is a
+session that never establishes while both configurations look plausible in
+isolation — which is exactly the failure an inventory holding both ends can catch
+and a device holding one cannot.
+
+**Suppress with** `E035` / `NG-F011`, or an annotation on either element.
+
+#### `E036` — duplicate router id
+
+*Alias: `NG-F012`. Severity: error.*
+
+Two elements declare the same `router_id`. One device giving OSPF and BGP the
+same value is **one** identity rather than a duplicate — it is the normal
+configuration — so the ids of a device are de-duplicated before they are
+counted.
+
+**Why it matters.** A router id names the router itself. OSPF drops a hello from
+a neighbour claiming the local id (RFC 2328 §10.5) and BGP refuses a session with
+a duplicate identifier (RFC 4271 §6.8), so every adjacency between the two stays
+down. The cause is nearly always a router built by copying its neighbour's
+configuration, which makes it the mistake most likely to be in an inventory
+twice.
+
+**Suppress with** `E036` / `NG-F012`, or an annotation on either element.
+
 ### Warnings
 
 #### `W101` — interface neither routes nor switches
@@ -862,7 +956,7 @@ splits a subnet into halves that cannot reach each other while every individual
 document still looks right. The other reading is just as useful — the neighbour
 exists but was never written down, so the diagram is missing a device. Only the
 layer-3 view can show this at all, which is why the rule arrived with it; see
-[`--layer l3`](rendering.md#layers-one-inventory-six-questions).
+[`--layer l3`](rendering.md#layers-one-inventory-seven-questions).
 
 **Suppress with** `W105` / `NG-A008`, or an annotation on the element holding
 the address. A deliberately sparse management prefix, and a link whose peer is
@@ -1428,6 +1522,48 @@ The approximation can only make the rule warn more readily, never less.
 
 **Suppress with** `W134` / `NG-W011`, or an annotation on either element.
 
+#### `W135` — BGP neighbour is not in the inventory
+
+*Alias: `NG-F013`. Severity: warning.*
+
+A `neighbors[].address` matches no address the inventory configures, so the far
+end of the session cannot be found.
+
+**Why it matters.** A warning rather than an error, deliberately: a perfectly
+correct eBGP session towards a transit provider points at an address on *their*
+router, which is not an element of this inventory and never will be. What the
+warning says is what is lost — netgraph cannot check the AS numbers or the
+reachability of the far end (`E035`), and the routing view has nothing to draw
+the edge to, so the session is listed in the graph's dropped-link report instead.
+
+The other cause is a typo in an address that *was* meant to be internal, and
+that is worth a line of output. Between the two, silence would be the wrong
+default and an error would fail every inventory with an upstream.
+
+**Suppress with** `W135` / `NG-F013`, or an annotation on the device — which is
+what to do for a genuinely external peer.
+
+#### `W136` — VRF with no interface bound to it
+
+*Alias: `NG-F014`. Severity: warning.*
+
+A device declares a `vrfs` entry that no `interfaces[].vrf` names. The finding
+also counts the static routes placed in the instance, because those are what
+cannot work.
+
+**Why it matters.** A routing instance is a table plus the interfaces that feed
+it. With nothing bound, it holds no address and no connected route, so every
+route placed in it can never resolve a next hop — and, worse, the partition it
+was declared to create does not exist: the addresses somebody meant to isolate
+are all still in the global table, colliding with each other as if the VRF had
+never been written.
+
+A warning rather than an error because a VRF declared ahead of the interfaces
+that will join it is a normal state for an inventory to be in halfway through a
+migration.
+
+**Suppress with** `W136` / `NG-F014`, or an annotation on the device.
+
 ### Info
 
 #### `I001` — locally administered MAC address
@@ -1496,13 +1632,13 @@ inventory that moves every tunnel off its default port should say
 ## Suppressing a rule
 
 Four mechanisms, all additive. A finding is silenced if any of them applies.
-Only the forty-one [pass 3](#pass-3--semantics) rules can be suppressed; naming a
+Only the [pass 3](#pass-3--semantics) rules can be suppressed; naming a
 schema rule is a usage error:
 
 <!-- run: rc=2 -->
 ```console
 $ netgraph validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 Every mechanism accepts both spellings of an id — `W102` and `NG-C010` select

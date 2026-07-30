@@ -62,6 +62,10 @@ class Reason(str, Enum):
     human needs in order to know whether to act on it.
     """
 
+    #: The device declares no ``spec.routes``, so there is no command to write
+    #: for it. Expected of everything that is not a router, and of a router whose
+    #: routing is entirely dynamic.
+    NO_ROUTES = "no-routes"
     #: The element configures no address at all, or none on any interface that
     #: survived the filter. Expected of a patch panel and of an unmanaged
     #: switch; a gap in the inventory for anything else.

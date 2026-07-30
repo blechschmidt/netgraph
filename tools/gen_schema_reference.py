@@ -46,6 +46,8 @@ from pydantic.fields import FieldInfo  # noqa: E402
 from netgraph.models import (  # noqa: E402
     AcceptableFrames,
     AdapterSpec,
+    BgpConfig,
+    BgpNeighbor,
     BridgeConfig,
     BridgeType,
     Bss,
@@ -64,7 +66,10 @@ from netgraph.models import (  # noqa: E402
     Location,
     Medium,
     Metadata,
+    OspfConfig,
     PatchPanelSpec,
+    RoutingConfig,
+    StaticRoute,
     TunnelAuth,
     TunnelMode,
     TunnelSpec,
@@ -76,6 +81,7 @@ from netgraph.models import (  # noqa: E402
     VlanDefinition,
     VlanMode,
     VlanSet,
+    VrfDefinition,
     WirelessConfig,
 )
 from netgraph.models.document import ELEMENT_MODELS  # noqa: E402
@@ -272,6 +278,62 @@ SECTIONS: Final[tuple[Section, ...]] = (
         ),
     ),
     Section(
+        VrfDefinition,
+        "`spec.vrfs[]`",
+        "One routing instance — a VRF (§16.1). An interface joins it with `vrf`, and that "
+        "binding is what makes an address private to the instance.",
+        notes=(
+            "Two devices that use the same `name` are taken to mean the same VRF; the route "
+            "distinguisher is recorded because MPLS needs it, not to identify the instance.",
+            "A VRF no interface binds to holds nothing, which is `NG-F014`.",
+        ),
+    ),
+    Section(
+        StaticRoute,
+        "`spec.routes[]`",
+        "One configured static route (§16.2).",
+        notes=(
+            "At least one of `via`, `dev` and `blackhole` is required, and `blackhole` excludes "
+            "the other two (`NG-F004`).",
+            "`via` is of the same family as `prefix` (`NG-F003`) and must be on-link: inside a "
+            "prefix the device configures, in the same VRF (`NG-F008`).",
+        ),
+    ),
+    Section(
+        RoutingConfig,
+        "`spec.routing`",
+        "The dynamic routing protocols the device takes part in (§16.3). Both blocks are "
+        "optional and neither implies the other.",
+    ),
+    Section(
+        OspfConfig,
+        "`spec.routing.ospf`",
+        "One OSPF area, and the interfaces that run it.",
+        notes=(
+            "`area` accepts `0` and `0.0.0.0` for the backbone and stores the dotted quad, so "
+            "two documents that spell one area differently still compare equal.",
+            "One area per device: per-interface areas, and therefore area border routers, are "
+            "deferred (§16.5).",
+        ),
+    ),
+    Section(
+        BgpConfig,
+        "`spec.routing.bgp`",
+        "The autonomous system this device is in, and the sessions it configures.",
+    ),
+    Section(
+        BgpNeighbor,
+        "`spec.routing.bgp.neighbors[]`",
+        "One BGP session. The peer is an **address**, which is what the device is configured "
+        "with — never an element name (§16.4).",
+        notes=(
+            "The address is resolved against every address the inventory configures. A peer "
+            "that resolves to nothing is a warning (`NG-F013`), because an eBGP peer may be a "
+            "transit provider nobody declares here; a peer whose own `asn` contradicts "
+            "`remote_asn` is an error (`NG-F011`).",
+        ),
+    ),
+    Section(
         CableSpec,
         "`spec` — cable",
         "A cable is an undirected physical link between exactly two interfaces, and a "
@@ -422,6 +484,8 @@ _NAMED_PATTERNS: Final[dict[str, str]] = {
 _NAMED_VALIDATORS: Final[dict[str, str]] = {
     "normalise_mac": "MAC address",
     "parse_bitrate": "bit rate",
+    "normalise_rd": "route distinguisher",
+    "normalise_area": "OSPF area",
 }
 
 
@@ -512,6 +576,8 @@ def _scalar_name(annotation: Any) -> str:
         bool: "boolean",
         ipaddress.IPv4Address: "IPv4 address",
         ipaddress.IPv6Address: "IPv6 address",
+        ipaddress.IPv4Network: "IPv4 prefix",
+        ipaddress.IPv6Network: "IPv6 prefix",
     }.get(annotation, getattr(annotation, "__name__", str(annotation)))
 
 
@@ -539,6 +605,12 @@ def render_type(field: FieldInfo) -> str:
 
 
 def _render_leaf(annotation: Any, constraints: Sequence[Any]) -> str:
+    if get_origin(annotation) in (Union, types.UnionType):
+        # A field that takes either address family, such as a route's ``prefix``.
+        # Rendered member by member, with the pipe escaped: an unescaped one
+        # would end the table cell it is written in.
+        members = [member for member in get_args(annotation) if member is not type(None)]
+        return " \\| ".join(_render_leaf(member, ()) for member in members)
     if isinstance(annotation, type) and issubclass(annotation, enum.Enum):
         return " \\| ".join(f"`{member.value}`" for member in annotation)
     if annotation is VlanSet:

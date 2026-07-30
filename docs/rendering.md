@@ -18,11 +18,12 @@ labelled links](images/home-lab.svg)
 
 ## Contents
 
-- [Layers: one inventory, six questions](#layers-one-inventory-six-questions)
+- [Layers: one inventory, seven questions](#layers-one-inventory-seven-questions)
   - [`physical` and `l1`: the cabling record and the network](#physical-and-l1-the-cabling-record-and-the-network)
   - [`l2`: the same graph, annotated with VLANs](#l2-the-same-graph-annotated-with-vlans)
   - [`l3`: prefixes and who is addressed in them](#l3-prefixes-and-who-is-addressed-in-them)
   - [`overlay`: tunnels and what runs inside what](#overlay-tunnels-and-what-runs-inside-what)
+  - [`routing`: sessions, adjacencies and VRFs](#routing-sessions-adjacencies-and-vrfs)
   - [`rack`: a front elevation per cabinet](#rack-a-front-elevation-per-cabinet)
 - [Filters: drawing less of the network](#filters-drawing-less-of-the-network)
 - [Aggregation: one node per site, one line per bundle](#aggregation-one-node-per-site-one-line-per-bundle)
@@ -35,9 +36,9 @@ labelled links](images/home-lab.svg)
 
 ---
 
-## Layers: one inventory, six questions
+## Layers: one inventory, seven questions
 
-One inventory, six questions. `--layer` picks which one the diagram answers.
+One inventory, seven questions. `--layer` picks which one the diagram answers.
 
 | Layer | Nodes | Edges | Annotations | Reach for it when |
 |---|---|---|---|---|
@@ -46,6 +47,7 @@ One inventory, six questions. `--layer` picks which one the diagram answers.
 | `l2` | the same | the same | VLAN membership per node and per link, port mode | "Is this host in VLAN 10 all the way to the gateway?" Broadcast domains, trunk pruning, a VLAN that stops one switch short. |
 | `l3` | the elements that hold a routable address, **plus one node per IP prefix** | one per address: element ↔ the subnet it is addressed in, labelled with the interface and the address | VLANs the prefix is reachable in | "Why can these two not reach each other?" The addressing plan, gateways, a subnet mask that is one bit off. |
 | `overlay` | the elements that terminate a tunnel, **plus one node per tunnel** | one per endpoint, plus one per `over` — this tunnel runs inside that one | encapsulation stack, VNI, MTU budget, what encrypts | "Is this traffic actually protected, and what carries it?" VPNs, VXLAN fabrics, a cleartext overlay somebody assumed was private. |
+| `routing` | the elements that take part in routing — anything declaring `routing`, `routes` or `vrfs` — grouped into one cluster per VRF | one per BGP session (solid, labelled with the AS pair) and one per OSPF adjacency (dotted, labelled with the area) | AS number, router id, area, the instances and static routes each device holds | "Who peers with whom, and in which table?" An iBGP mesh with a gap in it, an AS number typed twice, a VRF nothing is bound to. |
 | `rack` | one node per rack named by a `metadata.location` | none — a cable says nothing about where either end is bolted | a front elevation: one row per unit, occupied and empty alike | "How much room is left in that cabinet, and what is above the UPS?" |
 
 The default is `l1`. `-f html` accepts `--layer` more than once and puts a
@@ -124,11 +126,14 @@ What layer 3 leaves out is deliberate:
 * **Loopback and link-local addresses**, and unnumbered interfaces. `127.0.0.1`,
   `::1` and `fe80::/10` are scoped to one host or one link, so they are not
   prefixes of *this* network.
-* **VLAN identity of a prefix.** Grouping is by prefix alone, because that is
-  what a routing table keys on. A prefix deliberately re-used in two VLANs
-  therefore appears once — which is exactly what
+* **VLAN identity of a prefix.** Grouping is by prefix, because that is what a
+  routing table keys on. A prefix deliberately re-used in two VLANs therefore
+  appears once — which is exactly what
   [`W106`](validation-rules.md#w106--one-address-claimed-twice-in-a-subnet)
-  points out.
+  points out. A **VRF** is the one thing that does split it: a routing instance
+  is a routing table of its own, so `10.0.0.0/24` in `blue` and in the global
+  table are two nodes, each labelled with its instance
+  ([`docs/schema.md` §16.1](schema.md#161-vrfs--routing-instances)).
 
 Two problems are visible only from the derived layers, and `netgraph validate`
 reports both:
@@ -161,6 +166,47 @@ A tunnel has to become a node there because nesting is a relation between two
 undrawable at layer 1 and obvious here. Below that layer a point-to-point tunnel
 stays a dashed edge, so a render shows the VPNs over the physical topology
 without a box in the middle of each one.
+
+### `routing`: sessions, adjacencies and VRFs
+
+The `routing` layer draws the control plane
+([`docs/schema.md` §16.6](schema.md#166-the-routing-view)). Nodes are the
+elements that take part in routing at all, labelled with the AS number and router
+id their peers know them by; edges are the sessions and adjacencies between them:
+
+<!-- norun: an excerpt of the flowchart, elided in the middle -->
+```console
+$ netgraph -i examples/campus render --layer routing -f mermaid
+n3(["rtr-north-core-01<br/>[router]<br/>AS 65001<br/>id 192.0.2.1<br/>…"])
+…
+n3 -- "iBGP 65001 · iBGP to rtr-south-core-01" --- n7
+n3 -. "area 0.0.0.0" .- n4
+```
+
+The two kinds of edge are resolved differently, because the protocols work
+differently:
+
+* a **BGP session** is *declared*, by address, on one or both ends. It is drawn
+  once however many times it is declared, solid, and labelled with the AS pair —
+  `65001 → 65002` for an external session, `iBGP 65001` when both ends are in one
+  AS. A session whose address matches nothing in the inventory is reported as a
+  dropped link rather than drawn to a node that does not exist, and as
+  [`W135`](validation-rules.md#w135--bgp-neighbour-is-not-in-the-inventory) by
+  the validator.
+* an **OSPF adjacency** is *discovered*, so netgraph derives it the way the
+  protocol does: two interfaces that run OSPF in the same area and are addressed
+  in one subnet form one, drawn dotted and labelled with the area. Deriving it
+  from the addressing rather than from the cables is what makes it right for two
+  routers facing each other across a layer-2 switch, which no cable joins.
+
+**Clusters are VRFs**, and they replace `--group-by-namespace` at this layer: the
+grouping the reader asked for by choosing the layer wins over the one a flag
+asks for. A router with interfaces in exactly one instance is drawn inside that
+instance's box; one that straddles several belongs to no box — the same choice a
+cross-site prefix gets at layer 3 — and names its instances on its label instead.
+
+Nothing physical appears. Two routers are adjacent here because they exchange
+routes, which a cable neither guarantees nor is needed for.
 
 ### `rack`: a front elevation per cabinet
 

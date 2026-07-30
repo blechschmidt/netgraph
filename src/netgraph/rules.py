@@ -8,7 +8,7 @@ without importing the validator itself.
 Two identifier vocabularies exist and both are accepted everywhere a rule can be
 named (``netgraph.toml``, the ``netgraph/ignore`` annotation, ``--disable``):
 
-* The **short ids** ``E001``…``E019``, ``W101``…``W129`` and ``I001``…``I003``
+* The **short ids** ``E001``…``E036``, ``W101``…``W136`` and ``I001``…``I003``
   used by the validation engine and printed in diagnostics. The letter is the
   default severity — ``E`` error, ``W`` warning, ``I`` info — as first
   assigned; a rule keeps its id when an inventory re-grades it.
@@ -364,6 +364,41 @@ RULES: Final[tuple[Rule, ...]] = (
         title="associated to an SSID the access point does not advertise",
     ),
     Rule(
+        "E032",
+        Severity.ERROR,
+        "A route's next hop lies in no prefix the device configures in that VRF.",
+        ("NG-F008",),
+        title="next hop is not on-link",
+    ),
+    Rule(
+        "E033",
+        Severity.ERROR,
+        "A route's 'dev' names an interface the device does not have.",
+        ("NG-F009",),
+        title="route sends out of an unknown interface",
+    ),
+    Rule(
+        "E034",
+        Severity.ERROR,
+        "An OSPF interface is not in the device's interface list.",
+        ("NG-F010",),
+        title="OSPF runs on an interface the device does not have",
+    ),
+    Rule(
+        "E035",
+        Severity.ERROR,
+        "The two ends of a resolved BGP session disagree about an AS number.",
+        ("NG-F011",),
+        title="BGP session disagrees about an AS number",
+    ),
+    Rule(
+        "E036",
+        Severity.ERROR,
+        "Two elements claim the same router id.",
+        ("NG-F012",),
+        title="duplicate router id",
+    ),
+    Rule(
         "W101",
         Severity.WARNING,
         "An interface has neither IPv4 nor IPv6 and is not a switchport.",
@@ -600,6 +635,20 @@ RULES: Final[tuple[Rule, ...]] = (
         "Two access points in one broadcast domain share overlapping channels.",
         ("NG-W011",),
         title="access points on overlapping channels",
+    ),
+    Rule(
+        "W135",
+        Severity.WARNING,
+        "A BGP neighbour address resolves to no element of the inventory.",
+        ("NG-F013",),
+        title="BGP neighbour is not in the inventory",
+    ),
+    Rule(
+        "W136",
+        Severity.WARNING,
+        "A VRF is declared that no interface of the device is bound to.",
+        ("NG-F014",),
+        title="VRF with no interface bound to it",
     ),
     Rule(
         "I001",

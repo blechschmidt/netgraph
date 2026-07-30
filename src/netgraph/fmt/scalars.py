@@ -21,6 +21,11 @@ integer 8041827001 to YAML 1.1, while ``b4:96:91:01:10:01`` is a string, and
 nothing but counting tells the two apart. So the whole class is quoted, and a
 reader never has to do the counting.
 
+A route distinguisher (``spec.vrfs[].rd``, §16.1) is the same story with a
+sharper edge: ``65001:59`` is the base-60 integer 3900059 and ``65001:99`` is a
+string, so two RDs written side by side would be quoted differently for a reason
+no reader could see. The class is quoted whole.
+
 A version number is the other half of that story and needs no rule of its own.
 ``1.0`` is already a float to every reader including netgraph's, so it never
 reaches this module as a string; if it was written ``'1.0'`` the resolver rule
@@ -56,6 +61,7 @@ from ruamel.yaml.scalarstring import (
 )
 
 from netgraph.loader.documents import StrictSafeLoader, scan_tokens
+from netgraph.models.routing import ROUTE_DISTINGUISHER_PATTERN
 
 __all__ = [
     "QUOTE",
@@ -64,6 +70,7 @@ __all__ = [
     "is_quoted",
     "is_untouchable",
     "looks_like_mac",
+    "looks_like_route_distinguisher",
     "plain",
     "plain_survives",
     "quote_style",
@@ -83,10 +90,19 @@ _MAC_COLON: Final = re.compile(
 #: The three-group form Cisco writes, ``aabb.ccdd.eeff``.
 _MAC_DOTTED: Final = re.compile(r"\A[0-9A-Fa-f]{4}(?:\.[0-9A-Fa-f]{4}){2}\Z")
 
+#: The RFC 4364 §4.2 route distinguisher, taken from the model so the shape the
+#: formatter recognises and the shape the schema accepts cannot drift apart.
+_ROUTE_DISTINGUISHER: Final = re.compile(ROUTE_DISTINGUISHER_PATTERN)
+
 
 def looks_like_mac(text: str) -> bool:
     """Is ``text`` shaped like a MAC address?"""
     return bool(_MAC_COLON.match(text) or _MAC_DOTTED.match(text))
+
+
+def looks_like_route_distinguisher(text: str) -> bool:
+    """Is ``text`` shaped like a route distinguisher (``65001:1``, ``192.0.2.1:1``)?"""
+    return bool(_ROUTE_DISTINGUISHER.match(text))
 
 
 #: The bound strict loader, typed loosely: ``documents`` exports it through a
@@ -188,7 +204,7 @@ def quote_style(value: str) -> str | None:
         # A YAML 1.1 reader would see a boolean, an integer or a timestamp
         # where netgraph sees a string: ``yes``, ``no``, ``on``, ``off``.
         return QUOTE
-    if looks_like_mac(text):
+    if looks_like_mac(text) or looks_like_route_distinguisher(text):
         return QUOTE
     return None
 

@@ -38,17 +38,19 @@ With no options, `netgraph ipam` prints one row per derived prefix:
 <!-- run: -->
 ```console
 $ netgraph -i examples/campus ipam --family ipv4
-PREFIX           IP  VLANS  HOSTS  USED  FREE    UTIL  DEVICES
----------------  --  -----  -----  ----  ----  ------  -------
-10.1.0.0/30       4  -          2     2     0  100.0%        2
-10.1.10.0/24      4  10       254     3   251    1.2%        3
-10.1.20.0/24      4  20       254     2   252    0.8%        2
-10.1.99.0/24      4  99       254     4   250    1.6%        4
-10.2.0.0/30       4  -          2     2     0  100.0%        2
+VRF   PREFIX           IP  VLANS  HOSTS  USED  FREE    UTIL  DEVICES
+----  ---------------  --  -----  -----  ----  ----  ------  -------
+-     10.1.0.0/30       4  -          2     2     0  100.0%        2
+-     10.1.10.0/24      4  10       254     3   251    1.2%        3
+-     10.1.20.0/24      4  20       254     2   252    0.8%        2
+-     10.2.0.0/30       4  -          2     2     0  100.0%        2
 ...
-192.0.2.1/32      4  -          1     1     0  100.0%        1
+-     192.0.2.1/32      4  -          1     1     0  100.0%        1
 ...
-198.51.100.8/30   4  -          2     2     0  100.0%        2
+-     198.51.100.8/30   4  -          2     2     0  100.0%        2
+mgmt  10.1.99.0/24      4  99       254     4   250    1.6%        4
+mgmt  10.2.99.0/24      4  99       254     3   251    1.2%        3
+mgmt  10.3.99.0/24      4  99       254     3   251    1.2%        3
 
 conflicts
 no problems found
@@ -56,7 +58,8 @@ no problems found
 
 | Column | Meaning |
 |---|---|
-| `PREFIX` | The derived prefix. Grouping is by prefix alone, exactly as `list subnets` groups. |
+| `VRF` | The routing instance the prefix is in, shown only when something is in one; `-` is the global instance. |
+| `PREFIX` | The derived prefix. Grouping is by prefix *and* instance, exactly as `list subnets` groups. |
 | `IP` | Address family, `4` or `6`. |
 | `VLANS` | Every VLAN an interface addressed in the prefix belongs to, compacted (`10,20,99` / `100-104`). `-` for a routed or untagged prefix. |
 | `HOSTS` | Usable host addresses — see [sizing](#sizing) below. |
@@ -69,7 +72,24 @@ Rows are sorted by family, then network address, then prefix length — the same
 deterministic order `list subnets` and the layer-3 graph use, so two runs of the
 command over an unchanged tree produce byte-identical output.
 
-### Sizing
+### Routing instances
+
+A VRF is a routing table of its own, so it is an address space of its own
+([`docs/schema.md` §16.1](schema.md#161-vrfs--routing-instances)). Everything on
+this page therefore works per instance:
+
+* one row per `(instance, prefix)`, so the same prefix in `blue` and in the global
+  table is sized, counted and reported twice — which is what it is;
+* `--aggregate` never folds across instances: two halves of a supernet in two
+  tables do not fill it, they are two plans that happen to be adjacent on paper;
+* the conflict rules partition the same way, so an address is only in conflict
+  with an address in its own instance (`E004`, `W106`, `W130`, `W131`).
+
+`--free` and `--next-free` answer for **every** instance at once, which is the
+conservative reading: a block that is free in one table and used in another is
+not one to hand out without saying which table was meant.
+
+## Sizing
 
 `HOSTS` is not `2^n`. The rules are the ones the protocols actually specify:
 

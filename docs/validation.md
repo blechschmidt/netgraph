@@ -261,7 +261,7 @@ to nothing, and the message lists what you could have meant:
 <!-- run: rc=2 -->
 ```console
 $ netgraph -i examples/quickstart validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 An unknown id in an *annotation* is ignored rather than fatal — inventory data
@@ -345,6 +345,11 @@ says why the rule exists, what it deliberately exempts, and how to suppress it.
 | [`E029`](validation-rules.md#e029--duplicate-bssid) | `NG-W008` | error | duplicate BSSID |
 | [`E030`](validation-rules.md#e030--ssid-vlan-is-carried-nowhere-on-the-access-point) | `NG-W009` | error | SSID VLAN is carried nowhere on the access point |
 | [`E031`](validation-rules.md#e031--associated-to-an-ssid-the-access-point-does-not-advertise) | `NG-W010` | error | associated to an SSID the access point does not advertise |
+| [`E032`](validation-rules.md#e032--next-hop-is-not-on-link) | `NG-F008` | error | next hop is not on-link |
+| [`E033`](validation-rules.md#e033--route-sends-out-of-an-unknown-interface) | `NG-F009` | error | route sends out of an unknown interface |
+| [`E034`](validation-rules.md#e034--ospf-runs-on-an-interface-the-device-does-not-have) | `NG-F010` | error | OSPF runs on an interface the device does not have |
+| [`E035`](validation-rules.md#e035--bgp-session-disagrees-about-an-as-number) | `NG-F011` | error | BGP session disagrees about an AS number |
+| [`E036`](validation-rules.md#e036--duplicate-router-id) | `NG-F012` | error | duplicate router id |
 | [`W101`](validation-rules.md#w101--interface-neither-routes-nor-switches) | `NG-I013` | warning | interface neither routes nor switches |
 | [`W102`](validation-rules.md#w102--mtu-mismatch-across-a-link) | `NG-C010` | warning | MTU mismatch across a link |
 | [`W103`](validation-rules.md#w103--orphan-device) | `NG-C016` | warning | orphan device |
@@ -379,6 +384,8 @@ says why the rule exists, what it deliberately exempts, and how to suppress it.
 | [`W132`](validation-rules.md#w132--address-outside-every-prefix-on-its-link) | `NG-A012` | warning | address outside every prefix on its link |
 | [`W133`](validation-rules.md#w133--patch-run-stops-inside-the-panel) | `NG-P002` | warning | patch run stops inside the panel |
 | [`W134`](validation-rules.md#w134--access-points-on-overlapping-channels) | `NG-W011` | warning | access points on overlapping channels |
+| [`W135`](validation-rules.md#w135--bgp-neighbour-is-not-in-the-inventory) | `NG-F013` | warning | BGP neighbour is not in the inventory |
+| [`W136`](validation-rules.md#w136--vrf-with-no-interface-bound-to-it) | `NG-F014` | warning | VRF with no interface bound to it |
 | [`I001`](validation-rules.md#i001--locally-administered-mac-address) | `NG-I010` | info | locally administered MAC address |
 | [`I002`](validation-rules.md#i002--enabled-interface-terminates-no-cable) | `NG-C015` | info | enabled interface terminates no cable |
 | [`I003`](validation-rules.md#i003--tunnel-on-a-non-standard-port) | `NG-T015` | info | tunnel on a non-standard port |

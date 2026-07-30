@@ -1,0 +1,49 @@
+# E035 (NG-F011) - the two ends of a resolved session disagree about an AS.
+#
+# 'rtr-a' peers with 10.0.0.2 as AS 65002; the router holding that address
+# declares AS 65003. The OPEN message would carry an AS the far end does not
+# recognise, so the session never establishes.
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+  routing:
+    bgp:
+      asn: 65001
+      router_id: 192.0.2.1
+      neighbors:
+        - address: 10.0.0.2
+          remote_asn: 65002
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+  routing:
+    bgp:
+      asn: 65003
+      router_id: 192.0.2.2
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - rtr-a:eth0
+    - rtr-b:eth0
+  medium: copper

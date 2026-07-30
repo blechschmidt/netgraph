@@ -54,6 +54,7 @@ spec:
       vlan:
         mode: access
         access_vlan: 99
+      vrf: mgmt
       parent: br0
 
     - name: Ethernet49/1
@@ -103,3 +104,30 @@ spec:
   forwarding:
     ipv4: true
     ipv6: true
+  vrfs:
+    # Management is a routing instance of its own: the Vlan99 SVI here and the
+    # one on every access switch are bound to it, so 10.3.99.0/24 is reachable
+    # from the management network and from nowhere else. Nothing in the global
+    # table has a route into it.
+    - name: mgmt
+      rd: '65001:99'
+      description: In-band management, west campus
+  routes:
+    - prefix: 0.0.0.0/0
+      via: 10.3.0.1
+      dev: Ethernet52/1
+      metric: 10
+    # The management instance is deliberately not routed off-site.
+    - prefix: 0.0.0.0/0
+      vrf: mgmt
+      blackhole: true
+  routing:
+    ospf:
+      area: 0.0.0.0
+      # The uplink and the two SVIs that carry user traffic. Vlan99 is in the
+      # 'mgmt' instance and is not in the IGP.
+      router_id: 10.3.0.2
+      interfaces:
+        - Ethernet52/1
+        - Vlan10
+        - Vlan20

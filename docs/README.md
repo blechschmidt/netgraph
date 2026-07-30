@@ -40,7 +40,7 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
   48-port switch without typing 48 interfaces.
 * **[importing.md](importing.md)** — bootstrap the first inventory from LLDP, `ip -j addr`
   or the cabling spreadsheet you already keep, then converge on it by hand.
-* **[rendering.md](rendering.md)** — the six layers, the filters, namespace collapsing and
+* **[rendering.md](rendering.md)** — the seven layers, the filters, namespace collapsing and
   link bundling, icon themes, labelling, interactivity, and what each output format is
   good for.
 * **[validation.md](validation.md)** — the three passes, severities, `--strict`, the four
@@ -53,7 +53,7 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
   conflicts, with the arithmetic spelled out.
 * **[paths.md](paths.md)** — how the trace works, what counts as a hop, several paths and
   none, and how to draw the answer.
-* **[export.md](export.md)** — the five operational artefacts, what each guarantees, what
+* **[export.md](export.md)** — the six operational artefacts, what each guarantees, what
   each drops, and how names are folded.
 * **[configuration.md](configuration.md)** — `netgraph.toml`: per-inventory render
   defaults, named profiles, precedence, and how to see what resolved.

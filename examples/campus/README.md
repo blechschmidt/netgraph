@@ -2,7 +2,9 @@
 
 Three sites, 22 devices, 22 cables. A classic three-tier campus: layer-3 core
 routers joined in a fibre backbone ring, layer-3 distribution switches carrying
-the VLAN gateways, and layer-2 access switches trunking up to them.
+the VLAN gateways, and layer-2 access switches trunking up to them — with one
+OSPF area over the lot, an iBGP mesh between the cores, and management in a VRF
+of its own.
 
 ```text
 campus/
@@ -70,6 +72,11 @@ Site index `i` is 1 (north), 2 (south), 3 (west).
 | Backbone south↔west | `198.51.100.4/30` | `2001:db8:ff:2::/64` |
 | Backbone west↔north | `198.51.100.8/30` | `2001:db8:ff:3::/64` |
 
+VLAN 99 is in the `mgmt` VRF (`rd 65001:99`) on every switch that has an SVI in
+it, which is why `10.<i>.99.0/24` is listed under an instance of its own below:
+a VRF is a routing table of its own, so it is an address space of its own
+(§16.1).
+
 VLAN 30 (`voice`) is declared in every VLAN database and trunked everywhere,
 but has no access port yet — the state a campus is usually in halfway through a
 telephony rollout.
@@ -81,17 +88,68 @@ that span two sites.
 <!-- run: -->
 ```console
 $ netgraph -i examples/campus list subnets
-SUBNET              IP  ADDRESSES  ELEMENTS  VLANS
-------------------  --  ---------  --------  -----
-10.1.0.0/30          4          2         2  -
-10.1.10.0/24         4          3         3  10
+VRF   SUBNET              IP  ADDRESSES  ELEMENTS  VLANS
+----  ------------------  --  ---------  --------  -----
+-     10.1.0.0/30          4          2         2  -
+-     10.1.10.0/24         4          3         3  10
 ...
-2001:db8:ff:3::/64   6          2         2  -
+-     2001:db8:ff:3::/64   6          2         2  -
+mgmt  10.1.99.0/24         4          4         4  99
+mgmt  10.2.99.0/24         4          3         3  99
+mgmt  10.3.99.0/24         4          3         3  99
 ```
 
 <!-- norun: writes an SVG into the reader's directory -->
 ```bash
 netgraph -i examples/campus render --layer l3 --namespace sites/north -f svg -o north-l3.svg
+```
+
+## Routing
+
+One IGP, one AS, and one VRF (§16):
+
+```text
+                 iBGP, AS 65001, on the loopbacks
+        rtr-north-core-01 ═══════════════════ rtr-south-core-01
+                 ╚════════ rtr-west-core-01 ════════╝
+
+  ospf area 0.0.0.0 over the three backbone /30s and, per site,
+  over the core-to-distribution /30
+
+  vrf mgmt (rd 65001:99): the Vlan99 SVI of every dist and access switch
+```
+
+* **OSPF** runs in area `0.0.0.0` on the core loopbacks, the backbone fibres and
+  the core-to-distribution uplinks; on the distribution switches it runs on the
+  uplink and the two user SVIs. Nobody declares an adjacency — netgraph derives
+  them the way the protocol does, from two OSPF interfaces addressed in one
+  subnet (§16.4), which is what produces the nine edges of the routing view.
+* **BGP** is a three-router iBGP mesh in AS 65001, peering on the loopbacks. The
+  peer is written as an *address*, so the session resolves against
+  `192.0.2.<i>/32` and the AS numbers of both ends are checked against each
+  other (`NG-F011`).
+* **Static routes**: each core carries a discard route for its own site summary,
+  so the parts of `10.<i>.0.0/16` that are not deployed yet do not follow a
+  default route back out over the backbone, plus one route pinning the next
+  site's management prefix to the clockwise fibre. Each distribution switch has a
+  default route into its core, and a discard default *inside* the `mgmt`
+  instance — management is deliberately not routed off-site.
+
+<!-- norun: writes an SVG into the reader's directory -->
+```bash
+netgraph -i examples/campus render --layer routing -f svg -o campus-routing.svg
+```
+
+The same static routes, as a script to apply. `netgraph export routes` writes one
+shell function per device and a dispatcher over them; the north core's function is
+
+<!-- norun: an excerpt of a twelve-function script, quoted rather than piped -->
+```sh
+# sites/north/core/rtr-north-core-01
+netgraph_routes_sites_north_core_rtr_north_core_01() {
+    ip -4 route replace blackhole 10.1.0.0/16 metric 250
+    ip -4 route replace 10.2.99.0/24 via 198.51.100.2 dev xe-0/0/1 metric 200
+}
 ```
 
 ## One switch declared from a template

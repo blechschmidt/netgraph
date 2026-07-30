@@ -32,6 +32,7 @@ spec:
       vlan:
         mode: access
         access_vlan: 99
+      vrf: mgmt
       parent: br0
 
     - name: GigabitEthernet1/0/1
@@ -83,6 +84,10 @@ spec:
       name: voice
     - id: 99
       name: mgmt
+  vrfs:
+    - name: mgmt
+      rd: '65001:99'
+      description: In-band management
 ---
 apiVersion: netgraph.dev/v1alpha1
 kind: switch
@@ -114,6 +119,7 @@ spec:
       vlan:
         mode: access
         access_vlan: 99
+      vrf: mgmt
       parent: br0
 
     - name: GigabitEthernet1/0/1
@@ -156,3 +162,7 @@ spec:
       name: voice
     - id: 99
       name: mgmt
+  vrfs:
+    - name: mgmt
+      rd: '65001:99'
+      description: In-band management

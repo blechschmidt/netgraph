@@ -2161,33 +2161,6 @@
       "interfaces": []
     },
     {
-      "id": "subnet:10.1.99.0/24",
-      "type": "subnet",
-      "name": "10.1.99.0/24",
-      "kind": "subnet",
-      "namespace": "",
-      "subnet": {
-        "prefix": "10.1.99.0/24",
-        "family": "ipv4",
-        "addresses": [
-          "10.1.99.11/24",
-          "10.1.99.12/24",
-          "10.1.99.13/24",
-          "10.1.99.1/24"
-        ],
-        "elements": [
-          "sites/north/access/sw-north-acc-01",
-          "sites/north/access/sw-north-acc-02",
-          "sites/north/access/sw-north-acc-03",
-          "sites/north/distribution/sw-north-dist-01"
-        ]
-      },
-      "vlans": [
-        99
-      ],
-      "interfaces": []
-    },
-    {
       "id": "subnet:10.2.0.0/30",
       "type": "subnet",
       "name": "10.2.0.0/30",
@@ -2257,31 +2230,6 @@
       "interfaces": []
     },
     {
-      "id": "subnet:10.2.99.0/24",
-      "type": "subnet",
-      "name": "10.2.99.0/24",
-      "kind": "subnet",
-      "namespace": "",
-      "subnet": {
-        "prefix": "10.2.99.0/24",
-        "family": "ipv4",
-        "addresses": [
-          "10.2.99.11/24",
-          "10.2.99.12/24",
-          "10.2.99.1/24"
-        ],
-        "elements": [
-          "sites/south/access/sw-south-acc-01",
-          "sites/south/access/sw-south-acc-02",
-          "sites/south/distribution/sw-south-dist-01"
-        ]
-      },
-      "vlans": [
-        99
-      ],
-      "interfaces": []
-    },
-    {
       "id": "subnet:10.3.0.0/30",
       "type": "subnet",
       "name": "10.3.0.0/30",
@@ -2347,31 +2295,6 @@
       },
       "vlans": [
         20
-      ],
-      "interfaces": []
-    },
-    {
-      "id": "subnet:10.3.99.0/24",
-      "type": "subnet",
-      "name": "10.3.99.0/24",
-      "kind": "subnet",
-      "namespace": "",
-      "subnet": {
-        "prefix": "10.3.99.0/24",
-        "family": "ipv4",
-        "addresses": [
-          "10.3.99.11/24",
-          "10.3.99.12/24",
-          "10.3.99.1/24"
-        ],
-        "elements": [
-          "sites/west/access/sw-west-acc-01",
-          "sites/west/access/sw-west-acc-02",
-          "sites/west/distribution/sw-west-dist-01"
-        ]
-      },
-      "vlans": [
-        99
       ],
       "interfaces": []
     },
@@ -2821,6 +2744,86 @@
       },
       "vlans": [],
       "interfaces": []
+    },
+    {
+      "id": "subnet:mgmt/10.1.99.0/24",
+      "type": "subnet",
+      "name": "10.1.99.0/24 (vrf mgmt)",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "10.1.99.0/24",
+        "family": "ipv4",
+        "addresses": [
+          "10.1.99.11/24",
+          "10.1.99.12/24",
+          "10.1.99.13/24",
+          "10.1.99.1/24"
+        ],
+        "elements": [
+          "sites/north/access/sw-north-acc-01",
+          "sites/north/access/sw-north-acc-02",
+          "sites/north/access/sw-north-acc-03",
+          "sites/north/distribution/sw-north-dist-01"
+        ],
+        "vrf": "mgmt"
+      },
+      "vlans": [
+        99
+      ],
+      "interfaces": []
+    },
+    {
+      "id": "subnet:mgmt/10.2.99.0/24",
+      "type": "subnet",
+      "name": "10.2.99.0/24 (vrf mgmt)",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "10.2.99.0/24",
+        "family": "ipv4",
+        "addresses": [
+          "10.2.99.11/24",
+          "10.2.99.12/24",
+          "10.2.99.1/24"
+        ],
+        "elements": [
+          "sites/south/access/sw-south-acc-01",
+          "sites/south/access/sw-south-acc-02",
+          "sites/south/distribution/sw-south-dist-01"
+        ],
+        "vrf": "mgmt"
+      },
+      "vlans": [
+        99
+      ],
+      "interfaces": []
+    },
+    {
+      "id": "subnet:mgmt/10.3.99.0/24",
+      "type": "subnet",
+      "name": "10.3.99.0/24 (vrf mgmt)",
+      "kind": "subnet",
+      "namespace": "",
+      "subnet": {
+        "prefix": "10.3.99.0/24",
+        "family": "ipv4",
+        "addresses": [
+          "10.3.99.11/24",
+          "10.3.99.12/24",
+          "10.3.99.1/24"
+        ],
+        "elements": [
+          "sites/west/access/sw-west-acc-01",
+          "sites/west/access/sw-west-acc-02",
+          "sites/west/distribution/sw-west-dist-01"
+        ],
+        "vrf": "mgmt"
+      },
+      "vlans": [
+        99
+      ],
+      "interfaces": []
     }
   ],
   "edges": [
@@ -2833,7 +2836,7 @@
           "interface": "Vlan99"
         },
         {
-          "node": "subnet:10.1.99.0/24"
+          "node": "subnet:mgmt/10.1.99.0/24"
         }
       ],
       "addresses": [
@@ -2852,7 +2855,7 @@
           "interface": "Vlan99"
         },
         {
-          "node": "subnet:10.1.99.0/24"
+          "node": "subnet:mgmt/10.1.99.0/24"
         }
       ],
       "addresses": [
@@ -2871,7 +2874,7 @@
           "interface": "Vlan99"
         },
         {
-          "node": "subnet:10.1.99.0/24"
+          "node": "subnet:mgmt/10.1.99.0/24"
         }
       ],
       "addresses": [
@@ -3102,7 +3105,7 @@
           "interface": "Vlan99"
         },
         {
-          "node": "subnet:10.1.99.0/24"
+          "node": "subnet:mgmt/10.1.99.0/24"
         }
       ],
       "addresses": [
@@ -3257,7 +3260,7 @@
           "interface": "Vlan99"
         },
         {
-          "node": "subnet:10.2.99.0/24"
+          "node": "subnet:mgmt/10.2.99.0/24"
         }
       ],
       "addresses": [
@@ -3276,7 +3279,7 @@
           "interface": "Vlan99"
         },
         {
-          "node": "subnet:10.2.99.0/24"
+          "node": "subnet:mgmt/10.2.99.0/24"
         }
       ],
       "addresses": [
@@ -3507,7 +3510,7 @@
           "interface": "Vlan99"
         },
         {
-          "node": "subnet:10.2.99.0/24"
+          "node": "subnet:mgmt/10.2.99.0/24"
         }
       ],
       "addresses": [
@@ -3662,7 +3665,7 @@
           "interface": "Vlan99"
         },
         {
-          "node": "subnet:10.3.99.0/24"
+          "node": "subnet:mgmt/10.3.99.0/24"
         }
       ],
       "addresses": [
@@ -3681,7 +3684,7 @@
           "interface": "Vlan99"
         },
         {
-          "node": "subnet:10.3.99.0/24"
+          "node": "subnet:mgmt/10.3.99.0/24"
         }
       ],
       "addresses": [
@@ -3912,7 +3915,7 @@
           "interface": "Vlan99"
         },
         {
-          "node": "subnet:10.3.99.0/24"
+          "node": "subnet:mgmt/10.3.99.0/24"
         }
       ],
       "addresses": [

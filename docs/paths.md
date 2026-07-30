@@ -595,7 +595,7 @@ modelling gap from a real break.
 
 ---
 
-**See also:** [`netgraph render --layer l3`](rendering.md#layers-one-inventory-six-questions)
+**See also:** [`netgraph render --layer l3`](rendering.md#layers-one-inventory-seven-questions)
 for the routed graph this walks, [`docs/schema.md` §14](schema.md) for how a
 tunnel is declared, and
 [`docs/validation-rules.md`](validation-rules.md) for the checks that run before

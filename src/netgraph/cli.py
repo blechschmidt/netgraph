@@ -1110,9 +1110,10 @@ _LAYER_OPTION: Final[Callable[[Any], Any]] = click.option(
     shell_complete=complete_layer,
     help=(
         "l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets "
-        "and the elements addressed in them; physical adds the patch panels l1 splices out; "
-        "rack draws a front elevation per rack. Repeatable for -f html, which draws each "
-        "layer and puts a switcher over them."
+        "and the elements addressed in them; overlay draws the tunnels; routing draws the "
+        "BGP sessions and OSPF adjacencies, clustered by VRF; physical adds the patch panels "
+        "l1 splices out; rack draws a front elevation per rack. Repeatable for -f html, "
+        "which draws each layer and puts a switcher over them."
     ),
 )
 
@@ -1466,6 +1467,12 @@ def _empty_graph_reason(layer: Layer, spec: FilterSpec) -> str:
         return (
             "nothing to draw in the overlay view: the inventory declares no tunnel. "
             "Render '--layer l1' for the physical topology, or add a 'tunnel' document"
+        )
+    if layer is Layer.ROUTING:
+        return (
+            "nothing to draw in the routing view: no element declares 'spec.routing', "
+            "'spec.routes' or 'spec.vrfs'. Render '--layer l3' for the addressing the "
+            "inventory does declare, or add a 'routing' block to a router"
         )
     if layer is Layer.RACK:
         return (
@@ -2605,13 +2612,21 @@ def _list_subnets(inventory: Inventory) -> _Listing:
     prefixes are left out there: they are scoped to a single host or a single
     link, so listing ``127.0.0.0/8`` once per machine would say nothing about
     the addressing plan this command exists to show.
+
+    A ``VRF`` column appears only when something is in one (§16.1). Two routing
+    instances may hold the same prefix, and without the column the two rows would
+    be indistinguishable; adding it unconditionally would put an empty column in
+    front of every inventory that has no VRF, which is nearly all of them.
     """
+    subnets = subnets_of(inventory)
+    partitioned = any(subnet.vrf for subnet in subnets)
     rows: list[list[str]] = []
     records: list[dict[str, Any]] = []
-    for subnet in subnets_of(inventory):
+    for subnet in subnets:
         vlans = sorted(subnet.vlans)
         rows.append(
             [
+                *([subnet.vrf or "-"] if partitioned else []),
                 subnet.prefix,
                 str(subnet.version),
                 str(len(subnet.addresses)),
@@ -2619,17 +2634,32 @@ def _list_subnets(inventory: Inventory) -> _Listing:
                 compact_ids(vlans) or "-",
             ]
         )
-        records.append(
-            {
-                "subnet": subnet.prefix,
-                "family": subnet.family,
-                "addresses": list(subnet.addresses),
-                "elements": list(subnet.elements),
-                "vlans": vlans,
-            }
-        )
-    headers = ("SUBNET", "IP", "ADDRESSES", "ELEMENTS", "VLANS")
-    aligns: tuple[Align, ...] = ("left", "right", "right", "right", "left")
+        record: dict[str, Any] = {
+            "subnet": subnet.prefix,
+            "family": subnet.family,
+            "addresses": list(subnet.addresses),
+            "elements": list(subnet.elements),
+            "vlans": vlans,
+        }
+        if subnet.vrf:
+            record["vrf"] = subnet.vrf
+        records.append(record)
+    headers = (
+        *(("VRF",) if partitioned else ()),
+        "SUBNET",
+        "IP",
+        "ADDRESSES",
+        "ELEMENTS",
+        "VLANS",
+    )
+    aligns: tuple[Align, ...] = (
+        *(("left",) if partitioned else ()),
+        "left",
+        "right",
+        "right",
+        "right",
+        "left",
+    )
     return headers, aligns, rows, records
 
 
@@ -2939,6 +2969,8 @@ def _report_ipam(
 def _print_utilisation_table(
     console: Console, rows: Sequence[Utilisation], *, aggregated: bool
 ) -> None:
+    # A VRF column only when something is in one; see ``_list_subnets``.
+    partitioned = any(row.vrf for row in rows)
     headers = ["PREFIX", "IP", "VLANS", "HOSTS", "USED", "FREE", "UTIL", "DEVICES"]
     aligns: list[Align] = [
         "left",
@@ -2950,6 +2982,9 @@ def _print_utilisation_table(
         "right",
         "right",
     ]
+    if partitioned:
+        headers.insert(0, "VRF")
+        aligns.insert(0, "left")
     if aggregated:
         headers.append("PARTS")
         aligns.append("right")
@@ -2957,6 +2992,7 @@ def _print_utilisation_table(
     table: list[list[str]] = []
     for row in rows:
         cells = [
+            *([row.vrf or "-"] if partitioned else []),
             row.prefix,
             str(row.version),
             compact_ids(row.vlans) or "-",

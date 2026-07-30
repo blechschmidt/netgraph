@@ -78,6 +78,7 @@ spec:
       vlan:
         mode: access
         access_vlan: 99
+      vrf: mgmt
 
     # One entry, forty-eight ports (docs/schema.md §6.2.5). '{}' substitutes
     # the current port number into the description. The ports ship
@@ -112,3 +113,7 @@ spec:
       name: voice
     - id: 99
       name: mgmt
+  vrfs:
+    - name: mgmt
+      rd: '65001:99'
+      description: In-band management

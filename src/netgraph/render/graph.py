@@ -62,6 +62,13 @@ share one topology; ``l3``, ``overlay`` and ``rack`` each build a different one:
     it terminates on and — this is why it is a node — to the tunnel it is
     encapsulated in. That edge is what makes ``VXLAN over IPsec`` drawable:
     nesting is a relation between two links, and a link cannot end on a link.
+``routing``
+    The control plane (§16.6). Nodes are the elements that take part in routing,
+    labelled with the AS and router id their peers know them by; edges are the
+    BGP sessions they declare and the OSPF adjacencies their addressing implies,
+    and nodes are grouped into one cluster per VRF. Nothing physical appears: two
+    routers are adjacent here because they exchange routes, which a cable neither
+    guarantees nor is needed for.
 ``rack``
     Not a topology at all: one node per rack named by a ``metadata.location``,
     carrying the elevation of that rack — which unit each element occupies, and
@@ -82,6 +89,7 @@ pass-through without the panel being a hop.
 
 from __future__ import annotations
 
+import itertools
 from collections import deque
 from collections.abc import Container, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -104,7 +112,13 @@ from netgraph.models import (
     format_bitrate,
 )
 from netgraph.models.metadata import Location
-from netgraph.subnets import AddressPlacement, Subnet, is_routable_address, subnets_of
+from netgraph.subnets import (
+    SUBNET_ID_PREFIX,
+    AddressPlacement,
+    Subnet,
+    is_routable_address,
+    subnets_of,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - imported for typing only
     # :mod:`netgraph.render.aggregate` consumes this module, so the dependency
@@ -122,6 +136,7 @@ __all__ = [
     "SUBNET_KIND",
     "TUNNEL_ID_PREFIX",
     "TUNNEL_KIND",
+    "AdjacencyView",
     "Edge",
     "EdgeKind",
     "FilterSpec",
@@ -134,6 +149,7 @@ __all__ = [
     "PortView",
     "RackSlot",
     "RackView",
+    "RoutingView",
     "Subnet",
     "TunnelEnd",
     "TunnelView",
@@ -162,6 +178,9 @@ class Layer(str, Enum):
     #: Encapsulation: tunnels as nodes, joined to their endpoints and to the
     #: tunnels they run inside (§14).
     OVERLAY = "overlay"
+    #: Control plane: the routers, joined by the BGP sessions and OSPF
+    #: adjacencies they declare, clustered by VRF (§16.6).
+    ROUTING = "routing"
     #: Placement: one node per rack, holding its front elevation (§3.2).
     RACK = "rack"
 
@@ -213,10 +232,9 @@ SUBNET_KIND: Final = "subnet"
 RACK_KIND: Final = "rack"
 RACK_ID_PREFIX: Final = "rack:"
 
-#: Prefix of a subnet node's identity, e.g. ``subnet:10.0.0.0/24``. A colon
-#: cannot occur in an element's fully-qualified name (§2 name grammar), so a
-#: subnet node can never shadow a device.
-SUBNET_ID_PREFIX: Final = "subnet:"
+#: Prefix of a subnet node's identity, e.g. ``subnet:10.0.0.0/24``. Defined by
+#: :mod:`netgraph.subnets`, beside the :attr:`Subnet.node_id` that mints one, and
+#: re-exported here because every consumer of the graph reads it from this module.
 
 #: ``kind`` reported for a tunnel node. It is also the declared ``kind`` of the
 #: document it stands for, unlike :data:`SUBNET_KIND`: a tunnel node *is* the
@@ -244,6 +262,10 @@ class EdgeKind(str, Enum):
     TUNNEL = "tunnel"
     #: A tunnel's ``over``: this tunnel is carried inside that one (§14.3).
     ENCAPSULATION = "encapsulation"
+    #: A BGP session one of the two ends declares (§16.4).
+    BGP = "bgp"
+    #: An OSPF adjacency: two routers in one area, on one link.
+    OSPF = "ospf"
 
     def __str__(self) -> str:
         return self.value
@@ -417,6 +439,121 @@ class TunnelView:
         would report endpoints the reader cannot see.
         """
         return replace(self, ends=tuple(end for end in self.ends if end.element in elements))
+
+
+@dataclass(frozen=True, slots=True)
+class RoutingView:
+    """What one element contributes to the routing layer (§16.6).
+
+    Flattened out of ``spec.routing``, ``spec.vrfs`` and ``spec.routes`` once,
+    here, so that the DOT, Mermaid, JSON and HTML renderings of one inventory
+    cannot disagree about which AS a router is in or which area a link is in.
+    """
+
+    #: Fully-qualified name of the element.
+    element: str
+    asn: int | None = None
+    #: The router id, as text; the OSPF one when the two differ, since that is
+    #: the identity an adjacency is refused over (RFC 2328 §10.5).
+    router_id: str | None = None
+    #: The OSPF area the device runs, when it runs one.
+    area: str | None = None
+    #: The interfaces OSPF runs on, in declaration order.
+    ospf_interfaces: tuple[str, ...] = ()
+    #: ``(name, rd)`` per declared VRF, in declaration order.
+    vrfs: tuple[tuple[str, str], ...] = ()
+    #: The instances an interface is actually bound to, in interface order. A
+    #: declared VRF nothing is bound to holds no address (``NG-F014``), so it is
+    #: not an instance this router takes part in and cannot group it.
+    bound_vrfs: tuple[str, ...] = ()
+    #: Every static route the device holds, already rendered (``0.0.0.0/0 via
+    #: 203.0.113.1 dev wan0``), in declaration order.
+    routes: tuple[str, ...] = ()
+
+    @property
+    def speaks_bgp(self) -> bool:
+        return self.asn is not None
+
+    @property
+    def speaks_ospf(self) -> bool:
+        return self.area is not None
+
+    @property
+    def is_empty(self) -> bool:
+        """Does the element take part in no routing at all?"""
+        return not (self.speaks_bgp or self.speaks_ospf or self.routes or self.vrfs)
+
+    @property
+    def asn_text(self) -> str | None:
+        """``AS 65001``, the way a diagram labels an autonomous system."""
+        return None if self.asn is None else f"AS {self.asn}"
+
+    def describe(self) -> tuple[str, ...]:
+        """The lines a node label carries: what this router *is*, routing-wise."""
+        lines = [text for text in (self.asn_text,) if text]
+        if self.router_id is not None:
+            lines.append(f"id {self.router_id}")
+        if self.area is not None:
+            lines.append(f"ospf area {self.area}")
+        return tuple(lines)
+
+
+@dataclass(frozen=True, slots=True)
+class AdjacencyView:
+    """One protocol adjacency between two elements (§16.6).
+
+    A BGP session and an OSPF adjacency are both "these two routers talk", but
+    they are different facts about a network and are drawn differently, so the
+    kind is carried rather than inferred from whichever field happens to be set.
+    """
+
+    #: ``bgp`` or ``ospf`` — :class:`EdgeKind` uses the same two spellings.
+    protocol: str
+    #: The element that declares the session, or the lower-sorting of the two
+    #: ends of an OSPF adjacency.
+    source: str
+    target: str
+    #: The address the session is configured towards; empty for OSPF, which
+    #: discovers its neighbours rather than naming them.
+    peer_address: str = ""
+    #: The interface the peer address sits on, for a resolved BGP session; the
+    #: interfaces the adjacency runs over, for OSPF.
+    source_port: str = ""
+    target_port: str = ""
+    #: The two AS numbers, source first, when both ends declare one.
+    asns: tuple[int, ...] = ()
+    #: The OSPF area the adjacency is in.
+    area: str | None = None
+    description: str | None = None
+
+    @property
+    def is_internal(self) -> bool:
+        """Is this session inside one AS — iBGP rather than eBGP?"""
+        return len(self.asns) == 2 and self.asns[0] == self.asns[1]
+
+    @property
+    def label(self) -> str:
+        """``65001 → 65002``, or ``area 0.0.0.0`` — what the edge is annotated with.
+
+        The AS pair is what makes a BGP edge readable: whether a session is
+        internal or external is the first thing anybody wants from a routing
+        diagram, and two identical numbers say "iBGP" more directly than a legend
+        can.
+        """
+        if self.protocol == "ospf":
+            return f"area {self.area}" if self.area else "ospf"
+        if len(self.asns) == 2:
+            return (
+                f"iBGP {self.asns[0]}" if self.is_internal else f"{self.asns[0]} → {self.asns[1]}"
+            )
+        return f"AS {self.asns[0]}" if self.asns else "bgp"
+
+    @property
+    def id(self) -> str:
+        """Stable identity of the edge this adjacency becomes."""
+        if self.protocol == "ospf":
+            return f"{self.source}#ospf#{self.target}"
+        return f"{self.source}#bgp#{self.peer_address}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -614,6 +751,14 @@ class Node:
     aggregate: AggregateView | None = None
     #: The rack this node stands for; set exactly for a rack node.
     rack: RackView | None = None
+    #: What this element contributes to the control plane; set at
+    #: :attr:`Layer.ROUTING` only, where it is the whole reason the node is drawn.
+    routing: RoutingView | None = None
+    #: The box this node is drawn inside when the *layer* groups the nodes rather
+    #: than the reader: the VRF at :attr:`Layer.ROUTING`. Distinct from
+    #: :attr:`namespace`, which is where the document lives — a router holds any
+    #: number of VRFs and lives in exactly one directory.
+    cluster: str = ""
 
     @classmethod
     def for_tunnel(cls, view: TunnelView) -> Node:
@@ -661,8 +806,8 @@ class Node:
         honestly belongs.
         """
         return cls(
-            fqn=f"{SUBNET_ID_PREFIX}{subnet.prefix}",
-            name=subnet.prefix,
+            fqn=subnet.node_id,
+            name=subnet.label,
             kind=SUBNET_KIND,
             namespace="",
             vlans=subnet.vlans,
@@ -775,6 +920,9 @@ class Edge:
     #: declares a ``wireless`` block (§6.2.6). ``None`` on every wired link, and
     #: on a radio link whose ends model no radio detail.
     wireless: WirelessView | None = None
+    #: The protocol adjacency this edge is; set on ``bgp`` and ``ospf`` edges,
+    #: which exist only at :attr:`Layer.ROUTING` (§16.6).
+    adjacency: AdjacencyView | None = None
 
     @property
     def name(self) -> str:
@@ -873,6 +1021,26 @@ class Graph:
     def aggregate_nodes(self) -> tuple[Node, ...]:
         """The collapsed-namespace nodes, in graph order; empty without ``--collapse``."""
         return tuple(node for node in self.nodes.values() if node.is_aggregate)
+
+    @property
+    def routing_nodes(self) -> tuple[Node, ...]:
+        """The nodes carrying routing state; empty outside :attr:`Layer.ROUTING`."""
+        return tuple(node for node in self.nodes.values() if node.routing is not None)
+
+    @property
+    def clusters(self) -> tuple[str, ...]:
+        """Every box the layer itself asks for, in first-seen order.
+
+        Empty at every layer but :attr:`Layer.ROUTING`, which groups its nodes by
+        VRF. A renderer that finds this non-empty groups by it *instead* of by
+        namespace: the layer's own grouping is the one the reader asked for by
+        choosing the layer, and two nested sets of boxes would say less than one.
+        """
+        return tuple(dict.fromkeys(node.cluster for node in self.nodes.values() if node.cluster))
+
+    def nodes_in_cluster(self, cluster: str) -> tuple[Node, ...]:
+        """The nodes drawn inside ``cluster``; ``""`` selects the unboxed ones."""
+        return tuple(node for node in self.nodes.values() if node.cluster == cluster)
 
     @property
     def tunnels(self) -> tuple[TunnelView, ...]:
@@ -1000,6 +1168,9 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         nodes, edges = _routed_view(nodes, subnets_of(inventory))
     elif layer is Layer.OVERLAY:
         nodes, edges = _overlay_view(nodes, tunnels)
+    elif layer is Layer.ROUTING:
+        nodes, edges, routing_dangling = _routing_view(nodes, inventory, subnets_of(inventory))
+        dangling += routing_dangling
     elif layer is Layer.RACK:
         nodes, edges = _rack_view(inventory)
     return Graph(
@@ -1320,18 +1491,19 @@ def _routed_view(
     for fqn in kept:
         # One edge per (interface, prefix): a second address on the same
         # interface in the same prefix is another label, not another adjacency.
-        grouped: dict[tuple[str, str], list[AddressPlacement]] = {}
+        grouped: dict[tuple[str, str, str], list[AddressPlacement]] = {}
         for subnet, member in sorted(
             memberships[fqn], key=lambda entry: (entry[1].index, entry[0].sort_key)
         ):
-            grouped.setdefault((member.interface, subnet.prefix), []).append(member)
-        for (interface, prefix), placements in grouped.items():
+            key = (member.interface, subnet.node_id, subnet.prefix)
+            grouped.setdefault(key, []).append(member)
+        for (interface, node_id, prefix), placements in grouped.items():
             edges.append(
                 Edge(
                     id=f"{fqn}:{interface}#{prefix}",
                     kind=EdgeKind.SUBNET,
                     source=fqn,
-                    target=f"{SUBNET_ID_PREFIX}{prefix}",
+                    target=node_id,
                     source_port=interface,
                     medium="",
                     addresses=tuple(placement.address for placement in placements),
@@ -1343,6 +1515,232 @@ def _routed_view(
         node = Node.for_subnet(subnet)
         kept[node.fqn] = node
     return kept, tuple(edges)
+
+
+def _routing_view(
+    nodes: Mapping[str, Node], inventory: Inventory, subnets: Sequence[Subnet]
+) -> tuple[dict[str, Node], tuple[Edge, ...], tuple[str, ...]]:
+    """Turn the physical graph into the control-plane one (§16.6).
+
+    Nodes are the elements that take part in routing at all — anything declaring
+    ``routing``, ``routes`` or ``vrfs`` — labelled with the AS and router id that
+    identify them to their peers. Everything physical is discarded: two routers
+    are adjacent here because they exchange routes, and a cable between them is
+    neither necessary (an eBGP session may cross a provider) nor sufficient (a
+    trunk carries VLANs neither end routes).
+
+    Two kinds of edge, resolved differently because the protocols work
+    differently:
+
+    * a **BGP session** is declared, by address, on one or both ends; it is drawn
+      once however many times it is declared, and a session whose address matches
+      nothing in the inventory is reported in :attr:`Graph.dangling` rather than
+      drawn to a node that does not exist (``NG-F013``);
+    * an **OSPF adjacency** is *discovered*, so it is derived the way the protocol
+      derives it: two interfaces that run OSPF in the same area and are addressed
+      in one subnet form one. Deriving it from the subnets rather than from the
+      cables is what makes it right for two routers facing each other across a
+      layer-2 switch, which no cable joins directly.
+
+    Nodes come out in inventory order, BGP edges before OSPF ones.
+    """
+    views = {
+        fqn: view
+        for fqn, node in nodes.items()
+        if node.is_element
+        and isinstance(node.element, Device)
+        and not (view := _routing_of(fqn, node.element)).is_empty
+    }
+    kept = {
+        fqn: replace(nodes[fqn], routing=view, cluster=_vrf_cluster(view))
+        for fqn, view in views.items()
+    }
+
+    addresses = _address_index(inventory)
+    sessions, dangling = _bgp_adjacencies(views, inventory, addresses)
+    edges = [
+        *(_adjacency_edge(view) for view in sessions),
+        *(_adjacency_edge(view) for view in _ospf_adjacencies(views, subnets)),
+    ]
+    return kept, tuple(edges), dangling
+
+
+def _routing_of(fqn: str, device: Device) -> RoutingView:
+    """What one device contributes to the routing layer."""
+    routing = device.spec.routing
+    ospf = routing.ospf if routing is not None else None
+    bgp = routing.bgp if routing is not None else None
+    router_ids = routing.router_ids if routing is not None else ()
+    return RoutingView(
+        element=fqn,
+        asn=bgp.asn if bgp is not None else None,
+        router_id=str(router_ids[0]) if router_ids else None,
+        area=ospf.area if ospf is not None else None,
+        ospf_interfaces=tuple(ospf.interfaces) if ospf is not None else (),
+        vrfs=tuple((vrf.name, vrf.rd) for vrf in device.spec.vrfs),
+        bound_vrfs=tuple(
+            dict.fromkeys(
+                interface.vrf for interface in device.interfaces if interface.vrf is not None
+            )
+        ),
+        routes=tuple(route.describe() for route in device.spec.routes),
+    )
+
+
+def _vrf_cluster(view: RoutingView) -> str:
+    """The VRF box this router is drawn in, or ``""`` for none.
+
+    A router with interfaces in exactly one instance is drawn inside it. A router
+    that straddles several belongs to no box — the same choice a cross-site subnet
+    gets at layer 3, and for the same reason: putting it in one of them would
+    claim something the inventory does not say. Its instances are named on the
+    label either way, so nothing is lost but the frame.
+    """
+    return view.bound_vrfs[0] if len(view.bound_vrfs) == 1 else ""
+
+
+def _address_index(inventory: Inventory) -> dict[str, tuple[str, str]]:
+    """Every configured address -> ``(element, interface)``, first one winning.
+
+    Keyed by the *text* of the address rather than by an :mod:`ipaddress` object
+    because that is what a peer is looked up by here and what an edge label
+    carries; the text is already canonical, since the model normalises it.
+
+    Loopback and link-local addresses are left out for the reason
+    :func:`is_routable_address` gives: ``127.0.0.1`` is on every machine, so a
+    session pointed at one resolves to whichever host was loaded first.
+    """
+    index: dict[str, tuple[str, str]] = {}
+    for fqn, element in inventory.elements.items():
+        if not isinstance(element, (Device, Adapter)):
+            continue
+        for interface in element.interfaces:
+            for address in interface.addresses():
+                if is_routable_address(address):
+                    index.setdefault(str(address.ip), (fqn, interface.name))
+    return index
+
+
+def _bgp_adjacencies(
+    views: Mapping[str, RoutingView],
+    inventory: Inventory,
+    addresses: Mapping[str, tuple[str, str]],
+) -> tuple[tuple[AdjacencyView, ...], tuple[str, ...]]:
+    """One :class:`AdjacencyView` per BGP session, and one message per lost peer.
+
+    A session both ends declare is one session, so it is drawn once: the pair is
+    keyed on the two elements and the address family, which keeps a v4 and a v6
+    session between the same routers as the two sessions they are. The first
+    declaration in inventory order wins, so the direction of the edge — and the
+    order of its AS pair — is deterministic.
+    """
+    seen: dict[tuple[str, str, int], AdjacencyView] = {}
+    dangling: list[str] = []
+    for fqn, view in views.items():
+        device = inventory.devices.get(fqn)
+        routing = device.spec.routing if device is not None else None
+        bgp = routing.bgp if routing is not None else None
+        if bgp is None:
+            continue
+        for neighbor in bgp.neighbors:
+            peer = addresses.get(str(neighbor.address))
+            if peer is None:
+                dangling.append(
+                    f"{fqn}: BGP neighbour {neighbor.address} (AS {neighbor.remote_asn}) is not "
+                    f"an address of this inventory, so the session is drawn to nothing"
+                )
+                continue
+            peer_fqn, peer_port = peer
+            if peer_fqn == fqn:
+                # A session pointed at the router's own address: nothing to draw
+                # a line between. Reported by the validator as an off-link peer
+                # or simply as a mistake; the picture just leaves it out.
+                continue
+            first, second = sorted((fqn, peer_fqn))
+            key = (first, second, neighbor.version)
+            if key in seen:
+                continue
+            peer_view = views.get(peer_fqn)
+            seen[key] = AdjacencyView(
+                protocol=EdgeKind.BGP.value,
+                source=fqn,
+                target=peer_fqn,
+                peer_address=str(neighbor.address),
+                target_port=peer_port,
+                asns=(
+                    (view.asn, peer_view.asn)
+                    if view.asn is not None and peer_view is not None and peer_view.asn is not None
+                    else ((view.asn,) if view.asn is not None else ())
+                ),
+                description=neighbor.description,
+            )
+    return tuple(seen.values()), tuple(dangling)
+
+
+def _ospf_adjacencies(
+    views: Mapping[str, RoutingView], subnets: Sequence[Subnet]
+) -> tuple[AdjacencyView, ...]:
+    """Every OSPF adjacency the addressing implies, in subnet then element order.
+
+    Two routers are adjacent when they run OSPF in the same area on interfaces
+    addressed in one subnet. Both halves matter: a shared subnet without the
+    interface being in the process is not an adjacency, and two interfaces in one
+    process in different areas do not form one either.
+
+    One edge per pair of routers per area, however many subnets and families they
+    share — a dual-stacked link is one adjacency drawn once, not two.
+    """
+    adjacencies: dict[tuple[str, str, str], AdjacencyView] = {}
+    for subnet in subnets:
+        speakers = [
+            (member.element, member.interface, view)
+            for member in subnet.members
+            if (view := views.get(member.element)) is not None
+            and member.interface in view.ospf_interfaces
+        ]
+        for (left, left_port, left_view), (right, right_port, _) in itertools.combinations(
+            speakers, 2
+        ):
+            area = left_view.area
+            if left == right or area is None or area != views[right].area:
+                continue
+            source, source_port, target, target_port = (
+                (left, left_port, right, right_port)
+                if left <= right
+                else (right, right_port, left, left_port)
+            )
+            adjacencies.setdefault(
+                (source, target, area),
+                AdjacencyView(
+                    protocol=EdgeKind.OSPF.value,
+                    source=source,
+                    target=target,
+                    source_port=source_port,
+                    target_port=target_port,
+                    area=area,
+                ),
+            )
+    return tuple(adjacencies.values())
+
+
+def _adjacency_edge(view: AdjacencyView) -> Edge:
+    """The edge one adjacency is drawn as.
+
+    ``medium`` is empty for the reason a tunnel's is: a routing session runs over
+    whatever the rest of the diagram provides, and claiming a wire would claim one
+    that is not this edge's.
+    """
+    return Edge(
+        id=view.id,
+        kind=EdgeKind.BGP if view.protocol == EdgeKind.BGP.value else EdgeKind.OSPF,
+        source=view.source,
+        target=view.target,
+        source_port=view.source_port,
+        target_port=view.target_port,
+        medium="",
+        label=view.label,
+        adjacency=view,
+    )
 
 
 def _overlay_view(

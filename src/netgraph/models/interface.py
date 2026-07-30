@@ -19,6 +19,7 @@ from netgraph.models.base import NetgraphModel
 from netgraph.models.diagnostics import field_error
 from netgraph.models.scalars import (
     Boolean,
+    ElementName,
     IfName,
     InterfaceMtu,
     IPv4Mtu,
@@ -821,6 +822,11 @@ class Interface(NetgraphModel):
     ipv4: IPv4Config | None = None
     ipv6: IPv6Config | None = None
     vlan: VlanConfig | None = None
+    #: The routing instance this interface belongs to (§16.1). Names an entry of
+    #: the device's ``spec.vrfs`` (``NG-F002``); unset means the global instance,
+    #: and *that* is what partitions the address namespace: an address is only
+    #: in conflict with another address in the same VRF.
+    vrf: ElementName | None = None
     #: Radio configuration; ``wifi`` interfaces only (§6.2.6).
     wireless: WirelessConfig | None = None
     #: ``if:lower-layer-if`` of a ``vlan`` sub-interface.

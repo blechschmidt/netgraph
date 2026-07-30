@@ -41,9 +41,10 @@ See [`netgraph validate`](validate.md) for the checks and
 `--layer` picks the question the diagram answers: `l1` (the default) for the
 physical topology, `l2` for the same topology annotated with VLANs, `l3` for the
 IP subnets and who is addressed in them, `overlay` for the tunnels and what runs
-inside what, `physical` for the cabling record with its patch panels, and `rack`
-for a front elevation per rack. The table in
-[Layers](../rendering.md#layers-one-inventory-six-questions) says what each one
+inside what, `routing` for the BGP sessions and OSPF adjacencies clustered by
+VRF, `physical` for the cabling record with its patch panels, and `rack` for a
+front elevation per rack. The table in
+[Layers](../rendering.md#layers-one-inventory-seven-questions) says what each one
 draws and when to reach for it.
 
 `-f/--format` decides what the artefact is. `svg`, `html`, `png` and `pdf` need
@@ -161,7 +162,7 @@ not look the way you expected.
 | `--max-addresses` | `N` | `4` | Longest address list spelled out under a node before it is abbreviated to 'and N more'. 0 prints the count alone. |
 | `--rankdir` | `[tb\|lr\|bt\|rl]` | TB, top to bottom | Layout direction. A wide network reads better left to right; a deep one top to bottom. Honoured by the Graphviz backends and by mermaid. |
 | `--title` | `TEXT` | — | Caption for the diagram. |
-| `--layer` | `[physical\|l1\|l2\|l3\|overlay\|rack]` | `l1` | l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets and the elements addressed in them; physical adds the patch panels l1 splices out; rack draws a front elevation per rack. Repeatable for -f html, which draws each layer and puts a switcher over them. |
+| `--layer` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack]` | `l1` | l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets and the elements addressed in them; overlay draws the tunnels; routing draws the BGP sessions and OSPF adjacencies, clustered by VRF; physical adds the patch panels l1 splices out; rack draws a front elevation per rack. Repeatable for -f html, which draws each layer and puts a switcher over them. |
 | `--strict` | — | off | Treat warnings as errors. |
 | `--force` | — | off | Proceed even when validation failed. The result may not match the files. |
 | `--profile` | `NAME` | — | Apply the [profile.NAME] block of netgraph.toml on top of its [render] table. Explicit flags still win over both. |

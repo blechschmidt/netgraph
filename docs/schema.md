@@ -51,6 +51,7 @@ expands §9 with the reasoning and with what is deliberately left uncovered.
 13. [Editor integration](#13-editor-integration)
 14. [Tunnels](#14-tunnels)
 15. [Patch panels](#15-patch-panels)
+16. [Routing](#16-routing)
 
 ---
 
@@ -1436,6 +1437,31 @@ are append-only (§12), so a group added in a later revision lands at the end.
 `NG-W001` to `NG-W006` are schema rules, reported while the document is parsed
 and not suppressible; the rest are semantic and carry the short ids of §10.10.
 
+### 10.15 Routing
+
+| ID | Sev. | Rule |
+|---|---|---|
+| `NG-F001` | error | `vrfs[].name` is unique within a device. |
+| `NG-F002` | error | An interface's `vrf` names an entry of the device's `vrfs`; an adapter interface declares none. |
+| `NG-F003` | error | A route's `via` is of the same address family as its `prefix`. |
+| `NG-F004` | error | A route declares at least one of `via`, `dev` and `blackhole`, and `blackhole` excludes the other two. |
+| `NG-F005` | error | A route's `vrf` names an entry of the device's `vrfs`. |
+| `NG-F006` | error | `routing.ospf.interfaces` is non-empty and free of duplicates. |
+| `NG-F007` | error | `routing.bgp.neighbors[].address` is unique within a device. |
+| `NG-F008` | error | A route's next hop is inside a prefix the device configures, on an interface in the route's own VRF. |
+| `NG-F009` | error | A route's `dev` names an interface of the device. |
+| `NG-F010` | error | Every `routing.ospf.interfaces` entry names an interface of the device. |
+| `NG-F011` | error | The two ends of a resolved BGP session agree about both AS numbers. |
+| `NG-F012` | error | A router id is claimed by at most one element. |
+| `NG-F013` | warning | A BGP neighbour address resolves to an element of the inventory. |
+| `NG-F014` | warning | Every declared VRF has at least one interface bound to it. |
+
+`NG-F001` to `NG-F007` are schema rules, reported while the document is parsed
+and not suppressible; `NG-F008` to `NG-F014` are semantic and carry the short
+ids of §10.10. The group is lettered `F`, for *forwarding*: `NG-R` was spent on
+interface ranges (§10.9) long before routing was modelled, and an id, once
+assigned, is never reused.
+
 ---
 
 ## 11. Worked examples
@@ -2397,8 +2423,6 @@ loader converts older documents to the current internal model on read.
 Deliberately out of scope for `v1alpha1`, listed so that nobody designs around
 their absence:
 
-* **Routing**: static routes, BGP/OSPF adjacencies, VRFs.
-  (`ietf-routing`, RFC 8349.)
 * **Spanning tree**: STP/RSTP/MSTP roles and per-port cost.
 * **Multi-chassis aggregation**: MLAG/vPC/stacking relationships between
   switch elements.
@@ -2828,3 +2852,259 @@ A patch panel has no YANG counterpart: RFC 8343 models interfaces of a *system*,
 and a panel is not one. Its derived positions are described here as
 `if:interface` entries of type `ianaift:ethernetCsmacd` for internal consistency
 only; nothing exports them, and `couplers` is netgraph's own.
+
+---
+
+## 16. Routing
+
+Routing is *state of a box*, not a thing between boxes: a route is written on
+one device, and an adjacency is configured on one device towards a neighbour it
+names by address. So all three blocks hang off a device's `spec`, which is also
+the shape [RFC 8349](https://www.rfc-editor.org/rfc/rfc8349) (`ietf-routing`)
+gives it — a control-plane protocol and a routing table live inside a *network
+instance*, which is what a VRF is
+([RFC 8529](https://www.rfc-editor.org/rfc/rfc8529)).
+
+| Key | Holds |
+|---|---|
+| `spec.vrfs[]` | The routing instances the device implements (§16.1). |
+| `spec.interfaces[].vrf` | Which instance one interface is in (§16.1). |
+| `spec.routes[]` | Static routes (§16.2). |
+| `spec.routing` | The dynamic protocols it takes part in (§16.3). |
+
+None of them is required, and a device that declares none of them is exactly
+what every device in an inventory written before this section was one: routing
+is additive, and an inventory that says nothing about it is not wrong, only
+silent.
+
+**There is nowhere to put a secret.** As with tunnels (§14.2), a BGP password or
+an OSPF authentication key has no field: a secret in an inventory is a secret in
+version control, and netgraph has no use for one.
+
+### 16.1 `vrfs[]` — routing instances
+
+```yaml
+spec:
+  vrfs:
+    - name: mgmt
+      rd: '65001:99'          # RFC 4364 §4.2; quote it, see below
+      description: In-band management
+  interfaces:
+    - name: Vlan99
+      type: vlan
+      ipv4:
+        addresses: [10.1.99.1/24]
+      vrf: mgmt               # names an entry of spec.vrfs
+      parent: br0
+```
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `name` | element name | yes | How everything else refers to the instance. Unique within the device (`NG-F001`). |
+| `rd` | route distinguisher | yes | `65001:1`, `192.0.2.1:1` or `4200000000:1` — one of the three RFC 4364 §4.2 encodings. |
+| `description` | string | no | Free text. |
+
+`interfaces[].vrf` binds one interface to one instance and must name an entry of
+the same device's `vrfs` (`NG-F002`). An interface that binds to none is in the
+**global instance**, which is where every address is until something says
+otherwise.
+
+**Binding is what partitions the address space.** An address only collides with
+another address in the same instance, so `10.0.0.1/24` in `blue` and
+`10.0.0.1/24` in the global table are two addresses and not a duplicate
+(`NG-A004`); two interfaces of one device may hold overlapping prefixes when
+they are in different instances (`NG-A006`); and `netgraph list subnets`,
+`netgraph ipam` and `--layer l3` each report one row, one prefix and one node
+*per instance*. That is the whole reason to model a VRF: it is a routing table
+of its own, so it is an address space of its own.
+
+Two devices that use the same `name` are taken to mean the same VRF — that is
+what an operator means by "the blue VRF". The route distinguisher is recorded
+because MPLS needs it, not because netgraph identifies the instance by it.
+
+A VRF nothing is bound to holds no address and no connected route, so the
+isolation it was declared to create does not exist; that is `NG-F014`.
+
+> **Quote the `rd`.** `65001:59` is the base-60 integer 3900059 to a YAML 1.1
+> reader and `65001:99` is a string, so the class is quoted whole — exactly as
+> MAC addresses are (§5). `netgraph fmt` adds the quotes if you forget them.
+
+An adapter has no `vrfs` of its own and its interfaces may not declare `vrf`
+(`NG-F002`): an adapter is a *port* of the host it hangs off, and the routing
+instance belongs to that host.
+
+### 16.2 `routes[]` — static routes
+
+```yaml
+spec:
+  routes:
+    - prefix: 0.0.0.0/0
+      via: 203.0.113.1
+      dev: wan0
+      metric: 10
+    - prefix: 10.1.0.0/16
+      blackhole: true
+    - prefix: 0.0.0.0/0
+      vrf: mgmt
+      blackhole: true
+```
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `prefix` | IPv4/IPv6 prefix | yes | The destination, in canonical CIDR form. Host bits are refused. |
+| `via` | IP address | no | The next hop. |
+| `dev` | interface name | no | The egress interface. |
+| `vrf` | element name | no | The instance holding the route; the global one when unset. |
+| `metric` | integer | no | Administrative distance or cost, as this device counts it. |
+| `blackhole` | boolean | no | Discard matching packets. Default `false`. |
+
+A route needs somewhere to send the packet, so at least one of `via`, `dev` and
+`blackhole` is required, and `blackhole` excludes the other two (`NG-F004`).
+`via` is of the same family as `prefix` (`NG-F003`) — a next hop is resolved on
+the destination's own address family — and must be **on-link**: inside a prefix
+this device configures, on an interface in the route's own instance
+(`NG-F008`). An IPv6 link-local next hop is exempt, being on-link by
+definition. `dev` names an interface of this device (`NG-F009`).
+
+`prefix` rejects a destination with host bits set. `10.0.0.1/24` as a
+destination is either a typo or a `/32`, and guessing which would put a route in
+the diagram that the device does not have.
+
+Nothing here computes a best path. `metric` is recorded, routes are not sorted,
+and two routes for one prefix are two declarations rather than a decision:
+netgraph describes the configuration, and which route wins is the device's
+business.
+
+### 16.3 `routing` — dynamic protocols
+
+```yaml
+spec:
+  routing:
+    ospf:
+      area: 0.0.0.0           # or the plain number 0
+      router_id: 192.0.2.1
+      interfaces: [lo0, xe-0/0/0]
+    bgp:
+      asn: 65001
+      router_id: 192.0.2.1
+      neighbors:
+        - address: 192.0.2.2
+          remote_asn: 65001
+          description: iBGP to rtr-south-core-01
+```
+
+Both blocks are optional and neither implies the other.
+
+**`ospf`**
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `area` | area id | no | Dotted quad or plain number; `0` and `0.0.0.0` are the same backbone area and both normalise to `0.0.0.0`. Default `0.0.0.0`. |
+| `router_id` | IPv4 address | no | A dotted quad even in an IPv6-only network (RFC 5340 §2.1). |
+| `interfaces` | interface names | yes | The interfaces OSPF runs on. Non-empty and free of duplicates (`NG-F006`); each names an interface of this device (`NG-F010`). |
+
+**`bgp`**
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `asn` | 1–4294967295 | yes | The local autonomous system. AS 0 is reserved (RFC 7607). |
+| `router_id` | IPv4 address | no | The BGP identifier (RFC 4271 §4.2). |
+| `neighbors[].address` | IP address | yes | The peer. Unique within the device (`NG-F007`). |
+| `neighbors[].remote_asn` | 1–4294967295 | yes | The AS the peer is in. |
+| `neighbors[].description` | string | no | Free text. |
+
+A router id is unique across the inventory (`NG-F012`): it names the router
+itself, so OSPF drops an adjacency with a neighbour claiming the local id
+(RFC 2328 §10.5) and BGP refuses a session with a duplicate identifier
+(RFC 4271 §6.8). One device giving OSPF and BGP the same value is *one* identity,
+not a duplicate, and is the normal configuration.
+
+One area per device, deliberately. An area border router is a real thing, but
+modelling it needs per-interface areas; see §16.5.
+
+### 16.4 Peers are addresses, never names
+
+A BGP neighbour is written as an **address**, because that is what the device is
+configured with. netgraph resolves it against every address the inventory
+declares, and that resolution is what draws the session in the routing view and
+what lets the two ends be compared:
+
+* the peer's own `asn` is checked against `remote_asn` (`NG-F011`) — a
+  disagreement is a session that never establishes;
+* an address that matches nothing is a **warning**, not an error (`NG-F013`): a
+  correct eBGP session towards a transit provider points at an address on
+  *their* router, which is not an element of this inventory and never will be.
+  What the warning says is that netgraph cannot check the far end, and that the
+  diagram has nothing to draw the edge to.
+
+There is deliberately no second reference grammar. A `peer: rtr-south-core-01`
+field would be a name that could point somewhere the *device* does not, which is
+the one thing an inventory must not be able to say.
+
+An OSPF adjacency is not declared at all. It is **discovered**, so netgraph
+derives it the way the protocol does: two interfaces that run OSPF in the same
+area and are addressed in one subnet form one. Deriving it from the addressing
+rather than from the cables is what makes it right for two routers facing each
+other across a layer-2 switch, which no cable joins directly.
+
+### 16.5 What routing does not hold
+
+Deferred, and listed so nobody designs around the absence:
+
+* **Per-interface OSPF areas**, and therefore area border routers, stub and NSSA
+  area types, interface costs and network types.
+* **Route policy**: prefix lists, route maps, communities, local preference.
+  A policy language is a language, and inventing a half of one would make an
+  inventory that says what a router does *not* do.
+* **Protocols other than OSPF and BGP**: IS-IS, RIP, EIGRP, and the
+  redistribution between any two of them.
+* **Route reflectors and confederations**: an iBGP mesh here is a set of
+  sessions, with no hierarchy over it.
+* **BFD, timers, graceful restart** and everything else that tunes a session
+  rather than describing one.
+* **Learned state**. `spec.routes` is what somebody configured; a routing table
+  is what a router computed from it, and comparing the two is
+  `netgraph drift`'s business, not the schema's.
+
+### 16.6 The routing view
+
+`netgraph render --layer routing` draws the control plane:
+
+* **Nodes** are the elements that take part in routing — anything declaring
+  `routing`, `routes` or `vrfs` — labelled with the AS number and router id
+  their peers know them by, and carrying their instances and their static
+  routes.
+* **Edges** are the adjacencies: a BGP session is drawn solid and labelled with
+  the AS pair (`65001 → 65002`, or `iBGP 65001` when both ends are in one AS),
+  an OSPF adjacency dotted and labelled with the area.
+* **Clusters** are the VRFs. A router with interfaces in exactly one instance is
+  drawn inside that instance's box; one that straddles several belongs to no box,
+  exactly as a cross-site prefix belongs to no namespace at layer 3, and names
+  its instances on its label instead.
+
+Nothing physical appears. Two routers are adjacent here because they exchange
+routes, which a cable neither guarantees nor is needed for.
+
+`netgraph export routes` writes the same static routes out as an iproute2
+script, one shell function per device; see
+[`docs/export.md`](export.md).
+
+### 16.7 YANG mapping
+
+| netgraph | YANG |
+|---|---|
+| `spec.vrfs[].name` | `/ni:network-instances/ni:network-instance/ni:name` (RFC 8529) |
+| `spec.vrfs[].description` | `…/ni:network-instance/ni:description` |
+| `spec.vrfs[].rd` | — (RFC 4364 §4.2; `ietf-network-instance` has no node for it) |
+| `spec.interfaces[].vrf` | `…/ni:network-instance/ni:vrf-root` — the instance an interface is bound into |
+| `spec.routes[].prefix` | `…/rt:static-routes/v4ur:ipv4/v4ur:route/v4ur:destination-prefix` (RFC 8349) |
+| `spec.routes[].via` | `…/v4ur:route/v4ur:next-hop/v4ur:next-hop-address` |
+| `spec.routes[].dev` | `…/v4ur:route/v4ur:next-hop/v4ur:outgoing-interface` |
+| `spec.routes[].blackhole` | `…/v4ur:route/v4ur:next-hop/v4ur:special-next-hop` = `blackhole` |
+| `spec.routes[].metric` | — (`ietf-routing` leaves the metric to each protocol) |
+| `spec.routing.ospf` | `…/rt:control-plane-protocols/rt:control-plane-protocol` with `type: ospf` |
+| `spec.routing.bgp` | the same list entry with `type: bgp` |
+| `spec.routing.*.router_id` | — (`ietf-ospf` and `ietf-bgp` model it per protocol instance) |
+
+The IPv6 routes use the `v6ur:` paths of the same module; only the IPv4 ones are
+written out above.
