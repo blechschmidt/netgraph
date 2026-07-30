@@ -274,6 +274,15 @@ jobs:
       digest: ${{ steps.push.outputs.digest }}
       tags: ${{ steps.meta.outputs.tags }}
 
+    # Said once here because the metadata step below has to give each of these
+    # to ``labels`` *and* to ``annotations``, which are two separate inputs
+    # writing to two separate places -- the image config and the manifest -- and
+    # a copy-paste that drifted would leave a tag describing itself one way to
+    # ``docker inspect`` and another to anything reading the registry.
+    env:
+      DESCRIPTION: ${{ inputs.version != '' && format('netgraph {0}.', inputs.version) || format('Development build of netgraph from {0}. Not a release; see the X.Y.Z tags for those.', github.ref_name) }}
+      DOCUMENTATION: https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/docs/docker.md
+
     permissions:
       contents: read
       # The whole reason this job is separate. GITHUB_TOKEN with this pushes to
@@ -331,6 +340,15 @@ jobs:
       - name: Work out the tags and the labels
         id: meta
         uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
+        env:
+          # Where the annotations below are attached. The action's default is
+          # ``manifest`` alone, which puts them on each architecture's own
+          # manifest and leaves the index -- the thing the *tag* resolves to --
+          # carrying nothing at all. A registry UI, a scanner or a
+          # ``docker buildx imagetools inspect`` then sees an unlabelled image,
+          # because none of them descend into a per-architecture entry to find
+          # out what the tag is. Both levels, so either way of looking finds it.
+          DOCKER_METADATA_ANNOTATIONS_LEVELS: index,manifest
         with:
           images: ${{ env.IMAGE }}
           flavor: |
@@ -343,8 +361,15 @@ jobs:
             type=raw,value=latest,enable=${{ inputs.latest == true }}
             type=sha
           labels: |
-            org.opencontainers.image.description=${{ inputs.version != '' && format('netgraph {0}.', inputs.version) || format('Development build of netgraph from {0}. Not a release; see the X.Y.Z tags for those.', github.ref_name) }}
-            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/docs/docker.md
+            org.opencontainers.image.description=${{ env.DESCRIPTION }}
+            org.opencontainers.image.documentation=${{ env.DOCUMENTATION }}
+          # The same two again, and not redundantly: the action derives its
+          # ``annotations`` output from the labels it generated itself, not from
+          # the ``labels`` input above, so anything custom given only there
+          # reaches the image config and never the manifest.
+          annotations: |
+            org.opencontainers.image.description=${{ env.DESCRIPTION }}
+            org.opencontainers.image.documentation=${{ env.DOCUMENTATION }}
 
       - name: Build both architectures and push
         id: push
@@ -357,8 +382,10 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           # Labels live on each architecture's own image config, so ``docker
           # buildx imagetools inspect`` of the *index* shows none of them.
-          # Annotations are the index-level copy, and without them the tag looks
-          # unlabelled to anything that reads the manifest list.
+          # Annotations are the copy that lives on the manifest, and each one
+          # here is prefixed with the level it belongs to by the metadata step's
+          # ``DOCKER_METADATA_ANNOTATIONS_LEVELS`` -- see the note there for why
+          # the default alone leaves the tag looking unlabelled.
           annotations: ${{ steps.meta.outputs.annotations }}
           # In-toto attestations on the manifest itself, so buildx and syft find
           # them with no side channel to consult.
@@ -480,3 +507,70 @@ jobs:
             echo "gh attestation verify oci://${IMAGE}@${DIGEST} --repo ${GITHUB_REPOSITORY}"
             echo '```'
           } >>"$GITHUB_STEP_SUMMARY"
+
+  # --------------------------------------------------------------------------- #
+  # 3. Check it from outside
+  # --------------------------------------------------------------------------- #
+  #
+  # The job above pulled its own push back and ran it. What it cannot check is
+  # anything about how the image looks to *someone else*, because it holds a
+  # credential for the registry and a local copy of every layer:
+  #
+  #   * GHCR creates a package **private** on first push and no workflow flips
+  #     it. A logged-in runner cannot tell that apart from a public one, so the
+  #     failure is silent -- green pipeline here, ``denied`` on every other
+  #     machine on earth, and docs/docker.md's "no login needed to pull" quietly
+  #     false. This is the check that exists for that.
+  #   * The tag. The job above verifies ``@sha256:…``; a reader types ``:edge``.
+  #   * A cold pull. Nothing here has the layers already.
+  #
+  # So: no ``packages`` permission, an explicit logout first, and the tag rather
+  # than the digest. tools/verify_published_image.py holds the checks themselves
+  # and runs the same way on a laptop.
+  verify:
+    name: verify it from outside
+    needs: publish
+    runs-on: ubuntu-24.04
+
+    # Deliberately the workflow's floor, and deliberately not ``packages:
+    # read``: a token that can read a private package would make the one thing
+    # this job is for -- proving no token is needed -- unfalsifiable.
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      # docker/login-action stored a credential in ~/.docker/config.json in the
+      # job above; this is a different runner and should have none, but a pull
+      # that silently succeeded on one left behind would defeat the point.
+      - name: Make sure we are not logged in to the registry
+        run: docker logout ghcr.io
+
+      - name: Pull it as a stranger would, and run it
+        env:
+          # The first tag the metadata step produced: ``edge`` on the default
+          # branch, the branch name elsewhere, the version on a release. Taken
+          # from the push rather than rebuilt here so the two cannot disagree
+          # about what was published.
+          TAGS: ${{ needs.publish.outputs.tags }}
+        run: |
+          set -euo pipefail
+          tag="$(printf '%s\n' "$TAGS" | head -n 1)"
+          echo "checking $tag"
+
+          # Captured rather than piped straight into the summary so that the
+          # result reads as output there instead of one run-on paragraph -- and
+          # so that a failure still gets reported before the step exits on it.
+          status=0
+          python3 tools/verify_published_image.py --image "$tag" --expect-version \
+            | tee verify.log || status=$?
+          {
+            echo "### Verified from outside"
+            echo
+            echo '```'
+            cat verify.log
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+          exit "$status"

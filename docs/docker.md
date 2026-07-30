@@ -326,9 +326,30 @@ ends up unprivileged with `netgraph` as its entrypoint. The `docker` job in
 runs a command through each service and fetches a page from each server, so a compose file
 that parses but does not work fails there.
 
-The published image gets the same treatment before it is published: the `image` job of
-[`.github/workflows/release.yml`](../.github/workflows/release.yml) builds `linux/amd64`,
+The published image gets the same treatment before it is published: the `build` job of
+[`.github/workflows/container.yml`](../.github/workflows/container.yml) builds `linux/amd64`,
 loads it, runs `--version`, checks that Graphviz inside it answers, renders an example to
 SVG through the entrypoint — and only then builds both architectures and pushes. So an image
 that cannot draw never reaches the registry. See
 [`docs/releasing.md`](releasing.md#what-the-release-workflow-does).
+
+And once it is pushed, the same workflow checks it again from the outside, because the job
+that did the pushing is the wrong place to ask whether anyone else can pull. That job is
+logged in to GHCR and already holds every layer; it cannot tell a public package from a
+private one, or a working tag from a digest it happens to have cached. So a third job with
+no registry permission at all runs
+[`tools/verify_published_image.py`](../tools/verify_published_image.py) against the tag that
+was just published. You can run it yourself, on anything:
+
+<!-- norun: needs a Docker daemon and pulls ~250 MB -->
+```bash
+tools/verify_published_image.py --image ghcr.io/blechschmidt/netgraph:edge
+```
+
+It asks the registry for an anonymous pull token — which GHCR grants only for a public
+package — resolves the tag, checks the index really carries both architectures and the
+provenance and SBOM attachments, then pulls it cold and runs it: bare `docker run` prints
+help, the entrypoint is `netgraph` and reports the version this repository declares,
+Graphviz answers, a read-only mount validates and renders, and a writable one comes back
+owned by the user who asked rather than by root. `--registry-only` drops everything needing
+a daemon, for a quick "is it there and is it public".

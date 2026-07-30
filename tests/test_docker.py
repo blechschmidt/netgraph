@@ -778,7 +778,7 @@ def test_the_image_build_cache_is_scoped(
     # Both jobs, or the publish job's build is not a hit on what build produced
     # and the arm64 layers are paid for twice in the same run.
     for job in ("build", "publish"):
-        assert f"scope=${{{{ env.CACHE_SCOPE }}}}" in steps_of(container_workflow, job), (
+        assert "scope=${{ env.CACHE_SCOPE }}" in steps_of(container_workflow, job), (
             f"the {job} job's buildx cache is unscoped"
         )
 
@@ -790,3 +790,103 @@ def test_the_docs_page_documents_the_published_development_tags() -> None:
     for tag in ("edge", "sha-"):
         assert f"`{tag}" in page, f"docs/docker.md does not document the {tag!r} tag"
     assert f"{IMAGE}:edge" in page
+
+
+# --------------------------------------------------------------------------- #
+# The image as a stranger sees it: the ``verify`` job and its script
+# --------------------------------------------------------------------------- #
+#
+# Everything above this line is checked by a runner that is logged in to the
+# registry and holds every layer locally. That runner cannot see the two things
+# a reader of docs/docker.md depends on -- that the package is public, and that
+# the *tag* resolves -- so those are checked by a separate job with no registry
+# credential, driving tools/verify_published_image.py. These tests keep that job
+# from quietly acquiring the credential that would make it vacuous.
+
+
+def test_the_published_image_is_verified_without_a_credential(
+    container_workflow: dict[Any, Any],
+) -> None:
+    """GHCR makes a package private on first push, and no workflow flips it.
+
+    A logged-in runner cannot tell that apart from a public one: it pulls
+    happily either way. So the check has to run somewhere that has nothing --
+    which means the moment this job gains ``packages: read``, it stops proving
+    anything at all.
+    """
+    job = container_workflow["jobs"]["verify"]
+    assert job["needs"] == "publish", "nothing verifies the image after it is pushed"
+    assert job["permissions"] == {"contents": "read"}, (
+        "the verify job holds a registry permission, so it cannot tell public from private"
+    )
+
+    steps = steps_of(container_workflow, "verify")
+    assert "docker logout ghcr.io" in steps, (
+        "a credential left over from an earlier step would defeat the anonymous pull"
+    )
+    assert "tools/verify_published_image.py" in steps
+    # The tag, not the digest -- the publish job already did the digest, and a
+    # reader types a tag.
+    assert "needs.publish.outputs.tags" in steps, (
+        "the verify job does not check a tag the publish job actually pushed"
+    )
+
+
+def test_the_verifier_checks_what_the_docs_page_promises() -> None:
+    """Each claim docs/docker.md makes about the image, asserted by the script.
+
+    The page tells a reader they need no login, that both architectures are
+    there, and that ``docker run … validate`` works on a folder of YAML. Those
+    are the three the verifier exists to hold up, so a page edited to promise
+    something new should not silently go unchecked.
+    """
+    script = (REPO_ROOT / "tools" / "verify_published_image.py").read_text(encoding="utf-8")
+    for platform in ("linux/amd64", "linux/arm64"):
+        assert platform in script
+    assert "anonymous_token" in script, "nothing checks that the package is public"
+    assert f"{IMAGE}:edge" in script, "the verifier does not default to the documented dev tag"
+    assert MOUNT in script, "the verifier never mounts an inventory where the image expects one"
+
+
+def test_the_manifest_is_annotated_at_the_index_level(
+    container_workflow: dict[Any, Any],
+) -> None:
+    """``docker/metadata-action`` annotates the per-architecture manifests only.
+
+    Its default for ``DOCKER_METADATA_ANNOTATIONS_LEVELS`` is ``manifest``,
+    which leaves the index -- the thing a tag actually resolves to -- carrying
+    nothing. Registry UIs, scanners and ``imagetools inspect`` all read the
+    index and none of them descend into an architecture to find a title, so the
+    published tag looks unlabelled. Observed on ``:edge``, hence this test.
+    """
+    meta = next(
+        step for step in container_workflow["jobs"]["publish"]["steps"] if step.get("id") == "meta"
+    )
+    levels = meta.get("env", {}).get("DOCKER_METADATA_ANNOTATIONS_LEVELS", "")
+    assert "index" in levels.split(","), (
+        "annotations land on the architectures only, so the tag itself is unlabelled"
+    )
+
+
+def test_custom_metadata_reaches_both_the_config_and_the_manifest(
+    container_workflow: dict[Any, Any],
+) -> None:
+    """``labels`` and ``annotations`` are separate inputs writing to separate places.
+
+    The action derives its ``annotations`` output from the labels it generated
+    itself, *not* from the ``labels`` input, so anything custom passed only
+    there reaches ``docker inspect`` and never the registry. Both inputs have to
+    carry it, and both have to carry the same thing -- which is why the values
+    are named once in the job's environment rather than written out twice.
+    """
+    job = container_workflow["jobs"]["publish"]
+    meta = next(step for step in job["steps"] if step.get("id") == "meta")
+
+    for key in ("description", "documentation"):
+        variable = key.upper()
+        assert variable in job["env"], f"the {key} is not named once for both inputs"
+        for input_name in ("labels", "annotations"):
+            assert (
+                f"org.opencontainers.image.{key}=${{{{ env.{variable} }}}}"
+                in meta["with"][input_name]
+            ), f"the custom {key} never reaches the image's {input_name}"
