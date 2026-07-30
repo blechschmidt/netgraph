@@ -53,3 +53,11 @@ junit.xml
 # one machine. docker-compose.yml has a default for every variable it reads, so
 # the file is a convenience and never a requirement -- see docs/docker.md.
 /.env
+
+# Scratch output of container.yml's smoke test, which runs the image against the
+# workspace and writes its answers here. Left behind by running those same steps
+# by hand, which is the supported way to debug the workflow -- see docs/docker.md.
+/image-version.json
+/index.json
+/published.svg
+/topology.svg

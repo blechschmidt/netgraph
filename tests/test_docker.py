@@ -35,6 +35,21 @@ DOCKERIGNORE = REPO_ROOT / ".dockerignore"
 ENV_EXAMPLE = REPO_ROOT / ".env.example"
 DOC = REPO_ROOT / "docs" / "docker.md"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+CONTAINER_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "container.yml"
+RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
+
+#: The registry the two publishing workflows write to, spelled the way GHCR
+#: requires: lowercase, and the repository's own namespace.
+IMAGE = "ghcr.io/blechschmidt/netgraph"
+
+#: What ``container.yml`` publishes from the default branch. ``latest`` is
+#: pointedly absent -- see :func:`test_the_development_build_never_takes_latest`.
+DEVELOPMENT_TAGS = ["edge", "main", "sha-"]
+
+#: The tree the smoke test in ``container.yml`` renders. Also the compose file's
+#: default, which :func:`test_the_default_inventory_is_an_example_that_exists`
+#: checks from the other side.
+EXAMPLE_INVENTORY = "home-lab"
 
 #: Where the compose file mounts the inventory, which is also the Dockerfile's
 #: ``WORKDIR``: ``-i/--inventory`` defaults to the working directory, so no
@@ -487,3 +502,284 @@ def test_the_ci_workflow_exercises_every_service() -> None:
     assert "docker compose build" in script
     for name in SERVICES:
         assert name in script, f"the docker job never runs the {name} service"
+
+
+# --------------------------------------------------------------------------- #
+# Publishing the image: .github/workflows/container.yml
+# --------------------------------------------------------------------------- #
+#
+# ``container.yml`` and ``release.yml`` both push to the same repository in GHCR,
+# and the whole design is the line between them: the release owns the version
+# tags and ``latest``, the container workflow owns ``edge`` and everything named
+# after a commit. Cross that line and an unqualified ``docker pull`` starts
+# returning unreleased work, which is the failure this section exists to make
+# impossible to introduce quietly.
+
+
+@pytest.fixture(scope="module")
+def container_workflow() -> dict[Any, Any]:
+    """The parsed workflow.
+
+    Keyed by ``Any`` because YAML 1.1 reads the bare word ``on`` as the boolean
+    ``True``, so the trigger block genuinely lives under a non-string key.
+    """
+    parsed = yaml.safe_load(CONTAINER_WORKFLOW.read_text(encoding="utf-8"))
+    assert isinstance(parsed, dict)
+    return parsed
+
+
+def steps_of(workflow: dict[Any, Any], job: str) -> str:
+    """Every step of a job, dumped back to text.
+
+    The raw YAML rather than the structure: what these tests assert on is the
+    exact word passed to an action or a shell, and picking it out of the parsed
+    tree means knowing which key of which step holds it, which is precisely the
+    detail that moves.
+    """
+    return yaml.dump(workflow["jobs"][job]["steps"])
+
+
+def test_the_container_workflow_builds_on_every_branch_and_pull_request(
+    container_workflow: dict[Any, Any],
+) -> None:
+    """An image only built at release time breaks halfway through a release."""
+    triggers = container_workflow[True]
+    assert triggers["push"]["branches"] == ["**"]
+    assert "pull_request" in triggers
+    # A ``v*`` push is release.yml's; building it here too would race it for the
+    # same tags in the same registry.
+    assert triggers["push"]["tags-ignore"] == ["v*"]
+
+
+def test_the_base_image_is_rebuilt_on_a_schedule(container_workflow: dict[Any, Any]) -> None:
+    """``edge`` is python:3.12-slim plus Debian's Graphviz.
+
+    Neither takes its security updates from this repository, so without a
+    rebuild the published image ages into whatever its base was on the day some
+    unrelated commit last touched ``src/``.
+    """
+    assert container_workflow[True]["schedule"], "nothing rebuilds the image against a fresh base"
+
+
+def test_the_default_permission_is_read_only(container_workflow: dict[Any, Any]) -> None:
+    assert container_workflow["permissions"] == {"contents": "read"}
+
+
+def test_only_the_publishing_job_can_write_to_the_registry(
+    container_workflow: dict[Any, Any],
+) -> None:
+    """The job that executes a pull request's Dockerfile holds no credential.
+
+    That is the reason the build and the push are two jobs rather than one with
+    an ``if:`` on half its steps: ``packages: write`` is granted to a job that
+    only ever runs on an already-merged ref.
+    """
+    writers = [
+        name
+        for name, job in container_workflow["jobs"].items()
+        if job.get("permissions", {}).get("packages") == "write"
+    ]
+    assert writers == ["publish"]
+    assert container_workflow["jobs"]["build"]["permissions"] == {"contents": "read"}
+
+
+def test_the_publish_job_waits_for_the_image_to_have_been_run(
+    container_workflow: dict[Any, Any],
+) -> None:
+    assert container_workflow["jobs"]["publish"]["needs"] == "build"
+
+
+def test_nothing_is_published_from_a_pull_request(
+    container_workflow: dict[Any, Any],
+) -> None:
+    """Every push publishes; a pull request never does.
+
+    A fork's token could not push anyway, and a same-repo one should not: a pull
+    request builds code nobody has reviewed yet, and the image it produced would
+    sit in the registry indistinguishable from one built from a merged commit.
+    """
+    condition = " ".join(container_workflow["jobs"]["publish"]["if"].split())
+    assert "github.event_name != 'pull_request'" in condition
+
+    # The one other way not to push: asking for a build without one, either by
+    # unticking the box on a manual run or through release.yml's dry run, which
+    # arrives here as a workflow_call still carrying the caller's event name.
+    assert "github.event_name != 'workflow_dispatch' || inputs.push" in condition
+
+    # And nothing narrower than that. A branch filter here would mean the branch
+    # tag below is produced for a branch nobody can pull.
+    assert "default_branch" not in condition, (
+        "the publish job is restricted to one branch, so branch tags are unreachable"
+    )
+
+
+def test_a_branch_build_can_never_take_latest(container_workflow: dict[Any, Any]) -> None:
+    """``latest`` is what an unqualified ``docker pull`` gets.
+
+    So it has to keep meaning "the newest release" and never "whatever main was
+    this morning", nor "the newest pre-release". Two things enforce that, and
+    both are asserted here because either alone would let it through:
+
+    ``latest=false`` turns off ``docker/metadata-action``'s ``latest=auto``,
+    which would otherwise hand ``latest`` to *any* semver tag, pre-release
+    included. The single remaining source of it is an input, which only
+    release.yml passes and only when its guard says the version is not a
+    pre-release -- a push to a branch leaves it unset, and unset is false.
+    """
+    steps = steps_of(container_workflow, "publish")
+    assert "latest=false" in steps
+
+    produced = [line for line in steps.splitlines() if "value=latest" in line]
+    assert len(produced) == 1, f"expected exactly one source of :latest, found {produced}"
+    assert "enable=${{ inputs.latest == true }}" in produced[0], (
+        "container.yml can tag :latest without release.yml having asked for it"
+    )
+
+    # And the other half of the contract: the release still asks for it, and
+    # still withholds it from a pre-release.
+    release = yaml.safe_load(RELEASE_WORKFLOW.read_text(encoding="utf-8"))
+    latest = release["jobs"]["image"]["with"]["latest"]
+    assert "needs.guard.outputs.prerelease == 'false'" in latest
+
+
+@pytest.mark.parametrize(
+    ("tag", "produced"),
+    [
+        ("X.Y.Z", "type=semver,pattern={{version}}"),
+        ("X.Y", "type=semver,pattern={{major}}.{{minor}}"),
+    ],
+)
+def test_a_version_tag_produces_the_semantic_version_tags(
+    container_workflow: dict[Any, Any], tag: str, produced: str
+) -> None:
+    """A push of ``v1.2.3`` publishes ``1.2.3`` and the ``1.2`` line it belongs to.
+
+    ``type=semver`` reads the version off the ref and is inert on any ref that is
+    not a tag shaped like one, which is what lets the branch tags and the version
+    tags share one unconditional list.
+    """
+    assert produced in steps_of(container_workflow, "publish"), (
+        f"container.yml no longer produces the {tag} tag for a v*.*.* push"
+    )
+
+
+def test_a_version_tag_reaches_the_container_workflow_exactly_once(
+    container_workflow: dict[Any, Any],
+) -> None:
+    """One build of the commit, one push of ``1.2.3``.
+
+    The image is built by one file, and a ``v*`` tag reaches it through
+    release.yml's call and through nothing else. Were container.yml also
+    triggered by the tag directly, two runs would build the same commit and race
+    to push the same version tag, and whichever finished last would silently
+    decide what it resolves to.
+    """
+    assert container_workflow[True]["push"]["tags-ignore"] == ["v*"], (
+        "container.yml also triggers on version tags, so it races release.yml"
+    )
+    assert "workflow_call" in container_workflow[True], (
+        "container.yml cannot be called, so release.yml has to build its own image"
+    )
+
+    release = yaml.safe_load(RELEASE_WORKFLOW.read_text(encoding="utf-8"))
+    image = release["jobs"]["image"]
+    assert image["uses"] == "./.github/workflows/container.yml"
+    assert "steps" not in image, "release.yml still builds an image of its own"
+
+
+@pytest.mark.parametrize("tag", DEVELOPMENT_TAGS)
+def test_every_documented_development_tag_is_produced(
+    container_workflow: dict[Any, Any], tag: str
+) -> None:
+    """The three tags docs/docker.md promises, against the metadata that makes them."""
+    steps = steps_of(container_workflow, "publish")
+    produced = {
+        "edge": "type=raw,value=edge,enable={{is_default_branch}}",
+        "main": "type=ref,event=branch",
+        "sha-": "type=sha",
+    }[tag]
+    assert produced in steps, f"container.yml no longer produces the {tag!r} tag"
+
+
+def test_both_architectures_are_built_before_and_during_the_push(
+    container_workflow: dict[Any, Any],
+) -> None:
+    """arm64 is half the machines this image is pulled onto.
+
+    Building it in the ``build`` job as well as the ``publish`` one is what makes
+    an arm64 break a red pull request instead of a red default branch.
+    """
+    for job in ("build", "publish"):
+        assert "linux/amd64,linux/arm64" in steps_of(container_workflow, job), (
+            f"the {job} job never builds arm64"
+        )
+
+
+def test_the_image_is_run_before_it_is_published(container_workflow: dict[Any, Any]) -> None:
+    """Built is not working: the console script, Graphviz and a real render."""
+    assert "load: true" in steps_of(container_workflow, "build"), (
+        "nothing loads the image into the daemon to run it"
+    )
+    # The raw file rather than the parsed steps, because what matters here is
+    # the exact shell word and ``yaml.dump`` re-escapes every quote in it into
+    # something no assertion can read. Same reasoning as tests/test_release.py.
+    text = CONTAINER_WORKFLOW.read_text(encoding="utf-8")
+    assert "netgraph:smoke --version" in text
+    assert "netgraph:smoke version --json" in text
+    assert f'-v "$PWD/examples/{EXAMPLE_INVENTORY}:{MOUNT}:ro" netgraph:smoke' in text, (
+        "the smoke test never renders a real inventory through the entrypoint"
+    )
+
+
+def test_the_published_manifest_is_pulled_back_and_run() -> None:
+    """The one check that a locally-built image cannot stand in for.
+
+    A push can succeed and still leave a tag that resolves to nothing, or an
+    index whose entry for an architecture points at the wrong blob. Pulling by
+    digest and running it is the only way to find that out here rather than in
+    somebody's ``docker run``.
+    """
+    text = CONTAINER_WORKFLOW.read_text(encoding="utf-8")
+    assert 'ref="${IMAGE}@${DIGEST}"' in text, "the image is not pulled back by digest"
+    assert 'docker pull --quiet "$ref"' in text
+    assert 'docker run --rm "$ref" --version' in text
+    assert "imagetools inspect --raw" in text, "the index's architectures are never checked"
+
+
+def test_the_image_carries_provenance_and_an_sbom(container_workflow: dict[Any, Any]) -> None:
+    """Same guarantee the release gives, so ``edge`` can be traced too."""
+    steps = steps_of(container_workflow, "publish")
+    assert "provenance: mode=max" in steps
+    assert "sbom: true" in steps
+    assert "attest-build-provenance" in steps
+    assert "push-to-registry: true" in steps
+
+
+def test_both_publishing_workflows_name_the_same_image(
+    container_workflow: dict[Any, Any],
+) -> None:
+    """Two files, one repository in the registry. A typo in either forks it."""
+    release = yaml.safe_load(RELEASE_WORKFLOW.read_text(encoding="utf-8"))
+    assert container_workflow["env"]["IMAGE"] == release["env"]["IMAGE"]
+    assert container_workflow["env"]["IMAGE"] == "ghcr.io/${{ github.repository }}"
+
+
+def test_the_two_workflows_do_not_share_a_build_cache_scope(
+    container_workflow: dict[Any, Any],
+) -> None:
+    """An unscoped ``type=gha`` is one bucket for every workflow in the repository.
+
+    They would then evict each other's entries, which turns the cheap rebuild
+    this workflow relies on into a full one at the least convenient moment.
+    """
+    assert container_workflow["env"]["CACHE_SCOPE"]
+    assert "scope=" in steps_of(container_workflow, "publish")
+
+
+def test_the_docs_page_documents_the_published_development_tags() -> None:
+    """A tag nobody can find out about is a tag nobody uses."""
+    page = DOC.read_text(encoding="utf-8")
+    assert "container.yml" in page, "docs/docker.md does not say what publishes the dev image"
+    for tag in ("edge", "sha-"):
+        assert f"`{tag}" in page, f"docs/docker.md does not document the {tag!r} tag"
+    assert f"{IMAGE}:edge" in page

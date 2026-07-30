@@ -1,0 +1,477 @@
+name: container
+
+# The container, continuously.
+#
+# This is the only workflow that builds the image and the only one that pushes
+# it. Every commit on every branch produces one, and a ``v*.*.*`` tag produces
+# the released one -- same file, same steps, the tags being the only difference.
+#
+# The tag set follows the ref, and ``docker/metadata-action`` derives it rather
+# than a chain of ``if``s here:
+#
+#   push to a branch      main, feature-x         the branch it came from
+#                         sha-1a2b3c4             that commit, immutably
+#                         edge                    additionally, on the default branch
+#
+#   push of v1.2.3        1.2.3, 1.2              the version, and its minor line
+#                         sha-1a2b3c4             that commit, immutably
+#                         latest                  only when the caller says so
+#
+# ``type=semver`` fires only on a tag shaped ``v*.*.*`` and ``type=ref,event=branch``
+# only on a branch, so the two columns cannot both appear and neither needs to be
+# guarded by hand.
+#
+# ``release.yml`` does not build its own image. It calls this workflow
+# (``workflow_call``, below) once its guard, the full CI gate and the
+# cross-platform verification have passed, which is what keeps a version tag
+# meaning "this was checked" -- and, more mundanely, what stops two workflows
+# racing each other to push ``1.2.3`` from two separate builds of the same
+# commit. ``latest`` is an input rather than a rule here because only the guard
+# knows whether the version is a pre-release.
+#
+# Two things go wrong without it.
+#
+# The first is that the Dockerfile only gets built at release time. Nothing in
+# ``src/`` knows it is also installed into an image, so a new runtime dependency,
+# a console script that moved or a file the build stage stopped copying breaks
+# the image silently and surfaces halfway through a release -- the one moment
+# where a red job is most expensive and least welcome. ``ci.yml`` builds the
+# compose image on every push, which catches much of that; what it does not
+# cover is the second architecture, the registry, the manifest and the push
+# itself, all of which are only exercised here.
+#
+# The second is that there is no way to run unreleased work without a Python
+# environment. ``edge`` is that: what main does today, on both architectures,
+# pullable by anyone, and explicitly *not* ``latest``.
+#
+# The tags this produces are documented in docs/docker.md, and the split of
+# responsibility with release.yml is asserted in tests/test_docker.py.
+
+on:
+  push:
+    # Both halves named, deliberately: a ``push`` filter that mentions tags and
+    # not branches means "tags only", silently. See the same comment in ci.yml,
+    # and test_every_push_triggered_workflow_names_the_branches_it_runs_on.
+    branches:
+      - "**"
+    # A ``v*`` tag arrives here through release.yml's ``workflow_call``, not
+    # through this filter, so that the image is pushed only after the release
+    # guard and the CI gate have passed. Triggering on it directly as well would
+    # mean two runs of this file building the same commit and racing to push
+    # ``1.2.3``, with whichever finished last deciding what the tag resolves to.
+    tags-ignore:
+      - "v*"
+  pull_request:
+  schedule:
+    # Mondays, 04:40 UTC. Nothing in the repository changes, and that is the
+    # point: the image is ``python:3.12-slim`` plus Debian's Graphviz, both of
+    # which take security updates on their own schedule. Without a rebuild,
+    # ``edge`` ages into whatever its base image was on the day it was built.
+    # Off the hour and off Sunday night, where every other cron on GitHub is.
+    - cron: "40 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      push:
+        description: "Push to GHCR (off = build and smoke-test only)"
+        type: boolean
+        default: true
+
+  # How release.yml gets its image. Every input is something this workflow
+  # cannot work out for itself: whether the run is a real push or a dry run,
+  # whether the version being released is allowed to take ``latest``, and where
+  # to leave the standalone SBOM. The version *tags* are not among them -- they
+  # are read off the ref, so the tag that triggered the release is the single
+  # source of them and cannot disagree with an argument passed alongside it.
+  workflow_call:
+    inputs:
+      push:
+        description: "Push to GHCR (off = build and smoke-test only)"
+        type: boolean
+        default: true
+      latest:
+        description: "Also tag this image `latest` (a release that is not a pre-release)"
+        type: boolean
+        default: false
+      sbom-artifact:
+        description: "Upload a standalone SPDX SBOM of the image under this artifact name (empty = skip)"
+        type: string
+        default: ""
+      version:
+        description: "The version being released; names the SBOM file and marks the image a release rather than a development build (empty = development)"
+        type: string
+        default: ""
+    outputs:
+      digest:
+        description: "Digest of the pushed manifest, for attestation and release notes"
+        value: ${{ jobs.publish.outputs.digest }}
+      tags:
+        description: "Newline-separated list of tags that were pushed"
+        value: ${{ jobs.publish.outputs.tags }}
+
+# The floor. The publishing job asks for more, next to the reason.
+permissions:
+  contents: read
+
+# A superseded PR build is worth cancelling; a push to a branch is not, because
+# the run that would be cancelled may be the one that publishes ``edge`` and the
+# registry would then be a commit behind main with nothing to say so.
+concurrency:
+  group: container-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Lowercase already for this repository, which is what GHCR requires of an
+  # image name. A fork publishes to its own namespace without editing anything.
+  IMAGE: ghcr.io/${{ github.repository }}
+  # Both jobs build the same Dockerfile, so they share a cache scope -- the
+  # publish job's build is then a hit on everything the build job just produced.
+  # Named rather than left to default so that release.yml's builds, which use
+  # the default scope, cannot evict these entries or be evicted by them.
+  CACHE_SCOPE: container
+  PYTHONUNBUFFERED: "1"
+  FORCE_COLOR: "1"
+
+jobs:
+  # --------------------------------------------------------------------------- #
+  # 1. Build it and run it -- on every event, holding nothing
+  # --------------------------------------------------------------------------- #
+  #
+  # Deliberately separate from the job below, and deliberately without
+  # ``packages: write``. This is the job that executes the Dockerfile as written
+  # in a pull request; the credential that can write to the registry is held
+  # only by a job that runs after this one has passed, on a ref that has already
+  # been merged.
+  build:
+    name: build and smoke-test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up QEMU for the arm64 build
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+        with:
+          platforms: arm64
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      # ``load: true`` needs a single platform -- a multi-architecture result is
+      # a manifest list, which the local daemon cannot hold. So the native build
+      # is its own pass, and it is the one that gets run.
+      - name: Build linux/amd64 and load it
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: netgraph:smoke
+          cache-from: type=gha,scope=${{ env.CACHE_SCOPE }}
+          cache-to: type=gha,scope=${{ env.CACHE_SCOPE }},mode=max
+
+      # An image that builds is not an image that works, and each of the three
+      # checks below is one the build alone cannot make: the console script is on
+      # PATH and reports the version the source claims, Graphviz is present and
+      # findable by netgraph rather than merely installed, and a real inventory
+      # renders end to end through the entrypoint from a read-only mount.
+      - name: Run the image
+        run: |
+          set -euo pipefail
+
+          # The entrypoint is netgraph itself, so this is ``netgraph --version``.
+          reported="$(docker run --rm netgraph:smoke --version | head -n 1)"
+          echo "$reported"
+          # Against pyproject.toml rather than a literal: this workflow runs on
+          # every commit, including the one that bumps the version, and a check
+          # that had to be edited in the same commit is a check nobody trusts.
+          # ``tool.hatch`` reads the same line, so the grep cannot drift from it.
+          version="$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)"
+          if [ "$reported" != "netgraph ${version}" ]; then
+            echo "::error::the image reports '${reported}', but pyproject says '${version}'"
+            exit 1
+          fi
+
+          # An image that cannot draw is not worth publishing, and ``--version``
+          # alone would not notice: netgraph installs and runs perfectly well
+          # with no ``dot`` on the machine, it just cannot produce an SVG.
+          docker run --rm netgraph:smoke version --json >image-version.json
+          python - <<'PY'
+          import json
+
+          report = json.load(open("image-version.json", encoding="utf-8"))
+          graphviz = report["graphviz"]
+          if graphviz["version"] is None:
+              raise SystemExit(f"::error::no usable Graphviz in the image: {graphviz}")
+          print("graphviz", graphviz["version"], "at", graphviz["path"])
+          PY
+
+          # Read-only mount, because that is how the published image is meant to
+          # be used and a build stage that left something writable-only would
+          # pass every other check here.
+          docker run --rm -v "$PWD/examples/home-lab:/inventory:ro" netgraph:smoke \
+            render --layer l2 -f svg >topology.svg
+          grep -q "<svg" topology.svg
+          echo "ok: $(wc -c <topology.svg) bytes of SVG"
+
+      # amd64 is a complete cache hit from the pass above, so what this actually
+      # costs is the arm64 layers -- apt-get under emulation, a few minutes. It
+      # is here rather than only in the publish job so that an arm64 break is a
+      # red pull request instead of a red main: half of the machines this tool
+      # is pulled onto are arm64, and nothing else in the repository compiles
+      # anything for them.
+      - name: Build both architectures
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          # Explicit rather than left to the default: with neither ``push`` nor
+          # ``load``, buildx warns that the result goes nowhere. It going nowhere
+          # is the point -- what is wanted is the cache entry and the proof that
+          # both architectures compile -- so it is said outright.
+          outputs: type=cacheonly
+          cache-from: type=gha,scope=${{ env.CACHE_SCOPE }}
+          cache-to: type=gha,scope=${{ env.CACHE_SCOPE }},mode=max
+
+  # --------------------------------------------------------------------------- #
+  # 2. Tag it and push it
+  # --------------------------------------------------------------------------- #
+  publish:
+    name: push to ghcr.io
+    needs: build
+    runs-on: ubuntu-24.04
+
+    # Every push publishes, whatever branch it is on: the branch tag is only
+    # useful if it actually exists while the branch does, and "run what is on my
+    # colleague's branch" is the case it is for. A branch tag is rewritten in
+    # place on each push and deleted with the branch, so the registry holds one
+    # per live branch rather than one per commit -- the immutable per-commit
+    # record is ``sha-…``, which is expected to accumulate.
+    #
+    # Not a pull request, though. A fork's token could not push anyway, and a
+    # same-repo one should not: a pull request builds code nobody has reviewed
+    # yet, and an image published from it is indistinguishable in the registry
+    # from one built from a merged commit.
+    #
+    # The ``workflow_dispatch`` clause covers two callers at once -- a manual run
+    # of this workflow with the box unticked, and release.yml's dry run, which
+    # reaches here as a ``workflow_call`` whose event is still the caller's
+    # ``workflow_dispatch``. Both mean "build it, do not push it".
+    if: >-
+      github.event_name != 'pull_request'
+      && (github.event_name != 'workflow_dispatch' || inputs.push)
+
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+      tags: ${{ steps.meta.outputs.tags }}
+
+    permissions:
+      contents: read
+      # The whole reason this job is separate. GITHUB_TOKEN with this pushes to
+      # ghcr.io under the repository's own namespace; there is no registry
+      # credential in this repository to store, rotate or leak.
+      packages: write
+      # For the provenance attestation below, which is what makes ``gh
+      # attestation verify oci://...`` able to say where the image came from.
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up QEMU for the arm64 build
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+        with:
+          platforms: arm64
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The tag set, derived from the ref rather than decided here. Each
+      # ``type=`` below is inert unless the ref is of its kind, so a branch push
+      # and a version tag select disjoint halves of this list without a
+      # condition being written:
+      #
+      #   sha-1a2b3c4   always -- immutable, and the only one worth writing into
+      #                 a pipeline or a compose file that has to stay put
+      #   main          branch pushes only; the branch it came from, so a build
+      #                 from elsewhere is named for where it came from rather
+      #                 than silently becoming edge. Slashes become dashes, so
+      #                 feature/x is feature-x.
+      #   edge          branch pushes, and only on the default branch
+      #   1.2.3 / 1.2   ``v*.*.*`` tags only; the version and its minor line, so
+      #                 that ``:1.2`` follows patch releases
+      #   latest        only when the caller says so -- see below
+      #
+      # ``latest`` is what an unqualified ``docker pull`` gets, so it has to keep
+      # meaning "the newest release" and never "whatever main was this morning"
+      # nor "the newest pre-release". ``flavor: latest=false`` turns off the
+      # action's own ``auto`` handling -- which would otherwise hand it to any
+      # semver tag, pre-release included -- and the single ``type=raw`` below
+      # gives it out only on the say-so of release.yml's guard, which is the one
+      # place that knows whether 1.2.3-rc1 is a pre-release. A push to a branch
+      # cannot reach it: ``inputs.latest`` is unset there, and unset is false.
+      - name: Work out the tags and the labels
+        id: meta
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: |
+            latest=false
+          tags: |
+            type=raw,value=edge,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ inputs.latest == true }}
+            type=sha
+          labels: |
+            org.opencontainers.image.description=${{ inputs.version != '' && format('netgraph {0}.', inputs.version) || format('Development build of netgraph from {0}. Not a release; see the X.Y.Z tags for those.', github.ref_name) }}
+            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/docs/docker.md
+
+      - name: Build both architectures and push
+        id: push
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Labels live on each architecture's own image config, so ``docker
+          # buildx imagetools inspect`` of the *index* shows none of them.
+          # Annotations are the index-level copy, and without them the tag looks
+          # unlabelled to anything that reads the manifest list.
+          annotations: ${{ steps.meta.outputs.annotations }}
+          # In-toto attestations on the manifest itself, so buildx and syft find
+          # them with no side channel to consult.
+          provenance: mode=max
+          sbom: true
+          cache-from: type=gha,scope=${{ env.CACHE_SCOPE }}
+          cache-to: type=gha,scope=${{ env.CACHE_SCOPE }},mode=max
+
+      - name: Attest the image
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          # Beside the manifest in the registry, so ``gh attestation verify
+          # oci://...`` works for someone holding only the image.
+          push-to-registry: true
+
+      # A second, standalone SBOM, in SPDX, so that the GitHub release carries
+      # one as a plain file for anyone who does not want to talk to a registry to
+      # read it. The one buildx attached above is the authoritative copy; this is
+      # the readable one, and only a release has somewhere to put it.
+      - name: Generate an SPDX SBOM of the published image
+        if: inputs.sbom-artifact != ''
+        uses: anchore/sbom-action@7b36ad622f042cab6f59a75c2ac24ccb256e9b45 # v0.20.4
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.push.outputs.digest }}
+          format: spdx-json
+          artifact-name: netgraph-${{ inputs.version }}-image.spdx.json
+          output-file: sbom/netgraph-${{ inputs.version }}-image.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Upload the image SBOM
+        if: inputs.sbom-artifact != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ inputs.sbom-artifact }}
+          path: sbom/
+          if-no-files-found: error
+
+      # The build job ran an image it had built locally. This runs the one that
+      # is actually in the registry, pulled back by digest -- which is the only
+      # way to catch a manifest that pushed but cannot be resolved, an index
+      # whose amd64 entry points at the wrong blob, or a tag that landed on
+      # nothing. It is a pull over the network of a thing just uploaded, and it
+      # has caught exactly this class of problem elsewhere.
+      - name: Pull the published image back and run it
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          ref="${IMAGE}@${DIGEST}"
+          docker pull --quiet "$ref"
+
+          docker run --rm "$ref" --version
+          docker run --rm -v "$PWD/examples/home-lab:/inventory:ro" "$ref" \
+            render --layer l2 -f svg >published.svg
+          grep -q "<svg" published.svg
+          echo "ok: the published manifest runs and drew $(wc -c <published.svg) bytes"
+
+          # Both architectures are in the index, which is the claim the tags make
+          # and the one an amd64 runner would otherwise never check -- it can
+          # pull and run the index perfectly happily while the arm64 entry is
+          # absent, because it never looks at that entry.
+          docker buildx imagetools inspect --raw "$ref" >index.json
+          python - <<'PY'
+          import json
+
+          index = json.load(open("index.json", encoding="utf-8"))
+          found = set()
+          for entry in index.get("manifests", []):
+              platform = entry.get("platform") or {}
+              # The provenance and SBOM attestations ride in the same index as
+              # entries with no real platform. They are not architectures.
+              if platform.get("architecture") in (None, "unknown"):
+                  continue
+              found.add(f"{platform['os']}/{platform['architecture']}")
+          print("platforms:", ", ".join(sorted(found)) or "none")
+          missing = {"linux/amd64", "linux/arm64"} - found
+          if missing:
+              raise SystemExit(f"::error::missing from the published index: {sorted(missing)}")
+          PY
+
+      - name: Report what was published
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### Container published"
+            echo
+            echo "\`${IMAGE}@${DIGEST}\`"
+            echo
+            echo "| Tag |"
+            echo "|---|"
+            printf '%s\n' "$TAGS" | while IFS= read -r tag; do
+              [ -n "$tag" ] && echo "| \`${tag}\` |"
+            done
+            echo
+            # The version tags only exist on the release path, so the line that
+            # tells a reader what they just got has to follow the same split.
+            if [ -n "${VERSION}" ]; then
+              example="${IMAGE}:${VERSION}"
+              echo "Release build of ${VERSION}."
+            else
+              example="${IMAGE}:${GITHUB_REF_NAME//\//-}"
+              echo "Development build. \`latest\` still points at the newest release."
+            fi
+            echo
+            echo '```bash'
+            echo "docker run --rm -v \"\$PWD:/inventory:ro\" ${example} validate"
+            echo '```'
+            echo
+            echo "Verify where it came from:"
+            echo
+            echo '```bash'
+            echo "gh attestation verify oci://${IMAGE}@${DIGEST} --repo ${GITHUB_REPOSITORY}"
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"

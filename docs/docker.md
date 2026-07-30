@@ -13,11 +13,14 @@ Every release publishes one, so there is nothing to build:
 docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netgraph:latest validate
 ```
 
-## The published image
+## The released image
 
-`ghcr.io/blechschmidt/netgraph`, built and pushed by
-[`.github/workflows/release.yml`](../.github/workflows/release.yml) from the
-[`Dockerfile`](../Dockerfile) in this repository.
+`ghcr.io/blechschmidt/netgraph`, built from the [`Dockerfile`](../Dockerfile) in this
+repository by [`.github/workflows/container.yml`](../.github/workflows/container.yml) when
+[`release.yml`](../.github/workflows/release.yml) calls it — after the guard, the CI gate
+and the cross-platform verification have passed. The same repository in the registry also
+holds a [development image](#the-development-image) under different tags; these three are
+the ones a release sets, and the only ones that stand for a version.
 
 | | |
 |---|---|
@@ -44,6 +47,52 @@ is in each release's notes:
 gh attestation verify oci://ghcr.io/blechschmidt/netgraph:0.1.0 \
   --repo blechschmidt/netgraph
 ```
+
+## The development image
+
+The same repository in the registry also carries unreleased work, built and pushed by
+[`.github/workflows/container.yml`](../.github/workflows/container.yml) on **every push to
+every branch**, and rebuilt weekly against a fresh base image:
+
+| Tag | Means | Moves |
+|---|---|---|
+| `edge` | the tip of `main` | yes, on every commit and every Monday |
+| `main`, `feature-x` | the branch it was built from | yes, on every push to that branch |
+| `sha-1a2b3c4` | one commit, exactly | never |
+
+A branch tag is rewritten in place on each push, so the registry holds one per branch
+rather than one per commit — `sha-…` is the tag that accumulates, and the one to write down
+if you need to come back to the same bytes later. A branch name containing a slash becomes
+a dash: `feature/vlans` publishes as `feature-vlans`.
+
+<!-- norun: needs a Docker daemon -->
+```bash
+docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netgraph:edge validate
+```
+
+Same file, same steps, same two platforms, same provenance attestation and SBOM as a
+release — one workflow builds and pushes every image this project publishes, and the tags
+are the only thing that differs between a branch build and a release. So `gh attestation
+verify` works on these too. What differs is only the promise: `edge` is whatever passed CI
+most recently, not something anyone decided to release. It is the tag to reach for when a
+fix has landed and you would rather not wait for the version that carries it; a branch tag
+is how to run a colleague's work without a Python environment.
+
+**`latest` is never a development build.** It follows releases and nothing else, so an
+unqualified `docker pull ghcr.io/blechschmidt/netgraph` cannot land on unreleased work.
+A branch build has no way to reach it: `latest` is set only when `release.yml` asks for it,
+and it only asks once its guard confirms the version is not a pre-release. That split is
+enforced in `tests/test_docker.py`, not just intended.
+
+The weekly rebuild exists because the image is `python:3.12-slim` plus Debian's Graphviz,
+and neither takes its security updates from this repository. Without it, `edge` would age
+into whatever its base image happened to be on the day some unrelated commit last touched
+`src/`.
+
+Pull requests get the build but not the push: both architectures are compiled and the
+resulting image is run — `--version`, a Graphviz probe and a real render through the
+entrypoint — before anything reaches the registry. The credential that can write to GHCR
+is held by a separate job that only ever runs on an already-merged commit.
 
 ## Or with compose, for the two servers
 

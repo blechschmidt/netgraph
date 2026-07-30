@@ -218,9 +218,14 @@ and by `workflow_dispatch`.
 6. **`provenance`** — `actions/attest-build-provenance` over the sdist and the wheel, so
    `gh attestation verify` can tie a downloaded file to this repository, this workflow and
    this commit.
-7. **`image`** — `linux/amd64` and `linux/arm64` to `ghcr.io/blechschmidt/netgraph`, tagged
-   `X.Y.Z`, `X.Y` and `latest`, with an SPDX SBOM and a provenance attestation of the image
-   digest.
+7. **`image`** — [`container.yml`](../.github/workflows/container.yml) called as a reusable
+   workflow, exactly as `ci` above is called. It pushes `linux/amd64` and `linux/arm64` to
+   `ghcr.io/blechschmidt/netgraph` tagged `X.Y.Z`, `X.Y` and `latest`, with an SPDX SBOM and
+   a provenance attestation of the image digest. The version tags are read off the ref, not
+   passed down, so the tag that triggered the release is the only source of them. This job
+   is the *only* thing that may set `latest`, and it passes it only when the guard says the
+   version is not a pre-release; the development image described below shares the registry
+   but never that tag.
 8. **`github-release`** — the release, with the changelog section as the body, the sdist, the
    wheel and both SBOMs attached, and the image digest recorded in the notes.
 
@@ -231,18 +236,63 @@ needs `id-token: write` for the OIDC exchange, `provenance` and `image` need
 The `permissions` block of a job that publishes is the whole of its blast radius, so it is
 written per job rather than once at the top of the file.
 
+## The container image between releases
+
+[`.github/workflows/container.yml`](../.github/workflows/container.yml) is the only file
+that builds the image and the only one that pushes it. It runs on every push to every
+branch and on every pull request, and `release.yml` reaches it through the `workflow_call`
+above. It exists for two reasons: so a Dockerfile break is a red pull request rather than a
+surprise in the middle of a release, and so unreleased work can be run without a Python
+environment.
+
+Because one file serves both, the release build is not a separate code path that can drift
+from the one every commit rehearses — and a `v*` tag causes exactly one build of the commit
+and one push of `X.Y.Z`, rather than two workflows racing for the same registry namespace.
+
+What changes between the two is the tag set, which `docker/metadata-action` derives from
+the ref. `type=semver` is inert on anything that is not a `v*.*.*` tag and
+`type=ref,event=branch` is inert on anything that is not a branch, so the two halves cannot
+both appear and neither needs a hand-written condition:
+
+| | a `v*.*.*` tag | any other push |
+|---|---|---|
+| Entered through | `release.yml`, after guard + CI + verify | the `push` trigger directly |
+| Publishes | `X.Y.Z`, `X.Y`, `sha-…`, and `latest` when asked | `<branch>`, `sha-…`, plus `edge` on `main` |
+| Stands for | a version somebody released | whatever passed CI most recently |
+
+A pre-release is narrower still: `v1.2.3-rc1` publishes `1.2.3-rc1` and `sha-…` and nothing
+else. It takes no `1.2`, because a release candidate must not become what `:1.2` resolves
+to, and no `latest`, because the guard does not ask for it.
+
+`latest` is the one tag not derived from the ref: it comes from an input that only
+`release.yml` passes and only for a non-pre-release, so a push to a branch cannot reach it
+and an unqualified `docker pull ghcr.io/blechschmidt/netgraph` cannot land on unreleased
+work. That split is asserted in `tests/test_docker.py` rather than left as an intention.
+
+Two details worth knowing when reading that file. The build and the push are separate jobs
+so that the job executing a pull request's `Dockerfile` holds no registry credential —
+`packages: write` belongs to a job that only runs on an already-merged commit. And a weekly
+`schedule` rebuilds `edge` with nothing changed in the repository, because the image is
+`python:3.12-slim` plus Debian's Graphviz and neither takes its security updates from here.
+[`docs/docker.md`](docker.md#the-development-image) documents the tags for the people
+pulling them.
+
 ### Pinning
 
-`release.yml` pins every action to a commit SHA with the tag in a trailing comment:
+`release.yml` and `container.yml` pin every action to a commit SHA with the tag in a
+trailing comment:
 
 ```yaml
 uses: pypa/gh-action-pypi-publish@7f25271a4aa483500f742f9492b2ab5648d61011  # v1.12.4
 ```
 
 `ci.yml` does not, and the difference is deliberate: a compromised action in `ci.yml` can
-read a checkout that is already public, while one in `release.yml` runs in a job holding a
-token that can publish to PyPI and push to GHCR under this project's name. To bump a pin,
-resolve the tag and replace both the SHA and the comment:
+read a checkout that is already public, while one in the other two runs in a job holding a
+token that can publish to PyPI or push to GHCR under this project's name. The rule is
+applied by `tests/test_release.py` to any workflow granting `contents`, `packages`,
+`id-token` or `attestations` write access, so it covers the next publishing workflow
+without anyone having to remember it. To bump a pin, resolve the tag and replace both the
+SHA and the comment:
 
 ```bash
 git ls-remote --tags https://github.com/pypa/gh-action-pypi-publish v1.12.4

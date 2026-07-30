@@ -458,178 +458,36 @@ jobs:
   # --------------------------------------------------------------------------- #
   # 7. The container image
   # --------------------------------------------------------------------------- #
+  #
+  # container.yml called as a reusable workflow, for the same reason ``ci`` above
+  # is: the image a release publishes and the image every commit publishes must
+  # be built by the same file, or the release is the one build that nothing has
+  # rehearsed. It is also what keeps the two off each other's toes -- a ``v*``
+  # tag reaches container.yml through here and nowhere else, so exactly one run
+  # builds the commit and exactly one pushes ``1.2.3``.
+  #
+  # The version tags come from the ref, so nothing about the version is passed
+  # down for them. The three things that *are* passed are the ones this workflow
+  # knows and that one cannot: whether this is a real release or a dry run,
+  # whether the version has earned ``latest`` -- a pre-release has not -- and
+  # where to leave the standalone SBOM the GitHub release attaches.
   image:
     name: image
     needs: [guard, ci, verify]
-    runs-on: ubuntu-24.04
     permissions:
       contents: read
-      # Pushing to GHCR needs nothing but GITHUB_TOKEN with this; there is no
-      # registry credential to store either.
+      # A reusable workflow cannot hold more than its caller grants, so the whole
+      # of the image job's blast radius is declared here: the GHCR write, and the
+      # OIDC token and attestation write that its provenance needs.
       packages: write
-      # The image's own provenance attestation, as for the wheel above.
       id-token: write
       attestations: write
-
-    outputs:
-      digest: ${{ steps.push.outputs.digest }}
-
-    steps:
-      - name: Check out the repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-
-      # arm64 is emulated on an amd64 runner. It is slow -- a few minutes, mostly
-      # apt-get inside the arm64 layer -- and it is the architecture a growing
-      # share of laptops and cheap servers actually are, so it is built rather
-      # than promised.
-      - name: Set up QEMU for the arm64 build
-        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
-        with:
-          platforms: arm64
-
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
-
-      # Build the native architecture first and load it, so the image is *run*
-      # before it is pushed. A multi-architecture build cannot be loaded into the
-      # local daemon, so this is a separate, cached, single-platform pass rather
-      # than an extra output of the push below.
-      - name: Build linux/amd64 and load it
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
-        with:
-          context: .
-          platforms: linux/amd64
-          load: true
-          push: false
-          tags: netgraph:smoke
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Run the image before publishing it
-        env:
-          VERSION: ${{ needs.guard.outputs.version }}
-        run: |
-          set -euo pipefail
-          # The entrypoint is netgraph itself, so this is ``netgraph --version``.
-          reported="$(docker run --rm netgraph:smoke --version | head -n 1)"
-          echo "$reported"
-          if [ "$reported" != "netgraph ${VERSION}" ]; then
-            echo "::error::the image reports '${reported}', expected 'netgraph ${VERSION}'"
-            exit 1
-          fi
-          # Graphviz is in the image; an image that cannot draw is not worth
-          # publishing, and this is the one check ``--version`` alone would miss.
-          docker run --rm netgraph:smoke version --json >image-version.json
-          python - <<'PY'
-          import json
-
-          report = json.load(open("image-version.json", encoding="utf-8"))
-          graphviz = report["graphviz"]
-          if graphviz["version"] is None:
-              raise SystemExit(f"::error::no usable Graphviz in the image: {graphviz}")
-          print("graphviz", graphviz["version"], "at", graphviz["path"])
-          PY
-
-          # And a real render, through the entrypoint, from a mounted tree.
-          docker run --rm -v "$PWD/examples/home-lab:/inventory:ro" netgraph:smoke \
-            render --layer l2 -f svg >topology.svg
-          grep -q "<svg" topology.svg
-          echo "ok: $(wc -c <topology.svg) bytes of SVG"
-
-      - name: Log in to GHCR
-        if: github.event_name == 'push'
-        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Three tags: the exact version, the minor line so that ``:0.1`` follows
-      # patch releases, and ``latest`` -- withheld from a pre-release, which must
-      # not become what an unqualified ``docker pull`` gets.
-      - name: Work out the tags and the labels
-        id: meta
-        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
-        with:
-          images: ${{ env.IMAGE }}
-          tags: |
-            type=raw,value=${{ needs.guard.outputs.version }}
-            type=raw,value=${{ needs.guard.outputs.minor }}
-            type=raw,value=latest,enable=${{ github.event_name == 'push' && needs.guard.outputs.prerelease == 'false' }}
-          labels: |
-            org.opencontainers.image.version=${{ needs.guard.outputs.version }}
-            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/docs/docker.md
-
-      - name: Build both architectures and push
-        id: push
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          # In-toto attestations attached to the manifest itself, so ``docker
-          # buildx imagetools inspect`` and ``syft`` find them without a side
-          # channel. Both need a registry to be written to, hence the condition:
-          # a dry run has nowhere to put them.
-          provenance: ${{ github.event_name == 'push' && 'mode=max' || 'false' }}
-          sbom: ${{ github.event_name == 'push' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      # A second, standalone SBOM of the image, in SPDX, so that the GitHub
-      # release carries one as a plain file for anyone who does not want to talk
-      # to a registry to read it. The one buildx attached above is the
-      # authoritative copy; this is the readable one.
-      - name: Generate an SPDX SBOM of the published image
-        if: github.event_name == 'push'
-        uses: anchore/sbom-action@7b36ad622f042cab6f59a75c2ac24ccb256e9b45 # v0.20.4
-        with:
-          image: ${{ env.IMAGE }}@${{ steps.push.outputs.digest }}
-          format: spdx-json
-          artifact-name: netgraph-${{ needs.guard.outputs.version }}-image.spdx.json
-          output-file: sbom/netgraph-${{ needs.guard.outputs.version }}-image.spdx.json
-          upload-artifact: false
-          upload-release-assets: false
-
-      - name: Attest the image
-        if: github.event_name == 'push'
-        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
-        with:
-          subject-name: ${{ env.IMAGE }}
-          subject-digest: ${{ steps.push.outputs.digest }}
-          # Written into the registry beside the manifest, so ``gh attestation
-          # verify oci://...`` works for someone who only has the image.
-          push-to-registry: true
-
-      - name: Upload the image SBOM
-        if: github.event_name == 'push'
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: sbom-image
-          path: sbom/
-          if-no-files-found: error
-
-      - name: Report what was published
-        env:
-          TAGS: ${{ steps.meta.outputs.tags }}
-          DIGEST: ${{ steps.push.outputs.digest }}
-        run: |
-          set -euo pipefail
-          {
-            echo "## Container image"
-            echo
-            if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
-              echo "Pushed \`${DIGEST}\` as:"
-            else
-              echo "Dry run -- built, ran and discarded. Would have pushed:"
-            fi
-            echo
-            while IFS= read -r tag; do
-              [ -n "$tag" ] && echo "* \`${tag}\`"
-            done <<<"$TAGS"
-          } >>"$GITHUB_STEP_SUMMARY"
+    uses: ./.github/workflows/container.yml
+    with:
+      push: ${{ github.event_name == 'push' }}
+      latest: ${{ github.event_name == 'push' && needs.guard.outputs.prerelease == 'false' }}
+      sbom-artifact: sbom-image
+      version: ${{ needs.guard.outputs.version }}
 
   # --------------------------------------------------------------------------- #
   # 8. The GitHub release

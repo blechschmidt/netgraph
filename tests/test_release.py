@@ -345,30 +345,79 @@ _USES_RE = re.compile(r"^\s*(?:-\s+)?uses:\s*(?P<ref>\S+)\s*(?:#\s*(?P<comment>.
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
-def workflow_uses() -> list[tuple[int, str, str | None]]:
-    """Every ``uses:`` in release.yml, with its line and trailing comment."""
+#: Permissions that let a job leave something behind that other people fetch: a
+#: commit, a package in the registry, a signature, or an OIDC token that trades
+#: for an upload. ``security-events: write`` is pointedly not here -- it writes
+#: alerts into this repository's own security tab, produces nothing anybody
+#: downloads, and ``ci.yml`` holds it while floating its action pins on purpose.
+PUBLISHING_PERMISSIONS = frozenset({"contents", "packages", "id-token", "attestations"})
+
+
+def privileged_workflows() -> list[Path]:
+    """Every workflow in which some job can publish something.
+
+    Membership is derived rather than listed, so the rule below applies to the
+    next publishing workflow somebody adds without anyone having to remember to
+    name it here. Today that is ``release.yml`` and ``container.yml``.
+    """
+    privileged = []
+    for path in sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")):
+        workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
+        jobs: dict[str, Any] = workflow.get("jobs", {})
+        grants = [workflow.get("permissions") or {}]
+        grants += [job.get("permissions") or {} for job in jobs.values()]
+        if any(
+            value == "write" and name in PUBLISHING_PERMISSIONS
+            for grant in grants
+            for name, value in grant.items()
+        ):
+            privileged.append(path)
+    return privileged
+
+
+def workflow_uses(path: Path) -> list[tuple[int, str, str | None]]:
+    """Every ``uses:`` in a workflow, with its line and trailing comment."""
     found = []
-    for number, line in enumerate(RELEASE_WORKFLOW.read_text(encoding="utf-8").splitlines(), 1):
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         match = _USES_RE.match(line)
         if match is not None:
             found.append((number, match.group("ref"), match.group("comment")))
     return found
 
 
-def test_the_workflow_uses_some_actions() -> None:
-    """Guards the two tests below against a regex that quietly matches nothing."""
-    assert len(workflow_uses()) >= 8
+def privileged_uses() -> list[tuple[str, int, str, str | None]]:
+    """Flattened for parametrisation: the file name alongside each ``uses:``."""
+    return [
+        (path.name, number, ref, comment)
+        for path in privileged_workflows()
+        for number, ref, comment in workflow_uses(path)
+    ]
+
+
+def test_there_are_privileged_workflows_and_they_use_actions() -> None:
+    """Guards the test below against a filter or a regex that matches nothing.
+
+    Both are derived, so either one silently returning an empty list would turn
+    the pinning rule into a test that passes by having nothing to check.
+    """
+    names = {path.name for path in privileged_workflows()}
+    assert {"release.yml", "container.yml"} <= names, names
+    assert len(privileged_uses()) >= 12
 
 
 @pytest.mark.parametrize(
-    ("line", "ref", "comment"), workflow_uses(), ids=[f"line-{n}" for n, _, _ in workflow_uses()]
+    ("name", "line", "ref", "comment"),
+    privileged_uses(),
+    ids=[f"{name}-line-{n}" for name, n, _, _ in privileged_uses()],
 )
-def test_every_action_is_pinned_to_a_commit_sha(line: int, ref: str, comment: str | None) -> None:
+def test_every_action_in_a_privileged_workflow_is_pinned_to_a_commit_sha(
+    name: str, line: int, ref: str, comment: str | None
+) -> None:
     """A tag can be moved; a commit cannot.
 
     ``ci.yml`` floats on purpose -- a compromised action there can read a
-    checkout that is already public. A compromised action *here* runs in a job
-    holding a token that publishes to PyPI and pushes to GHCR under this
+    checkout that is already public. A compromised action in one of *these* runs
+    in a job holding a token that publishes to PyPI or pushes to GHCR under this
     project's name, so the pins are not optional. ``docs/releasing.md`` says how
     to bump one.
     """
@@ -377,11 +426,11 @@ def test_every_action_is_pinned_to_a_commit_sha(line: int, ref: str, comment: st
         return
     _, _, version = ref.partition("@")
     assert _SHA_RE.match(version), (
-        f"release.yml line {line}: {ref} is pinned to {version!r}, not to a 40-character "
+        f"{name} line {line}: {ref} is pinned to {version!r}, not to a 40-character "
         "commit SHA. Resolve it with 'git ls-remote --tags <url> <tag>'."
     )
     assert comment and re.search(r"v?\d+\.\d+", comment), (
-        f"release.yml line {line}: {ref} has no '# vX.Y.Z' comment, so nobody can tell "
+        f"{name} line {line}: {ref} has no '# vX.Y.Z' comment, so nobody can tell "
         "which version the SHA is without asking GitHub."
     )
 
@@ -504,9 +553,28 @@ def test_the_wheel_is_installed_and_run_on_all_three_platforms(
     assert "netgraph-${VERSION}-py3-none-any.whl" in text
 
 
-def test_the_image_is_built_for_both_architectures(release_workflow: dict[Any, Any]) -> None:
-    steps = yaml.dump(release_workflow["jobs"]["image"]["steps"])
-    assert "linux/amd64,linux/arm64" in steps
+def test_the_release_image_is_the_one_every_commit_builds(
+    release_workflow: dict[Any, Any],
+) -> None:
+    """container.yml called as a reusable workflow, for the same reason ``ci`` is.
+
+    A release-only copy of the image build is a copy that drifts, and the release
+    is the worst place to find out: the image a version tag publishes has then
+    been built by a file nothing rehearsed. Delegating also means a ``v*`` tag
+    causes exactly one build of the commit and one push of ``1.2.3``.
+
+    The two architectures are asserted where they are now built, in
+    tests/test_docker.py.
+    """
+    image = release_workflow["jobs"]["image"]
+    assert image["uses"] == "./.github/workflows/container.yml"
+    assert "steps" not in image, "release.yml builds an image of its own again"
+
+    # The inputs it cannot leave to the ref: a dry run must not push, and the
+    # SBOM the GitHub release attaches has to be named after this version.
+    assert image["with"]["push"] == "${{ github.event_name == 'push' }}"
+    assert image["with"]["sbom-artifact"] == "sbom-image"
+    assert "needs.guard.outputs.version" in image["with"]["version"]
 
 
 def test_the_ci_workflow_can_be_called_by_the_release(release_workflow: dict[Any, Any]) -> None:

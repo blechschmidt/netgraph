@@ -18,6 +18,21 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **A container image published on every push.** `ghcr.io/blechschmidt/netgraph` now also
+  carries unreleased work, tagged after the ref it was built from: `<branch>` for every
+  branch pushed (slashes become dashes, so `feature/vlans` is `feature-vlans`),
+  `sha-<commit>` for the exact commit, and `edge` for the tip of the default branch. So a
+  fix that has landed — or a colleague's branch — can be run without a Python environment
+  and without waiting for the release that carries it. Same two platforms, same provenance
+  attestation and SBOM as a release, because it is now the same workflow: a `v*.*.*` tag
+  builds through the same file and takes the semantic version tags `X.Y.Z` and `X.Y` from
+  the tag itself. `latest` is unchanged and still follows releases only — a branch build has
+  no way to reach it — so an unqualified `docker pull ghcr.io/blechschmidt/netgraph` cannot
+  land on unreleased work. The image is rebuilt weekly against a fresh `python:3.12-slim`
+  and Graphviz, and every pull request now builds it for both architectures and runs it
+  before anything can be merged. See
+  [`docs/docker.md`](docs/docker.md#the-development-image).
+
 - **`netgraph report`, the as-built documentation.** One command writes the document an
   engineer is asked to hand over: an overview, a page per site and a page per device, with
   the layer diagrams, the address plan and its utilisation, a VLAN-to-subnet-to-device
