@@ -31,15 +31,20 @@ differs by a factor of eight between the two:
 =============  ===============  ==========  =========
 Parser         Before entry 5   Today       Threshold
 =============  ===============  ==========  =========
-libyaml        1.78-1.79        1.52-1.53   1.70
+libyaml        1.78-1.79        1.58-1.60   1.70
 pure Python    1.16             1.10-1.12   1.25
 =============  ===============  ==========  =========
 
 The libyaml row is the guard that does the work, and it was checked in both
-directions: it passes on this commit and fails on its parent, quoting 1.79.
-The margin either side is real but not generous — roughly 11 % of headroom
-above today and 5 % below a full revert — which is the price of a guard sharp
+directions: it passed on the commit that set it and failed on its parent,
+quoting 1.79. The margin either side is real but not generous — 6 % of headroom
+above today and 12 % below a full revert — which is the price of a guard sharp
 enough to notice anything.
+
+Every "today" figure here is from one machine and will not be yours. Each guard
+prints its own on every run — ``[perf] validate: 8.27x against a budget of
+9.50x (13% headroom)`` — so the number to recalibrate against can be read off
+the three CI runners rather than inferred from the one that happened to fail.
 
 The pure-Python row is honestly weaker. With a parse eight times slower in the
 denominator, the model layer would have to roughly triple before the ratio
@@ -261,6 +266,30 @@ def milliseconds(call: Callable[[], object]) -> float:
         return (time.perf_counter() - start) * 1000
 
 
+def report(config: pytest.Config, name: str, *, ratio: float, budget: float) -> None:
+    """Print what a guard measured, whether or not it passed.
+
+    Every threshold in this file has been recalibrated at least once, and each
+    time the only numbers to hand were from the run that *failed* — so "how much
+    headroom did we actually have" could only be answered by the sample that had
+    none. Printed on every run, on every platform, so the next recalibration
+    reads a spread off three runners rather than off one bad minute on one of
+    them.
+
+    Through the terminal reporter rather than :func:`print`, which pytest
+    captures and shows only for a failing test, and rather than
+    ``record_property``, which pytest 9 warns about under the ``xunit2`` junit
+    family it also defaults to.
+    """
+    reporter = config.pluginmanager.get_plugin("terminalreporter")
+    if reporter is None:  # pragma: no cover - only under a bare pytest API call
+        return
+    headroom = (budget - ratio) / budget * 100
+    reporter.write_line(
+        f"[perf] {name}: {ratio:.2f}x against a budget of {budget:.2f}x ({headroom:.0f}% headroom)"
+    )
+
+
 def interleaved_best(
     first: Callable[[], object], second: Callable[[], object], *, samples: int = SAMPLES
 ) -> tuple[float, float]:
@@ -316,7 +345,9 @@ def test_the_generated_tree_is_the_shape_the_guard_assumes(benchmark_tree: Path)
     assert len(inventory.devices) == 80
 
 
-def test_loading_costs_no_more_than_its_budget_above_the_parse(benchmark_tree: Path) -> None:
+def test_loading_costs_no_more_than_its_budget_above_the_parse(
+    benchmark_tree: Path, pytestconfig: pytest.Config
+) -> None:
     """``load_tree`` stays within its documented multiple of the raw parse."""
     files = iter_inventory_files(benchmark_tree)
 
@@ -338,6 +369,7 @@ def test_loading_costs_no_more_than_its_budget_above_the_parse(benchmark_tree: P
 
     libyaml_in_use = HAVE_LIBYAML and StrictSafeLoader.__name__ == "CStrictSafeLoader"
     budget = MAX_LOAD_RATIO_LIBYAML if libyaml_in_use else MAX_LOAD_RATIO_PURE_PYTHON
+    report(pytestconfig, "load", ratio=ratio, budget=budget)
 
     assert ratio <= budget, (
         f"load_tree is {ratio:.2f}x the raw parse ({full:.1f} ms against {floor:.1f} ms) "
@@ -349,7 +381,7 @@ def test_loading_costs_no_more_than_its_budget_above_the_parse(benchmark_tree: P
 
 
 def test_validating_costs_no_more_than_its_budget_above_an_address_walk(
-    benchmark_tree: Path,
+    benchmark_tree: Path, pytestconfig: pytest.Config
 ) -> None:
     """``validate`` stays within its documented multiple of the walk floor."""
     # Warm the lazily-built pydantic validators and the page cache before
@@ -370,6 +402,7 @@ def test_validating_costs_no_more_than_its_budget_above_an_address_walk(
 
     floor, full = min(floors), min(fulls)
     ratio = full / floor
+    report(pytestconfig, "validate", ratio=ratio, budget=MAX_VALIDATE_RATIO)
 
     assert ratio <= MAX_VALIDATE_RATIO, (
         f"validate is {ratio:.2f}x the address-walk floor "
