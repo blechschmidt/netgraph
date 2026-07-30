@@ -1353,15 +1353,28 @@ truth with more attempts.
 | threshold | 9.0 | 9.5 |
 | headroom above the worst sample | 0–6 % | 11 % |
 
+Confirmed across the matrix afterwards: 7.04 to 8.48 over six jobs, the worst of
+them Windows, against 9.5.
+
 The threshold moved with it, and the guard keeps what it is for: entry 7 records
 that reverting the `validate.py` half of its work alone gives 9.1 against a
 "today" of 6.9, which is 11.0 against a today of 8.4 — well clear of 9.5, as are
 the two larger reverts.
 
-**And the *load* guard's premise does not survive leaving Linux.** The same
-commit reads 1.58–1.60 on ubuntu-24.04 and **1.72** on windows-latest, against a
-threshold of 1.70 — inside the 1.60-to-1.79 band that guard exists to
-discriminate within, so on Windows it was not discriminating, it was failing.
+**And the *load* guard's premise does not survive leaving Linux.** One commit,
+all six CI jobs, once both guards began reporting what they measured:
+
+| job | load/floor | validate/floor |
+|---|---|---|
+| ubuntu-24.04 3.10 / 3.11 / 3.12, libyaml | 1.59 / 1.56 / 1.60 | 7.31 / 7.54 / 7.48 |
+| ubuntu-24.04 3.12, pure Python | 1.09 | 7.31 |
+| macos-14 3.12, libyaml | 1.46 | 7.04 |
+| windows-latest 3.12, libyaml | 1.76 | 8.48 |
+
+The three Linux libyaml jobs agree within 0.04. Windows is 0.16 above them and
+macOS 0.13 below — both inside the 1.60-to-1.79 band that guard exists to
+discriminate within, so against the old threshold of 1.70 it was not
+discriminating on Windows, it was failing.
 
 That is the ratio premise failing rather than noise. Machine speed cancels out
 of a ratio when both halves are the same kind of work, and the two halves here

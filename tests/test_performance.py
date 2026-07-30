@@ -46,17 +46,32 @@ elsewhere**, and the difference is not a concession, it is the premise failing.
 Machine speed cancels out of a ratio only when both halves are the same kind of
 work, and here they are not: the floor reads forty files and runs a C parser
 over them, the numerator adds pydantic on top, and the balance between
-filesystem and interpreter is the thing that differs most between an
-ubuntu-24.04 runner and a windows-latest one. The same commit reads 1.58-1.60 on
-Linux and 1.72 on Windows — *inside* the 1.60-to-1.79 band this row exists to
-discriminate within. So the Linux copy stays sharp, and the other two get the
-blunter one: an entry-5-sized regression is invisible to them, a catastrophic
-one is not.
+filesystem and interpreter is the thing that differs most between the runners.
+One commit, all six CI jobs:
 
-Every "today" figure here is from one machine and will not be yours. Each guard
-prints its own on every run — ``[perf] validate: 8.27x against a budget of
-9.50x (13% headroom)`` — so the number to recalibrate against can be read off
-all six CI jobs rather than inferred from the one that happened to fail.
+===================================  ==========  =========  ========
+Job                                  load/floor  validate   headroom
+===================================  ==========  =========  ========
+ubuntu-24.04 3.10 libyaml            1.59        7.31       7 %
+ubuntu-24.04 3.11 libyaml            1.56        7.54       8 %
+ubuntu-24.04 3.12 libyaml            1.60        7.48       6 %
+ubuntu-24.04 3.12 pure Python        1.09        7.31       13 %
+macos-14 3.12 libyaml                1.46        7.04       25 %
+windows-latest 3.12 libyaml          1.76        8.48       10 %
+===================================  ==========  =========  ========
+
+The three Linux libyaml jobs agree within 0.04; Windows is 0.16 above them and
+macOS 0.13 below, which puts both *inside* the 1.60-to-1.79 band this row exists
+to discriminate within. So the Linux copy stays sharp, and the other two get the
+blunter 1.95: an entry-5-sized regression is invisible to them, a catastrophic
+one is not. The ``validate`` column needs no such split — both of its halves run
+over an inventory already in memory, and it spans 7.04 to 8.48 across six jobs
+against a threshold of 9.5.
+
+The "headroom" column is the load guard's, and the Linux rows are the thin ones.
+Each guard prints its own figures on every run — ``[perf] validate: 8.48x
+against a budget of 9.50x (11% headroom)`` — so the table above can be rebuilt
+from any run rather than inferred from whichever job happened to fail.
 
 The pure-Python row is honestly weaker. With a parse eight times slower in the
 denominator, the model layer would have to roughly triple before the ratio
