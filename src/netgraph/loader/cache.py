@@ -113,6 +113,12 @@ DISABLE_ENV_VAR: Final = "NETGRAPH_NO_CACHE"
 
 _TRUTHY: Final[frozenset[str]] = frozenset({"1", "true", "yes", "on"})
 
+#: ``sys.platform``, laundered through a plain ``str``. See
+#: :func:`resolve_cache_root`, which is the only thing that asks: a literal
+#: ``sys.platform == "..."`` is a compile-time constant to a type checker, and the
+#: branch it folds away is the one the other two runners need checked.
+PLATFORM: str = sys.platform
+
 #: Extension of one cache entry. Named so that a human who finds the directory
 #: can tell what they are looking at, and so a stray file of any other name is
 #: left strictly alone.
@@ -355,6 +361,15 @@ def resolve_cache_root(*, configured: Path | None = None, environ: Any = None) -
     4. The platform's own answer: ``%LOCALAPPDATA%`` on Windows,
        ``~/Library/Caches`` on macOS, ``~/.cache`` elsewhere.
 
+    The last rung is compared against :data:`PLATFORM` rather than against
+    ``sys.platform`` directly, and that is not a stylistic choice. mypy treats a
+    literal ``sys.platform == "..."`` in a condition as a compile-time constant
+    for the platform it is *running on*, so under ``warn_unreachable`` the two
+    branches this function does not take became an error on the two runners that
+    do not take them — and the ``~/.cache`` line was unreachable code on macOS.
+    Going through a plain ``str`` makes all three branches ordinary code, checked
+    on every platform instead of skipped on two.
+
     Returns:
         The directory and a short phrase naming the rung it came from, which is
         what ``netgraph cache info`` prints — "the cache is not where I think it
@@ -369,11 +384,11 @@ def resolve_cache_root(*, configured: Path | None = None, environ: Any = None) -
     xdg = (env.get("XDG_CACHE_HOME") or "").strip()
     if xdg:
         return Path(xdg).expanduser() / "netgraph", "XDG_CACHE_HOME"
-    if sys.platform == "win32":  # pragma: no cover - platform fork
+    if PLATFORM == "win32":  # pragma: no cover - platform fork
         local = (env.get("LOCALAPPDATA") or "").strip()
         base = Path(local) if local else Path.home() / "AppData" / "Local"
         return base / "netgraph" / "Cache", "LOCALAPPDATA"
-    if sys.platform == "darwin":  # pragma: no cover - platform fork
+    if PLATFORM == "darwin":  # pragma: no cover - platform fork
         return Path.home() / "Library" / "Caches" / "netgraph", "~/Library/Caches"
     return Path.home() / ".cache" / "netgraph", "~/.cache"
 

@@ -227,7 +227,22 @@ jobs:
         # ``--python-version`` overrides the 3.10 floor pinned in pyproject.toml
         # so each matrix entry is type-checked against its own interpreter
         # semantics instead of checking the same thing three times.
-        run: mypy --python-version ${{ matrix.python-version }} src/
+        #
+        # ``--platform`` is swept rather than left to the runner, because mypy
+        # folds a literal ``sys.platform == "..."`` into a constant for whatever
+        # platform it is running on -- so a type error inside a Windows-only
+        # branch, or an unreachable line after a macOS-only one, is invisible
+        # everywhere but there. Sweeping makes every branch checked in every job:
+        # the Linux jobs then fail on it too, which is where it can be fixed
+        # before the two slow runners have finished starting.
+        run: |
+          set -euo pipefail
+          for platform in linux darwin win32; do
+            echo "::group::mypy --platform ${platform}"
+            mypy --platform "${platform}" \
+                 --python-version ${{ matrix.python-version }} src/
+            echo "::endgroup::"
+          done
 
       - name: netgraph fmt --check
         # What ruff is to this repository's Python, ``fmt`` is to the YAML it
