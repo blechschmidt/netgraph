@@ -434,6 +434,11 @@ def test_the_examples_are_mostly_executed() -> None:
 _NEEDS_BASH_COMPLETION = "netgraph completion bash"
 
 
+def _needs_a_modern_bash(block: Any) -> bool:
+    """Does running ``block`` ask Click what version of bash is installed?"""
+    return any(step.command.startswith(_NEEDS_BASH_COMPLETION) for step in EXAMPLES.steps_of(block))
+
+
 @pytest.mark.parametrize("block", _BLOCKS, ids=[block.id for block in _BLOCKS])
 def test_the_documented_example_is_what_netgraph_prints(block: Any) -> None:
     """Run the transcript and diff it, or check the excuse gives a reason.
@@ -441,9 +446,9 @@ def test_the_documented_example_is_what_netgraph_prints(block: Any) -> None:
     A ``run`` block is executed through the installed console script, so a usage
     error it documents carries the program name a reader would actually see.
     """
-    if not HAVE_BASH_COMPLETION and any(
-        step.command.startswith(_NEEDS_BASH_COMPLETION) for step in EXAMPLES.steps_of(block)
-    ):
+    # ``block.runnable`` first: ``steps_of`` splits a transcript on its ``$ ``
+    # prompts and refuses a block that has none, which is most ``norun`` blocks.
+    if block.runnable and not HAVE_BASH_COMPLETION and _needs_a_modern_bash(block):
         pytest.skip(
             "bash is older than 4.4, so Click adds a warning to what this block documents; "
             "the transcript is what a machine with a supported bash sees"
