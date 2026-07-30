@@ -68,6 +68,7 @@ from __future__ import annotations
 
 import csv
 import io
+import itertools
 import json
 import shutil
 import sys
@@ -142,7 +143,7 @@ from netgraph.loader import (
     load_tree,
     read_documents,
 )
-from netgraph.models import DOCUMENT_KINDS, Element, format_bitrate
+from netgraph.models import DOCUMENT_KINDS, Adapter, Device, Element, format_bitrate
 from netgraph.render import (
     DEFAULT_RANKDIR,
     FORMATS,
@@ -2349,7 +2350,7 @@ def _open_browser(app: AppContext, url: str) -> None:
 @cli.command("list")
 @click.argument(
     "what",
-    type=click.Choice(["devices", "cables", "tunnels", "vlans", "subnets"]),
+    type=click.Choice(["devices", "cables", "tunnels", "vlans", "bss", "subnets"]),
     default="devices",
     required=False,
 )
@@ -2363,7 +2364,7 @@ def _open_browser(app: AppContext, url: str) -> None:
 )
 @click.pass_obj
 def list_command(app: AppContext, what: str, output_format: str) -> None:
-    """List the devices, cables, tunnels, VLANs or subnets an inventory declares."""
+    """List the devices, cables, tunnels, VLANs, BSSs or subnets of an inventory."""
     console = app.console()
     inventory = app.load()
     _warn_about_load_errors(console, inventory)
@@ -2502,6 +2503,59 @@ def _list_tunnels(inventory: Inventory) -> _Listing:
     return headers, aligns, rows, records
 
 
+def _list_bss(inventory: Inventory) -> _Listing:
+    """Every BSS the inventory declares: the wireless side of ``list vlans``.
+
+    One row per SSID per radio, because that is the unit an operator works with
+    — a dual-band access point serving three networks has six of them, and each
+    has its own BSSID, its own VLAN and possibly its own security. Client radios
+    are listed too, with their role, so that "who is on the guest network?" is a
+    question the listing can answer.
+    """
+    rows: list[list[str]] = []
+    records: list[dict[str, Any]] = []
+    owners: Iterable[tuple[str, Device | Adapter]] = itertools.chain(
+        inventory.devices.items(), inventory.adapters.items()
+    )
+    for fqn, owner in owners:
+        for interface in owner.interfaces:
+            wireless = interface.wireless
+            if wireless is None:
+                continue
+            for entry in wireless.bss:
+                rows.append(
+                    [
+                        entry.ssid + (" (hidden)" if entry.hidden else ""),
+                        f"{fqn}:{interface.name}",
+                        wireless.role.value,
+                        wireless.channel_text or "-",
+                        entry.bssid or "-",
+                        str(entry.vlan) if entry.vlan is not None else "-",
+                        entry.security.value if entry.security is not None else "-",
+                    ]
+                )
+                records.append(
+                    {
+                        "ssid": entry.ssid,
+                        "element": fqn,
+                        "interface": interface.name,
+                        "role": wireless.role.value,
+                        "band": wireless.band.value if wireless.band is not None else None,
+                        "channel": wireless.channel,
+                        "widthMhz": wireless.width_mhz,
+                        "txPowerDbm": wireless.tx_power_dbm,
+                        "bssid": entry.bssid,
+                        "vlan": entry.vlan,
+                        "security": entry.security.value if entry.security is not None else None,
+                        "hidden": entry.hidden,
+                        "source": str(inventory.source_of(fqn) or ""),
+                    }
+                )
+    headers = ("SSID", "RADIO", "ROLE", "CHANNEL", "BSSID", "VLAN", "SECURITY")
+    aligns: tuple[Align, ...] = ("left", "left", "left", "left", "left", "right", "left")
+    return headers, aligns, rows, records
+
+
 def _list_vlans(inventory: Inventory) -> _Listing:
     """Every VLAN, with the elements that participate in it.
 
@@ -2584,6 +2638,7 @@ _LISTINGS: Final[dict[str, Any]] = {
     "cables": _list_cables,
     "tunnels": _list_tunnels,
     "vlans": _list_vlans,
+    "bss": _list_bss,
     "subnets": _list_subnets,
 }
 

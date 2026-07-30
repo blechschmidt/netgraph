@@ -1,0 +1,50 @@
+# E030 (NG-W009) - an SSID's VLAN is carried nowhere on the access point.
+#
+# The guest SSID is bridged into VLAN 20. VLAN 20 is declared in the device's
+# VLAN database - so W113 stays quiet - but no interface of 'ap-a' is a member
+# of it, so guest traffic arrives from the air and has nowhere to go.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: ap-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+
+    - name: wlan0
+      type: wifi
+      enabled: false
+      wireless:
+        role: ap
+        bss:
+          - ssid: lab-guest
+            vlan: 20
+  vlans:
+    - id: 20
+      name: guest
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - ap-a:eth0
+    - pc-b:eth0
+  medium: copper

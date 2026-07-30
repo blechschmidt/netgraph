@@ -11,7 +11,7 @@ when the question is a count, a spelling or a missing row rather than a shape.
 
 <!-- generated: synopsis list -->
 ```text
-netgraph [GLOBAL OPTIONS] list [OPTIONS] [devices|cables|tunnels|vlans|subnets]
+netgraph [GLOBAL OPTIONS] list [OPTIONS] [devices|cables|tunnels|vlans|bss|subnets]
 ```
 <!-- /generated -->
 
@@ -29,6 +29,7 @@ about one element:
 | `cables` | `NAME`, `MEDIUM`, `SPEED`, `A END`, `B END`, `LENGTH` |
 | `tunnels` | `NAME`, `STACK`, `VNI`, `ENCRYPTED`, `ENDS`, `ENDPOINTS` |
 | `vlans` | `VLAN`, `NAME`, `ELEMENTS`, `PORTS` |
+| `bss` | `SSID`, `RADIO`, `ROLE`, `CHANNEL`, `BSSID`, `VLAN`, `SECURITY` |
 | `subnets` | `SUBNET`, `IP`, `ADDRESSES`, `ELEMENTS`, `VLANS` |
 
 The columns that are not self-evident:
@@ -47,6 +48,16 @@ The columns that are not self-evident:
 | `IP` | `subnets` | The address family, as `4` or `6`. |
 | `ADDRESSES`, `ELEMENTS` | `subnets` | How many addresses are claimed in the prefix, and how many elements hold one. |
 | `ELEMENTS`, `PORTS` | `vlans` | How many elements are members, and how many of their interfaces carry the VLAN. |
+| `RADIO` | `bss` | The `element:interface` of the radio serving or joining the BSS. |
+| `ROLE` | `bss` | `ap` for a radio that beacons the SSID, `station` or `mesh` for one associated to it. |
+| `CHANNEL` | `bss` | `36/5GHz` — the primary channel and its band, or `-` when the document states neither. |
+
+`bss` is one row per SSID per radio, which is the unit an operator works with: a
+dual-band access point serving three networks has six of them, each with its own
+BSSID, VLAN and security. Client radios appear too, so "who is on the guest
+network?" is a question the listing answers. A hidden SSID is marked as such
+rather than left out — it is still on the air. See
+[§6.2.6 of the schema](../schema.md#626-wireless).
 
 ## Computed, not transcribed
 
@@ -108,9 +119,11 @@ NAME               KIND      PORTS  ADDRESS           VLANS
 hosts/adp-usb-eth  adapter       1  192.168.10.30/24  10
 hosts/laptop       computer      2  -                 10
 hosts/pc-desk      computer      3  192.168.10.20/24  10
+hosts/phone        computer      1  192.168.10.40/24  -
 hosts/srv-nas      server        2  192.168.10.10/24  10
 routers/rtr-home   router        3  192.0.2.1/32      10
-switches/sw-home   switch        7  192.168.10.2/24   10
+switches/sw-home   switch        7  192.168.10.2/24   10,20
+wireless/ap-home   switch        4  192.168.10.3/24   10,20
 ```
 
 `hosts/laptop` shows `-` because it has no routable address of its own: it
@@ -141,7 +154,7 @@ answer to everything else, and is usually faster to act on:
 <!-- generated: arguments list -->
 | Argument | Required | Count | Default |
 |---|---|---|---|
-| `[devices\|cables\|tunnels\|vlans\|subnets]` | no | 1 | `devices` |
+| `[devices\|cables\|tunnels\|vlans\|bss\|subnets]` | no | 1 | `devices` |
 <!-- /generated -->
 
 ---

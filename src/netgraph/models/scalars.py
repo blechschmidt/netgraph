@@ -25,6 +25,7 @@ __all__ = [
     "MAC_PATTERNS",
     "MAX_ELEMENT_REF_LENGTH",
     "MAX_RACK_UNITS",
+    "MAX_SSID_OCTETS",
     "MAX_VLAN_ID",
     "MIN_VLAN_ID",
     "VLAN_SET_PATTERN",
@@ -44,8 +45,12 @@ __all__ = [
     "PrefixLengthV6",
     "RackUnit",
     "RackUnits",
+    "Ssid",
+    "TxPowerDbm",
     "VlanId",
     "VlanSet",
+    "WirelessChannel",
+    "check_ssid",
     "format_bitrate",
     "normalise_mac",
     "parse_bitrate",
@@ -151,6 +156,60 @@ IPv6Mtu = Annotated[int, Field(strict=True, ge=1280, le=4294967295)]
 
 PrefixLengthV4 = Annotated[int, Field(strict=True, ge=0, le=32)]
 PrefixLengthV6 = Annotated[int, Field(strict=True, ge=0, le=128)]
+
+
+# --------------------------------------------------------------------------- #
+# Radio values (§6.2.6)
+# --------------------------------------------------------------------------- #
+
+#: IEEE 802.11 caps an SSID at 32 *octets*, not 32 characters, so a name in a
+#: non-Latin script runs out of room sooner than its length suggests.
+MAX_SSID_OCTETS: Final = 32
+
+
+def check_ssid(value: Any) -> Any:
+    """Reject an SSID that no radio could beacon (``NG-W001``).
+
+    Only the octet bound and the empty string are checked here. Every byte
+    sequence is a legal SSID as far as 802.11 is concerned — the element is a
+    counted octet string, not text — so a name with a space, an emoji or a
+    trailing dot is accepted as written and stored unchanged.
+
+    A YAML scalar that is not a string is refused rather than stringified: an
+    unquoted ``5`` is a number to the loader, and silently turning it into
+    ``"5"`` would hide the missing quotes from a reader comparing the document
+    with the access point.
+    """
+    if isinstance(value, str):
+        octets = len(value.encode("utf-8"))
+        if not octets:
+            raise ValueError("an SSID is at least one octet long")
+        if octets > MAX_SSID_OCTETS:
+            raise ValueError(
+                f"{echo_value(value)} is {octets} octets long; IEEE 802.11 allows "
+                f"at most {MAX_SSID_OCTETS}"
+            )
+    return value
+
+
+#: ``dot11:ssid`` — an octet string of 1 to 32 bytes (§5). ``max_length`` is the
+#: character bound the JSON Schema can express; :func:`check_ssid` enforces the
+#: octet bound the standard actually states.
+Ssid = Annotated[
+    str,
+    BeforeValidator(check_ssid),
+    Field(min_length=1, max_length=MAX_SSID_OCTETS),
+]
+
+#: An 802.11 channel number. The bound spans every band's numbering: 1 to 14 at
+#: 2.4 GHz, 32 to 177 at 5 GHz, 1 to 233 at 6 GHz; which numbers are legal in
+#: which band is :class:`~netgraph.models.interface.Band`'s business (``NG-W003``).
+WirelessChannel = Annotated[int, Field(strict=True, ge=1, le=233)]
+
+#: Radiated power in dBm. The floor admits the -10 dBm a phone-sized radio backs
+#: off to; the ceiling is above any regulatory domain's EIRP limit, so a value
+#: past it is a unit mix-up (milliwatts written as dBm) rather than a setting.
+TxPowerDbm = Annotated[float, Field(ge=-30.0, le=40.0, allow_inf_nan=False)]
 
 
 # --------------------------------------------------------------------------- #

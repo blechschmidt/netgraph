@@ -37,6 +37,80 @@
           10
         ]
       },
+      "ap-home.wireless": {
+        "ansible_host": "192.168.10.3",
+        "netgraph_element": "wireless/ap-home",
+        "netgraph_name": "ap-home",
+        "netgraph_kind": "switch",
+        "netgraph_namespace": "wireless",
+        "netgraph_description": "Ceiling access point in the hallway, powered over the uplink. It is a\nswitch: the radio is a bridge port like any other, and the two SSIDs are\nwhat it bridges the air into.\n",
+        "netgraph_vendor": "Ubiquiti",
+        "netgraph_model": "U6-Lite",
+        "netgraph_labels": {
+          "role": "wireless",
+          "site": "home"
+        },
+        "netgraph_addresses": [
+          "192.168.10.3/24"
+        ],
+        "netgraph_interfaces": [
+          {
+            "name": "br0",
+            "type": "bridge",
+            "enabled": true,
+            "description": "Bridges the radio onto the wired uplink"
+          },
+          {
+            "name": "Vlan10",
+            "type": "vlan",
+            "enabled": true,
+            "description": "In-band management address of the access point",
+            "addresses": [
+              "192.168.10.3/24"
+            ],
+            "vlan_mode": "access",
+            "vlans": [
+              10
+            ]
+          },
+          {
+            "name": "eth0",
+            "type": "ethernet",
+            "enabled": true,
+            "description": "PoE uplink to sw-home",
+            "mac": "78:8a:20:aa:00:01",
+            "mtu": 1500,
+            "vlan_mode": "trunk",
+            "vlans": [
+              10,
+              20
+            ]
+          },
+          {
+            "name": "wlan0",
+            "type": "wifi",
+            "enabled": true,
+            "description": "5 GHz radio, two SSIDs",
+            "mac": "78:8a:20:aa:00:10",
+            "mtu": 1500
+          }
+        ],
+        "netgraph_vlan_ids": [
+          10,
+          20
+        ],
+        "netgraph_vlans": [
+          {
+            "id": 10,
+            "name": "home"
+          },
+          {
+            "id": 20,
+            "name": "guest",
+            "description": "Isolated SSID for visitors; carried no further than the uplink"
+          }
+        ]
+      },
       "pc-desk.hosts": {
         "ansible_host": "192.168.10.20",
         "netgraph_element": "hosts/pc-desk",
@@ -88,6 +162,40 @@
         "netgraph_vlan_ids": [
           10
         ]
+      },
+      "phone.hosts": {
+        "ansible_host": "192.168.10.40",
+        "netgraph_element": "hosts/phone",
+        "netgraph_name": "phone",
+        "netgraph_kind": "computer",
+        "netgraph_namespace": "hosts",
+        "netgraph_description": "Wireless-only client. It reaches the network through its association to\nap-home, which is declared as a `medium: wireless` cable - the association\nis the link.\n",
+        "netgraph_vendor": "Apple",
+        "netgraph_model": "iPhone 15",
+        "netgraph_labels": {
+          "owner": "sam",
+          "role": "mobile",
+          "site": "home"
+        },
+        "netgraph_addresses": [
+          "192.168.10.40/24",
+          "2001:db8:10::40/64"
+        ],
+        "netgraph_interfaces": [
+          {
+            "name": "en0",
+            "type": "wifi",
+            "enabled": true,
+            "description": "Associated to the home SSID on 5 GHz",
+            "mac": "f0:18:98:11:22:33",
+            "mtu": 1500,
+            "addresses": [
+              "192.168.10.40/24",
+              "2001:db8:10::40/64"
+            ]
+          }
+        ],
+        "netgraph_vlan_ids": []
       },
       "rtr-home.routers": {
         "ansible_host": "192.0.2.1",
@@ -291,22 +399,29 @@
           {
             "name": "port5",
             "type": "ethernet",
-            "enabled": false,
-            "description": "Spare",
+            "enabled": true,
+            "description": "PoE injector for ap-home; trunks the guest VLAN up to it",
             "mac": "00:22:07:aa:00:05",
-            "vlan_mode": "access",
+            "mtu": 1500,
+            "vlan_mode": "trunk",
             "vlans": [
-              10
+              10,
+              20
             ]
           }
         ],
         "netgraph_vlan_ids": [
-          10
+          10,
+          20
         ],
         "netgraph_vlans": [
           {
             "id": 10,
             "name": "home"
+          },
+          {
+            "id": 20,
+            "name": "guest"
           }
         ]
       }
@@ -322,15 +437,20 @@
       "ns_hosts",
       "ns_routers",
       "ns_switches",
+      "ns_wireless",
       "role_access",
       "role_edge",
+      "role_mobile",
       "role_storage",
+      "role_wireless",
       "role_workstation",
       "vendor_anker",
+      "vendor_apple",
       "vendor_dell",
       "vendor_mikrotik",
       "vendor_synology",
-      "vendor_tp_link"
+      "vendor_tp_link",
+      "vendor_ubiquiti"
     ],
     "vars": {
       "netgraph_generated_by": "netgraph <version>"
@@ -343,7 +463,8 @@
   },
   "kind_computer": {
     "hosts": [
-      "pc-desk.hosts"
+      "pc-desk.hosts",
+      "phone.hosts"
     ]
   },
   "kind_router": {
@@ -358,6 +479,7 @@
   },
   "kind_switch": {
     "hosts": [
+      "ap-home.wireless",
       "sw-home.switches"
     ]
   },
@@ -365,6 +487,7 @@
     "hosts": [
       "adp-usb-eth.hosts",
       "pc-desk.hosts",
+      "phone.hosts",
       "srv-nas.hosts"
     ]
   },
@@ -378,6 +501,11 @@
       "sw-home.switches"
     ]
   },
+  "ns_wireless": {
+    "hosts": [
+      "ap-home.wireless"
+    ]
+  },
   "role_access": {
     "hosts": [
       "sw-home.switches"
@@ -388,9 +516,19 @@
       "rtr-home.routers"
     ]
   },
+  "role_mobile": {
+    "hosts": [
+      "phone.hosts"
+    ]
+  },
   "role_storage": {
     "hosts": [
       "srv-nas.hosts"
+    ]
+  },
+  "role_wireless": {
+    "hosts": [
+      "ap-home.wireless"
     ]
   },
   "role_workstation": {
@@ -401,6 +539,11 @@
   "vendor_anker": {
     "hosts": [
       "adp-usb-eth.hosts"
+    ]
+  },
+  "vendor_apple": {
+    "hosts": [
+      "phone.hosts"
     ]
   },
   "vendor_dell": {
@@ -421,6 +564,11 @@
   "vendor_tp_link": {
     "hosts": [
       "sw-home.switches"
+    ]
+  },
+  "vendor_ubiquiti": {
+    "hosts": [
+      "ap-home.wireless"
     ]
   }
 }

@@ -1,0 +1,45 @@
+# E031 (NG-W010) - a client joins an SSID its access point does not advertise.
+#
+# The laptop is associated to 'labb'; the access point beacons 'lab'. The
+# association recorded here cannot happen.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: ap-a
+spec:
+  interfaces:
+    - name: wlan0
+      type: wifi
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+      wireless:
+        role: ap
+        bss:
+          - ssid: lab
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: wlan0
+      type: wifi
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+      wireless:
+        role: station
+        bss:
+          - ssid: labb
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - ap-a:wlan0
+    - pc-b:wlan0
+  medium: wireless

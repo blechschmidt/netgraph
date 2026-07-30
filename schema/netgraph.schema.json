@@ -215,6 +215,16 @@
       "title": "AdapterSpec",
       "type": "object"
     },
+    "Band": {
+      "description": "§6.2.6 — the three bands 802.11 operates in.\n\nThe band is not derivable from the channel number: channels 1 to 13 exist in\nboth the 2.4 GHz and the 6 GHz plan and mean different frequencies, so a\ndocument that states a channel has to state the band with it (`NG-W003`).",
+      "enum": [
+        "2.4GHz",
+        "5GHz",
+        "6GHz"
+      ],
+      "title": "Band",
+      "type": "string"
+    },
     "BridgeConfig": {
       "additionalProperties": false,
       "description": "`spec.bridge` — the 802.1Q bridge component (§6.3).",
@@ -272,6 +282,71 @@
       ],
       "title": "BridgeType",
       "type": "string"
+    },
+    "Bss": {
+      "additionalProperties": false,
+      "description": "One entry of `interfaces[].wireless.bss` — a basic service set.\n\nOn an `ap` radio each entry is an SSID the radio beacons, with the VLAN\nits traffic is bridged into. On a `station` or `mesh` radio the single\nentry names the BSS the radio is associated to, which is what `NG-W010`\nchecks against the AP at the other end of the link.",
+      "properties": {
+        "ssid": {
+          "maxLength": 32,
+          "minLength": 1,
+          "title": "ssid",
+          "type": "string",
+          "description": "The network name, 1 to 32 octets. Unique within one radio (`NG-W005`), and on a client radio it must be one the AP at the far end advertises (`NG-W010`).\n\nYANG: `…/dot11:bss/dot11:ssid`"
+        },
+        "bssid": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "bssid",
+          "description": "MAC address of this BSS — usually the radio's own for the first SSID and a derived one for each further SSID. Unique across the inventory (`NG-W008`).\n\nYANG: `…/dot11:bss/dot11:bssid`"
+        },
+        "vlan": {
+          "anyOf": [
+            {
+              "maximum": 4094,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "vlan",
+          "description": "The VLAN this SSID's traffic is bridged into. Absent means the radio's untagged domain. Checked against the device's VLAN database (`W113`) and against the VLANs the access point actually carries (`NG-W009`)."
+        },
+        "security": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Security"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "security",
+          "description": "How the BSS authenticates: `open`, or WPA2/WPA3 with a passphrase (`-psk`) or an authentication server (`-eap`). Absent means nobody recorded it.\n\nYANG: `…/dot11:bss/dot11:rsna-enabled`"
+        },
+        "hidden": {
+          "default": false,
+          "title": "hidden",
+          "type": "boolean",
+          "description": "The SSID is left out of the beacon. It is still on the air, and still a BSS this radio serves."
+        }
+      },
+      "required": [
+        "ssid"
+      ],
+      "title": "Bss",
+      "type": "object"
     },
     "Cable": {
       "additionalProperties": false,
@@ -1268,6 +1343,19 @@
           "title": "vlan",
           "description": "802.1Q bridge-port configuration. Absent means the port is not VLAN-aware; a host port facing an access port normally omits it.\n\nYANG: `…/dot1q:bridge-port`"
         },
+        "wireless": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WirelessConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "wireless",
+          "description": "Radio configuration of a `type: wifi` interface: which side of the association it is, which frequency it uses and which BSSs it beacons or joins. Forbidden on every other type (`NG-W002`).\n\nYANG: `…/dot11:wireless-interface`"
+        },
         "parent": {
           "anyOf": [
             {
@@ -1474,6 +1562,16 @@
       "title": "PatchPanelSpec",
       "type": "object"
     },
+    "RadioRole": {
+      "description": "§6.2.6 — which side of an association a radio is on.\n\n`ap` beacons, so it is the end that owns the SSIDs; `station` and\n`mesh` associate to one. A mesh node's backhaul radio is a station of the\nnode above it, spelled separately because it is a relay rather than a client\nand a diagram should not draw it as a laptop.",
+      "enum": [
+        "ap",
+        "station",
+        "mesh"
+      ],
+      "title": "RadioRole",
+      "type": "string"
+    },
     "Router": {
       "additionalProperties": false,
       "description": "A layer-3 forwarder. Forwards by default (§6.1.1).",
@@ -1509,6 +1607,18 @@
       ],
       "title": "Router",
       "type": "object"
+    },
+    "Security": {
+      "description": "§6.2.6 — how a BSS authenticates and encrypts.\n\n`open` covers both a genuinely open network and OWE: netgraph records\nwhether a passphrase or an authentication server is involved, which is what\na reader of a diagram needs, and not the cipher suite negotiated on top.",
+      "enum": [
+        "open",
+        "wpa2-psk",
+        "wpa2-eap",
+        "wpa3-psk",
+        "wpa3-eap"
+      ],
+      "title": "Security",
+      "type": "string"
     },
     "Server": {
       "additionalProperties": false,
@@ -2234,6 +2344,93 @@
           }
         }
       ]
+    },
+    "WirelessConfig": {
+      "additionalProperties": false,
+      "description": "`interfaces[].wireless` — the radio configuration of a `wifi` port.\n\nOnly a `wifi` interface may carry it (`NG-W002`): the block is what\nturns an otherwise shapeless `medium: wireless` link into an association\nwith a direction, a frequency and a name.",
+      "properties": {
+        "role": {
+          "$ref": "#/$defs/RadioRole",
+          "title": "role",
+          "description": "Which side of the association this radio is: `ap` beacons the SSIDs, `station` and `mesh` associate to one. A wireless link joins exactly one `ap` to one client (`NG-W007`).\n\nYANG: `…/dot11:station-config/dot11:desired-bss-type`"
+        },
+        "band": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Band"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "band",
+          "description": "The band the radio operates in: `2.4GHz`, `5GHz` or `6GHz`. Required alongside `channel` and `width_mhz`, because both mean different frequencies in different bands.\n\nYANG: `…/dot11:phy/dot11:channel-starting-factor`"
+        },
+        "channel": {
+          "anyOf": [
+            {
+              "maximum": 233,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "channel",
+          "description": "The primary 20 MHz channel, as the band numbers it (`NG-W003`).\n\nYANG: `…/dot11:phy/dot11:current-channel-number`"
+        },
+        "width_mhz": {
+          "anyOf": [
+            {
+              "enum": [
+                20,
+                40,
+                80,
+                160,
+                320
+              ],
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "width_mhz",
+          "description": "Total channel width in MHz. 40 is the most 2.4 GHz can bond and 320 is 6 GHz only (`NG-W004`).\n\nYANG: `…/dot11:phy/dot11:current-channel-width`"
+        },
+        "tx_power_dbm": {
+          "anyOf": [
+            {
+              "maximum": 40.0,
+              "minimum": -30.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "tx_power_dbm",
+          "description": "Radiated power in dBm. The MIB counts abstract power *levels* per PHY, so the unit is netgraph's own.\n\nYANG: `…/dot11:phy/dot11:current-tx-power-level`"
+        },
+        "bss": {
+          "items": {
+            "$ref": "#/$defs/Bss"
+          },
+          "title": "bss",
+          "type": "array",
+          "description": "The basic service sets this radio beacons (`ap`) or is associated to (`station`, `mesh`, at most one — `NG-W006`).\n\nYANG: `…/dot11:bss`"
+        }
+      },
+      "required": [
+        "role"
+      ],
+      "title": "WirelessConfig",
+      "type": "object"
     }
   }
 }

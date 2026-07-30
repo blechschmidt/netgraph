@@ -9,7 +9,7 @@ result as SVG, PNG, PDF, Graphviz DOT, Mermaid or JSON. It can also open the who
 in a browser — `netgraph web` — where the YAML is edited on one side, drawn on the other,
 and every node and link answers a hover with its interfaces, addresses, VLANs and cabling.
 
-![Layer-2 diagram of the home-lab example: a router, a switch, two computers, a server and a USB-to-Ethernet adapter, annotated with addresses and VLANs](docs/images/home-lab.svg)
+![Layer-2 diagram of the home-lab example: a router, a switch, an access point, three computers, a server and a USB-to-Ethernet adapter, annotated with addresses, VLANs and the SSID a phone is associated to](docs/images/home-lab.svg)
 
 <sub>Produced from [`examples/home-lab`](examples/home-lab) with
 `netgraph -i examples/home-lab render --layer l2 --title "home-lab — layer 2" -f svg -o docs/images/home-lab.svg`.</sub>
@@ -161,7 +161,7 @@ report.txt` both do what they look like they do.
 | [`netgraph watch`](docs/commands/watch.md) | Re-render on every save, optionally serving the result. | [watch.md](docs/commands/watch.md) |
 | [`netgraph web`](docs/commands/web.md) | Edit the YAML and see the diagram side by side in a browser. | [web.md](docs/commands/web.md) |
 | [`netgraph path`](docs/commands/path.md) | Trace how two elements reach each other, hop by hop. | [path.md](docs/commands/path.md) |
-| [`netgraph list`](docs/commands/list.md) | Tabulate devices, cables, interfaces, VLANs, subnets or tunnels. | [list.md](docs/commands/list.md) |
+| [`netgraph list`](docs/commands/list.md) | Tabulate devices, cables, tunnels, VLANs, BSSs or subnets. | [list.md](docs/commands/list.md) |
 | [`netgraph ipam`](docs/commands/ipam.md) | Report utilisation, free space, overlaps and aggregates. | [ipam.md](docs/commands/ipam.md) |
 | [`netgraph export`](docs/commands/export.md) | Emit hosts files, DNS zones, Ansible, Prometheus, cable lists. | [export.md](docs/commands/export.md) |
 | [`netgraph show`](docs/commands/show.md) | Print one element as it was resolved, expansions included. | [show.md](docs/commands/show.md) |
@@ -184,6 +184,7 @@ The files describe the network once; each command asks something different of th
 | does the documentation contradict itself? | [`netgraph validate`](docs/validation.md) |
 | what does the physical topology look like? what does VLAN 10 reach? which subnets exist? | [`netgraph render --layer l1\|l2\|l3`](docs/rendering.md) |
 | what runs inside which tunnel? | [`netgraph render --layer overlay`](docs/rendering.md#overlay-tunnels-and-what-runs-inside-what) |
+| which SSID is on which channel, in which VLAN? | [`netgraph list bss`](docs/commands/list.md) |
 | what is in rack 3, and at which units? | [`netgraph render --layer rack`](docs/rendering.md#rack-a-front-elevation-per-cabinet) |
 | how does this host reach that one, hop by hop? | [`netgraph path`](docs/paths.md) |
 | how full is that /24, and where is the next free /28? | [`netgraph ipam`](docs/ipam.md) |
@@ -200,10 +201,10 @@ $ netgraph -i examples/home-lab list subnets
 SUBNET            IP  ADDRESSES  ELEMENTS  VLANS
 ----------------  --  ---------  --------  -----
 192.0.2.1/32       4          1         1  -
-192.168.10.0/24    4          5         5  10
+192.168.10.0/24    4          7         7  10
 203.0.113.0/30     4          1         1  -
 2001:db8::1/128    6          1         1  -
-2001:db8:10::/64   6          4         4  10
+2001:db8:10::/64   6          5         5  10
 ```
 
 and `netgraph path` traces the route two hosts in different sites actually take, naming

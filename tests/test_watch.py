@@ -93,8 +93,8 @@ def test_a_clean_inventory_renders() -> None:
     assert result.status is Status.OK
     assert result.payload is not None
     assert b"graph netgraph" in result.payload
-    assert result.nodes == 6
-    assert result.edges == 5
+    assert result.nodes == 8
+    assert result.edges == 7
     assert result.problems == ()
 
 

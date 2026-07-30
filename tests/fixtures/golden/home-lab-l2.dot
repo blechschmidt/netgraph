@@ -34,6 +34,13 @@ graph netgraph {
       <TR><TD ALIGN="LEFT">eno1</TD><TD ALIGN="LEFT">192.168.10.20/24, 2001:db8:10::20/64</TD><TD ALIGN="LEFT"></TD></TR>
     </TABLE>
   >];
+  "hosts/phone" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="phone [computer]\nnamespace: hosts\nWireless-only client. It reaches the network through its association to ap-home, which is declared as a `medium: wireless` cable - the association is the link.\nlabels: owner=sam, role=mobile, site=home\ninterfaces (1):\n  en0  wifi  192.168.10.40/24, 2001:db8:10::40/64  f0:18:98:11:22:33\nlinks (1):\n  en0 — wireless/ap-home:wlan0  (cable, wireless)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>phone</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+      <TR><TD ALIGN="LEFT">en0</TD><TD ALIGN="LEFT">192.168.10.40/24, 2001:db8:10::40/64</TD><TD ALIGN="LEFT"></TD></TR>
+    </TABLE>
+  >];
   "hosts/srv-nas" [shape=cylinder, fillcolor="#eae2f5", color="#7c3aed", tooltip="srv-nas [server]\nnamespace: hosts\nBackup and media server\nlabels: env=prod, role=storage, site=home\nvlans: 10\ninterfaces (2):\n  lo  loopback  127.0.0.1/8, ::1/128\n  eth0  ethernet  192.168.10.10/24, 2001:db8:10::10/64  00:11:32:40:01:01\nlinks (1):\n  eth0 — switches/sw-home:port3  (cable, copper, 1Gbps)  vlan 10", label=<
     <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
       <TR><TD COLSPAN="3" ALIGN="CENTER"><B>srv-nas</B></TD></TR>
@@ -50,7 +57,7 @@ graph netgraph {
       <TR><TD ALIGN="LEFT">lan0</TD><TD ALIGN="LEFT">192.168.10.1/24, 2001:db8:10::1/64</TD><TD ALIGN="LEFT">vlan 10</TD></TR>
     </TABLE>
   >];
-  "switches/sw-home" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-home [switch]\nnamespace: switches\nEight-port desktop switch in the hallway cabinet\nlabels: role=access, site=home\nvlans: 10\ninterfaces (7):\n  br0  bridge\n  Vlan10  vlan  192.168.10.2/24  vlan 10 (access)\n  port1  ethernet  vlan 10 (access)  00:22:07:aa:00:01\n  port2  ethernet  vlan 10 (access)  00:22:07:aa:00:02\n  port3  ethernet  vlan 10 (access)  00:22:07:aa:00:03\n  port4  ethernet  vlan 10 (access)  00:22:07:aa:00:04\n  port5  ethernet  disabled  vlan 10 (access)  00:22:07:aa:00:05\nlinks (4):\n  port1 — routers/rtr-home:lan0  (cable, copper, 1Gbps)  vlan 10\n  port2 — hosts/pc-desk:eno1  (cable, copper, 1Gbps)  vlan 10\n  port3 — hosts/srv-nas:eth0  (cable, copper, 1Gbps)  vlan 10\n  port4 — hosts/adp-usb-eth:enx001122334455  (cable, copper, 1Gbps)  vlan 10", label=<
+  "switches/sw-home" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-home [switch]\nnamespace: switches\nEight-port desktop switch in the hallway cabinet\nlabels: role=access, site=home\nvlans: 10,20\ninterfaces (7):\n  br0  bridge\n  Vlan10  vlan  192.168.10.2/24  vlan 10 (access)\n  port1  ethernet  vlan 10 (access)  00:22:07:aa:00:01\n  port2  ethernet  vlan 10 (access)  00:22:07:aa:00:02\n  port3  ethernet  vlan 10 (access)  00:22:07:aa:00:03\n  port4  ethernet  vlan 10 (access)  00:22:07:aa:00:04\n  port5  ethernet  vlan 10,20 (trunk)  00:22:07:aa:00:05\nlinks (5):\n  port1 — routers/rtr-home:lan0  (cable, copper, 1Gbps)  vlan 10\n  port2 — hosts/pc-desk:eno1  (cable, copper, 1Gbps)  vlan 10\n  port3 — hosts/srv-nas:eth0  (cable, copper, 1Gbps)  vlan 10\n  port4 — hosts/adp-usb-eth:enx001122334455  (cable, copper, 1Gbps)  vlan 10\n  port5 — wireless/ap-home:eth0  (cable, copper, 1Gbps)  vlan 10,20", label=<
     <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
       <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-home</B></TD></TR>
       <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
@@ -59,7 +66,15 @@ graph netgraph {
       <TR><TD ALIGN="LEFT">port2</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
       <TR><TD ALIGN="LEFT">port3</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
       <TR><TD ALIGN="LEFT">port4</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
-      <TR><TD ALIGN="LEFT">port5</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+      <TR><TD ALIGN="LEFT">port5</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10,20</TD></TR>
+    </TABLE>
+  >];
+  "wireless/ap-home" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="ap-home [switch]\nnamespace: wireless\nCeiling access point in the hallway, powered over the uplink. It is a switch: the radio is a bridge port like any other, and the two SSIDs are what it bridges the air into.\nlabels: role=wireless, site=home\nvlans: 10,20\ninterfaces (4):\n  br0  bridge\n  Vlan10  vlan  192.168.10.3/24  vlan 10 (access)\n  eth0  ethernet  vlan 10,20 (trunk)  78:8a:20:aa:00:01\n  wlan0  wifi  78:8a:20:aa:00:10\nlinks (2):\n  eth0 — switches/sw-home:port5  (cable, copper, 1Gbps)  vlan 10,20\n  wlan0 — hosts/phone:en0  (cable, wireless)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>ap-home</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+      <TR><TD ALIGN="LEFT">Vlan10</TD><TD ALIGN="LEFT">192.168.10.3/24</TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+      <TR><TD ALIGN="LEFT">eth0</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10,20</TD></TR>
     </TABLE>
   >];
 
@@ -67,5 +82,7 @@ graph netgraph {
   "hosts/pc-desk" -- "switches/sw-home" [color="#4a4a4a", style=solid, penwidth=1.5, label="eno1 -- port2\nvlan 10", tooltip="cable cables/cbl-sw-desk\nhosts/pc-desk:eno1 — switches/sw-home:port2\nmedium: copper, speed: 1Gbps, length: 8 m, label: H-002\nvlans: 10"];
   "hosts/srv-nas" -- "switches/sw-home" [color="#4a4a4a", style=solid, penwidth=1.5, label="eth0 -- port3\nvlan 10", tooltip="cable cables/cbl-sw-nas\nhosts/srv-nas:eth0 — switches/sw-home:port3\nmedium: copper, speed: 1Gbps, length: 0.5 m, label: H-003\nvlans: 10"];
   "hosts/adp-usb-eth" -- "switches/sw-home" [color="#4a4a4a", style=solid, penwidth=1.5, label="enx001122334455 -- port4\nvlan 10", tooltip="cable cables/cbl-sw-dongle\nhosts/adp-usb-eth:enx001122334455 — switches/sw-home:port4\nmedium: copper, speed: 1Gbps, length: 10 m, label: H-004\nvlans: 10"];
+  "wireless/ap-home" -- "switches/sw-home" [color="#4a4a4a", style=solid, penwidth=1.5, label="eth0 -- port5\nvlan 10,20", tooltip="cable cables/cbl-sw-ap\nwireless/ap-home:eth0 — switches/sw-home:port5\nmedium: copper, speed: 1Gbps, length: 6 m, label: H-005\nvlans: 10,20"];
+  "wireless/ap-home" -- "hosts/phone" [color="#2563eb", style=dashed, label="wlan0 -- en0\nhome @ 36/5GHz", tooltip="cable cables/wl-ap-phone\nwireless/ap-home:wlan0 — hosts/phone:en0\nmedium: wireless, wireless: home @ 36/5GHz"];
   "hosts/laptop" -- "hosts/adp-usb-eth" [color="#9ca3af", style=dotted, penwidth=2.0, label="usb0\nusb", tooltip="attachment hosts/adp-usb-eth#upstream\nhosts/laptop — hosts/adp-usb-eth:usb0\nmedium: copper, speed: 5Gbps, label: usb"];
 }

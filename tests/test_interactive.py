@@ -140,7 +140,7 @@ def test_an_edge_tooltip_names_both_ends_and_the_medium(home_lab: Inventory) -> 
 
 def test_a_cluster_tooltip_counts_what_the_box_holds(home_lab: Inventory) -> None:
     source = to_dot(build_graph(home_lab), RenderOptions(group_by_namespace=True))
-    assert "namespace hosts\\n4 elements: 1 adapter, 2 computers, 1 server" in source
+    assert "namespace hosts\\n5 elements: 1 adapter, 3 computers, 1 server" in source
 
 
 def test_a_subnet_tooltip_says_how_populated_the_prefix_is(home_lab: Inventory) -> None:
@@ -149,7 +149,7 @@ def test_a_subnet_tooltip_says_how_populated_the_prefix_is(home_lab: Inventory) 
         text for text in _attributes(source, "tooltip") if text.startswith("192.168.10.0/24")
     ]
     assert "[ipv4 subnet]" in subnet
-    assert "prefix 192.168.10.0/24: 5 elements, 5 addresses" in subnet
+    assert "prefix 192.168.10.0/24: 7 elements, 7 addresses" in subnet
 
 
 def test_a_tunnel_tooltip_spells_out_the_stack_and_what_protects_it(overlay: Inventory) -> None:
@@ -235,11 +235,11 @@ def test_a_template_expands_from_the_document_the_element_came_from(
 
 
 def test_each_cable_links_to_the_line_that_declares_it(home_lab: Inventory) -> None:
-    """Four cables in one file, four different lines."""
+    """Six cables in one file, six different lines."""
     template = LinkTemplate.parse("{file}#L{line}")
     urls = _attributes(to_dot(build_graph(home_lab), RenderOptions(link_template=template)), "URL")
     cables = sorted({url for url in urls if url.startswith("cables/links.yaml")})
-    assert len(cables) == 4
+    assert len(cables) == 6
     assert cables[0] != cables[1]
 
 

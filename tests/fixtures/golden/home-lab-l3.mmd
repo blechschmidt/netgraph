@@ -4,27 +4,32 @@ title: "Home lab, layer 3"
 flowchart TB
     n0>"adp-usb-eth<br/>[adapter]<br/>vlans: 10"]
     n1[/"pc-desk<br/>[computer]<br/>vlans: 10"/]
-    n2[("srv-nas<br/>[server]<br/>vlans: 10")]
-    n3(["rtr-home<br/>[router]<br/>vlans: 10"])
-    n4["sw-home<br/>[switch]<br/>vlans: 10"]
-    n5("192.0.2.1/32<br/>[ipv4 subnet]")
-    n6("192.168.10.0/24<br/>[ipv4 subnet]<br/>vlans: 10")
-    n7("203.0.113.0/30<br/>[ipv4 subnet]")
-    n8("2001:db8::1/128<br/>[ipv6 subnet]")
-    n9("2001:db8:10::/64<br/>[ipv6 subnet]<br/>vlans: 10")
+    n2[/"phone<br/>[computer]"/]
+    n3[("srv-nas<br/>[server]<br/>vlans: 10")]
+    n4(["rtr-home<br/>[router]<br/>vlans: 10"])
+    n5["sw-home<br/>[switch]<br/>vlans: 10,20"]
+    n6["ap-home<br/>[switch]<br/>vlans: 10,20"]
+    n7("192.0.2.1/32<br/>[ipv4 subnet]")
+    n8("192.168.10.0/24<br/>[ipv4 subnet]<br/>vlans: 10")
+    n9("203.0.113.0/30<br/>[ipv4 subnet]")
+    n10("2001:db8::1/128<br/>[ipv6 subnet]")
+    n11("2001:db8:10::/64<br/>[ipv6 subnet]<br/>vlans: 10")
 
-    n0 -- "enx001122334455 · 192.168.10.30/24" --- n6
-    n0 -- "enx001122334455 · 2001:db8:10::30/64" --- n9
-    n1 -- "eno1 · 192.168.10.20/24" --- n6
-    n1 -- "eno1 · 2001:db8:10::20/64" --- n9
-    n2 -- "eth0 · 192.168.10.10/24" --- n6
-    n2 -- "eth0 · 2001:db8:10::10/64" --- n9
-    n3 -- "lo0 · 192.0.2.1/32" --- n5
-    n3 -- "lo0 · 2001:db8::1/128" --- n8
-    n3 -- "wan0 · 203.0.113.2/30" --- n7
-    n3 -- "lan0 · 192.168.10.1/24" --- n6
-    n3 -- "lan0 · 2001:db8:10::1/64" --- n9
-    n4 -- "Vlan10 · 192.168.10.2/24" --- n6
+    n0 -- "enx001122334455 · 192.168.10.30/24" --- n8
+    n0 -- "enx001122334455 · 2001:db8:10::30/64" --- n11
+    n1 -- "eno1 · 192.168.10.20/24" --- n8
+    n1 -- "eno1 · 2001:db8:10::20/64" --- n11
+    n2 -- "en0 · 192.168.10.40/24" --- n8
+    n2 -- "en0 · 2001:db8:10::40/64" --- n11
+    n3 -- "eth0 · 192.168.10.10/24" --- n8
+    n3 -- "eth0 · 2001:db8:10::10/64" --- n11
+    n4 -- "lo0 · 192.0.2.1/32" --- n7
+    n4 -- "lo0 · 2001:db8::1/128" --- n10
+    n4 -- "wan0 · 203.0.113.2/30" --- n9
+    n4 -- "lan0 · 192.168.10.1/24" --- n8
+    n4 -- "lan0 · 2001:db8:10::1/64" --- n11
+    n5 -- "Vlan10 · 192.168.10.2/24" --- n8
+    n6 -- "Vlan10 · 192.168.10.3/24" --- n8
 
     classDef adapter fill:#fdf0e3,stroke:#ea580c,stroke-width:1px,stroke-dasharray:4 3
     classDef computer fill:#f5f5f5,stroke:#6b7280,stroke-width:1px
@@ -33,8 +38,8 @@ flowchart TB
     classDef subnet fill:#e0f2f1,stroke:#0f766e,stroke-width:1px
     classDef switch fill:#dcf0dc,stroke:#16a34a,stroke-width:1px
     class n0 adapter
-    class n1 computer
-    class n3 router
-    class n2 server
-    class n5,n6,n7,n8,n9 subnet
-    class n4 switch
+    class n1,n2 computer
+    class n4 router
+    class n3 server
+    class n7,n8,n9,n10,n11 subnet
+    class n5,n6 switch

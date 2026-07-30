@@ -68,6 +68,7 @@ from netgraph.render.graph import (
     RackView,
     Subnet,
     TunnelView,
+    WirelessView,
 )
 from netgraph.render.options import RenderOptions
 
@@ -325,11 +326,35 @@ def _edge(edge: Edge) -> dict[str, Any]:
         payload["label"] = edge.label
     if edge.length_m is not None:
         payload["lengthM"] = edge.length_m
+    if edge.wireless is not None:
+        payload["wireless"] = _wireless(edge.wireless)
     if edge.patch is not None:
         payload["patch"] = _patch(edge.patch)
     if edge.bundle is not None:
         payload["bundle"] = _bundle(edge.bundle)
     payload["vlans"] = sorted(edge.vlans)
+    return payload
+
+
+def _wireless(view: WirelessView) -> dict[str, Any]:
+    """The association a radio link is: the network, and where on the air.
+
+    Only what the inventory states is emitted. A consumer can tell "no channel
+    recorded" from "channel 1" — which a defaulted zero would not allow — and
+    the access point is named so that the direction of the association survives
+    an export, the one thing an undirected edge cannot carry by itself.
+    """
+    payload: dict[str, Any] = {}
+    if view.ssids:
+        payload["ssids"] = list(view.ssids)
+    if view.band is not None:
+        payload["band"] = view.band
+    if view.channel is not None:
+        payload["channel"] = view.channel
+    if view.width_mhz is not None:
+        payload["widthMhz"] = view.width_mhz
+    if view.access_point:
+        payload["accessPoint"] = view.access_point
     return payload
 
 

@@ -119,7 +119,7 @@ SUMMARY: Final[dict[str, str]] = {
     "watch": "Re-render on every save, optionally serving the result.",
     "web": "Edit the YAML and see the diagram side by side in a browser.",
     "path": "Trace how two elements reach each other, hop by hop.",
-    "list": "Tabulate devices, cables, interfaces, VLANs, subnets or tunnels.",
+    "list": "Tabulate devices, cables, tunnels, VLANs, BSSs or subnets.",
     "ipam": "Report utilisation, free space, overlaps and aggregates.",
     "export": "Emit hosts files, DNS zones, Ansible, Prometheus, cable lists.",
     "show": "Print one element as it was resolved, expansions included.",

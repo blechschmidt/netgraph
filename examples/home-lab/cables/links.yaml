@@ -69,3 +69,37 @@ spec:
   category: cat6
   connector: rj45
   label: H-004
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-sw-ap
+  description: PoE run into the hallway ceiling
+  labels:
+    site: home
+spec:
+  endpoints:
+    - sw-home:port5
+    - ap-home:eth0
+  medium: copper
+  speed: 1Gbps
+  length_m: 6
+  category: cat6
+  connector: rj45
+  label: H-005
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: wl-ap-phone
+  description: |
+    The phone's association to ap-home. A wireless link is not a wire, but it
+    is a link: `medium: wireless` joins the two radios, and the SSID, channel
+    and band come from the `wireless` blocks at either end.
+  labels:
+    site: home
+spec:
+  endpoints:
+    - ap-home:wlan0
+    - phone:en0
+  medium: wireless

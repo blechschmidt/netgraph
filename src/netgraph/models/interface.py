@@ -10,7 +10,7 @@ from __future__ import annotations
 import ipaddress
 from enum import Enum
 from functools import cached_property
-from typing import Annotated, Any, Final
+from typing import Annotated, Any, Final, Literal
 
 from pydantic import Field, field_validator, model_validator
 
@@ -26,14 +26,20 @@ from netgraph.models.scalars import (
     MacAddress,
     PrefixLengthV4,
     PrefixLengthV6,
+    Ssid,
+    TxPowerDbm,
     VlanId,
     VlanSet,
+    WirelessChannel,
 )
 
 __all__ = [
     "AGGREGATE_TYPES",
     "CABLEABLE_TYPES",
+    "CHANNEL_WIDTHS",
     "AcceptableFrames",
+    "Band",
+    "Bss",
     "IPv4Address",
     "IPv4Config",
     "IPv6Address",
@@ -41,8 +47,11 @@ __all__ = [
     "Interface",
     "InterfaceList",
     "InterfaceType",
+    "RadioRole",
+    "Security",
     "VlanConfig",
     "VlanMode",
+    "WirelessConfig",
 ]
 
 #: Interface types that can terminate a cable (``NG-C009``).
@@ -532,6 +541,267 @@ class VlanConfig(NetgraphModel):
 
 
 # --------------------------------------------------------------------------- #
+# Wireless configuration (§6.2.6)
+# --------------------------------------------------------------------------- #
+
+
+class RadioRole(str, Enum):
+    """§6.2.6 — which side of an association a radio is on.
+
+    ``ap`` beacons, so it is the end that owns the SSIDs; ``station`` and
+    ``mesh`` associate to one. A mesh node's backhaul radio is a station of the
+    node above it, spelled separately because it is a relay rather than a client
+    and a diagram should not draw it as a laptop.
+    """
+
+    AP = "ap"
+    STATION = "station"
+    MESH = "mesh"
+
+    @property
+    def is_ap(self) -> bool:
+        return self is RadioRole.AP
+
+    @property
+    def is_client(self) -> bool:
+        """Does this role associate *to* an AP rather than beacon for one?"""
+        return self is not RadioRole.AP
+
+
+class Band(str, Enum):
+    """§6.2.6 — the three bands 802.11 operates in.
+
+    The band is not derivable from the channel number: channels 1 to 13 exist in
+    both the 2.4 GHz and the 6 GHz plan and mean different frequencies, so a
+    document that states a channel has to state the band with it (``NG-W003``).
+    """
+
+    B2_4 = "2.4GHz"
+    B5 = "5GHz"
+    B6 = "6GHz"
+
+    @property
+    def channels(self) -> frozenset[int]:
+        """Every channel number this band numbers (``NG-W003``)."""
+        return _BAND_CHANNELS[self]
+
+    @property
+    def widths(self) -> frozenset[int]:
+        """The channel widths this band supports (``NG-W004``)."""
+        return _BAND_WIDTHS[self]
+
+    def centre_mhz(self, channel: int) -> int:
+        """Centre frequency of the 20 MHz channel ``channel``, in MHz.
+
+        Raises:
+            KeyError: ``channel`` is not a channel of this band.
+        """
+        if channel not in self.channels:
+            raise KeyError(channel)
+        base, spacing = _BAND_PLAN[self]
+        return _CHANNEL_14_MHZ if self is Band.B2_4 and channel == 14 else base + spacing * channel
+
+
+#: The channel widths the schema accepts at all, largest last (§6.2.6).
+CHANNEL_WIDTHS: Final[tuple[int, ...]] = (20, 40, 80, 160, 320)
+
+#: ``base + spacing * channel`` gives a channel's centre frequency in MHz. The
+#: 2.4 GHz plan is anchored so that channel 1 is 2412 MHz; channel 14 is the one
+#: exception and is spelled out in :data:`_CHANNEL_14_MHZ`.
+_BAND_PLAN: Final[dict[Band, tuple[int, int]]] = {
+    Band.B2_4: (2407, 5),
+    Band.B5: (5000, 5),
+    Band.B6: (5950, 5),
+}
+
+#: Channel 14 (Japan, 802.11b only) sits 12 MHz above channel 13 rather than 5.
+_CHANNEL_14_MHZ: Final = 2484
+
+_BAND_CHANNELS: Final[dict[Band, frozenset[int]]] = {
+    # 1 to 14; 14 is 802.11b-only and legal in Japan alone, but it is a channel a
+    # device can be set to, and refusing to *record* it would be wrong.
+    Band.B2_4: frozenset(range(1, 15)),
+    # UNII-1 through UNII-4, as numbered by 802.11: 32 to 68 and 96 in the low
+    # bands, 100 to 144 in UNII-2 extended, 149 to 177 in UNII-3 and UNII-4.
+    Band.B5: frozenset({32, 68, 96})
+    | frozenset(range(36, 65, 4))
+    | frozenset(range(100, 145, 4))
+    | frozenset(range(149, 178, 4)),
+    # UNII-5 through UNII-8: the 20 MHz channels are numbered 1, 5, 9 … 233.
+    Band.B6: frozenset(range(1, 234, 4)),
+}
+
+_BAND_WIDTHS: Final[dict[Band, frozenset[int]]] = {
+    # 802.11n at 2.4 GHz can bond two channels and no more; there is not enough
+    # spectrum in the band for 80 MHz to exist.
+    Band.B2_4: frozenset({20, 40}),
+    # 320 MHz is an 802.11be feature of the 6 GHz band only.
+    Band.B5: frozenset({20, 40, 80, 160}),
+    Band.B6: frozenset(CHANNEL_WIDTHS),
+}
+
+
+class Security(str, Enum):
+    """§6.2.6 — how a BSS authenticates and encrypts.
+
+    ``open`` covers both a genuinely open network and OWE: netgraph records
+    whether a passphrase or an authentication server is involved, which is what
+    a reader of a diagram needs, and not the cipher suite negotiated on top.
+    """
+
+    OPEN = "open"
+    WPA2_PSK = "wpa2-psk"
+    WPA2_EAP = "wpa2-eap"
+    WPA3_PSK = "wpa3-psk"
+    WPA3_EAP = "wpa3-eap"
+
+    @property
+    def is_encrypted(self) -> bool:
+        """Does traffic in this BSS get link-layer encryption?"""
+        return self is not Security.OPEN
+
+
+class Bss(NetgraphModel):
+    """One entry of ``interfaces[].wireless.bss`` — a basic service set.
+
+    On an ``ap`` radio each entry is an SSID the radio beacons, with the VLAN
+    its traffic is bridged into. On a ``station`` or ``mesh`` radio the single
+    entry names the BSS the radio is associated to, which is what ``NG-W010``
+    checks against the AP at the other end of the link.
+    """
+
+    ssid: Ssid
+    #: ``dot11:bssid`` — the MAC address of the BSS. Usually the radio's own
+    #: address for the first SSID and a derived one for each further SSID, which
+    #: is why it is written per BSS rather than inherited from ``mac``.
+    bssid: MacAddress | None = None
+    #: The VLAN this SSID's traffic is bridged into; ``None`` means the radio's
+    #: untagged domain. Checked against the device's VLAN database (``W113``)
+    #: and against what the AP actually carries (``NG-W009``).
+    vlan: VlanId | None = None
+    security: Security | None = None
+    #: A hidden SSID is absent from the beacon, not absent from the air.
+    hidden: Boolean = False
+
+
+class WirelessConfig(NetgraphModel):
+    """``interfaces[].wireless`` — the radio configuration of a ``wifi`` port.
+
+    Only a ``wifi`` interface may carry it (``NG-W002``): the block is what
+    turns an otherwise shapeless ``medium: wireless`` link into an association
+    with a direction, a frequency and a name.
+    """
+
+    role: RadioRole
+    band: Band | None = None
+    #: The primary 20 MHz channel. Requires ``band``, and must be one the band
+    #: numbers (``NG-W003``).
+    channel: WirelessChannel | None = None
+    #: Total channel width in MHz — 20, 40, 80, 160 or 320. Requires ``band``,
+    #: which bounds it (``NG-W004``).
+    width_mhz: Literal[20, 40, 80, 160, 320] | None = None
+    tx_power_dbm: TxPowerDbm | None = None
+    bss: list[Bss] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check_channel_plan(self) -> WirelessConfig:
+        """``NG-W003``/``NG-W004``: the frequency settings agree with the band."""
+        if self.band is None:
+            for name in ("channel", "width_mhz"):
+                if getattr(self, name) is not None:
+                    raise field_error(
+                        f"'{name}' requires 'band'; channel numbers and widths mean "
+                        "different frequencies in different bands",
+                        rule="NG-W003",
+                        path=(name,),
+                    )
+            return self
+
+        if self.channel is not None and self.channel not in self.band.channels:
+            raise field_error(
+                f"channel {self.channel} is not a channel of the {self.band.value} band; "
+                f"{self.band.value} numbers {_channel_summary(self.band)}",
+                rule="NG-W003",
+                path=("channel",),
+            )
+        if self.width_mhz is not None and self.width_mhz not in self.band.widths:
+            allowed = ", ".join(str(width) for width in sorted(self.band.widths))
+            raise field_error(
+                f"width_mhz {self.width_mhz} is not available in the {self.band.value} band; "
+                f"it supports {allowed} MHz",
+                rule="NG-W004",
+                path=("width_mhz",),
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _check_bss(self) -> WirelessConfig:
+        """``NG-W005``/``NG-W006``: the BSS list fits the role it is written on."""
+        if self.role.is_client and len(self.bss) > 1:
+            raise field_error(
+                f"a {self.role.value!r} radio associates to one BSS at a time, "
+                f"but {len(self.bss)} are listed",
+                rule="NG-W006",
+                path=("bss",),
+            )
+
+        ssids: set[str] = set()
+        bssids: set[str] = set()
+        for index, entry in enumerate(self.bss):
+            if entry.ssid in ssids:
+                raise field_error(
+                    f"SSID {entry.ssid!r} is declared twice on this radio",
+                    rule="NG-W005",
+                    path=("bss", index, "ssid"),
+                )
+            ssids.add(entry.ssid)
+            if entry.bssid is not None:
+                if entry.bssid in bssids:
+                    raise field_error(
+                        f"BSSID {entry.bssid} is declared twice on this radio",
+                        rule="NG-W005",
+                        path=("bss", index, "bssid"),
+                    )
+                bssids.add(entry.bssid)
+        return self
+
+    @property
+    def ssids(self) -> tuple[str, ...]:
+        """Every SSID this radio beacons or is associated to, in order."""
+        return tuple(entry.ssid for entry in self.bss)
+
+    @property
+    def channel_text(self) -> str | None:
+        """``36/5GHz``, the way a diagram labels a link; ``None`` if unstated."""
+        if self.band is None:
+            return None
+        if self.channel is None:
+            return self.band.value
+        return f"{self.channel}/{self.band.value}"
+
+    def span_mhz(self) -> tuple[float, float] | None:
+        """The frequency range the radio occupies, as ``(low, high)`` in MHz.
+
+        Centred on the primary channel, because that is all the schema records:
+        a bonded channel's real centre depends on which secondary channels the
+        radio picked, which no document states. The approximation is what
+        ``W134`` compares, and it can only make the overlap test *more* willing
+        to warn — never less.
+        """
+        if self.band is None or self.channel is None:
+            return None
+        centre = self.band.centre_mhz(self.channel)
+        half = (self.width_mhz or 20) / 2
+        return centre - half, centre + half
+
+
+def _channel_summary(band: Band) -> str:
+    """``1-14`` / ``32-177``, for the diagnostic of an out-of-plan channel."""
+    channels = sorted(band.channels)
+    return f"{channels[0]}-{channels[-1]}"
+
+
+# --------------------------------------------------------------------------- #
 # Interfaces
 # --------------------------------------------------------------------------- #
 
@@ -551,6 +821,8 @@ class Interface(NetgraphModel):
     ipv4: IPv4Config | None = None
     ipv6: IPv6Config | None = None
     vlan: VlanConfig | None = None
+    #: Radio configuration; ``wifi`` interfaces only (§6.2.6).
+    wireless: WirelessConfig | None = None
     #: ``if:lower-layer-if`` of a ``vlan`` sub-interface.
     parent: IfName | None = None
     #: ``if:lower-layer-if`` of a ``lag`` or ``bridge`` interface.
@@ -619,6 +891,17 @@ class Interface(NetgraphModel):
                 path=("members",),
             )
 
+        return self
+
+    @model_validator(mode="after")
+    def _check_wireless(self) -> Interface:
+        """``NG-W002``: only a radio has a radio configuration."""
+        if self.wireless is not None and self.type is not InterfaceType.WIFI:
+            raise field_error(
+                f"'wireless' is only allowed for type 'wifi', not {self.type.value!r}",
+                rule="NG-W002",
+                path=("wireless",),
+            )
         return self
 
     @model_validator(mode="after")

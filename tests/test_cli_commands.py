@@ -685,9 +685,11 @@ def test_the_device_listing_names_every_element_that_becomes_a_node(runner: CliR
         "hosts/adp-usb-eth",
         "hosts/laptop",
         "hosts/pc-desk",
+        "hosts/phone",
         "hosts/srv-nas",
         "routers/rtr-home",
         "switches/sw-home",
+        "wireless/ap-home",
     }
 
 
@@ -699,19 +701,23 @@ def test_the_home_lab_declares_no_tunnel(runner: CliRunner) -> None:
 
 def test_the_cable_listing_shows_both_endpoints(runner: CliRunner) -> None:
     records = json.loads(invoke(runner, "-i", str(HOME_LAB), "list", "cables", "-F", "json").stdout)
-    assert len(records) == 4
+    assert len(records) == 6
     for record in records:
         assert len(record["endpoints"]) == 2
 
 
 def test_the_vlan_listing_counts_participants(runner: CliRunner) -> None:
     records = json.loads(invoke(runner, "-i", str(HOME_LAB), "list", "vlans", "-F", "json").stdout)
-    assert [record["id"] for record in records] == [10]
+    assert [record["id"] for record in records] == [10, 20]
     assert records[0]["name"] == "home"
-    # Every element of the home lab is in VLAN 10 — the laptop included, which
-    # reaches it through its USB dongle rather than through a VLAN block.
-    assert len(records[0]["elements"]) == 6
+    # Every element of the home lab is in VLAN 10 except the phone — the laptop
+    # included, which reaches it through its USB dongle rather than through a
+    # VLAN block. The phone is on the air, and its radio declares no VLAN.
+    assert len(records[0]["elements"]) == 7
     assert "hosts/laptop" in records[0]["elements"]
+    # The guest VLAN reaches the access point and stops at the switch.
+    assert records[1]["name"] == "guest"
+    assert records[1]["elements"] == ["switches/sw-home", "wireless/ap-home"]
 
 
 def test_the_subnet_listing_omits_host_scoped_prefixes(runner: CliRunner) -> None:

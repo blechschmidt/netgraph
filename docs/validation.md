@@ -78,9 +78,9 @@ collision in pass 1:
 ```console
 $ netgraph -i tests/fixtures/invalid validate
 ...
-  e002-double-termination.yaml#0:4             NG-N002  metadata.name: duplicate element name 'pc-a' (first declared at e001-unknown-endpoint.yaml#0:7); this document is ignored
+  e002-double-termination.yaml#0:4               NG-N002  metadata.name: duplicate element name 'pc-a' (first declared at e001-unknown-endpoint.yaml#0:7); this document is ignored
 ...
-  e005-vlan-mismatch.yaml#1:18           I002  interface 'sw-b:GigabitEthernet0/1' is enabled but terminates no cable; mark it 'enabled: false' if the port is spare
+  e005-vlan-mismatch.yaml#1:18                   I002  interface 'sw-b:GigabitEthernet0/1' is enabled but terminates no cable; mark it 'enabled: false' if the port is spare
 ...
 ```
 
@@ -261,7 +261,7 @@ to nothing, and the message lists what you could have meant:
 <!-- run: rc=2 -->
 ```console
 $ netgraph -i examples/quickstart validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 An unknown id in an *annotation* is ignored rather than fatal — inventory data
@@ -341,6 +341,10 @@ says why the rule exists, what it deliberately exempts, and how to suppress it.
 | [`E025`](validation-rules.md#e025--two-elements-occupy-the-same-rack-unit) | `NG-U001` | error | two elements occupy the same rack unit |
 | [`E026`](validation-rules.md#e026--element-mounted-above-the-top-of-its-rack) | `NG-U002` | error | element mounted above the top of its rack |
 | [`E027`](validation-rules.md#e027--rack-declared-with-two-heights) | `NG-U003` | error | rack declared with two heights |
+| [`E028`](validation-rules.md#e028--wireless-link-is-not-an-association) | `NG-W007` | error | wireless link is not an association |
+| [`E029`](validation-rules.md#e029--duplicate-bssid) | `NG-W008` | error | duplicate BSSID |
+| [`E030`](validation-rules.md#e030--ssid-vlan-is-carried-nowhere-on-the-access-point) | `NG-W009` | error | SSID VLAN is carried nowhere on the access point |
+| [`E031`](validation-rules.md#e031--associated-to-an-ssid-the-access-point-does-not-advertise) | `NG-W010` | error | associated to an SSID the access point does not advertise |
 | [`W101`](validation-rules.md#w101--interface-neither-routes-nor-switches) | `NG-I013` | warning | interface neither routes nor switches |
 | [`W102`](validation-rules.md#w102--mtu-mismatch-across-a-link) | `NG-C010` | warning | MTU mismatch across a link |
 | [`W103`](validation-rules.md#w103--orphan-device) | `NG-C016` | warning | orphan device |
@@ -374,6 +378,7 @@ says why the rule exists, what it deliberately exempts, and how to suppress it.
 | [`W131`](validation-rules.md#w131--nested-prefix-in-a-different-broadcast-domain) | `NG-A011` | warning | nested prefix in a different broadcast domain |
 | [`W132`](validation-rules.md#w132--address-outside-every-prefix-on-its-link) | `NG-A012` | warning | address outside every prefix on its link |
 | [`W133`](validation-rules.md#w133--patch-run-stops-inside-the-panel) | `NG-P002` | warning | patch run stops inside the panel |
+| [`W134`](validation-rules.md#w134--access-points-on-overlapping-channels) | `NG-W011` | warning | access points on overlapping channels |
 | [`I001`](validation-rules.md#i001--locally-administered-mac-address) | `NG-I010` | info | locally administered MAC address |
 | [`I002`](validation-rules.md#i002--enabled-interface-terminates-no-cable) | `NG-C015` | info | enabled interface terminates no cable |
 | [`I003`](validation-rules.md#i003--tunnel-on-a-non-standard-port) | `NG-T015` | info | tunnel on a non-standard port |

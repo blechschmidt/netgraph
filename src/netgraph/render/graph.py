@@ -88,7 +88,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from fnmatch import fnmatchcase
 from pathlib import Path
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, TypeAlias
 
 from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of, short_name
 from netgraph.models import (
@@ -97,6 +97,7 @@ from netgraph.models import (
     Cable,
     Device,
     Interface,
+    Medium,
     PatchPanel,
     Tunnel,
     TunnelType,
@@ -136,6 +137,7 @@ __all__ = [
     "Subnet",
     "TunnelEnd",
     "TunnelView",
+    "WirelessView",
     "build_graph",
     "filter_graph",
     "is_routable_address",
@@ -463,6 +465,44 @@ class PatchView:
 
 
 @dataclass(frozen=True, slots=True)
+class WirelessView:
+    """What a ``medium: wireless`` edge is an association *to* (§6.2.6).
+
+    A wireless link has a shape a cable does not: one end beacons and the other
+    joins it, on a named network at a stated frequency. Resolving that once here
+    is what lets every renderer label the link the same way — and what keeps a
+    radio link tellable apart from a cable whose ``medium`` merely says
+    ``wireless``, which is all the graph carried before.
+    """
+
+    #: The SSIDs the association is on: what the client joined when it says so,
+    #: and otherwise everything the access point beacons.
+    ssids: tuple[str, ...] = ()
+    #: ``2.4GHz`` / ``5GHz`` / ``6GHz``, when the access point states one.
+    band: str | None = None
+    channel: int | None = None
+    width_mhz: int | None = None
+    #: ``element:interface`` of the ``ap``-role radio, when exactly one end is
+    #: one. Empty for a link whose ends disagree about that — ``E028``.
+    access_point: str = ""
+
+    @property
+    def channel_text(self) -> str | None:
+        """``36/5GHz``, or just the band when no channel is stated."""
+        if self.band is None:
+            return None
+        return self.band if self.channel is None else f"{self.channel}/{self.band}"
+
+    def describe(self) -> str:
+        """``home, guest @ 36/5GHz`` — the label an L2 diagram puts on the link."""
+        network = ", ".join(self.ssids)
+        tuning = self.channel_text
+        if network and tuning:
+            return f"{network} @ {tuning}"
+        return network or tuning or ""
+
+
+@dataclass(frozen=True, slots=True)
 class RackSlot:
     """One element mounted in a rack, and the units it occupies."""
 
@@ -731,6 +771,10 @@ class Edge:
     #: of two or more cable segments (§15.2). ``None`` on a direct cable, which
     #: is what makes the two tellable apart in an export.
     patch: PatchView | None = None
+    #: The association a ``medium: wireless`` link is, when at least one end
+    #: declares a ``wireless`` block (§6.2.6). ``None`` on every wired link, and
+    #: on a radio link whose ends model no radio detail.
+    wireless: WirelessView | None = None
 
     @property
     def name(self) -> str:
@@ -1577,6 +1621,12 @@ def _build_edges(inventory: Inventory) -> tuple[tuple[Edge, ...], tuple[str, ...
                     cable.endpoints[1].interface,
                 ),
                 cable=cable,
+                wireless=_link_wireless(
+                    (left, owners[left], cable.endpoints[0].interface),
+                    (right, owners[right], cable.endpoints[1].interface),
+                )
+                if spec.medium is Medium.WIRELESS
+                else None,
             )
         )
 
@@ -1641,6 +1691,50 @@ def _link_vlans(
     if not right:
         return left
     return left & right or left | right
+
+
+#: One end of a link, as :func:`_link_wireless` needs it.
+_LinkEnd: TypeAlias = "tuple[str, Device | Adapter | PatchPanel, str]"
+
+
+def _link_wireless(left: _LinkEnd, right: _LinkEnd) -> WirelessView | None:
+    """What the association on a ``medium: wireless`` cable is (§6.2.6).
+
+    The two ends do not carry the same information and are not interchangeable:
+    the access point owns the frequency and the list of SSIDs it beacons, while
+    the client owns the one fact the AP cannot state — *which* of those SSIDs
+    this particular link is on. The view takes each from whichever end knows it,
+    and falls back to the other end when only one is modelled at all.
+
+    ``None`` when neither end declares a ``wireless`` block: the link is then no
+    more than ``medium: wireless``, and inventing an empty annotation for it
+    would put a stray ``@`` on the diagram.
+    """
+    radios = [
+        (f"{fqn}:{port}", interface.wireless)
+        for fqn, owner, port in (left, right)
+        if (interface := owner.interface(port)) is not None and interface.wireless is not None
+    ]
+    if not radios:
+        return None
+
+    access_points = [(port, radio) for port, radio in radios if radio.role.is_ap]
+    clients = [(port, radio) for port, radio in radios if not radio.role.is_ap]
+    # The frequency is the access point's; with no AP end — which is ``E028`` —
+    # any radio that states one is better than dropping the annotation.
+    tuned = next(
+        (radio for _, radio in [*access_points, *radios] if radio.band is not None),
+        None,
+    )
+    joined = next((radio.ssids for _, radio in clients if radio.ssids), ())
+    beaconed = next((radio.ssids for _, radio in access_points if radio.ssids), ())
+    return WirelessView(
+        ssids=joined or beaconed,
+        band=tuned.band.value if tuned is not None and tuned.band is not None else None,
+        channel=tuned.channel if tuned is not None else None,
+        width_mhz=tuned.width_mhz if tuned is not None else None,
+        access_point=access_points[0][0] if len(access_points) == 1 else "",
+    )
 
 
 def _port_vlans(owner: Device | Adapter | PatchPanel, port: str) -> frozenset[int]:

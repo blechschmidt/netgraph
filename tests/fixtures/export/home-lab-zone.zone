@@ -20,8 +20,11 @@ $TTL 3600
 
 adp-usb-eth.hosts                   IN  A     192.168.10.30
 adp-usb-eth.hosts                   IN  AAAA  2001:db8:10::30
+ap-home.wireless                    IN  A     192.168.10.3
 pc-desk.hosts                       IN  A     192.168.10.20
 pc-desk.hosts                       IN  AAAA  2001:db8:10::20
+phone.hosts                         IN  A     192.168.10.40
+phone.hosts                         IN  AAAA  2001:db8:10::40
 rtr-home.routers                    IN  A     192.0.2.1
 rtr-home.routers                    IN  A     192.168.10.1
 rtr-home.routers                    IN  A     203.0.113.2
@@ -59,9 +62,11 @@ $TTL 3600
 
 1                                   IN  PTR  rtr-home.routers.example.com.
 2                                   IN  PTR  sw-home.switches.example.com.
+3                                   IN  PTR  ap-home.wireless.example.com.
 10                                  IN  PTR  srv-nas.hosts.example.com.
 20                                  IN  PTR  pc-desk.hosts.example.com.
 30                                  IN  PTR  adp-usb-eth.hosts.example.com.
+40                                  IN  PTR  phone.hosts.example.com.
 
 ;; zone: reverse 113.0.203.in-addr.arpa.
 $ORIGIN 113.0.203.in-addr.arpa.
@@ -107,3 +112,4 @@ $TTL 3600
 0.1.0.0.0.0.0.0.0.0.0.0.0.0.0.0     IN  PTR  srv-nas.hosts.example.com.
 0.2.0.0.0.0.0.0.0.0.0.0.0.0.0.0     IN  PTR  pc-desk.hosts.example.com.
 0.3.0.0.0.0.0.0.0.0.0.0.0.0.0.0     IN  PTR  adp-usb-eth.hosts.example.com.
+0.4.0.0.0.0.0.0.0.0.0.0.0.0.0.0     IN  PTR  phone.hosts.example.com.

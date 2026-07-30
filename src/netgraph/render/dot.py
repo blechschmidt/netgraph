@@ -1005,6 +1005,13 @@ def _edge_label(edge: Edge, layer: Layer, options: RenderOptions) -> str:
         return "\n".join(parts)
 
     if layer is Layer.L2:
+        # The association is layer-2 detail, not physical detail: which network
+        # the link is on and on which frequency is exactly what distinguishes
+        # two radio links that a dashed line draws identically (§6.2.6).
+        if edge.wireless is not None:
+            association = edge.wireless.describe()
+            if association:
+                parts.append(association)
         if options.show_vlans and edge.vlans:
             parts.append(f"vlan {compact_ids(edge.vlans)}")
         elif edge.kind is EdgeKind.ATTACHMENT and edge.label:

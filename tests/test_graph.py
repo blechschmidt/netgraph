@@ -126,9 +126,11 @@ def test_devices_and_adapters_are_nodes_and_cables_are_edges(home: nx.MultiGraph
         "hosts/adp-usb-eth",
         "hosts/laptop",
         "hosts/pc-desk",
+        "hosts/phone",
         "hosts/srv-nas",
         "routers/rtr-home",
         "switches/sw-home",
+        "wireless/ap-home",
     }
     assert "cables/cbl-rtr-sw" in edge_ids(home)
     assert not any(node.startswith("cables/") for node in home.nodes)
@@ -159,7 +161,7 @@ def test_nodes_carry_kind_namespace_and_the_interface_list(home: nx.MultiGraph) 
     assert data["node_type"] == ELEMENT_TYPE
     assert data["interfaces"] == tuple(port.name for port in data["ports"])
     assert "port1" in data["interfaces"]
-    assert data["vlans"] == frozenset({10})
+    assert data["vlans"] == frozenset({10, 20})
 
 
 def test_edges_carry_endpoints_medium_speed_and_vlans(home: nx.MultiGraph) -> None:
@@ -320,8 +322,8 @@ def test_filtering_preserves_input_order(campus_graph: nx.MultiGraph) -> None:
 
 def test_filter_by_kind(home: nx.MultiGraph) -> None:
     result = filter_graph(home, kinds=["switch", "router"])
-    assert set(result.nodes) == {"switches/sw-home", "routers/rtr-home"}
-    assert edge_ids(result) == ["cables/cbl-rtr-sw"]
+    assert set(result.nodes) == {"switches/sw-home", "wireless/ap-home", "routers/rtr-home"}
+    assert edge_ids(result) == ["cables/cbl-rtr-sw", "cables/cbl-sw-ap"]
 
 
 def test_filter_by_namespace_includes_descendants(campus_graph: nx.MultiGraph) -> None:
@@ -478,7 +480,10 @@ def test_l2_joins_every_member_to_its_broadcast_domain(home: nx.MultiGraph) -> N
     assert view.nodes[domain]["node_type"] == DOMAIN_TYPE
     assert view.nodes[domain]["vlan"] == 10
     assert view.graph["layer"] == "l2"
-    assert set(view.neighbors(domain)) == set(home.nodes)
+    # Everything but the phone, which is on the wireless side of the access
+    # point: its SSID is in VLAN 10, but the radio declares no `vlan` block, so
+    # the link that joins it carries no VLAN of its own.
+    assert set(view.neighbors(domain)) == set(home.nodes) - {"hosts/phone"}
     edge = view.edges["switches/sw-home", domain, f"switches/sw-home#{domain}"]
     assert edge["kind"] == VLAN_KIND
     assert "port1" in edge["interfaces"]
@@ -607,8 +612,8 @@ def test_a_domain_view_can_be_filtered(home: nx.MultiGraph) -> None:
     view = layers(home).l2
     result = filter_graph(view, kinds=["switch"])
     domain = f"{VLAN_NODE_PREFIX}10"
-    assert set(result.nodes) == {"switches/sw-home", domain}
-    assert result.nodes[domain]["members"] == ("switches/sw-home",)
+    assert set(result.nodes) == {"switches/sw-home", "wireless/ap-home", domain, "vlan:20"}
+    assert result.nodes[domain]["members"] == ("switches/sw-home", "wireless/ap-home")
 
 
 def test_a_domain_with_no_surviving_member_is_dropped(home: nx.MultiGraph) -> None:
@@ -628,16 +633,16 @@ def test_stats_counts_nodes_edges_vlans_and_subnets(
     assert summary.nodes == home.number_of_nodes()
     assert summary.edges == home.number_of_edges()
     assert summary.elements == summary.nodes
-    assert summary.vlans == 1
+    assert summary.vlans == 2
     assert summary.subnets == len(subnets_of(home_lab))
-    assert summary.namespaces == 3
+    assert summary.namespaces == 4
     assert summary.components == 1
     assert summary.by_kind == {
         "adapter": 1,
-        "computer": 2,
+        "computer": 3,
         "router": 1,
         "server": 1,
-        "switch": 1,
+        "switch": 2,
     }
 
 
@@ -708,4 +713,4 @@ def test_an_edge_whose_endpoint_is_not_an_element_never_resurrects_it(
     graph.nodes["switches/sw-home"]["node_type"] = SUBNET_TYPE
     view = layers(graph).l1
     assert not view.has_node("switches/sw-home")
-    assert edge_ids(view) == ["hosts/adp-usb-eth#upstream"]
+    assert edge_ids(view) == ["hosts/adp-usb-eth#upstream", "cables/wl-ap-phone"]

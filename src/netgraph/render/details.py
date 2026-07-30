@@ -152,6 +152,7 @@ def build_details(
                     "stack": " over ".join(edge["tunnel"]["stack"]) if "tunnel" in edge else None,
                     "speedText": edge.get("speedText"),
                     "label": edge.get("label"),
+                    "wireless": edge.get("wireless"),
                     "vlans": edge.get("vlans", []),
                 }
             )
@@ -410,6 +411,25 @@ def _bundled_row(link: Mapping[str, Any]) -> str:
     return "  ".join(parts)
 
 
+def _wireless_text(wireless: Mapping[str, Any]) -> str:
+    """``home, guest @ 36/5GHz`` — the association, for a tooltip line.
+
+    Rebuilt from the exported record rather than taken from the graph, because
+    a tooltip is generated from the same document the JSON export produces and
+    the two must not be able to say different things about one link.
+    """
+    ssids = wireless.get("ssids")
+    network = ", ".join(plain_text(str(ssid)) for ssid in ssids) if isinstance(ssids, list) else ""
+    band = wireless.get("band")
+    channel = wireless.get("channel")
+    tuning = ""
+    if band is not None:
+        tuning = plain_text(str(band)) if channel is None else f"{channel}/{plain_text(str(band))}"
+    if network and tuning:
+        return f"{network} @ {tuning}"
+    return network or tuning or "—"
+
+
 def _patch_lines(patch: Mapping[str, Any]) -> Iterator[str]:
     """The cross-connects a spliced run passes through (§15.2).
 
@@ -463,6 +483,9 @@ def _edge_lines(record: Mapping[str, Any]) -> Iterator[str]:
             parts.append(f"length: {_number(record['lengthM'])} m")
         if record.get("label"):
             parts.append(f"label: {plain_text(str(record['label']))}")
+        wireless = record.get("wireless")
+        if isinstance(wireless, Mapping):
+            parts.append(f"wireless: {_wireless_text(wireless)}")
         if parts:
             yield ", ".join(parts)
 

@@ -29,12 +29,14 @@ from netgraph.models.cable import CableSpec, InterfaceRef
 from netgraph.models.device import BridgeConfig, DeviceSpec, Forwarding, VlanDefinition
 from netgraph.models.element import ElementBase
 from netgraph.models.interface import (
+    Bss,
     Interface,
     IPv4Address,
     IPv4Config,
     IPv6Address,
     IPv6Config,
     VlanConfig,
+    WirelessConfig,
 )
 from netgraph.models.metadata import Location, Metadata
 from netgraph.models.patchpanel import PatchPanelSpec
@@ -80,6 +82,8 @@ DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
     IPv6Config,
     IPv6Address,
     VlanConfig,
+    WirelessConfig,
+    Bss,
     CableSpec,
     InterfaceRef,
     AdapterSpec,
@@ -250,6 +254,12 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "facing an access port normally omits it.",
         "…/dot1q:bridge-port",
     ),
+    ("Interface", "wireless"): Doc(
+        "Radio configuration of a `type: wifi` interface: which side of the association it is, "
+        "which frequency it uses and which BSSs it beacons or joins. Forbidden on every other "
+        "type (`NG-W002`).",
+        "…/dot11:wireless-interface",
+    ),
     ("Interface", "parent"): Doc(
         "The interface this one is stacked on. Required for `type: vlan`, forbidden otherwise "
         "(`NG-I002`).",
@@ -349,6 +359,63 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("VlanConfig", "acceptable_frames"): Doc(
         "Which frames the port admits. Derived from `mode` and `native_vlan` when not stated.",
         "…/dot1q:bridge-port/dot1q:acceptable-frame",
+    ),
+    # -- wireless ----------------------------------------------------------
+    ("WirelessConfig", "role"): Doc(
+        "Which side of the association this radio is: `ap` beacons the SSIDs, `station` and "
+        "`mesh` associate to one. A wireless link joins exactly one `ap` to one client "
+        "(`NG-W007`).",
+        "…/dot11:station-config/dot11:desired-bss-type",
+    ),
+    ("WirelessConfig", "band"): Doc(
+        "The band the radio operates in: `2.4GHz`, `5GHz` or `6GHz`. Required alongside "
+        "`channel` and `width_mhz`, because both mean different frequencies in different bands.",
+        "…/dot11:phy/dot11:channel-starting-factor",
+    ),
+    ("WirelessConfig", "channel"): Doc(
+        "The primary 20 MHz channel, as the band numbers it (`NG-W003`).",
+        "…/dot11:phy/dot11:current-channel-number",
+    ),
+    ("WirelessConfig", "width_mhz"): Doc(
+        "Total channel width in MHz. 40 is the most 2.4 GHz can bond and 320 is 6 GHz only "
+        "(`NG-W004`).",
+        "…/dot11:phy/dot11:current-channel-width",
+    ),
+    ("WirelessConfig", "tx_power_dbm"): Doc(
+        "Radiated power in dBm. The MIB counts abstract power *levels* per PHY, so the unit is "
+        "netgraph's own.",
+        "…/dot11:phy/dot11:current-tx-power-level",
+    ),
+    ("WirelessConfig", "bss"): Doc(
+        "The basic service sets this radio beacons (`ap`) or is associated to (`station`, "
+        "`mesh`, at most one — `NG-W006`).",
+        "…/dot11:bss",
+    ),
+    ("Bss", "ssid"): Doc(
+        "The network name, 1 to 32 octets. Unique within one radio (`NG-W005`), and on a client "
+        "radio it must be one the AP at the far end advertises (`NG-W010`).",
+        "…/dot11:bss/dot11:ssid",
+    ),
+    ("Bss", "bssid"): Doc(
+        "MAC address of this BSS — usually the radio's own for the first SSID and a derived one "
+        "for each further SSID. Unique across the inventory (`NG-W008`).",
+        "…/dot11:bss/dot11:bssid",
+    ),
+    ("Bss", "vlan"): Doc(
+        "The VLAN this SSID's traffic is bridged into. Absent means the radio's untagged "
+        "domain. Checked against the device's VLAN database (`W113`) and against the VLANs the "
+        "access point actually carries (`NG-W009`).",
+        NONE,
+    ),
+    ("Bss", "security"): Doc(
+        "How the BSS authenticates: `open`, or WPA2/WPA3 with a passphrase (`-psk`) or an "
+        "authentication server (`-eap`). Absent means nobody recorded it.",
+        "…/dot11:bss/dot11:rsna-enabled",
+    ),
+    ("Bss", "hidden"): Doc(
+        "The SSID is left out of the beacon. It is still on the air, and still a BSS this radio "
+        "serves.",
+        NONE,
     ),
     # -- cable -------------------------------------------------------------
     ("CableSpec", "endpoints"): Doc(

@@ -128,6 +128,19 @@ does not, the column reads `load` and the message carries the field path
 | `NG-C001` | `endpoints` has exactly two entries. | A cable with one end goes nowhere; one with three is a hub, which is a separate kind. |
 | `NG-C007` | `length_m` and `category` are absent when `medium: wireless`. | Radio has no cable to measure or specify. |
 
+### Wireless
+
+Checked while a `wifi` interface's `wireless` block is parsed (schema §6.2.6).
+
+| ID | Rule | Why it matters |
+|---|---|---|
+| `NG-W001` | `ssid` is between 1 and 32 octets. | 802.11 carries the SSID as a counted octet string; a longer name cannot be beaconed, and the limit is on bytes, so a non-Latin name runs out sooner than its length suggests. |
+| `NG-W002` | `wireless` appears only on `type: wifi`. | The block describes a radio. On an ethernet port it would be configuration nothing implements. |
+| `NG-W003` | `channel` names `band`, and is a channel that band numbers. | Channel 1 exists at 2.4 GHz and at 6 GHz and means two different frequencies; without the band there is nothing to resolve it against. |
+| `NG-W004` | `width_mhz` names `band`, and is a width that band supports. | There is no room for 80 MHz at 2.4 GHz, and 320 MHz is an 802.11be feature of the 6 GHz band alone. |
+| `NG-W005` | `ssid` and `bssid` are each unique within one radio. | The BSS list is keyed by both; a repeat is two descriptions of one service set. |
+| `NG-W006` | A `station` or `mesh` radio lists at most one BSS. | A client radio is associated to exactly one BSS at a time. Several entries describe a history, not a state. |
+
 ### Hubs
 
 A hub is a layer-1 repeater. It has no MAC table, no VLAN awareness and no IP
@@ -693,6 +706,82 @@ guessed on one document and measured on another.
 
 **Suppress with** `E027` / `NG-U003`, or an annotation on any of the elements
 involved. No legitimate case exists.
+
+#### `E028` — wireless link is not an association
+
+*Alias: `NG-W007`. Severity: error.*
+
+A `medium: wireless` cable joins two radios that are not one `ap` and one
+client: either both beacon, or neither does. Checked only once **both** ends
+declare a `wireless` block — an absent block says "not modelled", and
+[`E011`](#e011--medium-disagrees-with-the-endpoint-type) already owns the case
+where an end is not a radio at all.
+
+**Why it matters.** An 802.11 link has a direction a cable does not: one radio
+beacons and the other joins it. Two access points on one link is a description
+of interference rather than of a link, and two clients is a link no frame ever
+crosses, because neither end will beacon for the other to find. Both are what a
+copy-pasted radio block looks like. A mesh node's backhaul is the legitimate
+cousin of the second case and is written as `role: mesh` against the
+`role: ap` radio it associates to.
+
+**Suppress with** `E028` / `NG-W007`, or an annotation on the cable or either
+element.
+
+#### `E029` — duplicate BSSID
+
+*Alias: `NG-W008`. Severity: error.*
+
+Two `ap` radios in the inventory advertise the same `bssid`. Client radios are
+exempt: a station's BSS entry records the BSSID it *joined*, so repeating the
+access point's is what makes it the same service set.
+
+**Why it matters.** The wireless `E003`. A BSSID identifies one basic service
+set to every client in earshot, so two of them answering to one address means
+frames for one arrive at the other and a roam between them is invisible — to
+the client, and to anyone reading a capture. In practice it is a second access
+point cloned from the first with the radio section left untouched. Repeats
+*within* one radio never reach here: `NG-W005` rejects the document.
+
+**Suppress with** `E029` / `NG-W008`, or an annotation on either element.
+
+#### `E030` — SSID VLAN is carried nowhere on the access point
+
+*Alias: `NG-W009`. Severity: error.*
+
+An `ap` radio maps an SSID to a VLAN, and no interface of that access point is
+a member of it. An access point with a port trunking `all` carries whatever is
+asked of it and is exempt.
+
+**Why it matters.** An SSID with a `vlan` is a bridge between the air and that
+VLAN. If no port of the device is in it, the far side of the bridge is missing:
+clients associate, get an address from nowhere and reach nothing — while the
+inventory, and the access point's own configuration page, both list the network
+as present. The usual cause is a guest SSID added to the radio without adding
+the VLAN to the uplink trunk.
+
+[`W113`](#w113--undeclared-vlan-referenced) is the neighbouring, weaker
+statement: the VLAN is not in the device's `vlans` database. This one is about
+the ports.
+
+**Suppress with** `E030` / `NG-W009`, or an annotation on the access point.
+
+#### `E031` — associated to an SSID the access point does not advertise
+
+*Alias: `NG-W010`. Severity: error.*
+
+A client radio's BSS names an SSID that the `ap` radio at the other end of the
+link does not beacon. An access point that lists no BSS at all is not modelling
+its SSIDs, so there is nothing to contradict and the rule stays quiet.
+
+**Why it matters.** The association names a BSS, and the BSS is the access
+point's to define. An SSID that appears on the client and nowhere on the AP is
+either a typo or a record of the network as it used to be — a renamed SSID that
+the client documents never caught up with. Either way the link drawn from it
+does not exist, and the layer-2 diagram labels it with a network that is not on
+the air.
+
+**Suppress with** `E031` / `NG-W010`, or an annotation on either element.
 
 ### Warnings
 
@@ -1309,6 +1398,36 @@ to see the segment that does exist.
 panel. Annotating it is the right move for a position deliberately held for a
 run that is not yet needed.
 
+#### `W134` — access points on overlapping channels
+
+*Alias: `NG-W011`. Severity: warning.*
+
+Two `ap` radios in one broadcast domain are in the same band and their channels
+overlap. "One broadcast domain" is read as both halves of the phrase: the two
+elements are joined by the topology, *and* the radios put a common VLAN on the
+air — an SSID with no `vlan` counting as the untagged domain. VLAN 10 on two
+unconnected islands is two domains that share a number, exactly as in
+`netgraph.graph.broadcast_domains`.
+
+**Why it matters.** Two access points bridging one domain are there to extend
+each other's coverage, and that only works if they are on different
+frequencies. Radios sharing spectrum take turns rather than working in
+parallel, so the pair delivers roughly the throughput of one — and the symptom
+is "the Wi-Fi is slow in the middle of the house", which nobody traces back to
+a channel plan. At 2.4 GHz only 1, 6 and 11 are non-overlapping; the finding
+prints both frequency spans so the gap, or the lack of one, is visible.
+
+A warning rather than an error, for two reasons. A deliberate same-channel
+deployment exists — a repeater has no choice but to sit on its parent's channel
+— and the schema records no geometry, so netgraph cannot know whether the two
+are three metres or three floors apart.
+
+Overlap is computed by centring `width_mhz` on the primary channel; the true
+centre of a bonded channel depends on secondary channels no document states.
+The approximation can only make the rule warn more readily, never less.
+
+**Suppress with** `W134` / `NG-W011`, or an annotation on either element.
+
 ### Info
 
 #### `I001` — locally administered MAC address
@@ -1383,7 +1502,7 @@ schema rule is a usage error:
 <!-- run: rc=2 -->
 ```console
 $ netgraph validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 Every mechanism accepts both spellings of an id — `W102` and `NG-C010` select

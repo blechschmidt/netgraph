@@ -1,0 +1,45 @@
+# E028 (NG-W007) - a wireless link is not an AP-to-client association.
+#
+# Both radios beacon. Neither will associate to the other, so the link the
+# document draws is two access points shouting past each other.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: ap-a
+spec:
+  interfaces:
+    - name: wlan0
+      type: wifi
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+      wireless:
+        role: ap
+        bss:
+          - ssid: lab
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: ap-b
+spec:
+  interfaces:
+    - name: wlan0
+      type: wifi
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+      wireless:
+        role: ap
+        bss:
+          - ssid: lab
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - ap-a:wlan0
+    - ap-b:wlan0
+  medium: wireless

@@ -34,7 +34,7 @@ INVALID_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "invalid"
 #: Pinning the counts keeps a stray file or a lost document visible.
 EXAMPLE_SHAPES: dict[str, dict[str, int]] = {
     "quickstart": {"devices": 3, "cables": 2, "adapters": 0, "tunnels": 0},
-    "home-lab": {"devices": 5, "cables": 4, "adapters": 1, "tunnels": 0},
+    "home-lab": {"devices": 7, "cables": 6, "adapters": 1, "tunnels": 0},
     "campus": {"devices": 22, "cables": 22, "adapters": 0, "tunnels": 0},
     "overlay": {"devices": 7, "cables": 6, "adapters": 0, "tunnels": 5},
     "patch-room": {"devices": 4, "cables": 7, "adapters": 0, "tunnels": 0, "patchpanels": 2},
@@ -98,6 +98,23 @@ def test_the_home_lab_covers_every_element_kind_it_advertises() -> None:
     inventory = load_example("home-lab")
     kinds = sorted({element.kind for element in inventory})
     assert kinds == ["adapter", "cable", "computer", "router", "server", "switch"]
+
+
+def test_the_home_lab_puts_two_ssids_on_one_access_point() -> None:
+    """The wireless side of the example, as ``examples/home-lab/README.md`` says."""
+    inventory = load_example("home-lab")
+    radio = inventory.devices["wireless/ap-home"].spec.interface("wlan0")
+    assert radio is not None and radio.wireless is not None
+    assert radio.wireless.role.is_ap
+    assert radio.wireless.channel_text == "36/5GHz"
+    assert radio.wireless.ssids == ("home", "home-guest")
+    # Each SSID lands in a VLAN the uplink trunk carries, which is NG-W009.
+    assert [entry.vlan for entry in radio.wireless.bss] == [10, 20]
+
+    phone = inventory.devices["hosts/phone"].spec.interface("en0")
+    assert phone is not None and phone.wireless is not None
+    assert not phone.wireless.role.is_ap
+    assert phone.wireless.ssids == ("home",)
 
 
 def test_the_home_lab_joins_the_laptop_through_the_adapter() -> None:

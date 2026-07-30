@@ -336,6 +336,34 @@ RULES: Final[tuple[Rule, ...]] = (
         title="rack declared with two heights",
     ),
     Rule(
+        "E028",
+        Severity.ERROR,
+        "A wireless link does not join one 'ap' radio to a client radio.",
+        ("NG-W007",),
+        title="wireless link is not an association",
+    ),
+    Rule(
+        "E029",
+        Severity.ERROR,
+        "The same BSSID is advertised by two radios in the inventory.",
+        ("NG-W008",),
+        title="duplicate BSSID",
+    ),
+    Rule(
+        "E030",
+        Severity.ERROR,
+        "An SSID is mapped to a VLAN the access point carries nowhere.",
+        ("NG-W009",),
+        title="SSID VLAN is carried nowhere on the access point",
+    ),
+    Rule(
+        "E031",
+        Severity.ERROR,
+        "A client radio is associated to an SSID its access point does not advertise.",
+        ("NG-W010",),
+        title="associated to an SSID the access point does not advertise",
+    ),
+    Rule(
         "W101",
         Severity.WARNING,
         "An interface has neither IPv4 nor IPv6 and is not a switchport.",
@@ -565,6 +593,13 @@ RULES: Final[tuple[Rule, ...]] = (
         "A cabled patch-panel position is coupled to one nothing is patched into.",
         ("NG-P002",),
         title="patch run stops inside the panel",
+    ),
+    Rule(
+        "W134",
+        Severity.WARNING,
+        "Two access points in one broadcast domain share overlapping channels.",
+        ("NG-W011",),
+        title="access points on overlapping channels",
     ),
     Rule(
         "I001",

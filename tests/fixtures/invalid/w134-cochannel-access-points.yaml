@@ -1,0 +1,59 @@
+# W134 (NG-W011) - two access points in one broadcast domain overlap.
+#
+# Channels 1 and 3 at 2.4 GHz are 10 MHz apart and 20 MHz wide, so the two
+# radios share spectrum: they take turns instead of adding their capacity up.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: ap-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+
+    - name: wlan0
+      type: wifi
+      enabled: false
+      wireless:
+        role: ap
+        band: 2.4GHz
+        channel: 1
+        width_mhz: 20
+        bss:
+          - ssid: lab
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: ap-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+
+    - name: wlan0
+      type: wifi
+      enabled: false
+      wireless:
+        role: ap
+        band: 2.4GHz
+        channel: 3
+        width_mhz: 20
+        bss:
+          - ssid: lab
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - ap-a:eth0
+    - ap-b:eth0
+  medium: copper

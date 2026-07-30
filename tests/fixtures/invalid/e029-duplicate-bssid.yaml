@@ -1,0 +1,55 @@
+# E029 (NG-W008) - two radios advertise the same BSSID.
+#
+# Both access points answer to 02:00:5e:10:00:01, so a client cannot tell which
+# of the two it is talking to and a roam between them is invisible.
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: ap-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+
+    - name: wlan0
+      type: wifi
+      enabled: false
+      wireless:
+        role: ap
+        bss:
+          - ssid: lab
+            bssid: '02:00:5e:10:00:01'
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: ap-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+
+    - name: wlan0
+      type: wifi
+      enabled: false
+      wireless:
+        role: ap
+        bss:
+          - ssid: lab-guest
+            bssid: '02:00:5e:10:00:01'
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - ap-a:eth0
+    - ap-b:eth0
+  medium: copper

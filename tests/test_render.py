@@ -1142,7 +1142,7 @@ def test_dot_draws_a_subnet_in_its_own_shape_and_palette(home_lab: Inventory) ->
     assert '"#e0f2f1"' in block
     for node in graph.element_nodes:
         assert '"#e0f2f1"' not in _node_block(source, node.fqn)
-    assert "5 elements" in block, "the tooltip says how populated the prefix is"
+    assert "7 elements" in block, "the tooltip says how populated the prefix is"
 
 
 def test_mermaid_draws_a_subnet_as_a_rounded_node_of_its_own_class(
@@ -1177,16 +1177,20 @@ def test_json_export_discriminates_subnet_nodes_from_elements(home_lab: Inventor
         "addresses": [
             "192.168.10.30/24",
             "192.168.10.20/24",
+            "192.168.10.40/24",
             "192.168.10.10/24",
             "192.168.10.1/24",
             "192.168.10.2/24",
+            "192.168.10.3/24",
         ],
         "elements": [
             "hosts/adp-usb-eth",
             "hosts/pc-desk",
+            "hosts/phone",
             "hosts/srv-nas",
             "routers/rtr-home",
             "switches/sw-home",
+            "wireless/ap-home",
         ],
     }
     assert subnet["interfaces"] == []

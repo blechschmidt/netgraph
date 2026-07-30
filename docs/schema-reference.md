@@ -138,6 +138,7 @@ One entry per port or logical interface. Used by both devices and adapters.
 | `ipv4` | [IPv4Config](#specinterfacesipv4) | no | *unset* | IPv4 configuration. Absent means the interface has no IPv4 stack. | `…/ip:ipv4` |
 | `ipv6` | [IPv6Config](#specinterfacesipv6) | no | *unset* | IPv6 configuration. Absent means the interface has no IPv6 stack. | `…/ip:ipv6` |
 | `vlan` | [VlanConfig](#specinterfacesvlan) | no | *unset* | 802.1Q bridge-port configuration. Absent means the port is not VLAN-aware; a host port facing an access port normally omits it. | `…/dot1q:bridge-port` |
+| `wireless` | [WirelessConfig](#specinterfaceswireless) | no | *unset* | Radio configuration of a `type: wifi` interface: which side of the association it is, which frequency it uses and which BSSs it beacons or joins. Forbidden on every other type (`NG-W002`). | `…/dot11:wireless-interface` |
 | `parent` | interface name | no | *unset* | The interface this one is stacked on. Required for `type: vlan`, forbidden otherwise (`NG-I002`). | `…/if:lower-layer-if` |
 | `members` | interface name list | no | *unset* | The interfaces aggregated by this one. Required for `type: lag` and `type: bridge`, forbidden otherwise (`NG-I003`). | `…/if:lower-layer-if` |
 | `range` | string | no | *unset* | Declares many interfaces at once instead of `name`, by bracket expansion over one or more numeric spans (`GigabitEthernet1/0/[1-48]`). Consumed by the loader: the entry is replaced by the interfaces it expands to before anything else sees the document. Exactly one of `name` and `range` is written. | — |
@@ -211,6 +212,37 @@ The 802.1Q bridge-port configuration of one interface.
 * In `access` mode: `access_vlan` is allowed and defaults to 1; `trunk_vlans` and `native_vlan` are rejected (`NG-V002`, `NG-V003`).
 * In `trunk` mode: `trunk_vlans` is required and `access_vlan` is rejected.
 * `trunk_vlans` accepts an id, a list, `"10,20,100-110"`, `all` (1–4094) or `none`, and always serialises back to the coalesced string form.
+
+## `spec.interfaces[].wireless`
+
+The radio configuration of a `type: wifi` interface: which side of the association it is on, where on the air it is, and which networks it serves.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `role` | `ap` \| `station` \| `mesh` | **yes** | — | Which side of the association this radio is: `ap` beacons the SSIDs, `station` and `mesh` associate to one. A wireless link joins exactly one `ap` to one client (`NG-W007`). | `…/dot11:station-config/dot11:desired-bss-type` |
+| `band` | `2.4GHz` \| `5GHz` \| `6GHz` | no | *unset* | The band the radio operates in: `2.4GHz`, `5GHz` or `6GHz`. Required alongside `channel` and `width_mhz`, because both mean different frequencies in different bands. | `…/dot11:phy/dot11:channel-starting-factor` |
+| `channel` | integer, 1–233 | no | *unset* | The primary 20 MHz channel, as the band numbers it (`NG-W003`). | `…/dot11:phy/dot11:current-channel-number` |
+| `width_mhz` | `20` \| `40` \| `80` \| `160` \| `320` | no | *unset* | Total channel width in MHz. 40 is the most 2.4 GHz can bond and 320 is 6 GHz only (`NG-W004`). | `…/dot11:phy/dot11:current-channel-width` |
+| `tx_power_dbm` | number, -30.0–40.0 | no | *unset* | Radiated power in dBm. The MIB counts abstract power *levels* per PHY, so the unit is netgraph's own. | `…/dot11:phy/dot11:current-tx-power-level` |
+| `bss` | [Bss](#specinterfaceswirelessbss) list | no | `[]` | The basic service sets this radio beacons (`ap`) or is associated to (`station`, `mesh`, at most one — `NG-W006`). | `…/dot11:bss` |
+
+* `channel` and `width_mhz` both require `band`: channel numbers repeat between the 2.4 GHz and 6 GHz plans, and 320 MHz exists only at 6 GHz (`NG-W003`, `NG-W004`).
+* A `medium: wireless` cable joins exactly one `ap` radio to one `station` or `mesh` radio (`NG-W007`); that association is what the layer-2 view labels with `SSID @ channel/band`.
+
+## `spec.interfaces[].wireless.bss[]`
+
+One basic service set: an SSID the radio beacons, or — on a client radio — the one it is associated to.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `ssid` | string, 1–32 characters | **yes** | — | The network name, 1 to 32 octets. Unique within one radio (`NG-W005`), and on a client radio it must be one the AP at the far end advertises (`NG-W010`). | `…/dot11:bss/dot11:ssid` |
+| `bssid` | MAC address | no | *unset* | MAC address of this BSS — usually the radio's own for the first SSID and a derived one for each further SSID. Unique across the inventory (`NG-W008`). | `…/dot11:bss/dot11:bssid` |
+| `vlan` | integer, 1–4094 | no | *unset* | The VLAN this SSID's traffic is bridged into. Absent means the radio's untagged domain. Checked against the device's VLAN database (`W113`) and against the VLANs the access point actually carries (`NG-W009`). | — |
+| `security` | `open` \| `wpa2-psk` \| `wpa2-eap` \| `wpa3-psk` \| `wpa3-eap` | no | *unset* | How the BSS authenticates: `open`, or WPA2/WPA3 with a passphrase (`-psk`) or an authentication server (`-eap`). Absent means nobody recorded it. | `…/dot11:bss/dot11:rsna-enabled` |
+| `hidden` | boolean | no | `false` | The SSID is left out of the beacon. It is still on the air, and still a BSS this radio serves. | — |
+
+* An `ap` radio lists one entry per SSID it serves; a `station` or `mesh` radio lists at most one (`NG-W006`).
+* `vlan` is where the SSID's traffic goes on the wired side. It has to be a VLAN the access point carries somewhere (`NG-W009`), or clients associate and reach nothing.
 
 ## `spec` — cable
 

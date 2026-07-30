@@ -973,7 +973,7 @@ def test_a_watch_cycle_renders_several_layers_into_one_page() -> None:
     assert result.payload is not None
     assert [layer["layer"] for layer in data_of(result.payload.decode())["layers"]] == ["l1", "l2"]
     # Both layers are counted, so the status line does not under-report the work.
-    assert result.nodes == 12 and result.edges == 10
+    assert result.nodes == 16 and result.edges == 14
 
 
 # --------------------------------------------------------------------------- #

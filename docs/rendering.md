@@ -10,8 +10,9 @@ it, [`netgraph watch`](commands/watch.md) keeps that file current while you edit
 traced route over it — all four take the same options and mean the same things by
 them.
 
-![The home-lab example rendered at layer 2: a router, a switch, a server, two
-workstations and a USB adapter, joined by labelled links](images/home-lab.svg)
+![The home-lab example rendered at layer 2: a router, a switch, an access
+point, a server, two workstations, a phone and a USB adapter, joined by
+labelled links](images/home-lab.svg)
 
 ---
 
@@ -105,14 +106,15 @@ adjacent at layer 3 when they share a prefix — not when a cable happens to run
 between them (a route may cross three switches; a trunk carries VLANs neither end
 routes).
 
-![Layer-3 diagram of the home-lab example: five elements joined to the five IP
+![Layer-3 diagram of the home-lab example: seven elements joined to the five IP
 prefixes they are addressed in, each edge labelled with the interface and its
 address](images/home-lab-l3.svg)
 
 <sub>The same inventory as the diagram at the top of this page, at layer 3:
 `netgraph -i examples/home-lab render --layer l3 --title "home-lab — layer 3" -f svg -o docs/images/home-lab-l3.svg`.
 The router's loopback and its ISP hand-off are prefixes of their own; the switch
-appears only because its management SVI holds an address.</sub>
+and the access point appear only because their management SVIs hold an
+address.</sub>
 
 What layer 3 leaves out is deliberate:
 
@@ -215,15 +217,17 @@ neither.
 $ netgraph -i examples/home-lab render --neighbors-of sw-home --depth 1 --kind switch --kind server -f mermaid
 flowchart TB
     n0[("srv-nas<br/>[server]<br/>192.168.10.10/24<br/>2001:db8:10::10/64<br/>vlans: 10")]
-    n1["sw-home<br/>[switch]<br/>192.168.10.2/24<br/>vlans: 10"]
+    n1["sw-home<br/>[switch]<br/>192.168.10.2/24<br/>vlans: 10,20"]
+    n2["ap-home<br/>[switch]<br/>192.168.10.3/24<br/>vlans: 10,20"]
 
     n0 -- "eth0 ↔ port3 · H-003 · 1Gbps" --- n1
+    n2 -- "eth0 ↔ port5 · H-005 · 1Gbps" --- n1
 
     classDef server fill:#eae2f5,stroke:#7c3aed,stroke-width:1px
     classDef switch fill:#dcf0dc,stroke:#16a34a,stroke-width:1px
     class n0 server
-    class n1 switch
-rendered 2 node(s) and 1 edge(s) as mermaid at layer l1
+    class n1,n2 switch
+rendered 3 node(s) and 2 edge(s) as mermaid at layer l1
 ```
 
 ## Aggregation: one node per site, one line per bundle
@@ -339,9 +343,9 @@ the shape for a picture:
 netgraph render --icons cisco --layer l2 -f svg -o topology.svg
 ```
 
-![The home-lab example drawn with the bundled cisco theme: a router cylinder, a
-switch slab, two monitors, a server tower and a dongle, joined by labelled
-links](images/home-lab-icons.svg)
+![The home-lab example drawn with the bundled cisco theme: a router cylinder,
+two switch slabs, three monitors, a server tower and a dongle, joined by
+labelled links](images/home-lab-icons.svg)
 
 <sub>`netgraph -i examples/home-lab render --layer l2 --icons cisco --title "home-lab — layer 2, cisco icons" -f svg -o docs/images/home-lab-icons.svg`.</sub>
 
@@ -587,7 +591,7 @@ netgraph render -f html --layer l1 --layer l2 --layer l3 \
 ```
 
 [**docs/home-lab.html**](home-lab.html) is that command's output, committed:
-the home-lab inventory at all three layers, 146 kB, no server. GitHub shows an
+the home-lab inventory at all three layers, 174 kB, no server. GitHub shows an
 `.html` file as source, so download it — or open it from a Pages site — to see
 the page itself.
 
@@ -637,7 +641,7 @@ Two consequences of there being no layout engine in a browser are worth knowing:
   view — each layer, with and without the addresses and the VLANs — and shows
   the one you asked for. Identical drawings are stored once, so an inventory
   with no VLANs pays nothing for the VLAN toggle. That is also the size: expect
-  roughly 43 kB of client plus a drawing per view, or ~146 kB for the
+  roughly 43 kB of client plus a drawing per view, or ~174 kB for the
   three-layer example above. A view costs its drawing and essentially nothing
   else — the records are stored once for the whole page however many layers
   draw an element, and an `--icons` theme is stored once however many nodes and

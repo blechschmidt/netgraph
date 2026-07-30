@@ -160,9 +160,16 @@ def test_every_rule_title_matches_its_heading(rule: object, validation_rules_doc
 
 
 def test_the_rule_document_names_no_rule_that_does_not_exist(validation_rules_doc: str) -> None:
-    """Short ids are the validator's vocabulary; a stray one would be a lie."""
+    """Short ids are the validator's vocabulary; a stray one would be a lie.
+
+    The lookbehind keeps the *schema* ids of the wireless group out of it:
+    ``NG-W011`` is an alias of ``W134`` and has nothing to do with a short id
+    ``W011``, which does not exist. Every other group's letter differs from
+    ``E`` and ``W``, so this is the one place the two vocabularies can collide
+    in text.
+    """
     known = {rule.id for rule in RULES}
-    for mentioned in set(re.findall(r"\b([EW]\d{3})\b", validation_rules_doc)):
+    for mentioned in set(re.findall(r"(?<![-\w])([EW]\d{3})\b", validation_rules_doc)):
         assert mentioned in known, f"validation-rules.md documents unknown rule {mentioned}"
 
 

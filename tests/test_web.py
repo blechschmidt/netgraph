@@ -116,8 +116,8 @@ spec:
 def test_a_stream_loads_like_a_folder(home_lab: str) -> None:
     inventory = load_stream(home_lab)
     assert not inventory.errors
-    assert len(inventory.devices) == 5
-    assert len(inventory.cables) == 4
+    assert len(inventory.devices) == 7
+    assert len(inventory.cables) == 6
     assert len(inventory.adapters) == 1
 
 
@@ -159,8 +159,8 @@ def test_an_empty_stream_loads_to_nothing() -> None:
 def test_a_valid_stream_renders(home_lab: str) -> None:
     preview = render_source(home_lab)
     assert preview.status is Status.OK
-    assert preview.nodes == 6
-    assert preview.edges == 5
+    assert preview.nodes == 8
+    assert preview.edges == 7
     assert not preview.problems
     assert preview.svg is not None
     assert preview.svg.startswith("<svg")

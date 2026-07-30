@@ -86,7 +86,7 @@ there is a fourth lint gate:
 <!-- run: cwd=. -->
 ```console
 $ netgraph fmt --check examples
-0 file(s) would be reformatted, 43 already formatted
+0 file(s) would be reformatted, 45 already formatted
 ```
 
 Use `netgraph fmt --diff examples` to see what differs and `netgraph fmt examples`

@@ -69,12 +69,13 @@ spec:
 
     - name: port5
       type: ethernet
-      description: Spare
-      enabled: false
+      description: PoE injector for ap-home; trunks the guest VLAN up to it
       mac: '00:22:07:aa:00:05'
+      mtu: 1500
       vlan:
-        mode: access
-        access_vlan: 10
+        mode: trunk
+        trunk_vlans: 10,20
+        native_vlan: 10
   bridge:
     name: br0
     type: customer-vlan-bridge
@@ -82,3 +83,5 @@ spec:
   vlans:
     - id: 10
       name: home
+    - id: 20
+      name: guest

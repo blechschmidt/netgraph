@@ -109,6 +109,33 @@
       ]
     },
     {
+      "id": "hosts/phone",
+      "type": "element",
+      "name": "phone",
+      "kind": "computer",
+      "namespace": "hosts",
+      "description": "Wireless-only client. It reaches the network through its association to\nap-home, which is declared as a `medium: wireless` cable - the association\nis the link.\n",
+      "labels": {
+        "owner": "sam",
+        "role": "mobile",
+        "site": "home"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "en0",
+          "type": "wifi",
+          "description": "Associated to the home SSID on 5 GHz",
+          "mac": "f0:18:98:11:22:33",
+          "mtu": 1500,
+          "addresses": [
+            "192.168.10.40/24",
+            "2001:db8:10::40/64"
+          ]
+        }
+      ]
+    },
+    {
       "id": "hosts/srv-nas",
       "type": "element",
       "name": "srv-nas",
@@ -210,7 +237,8 @@
         "site": "home"
       },
       "vlans": [
-        10
+        10,
+        20
       ],
       "interfaces": [
         {
@@ -287,15 +315,74 @@
         {
           "name": "port5",
           "type": "ethernet",
-          "enabled": false,
-          "description": "Spare",
+          "description": "PoE injector for ap-home; trunks the guest VLAN up to it",
           "mac": "00:22:07:aa:00:05",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              10,
+              20
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "wireless/ap-home",
+      "type": "element",
+      "name": "ap-home",
+      "kind": "switch",
+      "namespace": "wireless",
+      "description": "Ceiling access point in the hallway, powered over the uplink. It is a\nswitch: the radio is a bridge port like any other, and the two SSIDs are\nwhat it bridges the air into.\n",
+      "labels": {
+        "role": "wireless",
+        "site": "home"
+      },
+      "vlans": [
+        10,
+        20
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Bridges the radio onto the wired uplink"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "In-band management address of the access point",
+          "addresses": [
+            "192.168.10.3/24"
+          ],
           "vlan": {
             "mode": "access",
             "vlans": [
               10
             ]
           }
+        },
+        {
+          "name": "eth0",
+          "type": "ethernet",
+          "description": "PoE uplink to sw-home",
+          "mac": "78:8a:20:aa:00:01",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              10,
+              20
+            ]
+          }
+        },
+        {
+          "name": "wlan0",
+          "type": "wifi",
+          "description": "5 GHz radio, two SSIDs",
+          "mac": "78:8a:20:aa:00:10",
+          "mtu": 1500
         }
       ]
     }
@@ -388,6 +475,54 @@
       "vlans": [
         10
       ]
+    },
+    {
+      "id": "cables/cbl-sw-ap",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "wireless/ap-home",
+          "interface": "eth0"
+        },
+        {
+          "node": "switches/sw-home",
+          "interface": "port5"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "H-005",
+      "lengthM": 6.0,
+      "vlans": [
+        10,
+        20
+      ]
+    },
+    {
+      "id": "cables/wl-ap-phone",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "wireless/ap-home",
+          "interface": "wlan0"
+        },
+        {
+          "node": "hosts/phone",
+          "interface": "en0"
+        }
+      ],
+      "medium": "wireless",
+      "wireless": {
+        "ssids": [
+          "home"
+        ],
+        "band": "5GHz",
+        "channel": 36,
+        "widthMhz": 80,
+        "accessPoint": "wireless/ap-home:wlan0"
+      },
+      "vlans": []
     },
     {
       "id": "hosts/adp-usb-eth#upstream",

@@ -48,6 +48,7 @@ from netgraph.models import (  # noqa: E402
     AdapterSpec,
     BridgeConfig,
     BridgeType,
+    Bss,
     CableSpec,
     DeviceSpec,
     Duplex,
@@ -75,6 +76,7 @@ from netgraph.models import (  # noqa: E402
     VlanDefinition,
     VlanMode,
     VlanSet,
+    WirelessConfig,
 )
 from netgraph.models.document import ELEMENT_MODELS  # noqa: E402
 from netgraph.models.element import TEMPLATE_KIND  # noqa: E402
@@ -242,6 +244,31 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "In `trunk` mode: `trunk_vlans` is required and `access_vlan` is rejected.",
             '`trunk_vlans` accepts an id, a list, `"10,20,100-110"`, `all` (1–4094) or `none`, '
             "and always serialises back to the coalesced string form.",
+        ),
+    ),
+    Section(
+        WirelessConfig,
+        "`spec.interfaces[].wireless`",
+        "The radio configuration of a `type: wifi` interface: which side of the association it "
+        "is on, where on the air it is, and which networks it serves.",
+        notes=(
+            "`channel` and `width_mhz` both require `band`: channel numbers repeat between the "
+            "2.4 GHz and 6 GHz plans, and 320 MHz exists only at 6 GHz (`NG-W003`, `NG-W004`).",
+            "A `medium: wireless` cable joins exactly one `ap` radio to one `station` or `mesh` "
+            "radio (`NG-W007`); that association is what the layer-2 view labels with "
+            "`SSID @ channel/band`.",
+        ),
+    ),
+    Section(
+        Bss,
+        "`spec.interfaces[].wireless.bss[]`",
+        "One basic service set: an SSID the radio beacons, or — on a client radio — the one it "
+        "is associated to.",
+        notes=(
+            "An `ap` radio lists one entry per SSID it serves; a `station` or `mesh` radio "
+            "lists at most one (`NG-W006`).",
+            "`vlan` is where the SSID's traffic goes on the wired side. It has to be a VLAN the "
+            "access point carries somewhere (`NG-W009`), or clients associate and reach nothing.",
         ),
     ),
     Section(

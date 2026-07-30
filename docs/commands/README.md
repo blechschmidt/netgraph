@@ -20,7 +20,7 @@ a flag that is documented exists. The prose around them is written by hand.
 | [`netgraph watch`](watch.md) | Re-render on every save, optionally serving the result. | [watch.md](watch.md) |
 | [`netgraph web`](web.md) | Edit the YAML and see the diagram side by side in a browser. | [web.md](web.md) |
 | [`netgraph path`](path.md) | Trace how two elements reach each other, hop by hop. | [path.md](path.md) |
-| [`netgraph list`](list.md) | Tabulate devices, cables, interfaces, VLANs, subnets or tunnels. | [list.md](list.md) |
+| [`netgraph list`](list.md) | Tabulate devices, cables, tunnels, VLANs, BSSs or subnets. | [list.md](list.md) |
 | [`netgraph ipam`](ipam.md) | Report utilisation, free space, overlaps and aggregates. | [ipam.md](ipam.md) |
 | [`netgraph export`](export.md) | Emit hosts files, DNS zones, Ansible, Prometheus, cable lists. | [export.md](export.md) |
 | [`netgraph show`](show.md) | Print one element as it was resolved, expansions included. | [show.md](show.md) |

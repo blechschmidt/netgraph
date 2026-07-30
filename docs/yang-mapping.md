@@ -19,6 +19,7 @@ reasoning around both.
 * [RFC 8343 — interfaces](#rfc-8343--interfaces)
 * [RFC 8344 — IP](#rfc-8344--ip)
 * [IEEE 802.1Q — bridging and VLANs](#ieee-8021q--bridging-and-vlans)
+* [IEEE 802.11 — radios, SSIDs and BSSs](#ieee-80211--radios-ssids-and-bsss)
 * [Deliberately not covered](#deliberately-not-covered)
 * [Things with no YANG home](#things-with-no-yang-home)
 * [If you want to export](#if-you-want-to-export)
@@ -33,6 +34,7 @@ reasoning around both.
 | ietf-yang-types, ietf-inet-types | — | `yang`, `inet` | [RFC 6991](https://www.rfc-editor.org/rfc/rfc6991) |
 | dot1q-bridge | `ieee802-dot1q-bridge` | `dot1q` | IEEE Std 802.1Q-2018 (the 802.1Qcp YANG modules) |
 | dot1q-types | `ieee802-dot1q-types` | `dot1qtypes` | IEEE Std 802.1Q-2018 |
+| dot11 | `ieee802-dot11` | `dot11` | IEEE Std 802.11-2020, Annex C (the MIB the module renders) |
 
 Borrowing has three concrete benefits, and they are the reason the schema looks
 the way it does rather than like a drawing tool's file format:
@@ -266,11 +268,60 @@ else:
 The consistent test: **would the diagram be different?** If the answer is no,
 the node is not modelled.
 
+## IEEE 802.11 — radios, SSIDs and BSSs
+
+The 802.11 management model is a MIB first and a YANG module second: IEEE
+publishes it as `ieee802-dot11`, whose containers and leaves are the `dot11Xxx`
+attributes of Annex C rendered in YANG's hyphenated lower-case spelling. That
+is the spelling used below, and the paths augment the RFC 8343 interface the
+radio is:
+
+```
+/if:interfaces/if:interface[if:type='ianaift:ieee80211']/dot11:wireless-interface
+```
+
+An interface of `type: wifi` already maps to `ianaift:ieee80211` (§9.1). The
+`wireless` block of §6.2.6 is what hangs beneath it.
+
+### The radio
+
+| YAML | YANG node | Notes |
+|---|---|---|
+| `wireless.role` | `…/dot11:station-config/dot11:desired-bss-type` | Approximate. The MIB distinguishes infrastructure from independent BSS, not "which side am I"; `ap` and `station` are that distinction seen from the two ends, and `mesh` has no counterpart at all — 802.11s mesh STAs are a separate subtree netgraph does not model. |
+| `wireless.band` | `…/dot11:phy/dot11:channel-starting-factor` | This is genuinely how 802.11 disambiguates the band: the starting factor anchors channel numbering (2407, 5000 and 5950 MHz), which is exactly why netgraph refuses a `channel` without a `band`. |
+| `wireless.channel` | `…/dot11:phy/dot11:current-channel-number` | The primary 20 MHz channel. |
+| `wireless.width_mhz` | `…/dot11:phy/dot11:current-channel-width` | 802.11n added the attribute; the 320 MHz value is 802.11be. |
+| `wireless.tx_power_dbm` | `…/dot11:phy/dot11:current-tx-power-level` | Approximate. The MIB numbers up to eight abstract *power levels* per PHY and states their dBm elsewhere; netgraph records the dBm, because that is what a survey and a regulatory limit are both written in. |
+
+### The service sets
+
+| YAML | YANG node | Notes |
+|---|---|---|
+| `bss[].ssid` | `…/dot11:bss/dot11:ssid` (`dot11DesiredSSID` on a client) | An octet string of 1–32 bytes in both models. |
+| `bss[].bssid` | `…/dot11:bss/dot11:bssid` | On an AP this is the address the radio beacons with; on a client, `dot11DesiredBSSID`. |
+| `bss[].security` | `…/dot11:bss/dot11:rsna-enabled` + `dot11:privacy-invoked` | One enum standing for several booleans: `open` is neither, and the four WPA values are RSNA with a PSK or an 802.1X authentication server. The cipher suite negotiated on top is not modelled. |
+| `bss[].hidden` | — | Beacon SSID suppression is vendor configuration; 802.11 has no attribute for it, and it is recorded because it explains why a network is missing from a scan. |
+| `bss[].vlan` | — | 802.1Q, not 802.11: it is the VLAN the AP bridges that BSS into, and it is checked against the device's VLAN database and its ports (`NG-V004`, `NG-W009`). |
+
+### What netgraph does not model from 802.11
+
+| Area | Why not |
+|---|---|
+| Associated stations: `dot11:association-table`, RSSI, rates, last-seen | Operational state, and the most volatile in the whole model. An association a file claims is stale before the file is saved. netgraph records the associations that are *infrastructure* — a mesh backhaul, a wireless bridge, a fixed client — as `medium: wireless` links, and nothing else. |
+| PHY detail: modulation, MCS sets, guard interval, spatial streams, beamforming | Capability and negotiation. Two radios differing only in MCS draw the same diagram. |
+| Regulatory: country codes, DFS state, channel availability | The channel a radio is *allowed* to use is a function of where it is; netgraph records the channel it is set to. DFS radar events are live state. |
+| 802.11r/k/v roaming, band steering, airtime fairness | Behaviour on top of the topology, and vendor-specific in practice. |
+| RSN detail: cipher suites, AKM lists, PMK caching, 802.1X server addresses | `security` records what a reader of a diagram needs — is it open, is there a passphrase, is there an authentication server. The suite negotiation belongs to the device configuration. |
+| Multiple radios per band, radio resource management | A radio is an interface here. An AP with three radios declares three `wifi` interfaces, which is the honest model; what an RRM controller then does with them is not. |
+
+The same test applies: **would the diagram be different?**
+
 ## Deliberately not covered
 
-The three tables above — [RFC 8343](#what-netgraph-does-not-model-from-rfc-8343),
-[RFC 8344](#what-netgraph-does-not-model-from-rfc-8344) and
-[802.1Q](#what-netgraph-does-not-model-from-8021q) — are not a to-do list. They
+The four tables above — [RFC 8343](#what-netgraph-does-not-model-from-rfc-8343),
+[RFC 8344](#what-netgraph-does-not-model-from-rfc-8344),
+[802.1Q](#what-netgraph-does-not-model-from-8021q) and
+[802.11](#what-netgraph-does-not-model-from-80211) — are not a to-do list. They
 are the scope boundary, and every entry falls into one of three buckets:
 
 1. **Operational state.** Anything a device's answer would change without

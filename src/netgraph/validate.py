@@ -64,6 +64,7 @@ from netgraph.models import (
     AGGREGATE_TYPES,
     PATCHPANEL_KIND,
     Adapter,
+    Bss,
     Cable,
     Computer,
     Device,
@@ -83,6 +84,7 @@ from netgraph.models import (
     Tunnel,
     VlanConfig,
     VlanMode,
+    WirelessConfig,
 )
 from netgraph.models.metadata import Location
 from netgraph.models.scalars import MAX_VLAN_ID, MIN_VLAN_ID, format_bitrate
@@ -1154,6 +1156,11 @@ def _check_unaddressed_interface(ctx: _Context) -> Iterator[_Draft]:
                 continue
             if interface.vlan is not None:
                 continue
+            # An 'ap' radio bridges its BSSs onto the air (§6.2.6). That is
+            # switching, whether or not the SSIDs are mapped to a VLAN, so the
+            # port needs no address to be doing something.
+            if interface.wireless is not None and interface.wireless.role.is_ap:
+                continue
             if ctx.bridges_frames(fqn, interface.name):
                 continue
             yield _Draft(
@@ -1834,6 +1841,10 @@ def _check_undeclared_vlan(ctx: _Context) -> Iterator[_Draft]:
     entirely. VLAN 1 is skipped too: 802.1Q gives every bridge a Default VLAN
     nobody configures, and the schema itself defaults ``access_vlan`` to it, so
     reporting it would fire on every port that simply left the field out.
+
+    An SSID's ``vlan`` (§6.2.6) is a port membership like any other — it is the
+    VLAN the radio bridges that BSS into — so it is checked against the same
+    database and reported against the BSS that names it.
     """
     for fqn, device in ctx.inventory.devices.items():
         declared = {vlan.id for vlan in device.spec.vlans}
@@ -1841,19 +1852,28 @@ def _check_undeclared_vlan(ctx: _Context) -> Iterator[_Draft]:
             continue
         for interface in device.interfaces:
             vlan = interface.vlan
-            if vlan is None or _trunks_every_vlan(vlan):
+            if vlan is not None and not _trunks_every_vlan(vlan):
+                missing = sorted(vlan.vlan_ids() - declared - {MIN_VLAN_ID})
+                if missing:
+                    yield _Draft(
+                        f"port {_q(f'{fqn}:{interface.name}')} is a member of "
+                        f"{'VLAN' if len(missing) == 1 else 'VLANs'} "
+                        f"{_join_plain([str(vlan_id) for vlan_id in missing])}, which "
+                        f"{_q(fqn)} does not declare in 'vlans'",
+                        (fqn,),
+                        _index_path(device, interface.name, "vlan"),
+                    )
+            if interface.wireless is None:
                 continue
-            missing = sorted(vlan.vlan_ids() - declared - {MIN_VLAN_ID})
-            if not missing:
-                continue
-            yield _Draft(
-                f"port {_q(f'{fqn}:{interface.name}')} is a member of "
-                f"{'VLAN' if len(missing) == 1 else 'VLANs'} "
-                f"{_join_plain([str(vlan_id) for vlan_id in missing])}, which "
-                f"{_q(fqn)} does not declare in 'vlans'",
-                (fqn,),
-                _index_path(device, interface.name, "vlan"),
-            )
+            for index, entry in enumerate(interface.wireless.bss):
+                if entry.vlan is None or entry.vlan in declared or entry.vlan == MIN_VLAN_ID:
+                    continue
+                yield _Draft(
+                    f"SSID {_q(entry.ssid)} on {_q(f'{fqn}:{interface.name}')} is bridged into "
+                    f"VLAN {entry.vlan}, which {_q(fqn)} does not declare in 'vlans'",
+                    (fqn,),
+                    _index_path(device, interface.name, "wireless", "bss", index, "vlan"),
+                )
 
 
 def _check_sub_interface_vlan(ctx: _Context) -> Iterator[_Draft]:
@@ -2413,6 +2433,306 @@ def _hub_domains(ctx: _Context) -> Iterator[tuple[tuple[str, ...], list[_HubPeer
                 if prefixes:
                     peers.append((far.owner_fqn, f"{far.owner_fqn}:{interface.name}", prefixes))
         yield tuple(domain), peers
+
+
+# --------------------------------------------------------------------------- #
+# Wireless (§10.14)
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True, slots=True)
+class _Radio:
+    """One ``wifi`` interface that declares a ``wireless`` block (§6.2.6).
+
+    Resolved into this shape because four rules read the same three things —
+    which element the radio is on, which side of the association it is, and what
+    it puts on the air — and because a ``wifi`` interface *without* a block has
+    to stay invisible to all of them: an absent block is "not modelled", not
+    "no SSIDs".
+    """
+
+    owner_fqn: str
+    owner: InterfaceOwner
+    interface: Interface
+    wireless: WirelessConfig
+
+    @property
+    def port(self) -> str:
+        """``element:interface``, the spelling every diagnostic uses."""
+        return f"{self.owner_fqn}:{self.interface.name}"
+
+    @property
+    def is_ap(self) -> bool:
+        return self.wireless.role.is_ap
+
+    @property
+    def domains(self) -> frozenset[int | None]:
+        """The broadcast domains this radio bridges onto the air.
+
+        ``None`` is the untagged domain, and is also what a radio with no BSS at
+        all is taken to be on: an access point that names no SSID still bridges
+        *something*, and treating it as tagged would make it share a domain with
+        nobody.
+        """
+        if not self.wireless.bss:
+            return frozenset({None})
+        return frozenset(entry.vlan for entry in self.wireless.bss)
+
+    def path(self, *suffix: str | int) -> tuple[str | int, ...]:
+        return _interface_path(self.owner, self.interface, "wireless", *suffix)
+
+
+def _radios(ctx: _Context) -> Iterator[_Radio]:
+    """Every configured radio in the inventory, in load order."""
+    for fqn, owner in ctx.owners.items():
+        for interface in owner.interfaces:
+            wireless = interface.wireless
+            if wireless is not None:
+                yield _Radio(fqn, owner, interface, wireless)
+
+
+def _link_radios(ctx: _Context) -> Iterator[tuple[str, tuple[_Radio, _Radio]]]:
+    """Each wireless cable whose two ends both declare a ``wireless`` block.
+
+    ``E011`` already reports a ``medium: wireless`` cable that lands on
+    something which is not a radio at all, so a link is only interesting here
+    once both ends are radios *and* both have said what they are.
+    """
+    for cable_fqn, first, second in _linked_endpoints(ctx):
+        if first.cable.spec.medium is not Medium.WIRELESS:
+            continue
+        ends: list[_Radio] = []
+        for end in (first, second):
+            owner = ctx.owners.get(end.owner_fqn) if end.owner_fqn is not None else None
+            interface = end.interface
+            if owner is None or interface is None or interface.wireless is None:
+                continue
+            ends.append(_Radio(str(end.owner_fqn), owner, interface, interface.wireless))
+        if len(ends) == 2:
+            yield cable_fqn, (ends[0], ends[1])
+
+
+def _check_wireless_association(ctx: _Context) -> Iterator[_Draft]:
+    """E028 — a wireless link is not an AP-to-client association (``NG-W007``).
+
+    An 802.11 link has a direction that a cable does not: one radio beacons and
+    the other joins it. Two access points on one link is a document describing
+    interference rather than a link, and two client radios is a link that no
+    frame ever crosses — neither will beacon, so neither can be joined. A mesh
+    node's backhaul is the second case's legitimate cousin and is written as
+    ``role: mesh`` against the AP-role radio it associates to.
+    """
+    for cable_fqn, (first, second) in _link_radios(ctx):
+        aps = [radio for radio in (first, second) if radio.is_ap]
+        if len(aps) == 1:
+            continue
+        if len(aps) == 2:
+            problem = (
+                f"joins two 'ap' radios ({_join([first.port, second.port])}); one end has to "
+                f"associate to the other, so it must be 'role: station' or 'role: mesh'"
+            )
+        else:
+            roles = _join_plain(
+                [
+                    f"{_q(radio.port)} is {_q(radio.wireless.role.value)}"
+                    for radio in (first, second)
+                ]
+            )
+            problem = (
+                f"joins no 'ap' radio ({roles}); neither end beacons, so there is no BSS for "
+                f"the other to associate to"
+            )
+        yield _Draft(
+            f"cable {_q(cable_fqn)} {problem}",
+            tuple(dict.fromkeys([cable_fqn, first.owner_fqn, second.owner_fqn])),
+            ("spec", "endpoints"),
+        )
+
+
+def _check_duplicate_bssid(ctx: _Context) -> Iterator[_Draft]:
+    """E029 — two radios advertise the same BSSID (``NG-W008``).
+
+    A BSSID identifies one basic service set to every client in earshot. Two of
+    them answering to one address is the wireless equivalent of ``E003``: frames
+    for one arrive at the other, and a client that roams between them never
+    knows it moved. Repeats *within* one radio are ``NG-W005``, at schema time.
+
+    Only ``ap`` radios are compared. A client's BSS entry records the BSSID it
+    joined, so it is *supposed* to repeat the access point's — that is what
+    makes it the same service set.
+    """
+    groups: dict[str, list[tuple[_Radio, int, Bss]]] = {}
+    for radio in _radios(ctx):
+        if not radio.is_ap:
+            continue
+        for index, entry in enumerate(radio.wireless.bss):
+            if entry.bssid is not None:
+                groups.setdefault(entry.bssid, []).append((radio, index, entry))
+
+    for bssid, entries in groups.items():
+        if len(entries) < 2:
+            continue
+        # Two SSIDs sharing an address are equally guilty; order by port so the
+        # finding does not move when an unrelated file is renamed (see _by_port).
+        ordered = sorted(entries, key=lambda entry: (entry[0].port, entry[2].ssid))
+        described = [f"{_q(radio.port)} ({_q(entry.ssid)})" for radio, _, entry in ordered]
+        yield _Draft(
+            f"BSSID {bssid} is advertised by {count_text(len(ordered), 'BSS')}: "
+            f"{_join_plain(described)}",
+            tuple(dict.fromkeys(radio.owner_fqn for radio, _, _ in ordered)),
+            ordered[0][0].path("bss", ordered[0][1], "bssid"),
+        )
+
+
+def _check_bss_vlan_carried(ctx: _Context) -> Iterator[_Draft]:
+    """E030 — an SSID's VLAN is carried nowhere on the AP (``NG-W009``).
+
+    An SSID that maps to a VLAN is a bridge between the air and that VLAN. If
+    no interface of the access point is a member of it, the far side of that
+    bridge is missing: clients associate, get an address from nowhere and reach
+    nothing. ``W113`` is the neighbouring, weaker statement — the VLAN is not in
+    the device's ``vlans`` database — and this one is about the ports.
+
+    A port trunking ``all`` carries whatever is asked of it, so an access point
+    with one of those cannot be wrong here.
+    """
+    for radio in _radios(ctx):
+        if not radio.is_ap:
+            continue
+        carried: set[int] = set()
+        unbounded = False
+        for interface in radio.owner.interfaces:
+            vlan = interface.vlan
+            if vlan is None:
+                continue
+            if _trunks_every_vlan(vlan):
+                unbounded = True
+                break
+            carried |= vlan.vlan_ids()
+        if unbounded:
+            continue
+        for index, entry in enumerate(radio.wireless.bss):
+            if entry.vlan is None or entry.vlan in carried:
+                continue
+            yield _Draft(
+                f"SSID {_q(entry.ssid)} on {_q(radio.port)} is bridged into VLAN {entry.vlan}, "
+                f"which {_q(radio.owner_fqn)} carries on no interface; the access point has no "
+                f"path out of that VLAN",
+                (radio.owner_fqn,),
+                radio.path("bss", index, "vlan"),
+            )
+
+
+def _check_associated_ssid(ctx: _Context) -> Iterator[_Draft]:
+    """E031 — a client joins an SSID its AP does not advertise (``NG-W010``).
+
+    The association names a BSS, and the BSS is the access point's to define.
+    An SSID that appears on the client and nowhere on the AP is either a typo or
+    a record of the network as it used to be; either way the link drawn from it
+    does not exist.
+
+    An access point that lists no BSS at all is not modelling its SSIDs, so
+    there is nothing to contradict and the rule stays quiet.
+    """
+    for _, (first, second) in _link_radios(ctx):
+        aps = [radio for radio in (first, second) if radio.is_ap]
+        if len(aps) != 1:
+            continue  # E028 owns a link that is not one AP and one client
+        ap = aps[0]
+        client = second if ap is first else first
+        advertised = ap.wireless.ssids
+        if not advertised:
+            continue
+        for index, entry in enumerate(client.wireless.bss):
+            if entry.ssid in advertised:
+                continue
+            yield _Draft(
+                f"{_q(client.port)} is associated to SSID {_q(entry.ssid)}, which "
+                f"{_q(ap.port)} does not advertise; it beacons "
+                f"{_join(list(advertised))}",
+                tuple(dict.fromkeys([client.owner_fqn, ap.owner_fqn])),
+                client.path("bss", index, "ssid"),
+            )
+
+
+def _check_cochannel_aps(ctx: _Context) -> Iterator[_Draft]:
+    """W134 — two APs in one broadcast domain overlap in frequency (``NG-W011``).
+
+    Two access points bridging the same domain are meant to extend each other's
+    coverage, which only works if they are on different frequencies: radios that
+    overlap take turns instead of working in parallel, so the pair delivers
+    roughly the throughput of one. It is a warning rather than an error because
+    a deliberate same-channel deployment exists — a repeater has no choice but
+    to sit on its parent's channel — and because the schema records no
+    geometry, so netgraph cannot know the two are far enough apart to be
+    harmless.
+
+    "One broadcast domain" is read as: the two elements are joined by the
+    topology *and* the radios put a common VLAN on the air (an SSID with no
+    ``vlan`` counts as the untagged domain). Both halves matter — VLAN 10 on two
+    unconnected islands is two domains that share a number, exactly as in
+    :func:`netgraph.graph.broadcast_domains`.
+    """
+    radios = [radio for radio in _radios(ctx) if radio.is_ap and radio.wireless.band is not None]
+    if len(radios) < 2:
+        return
+
+    islands = {
+        fqn: index
+        for index, component in enumerate(_components(ctx.owners, _topology_links(ctx)))
+        for fqn in component
+    }
+    for left, right in itertools.combinations(radios, 2):
+        if islands.get(left.owner_fqn, -1) != islands.get(right.owner_fqn, -2):
+            continue
+        if left.wireless.band is not right.wireless.band:
+            continue
+        shared = left.domains & right.domains
+        if not shared:
+            continue
+        overlap = _overlapping_spans(left, right)
+        if overlap is None:
+            continue
+        first, second = sorted((left, right), key=lambda radio: radio.port)
+        yield _Draft(
+            f"access points {_q(first.port)} ({_describe_radio(first)}) and {_q(second.port)} "
+            f"({_describe_radio(second)}) both serve {_describe_domains(shared)} and their "
+            f"channels overlap ({overlap}); co-channel radios take turns rather than adding up",
+            tuple(dict.fromkeys([first.owner_fqn, second.owner_fqn])),
+            first.path("channel"),
+        )
+
+
+def _overlapping_spans(left: _Radio, right: _Radio) -> str | None:
+    """``2402-2422 MHz and 2412-2432 MHz`` when the two radios overlap.
+
+    ``None`` means they do not, which includes either of them not stating a
+    channel: a band alone says nothing about which 20 MHz slice is in use.
+    """
+    first, second = left.wireless.span_mhz(), right.wireless.span_mhz()
+    if first is None or second is None:
+        return None
+    if first[0] >= second[1] or second[0] >= first[1]:
+        return None
+    return " and ".join(f"{low:g}-{high:g} MHz" for low, high in (first, second))
+
+
+def _describe_radio(radio: _Radio) -> str:
+    """``channel 6/2.4GHz, 40 MHz`` — how a radio is tuned."""
+    parts = [f"channel {radio.wireless.channel_text}"]
+    if radio.wireless.width_mhz is not None:
+        parts.append(f"{radio.wireless.width_mhz} MHz")
+    return ", ".join(parts)
+
+
+def _describe_domains(domains: frozenset[int | None]) -> str:
+    """``VLAN 10`` / ``the untagged domain``, for a set of them."""
+    return _join_plain([_describe_scope(domain) for domain in sorted(domains, key=_domain_sort)])
+
+
+def _domain_sort(domain: int | None) -> tuple[int, int]:
+    """Order the untagged domain first, then VLANs by id."""
+    return (1, domain) if domain is not None else (0, 0)
 
 
 # --------------------------------------------------------------------------- #
@@ -3200,6 +3520,10 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("E025", _check_rack_overlap),
     ("E026", _check_rack_height),
     ("E027", _check_rack_height_agreement),
+    ("E028", _check_wireless_association),
+    ("E029", _check_duplicate_bssid),
+    ("E030", _check_bss_vlan_carried),
+    ("E031", _check_associated_ssid),
     ("W101", _check_unaddressed_interface),
     ("W102", _check_mtu_mismatch),
     ("W103", _check_orphan_device),
@@ -3233,6 +3557,7 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("W131", _check_nested_prefix_domains),
     ("W132", _check_link_prefixes),
     ("W133", _check_dangling_patch),
+    ("W134", _check_cochannel_aps),
     ("I001", _check_local_mac),
     ("I002", _check_uncabled_interface),
     ("I003", _check_nonstandard_port),
@@ -3351,13 +3676,13 @@ def _by_port(entries: Sequence[tuple[str, Interface]]) -> list[tuple[str, Interf
 
 
 def _interface_path(
-    owner: InterfaceOwner, interface: Interface, *suffix: str
+    owner: InterfaceOwner, interface: Interface, *suffix: str | int
 ) -> tuple[str | int, ...]:
     """Field path of an interface inside its element document."""
     return _index_path(owner, interface.name, *suffix)
 
 
-def _index_path(owner: InterfaceOwner, name: str, *suffix: str) -> tuple[str | int, ...]:
+def _index_path(owner: InterfaceOwner, name: str, *suffix: str | int) -> tuple[str | int, ...]:
     """Field path of the interface called ``name`` inside its element document."""
     for index, candidate in enumerate(owner.interfaces):
         if candidate.name == name:

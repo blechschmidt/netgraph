@@ -300,6 +300,10 @@ def _edge_text(edge: Edge, layer: Layer, options: RenderOptions) -> str:
         return " · ".join(parts)
 
     if layer is Layer.L2:
+        # See ``netgraph.render.dot._edge_label``: the SSID and the channel are
+        # the layer-2 facts about a radio link.
+        if edge.wireless is not None and (association := edge.wireless.describe()):
+            parts.append(association)
         if options.show_vlans and edge.vlans:
             parts.append(f"vlan {_compact_ids(edge.vlans)}")
     else:

@@ -349,6 +349,8 @@ and resolves to the element as a whole.
 | `mtu` | Integer ≥ 68 for IPv4, ≥ 1280 for IPv6, ≤ 65535. | `uint16` / `uint32` |
 | `vlan-id` | Integer 1–4094. 0 (priority-tagged) and 4095 (reserved) are rejected. | `dot1qtypes:vlanid` |
 | `vlan-set` | List of `vlan-id`, inclusive range strings (`"100-110"`), or the literal `all` (= 1–4094) / `none`. Normalised to a sorted, coalesced set. | `dot1qtypes:vid-range-type` |
+| `ssid` | Network name: 1 to 32 **octets**, not characters. Any byte sequence; stored exactly as written. | `dot11:ssid` |
+| `dbm` | Radiated power in dBm, -30 to 40. Integers are accepted and widened. | — |
 | `speed` | Bit rate. Either an integer in bit/s, or `<number><unit>` with unit `bps`, `kbps`, `Mbps`, `Gbps`, `Tbps` (decimal multiples: 1 Gbps = 1 000 000 000 bit/s). Normalised to `uint64` bit/s; rendered back in the largest exact unit. | `yang:gauge64` (`if:speed`) |
 | `length` | Non-negative number of metres (`length_m`). | — |
 
@@ -400,6 +402,7 @@ free of boilerplate.
 | `ipv4` | AddressFamily | O | `null` | §6.2.3. |
 | `ipv6` | AddressFamily | O | `null` | §6.2.3. |
 | `vlan` | Vlan | O | `null` | §6.2.4. |
+| `wireless` | Wireless | O | `null` | §6.2.6. `type: wifi` only (`NG-W002`). |
 | `parent` | ifname | C | — | Required for `type: vlan`, optional for `type: tunnel`, MUST NOT appear otherwise. → `if:lower-layer-if`. |
 | `members` | list[ifname] | C | — | Required for `type: lag` and `type: bridge`; MUST NOT appear otherwise. → `if:lower-layer-if`. |
 
@@ -561,6 +564,110 @@ duplicates remain `NG-I001`.
 | `NG-R003` | error | Expanding a document's ranges produces at most 4096 interfaces. |
 | `NG-R004` | error | An expanded interface name does not collide with another interface of the same element. |
 | `NG-R005` | error | Every `{...}` placeholder in a range `description` is empty or names a span the range declares, and every brace is paired. |
+
+#### 6.2.6 `wireless`
+
+A `wifi` interface without this block is a radio netgraph knows nothing about:
+`medium: wireless` joins two of them and the diagram draws a dashed line, but
+nothing says which network is on the air, in which direction, or on which
+frequency. The block supplies exactly that.
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `role` | enum | M | — | `ap`, `station` or `mesh`. §6.2.6.1. |
+| `band` | enum | O | `null` | `2.4GHz`, `5GHz` or `6GHz`. Required alongside `channel` and `width_mhz`. |
+| `channel` | integer | O | `null` | The primary 20 MHz channel, as the band numbers it (`NG-W003`). |
+| `width_mhz` | enum | O | `null` | `20`, `40`, `80`, `160` or `320`, bounded by the band (`NG-W004`). |
+| `tx_power_dbm` | dbm | O | `null` | Radiated power. |
+| `bss` | list[Bss] | O | `[]` | The basic service sets this radio beacons or joins. §6.2.6.2. |
+
+##### 6.2.6.1 `role`
+
+| `role` | Meaning |
+|---|---|
+| `ap` | The radio beacons. It owns the SSIDs, the channel and the frequency width, and bridges each BSS into a VLAN. |
+| `station` | A client: it associates to one BSS of one access point. |
+| `mesh` | The backhaul radio of a mesh node — a station that relays rather than consumes. Drawn as infrastructure, not as a client. |
+
+A `medium: wireless` cable is an *association*, so it joins exactly one `ap`
+radio to one `station` or `mesh` radio (`NG-W007`). Two access points on one
+link describe interference rather than a link; two clients describe a link no
+frame can cross.
+
+##### 6.2.6.2 `bss[]`
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `ssid` | ssid | M | — | The network name. Unique within one radio (`NG-W005`). |
+| `bssid` | mac | O | `null` | MAC address of this BSS. Unique across the inventory among `ap` radios (`NG-W008`). |
+| `vlan` | vlan-id | O | `null` | The VLAN this SSID is bridged into; absent means the radio's untagged domain. Checked against the device VLAN database (`NG-V004`) and against the VLANs the AP carries (`NG-W009`). |
+| `security` | enum | O | `null` | `open`, `wpa2-psk`, `wpa2-eap`, `wpa3-psk` or `wpa3-eap`. Absent means "not recorded", which is deliberately not the same as `open`. |
+| `hidden` | boolean | O | `false` | The SSID is left out of the beacon. It is still on the air. |
+
+On an `ap` radio each entry is one SSID the radio beacons; a dual-SSID access
+point has two. On a `station` or `mesh` radio there is at most one entry
+(`NG-W006`) — the association — and it names the SSID, and optionally the
+BSSID, the radio joined:
+
+```yaml
+# On the access point
+- name: wlan0
+  type: wifi
+  mac: '78:8a:20:aa:00:10'
+  wireless:
+    role: ap
+    band: 5GHz
+    channel: 36
+    width_mhz: 80
+    tx_power_dbm: 23
+    bss:
+      - {ssid: home, bssid: '78:8a:20:aa:00:11', vlan: 10, security: wpa3-psk}
+      - {ssid: home-guest, bssid: '78:8a:20:aa:00:12', vlan: 20, security: wpa2-psk}
+
+# On the client
+- name: en0
+  type: wifi
+  wireless:
+    role: station
+    band: 5GHz
+    channel: 36
+    bss:
+      - {ssid: home, bssid: '78:8a:20:aa:00:11'}
+```
+
+**One association per radio.** A cable terminates an interface once
+(`NG-C005`), and an association is a cable, so one radio serves one client in
+this model. An access point with thirty phones on it is not something an
+inventory is meant to enumerate: declare the associations that are part of the
+*infrastructure* — a mesh backhaul, a wireless bridge, a fixed client — and
+leave the transient ones out.
+
+**Channels are per band.** Channel 1 exists at 2.4 GHz and at 6 GHz and means
+5 MHz apart in one case and nearly 3.5 GHz apart in the other, which is why
+`channel` without `band` is refused rather than guessed. The legal numbers are
+1–14 (2.4 GHz), the 802.11 UNII numbering 32–177 (5 GHz) and 1–233 in steps of
+four (6 GHz).
+
+**Frequency overlap** is computed by centring `width_mhz` on the primary
+channel; the real centre of a bonded channel depends on which secondary
+channels the radio picked, which no document states. `NG-W011` uses the
+approximation, which can only make it warn more readily, never less.
+
+The projection onto `ieee802-dot11` is §9.6.
+
+| ID | Sev. | Rule |
+|---|---|---|
+| `NG-W001` | error | `ssid` is between 1 and 32 octets. |
+| `NG-W002` | error | `wireless` appears only on an interface of `type: wifi`. |
+| `NG-W003` | error | `channel` names `band`, and is a channel that band numbers. |
+| `NG-W004` | error | `width_mhz` names `band`, and is a width that band supports. |
+| `NG-W005` | error | `ssid` and `bssid` are each unique within one radio. |
+| `NG-W006` | error | A `station` or `mesh` radio lists at most one BSS. |
+| `NG-W007` | error | A `medium: wireless` cable joins exactly one `ap` radio to one `station` or `mesh` radio. |
+| `NG-W008` | error | A `bssid` is advertised by at most one `ap` radio in the inventory. |
+| `NG-W009` | error | An SSID's `vlan` is carried by at least one interface of the access point. |
+| `NG-W010` | error | A client radio's SSID is one the access point at the far end advertises. |
+| `NG-W011` | warning | Two access points in one broadcast domain do not overlap in frequency. |
 
 ### 6.3 `bridge`
 
@@ -990,6 +1097,31 @@ If both endpoints and the cable declare a speed, they MUST agree (`NG-C008`).
 | *(derived)* | `if:higher-layer-if` on the upstream port lists every downstream interface |
 | `upstream.attached_to` | no YANG node; a netgraph topology edge |
 
+### 9.6 Wireless (IEEE 802.11)
+
+`ieee802-dot11` renders the `dot11Xxx` attributes of IEEE Std 802.11-2020
+Annex C as YANG leaves. The `wireless` block augments the interface that is the
+radio — `if:type = ianaift:ieee80211` — under
+`/if:interfaces/if:interface/dot11:wireless-interface`:
+
+| YAML | YANG node |
+|---|---|
+| `wireless.role` | `…/dot11:station-config/dot11:desired-bss-type` (approximate; `mesh` has no counterpart) |
+| `wireless.band` | `…/dot11:phy/dot11:channel-starting-factor` (2407 / 5000 / 5950 MHz) |
+| `wireless.channel` | `…/dot11:phy/dot11:current-channel-number` |
+| `wireless.width_mhz` | `…/dot11:phy/dot11:current-channel-width` |
+| `wireless.tx_power_dbm` | `…/dot11:phy/dot11:current-tx-power-level` (the MIB numbers abstract levels; netgraph records dBm) |
+| `bss[].ssid` | `…/dot11:bss/dot11:ssid` (`dot11DesiredSSID` on a client radio) |
+| `bss[].bssid` | `…/dot11:bss/dot11:bssid` (`dot11DesiredBSSID` on a client radio) |
+| `bss[].security` | `…/dot11:bss/dot11:rsna-enabled` plus `dot11:privacy-invoked` |
+| `bss[].vlan` | 802.1Q, not 802.11: the VLAN the AP bridges the BSS into |
+| `bss[].hidden` | no YANG node; beacon suppression is vendor configuration |
+
+Associated stations, PHY capabilities, regulatory state and RSN cipher
+negotiation are **not** modelled; see
+[`docs/yang-mapping.md`](yang-mapping.md#what-netgraph-does-not-model-from-80211).
+
+
 ---
 
 ## 10. Validation rules
@@ -1208,6 +1340,11 @@ first assigned: `E` error, `W` warning, `I` info.
 | `W130` | warning | `NG-A010` | One prefix is claimed by interfaces in two VLANs that hold addresses of their own. When the addresses are identical it is `W106`/`E004` instead. |
 | `W131` | warning | `NG-A011` | A nested prefix is used in a VLAN its parent prefix is not. |
 | `W132` | warning | `NG-A012` | The two ends of a cable are addressed in prefixes that do not overlap. Only families both ends configure are compared. |
+| `E028` | error | `NG-W007` | A `medium: wireless` cable joins two radios that are not one `ap` and one `station`/`mesh`. Checked once both ends declare a `wireless` block. |
+| `E029` | error | `NG-W008` | Two `ap` radios advertise the same `bssid`. A client's BSS entry repeats the AP's by design and is exempt. |
+| `E030` | error | `NG-W009` | An SSID's `vlan` is carried by no interface of the access point. An AP with a port trunking `all` is exempt. |
+| `E031` | error | `NG-W010` | A client radio's SSID is not one the `ap` radio at the far end advertises. An AP listing no BSS is exempt. |
+| `W134` | warning | `NG-W011` | Two access points that share a broadcast domain are in one band with overlapping channels. |
 
 Ids are permanent (§10), so a suppression written today keeps meaning the same
 thing. Where a short id covers two schema ids (`E001`), naming either alias
@@ -1279,6 +1416,25 @@ are append-only (§12), so a group added in a later revision lands at the end.
 | `NG-U002` | error | No element extends past the declared `rack_height` of its rack. |
 | `NG-U003` | error | Every element in one rack declares the same `rack_height`. |
 | `NG-U004` | error | `position` and `rack_height` are only written alongside a `rack`. |
+
+### 10.14 Wireless
+
+| ID | Sev. | Rule |
+|---|---|---|
+| `NG-W001` | error | `ssid` is between 1 and 32 octets. |
+| `NG-W002` | error | `wireless` appears only on an interface of `type: wifi`. |
+| `NG-W003` | error | `channel` names `band`, and is a channel that band numbers. |
+| `NG-W004` | error | `width_mhz` names `band`, and is a width that band supports. |
+| `NG-W005` | error | `ssid` and `bssid` are each unique within one radio. |
+| `NG-W006` | error | A `station` or `mesh` radio lists at most one BSS. |
+| `NG-W007` | error | A `medium: wireless` cable joins exactly one `ap` radio to one `station` or `mesh` radio. |
+| `NG-W008` | error | A `bssid` is advertised by at most one `ap` radio in the inventory. |
+| `NG-W009` | error | An SSID's `vlan` is carried by at least one interface of the access point. |
+| `NG-W010` | error | A client radio's SSID is one the access point at the far end advertises. |
+| `NG-W011` | warning | Two access points in one broadcast domain do not overlap in frequency. |
+
+`NG-W001` to `NG-W006` are schema rules, reported while the document is parsed
+and not suppressible; the rest are semantic and carry the short ids of §10.10.
 
 ---
 
@@ -2249,7 +2405,6 @@ their absence:
 * **Host-side expansion ports**: a `usb`/`thunderbolt` interface type on
   devices, which would let `upstream.attached_to` name a specific receptacle
   (§8.1).
-* **Wireless detail**: SSIDs, bands, channels, and BSS-to-SSID mapping.
 * **Per-inventory configuration** beyond validation and rendering:
   `netgraph.toml` at the inventory root carries rule suppression and severity
   overrides (§10.11), a `[render]` table of renderer defaults and any number of

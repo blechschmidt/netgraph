@@ -189,9 +189,11 @@ a dozen devices, nothing will ever be ambiguous:
 home-lab/
 ├── routers/rtr-home.yaml
 ├── switches/sw-home.yaml
+├── wireless/ap-home.yaml
 ├── hosts/
 │   ├── pc-desk.yaml
 │   ├── laptop.yaml
+│   ├── phone.yaml
 │   ├── srv-nas.yaml
 │   └── adp-usb-eth.yaml            # an adapter is a document like any other
 └── cables/links.yaml               # every cable, one file

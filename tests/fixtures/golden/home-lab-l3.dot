@@ -26,6 +26,12 @@ graph netgraph {
       <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
     </TABLE>
   >];
+  "hosts/phone" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="phone [computer]\nnamespace: hosts\nWireless-only client. It reaches the network through its association to ap-home, which is declared as a `medium: wireless` cable - the association is the link.\nlabels: owner=sam, role=mobile, site=home\ninterfaces (1):\n  en0  wifi  192.168.10.40/24, 2001:db8:10::40/64  f0:18:98:11:22:33\nlinks (2):\n  en0 — subnet:192.168.10.0/24  (subnet)\n  en0 — subnet:2001:db8:10::/64  (subnet)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>phone</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+    </TABLE>
+  >];
   "hosts/srv-nas" [shape=cylinder, fillcolor="#eae2f5", color="#7c3aed", tooltip="srv-nas [server]\nnamespace: hosts\nBackup and media server\nlabels: env=prod, role=storage, site=home\nvlans: 10\ninterfaces (2):\n  lo  loopback  127.0.0.1/8, ::1/128\n  eth0  ethernet  192.168.10.10/24, 2001:db8:10::10/64  00:11:32:40:01:01\nlinks (2):\n  eth0 — subnet:192.168.10.0/24  (subnet)\n  eth0 — subnet:2001:db8:10::/64  (subnet)", label=<
     <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
       <TR><TD COLSPAN="3" ALIGN="CENTER"><B>srv-nas</B></TD></TR>
@@ -39,7 +45,7 @@ graph netgraph {
       <TR><TD ALIGN="LEFT">lan0</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
     </TABLE>
   >];
-  "switches/sw-home" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-home [switch]\nnamespace: switches\nEight-port desktop switch in the hallway cabinet\nlabels: role=access, site=home\nvlans: 10\ninterfaces (7):\n  br0  bridge\n  Vlan10  vlan  192.168.10.2/24  vlan 10 (access)\n  port1  ethernet  vlan 10 (access)  00:22:07:aa:00:01\n  port2  ethernet  vlan 10 (access)  00:22:07:aa:00:02\n  port3  ethernet  vlan 10 (access)  00:22:07:aa:00:03\n  port4  ethernet  vlan 10 (access)  00:22:07:aa:00:04\n  port5  ethernet  disabled  vlan 10 (access)  00:22:07:aa:00:05\nlinks (1):\n  Vlan10 — subnet:192.168.10.0/24  (subnet)  vlan 10", label=<
+  "switches/sw-home" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-home [switch]\nnamespace: switches\nEight-port desktop switch in the hallway cabinet\nlabels: role=access, site=home\nvlans: 10,20\ninterfaces (7):\n  br0  bridge\n  Vlan10  vlan  192.168.10.2/24  vlan 10 (access)\n  port1  ethernet  vlan 10 (access)  00:22:07:aa:00:01\n  port2  ethernet  vlan 10 (access)  00:22:07:aa:00:02\n  port3  ethernet  vlan 10 (access)  00:22:07:aa:00:03\n  port4  ethernet  vlan 10 (access)  00:22:07:aa:00:04\n  port5  ethernet  vlan 10,20 (trunk)  00:22:07:aa:00:05\nlinks (1):\n  Vlan10 — subnet:192.168.10.0/24  (subnet)  vlan 10", label=<
     <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
       <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-home</B></TD></TR>
       <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
@@ -48,7 +54,15 @@ graph netgraph {
       <TR><TD ALIGN="LEFT">port2</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
       <TR><TD ALIGN="LEFT">port3</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
       <TR><TD ALIGN="LEFT">port4</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
-      <TR><TD ALIGN="LEFT">port5</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+      <TR><TD ALIGN="LEFT">port5</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10,20</TD></TR>
+    </TABLE>
+  >];
+  "wireless/ap-home" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="ap-home [switch]\nnamespace: wireless\nCeiling access point in the hallway, powered over the uplink. It is a switch: the radio is a bridge port like any other, and the two SSIDs are what it bridges the air into.\nlabels: role=wireless, site=home\nvlans: 10,20\ninterfaces (4):\n  br0  bridge\n  Vlan10  vlan  192.168.10.3/24  vlan 10 (access)\n  eth0  ethernet  vlan 10,20 (trunk)  78:8a:20:aa:00:01\n  wlan0  wifi  78:8a:20:aa:00:10\nlinks (1):\n  Vlan10 — subnet:192.168.10.0/24  (subnet)  vlan 10", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>ap-home</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+      <TR><TD ALIGN="LEFT">Vlan10</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+      <TR><TD ALIGN="LEFT">eth0</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10,20</TD></TR>
     </TABLE>
   >];
   "subnet:192.0.2.1/32" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="192.0.2.1/32 [ipv4 subnet]\nprefix 192.0.2.1/32: 1 element, 1 address\naddresses: 192.0.2.1/32\nelements: routers/rtr-home\nlinks (1):\n  routers/rtr-home:lo0  (subnet)", label=<
@@ -57,7 +71,7 @@ graph netgraph {
       <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
     </TABLE>
   >];
-  "subnet:192.168.10.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="192.168.10.0/24 [ipv4 subnet]\nprefix 192.168.10.0/24: 5 elements, 5 addresses\naddresses: 192.168.10.30/24, 192.168.10.20/24, 192.168.10.10/24, 192.168.10.1/24, 192.168.10.2/24\nelements: hosts/adp-usb-eth, hosts/pc-desk, hosts/srv-nas, routers/rtr-home, switches/sw-home\nvlans: 10\nlinks (5):\n  hosts/adp-usb-eth:enx001122334455  (subnet)\n  hosts/pc-desk:eno1  (subnet)\n  hosts/srv-nas:eth0  (subnet)\n  routers/rtr-home:lan0  (subnet)  vlan 10\n  switches/sw-home:Vlan10  (subnet)  vlan 10", label=<
+  "subnet:192.168.10.0/24" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="192.168.10.0/24 [ipv4 subnet]\nprefix 192.168.10.0/24: 7 elements, 7 addresses\naddresses: 192.168.10.30/24, 192.168.10.20/24, 192.168.10.40/24, 192.168.10.10/24, 192.168.10.1/24, 192.168.10.2/24, (+1 more)\nelements: hosts/adp-usb-eth, hosts/pc-desk, hosts/phone, hosts/srv-nas, routers/rtr-home, switches/sw-home, (+1 more)\nvlans: 10\nlinks (7):\n  hosts/adp-usb-eth:enx001122334455  (subnet)\n  hosts/pc-desk:eno1  (subnet)\n  hosts/phone:en0  (subnet)\n  hosts/srv-nas:eth0  (subnet)\n  routers/rtr-home:lan0  (subnet)  vlan 10\n  switches/sw-home:Vlan10  (subnet)  vlan 10\n  wireless/ap-home:Vlan10  (subnet)  vlan 10", label=<
     <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
       <TR><TD COLSPAN="3" ALIGN="CENTER"><B>192.168.10.0/24</B></TD></TR>
       <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv4 subnet]</TD></TR>
@@ -76,7 +90,7 @@ graph netgraph {
       <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
     </TABLE>
   >];
-  "subnet:2001:db8:10::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8:10::/64 [ipv6 subnet]\nprefix 2001:db8:10::/64: 4 elements, 4 addresses\naddresses: 2001:db8:10::30/64, 2001:db8:10::20/64, 2001:db8:10::10/64, 2001:db8:10::1/64\nelements: hosts/adp-usb-eth, hosts/pc-desk, hosts/srv-nas, routers/rtr-home\nvlans: 10\nlinks (4):\n  hosts/adp-usb-eth:enx001122334455  (subnet)\n  hosts/pc-desk:eno1  (subnet)\n  hosts/srv-nas:eth0  (subnet)\n  routers/rtr-home:lan0  (subnet)  vlan 10", label=<
+  "subnet:2001:db8:10::/64" [shape=box, fillcolor="#e0f2f1", color="#0f766e", style="filled,rounded", tooltip="2001:db8:10::/64 [ipv6 subnet]\nprefix 2001:db8:10::/64: 5 elements, 5 addresses\naddresses: 2001:db8:10::30/64, 2001:db8:10::20/64, 2001:db8:10::40/64, 2001:db8:10::10/64, 2001:db8:10::1/64\nelements: hosts/adp-usb-eth, hosts/pc-desk, hosts/phone, hosts/srv-nas, routers/rtr-home\nvlans: 10\nlinks (5):\n  hosts/adp-usb-eth:enx001122334455  (subnet)\n  hosts/pc-desk:eno1  (subnet)\n  hosts/phone:en0  (subnet)\n  hosts/srv-nas:eth0  (subnet)\n  routers/rtr-home:lan0  (subnet)  vlan 10", label=<
     <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
       <TR><TD COLSPAN="3" ALIGN="CENTER"><B>2001:db8:10::/64</B></TD></TR>
       <TR><TD COLSPAN="3" ALIGN="CENTER">[ipv6 subnet]</TD></TR>
@@ -88,6 +102,8 @@ graph netgraph {
   "hosts/adp-usb-eth" -- "subnet:2001:db8:10::/64" [color="#0f766e", style=solid, label="enx001122334455\n2001:db8:10::30/64", tooltip="subnet hosts/adp-usb-eth:enx001122334455#2001:db8:10::/64\nhosts/adp-usb-eth:enx001122334455 — subnet:2001:db8:10::/64\naddresses: 2001:db8:10::30/64"];
   "hosts/pc-desk" -- "subnet:192.168.10.0/24" [color="#0f766e", style=solid, label="eno1\n192.168.10.20/24", tooltip="subnet hosts/pc-desk:eno1#192.168.10.0/24\nhosts/pc-desk:eno1 — subnet:192.168.10.0/24\naddresses: 192.168.10.20/24"];
   "hosts/pc-desk" -- "subnet:2001:db8:10::/64" [color="#0f766e", style=solid, label="eno1\n2001:db8:10::20/64", tooltip="subnet hosts/pc-desk:eno1#2001:db8:10::/64\nhosts/pc-desk:eno1 — subnet:2001:db8:10::/64\naddresses: 2001:db8:10::20/64"];
+  "hosts/phone" -- "subnet:192.168.10.0/24" [color="#0f766e", style=solid, label="en0\n192.168.10.40/24", tooltip="subnet hosts/phone:en0#192.168.10.0/24\nhosts/phone:en0 — subnet:192.168.10.0/24\naddresses: 192.168.10.40/24"];
+  "hosts/phone" -- "subnet:2001:db8:10::/64" [color="#0f766e", style=solid, label="en0\n2001:db8:10::40/64", tooltip="subnet hosts/phone:en0#2001:db8:10::/64\nhosts/phone:en0 — subnet:2001:db8:10::/64\naddresses: 2001:db8:10::40/64"];
   "hosts/srv-nas" -- "subnet:192.168.10.0/24" [color="#0f766e", style=solid, label="eth0\n192.168.10.10/24", tooltip="subnet hosts/srv-nas:eth0#192.168.10.0/24\nhosts/srv-nas:eth0 — subnet:192.168.10.0/24\naddresses: 192.168.10.10/24"];
   "hosts/srv-nas" -- "subnet:2001:db8:10::/64" [color="#0f766e", style=solid, label="eth0\n2001:db8:10::10/64", tooltip="subnet hosts/srv-nas:eth0#2001:db8:10::/64\nhosts/srv-nas:eth0 — subnet:2001:db8:10::/64\naddresses: 2001:db8:10::10/64"];
   "routers/rtr-home" -- "subnet:192.0.2.1/32" [color="#0f766e", style=solid, label="lo0\n192.0.2.1/32", tooltip="subnet routers/rtr-home:lo0#192.0.2.1/32\nrouters/rtr-home:lo0 — subnet:192.0.2.1/32\naddresses: 192.0.2.1/32"];
@@ -96,4 +112,5 @@ graph netgraph {
   "routers/rtr-home" -- "subnet:192.168.10.0/24" [color="#0f766e", style=solid, label="lan0\n192.168.10.1/24\nvlan 10", tooltip="subnet routers/rtr-home:lan0#192.168.10.0/24\nrouters/rtr-home:lan0 — subnet:192.168.10.0/24\naddresses: 192.168.10.1/24\nvlans: 10"];
   "routers/rtr-home" -- "subnet:2001:db8:10::/64" [color="#0f766e", style=solid, label="lan0\n2001:db8:10::1/64\nvlan 10", tooltip="subnet routers/rtr-home:lan0#2001:db8:10::/64\nrouters/rtr-home:lan0 — subnet:2001:db8:10::/64\naddresses: 2001:db8:10::1/64\nvlans: 10"];
   "switches/sw-home" -- "subnet:192.168.10.0/24" [color="#0f766e", style=solid, label="Vlan10\n192.168.10.2/24\nvlan 10", tooltip="subnet switches/sw-home:Vlan10#192.168.10.0/24\nswitches/sw-home:Vlan10 — subnet:192.168.10.0/24\naddresses: 192.168.10.2/24\nvlans: 10"];
+  "wireless/ap-home" -- "subnet:192.168.10.0/24" [color="#0f766e", style=solid, label="Vlan10\n192.168.10.3/24\nvlan 10", tooltip="subnet wireless/ap-home:Vlan10#192.168.10.0/24\nwireless/ap-home:Vlan10 — subnet:192.168.10.0/24\naddresses: 192.168.10.3/24\nvlans: 10"];
 }
