@@ -75,6 +75,15 @@ publish a version whose section is missing or empty — see
   where one pair of tunnels clashed on two elements, which element was named.
 - **`netgraph drift` wrote the inventory path with backslashes on Windows.** Every other
   path netgraph prints uses forward slashes.
+- **`netgraph fmt` raised a traceback on a document `netgraph validate` accepts.** The
+  round-trip parser the formatter uses resolves `-._` as a float and then fails to convert
+  it; netgraph's own loader reads the same scalar as the string it plainly is. It is now a
+  diagnostic naming the file, like every other thing the formatter cannot read.
+- **Cache entries went missing when several netgraph processes filled one cache at once.**
+  Every write went through a scratch file named after its destination, so two processes
+  storing the same document wrote through the same file — on Windows, one of forty entries
+  would end up never written at all, and stay a cache miss for good. Each writer now has
+  its own.
 
 ## [0.1.0] - 2026-07-30
 
