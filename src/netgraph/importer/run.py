@@ -52,6 +52,7 @@ __all__ = [
     "ImportInput",
     "ImportSourceError",
     "build_draft",
+    "dialect_of",
     "read_inputs",
     "write_files",
 ]
@@ -251,15 +252,20 @@ def build_draft(
     """
     draft = Draft()
     for entry in inputs:
-        chosen = _dialect_of(entry, dialect)
+        chosen = dialect_of(entry, dialect)
+        draft.dialects[entry.name] = chosen
         _feed(entry, chosen, draft=draft, exclude=exclude)
     draft.prune()
     draft.assign_cable_names()
     return draft
 
 
-def _dialect_of(entry: ImportInput, requested: str) -> str:
-    """The dialect to read ``entry`` as, sniffing it when ``auto`` was asked for."""
+def dialect_of(entry: ImportInput, requested: str = "auto") -> str:
+    """The dialect to read ``entry`` as, sniffing it when ``auto`` was asked for.
+
+    Raises:
+        ImportSourceError: The input is JSON but no capture netgraph reads.
+    """
     if requested != "auto":
         return requested
     if entry.text.lstrip()[:1] not in "[{":

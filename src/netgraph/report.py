@@ -18,6 +18,14 @@ one flat :class:`Diagnostic`, and renders a list of those in three shapes:
     GitHub Actions workflow commands (:func:`as_github`), which annotate the
     diff of a pull request without a code-scanning upload.
 
+A fourth shape lives here without being one of ``validate``'s formats: JUnit XML
+(:func:`as_junit`), which every CI system in existence renders as a test report.
+It is written against :class:`JUnitCase` rather than against
+:class:`Diagnostic`, because the thing a reader wants one test case *per* differs
+by command — ``netgraph drift`` wants one per element, not one per difference —
+and the escaping, the counting and the document skeleton are the parts worth
+having in one place. :func:`dump_json` is shared for the same reason.
+
 Two conventions run through all of it.
 
 **Paths.** A diagnostic's :attr:`Diagnostic.file` is relative to the *inventory
@@ -39,10 +47,12 @@ from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Final
+from xml.sax.saxutils import escape as xml_escape
+from xml.sax.saxutils import quoteattr
 
 from netgraph import __version__
 from netgraph.errors import format_path
@@ -56,11 +66,14 @@ __all__ = [
     "SARIF_SCHEMA_URL",
     "SARIF_VERSION",
     "Diagnostic",
+    "JUnitCase",
     "Report",
     "as_github",
     "as_json",
+    "as_junit",
     "as_sarif",
     "build_report",
+    "dump_json",
     "render_report",
 ]
 
@@ -570,6 +583,104 @@ def _escape_property(text: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# junit
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True, slots=True)
+class JUnitCase:
+    """One ``<testcase>``: something that was checked, and how it went.
+
+    A case is in exactly one of three states, checked in this order: skipped
+    when :attr:`skipped` is set, failed when :attr:`failure` is, passed
+    otherwise. "Skipped" is what a JUnit reader already understands as *not
+    run* — which is precisely what an unobservable field is — so nothing has to
+    be invented to carry it.
+    """
+
+    #: Grouping shown as the suite/package column by most readers.
+    classname: str
+    #: The thing checked. Unique within a suite, or readers merge the rows.
+    name: str
+    #: One-line summary of the failure; ``None`` when the case passed.
+    failure: str | None = None
+    #: Body of the ``<failure>`` element — the detail behind the summary.
+    detail: str = ""
+    #: Why the case did not run. Takes precedence over :attr:`failure`.
+    skipped: str | None = None
+
+    @property
+    def state(self) -> str:
+        if self.skipped is not None:
+            return "skipped"
+        return "failed" if self.failure is not None else "passed"
+
+
+def as_junit(suite: str, cases: Sequence[JUnitCase], *, properties: Mapping[str, str] = {}) -> str:
+    """``cases`` as a JUnit XML document with exactly one suite.
+
+    The dialect is the widely-implemented one — ``<testsuites>`` wrapping one
+    ``<testsuite>``, counts as attributes, ``<failure>`` and ``<skipped>``
+    children — because there is no normative schema and every CI system reads
+    this shape. ``time`` is deliberately absent: netgraph reports whether an
+    inventory agrees with a network, and how long that took is not a fact about
+    the answer, only about the machine that computed it. A JUnit reader treats a
+    missing ``time`` as zero rather than as an error.
+    """
+    failures = sum(1 for case in cases if case.state == "failed")
+    skipped = sum(1 for case in cases if case.state == "skipped")
+    attributes = (
+        f'name={quoteattr(suite)} tests="{len(cases)}" failures="{failures}" '
+        f'errors="0" skipped="{skipped}"'
+    )
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        f"<testsuites {attributes}>",
+        f"  <testsuite {attributes}>",
+    ]
+    if properties:
+        lines.append("    <properties>")
+        lines.extend(
+            f"      <property name={quoteattr(key)} value={quoteattr(value)}/>"
+            for key, value in properties.items()
+        )
+        lines.append("    </properties>")
+    for case in cases:
+        lines.extend(_junit_case(case))
+    lines.extend(["  </testsuite>", "</testsuites>", ""])
+    return "\n".join(lines)
+
+
+def _junit_case(case: JUnitCase) -> Iterator[str]:
+    head = f"    <testcase classname={quoteattr(case.classname)} name={quoteattr(case.name)}"
+    if case.skipped is not None:
+        yield head + ">"
+        yield f"      <skipped message={quoteattr(_xml_text(case.skipped))}/>"
+        yield "    </testcase>"
+        return
+    if case.failure is None:
+        yield head + "/>"
+        return
+    yield head + ">"
+    yield f'      <failure message={quoteattr(_xml_text(case.failure))} type="drift">'
+    for line in _xml_text(case.detail).splitlines():
+        yield xml_escape(line)
+    yield "      </failure>"
+    yield "    </testcase>"
+
+
+#: Characters XML 1.0 forbids outright. A device description read off a switch
+#: can hold any of them, and a document carrying one is not merely ugly but
+#: unparseable, so they are replaced rather than escaped.
+_XML_FORBIDDEN: Final = dict.fromkeys([*range(0, 9), 11, 12, *range(14, 32)], "�")
+
+
+def _xml_text(text: str) -> str:
+    """``text`` with the code points no XML document may hold replaced."""
+    return text.translate(_XML_FORBIDDEN)
+
+
+# --------------------------------------------------------------------------- #
 # Dispatch
 # --------------------------------------------------------------------------- #
 
@@ -581,16 +692,21 @@ def render_report(report: Report, output_format: str) -> str:
         ValueError: ``output_format`` is not a structured format.
     """
     if output_format == "json":
-        return _dump_json(as_json(report))
+        return dump_json(as_json(report))
     if output_format == "sarif":
-        return _dump_json(as_sarif(report))
+        return dump_json(as_sarif(report))
     if output_format == "github":
         return as_github(report)
     raise ValueError(f"not a structured report format: {output_format!r}")
 
 
-def _dump_json(payload: Any) -> str:
-    """Pretty-printed JSON with the key order the builders chose."""
+def dump_json(payload: Any) -> str:
+    """Pretty-printed JSON with the key order the builders chose.
+
+    Every structured document netgraph writes goes through here, so two of them
+    cannot disagree about indentation or about whether a non-ASCII device name
+    survives as itself.
+    """
     return json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=False)
 
 

@@ -466,7 +466,9 @@ what went wrong — but check them before building on them.
 * **It cannot know a cable's medium, a VLAN's name or a device's role.** Those
   are the first things to correct.
 * **It is a starting point, not a sync.** There is no reconciliation against an
-  existing tree — see [re-running an import](#re-running-an-import).
+  existing tree — see [re-running an import](#re-running-an-import). What there
+  *is*, once the tree exists, is [`netgraph drift`](commands/drift.md): the same
+  captures read as a check on the inventory rather than as a replacement for it.
 
 ---
 
@@ -474,6 +476,8 @@ what went wrong — but check them before building on them.
 
 * [`netgraph import`](commands/import.md) — the flags, the exit codes and a
   worked example.
+* [`netgraph drift`](commands/drift.md) — the same captures, compared against a
+  tree that already exists instead of writing a new one.
 * [`netgraph init`](commands/init.md) — the other way to get a first tree, for a
   network that does not exist yet.
 * [Inventory layout](inventory-layout.md) — what the loader makes of the tree

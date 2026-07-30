@@ -11,6 +11,12 @@ One contract per command:
     operator collected from live devices — ``lldpctl -f json``, ``ip -j addr
     show``, a cabling CSV — into that tree. Nothing is fetched and no credential
     is read; the command consumes what has already been printed.
+``drift``
+    The same captures, read the other way round: the inventory becomes an
+    assertion about the live network and the command reports where reality
+    disagrees. What a dialect cannot see is reported as *unobserved* rather than
+    as a deletion, so a partial capture never reads as the network having been
+    dismantled.
 ``validate``
     Load, check, report. Exits non-zero when anything is an error, so it drops
     straight into CI.
@@ -100,6 +106,9 @@ from netgraph.completion import (
 )
 from netgraph.config import CONFIG_FILE_NAME, Config, ValidationConfig, load_config
 from netgraph.console import Align, Console
+from netgraph.drift import FORMATS as DRIFT_FORMATS
+from netgraph.drift import CompareSpec, DriftReport, check_drift, render_drift
+from netgraph.drift import write_text as write_drift
 from netgraph.errors import LoaderError, NetgraphError, RenderError, compact_ids, format_path
 from netgraph.export import (
     EXPORTERS,
@@ -624,6 +633,160 @@ def _report_import_validation(console: Console, inventory: Inventory, *, root: P
 _EXPECTED_IMPORT_RULES: Final[frozenset[str]] = frozenset(
     {"I002", "W101", "W103", "W105", "W109", "W113", "W121"}
 )
+
+
+# --------------------------------------------------------------------------- #
+# drift
+# --------------------------------------------------------------------------- #
+
+#: What ``drift --fail-on`` accepts, the gating value first.
+FAIL_ON: Final[tuple[str, ...]] = ("drift", "none")
+
+
+@cli.command("drift")
+@click.argument("inputs", nargs=-1, metavar="[NAME=]INPUT...")
+@click.option(
+    "--from",
+    "dialect",
+    type=click.Choice(DIALECTS),
+    default="auto",
+    show_default=True,
+    help=(
+        "Input dialect, as for 'netgraph import'. 'auto' sniffs each input on its own: "
+        "lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', "
+        "csv is 'device,port,device,port' cabling rows."
+    ),
+)
+@click.option(
+    "--host",
+    metavar="NAME",
+    default=None,
+    help=(
+        "Device every input was captured on. An lldp or iproute capture never names its own "
+        "host. Without this the name comes from the file name, or from a 'NAME=path' argument."
+    ),
+)
+@click.option(
+    "--only",
+    "only",
+    multiple=True,
+    metavar="GLOB",
+    shell_complete=complete_element,
+    help=(
+        "Compare only elements whose fully-qualified or short name matches this glob. Repeatable."
+    ),
+)
+@click.option(
+    "--exclude",
+    "excluded",
+    multiple=True,
+    metavar="GLOB",
+    shell_complete=complete_element,
+    help="Leave elements whose name matches this glob out of the comparison. Repeatable.",
+)
+@click.option(
+    "--exclude-interface",
+    "excluded_interfaces",
+    multiple=True,
+    metavar="PATTERN",
+    help=(
+        "Leave out interfaces whose name matches this glob, as 'netgraph import --exclude' "
+        "does. A declared interface it matches can never be reported as missing. Repeatable."
+    ),
+)
+@click.option(
+    "-F",
+    "--output-format",
+    type=click.Choice(DRIFT_FORMATS),
+    default="text",
+    show_default=True,
+    help="text is for reading; json is for a script, junit for a CI test report.",
+)
+@click.option(
+    "--fail-on",
+    "fail_on",
+    type=click.Choice(FAIL_ON),
+    default="drift",
+    show_default=True,
+    help=(
+        "Exit 1 when the network disagrees with the inventory, or never. An unobserved "
+        "field is not a disagreement and never fails the run."
+    ),
+)
+@click.pass_obj
+def drift_command(
+    app: AppContext,
+    inputs: tuple[str, ...],
+    dialect: str,
+    host: str | None,
+    only: tuple[str, ...],
+    excluded: tuple[str, ...],
+    excluded_interfaces: tuple[str, ...],
+    output_format: str,
+    fail_on: str,
+) -> None:
+    """Compare a live network against what the inventory declares.
+
+    Reads the same captures 'netgraph import' does — no host is contacted and no
+    credential is read — and reports, per element, what the network has that the
+    inventory does not, what the inventory declares that the network lacks, and
+    what the two spell differently.
+
+    A field the capture cannot see is reported as unobserved rather than as a
+    deletion, and never counts as drift, so a partial capture is safe to check
+    against a complete inventory.
+
+    \b
+    netgraph -i net drift --from lldp captures/*.json
+    ip -j addr show | netgraph -i net drift --host pc1 -
+    netgraph -i net drift --fail-on drift -F junit caps/* > drift.xml
+    """
+    inventory = app.load()
+    console = app.console()
+    report_stream = console.to_stderr() if output_format != "text" else console
+
+    if inventory.errors:
+        _report_problems(console.to_stderr(), inventory.errors, ())
+        console.to_stderr().error(
+            "refusing to compare against an inventory that does not load; a document that was "
+            "rejected is absent from the comparison, which would read as drift"
+        )
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+    report = check_drift(
+        inventory,
+        list(inputs),
+        dialect=dialect,
+        host=host,
+        spec=CompareSpec(only=only, exclude=excluded, ignore_interfaces=excluded_interfaces),
+    )
+    app.log(
+        f"compared {len(report.compared)} declared element(s) against "
+        f"{len(report.observed)} observed device(s)",
+        level=1,
+    )
+
+    if output_format == "text":
+        write_drift(console, report)
+    else:
+        console.print(render_drift(report, output_format))
+        report_stream.info(_drift_summary(report))
+
+    if report.drifted and fail_on == "drift":
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+
+def _drift_summary(report: DriftReport) -> str:
+    """The one-line commentary printed beside a structured document."""
+    if not report.drifted:
+        return (
+            f"no drift: {_plural(len(report.compared), 'element')} compared, "
+            f"{_plural(len(report.unobserved), 'unobserved item')}"
+        )
+    return (
+        f"{_plural(len(report.changes), 'difference')} between the inventory and the "
+        f"capture, {_plural(len(report.unobserved), 'unobserved item')}"
+    )
 
 
 # --------------------------------------------------------------------------- #

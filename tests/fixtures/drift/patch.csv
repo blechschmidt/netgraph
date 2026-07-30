@@ -1,0 +1,9 @@
+# The home-lab patch list as the label sheet in the cabinet has it. Two rows
+# agree with the inventory; the third is the NAS run that was moved from port3
+# to port6 without anybody updating cables/links.yaml, and the fourth records
+# the AP uplink as fibre where the inventory says copper.
+device,port,device,port,medium,label
+sw-home,port1,rtr-home,lan0,copper,H-001
+sw-home,port2,pc-desk,eno1,copper,H-002
+sw-home,port6,srv-nas,eth0,fiber,H-003
+sw-home,port5,ap-home,eth0,fiber,H-005

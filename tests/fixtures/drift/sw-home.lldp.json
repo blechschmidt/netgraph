@@ -1,0 +1,69 @@
+{
+  "lldp": {
+    "interface": [
+      {
+        "port1": {
+          "via": "LLDP",
+          "rid": "1",
+          "age": "0 day, 02:11:04",
+          "chassis": {
+            "rtr-home": {
+              "id": {"type": "mac", "value": "00:1e:8c:00:10:02"},
+              "descr": "MikroTik hEX S, RouterOS 7.14",
+              "mgmt-ip": "192.168.10.1",
+              "capability": [
+                {"type": "Bridge", "enabled": false},
+                {"type": "Router", "enabled": true}
+              ]
+            }
+          },
+          "port": {
+            "id": {"type": "ifname", "value": "lan0"},
+            "descr": "Downlink to sw-home",
+            "ttl": "120"
+          }
+        }
+      },
+      {
+        "port2": {
+          "via": "LLDP",
+          "rid": "2",
+          "age": "0 day, 02:10:58",
+          "chassis": {
+            "pc-desk": {
+              "id": {"type": "mac", "value": "3c:97:0e:20:01:01"},
+              "descr": "Debian GNU/Linux 12 (bookworm) Linux 6.1.0-18-amd64",
+              "mgmt-ip": "192.168.10.20",
+              "capability": [{"type": "Station", "enabled": true}]
+            }
+          },
+          "port": {
+            "id": {"type": "ifname", "value": "eno1"},
+            "descr": "Onboard gigabit port",
+            "ttl": "120"
+          }
+        }
+      },
+      {
+        "port6": {
+          "via": "LLDP",
+          "rid": "3",
+          "age": "0 day, 00:04:12",
+          "chassis": {
+            "prn-hall": {
+              "id": {"type": "mac", "value": "00:26:73:aa:bb:cc"},
+              "descr": "Brother HL-L2350DW",
+              "mgmt-ip": "192.168.10.60",
+              "capability": [{"type": "Station", "enabled": true}]
+            }
+          },
+          "port": {
+            "id": {"type": "mac", "value": "00:26:73:aa:bb:cc"},
+            "descr": "eth0",
+            "ttl": "120"
+          }
+        }
+      }
+    ]
+  }
+}

@@ -143,6 +143,12 @@ lldpctl -f json > collected/"$(hostname -s)".lldp.json    # on each device
 netgraph import -o my-network collected/*.json
 ```
 
+Once the tree exists, [`netgraph drift`](docs/commands/drift.md) reads the same captures
+the other way round — the inventory becomes an assertion about the network, and the
+command reports where reality disagrees. What a capture cannot see is reported as
+*unobserved* rather than as a deletion, so a partial capture never reads as the network
+having been dismantled, and `--fail-on drift` makes it a gate for a nightly job.
+
 ## The commands
 
 `netgraph [GLOBAL OPTIONS] COMMAND [OPTIONS] [ARGS]`. The inventory is named once, with
@@ -155,6 +161,7 @@ report.txt` both do what they look like they do.
 |---|---|---|
 | [`netgraph init`](docs/commands/init.md) | Scaffold a new inventory, ready to validate and render. | [init.md](docs/commands/init.md) |
 | [`netgraph import`](docs/commands/import.md) | Build a first inventory from output captured on live devices. | [import.md](docs/commands/import.md) |
+| [`netgraph drift`](docs/commands/drift.md) | Compare a live network against the declared inventory. | [drift.md](docs/commands/drift.md) |
 | [`netgraph validate`](docs/commands/validate.md) | Check the inventory; the gate for CI and pre-commit. | [validate.md](docs/commands/validate.md) |
 | [`netgraph fmt`](docs/commands/fmt.md) | Rewrite inventory YAML into the canonical form. | [fmt.md](docs/commands/fmt.md) |
 | [`netgraph render`](docs/commands/render.md) | Draw the graph as SVG, PNG, PDF, DOT, Mermaid, JSON or HTML. | [render.md](docs/commands/render.md) |

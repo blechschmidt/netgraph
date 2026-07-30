@@ -70,6 +70,7 @@ from netgraph.importer.run import (
     ImportSourceError,
     build_draft,
     build_files,
+    dialect_of,
     read_inputs,
     write_files,
 )
@@ -90,6 +91,7 @@ __all__ = [
     "ImportSourceError",
     "build_draft",
     "build_files",
+    "dialect_of",
     "element_name",
     "interface_name",
     "read_csv_links",

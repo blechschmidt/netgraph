@@ -71,6 +71,7 @@ REGION_RE: Final = re.compile(
 PAGE: Final[dict[str, str]] = {
     "init": "init.md",
     "import": "import.md",
+    "drift": "drift.md",
     "validate": "validate.md",
     "fmt": "fmt.md",
     "render": "render.md",
@@ -92,6 +93,7 @@ PAGE: Final[dict[str, str]] = {
 INDEX_ORDER: Final = [
     "init",
     "import",
+    "drift",
     "validate",
     "fmt",
     "render",
@@ -113,6 +115,7 @@ INDEX_ORDER: Final = [
 SUMMARY: Final[dict[str, str]] = {
     "init": "Scaffold a new inventory, ready to validate and render.",
     "import": "Build a first inventory from output captured on live devices.",
+    "drift": "Compare a live network against the declared inventory.",
     "validate": "Check the inventory; the gate for CI and pre-commit.",
     "fmt": "Rewrite inventory YAML into the canonical form.",
     "render": "Draw the graph as SVG, PNG, PDF, DOT, Mermaid, JSON or HTML.",

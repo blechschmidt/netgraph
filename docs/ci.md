@@ -23,6 +23,7 @@ findings can reach a pull request.
 * [The GitHub Action](#the-github-action)
 * [Workflow: upload SARIF](#workflow-upload-sarif)
 * [Workflow: annotate the diff](#workflow-annotate-the-diff)
+* [Workflow: a scheduled drift check](#workflow-a-scheduled-drift-check)
 * [pre-commit](#pre-commit)
 * [Other CI systems](#other-ci-systems)
 
@@ -286,6 +287,112 @@ Without the action, the same thing by hand:
 ```yaml
       - run: pip install netgraph
       - run: netgraph --inventory inventory validate --output-format github --strict
+```
+
+## Workflow: a scheduled drift check
+
+`validate` answers "is this inventory self-consistent?" — a question about the
+files, which a pull request can settle. [`netgraph drift`](commands/drift.md)
+answers the other one: "is the network still what the files say?" Nothing in a
+pull request can settle that, because the network changes when nobody is looking
+at the repository. So it belongs on a schedule rather than on a push.
+
+The shape is: collect on the network, compare in the repository, publish the
+result. Collection is not netgraph's job — it opens no socket and reads no
+credential — so a runner with reach into the network, or a cron job on a jump
+host that commits its captures, does that half:
+
+```yaml
+name: drift
+
+on:
+  schedule:
+    # 06:00 UTC daily. Drift is a slow signal; hourly buys nothing and wakes
+    # people up over a switch that was being replaced at the time.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: [self-hosted, network]   # a runner that can reach the devices
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install netgraph
+
+      # Collect. Your commands, your credentials, netgraph's input format.
+      - name: Capture the live network
+        run: |
+          mkdir -p captures
+          for host in $(cat hosts.txt); do
+            ssh "$host" 'ip -j addr show'  > "captures/$host.addr.json"
+            ssh "$host" 'lldpctl -f json' > "captures/$host.lldp.json"
+          done
+
+      - name: Compare the capture with the inventory
+        run: |
+          netgraph --inventory inventory drift \
+            --exclude-interface 'veth*' --exclude-interface 'docker*' \
+            --output-format junit captures/* > drift.xml
+
+      - name: Publish the report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: drift
+          path: drift.xml
+```
+
+Five things about that step are the point of the exercise.
+
+**`--fail-on drift` is the default**, so the job goes red on any difference and
+green otherwise. Use `--fail-on none` when the run only feeds a dashboard and
+something else decides what is worth waking somebody for; the JSON envelope's
+`drifted` flag and `summary` counts are there for exactly that.
+
+**A partial capture does not fail the job.** Anything a dialect cannot see is
+reported as *unobserved* and never counted as drift, so a host that was down at
+06:00, or an `ssh` that timed out, produces more blind spots and no more
+failures. That is what makes the schedule survivable; the reasoning is in
+[drift and unobserved](commands/drift.md#drift-and-unobserved).
+
+**`--exclude-interface` should match how the capture was taken.** Container and
+virtual-ethernet interfaces are not part of a physical topology, and without the
+pattern they read as interfaces the inventory failed to declare — the same
+patterns [`netgraph import`](commands/import.md) is given.
+
+**`-F junit` is the format to publish.** One test case per element, so the row
+list stays put between runs: a device goes red when it drifts and green when
+somebody fixes it, instead of the report growing and shrinking. Every CI system
+renders it, and `if: always()` is what makes the artifact survive the failing
+step above it.
+
+**Run `validate` first if the tree is not already gated.** `drift` refuses to
+compare against an inventory that does not load, because a document the loader
+rejected is absent from the comparison and would make every element in it look
+like something the network has and the inventory does not.
+
+Elsewhere the same job is the same three lines. GitLab, which renders JUnit
+natively in the merge-request widget:
+
+```yaml
+# .gitlab-ci.yml
+drift:
+  image: python:3.12
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - pip install netgraph
+    - netgraph --inventory inventory drift --output-format junit captures/* > drift.xml
+  artifacts:
+    when: always
+    reports:
+      junit: drift.xml
 ```
 
 ## pre-commit

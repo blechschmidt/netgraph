@@ -305,6 +305,15 @@ class Draft:
     cables: dict[tuple[Endpoint, Endpoint], DraftCable] = field(default_factory=dict)
     #: Lines for the run report: what was skipped, and why.
     notes: list[str] = field(default_factory=list)
+    #: Input name to the dialect it was read as, filled in by
+    #: :func:`~netgraph.importer.run.build_draft`.
+    #:
+    #: The importer itself has no use for this — a document is written from what
+    #: was observed, not from what did the observing. ``netgraph drift`` does:
+    #: whether the *absence* of something in a capture means "the network does
+    #: not have it" or "this dialect cannot see it" is a property of the dialect,
+    #: and :attr:`DraftDevice.sources` is what ties a device to one.
+    dialects: dict[str, str] = field(default_factory=dict)
 
     def device(self, name: str) -> DraftDevice:
         """The device called ``name``, created as a bare ``computer`` if new."""
