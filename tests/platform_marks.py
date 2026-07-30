@@ -124,19 +124,33 @@ def _bash_is_modern_enough_for_completion() -> bool:
 
     macOS is where this bites: Apple has shipped ``/bin/bash`` 3.2 since 2007,
     for licensing reasons that have nothing to do with the shell, so the warning
-    is the *correct* behaviour there and the documented transcript is the
-    correct one everywhere else. Measured exactly as Click measures it, so the
-    two cannot disagree.
+    is the *correct* behaviour there and the documented transcript is the correct
+    one everywhere else.
+
+    The three details below are Click's, copied deliberately rather than
+    approximated (``BashComplete._check_version``), and
+    ``tests/test_platform.py`` fails if the two ever disagree:
+
+    * The **resolved** path is run, not the bare name ``bash``. On Windows those
+      are different programs: ``shutil.which`` finds Git Bash on ``PATH``, while
+      ``CreateProcess`` searches ``System32`` first and finds WSL's ``bash.exe``,
+      which on a runner with no distro installed answers nothing at all.
+    * ``--norc``, so a login file's banner cannot appear where the version is.
+    * The version must have three components at the very start of the output.
     """
-    if shutil.which("bash") is None:
+    bash = shutil.which("bash")
+    if bash is None:
         return False
     try:
         completed = subprocess.run(
-            ["bash", "-c", 'echo "${BASH_VERSION}"'], capture_output=True, text=True, timeout=30
+            [bash, "--norc", "-c", 'echo "${BASH_VERSION}"'],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
     except (OSError, subprocess.SubprocessError):  # pragma: no cover - no bash to ask
         return False
-    match = re.match(r"(\d+)\.(\d+)", completed.stdout.strip())
+    match = re.search(r"^(\d+)\.(\d+)\.\d+", completed.stdout)
     return match is not None and (int(match[1]), int(match[2])) >= (4, 4)
 
 

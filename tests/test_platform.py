@@ -64,7 +64,11 @@ from netgraph.render.dot import (
 from netgraph.scaffold import build_scaffold, write_scaffold
 from netgraph.watch.loop import _DEBOUNCE_MS, DEFAULT_DEBOUNCE_MS
 
-from platform_marks import PWSH, requires_pwsh  # isort: skip -- tests/ is on sys.path, not a package
+from platform_marks import (  # isort: skip -- tests/ is on sys.path, not a package
+    HAVE_BASH_COMPLETION,
+    PWSH,
+    requires_pwsh,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -782,6 +786,31 @@ def test_an_unknown_shell_lists_the_ones_that_exist() -> None:
     assert result.exit_code == 2
     for shell in SHELLS:
         assert shell in result.output
+
+
+def test_the_bash_capability_matches_what_click_actually_does() -> None:
+    """:data:`HAVE_BASH_COMPLETION` predicts whether Click adds a line, or it is useless.
+
+    ``tests/test_docs.py`` skips the documented ``netgraph completion bash``
+    transcript on the strength of that prediction, and a prediction nothing
+    checks is a silent skip: wrong in one direction it hides a real difference in
+    what netgraph prints, wrong in the other it fails a job for a line the
+    documentation is right not to show.
+
+    Both halves are worth having on every runner. macOS is where the answer is
+    ``False`` — ``/bin/bash`` 3.2 — and Windows is where getting there is
+    delicate, because ``bash`` resolved through ``PATH`` and ``bash`` handed to
+    ``CreateProcess`` are two different programs.
+    """
+    result = CliRunner().invoke(cli, ["completion", "bash"])
+    assert result.exit_code == 0
+    assert "_netgraph_completion_setup;" in result.output, "the script itself is always emitted"
+
+    warned = "shell completion is not supported" in result.output.lower()
+    assert warned is not HAVE_BASH_COMPLETION, (
+        f"HAVE_BASH_COMPLETION={HAVE_BASH_COMPLETION} but Click "
+        f"{'warned' if warned else 'did not warn'}: {result.output.splitlines()[-1]!r}"
+    )
 
 
 # --------------------------------------------------------------------------- #
