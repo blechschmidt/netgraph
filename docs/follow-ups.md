@@ -1297,8 +1297,9 @@ malformed document already gets.
 
 ## 12. The `validate` timing guard is at its limit under coverage
 
-**Status:** threshold raised 2026-07-30 with the routing model (§16), the
-measurement recorded here. Nothing regressed; the guard had run out of headroom.
+**Status:** closed 2026-07-30. The honest fix this entry named — measuring both
+halves under the same conditions — is now what the guard does; the rest of the
+entry is the history that led there and is kept for the numbers in it.
 
 `tests/test_performance.py::test_validating_costs_no_more_than_its_budget_above_an_address_walk`
 compares `validate` against an address-walk floor and asserted a ratio of at most
@@ -1328,10 +1329,34 @@ The threshold is now **9.0**, which keeps the property the guard exists for: ent
 7 records that reverting the `validate.py` half of it alone gives 9.1 against a
 "today" of 6.9–7.2, so the same revert against a today of 8.6 lands far above 9.0.
 
-**What would justify revisiting this.** A floor that is instrumented like the
-thing it bounds — the honest fix, and a bigger change than a threshold: it would
-mean either running this one test with coverage disabled, or measuring both halves
-through the same tracer by construction.
+**How it was closed.** 9.0 was not enough either: CI read **9.07** on a commit
+that had regressed nothing, which is what a threshold 5 % above the measured
+spread does on a shared runner. Two changes, in the order they matter.
+
+*The tracer is now paused for the duration of every measurement in the file*
+(`tracing_paused` in `tests/test_performance.py`, `Coverage.current().stop()` and
+`.start()` around each timed call). This is the first of the two options this
+entry offered, and it is the one that removes a *systematic* error rather than
+budgeting for it: coverage costs time per line executed, so the hundred small
+functions of `validate` pay far more than the floor's one tight loop, and the
+ratio read half a point high for a reason that has nothing to do with netgraph.
+The lines that go untraced during the measurement are `validate` and the loader,
+which several hundred other tests execute; total coverage did not move.
+
+*The best of eight rounds rather than four*, because the floor is the noisier
+half — a tenth of a millisecond per walk — and a minimum only gets closer to the
+truth with more attempts.
+
+| | before | after |
+|---|---|---|
+| measured ratio, under `pytest --cov` | 8.50–9.07 | 8.17–8.56 |
+| threshold | 9.0 | 9.5 |
+| headroom above the worst sample | 0–6 % | 11 % |
+
+The threshold moved with it, and the guard keeps what it is for: entry 7 records
+that reverting the `validate.py` half of its work alone gives 9.1 against a
+"today" of 6.9, which is 11.0 against a today of 8.4 — well clear of 9.5, as are
+the two larger reverts.
 
 ---
 
