@@ -764,16 +764,23 @@ def test_both_publishing_workflows_name_the_same_image(
     assert container_workflow["env"]["IMAGE"] == "ghcr.io/${{ github.repository }}"
 
 
-def test_the_two_workflows_do_not_share_a_build_cache_scope(
+def test_the_image_build_cache_is_scoped(
     container_workflow: dict[Any, Any],
 ) -> None:
     """An unscoped ``type=gha`` is one bucket for every workflow in the repository.
 
-    They would then evict each other's entries, which turns the cheap rebuild
-    this workflow relies on into a full one at the least convenient moment.
+    Anything else that calls buildx would then evict these entries, which turns
+    the cheap rebuild this workflow relies on into a full one -- and a full one
+    means the emulated arm64 layers, which are the expensive part -- at the least
+    convenient moment.
     """
     assert container_workflow["env"]["CACHE_SCOPE"]
-    assert "scope=" in steps_of(container_workflow, "publish")
+    # Both jobs, or the publish job's build is not a hit on what build produced
+    # and the arm64 layers are paid for twice in the same run.
+    for job in ("build", "publish"):
+        assert f"scope=${{{{ env.CACHE_SCOPE }}}}" in steps_of(container_workflow, job), (
+            f"the {job} job's buildx cache is unscoped"
+        )
 
 
 def test_the_docs_page_documents_the_published_development_tags() -> None:

@@ -467,10 +467,12 @@ jobs:
   # builds the commit and exactly one pushes ``1.2.3``.
   #
   # The version tags come from the ref, so nothing about the version is passed
-  # down for them. The three things that *are* passed are the ones this workflow
-  # knows and that one cannot: whether this is a real release or a dry run,
-  # whether the version has earned ``latest`` -- a pre-release has not -- and
-  # where to leave the standalone SBOM the GitHub release attaches.
+  # down for them -- the tag that triggered this run is their only source, and
+  # cannot disagree with an argument sent alongside it. What *is* passed is the
+  # handful of things this workflow knows and that one cannot: whether this is a
+  # real release or a dry run, whether the version has earned ``latest`` -- a
+  # pre-release has not -- and the version itself, which names the standalone
+  # SBOM the GitHub release attaches and marks the image a release build.
   image:
     name: image
     needs: [guard, ci, verify]

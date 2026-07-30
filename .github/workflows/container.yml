@@ -124,9 +124,12 @@ env:
   # image name. A fork publishes to its own namespace without editing anything.
   IMAGE: ghcr.io/${{ github.repository }}
   # Both jobs build the same Dockerfile, so they share a cache scope -- the
-  # publish job's build is then a hit on everything the build job just produced.
-  # Named rather than left to default so that release.yml's builds, which use
-  # the default scope, cannot evict these entries or be evicted by them.
+  # publish job's build is then a hit on everything the build job just produced,
+  # which is what keeps the emulated arm64 layers from being paid for twice.
+  # Named rather than left to the default, which is one bucket shared with every
+  # other workflow in the repository that ever calls buildx: entries there are
+  # evicted by whoever wrote last, and the rebuild this file relies on being
+  # cheap would turn into a full one at the least convenient moment.
   CACHE_SCOPE: container
   PYTHONUNBUFFERED: "1"
   FORCE_COLOR: "1"
@@ -246,11 +249,13 @@ jobs:
     runs-on: ubuntu-24.04
 
     # Every push publishes, whatever branch it is on: the branch tag is only
-    # useful if it actually exists while the branch does, and "run what is on my
+    # useful if it exists while the branch does, and "run what is on my
     # colleague's branch" is the case it is for. A branch tag is rewritten in
-    # place on each push and deleted with the branch, so the registry holds one
-    # per live branch rather than one per commit -- the immutable per-commit
-    # record is ``sha-…``, which is expected to accumulate.
+    # place on each push, so the registry grows a tag per branch rather than per
+    # commit; the per-commit record is ``sha-…``, which is immutable and does
+    # accumulate. Note that neither is reclaimed when the branch is deleted --
+    # GHCR has no idea the branch existed -- so pruning old versions is a
+    # registry retention policy, not something this workflow can do.
     #
     # Not a pull request, though. A fork's token could not push anyway, and a
     # same-repo one should not: a pull request builds code nobody has reviewed
