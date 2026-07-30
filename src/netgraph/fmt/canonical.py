@@ -118,13 +118,32 @@ def format_stream(text: str) -> str:
     """Return ``text`` in canonical form.
 
     Raises:
-        FormatSyntaxError: ``text`` is not well-formed YAML.
+        FormatSyntaxError: ``text`` is not well-formed YAML, or the round-trip
+            parser could not read it.
     """
     yaml = _yaml()
     try:
         documents = list(yaml.load_all(text))
     except YAMLError as exc:
         raise FormatSyntaxError(str(exc)) from exc
+    except (ArithmeticError, LookupError, TypeError, ValueError) as exc:
+        # ruamel raising something that is not a ``YAMLError``. It resolves
+        # scalars by YAML 1.1 rules and then converts them, and the two do not
+        # quite agree: ``-._`` matches its float pattern and reaches
+        # ``float("-.")``, which is a bare ValueError out of the standard
+        # library. netgraph's own loader resolves that same scalar as the string
+        # it plainly is, so this arrives on a document ``validate`` accepts and
+        # would otherwise be a traceback rather than a diagnostic.
+        #
+        # Caught by category rather than by exception type: what these have in
+        # common is that they are what a *parser* fails with, and the specific
+        # one depends on which scalar pattern the input tripped.
+        raise FormatSyntaxError(
+            f"the formatter's YAML parser could not read this document "
+            f"({type(exc).__name__}: {exc}). The document may use a scalar it "
+            f"resolves differently from the loader; quoting the value makes both "
+            f"agree."
+        ) from exc
     if not documents:
         # A stream with no documents in it — empty, or nothing but comments,
         # which is what ``netgraph init --minimal`` writes. ruamel has nowhere

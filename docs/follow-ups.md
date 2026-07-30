@@ -1358,6 +1358,32 @@ that reverting the `validate.py` half of its work alone gives 9.1 against a
 "today" of 6.9, which is 11.0 against a today of 8.4 — well clear of 9.5, as are
 the two larger reverts.
 
+**And the *load* guard's premise does not survive leaving Linux.** The same
+commit reads 1.58–1.60 on ubuntu-24.04 and **1.72** on windows-latest, against a
+threshold of 1.70 — inside the 1.60-to-1.79 band that guard exists to
+discriminate within, so on Windows it was not discriminating, it was failing.
+
+That is the ratio premise failing rather than noise. Machine speed cancels out
+of a ratio when both halves are the same kind of work, and the two halves here
+are not: the floor reads forty files and runs a C parser over them, the
+numerator adds pydantic on top, and the balance between filesystem and
+interpreter is exactly what differs most between those two runners. The
+`validate` guard is unaffected because both of *its* halves run over an
+inventory already in memory.
+
+So the libyaml ceiling is 1.70 on Linux and 1.95 elsewhere. The sharp copy runs
+on all four Linux jobs, which is where it was calibrated and where a pull
+request will meet it; the other two get a threshold that catches a catastrophic
+regression and not an entry-5-sized one, on the same terms the pure-Python row
+has always been kept.
+
+**What to watch.** The Linux ceiling has 4–8 % of headroom over a measured
+1.57–1.64, which is thin. Both guards now print `[perf] <name>: <ratio>x against
+a budget of <budget>x (<n>% headroom)` on every job, so the next person to touch
+either number can read the spread off six jobs instead of guessing from the one
+that failed. If the Linux row starts flaking, that log is the input, and this
+entry is where the new number gets written down.
+
 ---
 
 ## 13. `netgraph --version --json` is not the spelling that works

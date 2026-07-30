@@ -592,6 +592,24 @@ def test_a_duplicate_key_is_refused() -> None:
         fmt("a: 1\na: 2\n")
 
 
+@pytest.mark.parametrize("scalar", ["-._", "._", "+._", ".__"])
+def test_a_scalar_the_round_trip_parser_chokes_on_is_a_diagnostic(scalar: str) -> None:
+    """Found by ``test_formatting_is_idempotent`` at the nightly search budget.
+
+    ruamel resolves scalars by YAML 1.1 rules and then converts them, and the two
+    do not quite agree: ``-._`` matches its float pattern and reaches
+    ``float("-.")``, a bare ``ValueError`` out of the standard library rather
+    than a ``YAMLError`` anything was catching.
+
+    netgraph's own loader resolves the same scalar as the string it plainly is,
+    so ``validate`` accepts the document and ``fmt`` used to answer it with a
+    traceback. A formatter may refuse a file; it may not crash on one.
+    """
+    document = f"apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: {scalar}\n"
+    with pytest.raises(FormatSyntaxError, match="could not read this document"):
+        format_stream(document)
+
+
 def test_a_file_whose_meaning_moved_is_never_written(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     """The safety net, forced: a formatter that corrupts a file writes nothing."""
     path = tmp_path / "d.yaml"

@@ -41,10 +41,22 @@ quoting 1.79. The margin either side is real but not generous — 6 % of headroo
 above today and 12 % below a full revert — which is the price of a guard sharp
 enough to notice anything.
 
+That sharpness is why the libyaml threshold is **1.70 on Linux and 1.95
+elsewhere**, and the difference is not a concession, it is the premise failing.
+Machine speed cancels out of a ratio only when both halves are the same kind of
+work, and here they are not: the floor reads forty files and runs a C parser
+over them, the numerator adds pydantic on top, and the balance between
+filesystem and interpreter is the thing that differs most between an
+ubuntu-24.04 runner and a windows-latest one. The same commit reads 1.58-1.60 on
+Linux and 1.72 on Windows — *inside* the 1.60-to-1.79 band this row exists to
+discriminate within. So the Linux copy stays sharp, and the other two get the
+blunter one: an entry-5-sized regression is invisible to them, a catastrophic
+one is not.
+
 Every "today" figure here is from one machine and will not be yours. Each guard
 prints its own on every run — ``[perf] validate: 8.27x against a budget of
 9.50x (13% headroom)`` — so the number to recalibrate against can be read off
-the three CI runners rather than inferred from the one that happened to fail.
+all six CI jobs rather than inferred from the one that happened to fail.
 
 The pure-Python row is honestly weaker. With a parse eight times slower in the
 denominator, the model layer would have to roughly triple before the ratio
@@ -160,6 +172,23 @@ HARNESS = REPO_ROOT / "tools" / "bench_pipeline.py"
 MAX_LOAD_RATIO_LIBYAML = 1.70
 MAX_LOAD_RATIO_PURE_PYTHON = 1.25
 
+#: What the libyaml ceiling becomes off the platform it was calibrated on.
+#:
+#: The premise of a ratio is that machine speed cancels out, and for the two
+#: halves of the *validate* guard it does. It does not here, because the two
+#: halves are not the same kind of work: the floor reads forty files and runs a C
+#: parser over them, the numerator adds pydantic on top, and the balance between
+#: filesystem and interpreter is exactly what differs most between an
+#: ubuntu-24.04 runner and a windows-latest one. Measured 1.58-1.60 on Linux and
+#: 1.72 on Windows, on the same commit — inside the 1.60-to-1.79 band this guard
+#: exists to discriminate within, so on Windows it was not discriminating, it was
+#: failing.
+#:
+#: Blunter off Linux, deliberately, and for the same reason the pure-Python row
+#: is blunter: an entry-5-sized regression is not visible here, and a
+#: catastrophic one still is. The sharp copy runs on all four Linux jobs.
+MAX_LOAD_RATIO_LIBYAML_ELSEWHERE = 1.95
+
 #: ``validate / address-walk floor`` ceiling. Parser-independent: both halves
 #: run over an inventory that is already in memory. See the module docstring, and
 #: entry 12 of ``docs/follow-ups.md`` for the history: 8.5, then 9.0 when the
@@ -266,7 +295,7 @@ def milliseconds(call: Callable[[], object]) -> float:
         return (time.perf_counter() - start) * 1000
 
 
-def report(config: pytest.Config, name: str, *, ratio: float, budget: float) -> None:
+def report(capsys: pytest.CaptureFixture[str], name: str, *, ratio: float, budget: float) -> None:
     """Print what a guard measured, whether or not it passed.
 
     Every threshold in this file has been recalibrated at least once, and each
@@ -276,18 +305,18 @@ def report(config: pytest.Config, name: str, *, ratio: float, budget: float) -> 
     reads a spread off three runners rather than off one bad minute on one of
     them.
 
-    Through the terminal reporter rather than :func:`print`, which pytest
-    captures and shows only for a failing test, and rather than
-    ``record_property``, which pytest 9 warns about under the ``xunit2`` junit
-    family it also defaults to.
+    Inside ``capsys.disabled()``, which is the whole point: pytest captures
+    everything a test writes and shows it only when the test fails, so the first
+    version of this printed on exactly the runs it was written to stop being the
+    only source of data. ``record_property`` was the other candidate, and pytest
+    9 warns about it under the ``xunit2`` junit family it also defaults to.
     """
-    reporter = config.pluginmanager.get_plugin("terminalreporter")
-    if reporter is None:  # pragma: no cover - only under a bare pytest API call
-        return
     headroom = (budget - ratio) / budget * 100
-    reporter.write_line(
-        f"[perf] {name}: {ratio:.2f}x against a budget of {budget:.2f}x ({headroom:.0f}% headroom)"
-    )
+    with capsys.disabled():
+        print(
+            f"\n[perf] {name}: {ratio:.2f}x against a budget of {budget:.2f}x "
+            f"({headroom:.0f}% headroom)"
+        )
 
 
 def interleaved_best(
@@ -346,7 +375,7 @@ def test_the_generated_tree_is_the_shape_the_guard_assumes(benchmark_tree: Path)
 
 
 def test_loading_costs_no_more_than_its_budget_above_the_parse(
-    benchmark_tree: Path, pytestconfig: pytest.Config
+    benchmark_tree: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """``load_tree`` stays within its documented multiple of the raw parse."""
     files = iter_inventory_files(benchmark_tree)
@@ -368,8 +397,13 @@ def test_loading_costs_no_more_than_its_budget_above_the_parse(
     ratio = full / floor
 
     libyaml_in_use = HAVE_LIBYAML and StrictSafeLoader.__name__ == "CStrictSafeLoader"
-    budget = MAX_LOAD_RATIO_LIBYAML if libyaml_in_use else MAX_LOAD_RATIO_PURE_PYTHON
-    report(pytestconfig, "load", ratio=ratio, budget=budget)
+    if not libyaml_in_use:
+        budget = MAX_LOAD_RATIO_PURE_PYTHON
+    elif sys.platform.startswith("linux"):
+        budget = MAX_LOAD_RATIO_LIBYAML
+    else:
+        budget = MAX_LOAD_RATIO_LIBYAML_ELSEWHERE
+    report(capsys, "load", ratio=ratio, budget=budget)
 
     assert ratio <= budget, (
         f"load_tree is {ratio:.2f}x the raw parse ({full:.1f} ms against {floor:.1f} ms) "
@@ -381,7 +415,7 @@ def test_loading_costs_no_more_than_its_budget_above_the_parse(
 
 
 def test_validating_costs_no_more_than_its_budget_above_an_address_walk(
-    benchmark_tree: Path, pytestconfig: pytest.Config
+    benchmark_tree: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """``validate`` stays within its documented multiple of the walk floor."""
     # Warm the lazily-built pydantic validators and the page cache before
@@ -402,7 +436,7 @@ def test_validating_costs_no_more_than_its_budget_above_an_address_walk(
 
     floor, full = min(floors), min(fulls)
     ratio = full / floor
-    report(pytestconfig, "validate", ratio=ratio, budget=MAX_VALIDATE_RATIO)
+    report(capsys, "validate", ratio=ratio, budget=MAX_VALIDATE_RATIO)
 
     assert ratio <= MAX_VALIDATE_RATIO, (
         f"validate is {ratio:.2f}x the address-walk floor "
