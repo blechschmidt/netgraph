@@ -25,6 +25,7 @@ labelled links](images/home-lab.svg)
   - [`overlay`: tunnels and what runs inside what](#overlay-tunnels-and-what-runs-inside-what)
   - [`routing`: sessions, adjacencies and VRFs](#routing-sessions-adjacencies-and-vrfs)
   - [`rack`: a front elevation per cabinet](#rack-a-front-elevation-per-cabinet)
+  - [`power`: the PDUs and what they feed](#power-the-pdus-and-what-they-feed)
 - [Filters: drawing less of the network](#filters-drawing-less-of-the-network)
 - [Aggregation: one node per site, one line per bundle](#aggregation-one-node-per-site-one-line-per-bundle)
 - [Icons](#icons)
@@ -36,9 +37,11 @@ labelled links](images/home-lab.svg)
 
 ---
 
-## Layers: one inventory, seven questions
+<a id="layers-one-inventory-seven-questions"></a>
 
-One inventory, seven questions. `--layer` picks which one the diagram answers.
+## Layers: one inventory, eight questions
+
+One inventory, eight questions. `--layer` picks which one the diagram answers.
 
 | Layer | Nodes | Edges | Annotations | Reach for it when |
 |---|---|---|---|---|
@@ -48,7 +51,8 @@ One inventory, seven questions. `--layer` picks which one the diagram answers.
 | `l3` | the elements that hold a routable address, **plus one node per IP prefix** | one per address: element ↔ the subnet it is addressed in, labelled with the interface and the address | VLANs the prefix is reachable in | "Why can these two not reach each other?" The addressing plan, gateways, a subnet mask that is one bit off. |
 | `overlay` | the elements that terminate a tunnel, **plus one node per tunnel** | one per endpoint, plus one per `over` — this tunnel runs inside that one | encapsulation stack, VNI, MTU budget, what encrypts | "Is this traffic actually protected, and what carries it?" VPNs, VXLAN fabrics, a cleartext overlay somebody assumed was private. |
 | `routing` | the elements that take part in routing — anything declaring `routing`, `routes` or `vrfs` — grouped into one cluster per VRF | one per BGP session (solid, labelled with the AS pair) and one per OSPF adjacency (dotted, labelled with the area) | AS number, router id, area, the instances and static routes each device holds | "Who peers with whom, and in which table?" An iBGP mesh with a gap in it, an AS number typed twice, a VRF nothing is bound to. |
-| `rack` | one node per rack named by a `metadata.location` | none — a cable says nothing about where either end is bolted | a front elevation: one row per unit, occupied and empty alike | "How much room is left in that cabinet, and what is above the UPS?" |
+| `rack` | one node per rack named by a `metadata.location` | none — a cable says nothing about where either end is bolted | a front elevation: one row per unit, occupied and empty alike, each occupant annotated with what it draws | "How much room is left in that cabinet, and what is above the UPS?" |
+| `power` | the PDUs, **plus** every element the inventory records power for | one per feed: an `outlet` cord from a PDU (solid amber) and a `poe` feed from a PSE port (dashed) | outlets used, load against capacity and the `input_feed` on a PDU; draw, redundancy and PoE budget on everything else | "Is this rack fed from one strip, and is there capacity left?" A single-fed cabinet, an oversubscribed PoE budget, a box nobody wrote a power path for. |
 
 The default is `l1`. `-f html` accepts `--layer` more than once and puts a
 switcher over the results; every other format holds one layer, and asking for
@@ -220,6 +224,14 @@ space is countable. Two things in the same unit are
 something that would stick out of the top is
 [`E026`](validation-rules.md#e026--element-mounted-above-the-top-of-its-rack).
 
+Each occupied unit is annotated with the **power** the inventory records for
+whatever is in it: a device shows its draw, and a PDU shows how full it is —
+`[server] 420 W`, `[pdu] 26.8% of 1840 W`. That is deliberately in the same cell
+as the kind rather than in a column of its own, because "can this cabinet take
+another box" is one question asked of the two facts, and an elevation is already
+three columns wide. Where the power comes *from* is
+[`--layer power`](#power-the-pdus-and-what-they-feed); what a unit costs is here.
+
 Mermaid has no way to express a grid, so `-f mermaid --layer rack` is refused
 with an error naming the formats that can:
 
@@ -231,6 +243,74 @@ Try 'netgraph render --help' for help.
 
 Error: --layer rack draws a front elevation — one row per rack unit, empty units included — and mermaid output has no way to express one; render it as dot, svg, html, png, pdf, json
 ```
+
+### `power`: the PDUs and what they feed
+
+`power` is the distribution plant rather than the network
+([`docs/schema.md` §17.5](schema.md#175-the-power-view)). It is the layer to reach
+for when the question is electrical: which strip feeds this rack, how much is left
+on it, and what stops working when one feed dies.
+
+**Nodes** are the PDUs plus every element the inventory records power for — a
+`draw_watts`, an `inputs` list, a `poe_budget_watts`, a `powered_by: poe`. A
+`pdu` ([§17.1](schema.md#171-power-distribution-units)) is a node with **no
+ports**: an outlet is not an interface and no `cable` terminates on a strip, so a
+PDU appears in no data layer at all and its node is built for this one, labelled
+with how many outlets are in use, its load against its capacity, and its
+`input_feed`. Everything else is the node it already is at layer 1 — the same
+ports, labels and description — and only gains what it says about power.
+
+**Edges** are the feeds, and the two kinds are drawn differently because they are
+found differently:
+
+* an **`outlet`** feed is drawn **solid**, in amber (`#b45309`) — a cord somebody
+  can reach behind a rack and pull. It is declared by the load, one entry per
+  power supply, and labelled with the outlet, the PSU and the watts that cord
+  carries.
+* a **`poe`** feed is drawn **dashed**, in a lighter amber (`#ca8a04`) — the power
+  rides on a data run this diagram draws *elsewhere*, so it borrows the visual
+  vocabulary a tunnel uses for "this runs over something else", in the power
+  palette rather than the tunnel one. It is derived rather than declared, by
+  walking the powered device's uplink to the PSE port at the far end
+  ([§17.4](schema.md#174-how-power-paths-are-resolved)) — a walk that crosses
+  patch panels, because a run through a panel is electrically one run for power
+  exactly as it is for frames.
+
+The line style is what carries the distinction, not the hue: a greyscale print of
+the diagram still tells a cord from a PoE run.
+
+Everything else is discarded. A cable is not a power path — two servers joined by
+one patch lead may be on opposite sides of the room electrically — and the cords
+joining a PDU to what it feeds appear on no data diagram, which is the whole
+reason this layer exists.
+
+Amber is the palette because it is the colour every electrical drawing uses for a
+live conductor and the one no element kind had taken, so a power node cannot be
+misread as part of the data path. `pdu` also has an icon in the bundled
+[themes](#icons).
+
+Unlike `rack`, this layer is an **ordinary topology** — nodes joined by edges — so
+every output format can draw it, Mermaid included:
+
+<!-- run: -->
+```console
+$ netgraph -i examples/patch-room render --layer power -f mermaid
+flowchart TB
+    n0["ap-ceiling-01<br/>[switch]<br/>22 W (max 25.5 W)<br/>powered over PoE"]
+...
+    n5["sw-access-01<br/>[switch]<br/>55 W (max 435 W)<br/>redundant, 2 feeds<br/>PoE 37/370 W"]
+...
+    n9["pdu-r2-a<br/>[pdu]<br/>3/8 outlets<br/>492.5/1840 W (26.8%)<br/>feed utility-a"]
+...
+    n9 -- "1 ↔ psu1 · 210 W" --- n2
+...
+    n5 -. "GigabitEthernet1/0/1 ↔ eth0 · 30 W" .- n0
+...
+```
+
+`sw-access-01` reads as both: a load of 55 W on two strips, and a source of 37 W
+of the 370 W it may hand out. `ap-ceiling-01` has no cord at all, and the dashed
+line into it is the run it takes its traffic over.
 
 ## Filters: drawing less of the network
 
@@ -244,7 +324,7 @@ themselves.
 |---|---|---|
 | `--namespace NS` | yes | Elements in `NS` or in any namespace below it. |
 | `--vlan VID` | yes | Elements participating in that VLAN (1–4094). A host on an untagged access port counts as a member. |
-| `--kind KIND` | yes | Elements of that kind: `switch`, `router`, `hub`, `computer`, `server`, `adapter`, `patchpanel`. A cable is an edge and so is a tunnel, so neither is selectable; both follow whichever elements survive. |
+| `--kind KIND` | yes | Elements of that kind: `switch`, `router`, `hub`, `computer`, `server`, `adapter`, `patchpanel`, `pdu`. A cable is an edge and so is a tunnel, so neither is selectable; both follow whichever elements survive. |
 | `--name GLOB` | yes | Elements whose short **or** fully-qualified name matches the shell-style glob. |
 | `--neighbors-of NAME` | no | Only the neighbourhood of one element. An unknown name is a usage error, with suggestions. |
 | `--depth N` | no | How many hops `--neighbors-of` reaches. Default 1. |
@@ -400,8 +480,9 @@ edges and every filter behave exactly as they do without a theme, and a kind the
 theme has no picture for keeps its plain shape rather than disappearing.
 
 **`cisco`** ships with netgraph and covers every kind that becomes a node: the
-seven hardware kinds, the subnet clouds of `--layer l3`, and the tunnel conduit
-of `--layer overlay`. The artwork is drawn in the topology idiom Cisco made the
+eight hardware kinds — `pdu` included, so [`--layer power`](#power-the-pdus-and-what-they-feed)
+draws strips rather than boxes — the subnet clouds of `--layer l3`, and the tunnel
+conduit of `--layer overlay`. The artwork is drawn in the topology idiom Cisco made the
 industry convention and is netgraph's own, under the same MIT licence as the
 rest of the package — Cisco's published icon library is copyrighted and is not
 redistributed here.
@@ -420,7 +501,7 @@ picture but a box holding several, and the folder shape says that better.
 **A directory** works just as well, which is how you use that library, or any
 other set, if you have it. A theme is nothing but a directory of images named
 after the kinds they stand for — `router`, `switch`, `hub`, `computer`,
-`server`, `adapter`, `patchpanel`, `subnet` and `tunnel`, with an `.svg`,
+`server`, `adapter`, `patchpanel`, `pdu`, `subnet` and `tunnel`, with an `.svg`,
 `.png`, `.jpg` or `.gif` extension:
 
 <!-- norun: the paths are illustrative -->
@@ -792,7 +873,7 @@ they control what a diagram prints; node and link VLAN membership is always
 exported, because it is topology rather than decoration.
 
 For the other machine-readable artefacts an inventory can produce — a CSV cable
-schedule, a DNS zone, an SVG rack elevation — see
+schedule, a power load schedule, a DNS zone, an SVG rack elevation — see
 [`netgraph export`](commands/export.md).
 
 ---

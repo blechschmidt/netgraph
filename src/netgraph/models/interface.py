@@ -17,6 +17,7 @@ from pydantic import Field, field_validator, model_validator
 from netgraph.errors import clip_text, echo_value
 from netgraph.models.base import NetgraphModel
 from netgraph.models.diagnostics import field_error
+from netgraph.models.power import PoeConfig
 from netgraph.models.scalars import (
     Boolean,
     ElementName,
@@ -108,6 +109,13 @@ _PARENT_TYPES: Final[frozenset[InterfaceType]] = frozenset(
 AGGREGATE_TYPES: Final[frozenset[InterfaceType]] = frozenset(
     {InterfaceType.LAG, InterfaceType.BRIDGE}
 )
+
+#: Types that may carry a ``poe`` block (§17.3, ``NG-E006``). Power over
+#: Ethernet travels over the twisted pairs of the run, so the port has to be one
+#: a run lands on; ``lag`` is here because an aggregate of two PoE ports is how a
+#: multi-gigabit access point is fed, and ``wifi`` is not because a radio is
+#: precisely the port with no copper.
+_POE_TYPES: Final[frozenset[InterfaceType]] = frozenset({InterfaceType.ETHERNET, InterfaceType.LAG})
 
 
 class VlanMode(str, Enum):
@@ -829,6 +837,9 @@ class Interface(NetgraphModel):
     vrf: ElementName | None = None
     #: Radio configuration; ``wifi`` interfaces only (§6.2.6).
     wireless: WirelessConfig | None = None
+    #: Power sourcing equipment configuration; a port that hands power down the
+    #: cable (§17.3). Only on a type that terminates one (``NG-E006``).
+    poe: PoeConfig | None = None
     #: ``if:lower-layer-if`` of a ``vlan`` sub-interface.
     parent: IfName | None = None
     #: ``if:lower-layer-if`` of a ``lag`` or ``bridge`` interface.
@@ -907,6 +918,25 @@ class Interface(NetgraphModel):
                 f"'wireless' is only allowed for type 'wifi', not {self.type.value!r}",
                 rule="NG-W002",
                 path=("wireless",),
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _check_poe(self) -> Interface:
+        """``NG-E006``: only a port a cable lands on can hand power down it.
+
+        PoE travels over the twisted pairs of an ethernet run, so a ``loopback``,
+        a ``vlan`` sub-interface, a ``bridge`` or a ``tunnel`` cannot source it —
+        there is no copper. ``wifi`` is refused for the same reason and one
+        further one: a radio is exactly the thing that has no cable.
+        """
+        if self.poe is not None and self.type not in _POE_TYPES:
+            permitted = ", ".join(sorted(itype.value for itype in _POE_TYPES))
+            raise field_error(
+                f"'poe' is only allowed on a port a cable terminates on ({permitted}), "
+                f"not on type {self.type.value!r}",
+                rule="NG-E006",
+                path=("poe",),
             )
         return self
 

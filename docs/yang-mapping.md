@@ -21,6 +21,8 @@ reasoning around both.
 * [IEEE 802.1Q — bridging and VLANs](#ieee-8021q--bridging-and-vlans)
 * [IEEE 802.11 — radios, SSIDs and BSSs](#ieee-80211--radios-ssids-and-bsss)
 * [Deliberately not covered](#deliberately-not-covered)
+* [RFC 8349 — routing](#rfc-8349--routing)
+* [Power — RFC 3621 and RFC 7460](#power--rfc-3621-and-rfc-7460)
 * [Things with no YANG home](#things-with-no-yang-home)
 * [If you want to export](#if-you-want-to-export)
 
@@ -37,6 +39,15 @@ reasoning around both.
 | dot11 | `ieee802-dot11` | `dot11` | IEEE Std 802.11-2020, Annex C (the MIB the module renders) |
 | ietf-routing | `ietf-routing` (rev. 2018-03-13) | `rt`, `v4ur`, `v6ur` | [RFC 8349](https://www.rfc-editor.org/rfc/rfc8349) |
 | ietf-network-instance | `ietf-network-instance` | `ni` | [RFC 8529](https://www.rfc-editor.org/rfc/rfc8529) |
+| power-ethernet-mib | `POWER-ETHERNET-MIB` | `peth` | [RFC 3621](https://www.rfc-editor.org/rfc/rfc3621) |
+| energy-object-mib | `ENERGY-OBJECT-MIB` | `eo` | [RFC 7460](https://www.rfc-editor.org/rfc/rfc7460) |
+| energy-object-context-mib | `ENERGY-OBJECT-CONTEXT-MIB` | `eo` | [RFC 7461](https://www.rfc-editor.org/rfc/rfc7461) |
+| entity-mib | `ENTITY-MIB` | `ent` | [RFC 6933](https://www.rfc-editor.org/rfc/rfc6933) |
+| 802.3 PoE classes | — (no YANG module exists) | — | IEEE Std 802.3-2022, clauses 33 and 145 |
+
+The last five are **MIB modules, not YANG**, and that is the standards landscape
+rather than a preference; [Power](#power--rfc-3621-and-rfc-7460) below explains
+why.
 
 Borrowing has three concrete benefits, and they are the reason the schema looks
 the way it does rather than like a drawing tool's file format:
@@ -341,7 +352,7 @@ are the scope boundary, and every entry falls into one of three buckets:
    differing only in that node would render identically, the node is not
    modelled.
 
-Routing is the one boundary that has moved. netgraph now borrows the *intent*
+Two boundaries have moved. Routing is the first: netgraph now borrows the *intent*
 half of `ietf-routing` — static routes, and enough of a control-plane protocol to
 say which AS and which OSPF area a router is in — plus the network instance of
 RFC 8529 for VRFs; see [RFC 8349 — routing](#rfc-8349--routing) below. What stays
@@ -350,6 +361,13 @@ is operational state (`rt:routes` is `config false`, and comparing it with the
 inventory is a job for a tool that can read a live device), protocol *behaviour*
 is protocol behaviour — timers, BFD, LSA flooding, best-path selection — and route
 policy is a language, of which half would be worse than none.
+
+Power is the second, and it moved for the same reason: which outlet a cord is in
+and which port sources PoE are as much *as-built physical facts* as a cable is,
+and a diagram that omits them cannot answer the question a rack fed from one
+strip poses. What stays out is on the far side of the first bucket — a measured
+watt reading, a PSE's detection status, an accumulated kilowatt-hour. See
+[Power](#power--rfc-3621-and-rfc-7460).
 
 A tool that stored everything would be a configuration-management system with
 an inventory attached, and it would rot for exactly the reason the diagrams it
@@ -391,6 +409,106 @@ written out.
 | `ietf-ospf` areas, interfaces, costs, network types | One area per device, deliberately (§16.5). Per-interface areas, costs and DR priorities describe how the IGP behaves rather than who is in it. |
 | `ietf-bgp` policy, capabilities, timers, route reflection | Policy is a language and the rest is behaviour; both are on the far side of the boundary above. |
 | `ni:vrf-root` sub-trees | RFC 8529 mounts a whole per-instance configuration tree under each instance. netgraph binds interfaces to instances and stops there. |
+
+## Power — RFC 3621 and RFC 7460
+
+Power is the one area of this document where the standard model is a **MIB rather
+than a YANG module**, and that is not an omission on netgraph's part. The IETF
+never migrated the power work to YANG: PoE lives in
+[RFC 3621](https://www.rfc-editor.org/rfc/rfc3621), the POWER-ETHERNET-MIB, and a
+device's own power lives in the Energy Management pair,
+[RFC 7460](https://www.rfc-editor.org/rfc/rfc7460) ("Power and Energy Monitoring
+MIB") and [RFC 7461](https://www.rfc-editor.org/rfc/rfc7461) ("Energy Object
+Context MIB"), whose framework and vocabulary —
+**Energy Object**, **power inlet**, **power outlet** — come from
+[RFC 7326](https://www.rfc-editor.org/rfc/rfc7326). IEEE publishes **no YANG
+module for PoE at all**: the class tables are normative text in IEEE Std
+802.3-2022, clauses 33 (802.3af/at) and 145 (802.3bt), so the MIB is the only
+machine-readable reference there is and it is the one netgraph borrows from.
+
+The division of labour between the three is exactly the division §17 uses, which
+is why the schema is shaped that way:
+
+* **RFC 3621** is per *port* and per *box*: a PSE port, its class, its limit, and
+  the pool the whole switch hands out. That is `interfaces[].poe` and
+  `spec.power.poe_budget_watts` (§17.3).
+* **RFC 7460** is per *box*: what it draws and what it is rated for. That is
+  `draw_watts` and a PDU's `capacity_watts` (§17.1, §17.2).
+* **RFC 7461** is the *relation*: which Energy Object powers which. That is
+  `power.inputs` and a PDU's `input_feed` (§17.4) — the only half of power that
+  is a fact *between* two elements, and the reason it needed a standard of its
+  own rather than a leaf on either end.
+* **RFC 6933**, the ENTITY-MIB, is where an outlet is a thing at all: a physical
+  component of a chassis, which is what `entPhysicalTable` enumerates.
+
+### Power over Ethernet
+
+`pethPsePortTable`/`pethPsePortEntry` is one row per PSE port, indexed by a group
+number and a port number rather than by the interface name RFC 8343 keys on.
+netgraph hangs the block off the interface instead, because an inventory names a
+port the way a configuration does:
+
+| netgraph | YANG/MIB |
+|---|---|
+| `interfaces[].poe` | `pethPsePortTable/pethPsePortEntry` — declaring the block *is* the row: this port is power sourcing equipment |
+| `interfaces[].poe.enabled` | `…/pethPsePortAdminEnable` — the intended half; a disabled PSE reserves nothing |
+| `interfaces[].poe.class` | `…/pethPsePortPowerClassifications` |
+| `interfaces[].poe.standard` | `…/pethPsePortType` |
+| `interfaces[].poe.budget_watts` | `…/pethPsePortPowerLimit` |
+| `spec.power.poe_budget_watts` | `pethMainPseTable/pethMainPseEntry/pethMainPsePower` — the pool the whole box hands out |
+| the watt figures behind a `class` | — (IEEE Std 802.3-2022 clauses 33 and 145; no YANG or MIB node carries the tables, only the classification) |
+
+`pethPsePortPowerClassifications` is an enumeration in the MIB
+(`class0`…`class4`, extended by later work) while netgraph writes the integer
+0–8, because 802.3bt classes 5 to 8 postdate RFC 3621 and an inventory should not
+have to spell a class the MIB has no name for.
+
+### A device's power, and a PDU's
+
+`eoPowerTable`/`eoPowerEntry` is one row per Energy Object, and a netgraph
+element — a server, a switch, a PDU — is one Energy Object:
+
+| netgraph | YANG/MIB |
+|---|---|
+| `spec.power` | `eoPowerTable/eoPowerEntry` — the element as an Energy Object |
+| `spec.power.draw_watts.typical` | `…/eoPowerEntry/eoPower` — the power actually drawn |
+| `spec.power.draw_watts.maximum` | `…/eoPowerEntry/eoPowerNameplate` — the rating |
+| a `pdu`'s `spec.capacity_watts` | `…/eoPowerEntry/eoPowerNameplate` — the same node, read at the other end of the cord: what may be drawn *through* the unit |
+| `spec.power.inputs[]` | `eoPowerRelationTable/eoPowerRelationEntry` (RFC 7461) — one row per "this object is powered by that one" |
+| a `pdu`'s `spec.input_feed` | the same table, one relation further upstream: the supply the unit itself hangs off. netgraph records it as free text rather than as a reference, because the UPS string on the other end is usually not an element of the inventory |
+| `inputs[].pdu`, `inputs[].outlet` | — (the relation table indexes Energy Objects by their own index; netgraph names them by `pdu:outlet`, which is what is printed on the cord) |
+| `inputs[].psu` | — (netgraph-only; the label on the back of the chassis) |
+| a `pdu`'s `spec.outlets` | `entPhysicalTable/entPhysicalEntry` (RFC 6933) — an outlet is a physical component, not an interface (§17.1) |
+| a power supply as a component | `…/entPhysicalEntry/entPhysicalClass` = `powerSupply(6)` — which is what `inputs[].psu` labels, and as far as netgraph goes towards the component tree |
+| `spec.power.redundant` | — netgraph-only. The relation table can record that a box has two inlets; nothing in any of these models says the two were *bought to survive each other*, which is a design intention only a human can state (`NG-E015`) |
+| `spec.power.powered_by` | — netgraph-only. RFC 7326 has both a power inlet and a PoE port, but nothing that says "this box has no cord, so read its power path off its uplink", which is the fact that lets netgraph derive the feed (§17.4) |
+
+`eoPower` is `read-only` in the MIB, because it is a *measurement*. netgraph
+writes an intended figure there anyway, for the same reason it accepts
+`if:phys-address` and `if:speed`
+([above](#intended-state-not-a-datastore)): a nameplate draw is exactly the sort
+of fact an inventory exists to record, and it is the only figure a load schedule
+can be built from before the rack is powered on. An exporter aiming at a live
+datastore must not write it back.
+
+### What netgraph does not model from the power MIBs
+
+| Node | Why not |
+|---|---|
+| `pethPsePortDetectionStatus` | Operational state, and the most volatile in the whole model: whether a PD is detected, delivering, faulted or searching *right now*. An inventory that recorded it would be wrong before the file was saved. |
+| `pethMainPseConsumptionPower`, `pethMainPseOperStatus` | The same, one level up: what the switch is handing out at this instant. `poe_budget_watts` is the pool; what is drawn from it is a monitoring system's answer, and §17.3 computes the *allocation* from the ports instead. |
+| `pethPsePortPowerPriority` and the notification controls | Behaviour under overload — which port gets shed first — and SNMP trap configuration. Both change what happens when the budget runs out; neither changes what is drawn. |
+| `eoPowerStateTable` (RFC 7460) | Power states and their wake semantics: which of a dozen sleep or standby states a box is in, and how to bring it out of one. That is control plus operational state, and a diagram of a rack does not differ because a server supports one more ACPI state. |
+| RFC 7460's energy accounting — accumulated kilowatt-hours, metering intervals, historical buckets | Measurement over time, which is the definition of what this file does not hold. A load schedule is built from nameplates; a bill is built from a meter. |
+| RFC 7460's unit multiplier and accuracy leaves | netgraph stores a wattage as a number in watts (§5). A device that reports milliwatts to three digits is reporting a measurement, and there is no measurement here to qualify. |
+| `entPhysicalTable` beyond the outlet: the full component tree, `entPhysicalContainedIn`, per-component serials and firmware | netgraph models a PDU's outlets as *numbers you can plug into*, because that is what a load schedule references. Enumerating a chassis as a component hierarchy is asset management, and nothing in a power diagram would differ. |
+| The rest of RFC 7461's context — the administrative domain and the role an Energy Object is placed in | Site metadata that `metadata.labels` and `metadata.location` already carry in whatever vocabulary the team uses (§3.1, §3.2), rather than in one the MIB fixes. |
+| Anything about phases, breakers, circuits or transfer switches | No standard here models them, and neither does netgraph. `input_feed` is the deliberate one-field answer: free text, compared only for equality (§17.1), because what counts as "a different feed" is site knowledge and a schema that guessed would be confidently wrong. |
+
+The same test as everywhere else: **would the diagram be different?** A PSE's
+detection status changes twice a day and never changes the drawing. Which outlet
+the cord is in changes once, when somebody moves it, and changes the drawing
+entirely.
 
 ## Things with no YANG home
 

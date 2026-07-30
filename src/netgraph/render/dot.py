@@ -91,7 +91,9 @@ from jinja2 import Environment, PackageLoader, StrictUndefined
 from markupsafe import Markup
 
 from netgraph.errors import RenderError, clip_text, compact_ids, count_text
-from netgraph.loader.inventory import namespace_of
+from netgraph.loader.inventory import namespace_of, short_name
+from netgraph.models import format_watts
+from netgraph.power import PowerNode
 from netgraph.render.aggregate import AGGREGATE_KIND, AggregateView
 from netgraph.render.details import (
     build_details,
@@ -102,6 +104,7 @@ from netgraph.render.details import (
 )
 from netgraph.render.graph import (
     PATCHPANEL_KIND,
+    PDU_KIND,
     RACK_KIND,
     SUBNET_KIND,
     TUNNEL_KIND,
@@ -110,6 +113,7 @@ from netgraph.render.graph import (
     Graph,
     Layer,
     Node,
+    RackSlot,
     RackView,
     RoutingView,
     TunnelView,
@@ -291,6 +295,11 @@ _NODE_STYLE: Final[Mapping[str, tuple[str, str, str]]] = {
     # switch's, so the elevation gets a plain frame and earns its identity from
     # the table inside it.
     RACK_KIND: ("box", "#f8fafc", "#334155"),
+    # A PDU is a strip, and ``box`` drawn tall is as close as Graphviz gets.
+    # Amber is the colour every electrical drawing uses for a live conductor and
+    # the one no element kind here had taken, which is what keeps a power node
+    # from being read as part of the data path.
+    PDU_KIND: ("box", "#fef3c7", "#b45309"),
 }
 _DEFAULT_NODE_STYLE: Final[tuple[str, str, str]] = ("box", "#f5f5f5", "#6b7280")
 
@@ -332,6 +341,15 @@ _ENCAPSULATION_STYLE: Final[tuple[str, str]] = ("#8b5cf6", "dotted")
 #: hue would not.
 _BGP_STYLE: Final[tuple[str, str]] = ("#0369a1", "solid")
 _OSPF_STYLE: Final[tuple[str, str]] = ("#0f766e", "dotted")
+
+#: The two feeds of the power view (§17.5). An outlet feed is a cord somebody can
+#: pull, so it is drawn *solid* in the PDU's amber; a PoE feed is power riding on
+#: a data run that the diagram draws elsewhere, so it is dashed — the same
+#: vocabulary a tunnel uses for "this runs over something else", in the power
+#: palette rather than the tunnel one. The line style is what survives a
+#: greyscale print, which is why the distinction is not carried by hue alone.
+_OUTLET_STYLE: Final[tuple[str, str]] = ("#b45309", "solid")
+_POE_STYLE: Final[tuple[str, str]] = ("#ca8a04", "dashed")
 
 #: Outline and text colour of something a :class:`~netgraph.render.highlight.Highlight`
 #: emphasises. Crimson is the one accent no element kind and no medium already
@@ -1035,6 +1053,9 @@ def _node_rows(node: Node, options: RenderOptions, layer: Layer) -> tuple[_Row, 
     if node.routing is not None:
         return _routing_rows(node.routing)
 
+    if node.power is not None:
+        return _power_rows(node.power)
+
     # At layer 3 each address is printed on the edge that puts the element in a
     # subnet, which also says which interface holds it; repeating the list under
     # the node would double the label to say less.
@@ -1084,6 +1105,10 @@ def _edge_views(
             colour, style = _BGP_STYLE
         elif edge.kind is EdgeKind.OSPF:
             colour, style = _OSPF_STYLE
+        elif edge.kind is EdgeKind.OUTLET:
+            colour, style = _OUTLET_STYLE
+        elif edge.kind is EdgeKind.POE:
+            colour, style = _POE_STYLE
         elif edge.kind is EdgeKind.TUNNEL:
             colour, style = (
                 _TUNNEL_STYLE
@@ -1203,6 +1228,16 @@ def _edge_label(edge: Edge, layer: Layer, options: RenderOptions) -> str:
             parts.append(f"vlan {compact_ids(edge.vlans)}")
         return "\n".join(parts)
 
+    if edge.kind.is_power and edge.feed is not None:
+        # The ports already name the outlet and the PSU, so the label adds the
+        # one number the reader is after: what this cord carries.
+        watts = edge.feed.reserved_watts
+        if watts:
+            parts.append(f"{format_watts(watts)} W")
+        if edge.feed.through:
+            parts.append(f"via {_inline(short_name(edge.feed.through[0]))}")
+        return "\n".join(parts)
+
     if layer is Layer.L2:
         # The association is layer-2 detail, not physical detail: which network
         # the link is on and on which frequency is exactly what distinguishes
@@ -1257,6 +1292,17 @@ def _tunnel_label(view: TunnelView) -> list[str]:
     return parts
 
 
+def _power_rows(view: PowerNode) -> tuple[_Row, ...]:
+    """What a node says about power (§17.5): the whole label, one clause a row.
+
+    Spanning rows rather than the three-column port table, because none of these
+    facts is about one port: a draw, a capacity and a PoE pool are properties of
+    the box. The port that sources PoE is named on the *edge*, which is where the
+    reader is looking when they ask which one it is.
+    """
+    return tuple(_Row(port=_inline(line), spans=True) for line in view.describe())
+
+
 def _rack_rows(view: RackView) -> tuple[_Row, ...]:
     """The elevation: one row per rack unit, from the top of the cabinet down.
 
@@ -1277,12 +1323,26 @@ def _rack_rows(view: RackView) -> tuple[_Row, ...]:
             _Row(
                 port=f"U{unit}",
                 addresses=_inline(slot.name) if not continuation else "\u2502",
-                vlans=f"[{slot.kind}]"
-                if not continuation
-                else (f"{slot.height}U" if unit == slot.top else ""),
+                vlans=_slot_note(slot) if not continuation else _continuation_note(slot, unit),
             )
         )
     return tuple(rows)
+
+
+def _slot_note(slot: RackSlot) -> str:
+    """``[server] 120 W`` — what occupies a unit, and what it costs (§17.5).
+
+    The power note is appended to the kind rather than given a column of its own:
+    an elevation is already three columns wide, and the reader asking "can this
+    rack take another box" is asking one question of the two facts.
+    """
+    note = slot.power.rack_note() if slot.power is not None else ""
+    return f"[{slot.kind}] {note}" if note else f"[{slot.kind}]"
+
+
+def _continuation_note(slot: RackSlot, unit: int) -> str:
+    """The height, printed on the topmost unit a multi-unit element fills."""
+    return f"{slot.height}U" if unit == slot.top else ""
 
 
 def _aggregate_rows(view: AggregateView, options: RenderOptions) -> tuple[_Row, ...]:

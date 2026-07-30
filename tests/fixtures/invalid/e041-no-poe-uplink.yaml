@@ -1,0 +1,43 @@
+# E041 (NG-E014) - a PoE-powered device's uplink offers no PoE.
+#
+# The camera has no power cord: 'powered_by: poe' says the run carrying its
+# traffic is its only power path. The switch port at the far end of that run
+# declares no 'poe' block, so the camera will not come up.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: cam-door
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+  power:
+    draw_watts: 8
+    powered_by: poe
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-cam
+spec:
+  endpoints:
+    - sw-a:port1
+    - cam-door:eth0
+  medium: copper

@@ -20,10 +20,12 @@ Format             What it is
                    located by rack, unit and panel port.
 ``routes``         An iproute2 script, one function per device, holding the
                    static routes that device declares (§16.2).
+``power``          The load schedule: one row per power feed, both ends
+                   located, with the per-PDU and per-PSE totals (§17.7).
 =================  =========================================================
 
-Four promises hold across all six, and they are why this is a package rather
-than six ad-hoc printers:
+Four promises hold across all seven, and they are why this is a package rather
+than seven ad-hoc printers:
 
 **Deterministic.** Every collection is sorted by an explicit canonical key —
 never by dict order, never by the loader's directory traversal. Two runs over an
@@ -62,7 +64,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Final
 
-from netgraph.export import ansible, cables, dnszone, hosts, prometheus, routes
+from netgraph.export import ansible, cables, dnszone, hosts, power, prometheus, routes
 from netgraph.export.context import ExportContext, ExportOptions
 from netgraph.export.manifest import MANIFEST_KIND, Manifest, Reason, Recorder, Skip
 from netgraph.export.names import ansible_identifier, domain_name, is_domain_name, sanitise_label
@@ -167,6 +169,17 @@ EXPORTERS: Final[Mapping[str, Exporter]] = {
             "invented here"
         ),
         emit=routes.emit,
+    ),
+    "power": Exporter(
+        name="power",
+        description="a CSV or JSON load schedule, one row per power feed",
+        layers=(Layer.POWER,),
+        suffix=".csv",
+        lossy=(
+            "power only: a feed carries no medium, no length and no label, and the data path "
+            "the PoE rides on is not described"
+        ),
+        emit=power.emit,
     ),
 }
 

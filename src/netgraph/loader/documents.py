@@ -54,6 +54,7 @@ __all__ = [
     "RawDocument",
     "StrictSafeLoader",
     "YamlSyntaxError",
+    "decode_text",
     "libyaml_loader",
     "parse_documents",
     "read_documents",
@@ -353,14 +354,35 @@ def read_documents(path: Path, *, relative: PurePosixPath) -> Generator[RawDocum
             tag, repeats a mapping key, or is not valid UTF-8.
         OSError: The file cannot be read.
     """
+    yield from parse_documents(decode_text(path.read_bytes(), path), path=path, relative=relative)
+
+
+def decode_text(content: bytes, path: Path) -> str:
+    """Turn the bytes of an inventory file into the text the parser sees.
+
+    Split out of :func:`read_documents` because a caller that needs the *bytes*
+    for something else — :mod:`netgraph.loader.cache` hashes them — must not
+    decode them a second, subtly different way. Two decisions live here:
+
+    * **UTF-8, tolerating a byte-order mark.** An editor on Windows writes one
+      and YAML has no idea what it is, so it would otherwise become part of the
+      first key.
+    * **Line endings are folded to ``\\n``**, exactly as Python's text mode
+      would. Both parsers accept CRLF, but a scalar's own line breaks and every
+      column in a diagnostic would otherwise depend on which platform wrote the
+      file. The scan is skipped when there is no carriage return at all, which
+      is every file on every platform that is not Windows.
+
+    Raises:
+        YamlSyntaxError: The bytes are not valid UTF-8.
+    """
     try:
-        text = path.read_text(encoding="utf-8-sig")
+        text = content.decode("utf-8-sig")
     except UnicodeDecodeError as exc:
-        raise YamlSyntaxError(
-            f"file is not valid UTF-8: {exc.reason}",
-            path=path,
-        ) from exc
-    yield from parse_documents(text, path=path, relative=relative)
+        raise YamlSyntaxError(f"file is not valid UTF-8: {exc.reason}", path=path) from exc
+    if "\r" not in text:
+        return text
+    return text.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def parse_documents(

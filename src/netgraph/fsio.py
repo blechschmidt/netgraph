@@ -131,7 +131,9 @@ def write_text_atomically(path: Path, text: str, *, encoding: str = "utf-8") -> 
     write_bytes_atomically(path, text.encode(encoding))
 
 
-def write_bytes_atomically(path: Path, payload: bytes, *, mode: int | None = None) -> None:
+def write_bytes_atomically(
+    path: Path, payload: bytes, *, mode: int | None = None, sync: bool = True
+) -> None:
     """Replace ``path`` with ``payload`` in one step.
 
     The temporary file is a sibling, so the replacement stays within one
@@ -148,6 +150,16 @@ def write_bytes_atomically(path: Path, payload: bytes, *, mode: int | None = Non
             everyone but its owner, which is not what somebody who asked for a
             picture meant. A rewritten inventory is the opposite case and should
             inherit. Ignored on Windows, which has no such bits.
+        sync: Force the bytes to the platter before the rename. On by default,
+            because for everything a *user* asked netgraph to write — a rewritten
+            inventory, a rendered diagram — "the command returned, and the file
+            is empty" after a power cut is not an acceptable outcome.
+
+            :mod:`netgraph.loader.cache` passes ``False``: an ``fsync`` per file
+            costs more than parsing the file it is caching (measured: 138 entries
+            take 405 ms with, 55 ms without), and a cache entry lost or truncated
+            by a crash is *already* a case that has to be handled, because it is
+            indistinguishable from one written by a killed process.
 
     Raises:
         OSError: The file cannot be written, or the replacement failed.
@@ -157,8 +169,9 @@ def write_bytes_atomically(path: Path, payload: bytes, *, mode: int | None = Non
     try:
         with temporary.open("wb") as handle:
             handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
+            if sync:
+                handle.flush()
+                os.fsync(handle.fileno())
         if mode is not None and os.name != "nt":
             os.chmod(temporary, mode)
         replace_atomically(temporary, path)

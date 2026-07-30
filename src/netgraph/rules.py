@@ -8,7 +8,7 @@ without importing the validator itself.
 Two identifier vocabularies exist and both are accepted everywhere a rule can be
 named (``netgraph.toml``, the ``netgraph/ignore`` annotation, ``--disable``):
 
-* The **short ids** ``E001``…``E036``, ``W101``…``W136`` and ``I001``…``I003``
+* The **short ids** ``E001``…``E042``, ``W101``…``W137`` and ``I001``…``I003``
   used by the validation engine and printed in diagnostics. The letter is the
   default severity — ``E`` error, ``W`` warning, ``I`` info — as first
   assigned; a rule keeps its id when an inventory re-grades it.
@@ -399,6 +399,48 @@ RULES: Final[tuple[Rule, ...]] = (
         title="duplicate router id",
     ),
     Rule(
+        "E037",
+        Severity.ERROR,
+        "One PDU outlet is claimed by two power supplies.",
+        ("NG-E010",),
+        title="PDU outlet claimed twice",
+    ),
+    Rule(
+        "E038",
+        Severity.ERROR,
+        "A power input names an outlet that does not exist.",
+        ("NG-E011",),
+        title="power input names no outlet that exists",
+    ),
+    Rule(
+        "E039",
+        Severity.ERROR,
+        "The declared load on a PDU exceeds its capacity.",
+        ("NG-E012",),
+        title="PDU load exceeds its capacity",
+    ),
+    Rule(
+        "E040",
+        Severity.ERROR,
+        "The PoE allocated on a device's ports exceeds its budget.",
+        ("NG-E013",),
+        title="PoE allocation exceeds the budget",
+    ),
+    Rule(
+        "E041",
+        Severity.ERROR,
+        "A PoE-powered device's uplink offers no PoE, or too little.",
+        ("NG-E014",),
+        title="PoE-powered device has no PoE uplink",
+    ),
+    Rule(
+        "E042",
+        Severity.ERROR,
+        "A device claims redundant power but its feeds are not independent.",
+        ("NG-E015",),
+        title="redundant power that is not redundant",
+    ),
+    Rule(
         "W101",
         Severity.WARNING,
         "An interface has neither IPv4 nor IPv6 and is not a switchport.",
@@ -649,6 +691,13 @@ RULES: Final[tuple[Rule, ...]] = (
         "A VRF is declared that no interface of the device is bound to.",
         ("NG-F014",),
         title="VRF with no interface bound to it",
+    ),
+    Rule(
+        "W137",
+        Severity.WARNING,
+        "A device declares a power draw but no power path.",
+        ("NG-E016",),
+        title="declared draw with no power path",
     ),
     Rule(
         "I001",

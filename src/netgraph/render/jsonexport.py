@@ -67,6 +67,7 @@ import json
 from typing import Any, Final
 
 from netgraph.models import API_VERSION
+from netgraph.power import Feed, PowerNode
 from netgraph.render.aggregate import AggregateView, BundleView
 from netgraph.render.graph import (
     AdjacencyView,
@@ -171,6 +172,8 @@ def _node(node: Node, options: RenderOptions) -> dict[str, Any]:
         payload["rack"] = _rack(node.rack)
     if node.routing is not None:
         payload["routing"] = _routing(node.routing)
+    if node.power is not None:
+        payload["power"] = _power(node.power)
     if node.cluster:
         payload["cluster"] = node.cluster
     payload["vlans"] = sorted(node.vlans)
@@ -225,6 +228,10 @@ def _rack(view: RackView) -> dict[str, Any]:
                 "kind": slot.kind,
                 "position": slot.position,
                 "height": slot.height,
+                # What this unit costs, or how full this strip is (§17.5). Only
+                # when the inventory records it: a defaulted zero would be a
+                # claim that the box draws nothing.
+                **({"power": _power(slot.power)} if slot.power is not None else {}),
             }
             for slot in view.slots
         ],
@@ -233,6 +240,67 @@ def _rack(view: RackView) -> dict[str, Any]:
             for unit, slot in reversed(view.elevation())
         ],
     }
+
+
+def _power(view: PowerNode) -> dict[str, Any]:
+    """What one element contributes to the power view (§17.5).
+
+    Emitted structurally rather than as the rendered label, and never defaulted:
+    a consumer must be able to tell "no capacity recorded" from "0 W", which is
+    the whole difference between a strip nobody measured and one nobody may use.
+    ``roles`` is first because it says which of the rest are meaningful — a switch
+    is commonly a load and a source at once.
+    """
+    payload: dict[str, Any] = {"roles": [str(role) for role in view.roles]}
+    if view.draw_watts:
+        payload["drawWatts"] = view.draw_watts
+    if view.maximum_watts and view.maximum_watts != view.draw_watts:
+        payload["maximumWatts"] = view.maximum_watts
+    if view.is_pdu:
+        payload["outlets"] = view.outlets
+        payload["usedOutlets"] = view.used_outlets
+        payload["loadWatts"] = round(view.load_watts, 3)
+        payload["failoverWatts"] = round(view.failover_watts, 3)
+        if view.capacity_watts is not None:
+            payload["capacityWatts"] = view.capacity_watts
+        if view.input_feed:
+            payload["inputFeed"] = view.input_feed
+    if view.poe_budget_watts is not None:
+        payload["poeBudgetWatts"] = view.poe_budget_watts
+    if view.poe_allocated_watts:
+        payload["poeAllocatedWatts"] = round(view.poe_allocated_watts, 3)
+    if view.inputs:
+        payload["inputs"] = view.inputs
+    if view.redundant:
+        payload["redundant"] = True
+    if view.powered_by_poe:
+        payload["poweredBy"] = "poe"
+    utilisation = view.utilisation
+    if utilisation is not None:
+        payload["utilisation"] = round(utilisation, 6)
+    return payload
+
+
+def _feed(feed: Feed) -> dict[str, Any]:
+    """One power feed: the socket, the supply and what it carries (§17.5)."""
+    payload: dict[str, Any] = {"feedKind": str(feed.kind), "source": feed.source}
+    if feed.outlet:
+        payload["outlet"] = feed.outlet
+    if feed.port:
+        payload["port"] = feed.port
+    if feed.peer_port:
+        payload["peerPort"] = feed.peer_port
+    if feed.psu:
+        payload["psu"] = feed.psu
+    if feed.through:
+        payload["through"] = list(feed.through)
+    if feed.reserved_watts:
+        payload["reservedWatts"] = round(feed.reserved_watts, 3)
+    if feed.element_watts:
+        payload["elementWatts"] = feed.element_watts
+    if feed.input_feed:
+        payload["inputFeed"] = feed.input_feed
+    return payload
 
 
 def _patch(view: PatchView) -> dict[str, Any]:
@@ -383,6 +451,10 @@ def _edge(edge: Edge) -> dict[str, Any]:
     elif edge.adjacency is not None:
         # Nor does a routing session: it runs over the rest of the diagram.
         payload["adjacency"] = _adjacency(edge.adjacency)
+    elif edge.feed is not None:
+        # Nor does a power feed: a cord is not a network medium, and a PoE feed
+        # rides on a run the diagram draws somewhere else.
+        payload["feed"] = _feed(edge.feed)
     elif edge.tunnel is not None:
         # Neither does a tunnel: what it runs over is the rest of the diagram.
         payload["tunnel"] = _tunnel(edge.tunnel)

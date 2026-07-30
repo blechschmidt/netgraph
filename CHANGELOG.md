@@ -16,7 +16,29 @@ publish a version whose section is missing or empty — see
 
 ## [Unreleased]
 
-_Nothing yet._
+### Added
+
+- **Power as a modelled layer.** A `pdu` element kind with numbered outlets, a `spec.power`
+  block on every device (draw, redundant inputs naming `<pdu>:<outlet>`, PoE budget and
+  per-port PoE), a `power` layer that draws which strip feeds what, `netgraph list power`
+  for the load schedule, `netgraph export power`, and seven rules (`E037`–`E042`, `W137`)
+  covering a claimed redundancy that is not one, an over-subscribed strip and a PoE budget
+  that does not add up.
+
+- **A parse cache, on by default.** A file that has been parsed once is remembered, keyed by
+  the hash of its bytes together with the netgraph, parser and model versions that read them,
+  so it cannot go stale. A repeated load costs 0.30 of a cold one in a new process and 0.05 in
+  a running `netgraph watch`, where a re-render now re-parses only the file that was saved.
+  Nothing about a timestamp enters the key: a `touch` changes nothing and a `git checkout` of
+  a revision seen before hits again.
+- **`netgraph cache info`** reports where the cache is, what is in it, and the identity an
+  entry is keyed by; **`netgraph cache clear`** empties it, `--all` for every inventory.
+- **`--no-cache`**, a global flag, parses everything and remembers nothing.
+  `NETGRAPH_NO_CACHE=1` does the same for a whole environment, and `NETGRAPH_CACHE_DIR`
+  moves the cache — both of which is what a CI job wants. See
+  [`docs/configuration.md`](docs/configuration.md#cache--remembering-parsed-files).
+- **`[cache]` in `netgraph.toml`** — `enabled`, `dir` and `max-size`, for an inventory that
+  needs to say where its cache goes on the machines it is used on.
 
 ## [0.1.0] - 2026-07-30
 

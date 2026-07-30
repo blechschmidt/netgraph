@@ -1,0 +1,77 @@
+# E040 (NG-E013) - the PoE allocated on a switch's ports exceeds its budget.
+#
+# Two ports reserve 25 W each out of a 30 W pool. An explicit 'budget_watts' is
+# the act of reserving, so both count whether or not anything is plugged in --
+# unlike a bare 'poe' block, which is a capability.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+      poe:
+        standard: 802.3at
+        budget_watts: 25
+    - name: port2
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+      poe:
+        standard: 802.3at
+        budget_watts: 25
+  power:
+    poe_budget_watts: 30
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-pc-a
+spec:
+  endpoints:
+    - sw-a:port1
+    - pc-a:eth0
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-pc-b
+spec:
+  endpoints:
+    - sw-a:port2
+    - pc-b:eth0
+  medium: copper

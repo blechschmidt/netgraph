@@ -50,6 +50,7 @@ from netgraph.models.fielddocs import (
     check_coverage,
 )
 from netgraph.models.patchpanel import PORT_RANGE_PATTERN
+from netgraph.models.pdu import OUTLET_RANGE_PATTERN
 from netgraph.models.scalars import (
     API_VERSION,
     BITRATE_PATTERN,
@@ -253,6 +254,22 @@ def _widen_vlan_set(_definition: dict[str, Any]) -> dict[str, Any]:
     return dict(_VLAN_SET_SCHEMA)
 
 
+def _widen_power_draw(definition: dict[str, Any]) -> dict[str, Any]:
+    """``draw_watts: 45`` as well as ``{typical: 45, maximum: 60}`` (§17.2).
+
+    The bare number is the spelling almost every device gets, because almost
+    every data sheet lists one figure.
+    """
+    return {
+        "title": "power draw",
+        "description": (
+            "What the device draws, in watts. A bare number is the typical draw; "
+            "the mapping form states `typical` and optionally `maximum`."
+        ),
+        "anyOf": [{"type": "number", "exclusiveMinimum": 0}, _bare(definition)],
+    }
+
+
 #: ``spec.ports`` of a patch panel (§15.1). The model normalises a count to the
 #: string form, so both spellings have to be describable here or an editor would
 #: flag ``ports: 24`` — the one people actually write.
@@ -266,6 +283,22 @@ _PORT_RANGE_SCHEMA: Final[dict[str, Any]] = {
     "anyOf": [
         {"type": "integer", "minimum": 1},
         {"type": "string", "pattern": PORT_RANGE_PATTERN},
+    ],
+}
+
+#: ``spec.outlets`` of a PDU (§17.1). The same count-or-spans shorthand as
+#: ``ports``, normalised the same way, and worth its own entry because what the
+#: positions *are* differs: an outlet becomes no interface at all.
+_OUTLET_RANGE_SCHEMA: Final[dict[str, Any]] = {
+    "title": "outlet range",
+    "description": (
+        "The outlets a unit has: a count (`24`, meaning 1 to 24) or "
+        "comma-separated spans (`1-24`, `1-12,17-24`). A device's `power.inputs` "
+        "names one of them as `<pdu>:<outlet>`."
+    ),
+    "anyOf": [
+        {"type": "integer", "minimum": 1},
+        {"type": "string", "pattern": OUTLET_RANGE_PATTERN},
     ],
 }
 
@@ -295,6 +328,7 @@ _SHORTHANDS: Final[dict[str, Any]] = {
     "IPv4Config": _widen_address_family(4),
     "IPv6Config": _widen_address_family(6),
     "VlanSet": _widen_vlan_set,
+    "PowerDraw": _widen_power_draw,
 }
 
 #: ``(definition, property)`` → the schema to use instead of what pydantic
@@ -307,6 +341,7 @@ _SCALAR_PROPERTIES: Final[dict[tuple[str, str], dict[str, Any]]] = {
     ("UpstreamPort", "speed"): _BITRATE_SCHEMA,
     ("PatchPanelSpec", "ports"): _PORT_RANGE_SCHEMA,
     ("PatchPanelSpec", "couplers"): _COUPLERS_SCHEMA,
+    ("PduSpec", "outlets"): _OUTLET_RANGE_SCHEMA,
 }
 
 

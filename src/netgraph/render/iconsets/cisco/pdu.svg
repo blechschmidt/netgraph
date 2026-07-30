@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="56" viewBox="0 0 72 56" role="img" aria-label="Power distribution unit">
+  <title>Power distribution unit</title>
+  <g stroke="#b45309" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M6 16 H66 V40 H6 Z" fill="#fef3c7"/>
+    <path d="M6 20 H2 M6 36 H2" fill="none"/>
+  </g>
+  <g fill="none" stroke="#b45309" stroke-width="2" stroke-linecap="round">
+    <circle cx="18" cy="28" r="5"/>
+    <circle cx="34" cy="28" r="5"/>
+    <circle cx="50" cy="28" r="5"/>
+  </g>
+  <g fill="#b45309" stroke="none">
+    <path d="M16 25 h1.6 v6 H16 Z"/>
+    <path d="M18.4 25 H20 v6 h-1.6 Z"/>
+    <path d="M32 25 h1.6 v6 H32 Z"/>
+    <path d="M34.4 25 H36 v6 h-1.6 Z"/>
+    <path d="M48 25 h1.6 v6 H48 Z"/>
+    <path d="M50.4 25 H52 v6 h-1.6 Z"/>
+    <path d="M62 22 l-4 6 h3 l-3 6 6-7 h-3 Z"/>
+  </g>
+</svg>

@@ -1,0 +1,54 @@
+# E037 (NG-E010) - one PDU outlet is claimed by two power supplies.
+#
+# Both switches name 'pdu-r1-a:1'. An outlet takes one plug, so one of the two
+# is plugged in somewhere nobody has written down.
+apiVersion: netgraph.dev/v1alpha1
+kind: pdu
+metadata:
+  name: pdu-r1-a
+spec:
+  outlets: 8
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+  power:
+    draw_watts: 40
+    inputs:
+      - pdu-r1-a:1
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-b
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+  power:
+    draw_watts: 40
+    inputs:
+      - pdu-r1-a:1
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - sw-a:port1
+    - sw-b:port1
+  medium: copper

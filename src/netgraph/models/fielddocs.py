@@ -40,6 +40,8 @@ from netgraph.models.interface import (
 )
 from netgraph.models.metadata import Location, Metadata
 from netgraph.models.patchpanel import PatchPanelSpec
+from netgraph.models.pdu import PduSpec
+from netgraph.models.power import PoeConfig, PowerConfig, PowerDraw, PowerInput
 from netgraph.models.routing import (
     BgpConfig,
     BgpNeighbor,
@@ -104,6 +106,11 @@ DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
     UpstreamPort,
     TunnelSpec,
     PatchPanelSpec,
+    PowerConfig,
+    PowerDraw,
+    PowerInput,
+    PoeConfig,
+    PduSpec,
 )
 
 #: What distinguishes one ``kind`` from the next, one sentence each.
@@ -120,6 +127,9 @@ KIND_NOTES: Final[dict[str, str]] = {
     "interfaces; `over` nests it inside another tunnel.",
     "patchpanel": "A passive cross-connect. Its `front/<n>` and `rear/<n>` ports are derived "
     "from `ports`, and a coupler joins each front port to one rear port; it is not a hop.",
+    "pdu": "A power distribution unit. Its numbered outlets are derived from `outlets`; they "
+    "are not interfaces, and a device names one in `power.inputs` rather than being cabled to "
+    "it. Placed on a rack elevation like any other hardware.",
     "template": "A named partial device spec, merged into every device that names it in "
     "`spec.from`. Not an element: never drawn, never listed, never validated on its own.",
 }
@@ -200,6 +210,11 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("DeviceSpec", "routes"): Doc(
         "Configured static routes, in the order the device holds them.",
         "…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rt:static-routes",
+    ),
+    ("DeviceSpec", "power"): Doc(
+        "What the device draws, which PDU outlets feed it, and how much PoE it hands out "
+        "(§17.2). Absent means the inventory records nothing about its power.",
+        "/eo-mib:eoPowerTable/eoPowerEntry",
     ),
     ("DeviceSpec", "routing"): Doc(
         "The dynamic routing protocols the device takes part in: an OSPF area, a BGP autonomous "
@@ -378,6 +393,11 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "(`NG-F002`); unset means the global instance. An address only collides with another "
         "address in the same VRF.",
         "/ni:network-instances/ni:network-instance/ni:name",
+    ),
+    ("Interface", "poe"): Doc(
+        "This port is power sourcing equipment: it hands power down the cable (§17.3). Only on "
+        "a type a cable terminates on — `ethernet` or `lag` (`NG-E006`).",
+        "/power-ethernet-mib:pethPsePortTable/pethPsePortEntry",
     ),
     ("Interface", "wireless"): Doc(
         "Radio configuration of a `type: wifi` interface: which side of the association it is, "
@@ -690,6 +710,100 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "Front position to rear position, for a panel that is not wired straight through. "
         "Absent means the identity mapping (`NG-P007`).",
         NONE,
+    ),
+    # -- power distribution unit -------------------------------------------
+    ("PduSpec", "vendor"): Doc("Hardware vendor, free text. Documentation only."),
+    ("PduSpec", "model"): Doc("Hardware model designation, free text."),
+    ("PduSpec", "serial"): Doc("Serial or asset number, free text."),
+    ("PduSpec", "form_factor"): Doc(
+        "Descriptive: `vertical`, `horizontal`, `1U`, `0U`. Documentation only."
+    ),
+    ("PduSpec", "outlets"): Doc(
+        "The outlets the unit has, as a count (`24`) or as spans (`1-12,17-24`). Referred to by "
+        "number from a device's `power.inputs`; at most 512, no repeats (`NG-E001`).",
+        "/entity-mib:entPhysicalTable/entPhysicalEntry",
+    ),
+    ("PduSpec", "capacity_watts"): Doc(
+        "How many watts may be drawn through the unit in total. `NG-E012` sums the declared "
+        "loads against it; absent means the rating is not recorded, and nothing is graded.",
+        "/eo-mib:eoPowerTable/eoPowerEntry/eoPowerNameplate",
+    ),
+    ("PduSpec", "input_feed"): Doc(
+        "Which supply feeds the unit — `A`, `B`, `ups-1`, `utility`. Free text, compared only "
+        "for equality: two PDUs on one feed do not make a device redundant (`NG-E015`).",
+        "/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry",
+    ),
+    # -- power (device) ----------------------------------------------------
+    ("PowerConfig", "draw_watts"): Doc(
+        "What the device draws. A bare number is the typical draw; a mapping states `typical` "
+        "and optionally `maximum`.",
+        "/eo-mib:eoPowerTable/eoPowerEntry/eoPower",
+    ),
+    ("PowerConfig", "inputs"): Doc(
+        "One entry per power supply, naming the PDU outlet feeding it. At most 8. Empty for a "
+        "device fed over PoE, or one whose feed is not recorded yet (`NG-E016`).",
+        "/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry",
+    ),
+    ("PowerConfig", "redundant"): Doc(
+        "The feeds are meant to be independent: losing one must not lose the device. Needs at "
+        "least two `inputs` (`NG-E002`) that land on different units and different feeds "
+        "(`NG-E015`).",
+        NONE,
+    ),
+    ("PowerConfig", "powered_by"): Doc(
+        "Where the device's own power comes from: `outlet` (the default) or `poe`, meaning it "
+        "takes power over its uplink and declares no `inputs` (`NG-E005`, `NG-E014`).",
+        NONE,
+    ),
+    ("PowerConfig", "poe_budget_watts"): Doc(
+        "The PoE power this device can hand out across every PSE port together. `NG-E013` "
+        "checks the ports that hold budget fit inside it.",
+        "/power-ethernet-mib:pethMainPseTable/pethMainPseEntry/pethMainPsePower",
+    ),
+    ("PowerDraw", "typical"): Doc(
+        "Steady-state draw of the box as configured, in watts. This is what a load schedule sums.",
+        "/eo-mib:eoPowerTable/eoPowerEntry/eoPower",
+    ),
+    ("PowerDraw", "maximum"): Doc(
+        "Nameplate or PSU rating, in watts — what a breaker has to survive. Must not be below "
+        "`typical` (`NG-E003`).",
+        "/eo-mib:eoPowerTable/eoPowerEntry/eoPowerNameplate",
+    ),
+    ("PowerInput", "pdu"): Doc(
+        "The PDU feeding this supply. An element reference, so it may be written fully "
+        "qualified to pick one of several PDUs sharing a short name (`NG-E011`).",
+        NONE,
+    ),
+    ("PowerInput", "outlet"): Doc(
+        "The outlet on it, as the PDU numbers it. Must exist (`NG-E011`) and must not already "
+        "feed something else (`NG-E010`). Writable as the shorthand `pdu-r1-a:7`.",
+        NONE,
+    ),
+    ("PowerInput", "psu"): Doc(
+        "Which supply on the device this feeds, e.g. `psu1`. Documentation only, and worth "
+        "writing: it is what an operator reads off the back of a chassis."
+    ),
+    # -- power over ethernet -----------------------------------------------
+    ("PoeConfig", "standard"): Doc(
+        "Which IEEE 802.3 amendment the port implements: `802.3af` (classes 0-3), `802.3at` "
+        "(adds 4) or `802.3bt` (adds 5-8).",
+        "/power-ethernet-mib:pethPsePortTable/pethPsePortEntry/pethPsePortType",
+    ),
+    ("PoeConfig", "pse_class"): Doc(
+        "The IEEE classification, 0 to 8, written `class` in YAML. Fixes the reservation; "
+        "refused above the standard's own ceiling, and exclusive with `budget_watts` "
+        "(`NG-E004`).",
+        "…/pethPsePortEntry/pethPsePortPowerClassifications",
+    ),
+    ("PoeConfig", "budget_watts"): Doc(
+        "An explicit reservation in watts instead of a class, for a vendor that lets an "
+        "operator cap a port below what its class allows.",
+        "…/pethPsePortEntry/pethPsePortPowerLimit",
+    ),
+    ("PoeConfig", "enabled"): Doc(
+        "Is the port administratively allowed to source power? A disabled PSE port reserves "
+        "nothing and powers nothing, which is what `NG-E014` reports it for.",
+        "…/pethPsePortEntry/pethPsePortAdminEnable",
     ),
 }
 

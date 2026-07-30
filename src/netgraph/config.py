@@ -22,6 +22,13 @@ from it. Those live in :mod:`netgraph.settings`, which owns the setting
 registry, the precedence ladder and the provenance report; this module only
 reads the tables and hands them over.
 
+A third, much smaller table says where this inventory's parse cache lives and
+how big it may get (:class:`CacheConfig`). It is the one table that configures a
+detail of *how* netgraph runs rather than what it produces, which it earns by
+being the one thing a shared inventory may need to say about the machines it is
+used on — a CI runner with a read-only home directory, a repository that wants
+the cache inside a directory it already archives.
+
 Unknown keys *inside* a known table are rejected rather than ignored: a
 misspelt ``ingore = [...]`` that silently did nothing would be worse than a
 failed run. Unknown *top-level* tables are left alone, so a configuration file
@@ -38,6 +45,7 @@ from types import MappingProxyType
 from typing import Any, Final
 
 from netgraph.errors import ConfigurationError
+from netgraph.loader.cache import DEFAULT_MAX_BYTES
 from netgraph.rules import RULE_IDS, WILDCARD, Severity, resolve_rule_id
 from netgraph.settings import (
     PROFILE_TABLE,
@@ -53,10 +61,13 @@ else:  # pragma: no cover - trivial version fork
     import tomli as tomllib
 
 __all__ = [
+    "CACHE_TABLE",
     "CONFIG_FILE_NAME",
+    "CacheConfig",
     "Config",
     "ValidationConfig",
     "load_config",
+    "parse_cache",
     "parse_config",
 ]
 
@@ -66,6 +77,28 @@ CONFIG_FILE_NAME: Final = "netgraph.toml"
 #: Keys accepted inside ``[validate]``. Anything else is a typo, not a feature
 #: from the future: unknown *tables* are tolerated, unknown *keys* are not.
 _VALIDATE_KEYS: Final[frozenset[str]] = frozenset({"strict", "ignore", "severity"})
+
+#: The table configuring the parse cache.
+CACHE_TABLE: Final = "cache"
+
+#: Keys accepted inside ``[cache]``.
+_CACHE_KEYS: Final[frozenset[str]] = frozenset({"enabled", "dir", "max-size"})
+
+#: The suffixes ``max-size`` accepts, and what each multiplies by. A cache size
+#: written in bytes is unreadable and one written in gigabytes by accident is a
+#: disk full, so the unit is required to be spelled unless the value is a plain
+#: integer count of bytes.
+_SIZE_UNITS: Final[Mapping[str, int]] = MappingProxyType(
+    {
+        "b": 1,
+        "kb": 1000,
+        "mb": 1000**2,
+        "gb": 1000**3,
+        "kib": 1024,
+        "mib": 1024**2,
+        "gib": 1024**3,
+    }
+)
 
 _EMPTY_SEVERITIES: Final[Mapping[str, Severity]] = MappingProxyType({})
 
@@ -119,6 +152,33 @@ class ValidationConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class CacheConfig:
+    """The ``[cache]`` table: where parsed documents are remembered, and how much.
+
+    Only three things are configurable, because only three are decisions rather
+    than implementation: whether the cache is used at all, where it goes, and how
+    large it may grow. What is *in* it and how it is keyed is netgraph's business
+    — see :mod:`netgraph.loader.cache`.
+    """
+
+    #: Use the cache. ``--no-cache`` and :data:`~netgraph.loader.cache.DISABLE_ENV_VAR`
+    #: can turn this off; nothing on the command line turns it on, so an
+    #: inventory that has opted out stays opted out.
+    enabled: bool = True
+    #: Base directory, already resolved against the configuration file.
+    #: ``None`` leaves the platform's answer alone, and
+    #: :data:`~netgraph.loader.cache.CACHE_DIR_ENV_VAR` outranks it either way.
+    directory: Path | None = None
+    #: Cap on the bytes kept for this inventory before the least recently used
+    #: entries are dropped.
+    max_bytes: int = DEFAULT_MAX_BYTES
+
+    def with_overrides(self, *, no_cache: bool = False) -> CacheConfig:
+        """A copy with the command line applied: ``--no-cache`` and nothing else."""
+        return replace(self, enabled=self.enabled and not no_cache)
+
+
+@dataclass(frozen=True, slots=True)
 class Config:
     """Everything ``netgraph.toml`` configures."""
 
@@ -130,6 +190,8 @@ class Config:
     render: RenderConfig = field(default_factory=RenderConfig)
     #: The ``[profile.<name>]`` blocks, in the order the file declares them.
     profiles: Mapping[str, RenderConfig] = field(default_factory=lambda: _EMPTY_PROFILES)
+    #: The ``[cache]`` table.
+    cache: CacheConfig = field(default_factory=CacheConfig)
 
     @property
     def is_default(self) -> bool:
@@ -228,7 +290,80 @@ def parse_config(data: Mapping[str, Any], *, path: Path | None = None) -> Config
         ),
         render=parse_render(data.get(RENDER_TABLE, {}), prefix=where, base=base),
         profiles=parse_profiles(data.get(PROFILE_TABLE, {}), prefix=where, base=base),
+        cache=parse_cache(data.get(CACHE_TABLE, {}), where=where, base=base),
     )
+
+
+def parse_cache(value: Any, *, where: str = "", base: Path | None = None) -> CacheConfig:
+    """Parse the ``[cache]`` table.
+
+    Args:
+        value: The decoded table.
+        where: ``"<file>: "``, prepended to every diagnostic.
+        base: Directory a relative ``dir`` resolves against — the configuration
+            file's own, not the working directory, because the file is committed
+            and shared and a cache that landed somewhere different depending on
+            where you stood would be a support question.
+
+    Raises:
+        ConfigurationError: The table holds an unknown key or a bad value.
+    """
+    if not isinstance(value, Mapping):
+        raise ConfigurationError(f"{where}'{CACHE_TABLE}' must be a table, got {_kind(value)}")
+    unknown = sorted(set(value) - _CACHE_KEYS)
+    if unknown:
+        known = ", ".join(sorted(_CACHE_KEYS))
+        raise ConfigurationError(
+            f"{where}unknown key(s) in [{CACHE_TABLE}]: {', '.join(unknown)}; "
+            f"expected one of {known}"
+        )
+
+    directory: Path | None = None
+    if "dir" in value:
+        raw = value["dir"]
+        if not isinstance(raw, str) or not raw.strip():
+            raise ConfigurationError(
+                f"{where}{CACHE_TABLE}.dir must be a non-empty path string, got {_kind(raw)}"
+            )
+        candidate = Path(raw.strip()).expanduser()
+        directory = candidate if candidate.is_absolute() or base is None else base / candidate
+
+    return CacheConfig(
+        enabled=_parse_bool(value.get("enabled", True), key=f"{CACHE_TABLE}.enabled", where=where),
+        directory=directory,
+        max_bytes=_parse_size(value.get("max-size", DEFAULT_MAX_BYTES), where=where),
+    )
+
+
+def _parse_size(value: Any, *, where: str) -> int:
+    """``max-size``: a byte count, or a size with a unit — ``"256MB"``, ``"1GiB"``."""
+    key = f"{CACHE_TABLE}.max-size"
+    if isinstance(value, bool) or not isinstance(value, (int, str)):
+        raise ConfigurationError(
+            f'{where}{key} must be a byte count or a size like "256MB", got {_kind(value)}'
+        )
+    if isinstance(value, int):
+        number, unit = float(value), "b"
+    else:
+        text = value.strip().lower()
+        digits = len(text) - len(text.lstrip("0123456789._"))
+        unit = text[digits:].strip() or "b"
+        try:
+            number = float(text[:digits])
+        except ValueError:
+            raise ConfigurationError(
+                f"{where}{key}: {value!r} is not a size; expected a byte count or a number "
+                f"followed by one of {', '.join(sorted(_SIZE_UNITS))}"
+            ) from None
+    if unit not in _SIZE_UNITS:
+        raise ConfigurationError(
+            f"{where}{key}: {value!r} names no unit netgraph knows; "
+            f"expected one of {', '.join(sorted(_SIZE_UNITS))}"
+        )
+    size = int(number * _SIZE_UNITS[unit])
+    if size < 0:
+        raise ConfigurationError(f"{where}{key} cannot be negative, got {value!r}")
+    return size
 
 
 def _parse_ignore(value: Any, *, where: str) -> frozenset[str]:

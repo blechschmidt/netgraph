@@ -41,18 +41,21 @@ producing a run that silently goes nowhere.
 
 from __future__ import annotations
 
-import re
 from collections.abc import Iterator, Mapping
 from functools import cached_property
 from typing import Annotated, Any, ClassVar, Final, Literal
 
 from pydantic import BeforeValidator, Field, model_validator
 
-from netgraph.errors import echo_value
 from netgraph.models.base import NetgraphModel
 from netgraph.models.diagnostics import field_error
 from netgraph.models.element import ElementBase
 from netgraph.models.interface import Interface, InterfaceType
+from netgraph.models.positions import (
+    POSITION_RANGE_PATTERN,
+    expand_positions,
+    normalise_positions,
+)
 
 __all__ = [
     "FRONT",
@@ -83,101 +86,35 @@ PanelSide: Final[tuple[str, str]] = (FRONT, REAR)
 #: modelled as one document and still bounds what a typo can ask for.
 MAX_PANEL_PORTS: Final = 1024
 
-#: One span of a port range: ``7`` or ``1-24``, decimal, leading zeros allowed.
-_SPAN_RE: Final = re.compile(r"^(\d+)(?:-(\d+))?$")
-
 #: What a normalised ``ports`` value looks like, for the JSON Schema.
-PORT_RANGE_PATTERN: Final = r"^\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*$"
+PORT_RANGE_PATTERN: Final = POSITION_RANGE_PATTERN
 
-#: Digits one span bound may carry. :data:`MAX_PANEL_PORTS` is four digits, so
-#: anything past this is out of range twice over; see :func:`parse_port_range`.
-_MAX_PORT_DIGITS: Final = 10
+#: What :func:`~netgraph.models.positions.expand_positions` is told a panel's
+#: numbered things are, so every ``NG-P006`` diagnostic reads the same way.
+_PORT_RANGE: Final[dict[str, Any]] = {
+    "field": "ports",
+    "rule": "NG-P006",
+    "limit": MAX_PANEL_PORTS,
+    "noun": "patch panel",
+    "unit": "position",
+}
 
 
 def parse_port_range(value: Any) -> tuple[str, ...]:
-    """Expand a ``ports`` shorthand into the port numbers it names.
+    """Expand a ``ports`` shorthand into the port numbers it names (``NG-P006``).
 
-    Accepts an integer — ``24`` means positions 1 to 24 — or a string of
-    comma-separated spans: ``1-24``, ``1-12,17-24``, ``7``. The width of a
-    span's *low* bound is the width every value it produces is padded to, which
-    is the same rule :mod:`netgraph.loader.ranges` applies to interface ranges,
-    so ``01-12`` yields ``01 … 12`` and ``1-12`` yields ``1 … 12``.
+    A thin wrapper over :func:`~netgraph.models.positions.expand_positions`; a
+    PDU's ``outlets`` takes the same shorthand and shares the implementation.
 
     Returns:
         The port numbers as written, in ascending span order.
-
-    Raises:
-        ValueError: The value is not an integer or a string, a span is
-            malformed or inverted, a number repeats, or the total exceeds
-            :data:`MAX_PANEL_PORTS`. The error carries ``NG-P006``.
     """
-    if isinstance(value, bool) or not isinstance(value, (int, str)):
-        raise field_error(
-            f"'ports' must be a count such as 24 or a range such as '1-24', got "
-            f"{type(value).__name__}",
-            rule="NG-P006",
-        )
-    if isinstance(value, int):
-        if value < 1:
-            raise field_error(
-                f"'ports' must name at least one position, got {value}", rule="NG-P006"
-            )
-        value = f"1-{value}" if value > 1 else "1"
-
-    numbers: list[str] = []
-    seen: set[int] = set()
-    for span in value.split(","):
-        match = _SPAN_RE.match(span.strip())
-        if match is None:
-            raise field_error(
-                f"{echo_value(span)} is not a port or a port range; write '7', '1-24' or "
-                f"'1-12,17-24'",
-                rule="NG-P006",
-            )
-        low_text, high_text = match.group(1), match.group(2) or match.group(1)
-        # Bounded before ``int``, which refuses a literal of more than 4300
-        # digits with a ``ValueError`` about ``sys.set_int_max_str_digits`` --
-        # true, and of no use to somebody reading a patch record.
-        if max(len(low_text), len(high_text)) > _MAX_PORT_DIGITS:
-            raise field_error(
-                f"port range {echo_value(span)} names a number of more than "
-                f"{_MAX_PORT_DIGITS} digits; a panel has at most {MAX_PANEL_PORTS} positions",
-                rule="NG-P006",
-            )
-        low, high = int(low_text), int(high_text)
-        if low > high:
-            raise field_error(
-                f"port range {echo_value(span)} is inverted: {low} > {high}", rule="NG-P006"
-            )
-        # Counted before it is expanded, not after. ``ports: 1-999999999`` is
-        # eight keystrokes and a billion strings, and a check that ran once the
-        # span had been built would be reached only by a process that had
-        # already been killed for asking. Arithmetic answers the same question
-        # for free; see ``test_an_amplifying_document_costs_bounded_time_and_memory``.
-        if len(numbers) + (high - low + 1) > MAX_PANEL_PORTS:
-            raise field_error(
-                f"'ports' names more than {MAX_PANEL_PORTS} positions; a patch panel that "
-                f"large is a typo, and a rack of them is a document each",
-                rule="NG-P006",
-            )
-        width = len(low_text)
-        for number in range(low, high + 1):
-            if number in seen:
-                raise field_error(f"port {number} is declared twice by 'ports'", rule="NG-P006")
-            seen.add(number)
-            numbers.append(f"{number:0{width}d}")
-    return tuple(numbers)
+    return expand_positions(value, **_PORT_RANGE)
 
 
 def _normalise_ports(value: Any) -> Any:
-    """Canonicalise ``ports`` to its string form, rejecting what cannot expand.
-
-    A list or a mapping is refused here rather than left to pydantic's
-    ``string_type`` error, so every way of getting ``ports`` wrong reports the
-    same rule and the same advice.
-    """
-    parse_port_range(value)
-    return f"1-{value}" if isinstance(value, int) and value > 1 else str(value).replace(" ", "")
+    """Canonicalise ``ports`` to its string form, rejecting what cannot expand."""
+    return normalise_positions(value, **_PORT_RANGE)
 
 
 #: ``spec.ports`` — a count or a comma-separated list of spans, normalised to

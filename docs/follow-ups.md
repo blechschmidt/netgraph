@@ -1362,6 +1362,156 @@ approach becomes correct rather than merely tempting.
 
 ---
 
+## 14. ~~Every command re-parses the whole tree~~ — fixed, 3.3× cold-process, 21× in-process
+
+**Status:** closed 2026-07-30. `netgraph.loader.cache` remembers a parsed file by
+the hash of its bytes; `netgraph cache info|clear` and `--no-cache` are the
+controls.
+
+Entries 1, 5 and 7 cut the constant factors of `load_tree` and `validate` — 3.3×,
+1.41× and 3.1× — but every one of them left the work *O(inventory) per
+invocation*. That is felt worst where the least has changed: `watch` re-renders on
+a keystroke-sized edit, `validate` runs from a pre-commit hook on a two-line diff,
+the web preview reloads.
+
+### The harness
+
+`tools/bench_incremental.py` (new), on `tools/bench_pipeline.py`'s default tree —
+**1056 devices in 2106 documents across 138 files, 1.2 MB of YAML**, through
+libyaml, median of five. It times the same tree six ways and, unlike
+`bench_pipeline.py`, it edits a file between two loads, because that is the case
+the cache exists for and the only one whose number can be quoted about `watch`.
+
+### Measured
+
+| | Load | Of a cold load |
+|---|---|---|
+| cold, no cache (what every command did) | 443 ms | 1.00 |
+| cold, filling the cache | 529 ms | 1.19 |
+| **warm, next process** (disk tier) | **135 ms** | **0.30** |
+| **warm, same process** (memory tier) | **21 ms** | **0.05** |
+| **reload after editing one 15 kB file** | **30 ms** | **0.07** |
+
+138 entries, **171 kB on disk** for 1.2 MB of YAML — the elements serialise to
+2.26 MB of JSON and zlib takes that to 171 kB, a 13× fold that is worth the 1.9 ms
+it costs to undo.
+
+### Where the warm 135 ms goes
+
+| Step | Cost |
+|---|---|
+| read all 138 inventory files and hash them | 2.2 ms |
+| read the 138 cache entries | 4.5 ms |
+| `zlib.decompress` both sections of each | 1.9 ms |
+| `json.loads` the per-file bookkeeping | 0.8 ms |
+| **pydantic re-validating the elements** | **~120 ms** |
+
+So the disk tier is *entirely* pydantic. Reconstruction goes back through the same
+validators the document went through — which is what makes a tampered entry
+harmless — and those validators do not know the values already passed once. The
+memory tier skips them, and that is the whole of the 135 ms → 21 ms difference.
+
+### The cycle, and what now dominates it
+
+The load is incremental. **Nothing after it is**: reference resolution,
+validation and the graph build all run over the whole inventory, from models that
+are already in memory.
+
+| Stage of one `watch` cycle | Cold | Incremental |
+|---|---|---|
+| load | 443 ms | 30 ms |
+| `validate` | 89 ms | 89 ms |
+| `build_graph` | 43 ms | 43 ms |
+| `render -f dot` | 100 ms | 100 ms |
+| **total** | **676 ms** | **263 ms** |
+
+**2.57× the cycle, not 14×.** The load was 66 % of a cold cycle and is 12 % of an
+incremental one, so the honest summary is that this entry closed the load and
+opened the next question: `validate`, `build_graph` and the renderer are now 88 %
+of a re-render, and none of them is incremental. That is entry 15's problem, and
+it is a harder one — a finding can depend on any pair of elements in the tree, so
+"re-validate only what changed" needs a dependency graph rather than a hash.
+
+Two things follow from the same numbers and are worth saying plainly:
+
+* **Filling the cache costs 19 %.** A CI runner that starts empty and is thrown
+  away pays that for nothing, which is why `docs/configuration.md` tells it to set
+  `NETGRAPH_NO_CACHE=1` or to persist the directory rather than leaving the
+  default in place.
+* **The win is much larger on the pure-Python parser** — 0.06 rather than 0.30 of
+  a cold load — because the denominator is five times bigger there. A machine
+  whose PyYAML has no libyaml bindings gets the most out of this.
+
+### The design, and the two things it refuses to do
+
+The key is `sha256(identity, relative path, file bytes)`. No timestamp: a file
+rewritten identically hits, a `git checkout` of an old revision hits again, a
+`touch` changes nothing. The *identity* is the netgraph version, the document
+`apiVersion`, the selected YAML parser, the pydantic and PyYAML versions, and a
+digest over the mtimes and sizes of netgraph's own sources — that last one so
+that editing a validator invalidates the cache in a source checkout, where the
+version number would not move.
+
+**Not a pickle.** An entry is a header line, then two zlib sections: the
+bookkeeping as JSON, and the elements as pydantic's own JSON. It is reconstructed
+through the validators, so an entry somebody has written into can be *refused*
+but cannot construct an object, let alone run code.
+
+**Not everything is cached.** A file declaring a `kind: template`, or a device
+inheriting one with `spec.from`, depends on another file's bytes, so a key over
+one file cannot see it change; those stay on the slow path and are counted. Nor
+is anything cached under `validate --format json|sarif|github`, which keeps the
+per-field provenance that *is* the YAML node tree.
+
+### The regression guard
+
+`tests/test_performance.py::test_a_warm_load_costs_a_fraction_of_a_cold_one`
+asserts the two ratios above against 0.55 and 0.20 — measured 0.30-0.34 and
+0.084-0.090, so 60 % of headroom each. It is the one guard in that file that is
+*helped* by coverage (the warm path executes far fewer traced lines than the
+parser does) rather than squeezed by it, which is the concern entry 12 records.
+
+`tests/test_cache.py` holds the correctness half: over every committed example, a
+hit produces the same elements in the same order, the same diagnostics in the same
+order, the same source locations and the same rendered bytes as a cold load. Then
+one test per failure mode a cache introduces — bytes that changed, a version that
+changed, an entry truncated, an entry filled with random bytes, an entry whose
+body is not zlib, an entry written for a different key, an entry edited into
+something the models reject, a half-written temporary file, four processes filling
+one cache at once, and a cache swept back under its cap. Every one of them has to
+end as a parse, because the alternative to a hit is never an error.
+
+### Measured and rejected
+
+**Reconstructing the models without validation.** ~120 ms of the warm 135 ms is
+pydantic, and `model_construct` would skip it — recursively, by hand, for twenty
+models. It was rejected on two counts: it is the property that makes a tampered
+entry harmless, and a hand-written reconstructor that drifts from the models is a
+class of bug with no symptom other than a wrong diagram. A validation *context*
+that let each cross-field check opt out on a trusted payload would be the
+supported way to buy most of it back, and it would touch every validator in the
+model layer; that is a change worth making on its own evidence, not as part of a
+cache.
+
+**`exclude_defaults` on the serialisation** would have cut the 2.26 MB of JSON
+substantially. It also drops `kind`, which is the discriminator of the element
+union, so the payload no longer validates at all. Not pursued further: the
+compressed size is 171 kB either way, and the JSON parse is 5 % of the warm load.
+
+**`fsync` per entry** was in the first version and cost **405 ms** for 138 files,
+turning a 19 % fill overhead into 92 %. Entries are now written atomically but not
+durably (`write_bytes_atomically(sync=False)`): a cache that does not survive a
+power cut is worth less than the 3 ms per file, and a torn entry is a case the
+decoder already has to handle because a killed process produces the same thing.
+
+**One pack file per inventory** instead of 138 entries would have made the reads
+one `open` instead of 138 — worth 4 ms of 135. It was rejected for what it costs
+elsewhere: every write rewrites the whole pack, LRU eviction becomes all-or-
+nothing, and two processes filling it concurrently lose each other's work rather
+than merely racing on one key.
+
+---
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

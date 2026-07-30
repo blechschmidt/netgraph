@@ -290,6 +290,16 @@ CASES = (
         options=RenderOptions(title="Patch room, elevations"),
         formats=("dot", "json"),
     ),
+    Case(
+        # The power distribution (§17.5): the PDUs, everything they feed, and the
+        # two PoE runs -- one of them across a patch panel, which is the case the
+        # feed walk exists for. Held in all three formats because a power feed is
+        # an ordinary edge and every backend has to draw one.
+        name="patch-room-power",
+        example="patch-room",
+        layer=Layer.POWER,
+        options=RenderOptions(title="Patch room, power"),
+    ),
 )
 
 #: The cases a Mermaid golden is kept for.

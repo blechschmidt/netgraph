@@ -2,7 +2,7 @@
 
 One optional file at the root of an inventory, holding everything that is true
 of *this* network rather than of this invocation: which rules it is graded by,
-and what its diagrams look like.
+what its diagrams look like, and where its parse cache goes.
 
 ```toml
 # netgraph.toml
@@ -41,6 +41,7 @@ declared the defaults, and `netgraph init` scaffolds a fully commented copy.
 - [Precedence](#precedence)
 - [Seeing what resolved, and why](#seeing-what-resolved-and-why)
 - [Every render setting](#every-render-setting)
+- [`[cache]` — remembering parsed files](#cache--remembering-parsed-files)
 - [Errors](#errors)
 
 ## Where the file is looked for
@@ -59,10 +60,15 @@ Which commands read which half:
 | `render`, `watch`, `path --highlight` | yes | yes |
 | `web` | no — it edits a stream, not a tree | yes, from the `-i` inventory |
 
+`[cache]` is read by every command that loads an inventory, which is every command
+in the table above. It is also the one table whose absence cannot be noticed: an
+inventory that says nothing about the cache gets the default one.
+
 `watch` re-reads the file on every cycle for `[validate]`, so re-grading a rule
 takes effect like editing any other file. The `[render]` half is resolved once
 when the watch starts, because the command line it was combined with is fixed
-for the run; restart the watcher after changing it.
+for the run; restart the watcher after changing it. So is `[cache]`, for the same
+reason.
 
 ## `[validate]` — how findings are graded
 
@@ -283,6 +289,96 @@ icons.
 **`bundle-links`** is genuinely three-valued. Unset means "fold only what the
 inventory itself calls one link" — the members of a declared `lag` interface —
 which is neither `true` nor `false`. Setting it to `false` turns even that off.
+
+## `[cache]` — remembering parsed files
+
+Every command re-reads the inventory from disk, because the files are the only
+state netgraph trusts. Turning those bytes back into validated models is the
+expensive half of that, so a file that has been parsed once is remembered:
+
+```toml
+[cache]
+enabled = true          # the default; false opts this inventory out entirely
+dir = ".netgraph-cache" # relative to *this file*; default is the platform's cache dir
+max-size = "64MB"       # least recently used entries are dropped past this
+```
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `enabled` | boolean | `true` | Use the cache. `--no-cache` and `NETGRAPH_NO_CACHE` can turn it off; nothing turns it back on, so an inventory that has opted out stays opted out. |
+| `dir` | string | platform cache directory | Base directory. A relative path resolves against this file, not the working directory. `NETGRAPH_CACHE_DIR` outranks it. |
+| `max-size` | integer bytes, or a string like `"256MB"`, `"1GiB"` | `64MB` | Cap on what is kept for this inventory. `0` keeps nothing on disk. |
+
+This is the one table that configures *how* netgraph runs rather than what it
+produces. It earns its place because it is the one thing a shared inventory may
+need to say about the machines it is used on — a CI runner whose home directory is
+read-only, a repository that wants the cache inside a directory it already
+archives between builds.
+
+### Exactly what is stored
+
+One file per inventory file, named after a SHA-256 of the file's **contents**, the
+path it has **within the inventory**, and the **identity** of the netgraph that
+read it (see `netgraph cache info`). Each holds, zlib-compressed:
+
+* every element of that file as pydantic serialises it — the same JSON
+  `netgraph show -o json` prints, after ranges are expanded and defaults applied;
+* every diagnostic the file produced, with its line, column and rule id, so a
+  broken document is reported identically without being parsed again.
+
+No timestamp is part of the key, so a file rewritten with identical bytes hits, a
+`git checkout` of an old revision hits again, and a `touch` changes nothing.
+Nothing is ever stored as a pickle: entries are reconstructed through the very
+same validators the document went through, so a tampered entry can be rejected
+but cannot execute anything or smuggle a model past the schema.
+
+**Where it goes**, strongest first: `NETGRAPH_CACHE_DIR`, then `[cache] dir`,
+then `XDG_CACHE_HOME/netgraph`, then the platform's own answer
+(`%LOCALAPPDATA%\netgraph\Cache` on Windows, `~/Library/Caches/netgraph` on
+macOS, `~/.cache/netgraph` elsewhere). Under it, one directory per inventory,
+named after the tree and a digest of its absolute path.
+
+**What is not cached:** files declaring a `kind: template` and devices that
+inherit one with `spec.from`, because their meaning depends on another file's
+bytes; and anything at all under `netgraph validate --format json|sarif|github`,
+which keeps the per-field provenance that a cache entry does not hold.
+
+A corrupt, truncated or half-written entry is not an error: it is a miss, and the
+file is parsed. So is an unwritable cache directory or a full disk.
+[`netgraph cache info`](commands/cache.md) reports the directory, the entry count
+and the identity; `netgraph cache clear` empties it; `-v` prints the hit and miss
+counts of a single run.
+
+### Turning it off
+
+Three ways, for three scopes:
+
+| Scope | How |
+|---|---|
+| One run | `netgraph --no-cache …` — the flag is global and goes before the subcommand. |
+| A whole environment: CI, a container image, a pre-commit hook | `NETGRAPH_NO_CACHE=1` in the environment. |
+| This inventory, for everybody | `[cache] enabled = false` in `netgraph.toml`. |
+
+**In CI, leaving it on is usually the wrong default** — not because it is unsafe
+but because it is pointless: a fresh runner starts with an empty cache and pays
+the ~20 % cost of *filling* one nobody will read. Either set
+`NETGRAPH_NO_CACHE=1`, or point `NETGRAPH_CACHE_DIR` at a directory the runner
+restores between builds and get the hit instead:
+
+```yaml
+# GitHub Actions: keep the cache between runs rather than disabling it
+- uses: actions/cache@v4
+  with:
+    path: .netgraph-cache
+    key: netgraph-${{ hashFiles('**/*.yaml') }}
+- run: netgraph validate
+  env:
+    NETGRAPH_CACHE_DIR: .netgraph-cache
+```
+
+Container images that run one command and exit should set `NETGRAPH_NO_CACHE=1`;
+this project's own image instead points `XDG_CACHE_HOME` at `/tmp`, so a
+read-only home directory is not a problem either way.
 
 ## Errors
 

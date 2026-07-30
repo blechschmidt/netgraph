@@ -101,17 +101,20 @@ from typing import TYPE_CHECKING, Final, TypeAlias
 from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of, short_name
 from netgraph.models import (
     PATCHPANEL_KIND,
+    PDU_KIND,
     Adapter,
     Cable,
     Device,
     Interface,
     Medium,
     PatchPanel,
+    Pdu,
     Tunnel,
     TunnelType,
     format_bitrate,
 )
 from netgraph.models.metadata import Location
+from netgraph.power import Feed, PowerNode, PowerPlan, power_plan
 from netgraph.subnets import (
     SUBNET_ID_PREFIX,
     AddressPlacement,
@@ -130,6 +133,7 @@ if TYPE_CHECKING:  # pragma: no cover - imported for typing only
 __all__ = [
     "NODE_KINDS",
     "PATCHPANEL_KIND",
+    "PDU_KIND",
     "RACK_ID_PREFIX",
     "RACK_KIND",
     "SUBNET_ID_PREFIX",
@@ -183,6 +187,9 @@ class Layer(str, Enum):
     ROUTING = "routing"
     #: Placement: one node per rack, holding its front elevation (§3.2).
     RACK = "rack"
+    #: Power: the PDUs and everything they feed, joined by outlet and PoE feeds
+    #: (§17.5). A different graph again — a power path is not a data path.
+    POWER = "power"
 
     def __str__(self) -> str:
         return self.value
@@ -191,6 +198,17 @@ class Layer(str, Enum):
     def shows_panels(self) -> bool:
         """Does this layer draw a passive cross-connect as a node of its own?"""
         return self is Layer.PHYSICAL
+
+    @property
+    def builds_own_nodes(self) -> bool:
+        """Does this layer replace the topology's node set with one of its own?
+
+        ``rack`` and ``power`` both do, and both therefore need the panels left in
+        the map they are built from: a panel occupies rack units, and a run to a
+        PoE device crosses one. Splicing panels out of a graph nobody draws would
+        cost nothing but the walk that finds the switch at the far end.
+        """
+        return self in (Layer.RACK, Layer.POWER)
 
 
 class NodeType(str, Enum):
@@ -266,9 +284,20 @@ class EdgeKind(str, Enum):
     BGP = "bgp"
     #: An OSPF adjacency: two routers in one area, on one link.
     OSPF = "ospf"
+    #: A cord from a PDU outlet to a power supply (§17.5).
+    OUTLET = "outlet"
+    #: Power over the uplink: a PSE port feeding a device that declares
+    #: ``powered_by: poe``. Drawn distinctly from an outlet feed because it is a
+    #: different kind of fact — nobody can unplug it without unplugging the data.
+    POE = "poe"
 
     def __str__(self) -> str:
         return self.value
+
+    @property
+    def is_power(self) -> bool:
+        """Is this a power feed rather than a data path?"""
+        return self in (EdgeKind.OUTLET, EdgeKind.POE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -649,6 +678,12 @@ class RackSlot:
     #: Lowest unit occupied, counted from 1 at the bottom.
     position: int
     height: int = 1
+    #: What this element says about power, when it says anything (§17.5). The
+    #: elevation prints :meth:`~netgraph.power.PowerNode.rack_note` from it: a
+    #: draw for a load, a utilisation for a PDU. ``None`` for an element the
+    #: inventory records no power for, which is what keeps an elevation of a
+    #: pre-§17 inventory byte-identical to what it was.
+    power: PowerNode | None = None
 
     @property
     def units(self) -> range:
@@ -736,7 +771,7 @@ class Node:
     kind: str
     namespace: str
     #: The declared element, or ``None`` for a derived node such as a subnet.
-    element: Device | Adapter | PatchPanel | None = None
+    element: Device | Adapter | PatchPanel | Pdu | None = None
     ports: tuple[PortView, ...] = ()
     #: Every VLAN this element participates in, links included. See the module
     #: docstring. For a subnet: every VLAN an interface addressed in it is in.
@@ -754,6 +789,9 @@ class Node:
     #: What this element contributes to the control plane; set at
     #: :attr:`Layer.ROUTING` only, where it is the whole reason the node is drawn.
     routing: RoutingView | None = None
+    #: What this element contributes to the power view; set at
+    #: :attr:`Layer.POWER` only (§17.5).
+    power: PowerNode | None = None
     #: The box this node is drawn inside when the *layer* groups the nodes rather
     #: than the reader: the VRF at :attr:`Layer.ROUTING`. Distinct from
     #: :attr:`namespace`, which is where the document lives — a router holds any
@@ -777,6 +815,25 @@ class Node:
             vlans=frozenset(),
             type=NodeType.TUNNEL,
             tunnel=view,
+        )
+
+    @classmethod
+    def for_pdu(cls, fqn: str, pdu: Pdu, power: PowerNode) -> Node:
+        """The node standing for one power distribution unit (§17.5).
+
+        A PDU is a declared element and keeps its own namespace, unlike a subnet
+        or a rack: ``--group-by-namespace`` draws it inside the directory that
+        declared it, which is where the document lives. It carries no ports —
+        an outlet is not an interface (§17.1) — so the label is its power summary
+        and nothing else.
+        """
+        return cls(
+            fqn=fqn,
+            name=pdu.metadata.name,
+            kind=PDU_KIND,
+            namespace=namespace_of(fqn),
+            element=pdu,
+            power=power,
         )
 
     @classmethod
@@ -839,7 +896,7 @@ class Node:
         return self.type is NodeType.ELEMENT
 
     @property
-    def _document(self) -> Device | Adapter | PatchPanel | Tunnel | None:
+    def _document(self) -> Device | Adapter | PatchPanel | Pdu | Tunnel | None:
         """The declared document behind the node, tunnels included."""
         if self.element is not None:
             return self.element
@@ -923,6 +980,9 @@ class Edge:
     #: The protocol adjacency this edge is; set on ``bgp`` and ``ospf`` edges,
     #: which exist only at :attr:`Layer.ROUTING` (§16.6).
     adjacency: AdjacencyView | None = None
+    #: The power feed this edge is; set on ``outlet`` and ``poe`` edges, which
+    #: exist only at :attr:`Layer.POWER` (§17.5).
+    feed: Feed | None = None
 
     @property
     def name(self) -> str:
@@ -1026,6 +1086,11 @@ class Graph:
     def routing_nodes(self) -> tuple[Node, ...]:
         """The nodes carrying routing state; empty outside :attr:`Layer.ROUTING`."""
         return tuple(node for node in self.nodes.values() if node.routing is not None)
+
+    @property
+    def power_nodes(self) -> tuple[Node, ...]:
+        """The nodes carrying power state; empty outside :attr:`Layer.POWER`."""
+        return tuple(node for node in self.nodes.values() if node.power is not None)
 
     @property
     def clusters(self) -> tuple[str, ...]:
@@ -1136,7 +1201,7 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
     edges += tunnel_edges
 
     panels = inventory.patchpanels
-    if panels and not layer.shows_panels:
+    if panels and not layer.shows_panels and not layer.builds_own_nodes:
         # Splice *before* membership is computed, so a host behind a panel is
         # in the VLAN of the port at the far end of the run rather than in the
         # nothing a panel port declares. That is also what makes a spliced
@@ -1159,7 +1224,7 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         for fqn, owner in owners.items()
     }
     nodes.update(tunnel_nodes)
-    if not layer.shows_panels and layer is not Layer.RACK:
+    if not layer.shows_panels and not layer.builds_own_nodes:
         # A panel that no cable reaches has no segments to splice, so removing
         # the nodes is a separate step from removing the edges.
         nodes = {fqn: node for fqn, node in nodes.items() if node.kind != PATCHPANEL_KIND}
@@ -1173,6 +1238,8 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         dangling += routing_dangling
     elif layer is Layer.RACK:
         nodes, edges = _rack_view(inventory)
+    elif layer is Layer.POWER:
+        nodes, edges = _power_view(inventory, nodes)
     return Graph(
         root=inventory.root,
         nodes=nodes,
@@ -1398,18 +1465,31 @@ def _splice(run: _Run, owners: Mapping[str, Device | Adapter | PatchPanel]) -> E
 # --------------------------------------------------------------------------- #
 
 
-def rack_elevations(inventory: Inventory) -> tuple[RackView, ...]:
+def rack_elevations(
+    inventory: Inventory, *, power: PowerPlan | None = None
+) -> tuple[RackView, ...]:
     """One :class:`RackView` per rack the inventory places anything in (§3.2).
 
     Racks come out in first-seen order and their slots bottom-up, so an
     elevation reads the way the inventory does and the way the cabinet does.
     An element whose ``location`` names a rack but no ``position`` is left out:
     it is in the room, and an elevation cannot say where.
+
+    Args:
+        inventory: A tree loaded by :func:`~netgraph.loader.load_tree`.
+        power: The power plan to annotate the slots with (§17.5). Resolved from
+            the inventory when not given; a caller that already has one passes it
+            so the walk is not repeated.
     """
     placed: dict[tuple[str, str, str], list[RackSlot]] = {}
     heights: dict[tuple[str, str, str], int] = {}
     declared: dict[tuple[str, str, str], bool] = {}
     labels: dict[tuple[str, str, str], str] = {}
+    # The elevation carries each occupant's draw and each PDU's utilisation
+    # (§17.5), which is the one question an elevation cannot otherwise answer:
+    # can this rack take another box. Resolved through the same plan the power
+    # layer draws, so the two never disagree.
+    plan = power if power is not None else power_plan(inventory)
 
     for fqn, element in inventory.elements.items():
         location: Location | None = element.metadata.location
@@ -1434,6 +1514,7 @@ def rack_elevations(inventory: Inventory) -> tuple[RackView, ...]:
                 kind=element.kind,
                 position=location.position,
                 height=location.height,
+                power=plan.node(fqn),
             )
         )
 
@@ -1461,6 +1542,60 @@ def _rack_view(inventory: Inventory) -> tuple[dict[str, Node], tuple[Edge, ...]]
     one would put a line between two elevations that says nothing about either.
     """
     return {view.id: Node.for_rack(view) for view in rack_elevations(inventory)}, ()
+
+
+# --------------------------------------------------------------------------- #
+# Power
+# --------------------------------------------------------------------------- #
+
+
+def _power_view(
+    inventory: Inventory, nodes: Mapping[str, Node]
+) -> tuple[dict[str, Node], tuple[Edge, ...]]:
+    """Turn the topology into the power distribution one (§17.5).
+
+    Nodes are the PDUs and everything the inventory says draws or sources power;
+    edges are the feeds. Everything else is discarded, because a cable is not a
+    power path: two servers joined by a patch lead may be on opposite sides of the
+    room electrically, and a PDU is joined to the boxes it feeds by cords no data
+    diagram draws.
+
+    A PDU is not in the topology at all — it owns no interfaces (§17.1) — so its
+    node is built here rather than kept. Everything else is *kept*, so a switch in
+    this view is the same node it is at layer 1: it carries its ports, its labels
+    and its description, and only gains what it says about power.
+
+    Two edge kinds, drawn distinctly and derived differently: an ``outlet`` feed
+    is declared by the load, and a ``poe`` feed is derived by walking the load's
+    uplink to the PSE port at the far end. Outlet feeds come first, in load order.
+    """
+    plan = power_plan(inventory)
+    kept: dict[str, Node] = {}
+    for fqn, summary in plan.nodes.items():
+        existing = nodes.get(fqn)
+        if existing is not None:
+            kept[fqn] = replace(existing, power=summary)
+            continue
+        pdu = inventory.pdus.get(fqn)
+        if pdu is not None:
+            kept[fqn] = Node.for_pdu(fqn, pdu, summary)
+
+    edges = tuple(
+        Edge(
+            id=feed.id,
+            kind=EdgeKind.POE if feed.is_poe else EdgeKind.OUTLET,
+            source=feed.source,
+            target=feed.element,
+            source_port=feed.outlet or feed.port,
+            target_port=feed.peer_port or feed.psu,
+            medium="",
+            label=feed.psu or None,
+            feed=feed,
+        )
+        for feed in plan.feeds
+        if feed.source in kept and feed.element in kept
+    )
+    return kept, edges
 
 
 def _routed_view(
@@ -2215,6 +2350,7 @@ NODE_KINDS: Final[tuple[str, ...]] = (
     "server",
     "adapter",
     "patchpanel",
+    "pdu",
 )
 
 

@@ -1,0 +1,37 @@
+---
+title: "Patch room, power"
+---
+flowchart TB
+    n0["ap-ceiling-01<br/>[switch]<br/>22 W (max 25.5 W)<br/>powered over PoE"]
+    n1[/"cam-lobby-01<br/>[computer]<br/>5 W<br/>powered over PoE"/]
+    n2[("srv-app-01<br/>[server]<br/>420 W (max 800 W)<br/>redundant, 2 feeds")]
+    n3[("srv-db-01<br/>[server]<br/>510 W (max 800 W)<br/>redundant, 2 feeds")]
+    n4(["rtr-edge-01<br/>[router]<br/>35 W (max 150 W)<br/>redundant, 2 feeds"])
+    n5["sw-access-01<br/>[switch]<br/>55 W (max 435 W)<br/>redundant, 2 feeds<br/>PoE 37/370 W"]
+    n6["sw-core-01<br/>[switch]<br/>48 W (max 125 W)<br/>redundant, 2 feeds"]
+    n7["pdu-r1-a<br/>[pdu]<br/>2/24 outlets<br/>41.5/3680 W (1.1%)<br/>feed utility-a"]
+    n8["pdu-r1-b<br/>[pdu]<br/>2/24 outlets<br/>41.5/3680 W (1.1%)<br/>feed ups-1"]
+    n9["pdu-r2-a<br/>[pdu]<br/>3/8 outlets<br/>492.5/1840 W (26.8%)<br/>feed utility-a"]
+    n10["pdu-r2-b<br/>[pdu]<br/>3/8 outlets<br/>492.5/1840 W (26.8%)<br/>feed ups-1"]
+
+    n9 -- "1 ↔ psu1 · 210 W" --- n2
+    n10 -- "1 ↔ psu2 · 210 W" --- n2
+    n9 -- "2 ↔ psu1 · 255 W" --- n3
+    n10 -- "2 ↔ psu2 · 255 W" --- n3
+    n7 -- "2 ↔ psu1 · 17.5 W" --- n4
+    n8 -- "2 ↔ psu2 · 17.5 W" --- n4
+    n9 -- "3 ↔ psu1 · 27.5 W" --- n5
+    n10 -- "3 ↔ psu2 · 27.5 W" --- n5
+    n7 -- "1 ↔ psu1 · 24 W" --- n6
+    n8 -- "1 ↔ psu2 · 24 W" --- n6
+    n5 -. "GigabitEthernet1/0/1 ↔ eth0 · 30 W" .- n0
+    n5 -. "GigabitEthernet1/0/2 ↔ eth0 · 7 W" .- n1
+
+    classDef computer fill:#f5f5f5,stroke:#6b7280,stroke-width:1px
+    classDef router fill:#dbe9f6,stroke:#2563eb,stroke-width:1px
+    classDef server fill:#eae2f5,stroke:#7c3aed,stroke-width:1px
+    classDef switch fill:#dcf0dc,stroke:#16a34a,stroke-width:1px
+    class n1 computer
+    class n4 router
+    class n2,n3 server
+    class n0,n5,n6 switch

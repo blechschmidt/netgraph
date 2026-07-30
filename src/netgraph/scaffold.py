@@ -128,6 +128,16 @@ _CONFIG: Final = f"""\
 # collapse-depth = 1              # one node per site, for a pull request
 # bundle-links = true
 # show-ips = false
+
+# Where parsed documents are remembered between runs, so that only the files you
+# actually edited are re-read. Keyed by file contents, so it cannot go stale;
+# 'netgraph cache info' says where it is. Set NETGRAPH_NO_CACHE=1 in CI, or point
+# NETGRAPH_CACHE_DIR at a directory the runner keeps between builds.
+
+# [cache]
+# enabled = true
+# dir = ".netgraph-cache"         # relative to this file; default is ~/.cache
+# max-size = "64MB"
 """
 
 _GITIGNORE: Final = """\
@@ -141,6 +151,11 @@ _GITIGNORE: Final = """\
 *.png
 *.svg
 /out/
+
+# The parse cache, if [cache] dir points it inside the tree. It is derived from
+# the YAML beside it and is machine-specific; netgraph skips dot-directories
+# when it walks, so this line is about git rather than about netgraph.
+/.netgraph-cache/
 
 # schema/netgraph.schema.json is deliberately *not* ignored: it is editor
 # wiring, and a fresh checkout should offer completion before netgraph is

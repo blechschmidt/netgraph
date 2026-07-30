@@ -62,6 +62,7 @@ from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of
 from netgraph.loader.provenance import Site
 from netgraph.models import (
     AGGREGATE_TYPES,
+    FRONT,
     GLOBAL_VRF,
     PATCHPANEL_KIND,
     Adapter,
@@ -91,9 +92,12 @@ from netgraph.models import (
     VlanMode,
     VrfDefinition,
     WirelessConfig,
+    split_panel_port,
 )
 from netgraph.models.metadata import Location
+from netgraph.models.power import format_watts
 from netgraph.models.scalars import MAX_VLAN_ID, MIN_VLAN_ID, format_bitrate
+from netgraph.power import FeedKind, PowerPlan, UnresolvedReason, Uplink, power_plan
 from netgraph.rules import RULES, WILDCARD, Rule, Severity, resolve_rule_id
 from netgraph.subnets import (
     AddressPlacement,
@@ -604,6 +608,11 @@ class _Context:
     #: the real world, so it is looked up as one here rather than by name. A
     #: duplicate address is ``E004``'s business, not this index's.
     address_owners: Mapping[_IPAddress, tuple[str, str]] = field(default_factory=dict)
+    #: Every power fact of the inventory (:mod:`netgraph.power`): the resolved
+    #: feeds, the per-PDU load, the PoE budgets and the references that did not
+    #: resolve. The same plan the ``power`` layer draws and ``list power``
+    #: prints, so a finding and a diagram of it can never disagree.
+    power: PowerPlan = field(default_factory=PowerPlan)
 
     def source_of(self, fqn: str | None) -> SourceLocation | None:
         return self.inventory.source_of(fqn) if fqn is not None else None
@@ -789,6 +798,7 @@ def _build_context(inventory: Inventory) -> _Context:
         vrfs=routing.vrfs,
         routing=routing.routing,
         address_owners=routing.address_owners,
+        power=power_plan(inventory),
     )
 
 
@@ -2738,10 +2748,18 @@ def _check_disconnected_topology(ctx: _Context) -> Iterator[_Draft]:
     words; this rule is about the case that looks fine locally — two halves of a
     network that are each internally cabled and never meet.
     """
+    # Components over the *couplers* as well as the elements, then projected back
+    # onto the active elements. A run through a patch panel joins its two ends
+    # (§15.2), so a plant where every server link crosses one is a connected
+    # topology; computing components over the active elements alone would call
+    # each of those servers an island of its own.
+    links = list(_topology_links(ctx))
+    nodes = list(dict.fromkeys([*ctx.owners, *(node for pair in links for node in pair)]))
     islands = [
-        island
-        for island in _components(ctx.owners, _topology_links(ctx))
-        if len(island) > 1  # a lone element is W103's finding, not this one
+        active
+        for island in _components(nodes, links)
+        if len(active := [fqn for fqn in island if fqn in ctx.owners]) > 1
+        # A lone element is W103's finding, not this one.
     ]
     if len(islands) < 2:
         return
@@ -2771,13 +2789,41 @@ def _topology_links(ctx: _Context) -> Iterator[tuple[str, str]]:
     elements, exactly as in :attr:`_Context.connected`: ``E001`` reports the bad
     reference, and treating the link as absent would split the topology over a
     typo.
+
+    A panel end is named by its :func:`_coupler_node` rather than by the panel,
+    so a run *through* the panel is one path and two runs patched through
+    different positions of one panel are two.
     """
     for _, first, second in ctx.endpoint_pairs:
-        if first.owner_fqn is not None and second.owner_fqn is not None:
-            yield first.owner_fqn, second.owner_fqn
+        left, right = _coupler_node(first), _coupler_node(second)
+        if left is not None and right is not None:
+            yield left, right
     for attachment in ctx.attachments:
         if attachment.host_fqn is not None:
             yield attachment.adapter_fqn, attachment.host_fqn
+
+
+def _coupler_node(endpoint: _Endpoint) -> str | None:
+    """Which node a cable end belongs to in the connectivity graph.
+
+    An active element is itself. A panel position is its **coupler** — the pair
+    of positions a plug on one side reaches from the other, named after the front
+    one — because a panel is not one node: two runs patched through positions 7
+    and 24 of one panel are two runs, and nothing joins them (§15.2). Naming the
+    panel instead would silently merge every island that happens to cross it.
+
+    A position the panel has not got is ``NG-P001`` and keeps the panel's own
+    name: there is no coupler to belong to, and the link is left where the
+    reference put it.
+    """
+    fqn = endpoint.owner_fqn
+    if fqn is None or endpoint.panel is None:
+        return fqn
+    port = endpoint.port
+    if split_panel_port(port) is None:
+        return fqn
+    front = port if port.startswith(f"{FRONT}/") else endpoint.panel.opposite(port)
+    return f"{fqn}#{front or port}"
 
 
 def _components(nodes: Iterable[str], links: Iterable[tuple[str, str]]) -> list[list[str]]:
@@ -3983,6 +4029,258 @@ def _span_text(placement: _Placement) -> str:
     return f"{_units_text(units)} ({location.height}U)" if units else "no position"
 
 
+# --------------------------------------------------------------------------- #
+# Power (§17)
+# --------------------------------------------------------------------------- #
+
+
+def _check_outlet_claimed_twice(ctx: _Context) -> Iterator[_Draft]:
+    """E037 — one PDU outlet feeds two power supplies (``NG-E010``).
+
+    An outlet takes one plug. Two cords in one is a load schedule that cannot be
+    true, and unlike the patch-panel version of the same mistake (``E022``) it is
+    usually not a typo about the outlet: it is a *second* device someone added to
+    a rack without a spare socket, which is exactly the case a schedule exists to
+    prevent.
+
+    Two inputs of the *same* device naming one outlet is caught earlier, by the
+    model (``NG-E002``), so everything reported here involves two elements.
+    """
+    for (pdu, outlet), feeds in ctx.power.outlet_claims().items():
+        elements = list(dict.fromkeys(feed.element for feed in feeds))
+        if len(elements) < 2:
+            continue
+        anchor = feeds[0]
+        yield _Draft(
+            f"outlet {_q(f'{pdu}:{outlet}')} is claimed by {len(elements)} elements: "
+            f"{_join(elements)}. An outlet takes one plug.",
+            (*elements, pdu),
+            ("spec", "power", "inputs", anchor.index),
+        )
+
+
+def _check_power_input_resolves(ctx: _Context) -> Iterator[_Draft]:
+    """E038 — a power input names no outlet that exists (``NG-E011``).
+
+    Four ways to get there, reported apart because the fix differs: the PDU is
+    not in the inventory, the name is ambiguous, the name resolves to something
+    that is not a PDU, or the PDU is right and the outlet number is not. The last
+    one names the range the PDU declares, for the same reason ``E021`` does: the
+    outlets come from a range rather than being written out, so ``25`` on a
+    24-outlet strip is only visible next to that range.
+    """
+    for entry in ctx.power.unresolved:
+        reference = _q(str(entry.input))
+        if entry.reason is UnresolvedReason.UNKNOWN_PDU:
+            message = (
+                f"element {_q(entry.element)} is fed from {reference}, but no element named "
+                f"{_q(entry.input.pdu)} exists"
+            )
+            elements: tuple[str, ...] = (entry.element,)
+        elif entry.reason is UnresolvedReason.AMBIGUOUS_PDU:
+            message = (
+                f"element {_q(entry.element)} is fed from {reference}, but "
+                f"{_q(entry.input.pdu)} is ambiguous: {_join(sorted(entry.candidates))}. "
+                f"Write the reference fully qualified."
+            )
+            elements = (entry.element, *entry.candidates)
+        elif entry.reason is UnresolvedReason.NOT_A_PDU:
+            other = ctx.inventory.elements.get(entry.pdu)
+            kind = other.kind if other is not None else "unknown"
+            message = (
+                f"element {_q(entry.element)} is fed from {reference}, but {_q(entry.pdu)} is a "
+                f"{kind}, not a pdu; an outlet exists only on a 'pdu' document"
+            )
+            elements = (entry.element, entry.pdu)
+        else:
+            pdu = ctx.inventory.pdus.get(entry.pdu)
+            declared = pdu.spec.outlets if pdu is not None else "none"
+            message = (
+                f"element {_q(entry.element)} is fed from {reference}, but pdu {_q(entry.pdu)} "
+                f"has outlets {declared}"
+            )
+            elements = (entry.element, entry.pdu)
+        yield _Draft(message, elements, entry.field_path)
+
+
+def _check_pdu_capacity(ctx: _Context) -> Iterator[_Draft]:
+    """E039 — the declared load on a PDU exceeds its capacity (``NG-E012``).
+
+    Summed over the *normal-operation* share of each load: a dual-corded server
+    draws half its watts through each cord, so a pair of PDUs each sized for half
+    the rack is a correct design and is not reported. What is reported is a strip
+    with more plugged into it than it is rated for, which no amount of failover
+    planning makes acceptable.
+
+    Silent when the PDU records no ``capacity_watts``: there is nothing to
+    compare against, and inventing a rating for a strip nobody measured would
+    turn a missing fact into a false error.
+    """
+    for load in ctx.power.pdus:
+        if not load.is_oversubscribed or load.capacity_watts is None:
+            continue
+        over = load.load_watts - load.capacity_watts
+        yield _Draft(
+            f"pdu {_q(load.pdu)} carries {format_watts(load.load_watts)} W across "
+            f"{count_text(len(load.elements), 'element')} but is rated for "
+            f"{format_watts(load.capacity_watts)} W: {format_watts(over)} W over. "
+            f"The loads are {_join(load.elements)}.",
+            (load.pdu, *load.elements),
+            ("spec", "capacity_watts"),
+        )
+
+
+def _check_poe_budget(ctx: _Context) -> Iterator[_Draft]:
+    """E040 — the PoE allocated on a device's ports exceeds its budget (``NG-E013``).
+
+    Only ports that hold budget are counted — one that feeds something, and one
+    whose ``budget_watts`` was written down. A ``poe`` block on an empty port is a
+    capability, and counting all forty-eight of them would report every real PoE
+    switch as oversubscribed (see
+    :attr:`~netgraph.power.PoePort.counted`), which would make the rule useless
+    exactly where it matters.
+    """
+    for budget in ctx.power.pse:
+        if not budget.is_oversubscribed or budget.budget_watts is None:
+            continue
+        ports = budget.counted_ports
+        spelled = _join_plain(
+            [
+                f"{port.interface} {format_watts(port.allocated_watts)} W"
+                for port in sorted(ports, key=lambda port: port.interface)
+            ]
+        )
+        over = budget.allocated_watts - budget.budget_watts
+        yield _Draft(
+            f"element {_q(budget.element)} allocates {format_watts(budget.allocated_watts)} W of "
+            f"PoE across {count_text(len(ports), 'port')} but its budget is "
+            f"{format_watts(budget.budget_watts)} W: {format_watts(over)} W over ({spelled})",
+            (budget.element, *(port.feeds for port in ports if port.feeds)),
+            ("spec", "power", "poe_budget_watts"),
+        )
+
+
+def _check_poe_uplink(ctx: _Context) -> Iterator[_Draft]:
+    """E041 — a PoE-powered device's uplink offers no PoE, or too little (``NG-E014``).
+
+    ``powered_by: poe`` says the device has no power cord, so the run carrying its
+    traffic is its *only* power path. Three ways for that to be wrong, and all
+    three are a device that will not come up:
+
+    * no run leaves the device at all, or none arrives anywhere;
+    * every run lands on a port with no ``poe`` block, or a disabled one;
+    * a run does source power, but less than the device says it draws — a class-2
+      port and a 20 W access point, which is the mistake this rule exists for.
+    """
+    for fqn, uplinks in ctx.power.uplinks.items():
+        node = ctx.power.node(fqn)
+        draw = node.draw_watts if node is not None else 0.0
+        sourcing = [uplink for uplink in uplinks if uplink.sources_power]
+        if not sourcing:
+            yield _Draft(
+                f"element {_q(fqn)} is powered over PoE but {_describe_uplinks(uplinks)}",
+                (fqn, *(uplink.peer for uplink in uplinks)),
+                ("spec", "power", "powered_by"),
+            )
+            continue
+        best = max(sourcing, key=lambda uplink: uplink.deliverable_watts)
+        if draw and draw > best.deliverable_watts:
+            yield _Draft(
+                f"element {_q(fqn)} draws {format_watts(draw)} W over PoE, but the best uplink "
+                f"it has delivers {format_watts(best.deliverable_watts)} W: {best.describe()}",
+                (fqn, best.peer),
+                ("spec", "power", "draw_watts"),
+            )
+
+
+def _describe_uplinks(uplinks: Sequence[Uplink]) -> str:
+    """The tail of ``E041`` when nothing on the far end sources power."""
+    if not uplinks:
+        return (
+            "no cable leaves it, so there is no run to take power over; cable it to a PSE "
+            "port, or drop 'powered_by: poe'"
+        )
+    disabled = [uplink for uplink in uplinks if uplink.poe is not None]
+    if disabled:
+        spelled = _join_plain([uplink.describe() for uplink in disabled])
+        return f"every port it reaches has PoE turned off: {spelled}"
+    spelled = _join_plain([uplink.describe() for uplink in uplinks])
+    return f"nothing it is cabled to sources power: {spelled}"
+
+
+def _check_power_redundancy(ctx: _Context) -> Iterator[_Draft]:
+    """E042 — redundant power that is not redundant (``NG-E015``).
+
+    ``redundant: true`` is a claim that losing one feed does not lose the device.
+    Two cords into one PDU do not make that true — the strip, its breaker and its
+    cord are the single point of failure — and neither do two PDUs fed from one
+    supply, which is the subtler and more common version: the racking is right and
+    the electrical plan is not.
+
+    A PDU that records no ``input_feed`` is not evidence either way, so two
+    different PDUs with no feed recorded are accepted. Silence is not a claim.
+    """
+    for fqn, element in ctx.inventory.devices.items():
+        power = element.spec.power
+        if power is None or not power.redundant:
+            continue
+        feeds = [feed for feed in ctx.power.feeds_into(fqn) if feed.kind is FeedKind.OUTLET]
+        if len(feeds) < 2:
+            # Fewer than two *resolved* feeds: the model already refused fewer
+            # than two declared ones (``NG-E002``), so what is left is a feed
+            # that did not resolve -- reported by ``E038``, and reporting it
+            # twice would blame the redundancy claim for someone else's typo.
+            continue
+        sources = {feed.source for feed in feeds}
+        if len(sources) == 1:
+            pdu = next(iter(sources))
+            yield _Draft(
+                f"element {_q(fqn)} claims redundant power but all "
+                f"{count_text(len(feeds), 'input')} come from pdu {_q(pdu)}: "
+                f"{_join_plain([feed.source_label for feed in feeds])}. Losing that unit loses "
+                f"the device.",
+                (fqn, pdu),
+                ("spec", "power", "redundant"),
+            )
+            continue
+        supplies = {feed.input_feed for feed in feeds}
+        if len(supplies) == 1 and (supply := next(iter(supplies))):
+            yield _Draft(
+                f"element {_q(fqn)} claims redundant power, but every pdu feeding it is on "
+                f"input feed {_q(supply)}: {_join_plain([feed.source_label for feed in feeds])}. "
+                f"Two units on one supply fail together.",
+                (fqn, *sorted(sources)),
+                ("spec", "power", "redundant"),
+            )
+
+
+def _check_missing_power_path(ctx: _Context) -> Iterator[_Draft]:
+    """W137 — a device declares a draw but no power path (``NG-E016``).
+
+    A warning rather than an error, deliberately. Recording draws before
+    recording the outlets they are plugged into is the normal order in which an
+    as-built document gets written, and refusing the half-finished state would
+    make the model unusable exactly while it is being adopted. It is still worth
+    saying: a load that appears on no PDU appears on no schedule either, so the
+    rack looks emptier than it is.
+    """
+    for fqn, element in ctx.inventory.devices.items():
+        power = element.spec.power
+        if power is None or power.draw_watts is None or power.is_poe_powered:
+            continue
+        if power.inputs:
+            # Declared but unresolved is ``E038``'s business; a device whose only
+            # problem is a typo must not also be accused of having no feed.
+            continue
+        yield _Draft(
+            f"element {_q(fqn)} declares a draw of {power.draw_watts.describe()} but no power "
+            f"path: add 'power.inputs' naming the outlets it is plugged into, or "
+            f"'powered_by: poe' if it takes power over its uplink",
+            (fqn,),
+            ("spec", "power", "draw_watts"),
+        )
+
+
 #: Every check, paired with the rule it reports, in report order.
 _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("E001", _check_endpoint_references),
@@ -4021,6 +4319,12 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("E034", _check_ospf_interfaces),
     ("E035", _check_bgp_asn),
     ("E036", _check_router_ids),
+    ("E037", _check_outlet_claimed_twice),
+    ("E038", _check_power_input_resolves),
+    ("E039", _check_pdu_capacity),
+    ("E040", _check_poe_budget),
+    ("E041", _check_poe_uplink),
+    ("E042", _check_power_redundancy),
     ("W101", _check_unaddressed_interface),
     ("W102", _check_mtu_mismatch),
     ("W103", _check_orphan_device),
@@ -4057,6 +4361,7 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("W134", _check_cochannel_aps),
     ("W135", _check_bgp_neighbour_resolves),
     ("W136", _check_empty_vrf),
+    ("W137", _check_missing_power_path),
     ("I001", _check_local_mac),
     ("I002", _check_uncabled_interface),
     ("I003", _check_nonstandard_port),

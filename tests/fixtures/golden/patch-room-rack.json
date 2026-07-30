@@ -16,21 +16,97 @@
         "label": "hq / mdf / r2",
         "height": 42,
         "heightInferred": false,
-        "usedUnits": 5,
+        "usedUnits": 8,
         "slots": [
+          {
+            "element": "power/pdu-r2-a",
+            "name": "pdu-r2-a",
+            "kind": "pdu",
+            "position": 1,
+            "height": 1,
+            "power": {
+              "roles": [
+                "pdu"
+              ],
+              "outlets": 8,
+              "usedOutlets": 3,
+              "loadWatts": 492.5,
+              "failoverWatts": 985.0,
+              "capacityWatts": 1840.0,
+              "inputFeed": "utility-a",
+              "utilisation": 0.267663
+            }
+          },
+          {
+            "element": "power/pdu-r2-b",
+            "name": "pdu-r2-b",
+            "kind": "pdu",
+            "position": 2,
+            "height": 1,
+            "power": {
+              "roles": [
+                "pdu"
+              ],
+              "outlets": 8,
+              "usedOutlets": 3,
+              "loadWatts": 492.5,
+              "failoverWatts": 985.0,
+              "capacityWatts": 1840.0,
+              "inputFeed": "ups-1",
+              "utilisation": 0.267663
+            }
+          },
+          {
+            "element": "network/sw-access-01",
+            "name": "sw-access-01",
+            "kind": "switch",
+            "position": 8,
+            "height": 1,
+            "power": {
+              "roles": [
+                "pse",
+                "load"
+              ],
+              "drawWatts": 55.0,
+              "maximumWatts": 435.0,
+              "poeBudgetWatts": 370.0,
+              "poeAllocatedWatts": 37.0,
+              "inputs": 2,
+              "redundant": true,
+              "utilisation": 0.1
+            }
+          },
           {
             "element": "hosts/srv-app-01",
             "name": "srv-app-01",
             "kind": "server",
             "position": 10,
-            "height": 2
+            "height": 2,
+            "power": {
+              "roles": [
+                "load"
+              ],
+              "drawWatts": 420.0,
+              "maximumWatts": 800.0,
+              "inputs": 2,
+              "redundant": true
+            }
           },
           {
             "element": "hosts/srv-db-01",
             "name": "srv-db-01",
             "kind": "server",
             "position": 12,
-            "height": 2
+            "height": 2,
+            "power": {
+              "roles": [
+                "load"
+              ],
+              "drawWatts": 510.0,
+              "maximumWatts": 800.0,
+              "inputs": 2,
+              "redundant": true
+            }
           },
           {
             "element": "panels/pp-r2-a",
@@ -43,11 +119,11 @@
         "units": [
           {
             "unit": 1,
-            "element": null
+            "element": "power/pdu-r2-a"
           },
           {
             "unit": 2,
-            "element": null
+            "element": "power/pdu-r2-b"
           },
           {
             "unit": 3,
@@ -71,7 +147,7 @@
           },
           {
             "unit": 8,
-            "element": null
+            "element": "network/sw-access-01"
           },
           {
             "unit": 9,
@@ -234,14 +310,32 @@
             "name": "sw-core-01",
             "kind": "switch",
             "position": 38,
-            "height": 1
+            "height": 1,
+            "power": {
+              "roles": [
+                "load"
+              ],
+              "drawWatts": 48.0,
+              "maximumWatts": 125.0,
+              "inputs": 2,
+              "redundant": true
+            }
           },
           {
             "element": "network/rtr-edge-01",
             "name": "rtr-edge-01",
             "kind": "router",
             "position": 40,
-            "height": 1
+            "height": 1,
+            "power": {
+              "roles": [
+                "load"
+              ],
+              "drawWatts": 35.0,
+              "maximumWatts": 150.0,
+              "inputs": 2,
+              "redundant": true
+            }
           },
           {
             "element": "panels/pp-r1-a",

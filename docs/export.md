@@ -4,7 +4,8 @@ An inventory is a declaration of what the network *is*. `netgraph render` turns
 that into a picture. `netgraph export` turns it into files other tools consume:
 
 > **The same file that draws the diagram writes the hosts file, the zone, the
-> Ansible inventory, the monitoring targets and the cabling pull-list.**
+> Ansible inventory, the monitoring targets, the cabling pull-list and the power
+> load schedule.**
 
 ```
 netgraph export FORMAT [-o FILE] [--manifest FILE] [FILTERS] [FORMAT OPTIONS]
@@ -18,13 +19,14 @@ export cannot disagree with a diagram of the same tree.
 
 ## Contents
 
-- [The six formats](#the-six-formats)
+- [The seven formats](#the-seven-formats)
 - [`hosts`](#hosts)
 - [`dns-zone`](#dns-zone)
 - [`ansible-inventory`](#ansible-inventory)
 - [`prometheus-sd`](#prometheus-sd)
 - [`cable-list`](#cable-list)
 - [`routes`](#routes)
+- [`power`](#power)
 - [What every format guarantees](#what-every-format-guarantees)
 - [Names, and how they are folded](#names-and-how-they-are-folded)
 - [The skip manifest](#the-skip-manifest)
@@ -35,7 +37,7 @@ export cannot disagree with a diagram of the same tree.
 
 ---
 
-## The six formats
+## The seven formats
 
 | Format | Artefact | Default extension |
 |---|---|---|
@@ -45,6 +47,7 @@ export cannot disagree with a diagram of the same tree.
 | [`prometheus-sd`](#prometheus-sd) | Prometheus `file_sd` targets | `.json` |
 | [`cable-list`](#cable-list) | A CSV or Markdown pull-list, one row per physical run | `.csv` |
 | [`routes`](#routes) | An iproute2 script of the static routes each device declares | `.sh` |
+| [`power`](#power) | A load schedule, one row per power feed | `.csv` |
 
 With no `-o`, the artefact goes to **stdout** and everything else — progress
 notes, validation findings and the [skip manifest](#the-skip-manifest) — goes to
@@ -139,10 +142,14 @@ $TTL 3600
                                             3600 )     ; minimum
 @                                   IN  NS  ns.lab.example.com.
 
+ap-ceiling-01.hosts                 IN  A  10.10.0.4
+cam-lobby-01.hosts                  IN  A  10.10.0.31
+laptop-lobby.hosts                  IN  A  10.10.0.41
 rtr-edge-01.network                 IN  A  10.0.0.1
 rtr-edge-01.network                 IN  A  192.0.2.1
 srv-app-01.hosts                    IN  A  10.10.0.11
 srv-db-01.hosts                     IN  A  10.10.0.12
+sw-access-01.network                IN  A  10.10.0.3
 sw-core-01.network                  IN  A  10.0.0.2
 sw-core-01.network                  IN  A  10.10.0.2
 ...
@@ -471,6 +478,130 @@ Four decisions worth knowing about:
 
 ---
 
+## `power`
+
+The electrical counterpart of the pull list
+([`docs/schema.md` §17.7](schema.md#177-the-load-schedule)). An installer carries
+the `cable-list`; the person signing off a rack carries this — *which outlet, on
+which strip, on which feed, powering which box in which rack unit, drawing how
+many watts*:
+
+<!-- norun: the real schedule is 22 columns and some 200 characters wide; the abbreviated one below is what fits a page -->
+```console
+$ netgraph -q -i examples/patch-room export power
+```
+
+| FEED_KIND | SOURCE | OUTLET | SOURCE_PORT | INPUT_FEED | LOAD | PSU | LOAD_RACK | LOAD_UNIT | RESERVED_W | ELEMENT_W | REDUNDANT | VIA |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| outlet | power/pdu-r1-a | 1 | | utility-a | network/sw-core-01 | psu1 | r1 | 38 | 24 | 48 | yes | |
+| outlet | power/pdu-r1-b | 1 | | ups-1 | network/sw-core-01 | psu2 | r1 | 38 | 24 | 48 | yes | |
+| outlet | power/pdu-r2-a | 1 | | utility-a | hosts/srv-app-01 | psu1 | r2 | 10 | 210 | 420 | yes | |
+| outlet | power/pdu-r2-b | 1 | | ups-1 | hosts/srv-app-01 | psu2 | r2 | 10 | 210 | 420 | yes | |
+| poe | network/sw-access-01 | | GigabitEthernet1/0/1 | | hosts/ap-ceiling-01 | | | | 30 | 22 | | pp-r2-a |
+| poe | network/sw-access-01 | | GigabitEthernet1/0/2 | | hosts/cam-lobby-01 | | | | 7 | 5 | | |
+
+*(abbreviated — the real schedule also carries `SOURCE_KIND`, `LOAD_KIND` and the
+`SITE`/`ROOM`/`RACK`/`UNIT` columns for the source end.)*
+
+**One row per feed, not per element.** A dual-corded server is two rows, which is
+the whole point: the two cords are two different things somebody can unplug, and a
+schedule that summarised them into one would hide exactly the fact it exists to
+show. A PoE-powered camera is a row too, and its `FEED_KIND` says `poe` so that a
+reader summing outlet loads does not double-count something that occupies no
+outlet.
+
+Rows are ordered by where the source end sits — site, room, rack, unit — so the
+schedule is walked strip by strip, and anything the inventory does not place sorts
+last.
+
+### `csv` or `json`
+
+| Option | Default | Effect |
+|---|---|---|
+| `--schedule-format csv\|json` | `csv` | How the schedule is laid out. |
+
+`csv` is the sheet somebody prints and initials. `json` is the same feed rows plus
+the **per-PDU and per-PSE totals** — outlets used and free, load, failover, spare
+watts, utilisation, and per PoE switch the allocation of each port against the
+budget — which a capacity tool wants and a spreadsheet computes for itself:
+
+<!-- norun: an excerpt; the whole document is the twelve feed rows as well -->
+```console
+$ netgraph -q -i examples/patch-room export power --schedule-format json | jq '.pdus[2]'
+{
+  "pdu": "power/pdu-r2-a",
+  "name": "pdu-r2-a",
+  "outlets": 8,
+  "usedOutlets": 3,
+  "freeOutlets": 5,
+  "loadWatts": 492.5,
+  "failoverWatts": 985.0,
+  "loads": ["hosts/srv-app-01", "hosts/srv-db-01", "network/sw-access-01"],
+  "inputFeed": "utility-a",
+  "capacityWatts": 1840.0,
+  "freeWatts": 1347.5,
+  "utilisation": 0.267663
+}
+```
+
+Neither shape is the lossy one: the CSV holds every fact about every feed, and the
+JSON adds only sums derived from them.
+
+### The columns of the schedule
+
+Twenty-two, in the one order the CSV uses. `SOURCE` and `LOAD` are the two ends of
+the feed, always in that direction — power flows one way, unlike a cable, so there
+is nothing to canonicalise and no `A`/`B` to look up.
+
+| Column | Contents |
+|---|---|
+| `FEED_KIND` | `outlet` for a cord from a PDU, `poe` for power over the uplink |
+| `SOURCE`, `SOURCE_KIND` | What feeds it: the PDU, or the switch whose PSE port does |
+| `OUTLET` | The outlet as the PDU numbers it. Blank on a `poe` row |
+| `SOURCE_PORT` | The PSE port. Blank on an `outlet` row |
+| `INPUT_FEED` | The PDU's `input_feed` — `utility-a`, `ups-1` — which is what makes an A/B pair legible |
+| `SOURCE_SITE`, `SOURCE_ROOM`, `SOURCE_RACK`, `SOURCE_UNIT` | Where that end is, from `metadata.location`. A 0U strip has a rack and no unit |
+| `LOAD`, `LOAD_KIND` | The powered element |
+| `PSU` | Which supply on the *device* this feeds, e.g. `psu1` — what an operator reads off the back of a chassis |
+| `LOAD_PORT` | The port the power arrives on. Blank on an `outlet` row |
+| `LOAD_SITE`, `LOAD_ROOM`, `LOAD_RACK`, `LOAD_UNIT` | Where the load is |
+| `RESERVED_W` | What *this feed* carries: `typical / n` for a device with *n* cords, and the PSE-side class figure on a `poe` row |
+| `ELEMENT_W` | What the whole element draws, so the two cords of a server are recognisable as halves of one load |
+| `REDUNDANT` | `yes` when the element claims `redundant: true` |
+| `VIA` | The patch panels the PoE run crosses, in order — `pp-r2-a` |
+
+`VIA` is the column that makes a PoE feed traceable. `ap-ceiling-01` in
+[`examples/patch-room`](../examples/patch-room) is fed from
+`sw-access-01:GigabitEthernet1/0/1` *through* `pp-r2-a`, because a run through a
+panel is electrically one run for power exactly as it is for frames
+([§17.4](schema.md#174-how-power-paths-are-resolved)) — and the person who has to
+find the dead access point needs the panel position, not just the switch port.
+
+Every cell goes through the same spreadsheet-injection guard `cable-list` uses: a
+field starting with `=`, `+`, `@` or a non-numeric `-` is prefixed with `'`
+(CWE-1236).
+
+### What it drops, and what the manifest gets instead
+
+Everything that is not power. Cables, addressing and VLANs have their own exports;
+a load schedule that also carried them would be a second copy of the inventory.
+The data path a PoE feed rides on is named only by `VIA` and the two ports — its
+medium, length and label are the `cable-list`'s business.
+
+Two things are **not** rows, and are recorded in the
+[manifest](#the-skip-manifest) instead:
+
+* a feed whose `pdu:outlet` did not resolve — there is no outlet to schedule, so
+  the row would be a lie;
+* an element that declares a draw and no power path at all
+  ([`W137`](validation-rules.md#w137--declared-draw-with-no-power-path)),
+  because a load nobody can find the socket for is precisely what a schedule is
+  supposed to surface.
+
+Only `--force` gets that far: the validator refuses both first.
+
+---
+
 ## What every format guarantees
 
 **Deterministic.** Every collection is sorted by an explicit canonical key —
@@ -490,7 +621,7 @@ quoting — RFC 1035 labels, Ansible identifiers, RFC 4180 fields, Markdown cell
 [`netgraph/export/names.py`](../src/netgraph/export/names.py), with every fold
 recorded.
 
-**Text.** Nothing here emits bytes. All six artefacts are diffable.
+**Text.** Nothing here emits bytes. All seven artefacts are diffable.
 
 ---
 
@@ -622,6 +753,7 @@ Every format here is lossy. What each one drops, in one line:
 | `prometheus-sd` | Everything except one address and a handful of labels. No topology, no interface detail, no VLAN membership. An element with no routable address cannot be scraped and does not appear. |
 | `cable-list` | Adapter attachments — a USB-to-Ethernet dongle's upstream is a physical connection, but it is part of the adapter rather than a run somebody pulls, and it has no medium, length or label to carry. Tunnels and addressing are not physical and never appear. |
 | `routes` | Everything that is not a static route. `spec.routing` is a *protocol* — an inventory can say a router is in AS 65001 and OSPF area 0, but the configuration that makes it so is vendor syntax this emitter has no business inventing, so it is left to a template engine and the manifest says it was left. Nothing here computes a best path either: the routes are emitted in declaration order. |
+| `power` | Everything that is not power. A feed carries no medium, no length and no label, and the data run a PoE feed rides on is named by its two ports and the panels in `VIA` but not otherwise described — that is the `cable-list`'s job. No measured watts anywhere: `draw_watts` and `capacity_watts` are nameplate figures, and comparing them with a meter is [`netgraph drift`](commands/drift.md)'s business. |
 
 For the lossless view of an inventory, use
 [`netgraph render -f json`](rendering.md#the-json-export), which exports the
@@ -698,6 +830,12 @@ cabling record.
 |---|---|---|
 | `--table-format csv\|markdown` | `csv` | How the list is laid out. The rows and columns are the same either way. |
 
+### `power`
+
+| Option | Default | Effect |
+|---|---|---|
+| `--schedule-format csv\|json` | `csv` | How the load schedule is laid out. `json` adds the per-PDU and per-PSE totals; the feed rows are the same either way. |
+
 Passing a format-specific option to a format that has no use for it is a usage
 error, not a silent no-op: a flag that is quietly dropped is worse than an
 error, because the operator believes they asked for something they did not get.
@@ -749,5 +887,7 @@ print(result.manifest.summary())  # 18 of 20 emitted, 2 skipped (no-address 2)
   from come from, and how they are sized.
 - [`docs/schema.md`](schema.md) §3.2 — `metadata.location`, which fills the
   rack and unit columns of the pull list.
+- [`docs/schema.md`](schema.md#17-power) §17 — the `pdu` kind, `spec.power` and
+  `interfaces[].poe`, which the load schedule is built from.
 - [`docs/rendering.md`](rendering.md#the-json-export) — `render -f json`, the lossless
   export.

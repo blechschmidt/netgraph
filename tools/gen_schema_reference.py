@@ -68,6 +68,13 @@ from netgraph.models import (  # noqa: E402
     Metadata,
     OspfConfig,
     PatchPanelSpec,
+    PduSpec,
+    PoeConfig,
+    PoeStandard,
+    PowerConfig,
+    PowerDraw,
+    PowerInput,
+    PowerSource,
     RoutingConfig,
     StaticRoute,
     TunnelAuth,
@@ -395,6 +402,61 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "identity mapping, which is what the numbering printed on a real panel promises.",
         ),
     ),
+    Section(
+        PduSpec,
+        "`spec` — pdu",
+        "A power distribution unit: numbered outlets, a rated capacity, and the supply that "
+        "feeds it. The power half of what a patch panel is for data.",
+        notes=(
+            "`outlets` is the only required key, and takes the same count-or-range shorthand "
+            "`ports` does. An outlet is **not** an interface: a power cord is not a `cable`, so "
+            "nothing is cabled to a PDU — a device names an outlet in `power.inputs` instead.",
+            "A PDU is placed on a rack elevation through `metadata.location`, exactly as a "
+            "switch is, and `netgraph render --layer rack` annotates it with its utilisation.",
+            "`input_feed` is free text and is compared only for equality. It is what makes A/B "
+            "redundancy checkable: two units on one feed fail together (`NG-E015`).",
+        ),
+    ),
+    Section(
+        PowerConfig,
+        "`spec.power`",
+        "What a device draws, which outlets feed it, and how much PoE it hands out. One block "
+        "for both directions, because they are one question about one box.",
+        notes=(
+            "`draw_watts` accepts a bare number as shorthand for `{typical: n}`. The typical "
+            "figure is what a load schedule sums; `maximum` is what a breaker has to survive.",
+            "`redundant: true` needs at least two `inputs` (`NG-E002`), and they have to land on "
+            "different units *and* different `input_feed`s for the claim to hold (`NG-E015`).",
+            "`powered_by: poe` excludes `inputs` (`NG-E005`): a device fed over its uplink has "
+            "no cord. `NG-E014` then checks the far end of that uplink actually sources power.",
+        ),
+    ),
+    Section(
+        PowerDraw,
+        "`spec.power.draw_watts`",
+        "The nameplate load of one device, in watts. Written as a bare number when only the "
+        "typical figure is known.",
+    ),
+    Section(
+        PowerInput,
+        "`spec.power.inputs[]`",
+        "One power supply and the outlet feeding it. Accepts the compact form `pdu-r1-a:7` and "
+        "the equivalent mapping, the same grammar a cable endpoint uses.",
+    ),
+    Section(
+        PoeConfig,
+        "`interfaces[].poe`",
+        "This port is power sourcing equipment: it hands power down the cable. Only on a type a "
+        "cable terminates on — `ethernet` or `lag` (`NG-E006`).",
+        notes=(
+            "How much the port reserves is said once: a `class`, or a `budget_watts`, never both "
+            "(`NG-E004`). With neither, the port reserves its standard's maximum, which is what "
+            "a switch with no per-port configuration does.",
+            "A `poe` block on a port with nothing on it is a *capability* and takes no budget. A "
+            "port that feeds something, or one with an explicit `budget_watts`, does — see "
+            "`NG-E013`.",
+        ),
+    ),
 )
 
 #: Enumerations rendered as value tables, with the note that explains them.
@@ -430,6 +492,18 @@ ENUMS: Final[tuple[tuple[type[enum.Enum], str, str], ...]] = (
         "Derived from `type`; `gre` and `esp` run directly over IP and carry no port.",
     ),
     (TunnelMode, "`tunnel.mode`", "IPsec only; every other type has a single mode."),
+    (
+        PoeStandard,
+        "`poe.standard`",
+        "Which IEEE 802.3 amendment the port implements, and therefore which classes exist: "
+        "`802.3af` stops at class 3, `802.3at` adds 4, `802.3bt` adds 5 to 8.",
+    ),
+    (
+        PowerSource,
+        "`power.powered_by`",
+        "`outlet` is the default. `poe` says the device takes power over its uplink and has no "
+        "cord, so it declares no `inputs`.",
+    ),
     (
         TunnelAuth,
         "`tunnel.auth`",

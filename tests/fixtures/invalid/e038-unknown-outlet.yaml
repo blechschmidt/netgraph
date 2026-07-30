@@ -1,0 +1,51 @@
+# E038 (NG-E011) - a power input names an outlet the PDU has not got.
+#
+# The strip declares outlets 1 to 8; the switch is plugged into outlet 9. The
+# outlets come from a range rather than being written out, so this is only
+# visible next to that range -- which is why the diagnostic quotes it.
+apiVersion: netgraph.dev/v1alpha1
+kind: pdu
+metadata:
+  name: pdu-r1-a
+spec:
+  outlets: 8
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+  power:
+    draw_watts: 40
+    inputs:
+      - pdu-r1-a:9
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-b
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - sw-a:port1
+    - sw-b:port1
+  medium: copper

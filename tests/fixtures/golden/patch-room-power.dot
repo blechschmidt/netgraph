@@ -1,0 +1,123 @@
+graph netgraph {
+  graph [
+    rankdir=TB,
+    splines=true,
+    overlap=false,
+    nodesep=0.5,
+    ranksep=0.7,
+    fontname="Helvetica,Arial,sans-serif",
+    fontsize=12,
+    label="Patch room, power",
+    labelloc=t,
+    fontsize=16,
+  ];
+  node [fontname="Helvetica,Arial,sans-serif", fontsize=10, style=filled, penwidth=1.2];
+  edge [fontname="Helvetica,Arial,sans-serif", fontsize=8];
+
+  "hosts/ap-ceiling-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="ap-ceiling-01 [switch]\nnamespace: hosts\nCeiling access point above the machine room, powered over its uplink: 'powered_by: poe' says the run carrying its traffic is its only power path, so it declares no 'power.inputs' at all. The far end of that run is sw-access-01:GigabitEthernet1/0/1, reached across pp-r2-a — a run through a panel is electrically one run for power exactly as it is for frames.\nlabels: env=prod, role=wireless, site=hq\nvlans: 10\ninterfaces (4):\n  br0  bridge\n  Vlan10  vlan  10.10.0.4/24  vlan 10 (access)\n  eth0  ethernet  vlan 10 (access)  70:69:5a:0c:00:01\n  wlan0  wifi  70:69:5a:0c:00:10\nlinks (1):\n  eth0 — network/sw-access-01:GigabitEthernet1/0/1  (poe)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>ap-ceiling-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">22 W (max 25.5 W)</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">powered over PoE</TD></TR>
+    </TABLE>
+  >];
+  "hosts/cam-lobby-01" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="cam-lobby-01 [computer]\nnamespace: hosts\nLobby camera, cabled straight to the access switch and powered over that cable. A class-2 PSE port delivers 6.49 W at the powered device, which is what its 5 W draw is checked against (NG-E014).\nlabels: env=prod, role=camera, site=hq\nvlans: 10\ninterfaces (1):\n  eth0  ethernet  10.10.0.31/24  vlan 10 (access)  ac:cc:8e:0d:00:01\nlinks (1):\n  eth0 — network/sw-access-01:GigabitEthernet1/0/2  (poe)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>cam-lobby-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">5 W</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">powered over PoE</TD></TR>
+    </TABLE>
+  >];
+  "hosts/srv-app-01" [shape=cylinder, fillcolor="#eae2f5", color="#7c3aed", tooltip="srv-app-01 [server]\nnamespace: hosts\nApplication server, rack r2. Patched through position 7.\nlabels: env=prod, role=application, site=hq\ninterfaces (2):\n  lo  loopback  127.0.0.1/8\n  eno1  ethernet  10.10.0.11/24  3c:d9:2b:0a:00:11\nlinks (2):\n  psu1 — power/pdu-r2-a:1  (outlet)\n  psu2 — power/pdu-r2-b:1  (outlet)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>srv-app-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[server]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">420 W (max 800 W)</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">redundant, 2 feeds</TD></TR>
+    </TABLE>
+  >];
+  "hosts/srv-db-01" [shape=cylinder, fillcolor="#eae2f5", color="#7c3aed", tooltip="srv-db-01 [server]\nnamespace: hosts\nDatabase server, rack r2. Patched through position 8.\nlabels: env=prod, role=database, site=hq\ninterfaces (2):\n  lo  loopback  127.0.0.1/8\n  eno1  ethernet  10.10.0.12/24  3c:d9:2b:0a:00:12\nlinks (2):\n  psu1 — power/pdu-r2-a:2  (outlet)\n  psu2 — power/pdu-r2-b:2  (outlet)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>srv-db-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[server]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">510 W (max 800 W)</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">redundant, 2 feeds</TD></TR>
+    </TABLE>
+  >];
+  "network/rtr-edge-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-edge-01 [router]\nnamespace: network\nEdge router for the machine room. It routes between the server VLAN and the outside world, and reaches the core switch over a routed (untagged) copper link in the same rack — the one run in this inventory that does not cross a patch panel.\nlabels: env=prod, role=edge, site=hq\ninterfaces (2):\n  lo0  loopback  192.0.2.1/32\n  ge-0/0/0  ethernet  10.0.0.1/30  00:05:86:0a:00:00\nlinks (2):\n  psu1 — power/pdu-r1-a:2  (outlet)\n  psu2 — power/pdu-r1-b:2  (outlet)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-edge-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">35 W (max 150 W)</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">redundant, 2 feeds</TD></TR>
+    </TABLE>
+  >];
+  "network/sw-access-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-access-01 [switch]\nnamespace: network\nPoE access switch in rack r2. Its uplink leaves the rack through the panel above it, exactly as the server links do; its two PoE ports feed a ceiling access point and a lobby camera, neither of which has a power cord. The switch itself is dual-corded: 'psu1' to the A-side strip, 'psu2' to the B-side one. Both strips are in this rack, and they are on different input feeds, which is what makes 'redundant: true' true (NG-E015).\nlabels: env=prod, role=access, site=hq\nvlans: 10\ninterfaces (5):\n  br0  bridge\n  Vlan10  vlan  10.10.0.3/24  vlan 10 (access)\n  GigabitEthernet1/0/1  ethernet  vlan 10 (access)  00:1b:0d:0b:00:01\n  GigabitEthernet1/0/2  ethernet  vlan 10 (access)  00:1b:0d:0b:00:02\n  GigabitEthernet1/0/24  ethernet  vlan 10 (access)  00:1b:0d:0b:00:18\nlinks (4):\n  psu1 — power/pdu-r2-a:3  (outlet)\n  psu2 — power/pdu-r2-b:3  (outlet)\n  GigabitEthernet1/0/1 — hosts/ap-ceiling-01:eth0  (poe)\n  GigabitEthernet1/0/2 — hosts/cam-lobby-01:eth0  (poe)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-access-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">55 W (max 435 W)</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">redundant, 2 feeds</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">PoE 37/370 W</TD></TR>
+    </TABLE>
+  >];
+  "network/sw-core-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-core-01 [switch]\nnamespace: network\nCore switch, rack r1. Its two server ports leave the rack through the patch panel above it: nothing is cabled from here to rack r2 directly, which is what a structured-cabling plant looks like.\nlabels: env=prod, role=core, site=hq\nvlans: 10\ninterfaces (6):\n  br0  bridge\n  Vlan10  vlan  10.10.0.2/24  vlan 10 (access)\n  GigabitEthernet1/0/1  ethernet  10.0.0.2/30  00:1b:0d:0a:00:01\n  GigabitEthernet1/0/2  ethernet  vlan 10 (access)  00:1b:0d:0a:00:02\n  GigabitEthernet1/0/7  ethernet  vlan 10 (access)  00:1b:0d:0a:00:07\n  GigabitEthernet1/0/8  ethernet  vlan 10 (access)  00:1b:0d:0a:00:08\nlinks (2):\n  psu1 — power/pdu-r1-a:1  (outlet)\n  psu2 — power/pdu-r1-b:1  (outlet)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-core-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">48 W (max 125 W)</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">redundant, 2 feeds</TD></TR>
+    </TABLE>
+  >];
+  "power/pdu-r1-a" [shape=box, fillcolor="#fef3c7", color="#b45309", tooltip="pdu-r1-a [pdu]\nnamespace: power\nA-side strip in rack r1, on the utility feed. Every dual-corded device in this rack has one cord here and one in pdu-r1-b; the two strips are on different feeds, which is what makes the second cord worth having.\nlabels: feed=a, role=power, site=hq\nlinks (2):\n  2 — network/rtr-edge-01:psu1  (outlet)\n  1 — network/sw-core-01:psu1  (outlet)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pdu-r1-a</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[pdu]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">2/24 outlets</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">41.5/3680 W (1.1%)</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">feed utility-a</TD></TR>
+    </TABLE>
+  >];
+  "power/pdu-r1-b" [shape=box, fillcolor="#fef3c7", color="#b45309", tooltip="pdu-r1-b [pdu]\nnamespace: power\nB-side strip in rack r1, on the UPS feed.\nlabels: feed=b, role=power, site=hq\nlinks (2):\n  2 — network/rtr-edge-01:psu2  (outlet)\n  1 — network/sw-core-01:psu2  (outlet)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pdu-r1-b</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[pdu]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">2/24 outlets</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">41.5/3680 W (1.1%)</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">feed ups-1</TD></TR>
+    </TABLE>
+  >];
+  "power/pdu-r2-a" [shape=box, fillcolor="#fef3c7", color="#b45309", tooltip="pdu-r2-a [pdu]\nnamespace: power\nA-side strip in rack r2, on the same utility feed as pdu-r1-a. Horizontal rather than vertical, so unlike the r1 pair it occupies a rack unit and appears on the elevation with its utilisation beside it.\nlabels: feed=a, role=power, site=hq\nlinks (3):\n  1 — hosts/srv-app-01:psu1  (outlet)\n  2 — hosts/srv-db-01:psu1  (outlet)\n  3 — network/sw-access-01:psu1  (outlet)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pdu-r2-a</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[pdu]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">3/8 outlets</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">492.5/1840 W (26.8%)</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">feed utility-a</TD></TR>
+    </TABLE>
+  >];
+  "power/pdu-r2-b" [shape=box, fillcolor="#fef3c7", color="#b45309", tooltip="pdu-r2-b [pdu]\nnamespace: power\nB-side strip in rack r2, on the UPS feed.\nlabels: feed=b, role=power, site=hq\nlinks (3):\n  1 — hosts/srv-app-01:psu2  (outlet)\n  2 — hosts/srv-db-01:psu2  (outlet)\n  3 — network/sw-access-01:psu2  (outlet)", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pdu-r2-b</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[pdu]</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">3/8 outlets</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">492.5/1840 W (26.8%)</TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">feed ups-1</TD></TR>
+    </TABLE>
+  >];
+
+  "power/pdu-r2-a" -- "hosts/srv-app-01" [color="#b45309", style=solid, label="1 -- psu1\n210 W", tooltip="outlet power/pdu-r2-a:1#power:hosts/srv-app-01\npower/pdu-r2-a:1 — hosts/srv-app-01:psu1\nlabel: psu1"];
+  "power/pdu-r2-b" -- "hosts/srv-app-01" [color="#b45309", style=solid, label="1 -- psu2\n210 W", tooltip="outlet power/pdu-r2-b:1#power:hosts/srv-app-01\npower/pdu-r2-b:1 — hosts/srv-app-01:psu2\nlabel: psu2"];
+  "power/pdu-r2-a" -- "hosts/srv-db-01" [color="#b45309", style=solid, label="2 -- psu1\n255 W", tooltip="outlet power/pdu-r2-a:2#power:hosts/srv-db-01\npower/pdu-r2-a:2 — hosts/srv-db-01:psu1\nlabel: psu1"];
+  "power/pdu-r2-b" -- "hosts/srv-db-01" [color="#b45309", style=solid, label="2 -- psu2\n255 W", tooltip="outlet power/pdu-r2-b:2#power:hosts/srv-db-01\npower/pdu-r2-b:2 — hosts/srv-db-01:psu2\nlabel: psu2"];
+  "power/pdu-r1-a" -- "network/rtr-edge-01" [color="#b45309", style=solid, label="2 -- psu1\n17.5 W", tooltip="outlet power/pdu-r1-a:2#power:network/rtr-edge-01\npower/pdu-r1-a:2 — network/rtr-edge-01:psu1\nlabel: psu1"];
+  "power/pdu-r1-b" -- "network/rtr-edge-01" [color="#b45309", style=solid, label="2 -- psu2\n17.5 W", tooltip="outlet power/pdu-r1-b:2#power:network/rtr-edge-01\npower/pdu-r1-b:2 — network/rtr-edge-01:psu2\nlabel: psu2"];
+  "power/pdu-r2-a" -- "network/sw-access-01" [color="#b45309", style=solid, label="3 -- psu1\n27.5 W", tooltip="outlet power/pdu-r2-a:3#power:network/sw-access-01\npower/pdu-r2-a:3 — network/sw-access-01:psu1\nlabel: psu1"];
+  "power/pdu-r2-b" -- "network/sw-access-01" [color="#b45309", style=solid, label="3 -- psu2\n27.5 W", tooltip="outlet power/pdu-r2-b:3#power:network/sw-access-01\npower/pdu-r2-b:3 — network/sw-access-01:psu2\nlabel: psu2"];
+  "power/pdu-r1-a" -- "network/sw-core-01" [color="#b45309", style=solid, label="1 -- psu1\n24 W", tooltip="outlet power/pdu-r1-a:1#power:network/sw-core-01\npower/pdu-r1-a:1 — network/sw-core-01:psu1\nlabel: psu1"];
+  "power/pdu-r1-b" -- "network/sw-core-01" [color="#b45309", style=solid, label="1 -- psu2\n24 W", tooltip="outlet power/pdu-r1-b:1#power:network/sw-core-01\npower/pdu-r1-b:1 — network/sw-core-01:psu2\nlabel: psu2"];
+  "network/sw-access-01" -- "hosts/ap-ceiling-01" [color="#ca8a04", style=dashed, label="GigabitEthernet1/0/1 -- eth0\n30 W\nvia pp-r2-a", tooltip="poe network/sw-access-01:GigabitEthernet1/0/1#poe:hosts/ap-ceiling-01\nnetwork/sw-access-01:GigabitEthernet1/0/1 — hosts/ap-ceiling-01:eth0"];
+  "network/sw-access-01" -- "hosts/cam-lobby-01" [color="#ca8a04", style=dashed, label="GigabitEthernet1/0/2 -- eth0\n7 W", tooltip="poe network/sw-access-01:GigabitEthernet1/0/2#poe:hosts/cam-lobby-01\nnetwork/sw-access-01:GigabitEthernet1/0/2 — hosts/cam-lobby-01:eth0"];
+}

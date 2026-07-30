@@ -30,6 +30,18 @@ spec:
       ipv4:
         addresses: [10.10.0.11/24]
         gateway: 10.10.0.1
+  power:
+    draw_watts:
+      typical: 420
+      maximum: 800
+    inputs:
+      - pdu: pdu-r2-a
+        outlet: '1'
+        psu: psu1
+      - pdu: pdu-r2-b
+        outlet: '1'
+        psu: psu2
+    redundant: true
 ---
 apiVersion: netgraph.dev/v1alpha1
 kind: server
@@ -63,3 +75,15 @@ spec:
       ipv4:
         addresses: [10.10.0.12/24]
         gateway: 10.10.0.1
+  power:
+    draw_watts:
+      typical: 510
+      maximum: 800
+    inputs:
+      - pdu: pdu-r2-a
+        outlet: '2'
+        psu: psu1
+      - pdu: pdu-r2-b
+        outlet: '2'
+        psu: psu2
+    redundant: true

@@ -139,6 +139,7 @@ _LAYER_LABELS: Final[Mapping[Layer, str]] = {
     Layer.L3: "l3 — IP subnets",
     Layer.OVERLAY: "overlay — tunnels",
     Layer.ROUTING: "routing — BGP and OSPF",
+    Layer.POWER: "power — PDUs and feeds",
 }
 
 #: Files inlined into every page, in the order they are concatenated. The

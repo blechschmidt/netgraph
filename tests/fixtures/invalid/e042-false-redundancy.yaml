@@ -1,0 +1,56 @@
+# E042 (NG-E015) - a device claims redundant power that is not redundant.
+#
+# Two cords, two outlets -- one strip. The strip, its breaker and its own feed
+# are the single point of failure the second cord was bought to remove.
+apiVersion: netgraph.dev/v1alpha1
+kind: pdu
+metadata:
+  name: pdu-r1-a
+spec:
+  outlets: 8
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-a
+spec:
+  interfaces:
+    - name: eno1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+  power:
+    draw_watts: 400
+    inputs:
+      - pdu: pdu-r1-a
+        outlet: '1'
+        psu: psu1
+      - pdu: pdu-r1-a
+        outlet: '2'
+        psu: psu2
+    redundant: true
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-srv
+spec:
+  endpoints:
+    - sw-a:port1
+    - srv-a:eno1
+  medium: copper

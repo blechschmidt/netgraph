@@ -28,6 +28,8 @@ a flag that is documented exists. The prose around them is written by hand.
 | [`netgraph rules`](rules.md) | List the validation rules and their ids. | [rules.md](rules.md) |
 | [`netgraph schema`](schema.md) | Write the JSON Schema for editor completion. | [schema.md](schema.md) |
 | [`netgraph config show`](config.md) | Show the resolved settings and where each value came from. | [config.md](config.md) |
+| [`netgraph cache info`](cache.md) | Report where the parse cache is and what is in it. | [cache.md](cache.md) |
+| [`netgraph cache clear`](cache.md) | Delete this inventory's cached documents. | [cache.md](cache.md) |
 | [`netgraph completion`](completion.md) | Print the shell completion script. | [completion.md](completion.md) |
 | [`netgraph version`](version.md) | Report the netgraph, Python and Graphviz versions in use. | [version.md](version.md) |
 <!-- /generated -->
@@ -45,6 +47,7 @@ works on and how loudly it reports.
 | `-q`, `--quiet` | — | off | Only report errors. |
 | `-v`, `--verbose` | `INTEGER, >= 0` | `0` | Increase verbosity; repeatable. |
 | `--color`, `--no-color` | — | — | Force coloured output on or off. Auto-detected from the terminal by default. |
+| `--no-cache` | — | off | Parse every file, and remember nothing. The cache is keyed by file contents and is safe to leave on; set NETGRAPH_NO_CACHE=1 to switch it off for a whole environment. See 'netgraph cache info'. |
 <!-- /generated -->
 
 So the inventory is named once, for any command:
@@ -59,6 +62,12 @@ no problems found
 inventory root as they are found, two adds per-stage timings. `--no-color` is implied
 whenever stdout is not a terminal, and `NO_COLOR` in the environment forces it, so a
 transcript captured in CI carries no escape sequences.
+
+`--no-cache` parses every file rather than reusing the parse cache, and remembers
+nothing for the next run. It is a global option because it is about the run rather than
+about one command; the cache is keyed by file contents and is safe to leave on. See
+[`netgraph cache`](cache.md) and
+[`docs/configuration.md`](../configuration.md#cache--remembering-parsed-files).
 
 `-h/--help` is not in the table because Click supplies it rather than netgraph, but it
 works on the group and on every subcommand, and running `netgraph` with no command at all
@@ -84,6 +93,9 @@ would.
 |---|---|
 | `NO_COLOR` | Suppress colour, per [no-color.org](https://no-color.org). |
 | `NETGRAPH_YAML_LOADER` | Which YAML parser to use: `auto` (default), `python` or `libyaml`. |
+| `NETGRAPH_NO_CACHE` | Set to `1` to disable the parse cache everywhere, as `--no-cache` does per run. |
+| `NETGRAPH_CACHE_DIR` | Where the parse cache lives, overriding `XDG_CACHE_HOME` and `netgraph.toml`. |
+| `NETGRAPH_DOT` | The Graphviz `dot` to use, overriding the one on `PATH`. |
 
 `auto` takes PyYAML's libyaml bindings when the installed wheel carries them — several
 times faster on a large inventory — and falls back to the pure-Python parser otherwise.

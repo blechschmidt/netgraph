@@ -159,6 +159,11 @@ class ExportOptions:
     #: ``csv`` or ``markdown``.
     table_format: str = "csv"
 
+    # -- power -----------------------------------------------------------
+    #: How the load schedule is laid out: ``csv`` for the sheet somebody signs,
+    #: ``json`` for the same rows plus the per-PDU and per-PSE totals (§17.7).
+    schedule_format: str = "csv"
+
     @property
     def wants_forward(self) -> bool:
         return self.zones in {"all", "forward"}

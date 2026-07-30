@@ -22,6 +22,12 @@ what makes every rendering deterministic — so :class:`_Builder` keeps one *slo
 per document, in document order, and fills the deferred ones before anything is
 indexed. An inventory written with templates therefore renders byte for byte
 like the same inventory written out longhand.
+
+Nothing above depends on where a document came from, which is what lets
+:mod:`netgraph.loader.cache` short-circuit it: a file whose bytes have been seen
+before is replayed as the slots it produced last time, in the same order, with
+the same diagnostics, and the builder cannot tell the difference. Templates are
+the exception and are never cached — see :meth:`_Builder.harvest`.
 """
 
 from __future__ import annotations
@@ -35,11 +41,12 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Final
 
 from netgraph.errors import LoaderError, SchemaError, SchemaIssue
+from netgraph.loader.cache import CachedFile, CachedSlot, DocumentCache
 from netgraph.loader.documents import (
     RawDocument,
     YamlSyntaxError,
+    decode_text,
     parse_documents,
-    read_documents,
 )
 from netgraph.loader.ignore import IGNORE_FILE_NAME, IgnoreStack, parse_ignore_file
 from netgraph.loader.inventory import Inventory, LoadError, SourceLocation, qualify
@@ -95,7 +102,9 @@ class _Pending:
     chain: frozenset[Path]
 
 
-def load_tree(root: Path, *, keep_provenance: bool = False) -> Inventory:
+def load_tree(
+    root: Path, *, keep_provenance: bool = False, cache: DocumentCache | None = None
+) -> Inventory:
     """Load every YAML document below ``root`` into an :class:`Inventory`.
 
     Each document is validated against the schema of its ``kind`` and indexed
@@ -122,6 +131,15 @@ def load_tree(root: Path, *, keep_provenance: bool = False) -> Inventory:
             alive for the lifetime of the inventory: measured on a 628-element
             tree, that is 18 MB retained instead of 5 MB. Only the machine-
             readable ``netgraph validate`` formats need it, and they ask.
+        cache: A store of already-parsed files
+            (:mod:`netgraph.loader.cache`), or ``None`` to parse everything.
+            Every file is still read and hashed, so the tree on disk remains the
+            only state that decides the result; what is skipped is turning bytes
+            that have been seen before back into elements.
+
+            Ignored when ``keep_provenance`` is set: provenance *is* the YAML
+            node tree, and a cache that stored those would defeat the reason
+            they are dropped.
 
     Returns:
         The populated inventory, possibly holding errors.
@@ -133,10 +151,13 @@ def load_tree(root: Path, *, keep_provenance: bool = False) -> Inventory:
     """
     inventory = Inventory(root=root)
     builder = _Builder(inventory, keep_provenance=keep_provenance)
+    store = None if keep_provenance else cache
     with _deferred_gc():
         for entry in iter_inventory_files(root, errors=inventory.errors):
-            _load_file(entry, builder)
+            _load_file(entry, builder, store)
         builder.finish()
+    if store is not None:
+        store.flush()
     return inventory
 
 
@@ -438,28 +459,60 @@ def _is_yaml_name(name: str) -> bool:
 # -- parsing --------------------------------------------------------------
 
 
-def _load_file(entry: InventoryFile, builder: _Builder) -> None:
-    """Parse one file and hand every document it holds to ``builder``."""
+def _load_file(entry: InventoryFile, builder: _Builder, cache: DocumentCache | None = None) -> None:
+    """Turn one file into slots, from the cache when its bytes are known.
+
+    The file is read either way — its bytes are the key — so a cache hit saves
+    the parse and the model validation, not the ``read``. That is where the time
+    is: on the benchmark tree the read is 2 ms of a 440 ms load.
+    """
     relative = entry.relative.as_posix()
     try:
-        for document in read_documents(entry.path, relative=entry.relative):
-            builder.feed(document, entry=entry)
-    except YamlSyntaxError as exc:
-        builder.inventory.record(
-            LoadError(
-                message=str(exc),
-                path=entry.path,
-                relative=relative,
-                line=exc.line,
-                column=exc.column,
-            )
-        )
+        content = entry.path.read_bytes()
     except OSError as exc:
         builder.inventory.record(
             LoadError(
                 message=f"cannot read file: {exc.strerror or exc}",
                 path=entry.path,
                 relative=relative,
+            )
+        )
+        return
+
+    if cache is None:
+        _parse_file(content, entry, builder)
+        return
+
+    key = cache.key_for(relative, content)
+    cached = cache.get(key, path=entry.path, relative=relative)
+    if cached is not None:
+        builder.replay(cached, entry=entry)
+        return
+
+    mark = builder.mark()
+    _parse_file(content, entry, builder)
+    produced = builder.harvest(mark)
+    if produced is None:
+        cache.not_cacheable()
+    else:
+        cache.put(key, produced, path=entry.path)
+
+
+def _parse_file(content: bytes, entry: InventoryFile, builder: _Builder) -> None:
+    """Parse one file's bytes and hand every document it holds to ``builder``."""
+    try:
+        for document in parse_documents(
+            decode_text(content, entry.path), path=entry.path, relative=entry.relative
+        ):
+            builder.feed(document, entry=entry)
+    except YamlSyntaxError as exc:
+        builder.inventory.record(
+            LoadError(
+                message=str(exc),
+                path=entry.path,
+                relative=entry.relative.as_posix(),
+                line=exc.line,
+                column=exc.column,
             )
         )
 
@@ -497,6 +550,20 @@ class _Deferred:
 _Slot = _Ready | _Rejected | _Deferred
 
 
+@dataclass(frozen=True, slots=True)
+class _Mark:
+    """How far a builder had got before one file was fed to it.
+
+    Everything a file contributes is appended, so a pair of marks delimits it
+    exactly — which is what lets the cache be written by the builder rather than
+    by a second parser that would have to agree with it.
+    """
+
+    slots: int
+    errors: int
+    templates: int
+
+
 @dataclass(eq=False)
 class _Builder:
     """Turns a stream of parsed documents into a populated :class:`Inventory`.
@@ -522,6 +589,9 @@ class _Builder:
     #: diagnostic can later be narrowed from the document to the field.
     keep_provenance: bool = False
     _slots: list[_Slot] = field(default_factory=list)
+    #: How many ``kind: template`` documents have been read. Only used to answer
+    #: "did this file declare one?" in :meth:`harvest`.
+    _templates_seen: int = 0
 
     # -- phase one: the walk ---------------------------------------------
 
@@ -553,6 +623,7 @@ class _Builder:
 
     def _add_template(self, document: RawDocument, entry: InventoryFile) -> None:
         """Register a ``kind: template`` document, or record why it is unusable."""
+        self._templates_seen += 1
         try:
             template = parse_template(document.data, source=document.source)
         except SchemaError as exc:
@@ -573,6 +644,86 @@ class _Builder:
                         ),
                         rule="NG-M002",
                     ),
+                )
+            )
+
+    # -- the cache ---------------------------------------------------------
+
+    def mark(self) -> _Mark:
+        """Where the builder stands before a file is fed to it."""
+        return _Mark(
+            slots=len(self._slots),
+            errors=len(self.inventory.errors),
+            templates=self._templates_seen,
+        )
+
+    def harvest(self, mark: _Mark) -> CachedFile | None:
+        """What the file fed since ``mark`` produced, or ``None`` if uncacheable.
+
+        Two shapes are refused, both for the same reason: their meaning is not a
+        function of this file's bytes.
+
+        * A file declaring a ``kind: template``. The template is *used* by
+          documents in other files, so replaying this one from a cache would
+          leave the registry empty and every device that inherits from it
+          dangling.
+        * A device carrying ``spec.from``. Its element is the merge of this
+          file's document with a template that may be declared anywhere, so a
+          key over this file alone cannot notice the template changing.
+
+        Both stay on the slow path forever, which is the honest cost of a
+        per-file cache. They are counted, so ``netgraph cache info`` can say how
+        much of the tree is not being cached and why.
+        """
+        if self._templates_seen != mark.templates:
+            return None
+        slots: list[CachedSlot] = []
+        for slot in self._slots[mark.slots :]:
+            if isinstance(slot, _Deferred):
+                return None
+            if isinstance(slot, _Rejected):
+                slots.append(CachedSlot(errors=slot.errors))
+            else:
+                slots.append(
+                    CachedSlot(
+                        element=slot.element,
+                        index=slot.source.index,
+                        line=slot.source.line,
+                    )
+                )
+        return CachedFile(
+            slots=tuple(slots),
+            # Whole-file problems -- a syntax error, an undecodable byte -- are
+            # recorded as they happen rather than held in a slot, so they are
+            # taken from the inventory and replayed the same way.
+            errors=tuple(self.inventory.errors[mark.errors :]),
+        )
+
+    def replay(self, cached: CachedFile, *, entry: InventoryFile) -> None:
+        """Feed a file that was parsed on an earlier run.
+
+        The slots are appended in file order and the file-level diagnostics are
+        recorded immediately, which is exactly what :meth:`feed` would have done
+        — so the inventory, and the order of every diagnostic in it, comes out
+        the same as a cold load's.
+        """
+        for error in cached.errors:
+            self.inventory.record(error)
+        relative = entry.relative.as_posix()
+        for slot in cached.slots:
+            if slot.element is None:
+                self._slots.append(_Rejected(errors=slot.errors))
+                continue
+            self._slots.append(
+                _Ready(
+                    element=slot.element,
+                    source=SourceLocation(
+                        path=entry.path,
+                        relative=relative,
+                        index=slot.index,
+                        line=slot.line,
+                    ),
+                    namespace=entry.namespace,
                 )
             )
 

@@ -1,10 +1,10 @@
 # `netgraph export`
 
-`netgraph export` turns the inventory into files other tools consume: six
+`netgraph export` turns the inventory into files other tools consume: seven
 deterministic, text-diffable emitters driven by the same resolved inventory and
 the same graph a diagram is drawn from — so the files that draw the picture also
 write the hosts file, the zone, the Ansible inventory, the monitoring targets,
-the cabling pull-list and the static-route script. This page is the reference for the command;
+the cabling pull-list, the static-route script and the power load schedule. This page is the reference for the command;
 [`docs/export.md`](../export.md) is the full treatment of every column, every
 option and exactly what each format drops.
 
@@ -13,7 +13,7 @@ option and exactly what each format drops.
 ## Contents
 
 - [Synopsis](#synopsis)
-- [The six formats](#the-six-formats)
+- [The seven formats](#the-seven-formats)
 - [Validation runs first](#validation-runs-first)
 - [Where the artefact goes, and the manifest](#where-the-artefact-goes-and-the-manifest)
 - [Scoping an export: the filters `render` takes](#scoping-an-export-the-filters-render-takes)
@@ -30,7 +30,7 @@ netgraph [GLOBAL OPTIONS] export [OPTIONS] FORMAT
 ```
 <!-- /generated -->
 
-## The six formats
+## The seven formats
 
 `FORMAT` is the one required argument. Every emitter is lossy in its own way, and
 which way is the thing to know before you pick one:
@@ -43,6 +43,7 @@ which way is the thing to know before you pick one:
 | [`prometheus-sd`](../export.md#prometheus-sd) | Prometheus `file_sd` targets with namespace/kind/vendor/site labels | Everything but one address and a few labels |
 | [`cable-list`](../export.md#cable-list) | A CSV or Markdown pull-list, one row per physical run | Adapter attachments, tunnels and addressing |
 | [`routes`](../export.md#routes) | An iproute2 script, one shell function per device, of the static routes it declares | Everything that is not a static route: BGP and OSPF configuration is vendor syntax and is not invented |
+| [`power`](../export.md#power) | A CSV or JSON load schedule, one row per power feed: which outlet, on which strip, on which feed, powering which box in which rack unit | Everything that is not power; a feed has no medium, length or label, and the data run a PoE feed rides on is not described |
 
 What they have in common — a generated-by header, stable ordering, and no clock
 or hostname anywhere in the output, so re-exporting an unchanged inventory
@@ -169,6 +170,14 @@ inventory cannot know — `env=prod`, say.
 columns are the same either way; `markdown` is for pasting into a change ticket,
 and [The columns](../export.md#the-columns) documents all of them.
 
+**`power`**: `--schedule-format csv|json` chooses the layout. The feed rows are the
+same either way — `csv` is the sheet somebody prints and initials, and `json` adds
+the per-PDU and per-PSE totals a capacity tool wants and a spreadsheet would
+compute for itself. Neither is the lossy one. All twenty-two columns, and why a
+dual-corded server is two rows rather than one, are
+[`power`](../export.md#power) and
+[The columns of the schedule](../export.md#the-columns-of-the-schedule).
+
 **`hosts`** and **`ansible-inventory`** have no options of their own. What
 `ansible-inventory` puts in each group, how `ansible_host` is chosen and which
 host variables are set are [Groups](../export.md#groups),
@@ -192,7 +201,7 @@ host variables are set are [Groups](../export.md#groups),
 | `--manifest` | `FILE` | — | Write the JSON record of what was skipped to this file. It goes to stderr when no file is named. |
 | `--namespace` | `NS` | — | Keep only elements in this namespace or below it. Repeatable. |
 | `--vlan` | `VID` | — | Keep only elements participating in this VLAN. Repeatable. |
-| `--kind` | `[switch\|router\|hub\|computer\|server\|adapter\|patchpanel]` | — | Keep only elements of this kind. Repeatable. |
+| `--kind` | `[switch\|router\|hub\|computer\|server\|adapter\|patchpanel\|pdu]` | — | Keep only elements of this kind. Repeatable. |
 | `--name` | `GLOB` | — | Keep only elements whose name matches this glob. Repeatable. |
 | `--neighbors-of` | `NAME` | — | Keep only the neighbourhood of this element. |
 | `--depth` | `INTEGER, >= 0` | `1` | How many hops --neighbors-of reaches. |
@@ -210,6 +219,7 @@ host variables are set are [Groups](../export.md#groups),
 | `--port` | `PORT` | none, a bare address | Port appended to every prometheus-sd target. IPv6 is bracketed automatically. |
 | `--label` | `KEY=VALUE` | — | Static label merged into every prometheus-sd target. Repeatable. |
 | `--table-format` | `[csv\|markdown]` | `csv` | How cable-list is laid out. The rows and columns are the same either way. |
+| `--schedule-format` | `[csv\|json]` | `csv` | How the power load schedule is laid out. json adds the per-PDU and per-PSE totals; the feed rows are the same either way. |
 | `--strict` | — | off | Treat warnings as errors. |
 | `--force` | — | off | Proceed even when validation failed. The result may not match the files. |
 <!-- /generated -->

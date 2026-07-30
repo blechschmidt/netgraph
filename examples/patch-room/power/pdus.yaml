@@ -1,0 +1,97 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: pdu
+metadata:
+  name: pdu-r1-a
+  description: |
+    A-side strip in rack r1, on the utility feed. Every dual-corded device in
+    this rack has one cord here and one in pdu-r1-b; the two strips are on
+    different feeds, which is what makes the second cord worth having.
+  location:
+    site: hq
+    room: mdf
+    rack: r1
+    rack_height: 42
+  labels:
+    site: hq
+    role: power
+    feed: a
+spec:
+  vendor: APC
+  model: AP8853
+  form_factor: vertical
+  outlets: 24
+  capacity_watts: 3680
+  input_feed: utility-a
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: pdu
+metadata:
+  name: pdu-r1-b
+  description: B-side strip in rack r1, on the UPS feed.
+  location:
+    site: hq
+    room: mdf
+    rack: r1
+    rack_height: 42
+  labels:
+    site: hq
+    role: power
+    feed: b
+spec:
+  vendor: APC
+  model: AP8853
+  form_factor: vertical
+  outlets: 24
+  capacity_watts: 3680
+  input_feed: ups-1
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: pdu
+metadata:
+  name: pdu-r2-a
+  description: |
+    A-side strip in rack r2, on the same utility feed as pdu-r1-a. Horizontal
+    rather than vertical, so unlike the r1 pair it occupies a rack unit and
+    appears on the elevation with its utilisation beside it.
+  location:
+    site: hq
+    room: mdf
+    rack: r2
+    position: 1
+    height: 1
+    rack_height: 42
+  labels:
+    site: hq
+    role: power
+    feed: a
+spec:
+  vendor: APC
+  model: AP7921B
+  form_factor: 1U
+  outlets: 8
+  capacity_watts: 1840
+  input_feed: utility-a
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: pdu
+metadata:
+  name: pdu-r2-b
+  description: B-side strip in rack r2, on the UPS feed.
+  location:
+    site: hq
+    room: mdf
+    rack: r2
+    position: 2
+    height: 1
+    rack_height: 42
+  labels:
+    site: hq
+    role: power
+    feed: b
+spec:
+  vendor: APC
+  model: AP7921B
+  form_factor: 1U
+  outlets: 8
+  capacity_watts: 1840
+  input_feed: ups-1

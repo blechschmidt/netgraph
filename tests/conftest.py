@@ -1,5 +1,13 @@
 """Shared pytest configuration.
 
+The parse cache is redirected to a temporary directory for the whole session
+(:func:`isolate_the_parse_cache`), so a test run never reads or writes the
+developer's real cache and a fresh checkout behaves like a machine that has run
+netgraph before. It is deliberately *not* switched off: the cache is on by
+default in every command, and a suite that disabled it would leave the warm path
+tested only by ``tests/test_cache.py`` while every golden, transcript and
+end-to-end assertion kept exercising the cold one.
+
 Two project-wide switches live here.
 
 ``--regen-golden`` rewrites the committed renderer snapshots in
@@ -17,12 +25,15 @@ one is for and ``docs/testing.md`` for how to run them.
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Final
 
 import pytest
 from hypothesis import HealthCheck, Phase, settings
 from hypothesis.database import DirectoryBasedExampleDatabase
+
+from netgraph.loader import CACHE_DIR_ENV_VAR
 
 #: Where a failing example is recorded so the next run tries it first. Kept at
 #: the repository root rather than in a temporary directory precisely so it can
@@ -100,3 +111,28 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 def regen_golden(request: pytest.FixtureRequest) -> bool:
     """Was the suite invoked with ``--regen-golden``?"""
     return bool(request.config.getoption("--regen-golden"))
+
+
+@pytest.fixture(scope="session", autouse=True)
+def isolate_the_parse_cache(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Path]:
+    """Point :data:`~netgraph.loader.CACHE_DIR_ENV_VAR` at a throwaway directory.
+
+    Set in ``os.environ`` rather than through ``monkeypatch`` because several
+    tests run the installed console script in a subprocess, and a cache is only
+    isolated if the child process agrees where it is.
+
+    One directory for the whole session, not one per test: entries are keyed by
+    file contents, so a hit is by construction the same answer as a parse, and
+    letting the suite hit means the assertions it already makes — goldens,
+    documented transcripts, every CLI test — are made against the warm path too.
+    """
+    directory = tmp_path_factory.mktemp("netgraph-cache")
+    previous = os.environ.get(CACHE_DIR_ENV_VAR)
+    os.environ[CACHE_DIR_ENV_VAR] = str(directory)
+    try:
+        yield directory
+    finally:
+        if previous is None:
+            os.environ.pop(CACHE_DIR_ENV_VAR, None)
+        else:  # pragma: no cover - only when a developer set it themselves
+            os.environ[CACHE_DIR_ENV_VAR] = previous

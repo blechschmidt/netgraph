@@ -102,12 +102,26 @@ from netgraph.completion import (
     complete_rule,
     completion_script,
 )
-from netgraph.config import CONFIG_FILE_NAME, Config, ValidationConfig, load_config
+from netgraph.config import (
+    CACHE_TABLE,
+    CONFIG_FILE_NAME,
+    CacheConfig,
+    Config,
+    ValidationConfig,
+    load_config,
+)
 from netgraph.console import Align, Console
 from netgraph.drift import FORMATS as DRIFT_FORMATS
 from netgraph.drift import CompareSpec, DriftReport, check_drift, render_drift
 from netgraph.drift import write_text as write_drift
-from netgraph.errors import LoaderError, NetgraphError, RenderError, compact_ids, format_path
+from netgraph.errors import (
+    ConfigurationError,
+    LoaderError,
+    NetgraphError,
+    RenderError,
+    compact_ids,
+    format_path,
+)
 from netgraph.export import (
     EXPORTERS,
     ExportContext,
@@ -143,15 +157,24 @@ from netgraph.ipam import (
 from netgraph.ipam import Report as IpamReport
 from netgraph.ipam import build_report as build_ipam_report
 from netgraph.loader import (
+    DISABLE_ENV_VAR,
     YAML_SUFFIXES,
+    CacheInfo,
+    DocumentCache,
     Inventory,
     LoadError,
+    clear_cache,
+    disabled_by_environment,
+    inspect_cache,
     iter_inventory_files,
     load_stream,
     load_tree,
+    open_cache,
     read_documents,
 )
-from netgraph.models import DOCUMENT_KINDS, Adapter, Device, Element, format_bitrate
+from netgraph.loader.inventory import short_name
+from netgraph.models import DOCUMENT_KINDS, Adapter, Device, Element, format_bitrate, format_watts
+from netgraph.power import format_utilisation_percent, power_plan
 from netgraph.render import (
     DEFAULT_RANKDIR,
     FORMATS,
@@ -268,11 +291,19 @@ class AppContext:
     verbosity: int = 0
     #: Force colour on or off; ``None`` auto-detects from the stream.
     color: bool | None = None
+    #: ``--no-cache``: parse every file, and remember nothing for the next run.
+    no_cache: bool = False
     #: ``netgraph.toml``, read at most once per run. A command may ask for it
     #: twice — once to resolve its render defaults, once to grade findings — and
     #: reading the file twice could answer the two questions differently if it
     #: were edited in between.
     _config: Config | None = field(default=None, repr=False)
+    #: The parse cache, opened at most once per run and shared by every load —
+    #: which is what makes a *second* load in the same process (``watch``) hit
+    #: memory rather than the disk. ``_cache_open`` distinguishes "not yet asked
+    #: for" from "asked for, and there is none".
+    _cache: DocumentCache | None = field(default=None, repr=False)
+    _cache_open: bool = field(default=False, repr=False)
 
     def log(self, message: str, *, level: int = 1) -> None:
         """Write ``message`` to stderr when the verbosity level allows it."""
@@ -302,14 +333,58 @@ class AppContext:
                 Problems *inside* the tree are collected on the inventory.
         """
         self.log(f"loading inventory from {self.inventory}", level=1)
-        inventory = load_tree(self.inventory, keep_provenance=keep_provenance)
+        # Provenance is the YAML node tree, which is exactly what a cached entry
+        # does not hold, so the two are mutually exclusive by construction rather
+        # than by a check inside the loader.
+        cache = None if keep_provenance else self.cache()
+        inventory = load_tree(self.inventory, keep_provenance=keep_provenance, cache=cache)
         self.log(
             f"loaded {len(inventory.elements)} element(s): "
             f"{len(inventory.devices)} device(s), {len(inventory.cables)} cable(s), "
             f"{len(inventory.adapters)} adapter(s), {len(inventory.tunnels)} tunnel(s)",
             level=1,
         )
+        if cache is not None:
+            self.log(cache.stats.summary(), level=1)
+            if cache.stats.problem is not None:
+                self.log(f"cache: {cache.stats.problem}", level=1)
         return inventory
+
+    def cache(self) -> DocumentCache | None:
+        """The parse cache for this inventory, or ``None`` when it is off.
+
+        Off means one of three things, in the order they are checked:
+        ``--no-cache``, the :data:`~netgraph.loader.DISABLE_ENV_VAR` environment
+        variable, or ``[cache] enabled = false`` in ``netgraph.toml``.
+
+        A ``netgraph.toml`` that cannot be read at all is *not* one of them. Some
+        commands here never look at the file; making them start failing over a
+        broken ``[render]`` table because the cache went to ask about a directory
+        would be a new failure mode for an optimisation. The commands that do
+        read it still report the error properly, and this one runs uncached.
+        """
+        if self._cache_open:
+            return self._cache
+        self._cache_open = True
+        settings = self.cache_settings()
+        if not settings.enabled:
+            return None
+        self._cache = open_cache(
+            self.inventory,
+            directory=settings.directory,
+            max_bytes=settings.max_bytes,
+        )
+        return self._cache
+
+    def cache_settings(self) -> CacheConfig:
+        """The ``[cache]`` table with the command line and environment applied."""
+        try:
+            settings = self.config().cache
+        except ConfigurationError:
+            settings = CacheConfig()
+        return settings.with_overrides(
+            no_cache=self.no_cache or disabled_by_environment(),
+        )
 
     def config(self) -> Config:
         """Read ``netgraph.toml`` from the inventory root, if there is one.
@@ -376,10 +451,32 @@ def _show_version(ctx: click.Context, param: click.Parameter, value: bool) -> No
     default=None,
     help="Force coloured output on or off. Auto-detected from the terminal by default.",
 )
+@click.option(
+    "--no-cache",
+    is_flag=True,
+    help=(
+        "Parse every file, and remember nothing. The cache is keyed by file "
+        f"contents and is safe to leave on; set {DISABLE_ENV_VAR}=1 to switch it "
+        "off for a whole environment. See 'netgraph cache info'."
+    ),
+)
 @click.pass_context
-def cli(ctx: click.Context, inventory: Path, quiet: bool, verbose: int, color: bool | None) -> None:
+def cli(
+    ctx: click.Context,
+    inventory: Path,
+    quiet: bool,
+    verbose: int,
+    color: bool | None,
+    no_cache: bool,
+) -> None:
     """Declare network elements in YAML and render them as network graphs."""
-    ctx.obj = AppContext(inventory=inventory, quiet=quiet, verbosity=verbose, color=color)
+    ctx.obj = AppContext(
+        inventory=inventory,
+        quiet=quiet,
+        verbosity=verbose,
+        color=color,
+        no_cache=no_cache,
+    )
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
 
@@ -1305,8 +1402,9 @@ _LAYER_OPTION: Final[Callable[[Any], Any]] = click.option(
         "l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets "
         "and the elements addressed in them; overlay draws the tunnels; routing draws the "
         "BGP sessions and OSPF adjacencies, clustered by VRF; physical adds the patch panels "
-        "l1 splices out; rack draws a front elevation per rack. Repeatable for -f html, "
-        "which draws each layer and puts a switcher over them."
+        "l1 splices out; rack draws a front elevation per rack; power draws the PDUs and the "
+        "feeds into everything they power. Repeatable for -f html, which draws each layer and "
+        "puts a switcher over them."
     ),
 )
 
@@ -1671,6 +1769,12 @@ def _empty_graph_reason(layer: Layer, spec: FilterSpec) -> str:
         return (
             "nothing to draw at layer rack: no element declares 'metadata.location' with a "
             "'rack' and a 'position'. Add one to place it on an elevation"
+        )
+    if layer is Layer.POWER:
+        return (
+            "nothing to draw in the power view: the inventory declares no 'pdu' and no "
+            "'spec.power'. Add a pdu document and name its outlets in a device's "
+            "'power.inputs', or run 'netgraph list power' to see what is recorded"
         )
     # No filter and nothing at layer 1 means the tree itself is empty, which is
     # what a freshly scaffolded 'netgraph init --minimal' looks like.
@@ -2218,6 +2322,9 @@ def watch_command(
         options=options,
         strict=bool(params["strict"]),
         force=bool(params["force"]),
+        # One store for the whole run, so the second cycle onwards re-parses
+        # only what the editor actually saved.
+        cache=app.cache(),
     )
     live = LiveRender(output_format)
 
@@ -2556,7 +2663,7 @@ def _open_browser(app: AppContext, url: str) -> None:
 @cli.command("list")
 @click.argument(
     "what",
-    type=click.Choice(["devices", "cables", "tunnels", "vlans", "bss", "subnets"]),
+    type=click.Choice(["devices", "cables", "tunnels", "vlans", "bss", "subnets", "power"]),
     default="devices",
     required=False,
 )
@@ -2570,7 +2677,7 @@ def _open_browser(app: AppContext, url: str) -> None:
 )
 @click.pass_obj
 def list_command(app: AppContext, what: str, output_format: str) -> None:
-    """List the devices, cables, tunnels, VLANs, BSSs or subnets of an inventory."""
+    """List the devices, cables, tunnels, VLANs, BSSs, subnets or PDUs of an inventory."""
     console = app.console()
     inventory = app.load()
     _warn_about_load_errors(console, inventory)
@@ -2862,6 +2969,82 @@ def _list_subnets(inventory: Inventory) -> _Listing:
     return headers, aligns, rows, records
 
 
+def _list_power(inventory: Inventory) -> _Listing:
+    """One row per PDU: its outlets, its load and how full it is (§17.6).
+
+    Shaped after the ``netgraph ipam`` utilisation table, and for the same
+    reason: the question is capacity planning, so the columns are what is there,
+    what is used, what is left, and the percentage that decides whether anybody
+    has to act.
+
+    Two load columns rather than one. ``LOAD`` is the normal-operation figure —
+    each dual-corded device drawing half its watts through each cord — and is what
+    ``E039`` grades. ``FAILOVER`` is what this unit carries when the other one in
+    the pair dies, each load counted whole. A single-fed rack has the two the
+    same; an A/B pair does not, and the gap between them *is* the redundancy plan.
+    """
+    plan = power_plan(inventory)
+    rows: list[list[str]] = []
+    records: list[dict[str, Any]] = []
+    for load in plan.pdus:
+        rows.append(
+            [
+                short_name(load.pdu),
+                load.input_feed or "-",
+                str(load.outlet_count),
+                str(load.used_outlets),
+                str(load.free_outlets),
+                format_watts(load.capacity_watts) if load.capacity_watts is not None else "-",
+                format_watts(load.load_watts),
+                format_watts(load.failover_watts),
+                format_utilisation_percent(load.utilisation),
+                str(len(load.elements)),
+            ]
+        )
+        record: dict[str, Any] = {
+            "pdu": load.pdu,
+            "name": load.name,
+            "inputFeed": load.input_feed,
+            "outlets": load.outlet_count,
+            "usedOutlets": load.used_outlets,
+            "freeOutlets": load.free_outlets,
+            "loadWatts": round(load.load_watts, 3),
+            "failoverWatts": round(load.failover_watts, 3),
+            "elements": list(load.elements),
+        }
+        if load.capacity_watts is not None:
+            record["capacityWatts"] = load.capacity_watts
+            record["freeWatts"] = round(load.capacity_watts - load.load_watts, 3)
+        if load.utilisation is not None:
+            record["utilisation"] = round(load.utilisation, 6)
+        records.append(record)
+    headers = (
+        "PDU",
+        "FEED",
+        "OUTLETS",
+        "USED",
+        "FREE",
+        "CAPACITY",
+        "LOAD",
+        "FAILOVER",
+        "UTIL",
+        "LOADS",
+    )
+    aligns: tuple[Align, ...] = (
+        "left",
+        "left",
+        "right",
+        "right",
+        "right",
+        "right",
+        "right",
+        "right",
+        "right",
+        "right",
+    )
+    return headers, aligns, rows, records
+
+
 _LISTINGS: Final[dict[str, Any]] = {
     "devices": _list_devices,
     "cables": _list_cables,
@@ -2869,6 +3052,7 @@ _LISTINGS: Final[dict[str, Any]] = {
     "vlans": _list_vlans,
     "bss": _list_bss,
     "subnets": _list_subnets,
+    "power": _list_power,
 }
 
 
@@ -3284,6 +3468,13 @@ ZONE_SELECTIONS: Final[tuple[str, ...]] = ("all", "forward", "reverse")
 #: same order — only the framing differs, so neither is the lossy one.
 TABLE_FORMATS: Final[tuple[str, ...]] = ("csv", "markdown")
 
+#: How ``export power`` lays the load schedule out. Not the same choice as
+#: :data:`TABLE_FORMATS`, and deliberately a separate flag: a schedule's second
+#: form carries the per-PDU totals a sheet has no row for, so the two options
+#: offer different things and folding them into one would advertise ``markdown``
+#: for a schedule and ``json`` for a pull list, neither of which exists.
+SCHEDULE_FORMATS: Final[tuple[str, ...]] = ("csv", "json")
+
 #: Which formats each format-specific option belongs to, and how the option is
 #: spelled. Everything not listed here — the filters, ``--strict``, ``--force``
 #: — applies to every format.
@@ -3308,6 +3499,7 @@ _EXPORT_OPTION_SCOPE: Final[dict[str, tuple[str, tuple[str, ...]]]] = {
     "port": ("--port", ("prometheus-sd",)),
     "labels": ("--label", ("prometheus-sd",)),
     "table_format": ("--table-format", ("cable-list",)),
+    "schedule_format": ("--schedule-format", ("power",)),
 }
 
 
@@ -3495,6 +3687,16 @@ _TARGET_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
         show_default=True,
         help="How cable-list is laid out. The rows and columns are the same either way.",
     ),
+    click.option(
+        "--schedule-format",
+        type=click.Choice(SCHEDULE_FORMATS),
+        default="csv",
+        show_default=True,
+        help=(
+            "How the power load schedule is laid out. json adds the per-PDU and per-PSE "
+            "totals; the feed rows are the same either way."
+        ),
+    ),
 )
 
 
@@ -3643,6 +3845,7 @@ def _export_options(params: Mapping[str, Any], export_format: str) -> ExportOpti
         port=params["port"],
         labels=dict(params["labels"]),
         table_format=params["table_format"],
+        schedule_format=params["schedule_format"],
     )
 
 
@@ -3853,6 +4056,118 @@ def _validate_source(config: Config, key: str) -> str:
     default = ValidationConfig()
     current = getattr(config.validation, {"severity": "severity"}.get(key, key))
     return "file [validate]" if current != getattr(default, key) else "default"
+
+
+# --------------------------------------------------------------------------- #
+# cache
+# --------------------------------------------------------------------------- #
+
+
+@cli.group("cache")
+def cache_command() -> None:
+    """Inspect or clear the parse cache for this inventory."""
+
+
+@cache_command.command("info")
+@click.pass_obj
+def cache_info_command(app: AppContext) -> None:
+    """Report where this inventory's parse cache is and what is in it.
+
+    Nothing is loaded and nothing is written: this reads the cache directory and
+    describes it. The identity table is what a cached entry is keyed by besides
+    the file's own bytes, so a cache that keeps missing is explained by whichever
+    line of it changed.
+    """
+    console = app.console()
+    info = _cache_info(app)
+    console.info("cache")
+    console.table(
+        ("SETTING", "VALUE"),
+        [
+            ["enabled", "true" if info.enabled else f"false ({info.reason})"],
+            ["directory", str(info.directory)],
+            ["location from", info.origin or "default"],
+            ["entries", f"{info.entries:,}"],
+            ["size", format_bytes(info.used_bytes)],
+            ["stale entries", f"{info.stale_entries:,} ({format_bytes(info.stale_bytes)})"],
+            ["maximum size", format_bytes(info.max_bytes)],
+        ],
+    )
+    console.print()
+    console.info("identity (an entry is keyed by this and the file's contents)")
+    console.table(("INPUT", "VALUE"), [list(pair) for pair in info.identity.describe()])
+    if not info.exists:
+        console.info(
+            "nothing cached yet; the next command that loads this inventory fills it"
+            if info.enabled
+            else "nothing cached, and the cache is off"
+        )
+
+
+@cache_command.command("clear")
+@click.option(
+    "--all",
+    "every",
+    is_flag=True,
+    help="Clear the cache of every inventory, not just this one.",
+)
+@click.pass_obj
+def cache_clear_command(app: AppContext, every: bool) -> None:
+    """Delete this inventory's cached documents.
+
+    Only ever a way to reclaim space or to rule the cache out of an
+    investigation: entries are keyed by file contents and by the code that read
+    them, so a stale one cannot be served and clearing fixes nothing that
+    editing the inventory would not.
+    """
+    console = app.console()
+    info = _cache_info(app)
+    target = info.directory.parent.parent if every else info.directory
+    removed, freed = clear_cache(target)
+    scope = "every inventory" if every else "this inventory"
+    console.info(
+        f"cleared {scope}: {removed:,} entr{'y' if removed == 1 else 'ies'} under {target}"
+    )
+    console.print(f"{removed} entr{'y' if removed == 1 else 'ies'}, {format_bytes(freed)} freed")
+
+
+def _cache_info(app: AppContext) -> CacheInfo:
+    """Describe the cache without opening it, disabled or not.
+
+    ``AppContext.cache`` returns ``None`` for a cache that is switched off, which
+    is the right answer for a *load* and the wrong one for a report: "off, and
+    here is where it would be, and here is what is still lying there" is exactly
+    what somebody asking has asked.
+    """
+    settings = app.config().cache
+    reason = ""
+    if app.no_cache:
+        reason = "--no-cache"
+    elif disabled_by_environment():
+        reason = f"{DISABLE_ENV_VAR} is set"
+    elif not settings.enabled:
+        reason = f"{CONFIG_FILE_NAME} [{CACHE_TABLE}] enabled = false"
+    store = open_cache(app.inventory, directory=settings.directory, max_bytes=settings.max_bytes)
+    return inspect_cache(
+        store.directory,
+        origin=store.origin,
+        enabled=not reason,
+        reason=reason,
+        identity=store.identity,
+        max_bytes=store.max_bytes,
+    )
+
+
+def format_bytes(count: int) -> str:
+    """A byte count as a short, readable string. Decimal units, as disks use."""
+    if count < 1000:
+        return f"{count} B"
+    size = float(count)
+    for unit in ("kB", "MB", "GB"):
+        size /= 1000
+        if size < 1000 or unit == "GB":
+            return f"{size:.1f} {unit}"
+    raise AssertionError  # pragma: no cover - the loop always returns
 
 
 @cli.command("version")

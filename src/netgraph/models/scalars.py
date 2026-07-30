@@ -49,6 +49,7 @@ __all__ = [
     "TxPowerDbm",
     "VlanId",
     "VlanSet",
+    "Watts",
     "WirelessChannel",
     "check_ssid",
     "format_bitrate",
@@ -344,6 +345,14 @@ BitRate = Annotated[int, BeforeValidator(parse_bitrate), Field(strict=True, gt=0
 
 #: Physical cable length in metres; integers are accepted and widened.
 LengthMetres = Annotated[float, Field(ge=0.0, allow_inf_nan=False)]
+
+#: A wattage (§17): a device's draw, a PDU's capacity, a PoE reservation.
+#: Strictly positive — ``0 W`` is not a load, it is the absence of one, and
+#: recording it as a load would put a device on a schedule that draws nothing.
+#: The ceiling is a megawatt: far above any rack and far below a float that
+#: would make a utilisation sum meaningless. Integers are accepted and widened,
+#: because ``draw_watts: 120`` is how a nameplate is written.
+Watts = Annotated[float, Field(gt=0.0, le=1_000_000.0, allow_inf_nan=False)]
 
 
 # --------------------------------------------------------------------------- #

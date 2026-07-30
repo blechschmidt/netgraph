@@ -96,9 +96,27 @@ the 17 % of headroom the threshold leaves above today's worst sample. Buying
 that last piece would mean a threshold within 4 % of the measured spread, which
 on a shared runner buys flakiness rather than coverage.
 
-If either test starts failing on a platform without a code change behind it, the
-right fix is to raise the number here *and say so in* ``docs/follow-ups.md`` —
-not to delete the guard.
+**And the same technique again for the cache.** Entry 14 made a repeated load
+incremental; the floor there is the *cold* load itself, and the guard asserts that
+a warm one is a small fraction of it — separately for the two tiers, because they
+answer different questions ("the next process" and "the next cycle of one
+``watch``"):
+
+==============  ==========  =========
+Measured        Today       Threshold
+==============  ==========  =========
+warm/cold disk  0.30-0.34   0.55
+warm/cold mem   0.084-0.090 0.20
+==============  ==========  =========
+
+Both are the libyaml numbers; through the pure-Python parser the denominator is
+five times larger and both ratios fall by a factor of five, so one threshold
+covers each path. What this catches is the cache silently ceasing to be
+consulted, which puts both ratios at 1.0.
+
+If any of these tests starts failing on a platform without a code change behind
+it, the right fix is to raise the number here *and say so in*
+``docs/follow-ups.md`` — not to delete the guard.
 """
 
 from __future__ import annotations
@@ -113,6 +131,7 @@ from types import ModuleType
 import pytest
 
 from netgraph.loader import Inventory, load_tree
+from netgraph.loader.cache import DocumentCache
 from netgraph.loader.documents import HAVE_LIBYAML, StrictSafeLoader, read_documents
 from netgraph.loader.tree import InventoryFile, iter_inventory_files
 from netgraph.models import Adapter, Device
@@ -132,6 +151,19 @@ MAX_LOAD_RATIO_PURE_PYTHON = 1.25
 #: 7 set: still far below the 9.1 that catches a revert of entry 7's work, and
 #: above the spread coverage instrumentation introduces.
 MAX_VALIDATE_RATIO = 9.0
+
+#: Ceilings on a *warm* load as a fraction of a cold one, for the two tiers of
+#: the parse cache. Measured 0.30-0.34 (disk) and 0.084-0.090 (memory) through
+#: libyaml, and 0.04-0.06 / 0.01-0.02 through the pure-Python parser, whose
+#: denominator is five times larger; so one pair of thresholds covers both paths
+#: and each leaves at least 60 % of headroom. Coverage *helps* here — the warm
+#: path executes far fewer traced lines than the parser does — which is why these
+#: two are not subject to the caveat in entry 12 of ``docs/follow-ups.md``.
+#:
+#: What they catch is the cache quietly ceasing to be consulted, which would put
+#: both at 1.0. See entry 14 for the full table.
+MAX_WARM_DISK_FRACTION = 0.55
+MAX_WARM_MEMORY_FRACTION = 0.20
 
 #: Walks per floor sample. One is too short to time cleanly; see the docstring.
 FLOOR_WALKS = 8
@@ -299,4 +331,54 @@ def test_validating_costs_no_more_than_its_budget_above_an_address_walk(
         f"{MAX_VALIDATE_RATIO:.1f}x. Either an optimisation from entry 7 of "
         f"docs/follow-ups.md was undone, or a rule grew per-address work. Profile with "
         f"'python tools/profile_validate.py' before changing this threshold."
+    )
+
+
+def test_a_warm_load_costs_a_fraction_of_a_cold_one(benchmark_tree: Path, tmp_path: Path) -> None:
+    """The cache actually skips the parse, on disk and in memory both.
+
+    Same technique as the two guards above: two things timed in the same process
+    against each other, so the machine cancels out. The floor here *is* the cold
+    load, which makes this the one ratio in the file where a number below the
+    threshold is the passing case.
+
+    A fresh :class:`DocumentCache` per disk sample, because a store that has
+    already answered would answer from memory the second time and the two tiers
+    would stop being separable.
+    """
+    directory = tmp_path / "cache"
+    warm_store = DocumentCache(directory)
+
+    def cold() -> None:
+        load_tree(benchmark_tree)
+
+    def from_disk() -> None:
+        load_tree(benchmark_tree, cache=DocumentCache(directory))
+
+    def from_memory() -> None:
+        load_tree(benchmark_tree, cache=warm_store)
+
+    # Fill the cache, then warm both paths: the first read of an entry pays for a
+    # cold page cache, and the first load of any kind builds pydantic's
+    # validators.
+    for _ in range(2):
+        cold()
+        from_disk()
+        from_memory()
+
+    cold_ms, disk_ms = interleaved_best(cold, from_disk)
+    _, memory_ms = interleaved_best(cold, from_memory)
+
+    assert disk_ms / cold_ms <= MAX_WARM_DISK_FRACTION, (
+        f"a warm load off disk is {disk_ms / cold_ms:.2f} of a cold one "
+        f"({disk_ms:.1f} ms against {cold_ms:.1f} ms), over the budget of "
+        f"{MAX_WARM_DISK_FRACTION:.2f}. Either the cache stopped being consulted, or "
+        f"reconstructing the models grew more expensive than parsing them. Measure with "
+        f"'python tools/bench_incremental.py' before changing this threshold."
+    )
+    assert memory_ms / cold_ms <= MAX_WARM_MEMORY_FRACTION, (
+        f"a second load in one process is {memory_ms / cold_ms:.2f} of a cold one "
+        f"({memory_ms:.1f} ms against {cold_ms:.1f} ms), over the budget of "
+        f"{MAX_WARM_MEMORY_FRACTION:.2f}. This is the tier 'netgraph watch' reloads "
+        f"through; see entry 14 of docs/follow-ups.md."
     )

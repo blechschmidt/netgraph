@@ -140,3 +140,142 @@ spec:
   category: cat6
   connector: rj45
   label: P-008B
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-sw-pp24
+  description: >-
+    Patch lead, core switch to the front of pp-r1-a. First segment of the uplink
+    run to the access switch in rack r2.
+  labels:
+    site: hq
+    medium: copper
+spec:
+  endpoints:
+    - sw-core-01:GigabitEthernet1/0/2
+    - pp-r1-a:front/24
+  medium: copper
+  speed: 1Gbps
+  length_m: 1
+  category: cat6
+  connector: rj45
+  label: P-024A
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-tie-24
+  description: Permanent cabling between the two racks, rear to rear.
+  labels:
+    site: hq
+    medium: copper
+    role: permanent
+spec:
+  endpoints:
+    - pp-r1-a:rear/24
+    - pp-r2-a:rear/24
+  medium: copper
+  speed: 1Gbps
+  length_m: 18
+  category: cat6a
+  connector: rj45
+  label: T-024
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-pp-access24
+  description: Patch lead, front of pp-r2-a to the access switch uplink.
+  labels:
+    site: hq
+    medium: copper
+spec:
+  endpoints:
+    - pp-r2-a:front/24
+    - sw-access-01:GigabitEthernet1/0/24
+  medium: copper
+  speed: 1Gbps
+  length_m: 2
+  category: cat6
+  connector: rj45
+  label: P-024B
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-access-pp09
+  description: >-
+    Patch lead, access switch to the front of pp-r2-a. First segment of the run
+    to the ceiling access point — and the segment the PoE leaves on.
+  labels:
+    site: hq
+    medium: copper
+spec:
+  endpoints:
+    - sw-access-01:GigabitEthernet1/0/1
+    - pp-r2-a:front/9
+  medium: copper
+  speed: 1Gbps
+  length_m: 1
+  category: cat6
+  connector: rj45
+  label: P-009A
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-pp-ap09
+  description: >-
+    Permanent cabling from the rear of pp-r2-a to the ceiling. The access point
+    takes both its traffic and its power over this run.
+  labels:
+    site: hq
+    medium: copper
+    role: permanent
+spec:
+  endpoints:
+    - pp-r2-a:rear/9
+    - ap-ceiling-01:eth0
+  medium: copper
+  speed: 1Gbps
+  length_m: 24
+  category: cat6a
+  connector: rj45
+  label: T-009
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-access-cam
+  description: Patch lead, access switch straight to the lobby camera.
+  labels:
+    site: hq
+    medium: copper
+spec:
+  endpoints:
+    - sw-access-01:GigabitEthernet1/0/2
+    - cam-lobby-01:eth0
+  medium: copper
+  speed: 1Gbps
+  length_m: 12
+  category: cat6
+  connector: rj45
+  label: P-010
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: air-lobby
+  description: >-
+    The association between the ceiling access point and the lobby workstation.
+    Not a cable anybody pulls, and modelled as one because it is a link.
+  labels:
+    site: hq
+    medium: wireless
+spec:
+  endpoints:
+    - ap-ceiling-01:wlan0
+    - laptop-lobby:wlan0
+  medium: wireless
+  speed: 1200Mbps

@@ -37,3 +37,15 @@ spec:
       mtu: 1500
       ipv4:
         addresses: [10.0.0.1/30]
+  power:
+    draw_watts:
+      typical: 35
+      maximum: 150
+    inputs:
+      - pdu: pdu-r1-a
+        outlet: '2'
+        psu: psu1
+      - pdu: pdu-r1-b
+        outlet: '2'
+        psu: psu2
+    redundant: true

@@ -11,6 +11,28 @@ graph netgraph {
   node [fontname="Helvetica,Arial,sans-serif", fontsize=10, style=filled, penwidth=1.2];
   edge [fontname="Helvetica,Arial,sans-serif", fontsize=8];
 
+  "hosts/ap-ceiling-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="ap-ceiling-01 [switch]\nnamespace: hosts\nCeiling access point above the machine room, powered over its uplink: 'powered_by: poe' says the run carrying its traffic is its only power path, so it declares no 'power.inputs' at all. The far end of that run is sw-access-01:GigabitEthernet1/0/1, reached across pp-r2-a — a run through a panel is electrically one run for power exactly as it is for frames.\nlabels: env=prod, role=wireless, site=hq\nvlans: 10\ninterfaces (4):\n  br0  bridge\n  Vlan10  vlan  10.10.0.4/24  vlan 10 (access)\n  eth0  ethernet  vlan 10 (access)  70:69:5a:0c:00:01\n  wlan0  wifi  70:69:5a:0c:00:10\nlinks (2):\n  eth0 — network/sw-access-01:GigabitEthernet1/0/1  (cable, copper, 1Gbps)  vlan 10\n  wlan0 — hosts/laptop-lobby:wlan0  (cable, wireless, 1200Mbps)  vlan 10", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>ap-ceiling-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+      <TR><TD ALIGN="LEFT">Vlan10</TD><TD ALIGN="LEFT">10.10.0.4/24</TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+      <TR><TD ALIGN="LEFT">eth0</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+    </TABLE>
+  >];
+  "hosts/cam-lobby-01" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="cam-lobby-01 [computer]\nnamespace: hosts\nLobby camera, cabled straight to the access switch and powered over that cable. A class-2 PSE port delivers 6.49 W at the powered device, which is what its 5 W draw is checked against (NG-E014).\nlabels: env=prod, role=camera, site=hq\nvlans: 10\ninterfaces (1):\n  eth0  ethernet  10.10.0.31/24  vlan 10 (access)  ac:cc:8e:0d:00:01\nlinks (1):\n  eth0 — network/sw-access-01:GigabitEthernet1/0/2  (cable, copper, 1Gbps)  vlan 10", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>cam-lobby-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+      <TR><TD ALIGN="LEFT">eth0</TD><TD ALIGN="LEFT">10.10.0.31/24</TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+    </TABLE>
+  >];
+  "hosts/laptop-lobby" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="laptop-lobby [computer]\nnamespace: hosts\nA fixed workstation on the lobby desk, associated to hq-staff. It is here so the access point's radio is a link and not a spare port; a wireless association is an ordinary cable of `medium: wireless`.\nlabels: role=workstation, site=hq\nvlans: 10\ninterfaces (1):\n  wlan0  wifi  10.10.0.41/24  vlan 10 (access)  8c:8c:aa:0e:00:01\nlinks (1):\n  wlan0 — hosts/ap-ceiling-01:wlan0  (cable, wireless, 1200Mbps)  vlan 10", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>laptop-lobby</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[computer]</TD></TR>
+      <TR><TD ALIGN="LEFT">wlan0</TD><TD ALIGN="LEFT">10.10.0.41/24</TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+    </TABLE>
+  >];
   "hosts/srv-app-01" [shape=cylinder, fillcolor="#eae2f5", color="#7c3aed", tooltip="srv-app-01 [server]\nnamespace: hosts\nApplication server, rack r2. Patched through position 7.\nlabels: env=prod, role=application, site=hq\nvlans: 10\ninterfaces (2):\n  lo  loopback  127.0.0.1/8\n  eno1  ethernet  10.10.0.11/24  3c:d9:2b:0a:00:11\nlinks (1):\n  eno1 — network/sw-core-01:GigabitEthernet1/0/7  (cable, copper, 1Gbps)  vlan 10", label=<
     <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
       <TR><TD COLSPAN="3" ALIGN="CENTER"><B>srv-app-01</B></TD></TR>
@@ -33,12 +55,23 @@ graph netgraph {
       <TR><TD ALIGN="LEFT">ge-0/0/0</TD><TD ALIGN="LEFT">10.0.0.1/30</TD><TD ALIGN="LEFT"></TD></TR>
     </TABLE>
   >];
-  "network/sw-core-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-core-01 [switch]\nnamespace: network\nCore switch, rack r1. Its two server ports leave the rack through the patch panel above it: nothing is cabled from here to rack r2 directly, which is what a structured-cabling plant looks like.\nlabels: env=prod, role=core, site=hq\nvlans: 10\ninterfaces (5):\n  br0  bridge\n  Vlan10  vlan  10.10.0.2/24  vlan 10 (access)\n  GigabitEthernet1/0/1  ethernet  10.0.0.2/30  00:1b:0d:0a:00:01\n  GigabitEthernet1/0/7  ethernet  vlan 10 (access)  00:1b:0d:0a:00:07\n  GigabitEthernet1/0/8  ethernet  vlan 10 (access)  00:1b:0d:0a:00:08\nlinks (3):\n  GigabitEthernet1/0/1 — network/rtr-edge-01:ge-0/0/0  (cable, copper, 1Gbps)\n  GigabitEthernet1/0/7 — hosts/srv-app-01:eno1  (cable, copper, 1Gbps)  vlan 10\n  GigabitEthernet1/0/8 — hosts/srv-db-01:eno1  (cable, copper, 1Gbps)  vlan 10", label=<
+  "network/sw-access-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-access-01 [switch]\nnamespace: network\nPoE access switch in rack r2. Its uplink leaves the rack through the panel above it, exactly as the server links do; its two PoE ports feed a ceiling access point and a lobby camera, neither of which has a power cord. The switch itself is dual-corded: 'psu1' to the A-side strip, 'psu2' to the B-side one. Both strips are in this rack, and they are on different input feeds, which is what makes 'redundant: true' true (NG-E015).\nlabels: env=prod, role=access, site=hq\nvlans: 10\ninterfaces (5):\n  br0  bridge\n  Vlan10  vlan  10.10.0.3/24  vlan 10 (access)\n  GigabitEthernet1/0/1  ethernet  vlan 10 (access)  00:1b:0d:0b:00:01\n  GigabitEthernet1/0/2  ethernet  vlan 10 (access)  00:1b:0d:0b:00:02\n  GigabitEthernet1/0/24  ethernet  vlan 10 (access)  00:1b:0d:0b:00:18\nlinks (3):\n  GigabitEthernet1/0/24 — network/sw-core-01:GigabitEthernet1/0/2  (cable, copper, 1Gbps)  vlan 10\n  GigabitEthernet1/0/1 — hosts/ap-ceiling-01:eth0  (cable, copper, 1Gbps)  vlan 10\n  GigabitEthernet1/0/2 — hosts/cam-lobby-01:eth0  (cable, copper, 1Gbps)  vlan 10", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+      <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-access-01</B></TD></TR>
+      <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
+      <TR><TD ALIGN="LEFT">Vlan10</TD><TD ALIGN="LEFT">10.10.0.3/24</TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+      <TR><TD ALIGN="LEFT">GigabitEthernet1/0/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+      <TR><TD ALIGN="LEFT">GigabitEthernet1/0/2</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+      <TR><TD ALIGN="LEFT">GigabitEthernet1/0/24</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
+    </TABLE>
+  >];
+  "network/sw-core-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-core-01 [switch]\nnamespace: network\nCore switch, rack r1. Its two server ports leave the rack through the patch panel above it: nothing is cabled from here to rack r2 directly, which is what a structured-cabling plant looks like.\nlabels: env=prod, role=core, site=hq\nvlans: 10\ninterfaces (6):\n  br0  bridge\n  Vlan10  vlan  10.10.0.2/24  vlan 10 (access)\n  GigabitEthernet1/0/1  ethernet  10.0.0.2/30  00:1b:0d:0a:00:01\n  GigabitEthernet1/0/2  ethernet  vlan 10 (access)  00:1b:0d:0a:00:02\n  GigabitEthernet1/0/7  ethernet  vlan 10 (access)  00:1b:0d:0a:00:07\n  GigabitEthernet1/0/8  ethernet  vlan 10 (access)  00:1b:0d:0a:00:08\nlinks (4):\n  GigabitEthernet1/0/1 — network/rtr-edge-01:ge-0/0/0  (cable, copper, 1Gbps)\n  GigabitEthernet1/0/7 — hosts/srv-app-01:eno1  (cable, copper, 1Gbps)  vlan 10\n  GigabitEthernet1/0/8 — hosts/srv-db-01:eno1  (cable, copper, 1Gbps)  vlan 10\n  GigabitEthernet1/0/2 — network/sw-access-01:GigabitEthernet1/0/24  (cable, copper, 1Gbps)  vlan 10", label=<
     <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
       <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-core-01</B></TD></TR>
       <TR><TD COLSPAN="3" ALIGN="CENTER">[switch]</TD></TR>
       <TR><TD ALIGN="LEFT">Vlan10</TD><TD ALIGN="LEFT">10.10.0.2/24</TD><TD ALIGN="LEFT">vlan 10</TD></TR>
       <TR><TD ALIGN="LEFT">GigabitEthernet1/0/1</TD><TD ALIGN="LEFT">10.0.0.2/30</TD><TD ALIGN="LEFT"></TD></TR>
+      <TR><TD ALIGN="LEFT">GigabitEthernet1/0/2</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
       <TR><TD ALIGN="LEFT">GigabitEthernet1/0/7</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
       <TR><TD ALIGN="LEFT">GigabitEthernet1/0/8</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
     </TABLE>
@@ -47,4 +80,8 @@ graph netgraph {
   "network/rtr-edge-01" -- "network/sw-core-01" [color="#4a4a4a", style=solid, penwidth=1.5, label="ge-0/0/0 -- GigabitEthernet1/0/1", tooltip="cable cables/cbl-rtr-sw\nnetwork/rtr-edge-01:ge-0/0/0 — network/sw-core-01:GigabitEthernet1/0/1\nmedium: copper, speed: 1Gbps, length: 1 m, label: C-001"];
   "network/sw-core-01" -- "hosts/srv-app-01" [color="#4a4a4a", style=solid, penwidth=1.5, label="GigabitEthernet1/0/7 -- eno1\nvlan 10", tooltip="cable cables/cbl-sw-pp07\nnetwork/sw-core-01:GigabitEthernet1/0/7 — hosts/srv-app-01:eno1\npatched run: 3 segments through 2 panels\nvia: panels/pp-r1-a front/7-rear/7, panels/pp-r2-a rear/7-front/7\nsegments: cables/cbl-sw-pp07, cables/cbl-tie-07, cables/cbl-pp-app07\nmedium: copper, speed: 1Gbps, length: 21 m, label: P-007A\nvlans: 10"];
   "network/sw-core-01" -- "hosts/srv-db-01" [color="#4a4a4a", style=solid, penwidth=1.5, label="GigabitEthernet1/0/8 -- eno1\nvlan 10", tooltip="cable cables/cbl-sw-pp08\nnetwork/sw-core-01:GigabitEthernet1/0/8 — hosts/srv-db-01:eno1\npatched run: 3 segments through 2 panels\nvia: panels/pp-r1-a front/8-rear/8, panels/pp-r2-a rear/8-front/8\nsegments: cables/cbl-sw-pp08, cables/cbl-tie-08, cables/cbl-pp-db08\nmedium: copper, speed: 1Gbps, length: 21 m, label: P-008A\nvlans: 10"];
+  "network/sw-core-01" -- "network/sw-access-01" [color="#4a4a4a", style=solid, penwidth=1.5, label="GigabitEthernet1/0/2 -- GigabitEthernet1/0/24\nvlan 10", tooltip="cable cables/cbl-sw-pp24\nnetwork/sw-core-01:GigabitEthernet1/0/2 — network/sw-access-01:GigabitEthernet1/0/24\npatched run: 3 segments through 2 panels\nvia: panels/pp-r1-a front/24-rear/24, panels/pp-r2-a rear/24-front/24\nsegments: cables/cbl-sw-pp24, cables/cbl-tie-24, cables/cbl-pp-access24\nmedium: copper, speed: 1Gbps, length: 21 m, label: P-024A\nvlans: 10"];
+  "network/sw-access-01" -- "hosts/ap-ceiling-01" [color="#4a4a4a", style=solid, penwidth=1.5, label="GigabitEthernet1/0/1 -- eth0\nvlan 10", tooltip="cable cables/cbl-access-pp09\nnetwork/sw-access-01:GigabitEthernet1/0/1 — hosts/ap-ceiling-01:eth0\npatched run: 2 segments through 1 panel\nvia: panels/pp-r2-a front/9-rear/9\nsegments: cables/cbl-access-pp09, cables/cbl-pp-ap09\nmedium: copper, speed: 1Gbps, length: 25 m, label: P-009A\nvlans: 10"];
+  "hosts/cam-lobby-01" -- "network/sw-access-01" [color="#4a4a4a", style=solid, penwidth=1.5, label="eth0 -- GigabitEthernet1/0/2\nvlan 10", tooltip="cable cables/cbl-access-cam\nhosts/cam-lobby-01:eth0 — network/sw-access-01:GigabitEthernet1/0/2\nmedium: copper, speed: 1Gbps, length: 12 m, label: P-010\nvlans: 10"];
+  "hosts/ap-ceiling-01" -- "hosts/laptop-lobby" [color="#2563eb", style=dashed, penwidth=1.5, label="wlan0 -- wlan0\nhq-staff @ 44/5GHz\nvlan 10", tooltip="cable cables/air-lobby\nhosts/ap-ceiling-01:wlan0 — hosts/laptop-lobby:wlan0\nmedium: wireless, speed: 1200Mbps, wireless: hq-staff @ 44/5GHz\nvlans: 10"];
 }

@@ -201,6 +201,8 @@ report.txt` both do what they look like they do.
 | [`netgraph rules`](docs/commands/rules.md) | List the validation rules and their ids. | [rules.md](docs/commands/rules.md) |
 | [`netgraph schema`](docs/commands/schema.md) | Write the JSON Schema for editor completion. | [schema.md](docs/commands/schema.md) |
 | [`netgraph config show`](docs/commands/config.md) | Show the resolved settings and where each value came from. | [config.md](docs/commands/config.md) |
+| [`netgraph cache info`](docs/commands/cache.md) | Report where the parse cache is and what is in it. | [cache.md](docs/commands/cache.md) |
+| [`netgraph cache clear`](docs/commands/cache.md) | Delete this inventory's cached documents. | [cache.md](docs/commands/cache.md) |
 | [`netgraph completion`](docs/commands/completion.md) | Print the shell completion script. | [completion.md](docs/commands/completion.md) |
 | [`netgraph version`](docs/commands/version.md) | Report the netgraph, Python and Graphviz versions in use. | [version.md](docs/commands/version.md) |
 <!-- /generated -->

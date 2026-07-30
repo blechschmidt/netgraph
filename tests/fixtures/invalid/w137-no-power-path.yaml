@@ -1,0 +1,44 @@
+# W137 (NG-E016) - a device declares a draw but no power path.
+#
+# The server says it draws 400 W and does not say where from, so it appears on
+# no PDU and on no load schedule. A warning rather than an error: recording
+# draws before recording outlets is the order an as-built document gets written
+# in, and refusing the half-finished state would make the model unusable while
+# it is being adopted.
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-a
+spec:
+  interfaces:
+    - name: eno1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+  power:
+    draw_watts: 400
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-srv
+spec:
+  endpoints:
+    - sw-a:port1
+    - srv-a:eno1
+  medium: copper

@@ -17,6 +17,7 @@
       "computer": "#/$defs/Computer",
       "hub": "#/$defs/Hub",
       "patchpanel": "#/$defs/PatchPanel",
+      "pdu": "#/$defs/Pdu",
       "router": "#/$defs/Router",
       "server": "#/$defs/Server",
       "switch": "#/$defs/Switch",
@@ -52,6 +53,9 @@
     },
     {
       "$ref": "#/$defs/PatchPanel"
+    },
+    {
+      "$ref": "#/$defs/Pdu"
     },
     {
       "$ref": "#/$defs/Template"
@@ -741,6 +745,19 @@
           "default": null,
           "title": "routing",
           "description": "The dynamic routing protocols the device takes part in: an OSPF area, a BGP autonomous system, or both.\n\nYANG: `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol`"
+        },
+        "power": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PowerConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "power",
+          "description": "What the device draws, which PDU outlets feed it, and how much PoE it hands out (§17.2). Absent means the inventory records nothing about its power.\n\nYANG: `/eo-mib:eoPowerTable/eoPowerEntry`"
         },
         "from": {
           "type": "string",
@@ -1530,6 +1547,19 @@
           "title": "wireless",
           "description": "Radio configuration of a `type: wifi` interface: which side of the association it is, which frequency it uses and which BSSs it beacons or joins. Forbidden on every other type (`NG-W002`).\n\nYANG: `…/dot11:wireless-interface`"
         },
+        "poe": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PoeConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "poe",
+          "description": "This port is power sourcing equipment: it hands power down the cable (§17.3). Only on a type a cable terminates on — `ethernet` or `lag` (`NG-E006`).\n\nYANG: `/power-ethernet-mib:pethPsePortTable/pethPsePortEntry`"
+        },
         "parent": {
           "anyOf": [
             {
@@ -1735,6 +1765,357 @@
       ],
       "title": "PatchPanelSpec",
       "type": "object"
+    },
+    "Pdu": {
+      "additionalProperties": false,
+      "description": "A power distribution unit: numbered outlets, and what may be drawn.",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "pdu",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. A power distribution unit. Its numbered outlets are derived from `outlets`; they are not interfaces, and a device names one in `power.inputs` rather than being cabled to it. Placed on a rack elevation like any other hardware."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/PduSpec",
+          "title": "spec",
+          "description": "The body of a `pdu` document."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "title": "Pdu",
+      "type": "object"
+    },
+    "PduSpec": {
+      "additionalProperties": false,
+      "description": "`spec` of a `pdu` document (§17.1).",
+      "properties": {
+        "vendor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "vendor",
+          "description": "Hardware vendor, free text. Documentation only."
+        },
+        "model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "model",
+          "description": "Hardware model designation, free text."
+        },
+        "serial": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "serial",
+          "description": "Serial or asset number, free text."
+        },
+        "form_factor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "form_factor",
+          "description": "Descriptive: `vertical`, `horizontal`, `1U`, `0U`. Documentation only."
+        },
+        "outlets": {
+          "title": "outlets",
+          "description": "The outlets the unit has, as a count (`24`) or as spans (`1-12,17-24`). Referred to by number from a device's `power.inputs`; at most 512, no repeats (`NG-E001`).\n\nYANG: `/entity-mib:entPhysicalTable/entPhysicalEntry`",
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "string",
+              "pattern": "^\\d+(?:-\\d+)?(?:,\\d+(?:-\\d+)?)*$"
+            }
+          ]
+        },
+        "capacity_watts": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "maximum": 1000000.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "capacity_watts",
+          "description": "How many watts may be drawn through the unit in total. `NG-E012` sums the declared loads against it; absent means the rating is not recorded, and nothing is graded.\n\nYANG: `/eo-mib:eoPowerTable/eoPowerEntry/eoPowerNameplate`"
+        },
+        "input_feed": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "input_feed",
+          "description": "Which supply feeds the unit — `A`, `B`, `ups-1`, `utility`. Free text, compared only for equality: two PDUs on one feed do not make a device redundant (`NG-E015`).\n\nYANG: `/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry`"
+        }
+      },
+      "required": [
+        "outlets"
+      ],
+      "title": "PduSpec",
+      "type": "object"
+    },
+    "PoeConfig": {
+      "additionalProperties": false,
+      "description": "`interfaces[].poe` — this port is a PSE (§17.3).\n\nDeclaring the block is what makes the port a power sourcing equipment port;\n`enabled: false` records a port that *could* source power and is\nadministratively told not to, which is `pethPsePortAdminEnable` and is the\ndifference between \"no PoE here\" and \"PoE turned off here\".\n\nHow much the port reserves is said in one of two ways, and never both\n(`NG-E004`):\n\n* `class` — an IEEE classification. The reservation is the PSE-side figure\n  for that class (:data:`POE_PSE_WATTS`), which is what the switch actually\n  takes out of its budget.\n* `budget_watts` — an explicit reservation, for a vendor that lets an\n  operator cap a port below its class.\n\nWith neither, the port reserves its standard's maximum: that is what a switch\nwith no per-port configuration does, and assuming less would make an\noversubscribed budget look fine.",
+      "properties": {
+        "standard": {
+          "$ref": "#/$defs/PoeStandard",
+          "title": "standard",
+          "description": "Which IEEE 802.3 amendment the port implements: `802.3af` (classes 0-3), `802.3at` (adds 4) or `802.3bt` (adds 5-8).\n\nYANG: `/power-ethernet-mib:pethPsePortTable/pethPsePortEntry/pethPsePortType`"
+        },
+        "class": {
+          "anyOf": [
+            {
+              "maximum": 8,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "class",
+          "description": "The IEEE classification, 0 to 8, written `class` in YAML. Fixes the reservation; refused above the standard's own ceiling, and exclusive with `budget_watts` (`NG-E004`).\n\nYANG: `…/pethPsePortEntry/pethPsePortPowerClassifications`"
+        },
+        "budget_watts": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "maximum": 1000000.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "budget_watts",
+          "description": "An explicit reservation in watts instead of a class, for a vendor that lets an operator cap a port below what its class allows.\n\nYANG: `…/pethPsePortEntry/pethPsePortPowerLimit`"
+        },
+        "enabled": {
+          "default": true,
+          "title": "enabled",
+          "type": "boolean",
+          "description": "Is the port administratively allowed to source power? A disabled PSE port reserves nothing and powers nothing, which is what `NG-E014` reports it for.\n\nYANG: `…/pethPsePortEntry/pethPsePortAdminEnable`"
+        }
+      },
+      "required": [
+        "standard"
+      ],
+      "title": "PoeConfig",
+      "type": "object"
+    },
+    "PoeStandard": {
+      "description": "Which IEEE 802.3 amendment a PSE port implements (§17.3).",
+      "enum": [
+        "802.3af",
+        "802.3at",
+        "802.3bt"
+      ],
+      "title": "PoeStandard",
+      "type": "string"
+    },
+    "PowerConfig": {
+      "additionalProperties": false,
+      "description": "`spec.power` — a device's power, both directions (§17.2).\n\n\"Both directions\" is the whole shape of it. A switch *takes* power through\n`inputs` and *gives* it through `poe_budget_watts` and the `poe` blocks\non its ports; an access point takes power over its uplink and gives none. One\nblock covers all three because they are one question — where does the power\nin this box come from and go to — and splitting it would put two halves of\none answer in two places.",
+      "properties": {
+        "draw_watts": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PowerDraw"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "draw_watts",
+          "description": "What the device draws. A bare number is the typical draw; a mapping states `typical` and optionally `maximum`.\n\nYANG: `/eo-mib:eoPowerTable/eoPowerEntry/eoPower`"
+        },
+        "inputs": {
+          "items": {
+            "$ref": "#/$defs/PowerInput"
+          },
+          "maxItems": 8,
+          "title": "inputs",
+          "type": "array",
+          "description": "One entry per power supply, naming the PDU outlet feeding it. At most 8. Empty for a device fed over PoE, or one whose feed is not recorded yet (`NG-E016`).\n\nYANG: `/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry`"
+        },
+        "redundant": {
+          "default": false,
+          "title": "redundant",
+          "type": "boolean",
+          "description": "The feeds are meant to be independent: losing one must not lose the device. Needs at least two `inputs` (`NG-E002`) that land on different units and different feeds (`NG-E015`)."
+        },
+        "powered_by": {
+          "$ref": "#/$defs/PowerSource",
+          "default": "outlet",
+          "title": "powered_by",
+          "description": "Where the device's own power comes from: `outlet` (the default) or `poe`, meaning it takes power over its uplink and declares no `inputs` (`NG-E005`, `NG-E014`)."
+        },
+        "poe_budget_watts": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0.0,
+              "maximum": 1000000.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "poe_budget_watts",
+          "description": "The PoE power this device can hand out across every PSE port together. `NG-E013` checks the ports that hold budget fit inside it.\n\nYANG: `/power-ethernet-mib:pethMainPseTable/pethMainPseEntry/pethMainPsePower`"
+        }
+      },
+      "title": "PowerConfig",
+      "type": "object"
+    },
+    "PowerDraw": {
+      "title": "power draw",
+      "description": "What the device draws, in watts. A bare number is the typical draw; the mapping form states `typical` and optionally `maximum`.",
+      "anyOf": [
+        {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "typical": {
+              "exclusiveMinimum": 0.0,
+              "maximum": 1000000.0,
+              "title": "Typical",
+              "type": "number"
+            },
+            "maximum": {
+              "anyOf": [
+                {
+                  "exclusiveMinimum": 0.0,
+                  "maximum": 1000000.0,
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Maximum"
+            }
+          },
+          "required": [
+            "typical"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PowerInput": {
+      "additionalProperties": false,
+      "description": "One entry of `spec.power.inputs` — one PSU and the outlet feeding it.\n\nAccepts the compact string form `pdu-r1-a:7` and the equivalent mapping\nform, the same grammar a cable endpoint uses (§4.2), because it is the same\nkind of fact: a named thing on a named element. `psu` labels the supply on\nthe *device* side, which is what an operator reads off the back of a chassis\nand what makes a diagnostic about \"the second input\" name something real.",
+      "properties": {
+        "pdu": {
+          "maxLength": 1024,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*(?:/[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*)*$",
+          "title": "pdu",
+          "type": "string",
+          "description": "The PDU feeding this supply. An element reference, so it may be written fully qualified to pick one of several PDUs sharing a short name (`NG-E011`)."
+        },
+        "outlet": {
+          "maxLength": 16,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9]+$",
+          "title": "outlet",
+          "type": "string",
+          "description": "The outlet on it, as the PDU numbers it. Must exist (`NG-E011`) and must not already feed something else (`NG-E010`). Writable as the shorthand `pdu-r1-a:7`."
+        },
+        "psu": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "psu",
+          "description": "Which supply on the device this feeds, e.g. `psu1`. Documentation only, and worth writing: it is what an operator reads off the back of a chassis."
+        }
+      },
+      "required": [
+        "pdu",
+        "outlet"
+      ],
+      "title": "PowerInput",
+      "type": "object"
+    },
+    "PowerSource": {
+      "description": "Where a device's own power comes from (§17.2).",
+      "enum": [
+        "outlet",
+        "poe"
+      ],
+      "title": "PowerSource",
+      "type": "string"
     },
     "RadioRole": {
       "description": "§6.2.6 — which side of an association a radio is on.\n\n`ap` beacons, so it is the end that owns the SSIDs; `station` and\n`mesh` associate to one. A mesh node's backhaul radio is a station of the\nnode above it, spelled separately because it is a relay rather than a client\nand a diagram should not draw it as a laptop.",
@@ -2159,6 +2540,19 @@
           "default": null,
           "title": "routing",
           "description": "The dynamic routing protocols the device takes part in: an OSPF area, a BGP autonomous system, or both.\n\nYANG: `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol`"
+        },
+        "power": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PowerConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "power",
+          "description": "What the device draws, which PDU outlets feed it, and how much PoE it hands out (§17.2). Absent means the inventory records nothing about its power.\n\nYANG: `/eo-mib:eoPowerTable/eoPowerEntry`"
         },
         "from": {
           "type": "string",

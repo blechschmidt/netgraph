@@ -26,7 +26,7 @@ from typing import Final
 from netgraph.config import load_config
 from netgraph.errors import NetgraphError, RenderError, format_path
 from netgraph.fsio import write_bytes_atomically
-from netgraph.loader import Inventory, LoadError, load_tree
+from netgraph.loader import DocumentCache, Inventory, LoadError, load_tree
 from netgraph.render import (
     AggregateSpec,
     FilterSpec,
@@ -134,6 +134,13 @@ class RenderRequest:
     disabled: tuple[str, ...] = ()
     #: Render even when the inventory was rejected.
     force: bool = False
+    #: The parse cache, shared by every cycle of one run, which is what makes a
+    #: re-render incremental: a file whose bytes have not changed since the last
+    #: cycle is not parsed again. ``None`` parses the whole tree every time.
+    #:
+    #: Excluded from equality: it is a store, not a setting, and two requests
+    #: that differ only in which cache they were handed describe the same render.
+    cache: DocumentCache | None = field(default=None, compare=False, repr=False)
 
     @property
     def config_root(self) -> Path:
@@ -178,6 +185,12 @@ def run_cycle(request: RenderRequest) -> CycleResult:
     root, a syntax error, a rejected validation, an unavailable Graphviz. A
     :class:`~netgraph.errors.NetgraphError` escaping this function would kill a
     watch loop that exists precisely to survive broken intermediate states.
+
+    The load is incremental when ``request.cache`` is set — only the files whose
+    bytes changed are parsed again — but everything after it is not: reference
+    resolution, validation and the graph build all run over the whole inventory,
+    from models that are already in memory. On a 1056-device tree that is what
+    now dominates a re-render; see entry 14 of ``docs/follow-ups.md``.
     """
     started = time.monotonic()
 
@@ -190,7 +203,7 @@ def run_cycle(request: RenderRequest) -> CycleResult:
             strict=True if request.strict else None,
             ignore=request.disabled,
         )
-        inventory = load_tree(request.inventory)
+        inventory = load_tree(request.inventory, cache=request.cache)
         findings = run_validation(inventory, settings)
         problems = flatten_problems(inventory.errors, findings)
 

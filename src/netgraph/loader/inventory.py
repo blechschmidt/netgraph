@@ -25,7 +25,7 @@ from pathlib import Path, PurePosixPath
 
 from netgraph.errors import SchemaIssue, format_path
 from netgraph.loader.provenance import Provenance, Site
-from netgraph.models import Adapter, Cable, Device, Element, PatchPanel, Tunnel
+from netgraph.models import Adapter, Cable, Device, Element, PatchPanel, Pdu, Tunnel
 
 __all__ = [
     "Inventory",
@@ -204,6 +204,8 @@ class Inventory:
     tunnels: dict[str, Tunnel] = field(default_factory=dict)
     #: The subset of :attr:`elements` that are patch panels (§15).
     patchpanels: dict[str, PatchPanel] = field(default_factory=dict)
+    #: The subset of :attr:`elements` that are power distribution units (§17).
+    pdus: dict[str, Pdu] = field(default_factory=dict)
     #: Provenance of each element, keyed by fully-qualified name.
     sources: dict[str, SourceLocation] = field(default_factory=dict)
     #: Problems found while loading, in the order they were encountered.
@@ -237,6 +239,8 @@ class Inventory:
             self.tunnels[fqn] = element
         elif isinstance(element, PatchPanel):
             self.patchpanels[fqn] = element
+        elif isinstance(element, Pdu):
+            self.pdus[fqn] = element
         elif isinstance(element, Device):
             self.devices[fqn] = element
 
@@ -349,6 +353,6 @@ class Inventory:
             f"Inventory(root={str(self.root)!r}, elements={len(self.elements)}, "
             f"devices={len(self.devices)}, cables={len(self.cables)}, "
             f"adapters={len(self.adapters)}, tunnels={len(self.tunnels)}, "
-            f"patchpanels={len(self.patchpanels)}, "
+            f"patchpanels={len(self.patchpanels)}, pdus={len(self.pdus)}, "
             f"errors={len(self.errors)})"
         )

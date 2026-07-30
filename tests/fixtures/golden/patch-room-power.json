@@ -1,0 +1,832 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkGraph",
+  "layer": "power",
+  "nodes": [
+    {
+      "id": "hosts/ap-ceiling-01",
+      "type": "element",
+      "name": "ap-ceiling-01",
+      "kind": "switch",
+      "namespace": "hosts",
+      "description": "Ceiling access point above the machine room, powered over its uplink:\n'powered_by: poe' says the run carrying its traffic is its only power path,\nso it declares no 'power.inputs' at all. The far end of that run is\nsw-access-01:GigabitEthernet1/0/1, reached across pp-r2-a — a run through a\npanel is electrically one run for power exactly as it is for frames.\n",
+      "labels": {
+        "env": "prod",
+        "role": "wireless",
+        "site": "hq"
+      },
+      "power": {
+        "roles": [
+          "load"
+        ],
+        "drawWatts": 22.0,
+        "maximumWatts": 25.5,
+        "poweredBy": "poe"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Bridges the radio onto the wired uplink"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "In-band management address of the access point",
+          "addresses": [
+            "10.10.0.4/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "eth0",
+          "type": "ethernet",
+          "description": "PoE uplink, patched through pp-r2-a position 9",
+          "mac": "70:69:5a:0c:00:01",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "wlan0",
+          "type": "wifi",
+          "description": "5 GHz radio, one SSID",
+          "mac": "70:69:5a:0c:00:10",
+          "mtu": 1500
+        }
+      ]
+    },
+    {
+      "id": "hosts/cam-lobby-01",
+      "type": "element",
+      "name": "cam-lobby-01",
+      "kind": "computer",
+      "namespace": "hosts",
+      "description": "Lobby camera, cabled straight to the access switch and powered over that\ncable. A class-2 PSE port delivers 6.49 W at the powered device, which is\nwhat its 5 W draw is checked against (NG-E014).\n",
+      "labels": {
+        "env": "prod",
+        "role": "camera",
+        "site": "hq"
+      },
+      "power": {
+        "roles": [
+          "load"
+        ],
+        "drawWatts": 5.0,
+        "poweredBy": "poe"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "eth0",
+          "type": "ethernet",
+          "description": "PoE uplink to sw-access-01",
+          "mac": "ac:cc:8e:0d:00:01",
+          "mtu": 1500,
+          "addresses": [
+            "10.10.0.31/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "hosts/srv-app-01",
+      "type": "element",
+      "name": "srv-app-01",
+      "kind": "server",
+      "namespace": "hosts",
+      "description": "Application server, rack r2. Patched through position 7.",
+      "labels": {
+        "env": "prod",
+        "role": "application",
+        "site": "hq"
+      },
+      "power": {
+        "roles": [
+          "load"
+        ],
+        "drawWatts": 420.0,
+        "maximumWatts": 800.0,
+        "inputs": 2,
+        "redundant": true
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback",
+          "addresses": [
+            "127.0.0.1/8"
+          ]
+        },
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "mac": "3c:d9:2b:0a:00:11",
+          "mtu": 1500,
+          "addresses": [
+            "10.10.0.11/24"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hosts/srv-db-01",
+      "type": "element",
+      "name": "srv-db-01",
+      "kind": "server",
+      "namespace": "hosts",
+      "description": "Database server, rack r2. Patched through position 8.",
+      "labels": {
+        "env": "prod",
+        "role": "database",
+        "site": "hq"
+      },
+      "power": {
+        "roles": [
+          "load"
+        ],
+        "drawWatts": 510.0,
+        "maximumWatts": 800.0,
+        "inputs": 2,
+        "redundant": true
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback",
+          "addresses": [
+            "127.0.0.1/8"
+          ]
+        },
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "mac": "3c:d9:2b:0a:00:12",
+          "mtu": 1500,
+          "addresses": [
+            "10.10.0.12/24"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "network/rtr-edge-01",
+      "type": "element",
+      "name": "rtr-edge-01",
+      "kind": "router",
+      "namespace": "network",
+      "description": "Edge router for the machine room. It routes between the server VLAN and\nthe outside world, and reaches the core switch over a routed (untagged)\ncopper link in the same rack — the one run in this inventory that does not\ncross a patch panel.\n",
+      "labels": {
+        "env": "prod",
+        "role": "edge",
+        "site": "hq"
+      },
+      "power": {
+        "roles": [
+          "load"
+        ],
+        "drawWatts": 35.0,
+        "maximumWatts": 150.0,
+        "inputs": 2,
+        "redundant": true
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "lo0",
+          "type": "loopback",
+          "description": "Router ID and management target",
+          "addresses": [
+            "192.0.2.1/32"
+          ]
+        },
+        {
+          "name": "ge-0/0/0",
+          "type": "ethernet",
+          "description": "Routed link to sw-core-01. No 'vlan' block: this port is a layer-3\ninterface, not a bridge port.\n",
+          "mac": "00:05:86:0a:00:00",
+          "mtu": 1500,
+          "addresses": [
+            "10.0.0.1/30"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "network/sw-access-01",
+      "type": "element",
+      "name": "sw-access-01",
+      "kind": "switch",
+      "namespace": "network",
+      "description": "PoE access switch in rack r2. Its uplink leaves the rack through the panel\nabove it, exactly as the server links do; its two PoE ports feed a ceiling\naccess point and a lobby camera, neither of which has a power cord.\n\nThe switch itself is dual-corded: 'psu1' to the A-side strip, 'psu2' to the\nB-side one. Both strips are in this rack, and they are on different input\nfeeds, which is what makes 'redundant: true' true (NG-E015).\n",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "hq"
+      },
+      "power": {
+        "roles": [
+          "pse",
+          "load"
+        ],
+        "drawWatts": 55.0,
+        "maximumWatts": 435.0,
+        "poeBudgetWatts": 370.0,
+        "poeAllocatedWatts": 37.0,
+        "inputs": 2,
+        "redundant": true,
+        "utilisation": 0.1
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "In-band management address of the access switch",
+          "addresses": [
+            "10.10.0.3/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "ap-ceiling-01, patched through pp-r2-a position 9. The class-4\nreservation is what the 802.3at PSE takes out of the 370 W pool for\nthis port.\n",
+          "mac": "00:1b:0d:0b:00:01",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "description": "cam-lobby-01, cabled directly. A class-2 camera.",
+          "mac": "00:1b:0d:0b:00:02",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/24",
+          "type": "ethernet",
+          "description": "Uplink to sw-core-01, patched through pp-r2-a position 24",
+          "mac": "00:1b:0d:0b:00:18",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "network/sw-core-01",
+      "type": "element",
+      "name": "sw-core-01",
+      "kind": "switch",
+      "namespace": "network",
+      "description": "Core switch, rack r1. Its two server ports leave the rack through the\npatch panel above it: nothing is cabled from here to rack r2 directly,\nwhich is what a structured-cabling plant looks like.\n",
+      "labels": {
+        "env": "prod",
+        "role": "core",
+        "site": "hq"
+      },
+      "power": {
+        "roles": [
+          "load"
+        ],
+        "drawWatts": 48.0,
+        "maximumWatts": 125.0,
+        "inputs": 2,
+        "redundant": true
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "Server gateway on the switch, for in-band management",
+          "addresses": [
+            "10.10.0.2/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "Routed link to rtr-edge-01. No 'vlan' block: this port is a layer-3\ninterface, not a bridge port.\n",
+          "mac": "00:1b:0d:0a:00:01",
+          "mtu": 1500,
+          "addresses": [
+            "10.0.0.2/30"
+          ]
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "description": "Uplink to sw-access-01 in rack r2, patched through pp-r1-a position 24.\n",
+          "mac": "00:1b:0d:0a:00:02",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/7",
+          "type": "ethernet",
+          "description": "srv-app-01, patched through pp-r1-a position 7",
+          "mac": "00:1b:0d:0a:00:07",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/8",
+          "type": "ethernet",
+          "description": "srv-db-01, patched through pp-r1-a position 8",
+          "mac": "00:1b:0d:0a:00:08",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "power/pdu-r1-a",
+      "type": "element",
+      "name": "pdu-r1-a",
+      "kind": "pdu",
+      "namespace": "power",
+      "description": "A-side strip in rack r1, on the utility feed. Every dual-corded device in\nthis rack has one cord here and one in pdu-r1-b; the two strips are on\ndifferent feeds, which is what makes the second cord worth having.\n",
+      "labels": {
+        "feed": "a",
+        "role": "power",
+        "site": "hq"
+      },
+      "power": {
+        "roles": [
+          "pdu"
+        ],
+        "outlets": 24,
+        "usedOutlets": 2,
+        "loadWatts": 41.5,
+        "failoverWatts": 83.0,
+        "capacityWatts": 3680.0,
+        "inputFeed": "utility-a",
+        "utilisation": 0.011277
+      },
+      "vlans": [],
+      "interfaces": []
+    },
+    {
+      "id": "power/pdu-r1-b",
+      "type": "element",
+      "name": "pdu-r1-b",
+      "kind": "pdu",
+      "namespace": "power",
+      "description": "B-side strip in rack r1, on the UPS feed.",
+      "labels": {
+        "feed": "b",
+        "role": "power",
+        "site": "hq"
+      },
+      "power": {
+        "roles": [
+          "pdu"
+        ],
+        "outlets": 24,
+        "usedOutlets": 2,
+        "loadWatts": 41.5,
+        "failoverWatts": 83.0,
+        "capacityWatts": 3680.0,
+        "inputFeed": "ups-1",
+        "utilisation": 0.011277
+      },
+      "vlans": [],
+      "interfaces": []
+    },
+    {
+      "id": "power/pdu-r2-a",
+      "type": "element",
+      "name": "pdu-r2-a",
+      "kind": "pdu",
+      "namespace": "power",
+      "description": "A-side strip in rack r2, on the same utility feed as pdu-r1-a. Horizontal\nrather than vertical, so unlike the r1 pair it occupies a rack unit and\nappears on the elevation with its utilisation beside it.\n",
+      "labels": {
+        "feed": "a",
+        "role": "power",
+        "site": "hq"
+      },
+      "power": {
+        "roles": [
+          "pdu"
+        ],
+        "outlets": 8,
+        "usedOutlets": 3,
+        "loadWatts": 492.5,
+        "failoverWatts": 985.0,
+        "capacityWatts": 1840.0,
+        "inputFeed": "utility-a",
+        "utilisation": 0.267663
+      },
+      "vlans": [],
+      "interfaces": []
+    },
+    {
+      "id": "power/pdu-r2-b",
+      "type": "element",
+      "name": "pdu-r2-b",
+      "kind": "pdu",
+      "namespace": "power",
+      "description": "B-side strip in rack r2, on the UPS feed.",
+      "labels": {
+        "feed": "b",
+        "role": "power",
+        "site": "hq"
+      },
+      "power": {
+        "roles": [
+          "pdu"
+        ],
+        "outlets": 8,
+        "usedOutlets": 3,
+        "loadWatts": 492.5,
+        "failoverWatts": 985.0,
+        "capacityWatts": 1840.0,
+        "inputFeed": "ups-1",
+        "utilisation": 0.267663
+      },
+      "vlans": [],
+      "interfaces": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "power/pdu-r2-a:1#power:hosts/srv-app-01",
+      "kind": "outlet",
+      "endpoints": [
+        {
+          "node": "power/pdu-r2-a",
+          "interface": "1"
+        },
+        {
+          "node": "hosts/srv-app-01",
+          "interface": "psu1"
+        }
+      ],
+      "feed": {
+        "feedKind": "outlet",
+        "source": "power/pdu-r2-a",
+        "outlet": "1",
+        "psu": "psu1",
+        "reservedWatts": 210.0,
+        "elementWatts": 420.0,
+        "inputFeed": "utility-a"
+      },
+      "label": "psu1",
+      "vlans": []
+    },
+    {
+      "id": "power/pdu-r2-b:1#power:hosts/srv-app-01",
+      "kind": "outlet",
+      "endpoints": [
+        {
+          "node": "power/pdu-r2-b",
+          "interface": "1"
+        },
+        {
+          "node": "hosts/srv-app-01",
+          "interface": "psu2"
+        }
+      ],
+      "feed": {
+        "feedKind": "outlet",
+        "source": "power/pdu-r2-b",
+        "outlet": "1",
+        "psu": "psu2",
+        "reservedWatts": 210.0,
+        "elementWatts": 420.0,
+        "inputFeed": "ups-1"
+      },
+      "label": "psu2",
+      "vlans": []
+    },
+    {
+      "id": "power/pdu-r2-a:2#power:hosts/srv-db-01",
+      "kind": "outlet",
+      "endpoints": [
+        {
+          "node": "power/pdu-r2-a",
+          "interface": "2"
+        },
+        {
+          "node": "hosts/srv-db-01",
+          "interface": "psu1"
+        }
+      ],
+      "feed": {
+        "feedKind": "outlet",
+        "source": "power/pdu-r2-a",
+        "outlet": "2",
+        "psu": "psu1",
+        "reservedWatts": 255.0,
+        "elementWatts": 510.0,
+        "inputFeed": "utility-a"
+      },
+      "label": "psu1",
+      "vlans": []
+    },
+    {
+      "id": "power/pdu-r2-b:2#power:hosts/srv-db-01",
+      "kind": "outlet",
+      "endpoints": [
+        {
+          "node": "power/pdu-r2-b",
+          "interface": "2"
+        },
+        {
+          "node": "hosts/srv-db-01",
+          "interface": "psu2"
+        }
+      ],
+      "feed": {
+        "feedKind": "outlet",
+        "source": "power/pdu-r2-b",
+        "outlet": "2",
+        "psu": "psu2",
+        "reservedWatts": 255.0,
+        "elementWatts": 510.0,
+        "inputFeed": "ups-1"
+      },
+      "label": "psu2",
+      "vlans": []
+    },
+    {
+      "id": "power/pdu-r1-a:2#power:network/rtr-edge-01",
+      "kind": "outlet",
+      "endpoints": [
+        {
+          "node": "power/pdu-r1-a",
+          "interface": "2"
+        },
+        {
+          "node": "network/rtr-edge-01",
+          "interface": "psu1"
+        }
+      ],
+      "feed": {
+        "feedKind": "outlet",
+        "source": "power/pdu-r1-a",
+        "outlet": "2",
+        "psu": "psu1",
+        "reservedWatts": 17.5,
+        "elementWatts": 35.0,
+        "inputFeed": "utility-a"
+      },
+      "label": "psu1",
+      "vlans": []
+    },
+    {
+      "id": "power/pdu-r1-b:2#power:network/rtr-edge-01",
+      "kind": "outlet",
+      "endpoints": [
+        {
+          "node": "power/pdu-r1-b",
+          "interface": "2"
+        },
+        {
+          "node": "network/rtr-edge-01",
+          "interface": "psu2"
+        }
+      ],
+      "feed": {
+        "feedKind": "outlet",
+        "source": "power/pdu-r1-b",
+        "outlet": "2",
+        "psu": "psu2",
+        "reservedWatts": 17.5,
+        "elementWatts": 35.0,
+        "inputFeed": "ups-1"
+      },
+      "label": "psu2",
+      "vlans": []
+    },
+    {
+      "id": "power/pdu-r2-a:3#power:network/sw-access-01",
+      "kind": "outlet",
+      "endpoints": [
+        {
+          "node": "power/pdu-r2-a",
+          "interface": "3"
+        },
+        {
+          "node": "network/sw-access-01",
+          "interface": "psu1"
+        }
+      ],
+      "feed": {
+        "feedKind": "outlet",
+        "source": "power/pdu-r2-a",
+        "outlet": "3",
+        "psu": "psu1",
+        "reservedWatts": 27.5,
+        "elementWatts": 55.0,
+        "inputFeed": "utility-a"
+      },
+      "label": "psu1",
+      "vlans": []
+    },
+    {
+      "id": "power/pdu-r2-b:3#power:network/sw-access-01",
+      "kind": "outlet",
+      "endpoints": [
+        {
+          "node": "power/pdu-r2-b",
+          "interface": "3"
+        },
+        {
+          "node": "network/sw-access-01",
+          "interface": "psu2"
+        }
+      ],
+      "feed": {
+        "feedKind": "outlet",
+        "source": "power/pdu-r2-b",
+        "outlet": "3",
+        "psu": "psu2",
+        "reservedWatts": 27.5,
+        "elementWatts": 55.0,
+        "inputFeed": "ups-1"
+      },
+      "label": "psu2",
+      "vlans": []
+    },
+    {
+      "id": "power/pdu-r1-a:1#power:network/sw-core-01",
+      "kind": "outlet",
+      "endpoints": [
+        {
+          "node": "power/pdu-r1-a",
+          "interface": "1"
+        },
+        {
+          "node": "network/sw-core-01",
+          "interface": "psu1"
+        }
+      ],
+      "feed": {
+        "feedKind": "outlet",
+        "source": "power/pdu-r1-a",
+        "outlet": "1",
+        "psu": "psu1",
+        "reservedWatts": 24.0,
+        "elementWatts": 48.0,
+        "inputFeed": "utility-a"
+      },
+      "label": "psu1",
+      "vlans": []
+    },
+    {
+      "id": "power/pdu-r1-b:1#power:network/sw-core-01",
+      "kind": "outlet",
+      "endpoints": [
+        {
+          "node": "power/pdu-r1-b",
+          "interface": "1"
+        },
+        {
+          "node": "network/sw-core-01",
+          "interface": "psu2"
+        }
+      ],
+      "feed": {
+        "feedKind": "outlet",
+        "source": "power/pdu-r1-b",
+        "outlet": "1",
+        "psu": "psu2",
+        "reservedWatts": 24.0,
+        "elementWatts": 48.0,
+        "inputFeed": "ups-1"
+      },
+      "label": "psu2",
+      "vlans": []
+    },
+    {
+      "id": "network/sw-access-01:GigabitEthernet1/0/1#poe:hosts/ap-ceiling-01",
+      "kind": "poe",
+      "endpoints": [
+        {
+          "node": "network/sw-access-01",
+          "interface": "GigabitEthernet1/0/1"
+        },
+        {
+          "node": "hosts/ap-ceiling-01",
+          "interface": "eth0"
+        }
+      ],
+      "feed": {
+        "feedKind": "poe",
+        "source": "network/sw-access-01",
+        "port": "GigabitEthernet1/0/1",
+        "peerPort": "eth0",
+        "through": [
+          "panels/pp-r2-a"
+        ],
+        "reservedWatts": 30.0,
+        "elementWatts": 22.0
+      },
+      "vlans": []
+    },
+    {
+      "id": "network/sw-access-01:GigabitEthernet1/0/2#poe:hosts/cam-lobby-01",
+      "kind": "poe",
+      "endpoints": [
+        {
+          "node": "network/sw-access-01",
+          "interface": "GigabitEthernet1/0/2"
+        },
+        {
+          "node": "hosts/cam-lobby-01",
+          "interface": "eth0"
+        }
+      ],
+      "feed": {
+        "feedKind": "poe",
+        "source": "network/sw-access-01",
+        "port": "GigabitEthernet1/0/2",
+        "peerPort": "eth0",
+        "reservedWatts": 7.0,
+        "elementWatts": 5.0
+      },
+      "vlans": []
+    }
+  ],
+  "title": "Patch room, power"
+}

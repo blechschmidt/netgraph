@@ -291,10 +291,10 @@ class _Comparison:
 
         ``computer`` is the importer's neutral fallback for a box nothing said
         anything about (:meth:`~netgraph.importer.draft.Draft.device`), so it is
-        never evidence. An adapter and a patch panel are netgraph's own
+        never evidence. An adapter, a patch panel and a PDU are netgraph's own
         abstractions, which no capture format has a word for.
         """
-        if observed.kind == "computer" or declared.kind in ("adapter", "patchpanel"):
+        if observed.kind == "computer" or declared.kind in ("adapter", "patchpanel", "pdu"):
             return
         if observed.kind == declared.kind:
             return

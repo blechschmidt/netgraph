@@ -52,6 +52,7 @@ expands §9 with the reasoning and with what is deliberately left uncovered.
 14. [Tunnels](#14-tunnels)
 15. [Patch panels](#15-patch-panels)
 16. [Routing](#16-routing)
+17. [Power](#17-power)
 
 ---
 
@@ -206,12 +207,12 @@ spec:
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
 | `apiVersion` | string | M | — | MUST be `netgraph.dev/v1alpha1` for this revision. See §12. |
-| `kind` | enum | M | — | One of `switch`, `router`, `hub`, `computer`, `server`, `cable`, `adapter`, `tunnel`, `patchpanel`, `template`. Lower-case; other spellings are rejected. |
+| `kind` | enum | M | — | One of `switch`, `router`, `hub`, `computer`, `server`, `cable`, `adapter`, `tunnel`, `patchpanel`, `pdu`, `template`. Lower-case; other spellings are rejected. |
 | `metadata` | mapping | M | — | §3.1 |
-| `spec` | mapping | M | — | Shape depends on `kind`: §6 (devices), §7 (cable), §8 (adapter), §14 (tunnel), §15 (patchpanel), §6.6 (template). |
+| `spec` | mapping | M | — | Shape depends on `kind`: §6 (devices), §7 (cable), §8 (adapter), §14 (tunnel), §15 (patchpanel), §17.1 (pdu), §6.6 (template). |
 
-The first nine kinds are **elements**: each becomes a node or an edge of the
-graph. `template` is the tenth kind and is not an element — it declares a
+The first ten kinds are **elements**: each becomes a node or an edge of the
+graph. `template` is the eleventh kind and is not an element — it declares a
 reusable partial device `spec` and is merged away by the loader (§6.6).
 
 ### 3.1 `metadata`
@@ -354,6 +355,7 @@ and resolves to the element as a whole.
 | `dbm` | Radiated power in dBm, -30 to 40. Integers are accepted and widened. | — |
 | `speed` | Bit rate. Either an integer in bit/s, or `<number><unit>` with unit `bps`, `kbps`, `Mbps`, `Gbps`, `Tbps` (decimal multiples: 1 Gbps = 1 000 000 000 bit/s). Normalised to `uint64` bit/s; rendered back in the largest exact unit. | `yang:gauge64` (`if:speed`) |
 | `length` | Non-negative number of metres (`length_m`). | — |
+| `watts` | Electrical power: a draw, a rating, a PoE reservation (§17). Strictly positive and at most 1 000 000; integers are accepted and widened, because `draw_watts: 120` is how a nameplate is written. `0 W` is refused — that is the absence of a load, not a load. | — (`eoPower`, RFC 7460, is the MIB counterpart) |
 
 ---
 
@@ -378,6 +380,7 @@ filtering.
 | `bridge` | Bridge | O | `null` | §6.3. Permitted on `switch`, `router`, `computer`, `server`. |
 | `vlans` | list[VlanDef] | O | `[]` | §6.4. VLAN database. Same permission set as `bridge`. |
 | `forwarding` | mapping | O | see §6.1.1 | `{ipv4: boolean, ipv6: boolean}`. |
+| `power` | PowerConfig | O | `null` | §17.2. What the device draws, which PDU outlets feed it, and how much PoE it hands out. |
 
 #### 6.1.1 `forwarding`
 
@@ -404,6 +407,7 @@ free of boilerplate.
 | `ipv6` | AddressFamily | O | `null` | §6.2.3. |
 | `vlan` | Vlan | O | `null` | §6.2.4. |
 | `wireless` | Wireless | O | `null` | §6.2.6. `type: wifi` only (`NG-W002`). |
+| `poe` | PoeConfig | O | `null` | §17.3. This port hands power down the cable. `type: ethernet` or `lag` only (`NG-E006`). |
 | `parent` | ifname | C | — | Required for `type: vlan`, optional for `type: tunnel`, MUST NOT appear otherwise. → `if:lower-layer-if`. |
 | `members` | list[ifname] | C | — | Required for `type: lag` and `type: bridge`; MUST NOT appear otherwise. → `if:lower-layer-if`. |
 
@@ -1146,7 +1150,7 @@ named. §10.10 maps them.
 |---|---|---|
 | `NG-D001` | error | The document is a mapping with the four envelope keys; `apiVersion`, `kind`, `metadata`, `spec` are all present. |
 | `NG-D002` | error | `apiVersion` is a recognised version string. |
-| `NG-D003` | error | `kind` is one of the nine element kinds or `template`, lower-case. |
+| `NG-D003` | error | `kind` is one of the ten element kinds or `template`, lower-case. |
 | `NG-D004` | error | `spec` matches the shape required by `kind`. |
 | `NG-D005` | error | No unknown keys anywhere in the document. |
 | `NG-N001` | error | `metadata.name` matches the name grammar (§4.1). |
@@ -1461,6 +1465,13 @@ and not suppressible; `NG-F008` to `NG-F014` are semantic and carry the short
 ids of §10.10. The group is lettered `F`, for *forwarding*: `NG-R` was spent on
 interface ranges (§10.9) long before routing was modelled, and an id, once
 assigned, is never reused.
+
+### 10.16 Power
+
+The `NG-E*` group — PDU outlets, device power and PoE — is tabulated beside the
+model it constrains, in [§17.8](#178-rules), because half of what each rule says
+is a sentence about watts that only makes sense next to the class table. The
+severities and the schema/semantic split are stated there.
 
 ---
 
@@ -2810,7 +2821,7 @@ A panel is **not a hop**, so the same inventory has two honest readings and
 : The cabling record. The panel is a node and each cable segment is an edge of
   its own, which is what a technician standing in the room would find.
 
-every other layer (`l1`, `l2`, `l3`, `overlay`)
+every other layer (`l1`, `l2`, `l3`, `overlay`, `routing`, `power`)
 : The panel is **spliced out**. The run
   `switch → front/7 ⇄ rear/7 → server` becomes the single edge
   `switch → server` it is indistinguishable from, between the two active ports.
@@ -3114,3 +3125,528 @@ script, one shell function per device; see
 
 The IPv6 routes use the `v6ur:` paths of the same module; only the IPv4 ones are
 written out above.
+
+---
+
+## 17. Power
+
+An as-built physical document has two halves. §15 and `metadata.location` are the
+first — what is bolted where, and what is patched into what. This is the second:
+which outlet each power supply is plugged into, how many watts the box draws, and
+which ports hand power *down* the cable instead of taking it from an outlet.
+
+It is worth modelling for the same reason cabling is: the mistakes are silent and
+expensive. A rack fed from one PDU looks perfect on a topology diagram and fails
+as a unit. A PoE budget oversubscribed by two cameras works until the third one
+is plugged in and then browns out a switch. A device with no declared power path
+is a device nobody will find during a maintenance window.
+
+Three places say something about power, and one new kind holds the sockets:
+
+| Key | Holds |
+|---|---|
+| `kind: pdu` | The outlets that exist and how many watts may be drawn through them (§17.1). |
+| `spec.power` | On a device: what it draws, which outlets feed it, and how much PoE it hands out (§17.2). |
+| `spec.interfaces[].poe` | On one port: that the port is power sourcing equipment, and how much of the shared budget it reserves (§17.3). |
+
+None of it is required. An inventory that says nothing about power is not wrong,
+only silent — power is additive, exactly as routing is (§16).
+
+**No measured watts.** As everywhere else in this schema there is nowhere to put
+a reading: a number a file claims about a live load is stale before the file is
+saved. `draw_watts` and `capacity_watts` are the nameplate figures a load
+schedule is built from, and comparing them with what a meter says is
+`netgraph drift`'s business, not the schema's.
+
+### 17.1 Power distribution units
+
+A `pdu` is the power half of what a patch panel is for data: a strip of numbered
+holes, bolted in a rack, that things plug into. Like a panel it is shaped by its
+numbering rather than by its configuration — a 24-outlet vertical strip is
+twenty-four identical facts — so `outlets` takes the same count-or-range
+shorthand `ports` does (§15.1), and for the same reason.
+
+It is an element rather than a field on a device because **two devices share
+one**, and that sharing is the fact worth drawing. A `power` block on a server
+can say "PSU 1 is fed from outlet 7"; only a document for the PDU itself can
+answer "what else is on that strip, and is there capacity left". Both questions
+are what a load schedule is, and the second is the one that catches a rack fed
+from a single unit.
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: pdu
+metadata:
+  name: pdu-r1-a
+  description: Left-hand vertical strip, rack 1
+  labels: {site: hq, role: power}
+  location: {site: hq, room: mdf, rack: r1, rack_height: 42}
+spec:
+  vendor: APC
+  model: AP8959EU3
+  form_factor: 0U
+  outlets: 24
+  capacity_watts: 3680
+  input_feed: A
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: pdu
+metadata:
+  name: pdu-r1-b
+  description: Right-hand vertical strip, rack 1
+  labels: {site: hq, role: power}
+  location: {site: hq, room: mdf, rack: r1, rack_height: 42}
+spec:
+  vendor: APC
+  model: AP8959EU3
+  form_factor: 0U
+  outlets: 24
+  capacity_watts: 3680
+  input_feed: B
+```
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `vendor` | string | O | `null` | Free text. |
+| `model` | string | O | `null` | Free text. |
+| `serial` | string | O | `null` | Free text. |
+| `form_factor` | string | O | `null` | Descriptive: `vertical`, `horizontal`, `1U`, `0U`. |
+| `outlets` | outlet range | M | — | The outlets the unit has: a count (`24`, meaning 1 to 24) or comma-separated spans (`1-24`, `1-12,17-24`). At most 512, no repeats (`NG-E001`). |
+| `capacity_watts` | watts | O | `null` | How many watts may be drawn through the unit in total. `NG-E012` sums the declared loads against it; absent means the rating is not recorded, and nothing is graded. |
+| `input_feed` | string (≤64) | O | `null` | Which supply feeds the unit — `A`, `B`, `ups-1`, `utility`. Free text; compared only for equality (`NG-E015`). |
+
+**The `outlets` shorthand** is the one §15.1 uses. A bare count `24` means outlets
+1 to 24; spans are written `1-24`, `7`, or `1-12,17-24` for a strip with a gap in
+its numbering. The zero padding of a span follows its *low* bound, as in §6.2.5,
+so a strip printed `01`…`24` is transcribed `01-24` and yields `01 … 24`, while
+`1-24` yields `1 … 24`. The two are different labels and are compared as written:
+naming outlet `7` on a strip that calls it `07` puts a cord in a hole nobody can
+find, so `NG-E011` reports it. At most 512 outlets, with no number declared twice
+(`NG-E001`) — the largest strip anybody ships has 54, and the ceiling is what
+bounds what a typo can ask for.
+
+**An outlet is not an interface, and nothing is cabled to a PDU.** A patch-panel
+position *is* an interface, because a `cable` document terminates on it. An
+outlet is not: a power cord is not a `cable`, it carries no frames, and giving a
+PDU forty-eight derived interfaces would put it in the layer-1 topology as a node
+nothing connects to. So a `pdu` owns no `interfaces` key at all, is not a legal
+cable endpoint, and appears in no data layer. The reference goes the other way
+instead — a device's `power.inputs` names `pdu:outlet` (§17.2) — which is also
+the direction the fact is discovered in: you read the label on the cord, not on
+the strip.
+
+**Placement is `metadata.location`, unchanged** (§3.2). A PDU is racked hardware
+like anything else, so it takes the same block, and a `position` is what puts it
+in a slot of `netgraph render --layer rack` — where the elevation annotates it
+with how full the unit is (§17.5). The two strips above name a rack and *no*
+`position`, which is the honest model of a 0U vertical unit: it occupies no rack
+unit, so it is in the room without being in a slot, it collides with nothing
+(`NG-U001`), and it is not drawn on the elevation. A 1U horizontal strip declares
+a `position` like any other 1U box, and appears on it.
+
+**Feeds are what make A/B redundancy expressible.** Two PDUs in one rack are only
+independent if they are fed from different places, and the inventory has no way to
+know whether they are unless somebody writes it down. `input_feed` is free text on
+purpose: what counts as "a different feed" is site knowledge — two utility feeds,
+two UPS strings, a UPS and a generator — and netgraph's job is to notice that two
+feeds a device calls redundant carry the same name (`NG-E015`), not to decide what
+the names mean.
+
+### 17.2 Device power
+
+`spec.power` is a device's power in *both directions*, which is the whole shape of
+it. A switch takes power through `inputs` and gives it through
+`poe_budget_watts` and the `poe` blocks on its ports; an access point takes power
+over its uplink and gives none. One block covers all three because they are one
+question — where does the power in this box come from and go to — and splitting
+it would put two halves of one answer in two places.
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-app-01
+  location: {site: hq, room: mdf, rack: r1, position: 10, height: 2, rack_height: 42}
+spec:
+  vendor: Dell
+  model: PowerEdge R660
+  interfaces:
+    - name: eno1
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.1.10.11/24]
+  power:
+    draw_watts:
+      typical: 240          # steady state, as configured — what a schedule sums
+      maximum: 495          # nameplate; what the breaker has to survive
+    redundant: true
+    inputs:
+      - pdu: pdu-r1-a
+        outlet: '7'
+        psu: psu1
+      - pdu-r1-b:7          # the compact form of the same fact
+```
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `draw_watts` | watts \| PowerDraw | O | `null` | The nameplate load. A bare number is shorthand for `{typical: <n>}`. |
+| `inputs` | list[PowerInput] | O | `[]` | One entry per power supply, naming the outlet feeding it. At most 8. Empty for a device fed over PoE, or one whose feed is not recorded yet (`NG-E016`). |
+| `redundant` | boolean | O | `false` | The feeds are meant to be independent: losing one must not lose the device. Needs at least two `inputs` (`NG-E002`) that land somewhere making the claim true (`NG-E015`). |
+| `powered_by` | enum | O | `outlet` | `outlet` or `poe`. `poe` says the device takes its power over its uplink, and excludes `inputs` (`NG-E005`). |
+| `poe_budget_watts` | watts | O | `null` | The PoE this device can hand out across every PSE port together (§17.3). `NG-E013` checks the ports fit inside it. |
+
+**`draw_watts`** — the nameplate load of the box:
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `typical` | watts | M | — | Steady-state draw of the box as configured. This is the figure a load schedule sums and the one `NG-E012` grades a PDU against. |
+| `maximum` | watts | O | `null` | Nameplate or PSU rating — what a breaker has to survive. MUST NOT be below `typical` (`NG-E003`). |
+
+`draw_watts: 45` is accepted as shorthand for `draw_watts: {typical: 45}`. The
+typical figure is the one every load schedule is built from and the only one most
+nameplates state, so requiring a mapping to say it would be ceremony. A boolean
+is refused with an explanation rather than coerced (`NG-E003`), and a wattage is
+strictly positive and at most 1 MW (§5): `0 W` is not a load, it is the absence of
+one.
+
+**`inputs[]`** — one power supply and the outlet feeding it:
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `pdu` | element ref | M | — | The PDU. A full element reference, so it may be written fully qualified to pick one of several PDUs sharing a short name (§2.2, `NG-E011`). |
+| `outlet` | string (1–16, alphanumeric) | M | — | The outlet as the PDU numbers it. Must exist (`NG-E011`) and must not already feed something else (`NG-E010`). |
+| `psu` | string (≤64) | O | `null` | Which supply on the *device* this feeds, e.g. `psu1`. Documentation only. |
+
+An entry may be written as the compact string **`pdu:outlet`** — `pdu-r1-a:7`,
+`sites/hq/mdf/pdu-r1-a:B12` — or as the equivalent mapping, which is the same
+grammar and the same choice a cable endpoint offers (§4.2), because it is the same
+kind of fact: a named thing on a named element. Anything that is not one
+identifier either side of one colon is `NG-E002`. The mapping form is what a `psu`
+label needs, and the label is worth writing: it is what an operator reads off the
+back of a chassis, and it is what makes a diagnostic about "the second input" name
+something real. `outlet` is alphanumeric rather than digits alone so that a
+two-bank unit printed `A1`…`B12` can be transcribed as it is printed.
+
+At most eight inputs. Four-PSU chassis exist; forty do not, and the bound keeps a
+copy-paste accident from becoming a load schedule nobody reads. Two of a device's
+own inputs naming one outlet is `NG-E002`; two *different* devices naming one
+outlet is `NG-E010`.
+
+**`redundant: true`** is a claim, not a description: losing one feed does not lose
+the device. It needs at least two `inputs` to be sayable at all (`NG-E002`), and
+`NG-E015` checks the claim is true of where they land — two cords into one strip
+are not redundant, and neither are two strips on one `input_feed`.
+
+**`powered_by: poe`** is for the box with no power cord — a ceiling access point,
+a camera, a doorbell. Its power path *is* the cable that carries its traffic, so
+it declares no `inputs` (`NG-E005`), and the feed is derived by walking that
+cable rather than declared (§17.4). `NG-E014` then checks the far end of the walk
+offers PoE at all, and offers enough of it.
+
+### 17.3 Power over Ethernet
+
+Declaring an `interfaces[].poe` block is what makes a port **power sourcing
+equipment**: a port that hands power down the twisted pairs of the run instead of
+only frames. It is permitted on `ethernet` and `lag` only (`NG-E006`) — PoE
+travels over copper, so a `loopback`, a `vlan` sub-interface, a `bridge` or a
+`tunnel` cannot source it, and `wifi` is refused for the same reason and one
+further one: a radio is precisely the port with no cable. `lag` is permitted
+because an aggregate of two PoE ports is how a multi-gigabit access point is fed.
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `standard` | enum | M | — | `802.3af`, `802.3at` or `802.3bt` — which amendment the port implements. |
+| `class` | integer 0–8 | C | `null` | The IEEE classification. Refused above the ceiling its `standard` defines, and exclusive with `budget_watts` (`NG-E004`). |
+| `budget_watts` | watts | C | `null` | An explicit reservation instead of a class, for a vendor that lets an operator cap a port below what its class allows. Exclusive with `class` (`NG-E004`). |
+| `enabled` | boolean | O | `true` | Is the port administratively allowed to source power? A disabled PSE port reserves nothing and powers nothing. |
+
+`spec.power.poe_budget_watts` (§17.2) is the other half of the same fact: the pool
+the whole box can hand out across every PSE port together. The ports say what each
+one wants and the pool says what there is, so `NG-E013` compares the two — and
+which ports count towards it is the question the rest of this section answers.
+
+#### The class table
+
+A class fixes two numbers, and they differ by the cable loss the standard budgets
+for over 100 m. Both are here because a switch budget is computed from the first
+and a device's draw is compared against the second (IEEE 802.3-2022, clauses 33
+and 145):
+
+| `class` | PSE reserves | PD may draw | Defined by |
+|---|---|---|---|
+| `0` | 15.4 W | 12.95 W | `802.3af` — "unclassified"; reserves the class-3 figure |
+| `1` | 4.0 W | 3.84 W | `802.3af` |
+| `2` | 7.0 W | 6.49 W | `802.3af` |
+| `3` | 15.4 W | 12.95 W | `802.3af` |
+| `4` | 30.0 W | 25.5 W | `802.3at` ("PoE+") |
+| `5` | 45.0 W | 40.0 W | `802.3bt` ("PoE++", Type 3) |
+| `6` | 60.0 W | 51.0 W | `802.3bt` (Type 3) |
+| `7` | 75.0 W | 62.0 W | `802.3bt` (Type 4) |
+| `8` | 90.0 W | 71.3 W | `802.3bt` (Type 4) |
+
+`standard` therefore fixes which classes exist: `802.3af` stops at class 3,
+`802.3at` adds class 4, `802.3bt` adds 5 to 8. A class outside its standard is
+`NG-E004` — an `802.3af` port cannot deliver class 4, so declaring one is a
+mistake about the hardware rather than a preference, and the diagnostic says which
+`standard` would make it true.
+
+#### How much a port reserves
+
+Say it with `class` **or** with `budget_watts`, never both (`NG-E004`): a class
+already fixes the reservation, and two answers cannot both be the budget.
+
+* With `class`, the port reserves the **PSE-side** figure for that class, which is
+  what the switch actually takes out of its pool.
+* With `budget_watts`, the port reserves exactly that.
+* With **neither**, the port reserves its standard's maximum — 15.4 W for
+  `802.3af`, 30 W for `802.3at`, 90 W for `802.3bt`. That is what a switch with no
+  per-port configuration does, and assuming less would make an oversubscribed
+  budget look fine, which is the one thing this rule exists to prevent.
+
+A disabled port (`enabled: false`) reserves nothing, whichever of the three
+applies: a switch does not set power aside for a PSE it is told not to use.
+Recording the block anyway is worth it, because `enabled: false` is the difference
+between "no PoE here" and "PoE turned off here" — and the second is what `NG-E014`
+names when a camera on that port will not come up.
+
+#### Capability versus allocation
+
+**A `poe` block on an empty port is a capability and takes no budget.** A 48-port
+PoE+ switch can source 30 W on every port and is sold with a 740 W supply;
+counting all 48 would report every real switch as oversubscribed, and a rule that
+fires on correct inventories is worse than no rule. Two things do count towards
+`poe_budget_watts`:
+
+* a port the walk of §17.4 found something on — power that is actually being
+  drawn;
+* a port whose `budget_watts` was written down — because writing it down *is* the
+  act of reserving it, whether or not anything is plugged in yet.
+
+So `class` describes the port and `budget_watts` commits the pool, which is the
+other reason the two are not interchangeable.
+
+#### A PoE access switch
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-access-01
+  location: {site: hq, room: mdf, rack: r1, position: 20, rack_height: 42}
+spec:
+  vendor: Cisco
+  model: C9300-24P
+  power:
+    draw_watts: 90            # the switch itself, before it hands anything out
+    poe_budget_watts: 445
+    inputs: [pdu-r1-a:11]
+  interfaces:
+    - name: GigabitEthernet1/0/1
+      type: ethernet
+      poe: {standard: 802.3at, class: 4}      # reserves 30 W: the AP
+    - name: GigabitEthernet1/0/2
+      type: ethernet
+      poe: {standard: 802.3af, class: 2}      # reserves 7 W: the camera
+    - name: GigabitEthernet1/0/3
+      type: ethernet
+      poe: {standard: 802.3at}                # capable, nothing on it, 0 W held
+    - name: GigabitEthernet1/0/24
+      type: ethernet
+      poe: {standard: 802.3at, enabled: false}
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: ap-floor-1
+  description: Ceiling access point; no power cord
+spec:
+  vendor: Ubiquiti
+  model: U6-Pro
+  power:
+    draw_watts: 22
+    powered_by: poe           # excludes 'inputs' (NG-E005)
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+    - name: ra0
+      type: wifi
+      wireless:
+        role: ap
+        band: 5g
+        channel: 36
+        bss:
+          - ssid: hq-corp
+            security: wpa2-psk
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: cam-lobby-01
+  description: Lobby dome camera
+spec:
+  vendor: Axis
+  model: M3216-LVE
+  power:
+    draw_watts: 6.2
+    powered_by: poe
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.1.60.21/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata: {name: cbl-sw-ap-01}
+spec:
+  endpoints: [sw-access-01:GigabitEthernet1/0/1, ap-floor-1:eth0]
+  medium: copper
+  category: cat6
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata: {name: cbl-sw-cam-01}
+spec:
+  endpoints: [sw-access-01:GigabitEthernet1/0/2, cam-lobby-01:eth0]
+  medium: copper
+  category: cat6
+```
+
+The switch allocates 37 W of its 445 W pool: 30 W on `1/0/1` and 7 W on `1/0/2`.
+`1/0/3` is a capability and `1/0/24` is switched off, so neither holds any. The AP
+draws 22 W and the class-4 port delivers 25.5 W PD-side, so it fits; a class-2
+port would not, and that is exactly the `NG-E014` this example is shaped to show
+the right side of.
+
+### 17.4 How power paths are resolved
+
+Two ways to be fed, and only one of them is written down.
+
+**An outlet feed is declared by the load.** A device's `spec.power.inputs` names
+`pdu:outlet` once per power supply. Nothing on the PDU mentions the device, which
+is the right direction twice over: it is the direction the fact is discovered in —
+you read the label on the cord — and a PDU carrying a list of its own downstream
+devices would be a second place for the same fact to be wrong.
+
+**A PoE feed is derived.** A device that says `powered_by: poe` takes its power
+over the run that carries its traffic, so nothing declares the feed at all:
+netgraph walks that run to the far end and looks for a `poe` block on the port it
+lands on. The walk **crosses patch panels** — a run that enters `front/7`
+continues from `rear/7`, because a run through a panel is electrically one run,
+for power exactly as for frames (§15.2) — since a ceiling access point patched
+through an IDF panel is the normal case and not the exotic one. It gives up after
+sixteen hops, because a run that long is a loop (`NG-P005`) or a plant nobody
+could trace, and the bound is what keeps a cross-wired pair of panels from
+hanging the resolver.
+
+A device with two runs to two switches is fed over whichever actually sources
+power, and over the more capable of the two when both do. Every run is recorded
+whether or not its far end sources anything, because "the uplink lands on a port
+with no PoE" is precisely what `NG-E014` has to be able to say.
+
+A reference that does not resolve is *recorded* rather than dropped: the validator
+grades it (`NG-E011`) and the renderer still has to draw the feeds that did
+resolve, because `--force` must produce a picture.
+
+**Load sharing.** A dual-corded server draws its load through both cords, so each
+of a device's *n* feeds carries `typical / n`. That is the figure summed per PDU,
+and it is what capacity is graded against (`NG-E012`), because it is the load the
+strip carries in normal operation — the state the plant is in on every day that
+nothing has failed. The share is computed once per device, so two cords of one
+server always add up to exactly its draw whatever the arithmetic rounds to.
+
+It is not the only figure worth having. When the other unit of an A/B pair fails,
+this one carries the **whole** load of everything dual-corded to it, each load
+counted once at its full draw. That is the failover figure, and both appear in the
+utilisation table (§17.6) and the load schedule (§17.7).
+
+**Only the normal-operation figure is graded.** A pair of PDUs each sized for half
+the rack is a design, not an error: that is what redundancy costs, and every
+correctly built A/B rack would fail a rule that graded the failover number. So
+`NG-E012` reports a strip with more plugged into it than it is rated for, the
+failover column is reported without a verdict, and the gap between the two *is*
+the redundancy plan, stated where somebody can read it.
+
+A PoE feed's reservation is the PSE-side class figure of the port (§17.3), not the
+device's draw: that is what the switch sets aside. Its PD-side counterpart is what
+`NG-E014` compares a declared draw against.
+
+### 17.5 The power view
+
+`netgraph render --layer power` draws the distribution plant:
+
+* **Nodes** are the PDUs and everything the inventory says draws or sources power.
+  A PDU is not in the topology at all — it owns no interfaces (§17.1) — so its
+  node is built for this layer, labelled with how many outlets are used, its load
+  against its capacity, and its `input_feed`. Everything else is the node it
+  already is at layer 1, with its ports, labels and description intact, and only
+  gains what it says about power.
+* **Edges** are the feeds, drawn distinctly because they are found differently: an
+  `outlet` feed is a cord somebody can unplug, and a `poe` feed is the run of
+  §17.4 seen electrically.
+* Everything else is discarded. A cable is not a power path — two servers joined
+  by a patch lead may be on opposite sides of the room electrically — and a PDU is
+  joined to the boxes it feeds by cords no data diagram draws.
+
+`--layer rack` (§3.2) annotates each occupied unit with the same plan: a PDU shows
+how full it is, everything else shows what it draws. That is the one question an
+elevation cannot otherwise answer, which is whether the rack can take another box.
+
+### 17.6 `netgraph list power`
+
+One row per PDU — feed, outlets, used, free, capacity, load, failover, utilisation
+and the number of loads — shaped after the `netgraph ipam` utilisation table and
+for the same reason: the question is capacity planning, so the columns are what is
+there, what is used, what is left, and the percentage that decides whether
+anybody has to act. `LOAD` is the normal-operation figure `NG-E012` grades;
+`FAILOVER` is what the unit carries when its partner dies (§17.4). A single-fed
+rack has the two the same; an A/B pair does not.
+
+### 17.7 The load schedule
+
+`netgraph export power` writes the electrical counterpart of the pull list: one
+row per **feed**, with both ends located — which outlet, on which strip, on which
+feed, powering which box in which rack unit, drawing how many watts. A
+dual-corded server is two rows, which is the point. A PoE-powered camera is a row
+too, marked as a PoE feed so a reader summing outlet loads does not double-count
+something that occupies no outlet. `--schedule-format csv` is the sheet somebody
+prints and initials; `json` is the same rows plus the per-PDU and per-PSE totals.
+See [`docs/export.md`](export.md).
+
+### 17.8 Rules
+
+The group is lettered `E`, for *electrical*. `NG-E001` to `NG-E006` are schema
+rules, reported while the document is parsed and not suppressible; `NG-E010` to
+`NG-E016` are semantic and carry the short ids of §10.10. `NG-E007` to `NG-E009`
+are unassigned, and stay that way: numbering the schema half from 1 and the
+semantic half from 10 means a rule added to either does not disturb the other,
+and an id, once assigned, is never reused (§10).
+
+| ID | Sev. | Rule |
+|---|---|---|
+| `NG-E001` | error | A `pdu`'s `spec.outlets` is a positive count or comma-separated spans, with no repeats and at most 512 outlets. |
+| `NG-E002` | error | `spec.power` is well formed: an `inputs` entry is `pdu:outlet` or the equivalent mapping, no two of the device's own inputs name one outlet, and `redundant: true` declares at least two inputs. |
+| `NG-E003` | error | `draw_watts` is a wattage or a `{typical, maximum}` mapping, and `maximum` is not below `typical`. |
+| `NG-E004` | error | An `interfaces[].poe` block declares at most one of `class` and `budget_watts`, and `class` is within the ceiling its `standard` defines. |
+| `NG-E005` | error | `powered_by: poe` excludes `inputs`: a device fed over its uplink has no cord. |
+| `NG-E006` | error | `poe` appears only on a port a cable terminates on — `type: ethernet` or `type: lag`. |
+| `NG-E010` | error | One PDU outlet is claimed by at most one element. Two of *one* device's inputs claiming it is `NG-E002` instead. |
+| `NG-E011` | error | Every `inputs` entry resolves: the reference names one declared `pdu` — unambiguously, after the §2.2 lookups — and that unit declares that outlet. |
+| `NG-E012` | error | A PDU's normal-operation load does not exceed its `capacity_watts` (§17.4). Silent when no capacity is recorded. |
+| `NG-E013` | error | The PoE allocated across the ports that hold budget does not exceed the device's `poe_budget_watts`. Silent when no budget is recorded. |
+| `NG-E014` | error | A `powered_by: poe` device reaches a PSE port that is enabled and delivers at least what the device declares it draws. |
+| `NG-E015` | error | A device claiming `redundant` is fed from two different PDUs, and from two different `input_feed`s where the units record one. |
+| `NG-E016` | warning | A device that declares a `draw_watts` also declares a power path — `inputs`, or `powered_by: poe`. |
+
+`NG-E016` is a warning deliberately. Recording draws before recording the outlets
+they are plugged into is the normal order in which an as-built document gets
+written, and refusing the half-finished state would make the model unusable
+exactly while it is being adopted. It is still worth saying: a load that appears
+on no PDU appears on no schedule either, so the rack looks emptier than it is.
+
+`NG-E015` accepts two PDUs that record no `input_feed` at all. Silence is not a
+claim, and a rule that treated a missing fact as evidence would punish the
+inventory for being incomplete rather than for being wrong.

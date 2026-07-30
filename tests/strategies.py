@@ -84,6 +84,7 @@ __all__ = [
     "namespaces",
     "optional_text",
     "patchpanel_documents",
+    "pdu_documents",
     "range_cases",
     "template_cases",
     "tunnel_documents",
@@ -722,6 +723,30 @@ def patchpanel_documents(draw: st.DrawFn, *, name: str, namespace: str) -> Plann
     )
 
 
+@st.composite
+def pdu_documents(draw: st.DrawFn, *, name: str, namespace: str) -> PlannedDocument:
+    """A ``pdu``: outlets, sometimes a rating, sometimes a named feed (§17.1).
+
+    Nothing is plugged into it. A generated ``power.inputs`` would have to name
+    an outlet that exists on a PDU that resolves, which is the *validator's*
+    business (``NG-E011``) rather than the loader's — and these plans exist to be
+    accepted by the loader.
+    """
+    count = draw(st.integers(min_value=1, max_value=8))
+    spec: dict[str, Any] = {"outlets": draw(st.sampled_from((count, f"1-{count}")))}
+    if draw(st.booleans()):
+        spec["capacity_watts"] = draw(st.integers(min_value=1, max_value=20_000))
+    if draw(st.booleans()):
+        spec["input_feed"] = draw(st.sampled_from(("A", "B", "ups-1")))
+    if draw(st.booleans()):
+        spec["form_factor"] = draw(free_text(min_size=1, max_size=2))
+    return PlannedDocument(
+        namespace=namespace,
+        stem=f"pdu-{name}"[:60],
+        data=_envelope("pdu", name, spec, draw(_metadata_extras())),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class _Port:
     """One cableable interface of one element, as a cable endpoint names it."""
@@ -840,6 +865,7 @@ def inventory_plans(
     max_devices: int = 4,
     adapters: bool = True,
     panels: bool = True,
+    pdus: bool = True,
     tunnels: bool = True,
     cables: bool = True,
 ) -> InventoryPlan:
@@ -853,8 +879,9 @@ def inventory_plans(
     device_count = draw(st.integers(min_value=min_devices, max_value=max_devices))
     adapter_count = draw(st.integers(min_value=0, max_value=1)) if adapters else 0
     panel_count = draw(st.integers(min_value=0, max_value=1)) if panels else 0
+    pdu_count = draw(st.integers(min_value=0, max_value=1)) if pdus else 0
 
-    total = device_count + adapter_count + panel_count
+    total = device_count + adapter_count + panel_count + pdu_count
     #: One pool for every name in the plan — elements, cables and tunnels alike.
     #: Uniqueness has to hold across kinds, not just within one: a cable named
     #: after a switch would be a second element with that short name, and a
@@ -892,6 +919,9 @@ def inventory_plans(
         documents.append(
             draw(patchpanel_documents(name=names[index], namespace=namespace_for(index)))
         )
+    for offset in range(pdu_count):
+        index = device_count + adapter_count + panel_count + offset
+        documents.append(draw(pdu_documents(name=names[index], namespace=namespace_for(index))))
 
     # -- cables ----------------------------------------------------------
     used: set[str] = set()

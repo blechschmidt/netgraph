@@ -32,6 +32,7 @@ the field maps to, with `…` standing for
 | `adapter` | [AdapterSpec](#spec--adapter) | Presents interfaces over a non-network host port. |
 | `tunnel` | [TunnelSpec](#spec--tunnel) | An undirected logical link between two or more `tunnel` interfaces. Owns no interfaces; `over` nests it inside another tunnel. |
 | `patchpanel` | [PatchPanelSpec](#spec--patchpanel) | A passive cross-connect. Its `front/<n>` and `rear/<n>` ports are derived from `ports`, and a coupler joins each front port to one rear port; it is not a hop. |
+| `pdu` | [PduSpec](#spec--pdu) | A power distribution unit. Its numbered outlets are derived from `outlets`; they are not interfaces, and a device names one in `power.inputs` rather than being cabled to it. Placed on a rack elevation like any other hardware. |
 | `template` | partial [DeviceSpec](#spec--switch-router-hub-computer-server) | A named partial device spec, merged into every device that names it in `spec.from`. Not an element: never drawn, never listed, never validated on its own. |
 
 ## Document envelope
@@ -93,6 +94,7 @@ The five device kinds share one spec shape. They differ in which fields they per
 | `vrfs` | [VrfDefinition](#specvrfs) list | no | `[]` | The routing instances (VRFs) this device implements. An interface binds to one with `vrf`, and that binding is what partitions the address namespace. | `/ni:network-instances/ni:network-instance` |
 | `routes` | [StaticRoute](#specroutes) list | no | `[]` | Configured static routes, in the order the device holds them. | `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rt:static-routes` |
 | `routing` | [RoutingConfig](#specrouting) | no | *unset* | The dynamic routing protocols the device takes part in: an OSPF area, a BGP autonomous system, or both. | `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol` |
+| `power` | [PowerConfig](#specpower) | no | *unset* | What the device draws, which PDU outlets feed it, and how much PoE it hands out (§17.2). Absent means the inventory records nothing about its power. | `/eo-mib:eoPowerTable/eoPowerEntry` |
 | `from` | element reference | no | *unset* | Names a `kind: template` document whose partial spec is merged underneath this one. Consumed by the loader: it is gone before validation, the graph or any renderer sees the device. `interfaces` is required only when `from` is absent. | — |
 
 * `from` merges a template underneath the device: the device's own keys win, `interfaces` merge by `name`, and every other list the device declares replaces the template's outright. See §6.6 of [`schema.md`](schema.md).
@@ -143,6 +145,7 @@ One entry per port or logical interface. Used by both devices and adapters.
 | `vlan` | [VlanConfig](#specinterfacesvlan) | no | *unset* | 802.1Q bridge-port configuration. Absent means the port is not VLAN-aware; a host port facing an access port normally omits it. | `…/dot1q:bridge-port` |
 | `vrf` | element name | no | *unset* | The routing instance this interface is in. Names an entry of the device's `spec.vrfs` (`NG-F002`); unset means the global instance. An address only collides with another address in the same VRF. | `/ni:network-instances/ni:network-instance/ni:name` |
 | `wireless` | [WirelessConfig](#specinterfaceswireless) | no | *unset* | Radio configuration of a `type: wifi` interface: which side of the association it is, which frequency it uses and which BSSs it beacons or joins. Forbidden on every other type (`NG-W002`). | `…/dot11:wireless-interface` |
+| `poe` | [PoeConfig](#interfacespoe) | no | *unset* | This port is power sourcing equipment: it hands power down the cable (§17.3). Only on a type a cable terminates on — `ethernet` or `lag` (`NG-E006`). | `/power-ethernet-mib:pethPsePortTable/pethPsePortEntry` |
 | `parent` | interface name | no | *unset* | The interface this one is stacked on. Required for `type: vlan`, forbidden otherwise (`NG-I002`). | `…/if:lower-layer-if` |
 | `members` | interface name list | no | *unset* | The interfaces aggregated by this one. Required for `type: lag` and `type: bridge`, forbidden otherwise (`NG-I003`). | `…/if:lower-layer-if` |
 | `range` | string | no | *unset* | Declares many interfaces at once instead of `name`, by bracket expansion over one or more numeric spans (`GigabitEthernet1/0/[1-48]`). Consumed by the loader: the entry is replaced by the interfaces it expands to before anything else sees the document. Exactly one of `name` and `range` is written. | — |
@@ -414,6 +417,73 @@ A patch panel is a passive cross-connect: numbered positions on the front, the s
 * A panel is not a hop. `netgraph render --layer physical` draws it and both cable segments; every other layer splices the run into the single edge it electrically is, between the two active ports.
 * `couplers` is only needed for a panel that is cross-wired. The default is the identity mapping, which is what the numbering printed on a real panel promises.
 
+## `spec` — pdu
+
+A power distribution unit: numbered outlets, a rated capacity, and the supply that feeds it. The power half of what a patch panel is for data.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `vendor` | string | no | *unset* | Hardware vendor, free text. Documentation only. | — |
+| `model` | string | no | *unset* | Hardware model designation, free text. | — |
+| `serial` | string | no | *unset* | Serial or asset number, free text. | — |
+| `form_factor` | string | no | *unset* | Descriptive: `vertical`, `horizontal`, `1U`, `0U`. Documentation only. | — |
+| `outlets` | string, ≥ 1 character | **yes** | — | The outlets the unit has, as a count (`24`) or as spans (`1-12,17-24`). Referred to by number from a device's `power.inputs`; at most 512, no repeats (`NG-E001`). | `/entity-mib:entPhysicalTable/entPhysicalEntry` |
+| `capacity_watts` | number, > 0.0, ≤ 1000000.0 | no | *unset* | How many watts may be drawn through the unit in total. `NG-E012` sums the declared loads against it; absent means the rating is not recorded, and nothing is graded. | `/eo-mib:eoPowerTable/eoPowerEntry/eoPowerNameplate` |
+| `input_feed` | string, ≤ 64 characters | no | *unset* | Which supply feeds the unit — `A`, `B`, `ups-1`, `utility`. Free text, compared only for equality: two PDUs on one feed do not make a device redundant (`NG-E015`). | `/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry` |
+
+* `outlets` is the only required key, and takes the same count-or-range shorthand `ports` does. An outlet is **not** an interface: a power cord is not a `cable`, so nothing is cabled to a PDU — a device names an outlet in `power.inputs` instead.
+* A PDU is placed on a rack elevation through `metadata.location`, exactly as a switch is, and `netgraph render --layer rack` annotates it with its utilisation.
+* `input_feed` is free text and is compared only for equality. It is what makes A/B redundancy checkable: two units on one feed fail together (`NG-E015`).
+
+## `spec.power`
+
+What a device draws, which outlets feed it, and how much PoE it hands out. One block for both directions, because they are one question about one box.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `draw_watts` | [PowerDraw](#specpowerdraw_watts) | no | *unset* | What the device draws. A bare number is the typical draw; a mapping states `typical` and optionally `maximum`. | `/eo-mib:eoPowerTable/eoPowerEntry/eoPower` |
+| `inputs` | [PowerInput](#specpowerinputs) list, ≤ 8 entries | no | `[]` | One entry per power supply, naming the PDU outlet feeding it. At most 8. Empty for a device fed over PoE, or one whose feed is not recorded yet (`NG-E016`). | `/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry` |
+| `redundant` | boolean | no | `false` | The feeds are meant to be independent: losing one must not lose the device. Needs at least two `inputs` (`NG-E002`) that land on different units and different feeds (`NG-E015`). | — |
+| `powered_by` | `outlet` \| `poe` | no | `outlet` | Where the device's own power comes from: `outlet` (the default) or `poe`, meaning it takes power over its uplink and declares no `inputs` (`NG-E005`, `NG-E014`). | — |
+| `poe_budget_watts` | number, > 0.0, ≤ 1000000.0 | no | *unset* | The PoE power this device can hand out across every PSE port together. `NG-E013` checks the ports that hold budget fit inside it. | `/power-ethernet-mib:pethMainPseTable/pethMainPseEntry/pethMainPsePower` |
+
+* `draw_watts` accepts a bare number as shorthand for `{typical: n}`. The typical figure is what a load schedule sums; `maximum` is what a breaker has to survive.
+* `redundant: true` needs at least two `inputs` (`NG-E002`), and they have to land on different units *and* different `input_feed`s for the claim to hold (`NG-E015`).
+* `powered_by: poe` excludes `inputs` (`NG-E005`): a device fed over its uplink has no cord. `NG-E014` then checks the far end of that uplink actually sources power.
+
+## `spec.power.draw_watts`
+
+The nameplate load of one device, in watts. Written as a bare number when only the typical figure is known.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `typical` | number, > 0.0, ≤ 1000000.0 | **yes** | — | Steady-state draw of the box as configured, in watts. This is what a load schedule sums. | `/eo-mib:eoPowerTable/eoPowerEntry/eoPower` |
+| `maximum` | number, > 0.0, ≤ 1000000.0 | no | *unset* | Nameplate or PSU rating, in watts — what a breaker has to survive. Must not be below `typical` (`NG-E003`). | `/eo-mib:eoPowerTable/eoPowerEntry/eoPowerNameplate` |
+
+## `spec.power.inputs[]`
+
+One power supply and the outlet feeding it. Accepts the compact form `pdu-r1-a:7` and the equivalent mapping, the same grammar a cable endpoint uses.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `pdu` | element reference | **yes** | — | The PDU feeding this supply. An element reference, so it may be written fully qualified to pick one of several PDUs sharing a short name (`NG-E011`). | — |
+| `outlet` | string, 1–16 characters | **yes** | — | The outlet on it, as the PDU numbers it. Must exist (`NG-E011`) and must not already feed something else (`NG-E010`). Writable as the shorthand `pdu-r1-a:7`. | — |
+| `psu` | string, ≤ 64 characters | no | *unset* | Which supply on the device this feeds, e.g. `psu1`. Documentation only, and worth writing: it is what an operator reads off the back of a chassis. | — |
+
+## `interfaces[].poe`
+
+This port is power sourcing equipment: it hands power down the cable. Only on a type a cable terminates on — `ethernet` or `lag` (`NG-E006`).
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `standard` | `802.3af` \| `802.3at` \| `802.3bt` | **yes** | — | Which IEEE 802.3 amendment the port implements: `802.3af` (classes 0-3), `802.3at` (adds 4) or `802.3bt` (adds 5-8). | `/power-ethernet-mib:pethPsePortTable/pethPsePortEntry/pethPsePortType` |
+| `class` | integer, 0–8 | no | *unset* | The IEEE classification, 0 to 8, written `class` in YAML. Fixes the reservation; refused above the standard's own ceiling, and exclusive with `budget_watts` (`NG-E004`). | `…/pethPsePortEntry/pethPsePortPowerClassifications` |
+| `budget_watts` | number, > 0.0, ≤ 1000000.0 | no | *unset* | An explicit reservation in watts instead of a class, for a vendor that lets an operator cap a port below what its class allows. | `…/pethPsePortEntry/pethPsePortPowerLimit` |
+| `enabled` | boolean | no | `true` | Is the port administratively allowed to source power? A disabled PSE port reserves nothing and powers nothing, which is what `NG-E014` reports it for. | `…/pethPsePortEntry/pethPsePortAdminEnable` |
+
+* How much the port reserves is said once: a `class`, or a `budget_watts`, never both (`NG-E004`). With neither, the port reserves its standard's maximum, which is what a switch with no per-port configuration does.
+* A `poe` block on a port with nothing on it is a *capability* and takes no budget. A port that feeds something, or one with an explicit `budget_watts`, does — see `NG-E013`.
+
 ## Enumerations
 
 ### `interfaces[].type`
@@ -526,6 +596,25 @@ IPsec only; every other type has a single mode.
 |---|
 | `tunnel` |
 | `transport` |
+
+### `poe.standard`
+
+Which IEEE 802.3 amendment the port implements, and therefore which classes exist: `802.3af` stops at class 3, `802.3at` adds 4, `802.3bt` adds 5 to 8.
+
+| Value |
+|---|
+| `802.3af` |
+| `802.3at` |
+| `802.3bt` |
+
+### `power.powered_by`
+
+`outlet` is the default. `poe` says the device takes power over its uplink and has no cord, so it declares no `inputs`.
+
+| Value |
+|---|
+| `outlet` |
+| `poe` |
 
 ### `tunnel.auth`
 

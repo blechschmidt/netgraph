@@ -42,10 +42,15 @@ See [`netgraph validate`](validate.md) for the checks and
 physical topology, `l2` for the same topology annotated with VLANs, `l3` for the
 IP subnets and who is addressed in them, `overlay` for the tunnels and what runs
 inside what, `routing` for the BGP sessions and OSPF adjacencies clustered by
-VRF, `physical` for the cabling record with its patch panels, and `rack` for a
-front elevation per rack. The table in
-[Layers](../rendering.md#layers-one-inventory-seven-questions) says what each one
+VRF, `physical` for the cabling record with its patch panels, `rack` for a front
+elevation per rack, and `power` for the PDUs and the outlet and PoE feeds into
+everything they power. The table in
+[Layers](../rendering.md#layers-one-inventory-eight-questions) says what each one
 draws and when to reach for it.
+
+`rack` is the one layer `-f mermaid` cannot draw, because an elevation is a grid
+and Mermaid has no way to express one. `power` is an ordinary topology of nodes
+and edges, so every format holds it.
 
 `-f/--format` decides what the artefact is. `svg`, `html`, `png` and `pdf` need
 Graphviz on the `PATH`; `dot`, `mermaid` and `json` do not. The comparison table
@@ -109,6 +114,7 @@ netgraph render -f json | jq '.nodes[].name'
 netgraph render -f mermaid -o docs/topology.mmd
 netgraph render --vlan 10 --layer l2 -f svg -o vlan-10.svg
 netgraph render --layer l3 -f svg -o subnets.svg
+netgraph render --layer power -f svg -o power.svg
 netgraph render --neighbors-of sw-dist-01 --depth 2 -f svg -o around-dist.svg
 netgraph render --kind switch --kind router --group-by-namespace -o core.dot
 netgraph render --collapse-depth 1 --group-by-namespace -f svg -o overview.svg
@@ -145,7 +151,7 @@ not look the way you expected.
 | `-o`, `--output` | `FILE` | — | Write to this file instead of stdout. |
 | `--namespace` | `NS` | — | Keep only elements in this namespace or below it. Repeatable. |
 | `--vlan` | `VID` | — | Keep only elements participating in this VLAN. Repeatable. |
-| `--kind` | `[switch\|router\|hub\|computer\|server\|adapter\|patchpanel]` | — | Keep only elements of this kind. Repeatable. |
+| `--kind` | `[switch\|router\|hub\|computer\|server\|adapter\|patchpanel\|pdu]` | — | Keep only elements of this kind. Repeatable. |
 | `--name` | `GLOB` | — | Keep only elements whose name matches this glob. Repeatable. |
 | `--neighbors-of` | `NAME` | — | Keep only the neighbourhood of this element. |
 | `--depth` | `INTEGER, >= 0` | `1` | How many hops --neighbors-of reaches. |
@@ -162,7 +168,7 @@ not look the way you expected.
 | `--max-addresses` | `N` | `4` | Longest address list spelled out under a node before it is abbreviated to 'and N more'. 0 prints the count alone. |
 | `--rankdir` | `[tb\|lr\|bt\|rl]` | TB, top to bottom | Layout direction. A wide network reads better left to right; a deep one top to bottom. Honoured by the Graphviz backends and by mermaid. |
 | `--title` | `TEXT` | — | Caption for the diagram. |
-| `--layer` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack]` | `l1` | l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets and the elements addressed in them; overlay draws the tunnels; routing draws the BGP sessions and OSPF adjacencies, clustered by VRF; physical adds the patch panels l1 splices out; rack draws a front elevation per rack. Repeatable for -f html, which draws each layer and puts a switcher over them. |
+| `--layer` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power]` | `l1` | l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets and the elements addressed in them; overlay draws the tunnels; routing draws the BGP sessions and OSPF adjacencies, clustered by VRF; physical adds the patch panels l1 splices out; rack draws a front elevation per rack; power draws the PDUs and the feeds into everything they power. Repeatable for -f html, which draws each layer and puts a switcher over them. |
 | `--strict` | — | off | Treat warnings as errors. |
 | `--force` | — | off | Proceed even when validation failed. The result may not match the files. |
 | `--profile` | `NAME` | — | Apply the [profile.NAME] block of netgraph.toml on top of its [render] table. Explicit flags still win over both. |

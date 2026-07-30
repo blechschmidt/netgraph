@@ -25,6 +25,7 @@ spec:
       type: bridge
       description: Switching instance
       members:
+        - GigabitEthernet1/0/2
         - GigabitEthernet1/0/7
         - GigabitEthernet1/0/8
 
@@ -47,6 +48,16 @@ spec:
       mtu: 1500
       ipv4:
         addresses: [10.0.0.2/30]
+
+    - name: GigabitEthernet1/0/2
+      type: ethernet
+      description: |
+        Uplink to sw-access-01 in rack r2, patched through pp-r1-a position 24.
+      mac: '00:1b:0d:0a:00:02'
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
 
     - name: GigabitEthernet1/0/7
       type: ethernet
@@ -72,3 +83,15 @@ spec:
   vlans:
     - id: 10
       name: servers
+  power:
+    draw_watts:
+      typical: 48
+      maximum: 125
+    inputs:
+      - pdu: pdu-r1-a
+        outlet: '1'
+        psu: psu1
+      - pdu: pdu-r1-b
+        outlet: '1'
+        psu: psu2
+    redundant: true

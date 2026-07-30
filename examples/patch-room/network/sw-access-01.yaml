@@ -1,0 +1,101 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-access-01
+  description: |
+    PoE access switch in rack r2. Its uplink leaves the rack through the panel
+    above it, exactly as the server links do; its two PoE ports feed a ceiling
+    access point and a lobby camera, neither of which has a power cord.
+
+    The switch itself is dual-corded: 'psu1' to the A-side strip, 'psu2' to the
+    B-side one. Both strips are in this rack, and they are on different input
+    feeds, which is what makes 'redundant: true' true (NG-E015).
+  location:
+    site: hq
+    room: mdf
+    rack: r2
+    position: 8
+    height: 1
+    rack_height: 42
+  labels:
+    site: hq
+    role: access
+    env: prod
+spec:
+  vendor: Cisco
+  model: C9300-24P
+  interfaces:
+    - name: br0
+      type: bridge
+      description: Switching instance
+      members:
+        - GigabitEthernet1/0/1
+        - GigabitEthernet1/0/2
+        - GigabitEthernet1/0/24
+
+    - name: Vlan10
+      type: vlan
+      description: In-band management address of the access switch
+      ipv4:
+        addresses: [10.10.0.3/24]
+        gateway: 10.10.0.1
+      vlan:
+        mode: access
+        access_vlan: 10
+      parent: br0
+
+    - name: GigabitEthernet1/0/1
+      type: ethernet
+      description: |
+        ap-ceiling-01, patched through pp-r2-a position 9. The class-4
+        reservation is what the 802.3at PSE takes out of the 370 W pool for
+        this port.
+      mac: '00:1b:0d:0b:00:01'
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+      poe:
+        standard: 802.3at
+        class: 4
+
+    - name: GigabitEthernet1/0/2
+      type: ethernet
+      description: cam-lobby-01, cabled directly. A class-2 camera.
+      mac: '00:1b:0d:0b:00:02'
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+      poe:
+        standard: 802.3af
+        class: 2
+
+    - name: GigabitEthernet1/0/24
+      type: ethernet
+      description: Uplink to sw-core-01, patched through pp-r2-a position 24
+      mac: '00:1b:0d:0b:00:18'
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+  bridge:
+    name: br0
+    type: customer-vlan-bridge
+    address: '00:1b:0d:0b:00:ff'
+  vlans:
+    - id: 10
+      name: servers
+  power:
+    draw_watts:
+      typical: 55
+      maximum: 435
+    inputs:
+      - pdu: pdu-r2-a
+        outlet: '3'
+        psu: psu1
+      - pdu: pdu-r2-b
+        outlet: '3'
+        psu: psu2
+    redundant: true
+    poe_budget_watts: 370

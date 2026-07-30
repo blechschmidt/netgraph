@@ -22,6 +22,7 @@ from netgraph.models.device import Computer, Hub, Router, Server, Switch
 from netgraph.models.diagnostics import decode_field_error
 from netgraph.models.element import DOCUMENT_KINDS, KINDS, ElementBase
 from netgraph.models.patchpanel import PatchPanel
+from netgraph.models.pdu import Pdu
 from netgraph.models.template import Template
 from netgraph.models.tunnel import Tunnel
 
@@ -44,11 +45,12 @@ ELEMENT_MODELS: Final[tuple[type[ElementBase], ...]] = (
     Adapter,
     Tunnel,
     PatchPanel,
+    Pdu,
 )
 
 #: A parsed document. Discriminated on ``kind`` (§3).
 Element = Annotated[
-    Switch | Router | Hub | Computer | Server | Cable | Adapter | Tunnel | PatchPanel,
+    Switch | Router | Hub | Computer | Server | Cable | Adapter | Tunnel | PatchPanel | Pdu,
     Field(discriminator="kind"),
 ]
 

@@ -90,7 +90,7 @@ does not, the column reads `load` and the message carries the field path
 |---|---|---|
 | `NG-D001` | The document is a mapping carrying `apiVersion`, `kind`, `metadata` and `spec`. | Anything else is not a netgraph document; guessing at its intent would be worse than refusing it. |
 | `NG-D002` | `apiVersion` is a version this build understands (`netgraph.dev/v1alpha1`). | A document written for a later schema may mean something different by the same keys. |
-| `NG-D003` | `kind` is one of the eight element kinds or `template`, lower-case. | `kind` selects the shape of `spec`; an unknown kind has no shape to check against. |
+| `NG-D003` | `kind` is one of the ten element kinds or `template`, lower-case. | `kind` selects the shape of `spec`; an unknown kind has no shape to check against. |
 | `NG-D004` | `spec` matches the shape required by `kind`. | The whole point of declaring the kind. |
 | `NG-D005` | No unknown keys anywhere in the document. | The one failure mode this tool exists to prevent: a misspelt `mtu:`/`mut:` that was silently ignored would produce a diagram that disagrees with the file. |
 | `NG-N001` | `metadata.name` matches the name grammar. | Names end up as graph node ids and as the left half of every `device:interface` reference. |
@@ -161,6 +161,20 @@ stack, so declaring any of those would describe hardware that is not a hub.
 | `NG-X003` | Every downstream interface is `type: ethernet`, `wifi` or `lag`. | An adapter presents physical ports; loopbacks and SVIs belong to the host's own stack. |
 | `NG-X004` | `upstream.name` does not collide with any downstream `interfaces[].name`. | Both are reachable as `adapter:port`, so a collision makes the cable endpoint ambiguous. |
 
+### Power
+
+Checked while a `pdu` document, a device's `spec.power` block or an interface's
+`poe` block is parsed (schema §17).
+
+| ID | Rule | Why it matters |
+|---|---|---|
+| `NG-E001` | A PDU's `spec.outlets` is a count (`24`) or comma-separated `[low-high]` spans (`1-12,17-24`), non-inverted, free of repeats, and totals at most 512 outlets. | Outlets are referred to by number from a device's `power.inputs`, so a strip whose numbering did not expand has no holes for anything to plug into. The bound is what stops `1-99999999` from becoming a load schedule nobody can read. |
+| `NG-E002` | An entry of `power.inputs` is `pdu:outlet` with exactly one colon; no two inputs of one device name the same outlet; `redundant: true` requires at least two inputs. | The reference is the same grammar a cable endpoint uses, for the same reason: a named thing on a named element. A device cannot plug two of its own supplies into one hole, and it cannot survive losing a feed it only has one of. |
+| `NG-E003` | `draw_watts` is a number of watts rather than a boolean, and `maximum` is not below `typical`. | `typical` is what a load schedule sums and `maximum` is what a breaker has to survive; a maximum under the typical draw is a transposition of the two, and a load schedule built from it is wrong in the safe-looking direction. |
+| `NG-E004` | A `poe` block states its reservation once — a `class` or a `budget_watts`, never both — and the class is one its `standard` defines. | Two answers cannot both be the budget. A class above the standard's ceiling — class 4 on an `802.3af` port — is a mistake about the hardware rather than a preference: that port cannot deliver 30 W however it is configured. |
+| `NG-E005` | `powered_by: poe` excludes `inputs`. | A device fed over its uplink has no power cord, so an outlet feeding it is a contradiction rather than extra detail; one of the two facts is wrong and the file cannot say which. |
+| `NG-E006` | `poe` appears only on `type: ethernet` or `type: lag`. | PoE travels over the twisted pairs of a run, so a loopback, an SVI, a bridge, a tunnel or a radio has no copper to hand power down. `lag` is allowed because an aggregate of two PoE ports is how a multi-gigabit access point is fed. |
+
 ### Ranges and templates
 
 Checked while the document is rewritten into the shape the models validate:
@@ -190,7 +204,7 @@ one mistake.
 ## Pass 3 — semantics
 
 Every document has parsed. Do they agree with **each other**? These
-seventy-five rules are the only ones that can be suppressed, re-graded or
+eighty-two rules are the only ones that can be suppressed, re-graded or
 disabled — they are judgements about a whole inventory rather than facts about
 one document.
 
@@ -876,6 +890,186 @@ configuration, which makes it the mistake most likely to be in an inventory
 twice.
 
 **Suppress with** `E036` / `NG-F012`, or an annotation on either element.
+
+#### `E037` — PDU outlet claimed twice
+
+*Alias: `NG-E010`. Severity: error.*
+
+Two elements name the same `pdu:outlet` in their `power.inputs`. Two inputs of
+*one* device naming one outlet is refused earlier, by the model (`NG-E002`), so
+every finding here involves at least two elements as well as the PDU, and the
+message names all of them.
+
+**Why it matters.** An outlet takes one plug. Unlike the patch-panel version of
+the same impossibility ([`E022`](#e022--patch-panel-position-terminated-twice))
+this is usually not a typo about the number: it is a *second* device someone
+added to a rack that had no spare socket, and whoever wrote it down read the
+label off the cord already in the hole. The consequence is that the PDU's own
+figures stay plausible — a doubled claim occupies one outlet, so the free-outlet
+count is right and the rack looks as though it has room — while one of the two
+devices is in fact fed from somewhere nobody recorded.
+
+**Suppress with** `E037` / `NG-E010`, or an annotation on either element or on
+the PDU. There is no legitimate case: a hole takes one plug. A splitter or a
+short strip chained off an outlet is its own `pdu` document, naming that supply
+in `input_feed`.
+
+#### `E038` — power input names no outlet that exists
+
+*Alias: `NG-E011`. Severity: error.*
+
+A `power.inputs` entry does not resolve. Four ways to get there, reported apart
+because the fix differs: no element answers to the name before the colon, the
+name is ambiguous across namespaces, it resolves to something that is not a
+`pdu`, or the PDU is right and the outlet number is not. The last spelling
+quotes the range the PDU declares.
+
+**Why it matters.** A PDU's outlets come from a range rather than being written
+out, so `25` on a 24-outlet strip is invisible in the document that names it —
+which is why the diagnostic puts the range in front of the reader, exactly as
+[`E021`](#e021--cable-on-a-position-the-patch-panel-does-not-have) does for a
+panel. The consequence is a load that lands on no PDU: it drops out of the load
+schedule and out of the utilisation table, so the strip appears to have capacity
+it does not and the device appears to have no recorded power at all. The common
+cause is the transcription `7` for an outlet printed `07` — numbers are compared
+as written, deliberately, because a strip labelled `01`…`24` and one labelled
+`1`…`24` are different labels and quietly accepting either would put a cord in a
+hole nobody can find.
+
+**Suppress with** `E038` / `NG-E011`, or an annotation on the device or on the
+PDU it names — on any of the candidates, when the name was ambiguous. There is
+no legitimate case; when the feed genuinely is not modelled, leave `inputs` off
+and accept [`W137`](#w137--declared-draw-with-no-power-path) instead of pointing
+at an outlet that does not exist.
+
+#### `E039` — PDU load exceeds its capacity
+
+*Alias: `NG-E012`. Severity: error.*
+
+The draws landing on a PDU's outlets add up to more than its `capacity_watts`.
+The sum is the **normal-operation share**: a dual-corded server draws its load
+through both cords, so it contributes half its `draw_watts` to each of its two
+PDUs. The other figure — the whole draw of everything corded to the unit, which
+is what it carries when its partner fails — is printed by `netgraph list power`
+and `netgraph export power`, and is deliberately not graded here.
+
+**Why it matters.** A strip carrying more than it is rated for trips its breaker
+and takes down everything on it, in a rack where no single document is wrong.
+That is the mistake this catches: the rack that grew one server at a time until
+the total passed the strip's rating, which nobody notices because each addition
+looked like it fitted.
+
+Grading the normal share rather than the failover figure is what makes the rule
+usable. An A/B pair each sized for half a rack is a correct design, and reporting
+it as an error would fire on every rack that got redundancy right — the racks
+that most need the other findings in this section.
+
+Silent when the PDU records no `capacity_watts`: there is nothing to compare
+against, and inventing a rating for a strip nobody measured would turn a missing
+fact into a false error. The load is still totalled and reported, without a
+verdict.
+
+**Suppress with** `E039` / `NG-E012`, or an annotation on the PDU or on any of
+the loads. A strip genuinely over its rating has no legitimate case; what is
+worth annotating is a schedule whose draws are known to be pessimistic, because
+they were copied from PSU ratings rather than from what the equipment actually
+pulls.
+
+#### `E040` — PoE allocation exceeds the budget
+
+*Alias: `NG-E013`. Severity: error.*
+
+The PoE reserved by a device's PSE ports adds up to more than its
+`power.poe_budget_watts`. A port reserves the PSE-side figure for its `class`,
+or its `budget_watts`, or its standard's maximum when it states neither — which
+is what a switch with no per-port configuration does.
+
+Only ports that actually *hold* budget are counted: one that feeds something the
+cable walk found, and one whose `budget_watts` was written down, which is the act
+of reserving it.
+
+**Why it matters.** That last restriction is the whole design of the rule. A
+`poe` block on an empty port is a **capability**, not an allocation: a 48-port
+PoE+ switch can source 30 W on every port and is sold with a supply of around
+740 W, so it is deliberately oversubscribed by a factor of two. Counting all 48
+ports would report every real switch as broken and the rule would be worthless
+exactly where it matters.
+
+What is graded is power promised to something. Past the budget a switch stops
+powering ports — by priority, or by class, or by port number, depending on the
+vendor — so the device that goes dark is not the one that was just added, and the
+symptom appears somewhere nobody is working. Hence the message spells out every
+counted port and its share.
+
+**Suppress with** `E040` / `NG-E013`, or an annotation on the switch or on any
+device it feeds. Silent when `poe_budget_watts` is not recorded at all. The one
+case worth annotating is a chassis with a second supply fitted that the budget
+was never updated for — though correcting the budget is the better fix, since it
+is also what the utilisation table reads.
+
+#### `E041` — PoE-powered device has no PoE uplink
+
+*Alias: `NG-E014`. Severity: error.*
+
+A device declares `powered_by: poe`, so the run carrying its traffic is its only
+power path, and that path does not deliver. Three shapes, all of them a device
+that will not come up: no cable leaves it at all; every run it has lands on a
+port with no `poe` block, or with a disabled one; or a run does source power, but
+less than the device says it draws. The walk crosses patch panels, because a run
+through a coupler is electrically one run for power exactly as it is for frames.
+
+The draw is compared against the **PD-side** class figure — 25.5 W for class 4,
+not the 30 W the PSE sets aside — because the difference between the two tables
+is precisely the cable loss IEEE 802.3 budgets for 100 m of copper. A device that
+drew the PSE figure at the far end of a run would be outside the standard, so
+grading against it would accept a link that does not work.
+
+**Why it matters.** A ceiling access point or a camera has no power cord. If the
+port it is patched to is not a PSE, it never boots — and every other document
+about it is correct: the cable exists, the addressing exists, the link is drawn.
+Two mistakes produce it. The device was moved to a spare port on a switch whose
+PoE ports are only the first 24, so the run is right and the power is not. Or the
+class is too small for the load — a class-2 port under a 20 W access point, which
+powers up, associates, and browns out the moment the radios are busy.
+`enabled: false` left over from the port's previous tenant is the third and
+quietest version.
+
+**Suppress with** `E041` / `NG-E014`, or an annotation on the device or on the
+switch at the far end of its uplink. The legitimate case is an inline midspan
+injector between the two, which the inventory has no element for; annotate the
+device, because "where does this get its power" is the next reader's question.
+
+#### `E042` — redundant power that is not redundant
+
+*Alias: `NG-E015`. Severity: error.*
+
+A device declares `redundant: true`, but the outlet feeds that resolved are not
+independent — either every input lands on one PDU, or the inputs land on
+different PDUs that record the same `input_feed`. Fewer than two *declared*
+inputs is refused by the model (`NG-E002`) and an input that failed to resolve is
+[`E038`](#e038--power-input-names-no-outlet-that-exists)'s finding, so a device
+whose only problem is a typo is not also accused of a false claim.
+
+A PDU recording no `input_feed` is not evidence either way, so two different PDUs
+with nothing written down are accepted: silence is not a claim. `input_feed` is
+free text and the rule compares two of them for equality and nothing more —
+whether two names describe two failure domains is site knowledge.
+
+**Why it matters.** Two cords into one strip is the cheap version of the mistake:
+the strip, its breaker and its own supply cord all remain single points of
+failure, so the second PSU buys nothing except the belief that there is one. The
+subtler and far more common version is two PDUs fed from one supply — the racking
+is right and the electrical plan is not — and it survives every visual
+inspection, because such a rack looks exactly like a rack that is A/B fed. Both
+fail as a unit at the one moment the redundancy was bought for. `redundant: true`
+is also a claim somebody acts on during a maintenance window, when the question
+is whether feed A can be dropped with everything still up.
+
+**Suppress with** `E042` / `NG-E015`, or an annotation on the device or on any
+PDU feeding it. Worth annotating when the feed names are coarser than the failure
+domains they stand for — two independent UPS strings both written `utility`, say
+— but naming the feeds apart is the better fix, because it makes the inventory
+right for every other device in that rack too.
 
 ### Warnings
 
@@ -1564,6 +1758,34 @@ migration.
 
 **Suppress with** `W136` / `NG-F014`, or an annotation on the device.
 
+#### `W137` — declared draw with no power path
+
+*Alias: `NG-E016`. Severity: warning.*
+
+A device declares `power.draw_watts`, declares no `power.inputs`, and is not
+`powered_by: poe` — so it says how much it draws and nothing about where from. A
+device that declares inputs which fail to resolve is
+[`E038`](#e038--power-input-names-no-outlet-that-exists)'s finding and is not
+reported here as well.
+
+**Why it matters.** A load on no PDU is a load on no schedule. Every strip in the
+rack then reports a utilisation that is right about what it was told and wrong
+about the rack, which is the failure mode a load schedule exists to prevent — and
+the device is one nobody will find when the question is what goes dark if feed B
+is dropped.
+
+A warning rather than an error, deliberately. Recording draws before recording
+the outlets they are plugged into is the normal order in which an as-built
+document gets written: the nameplate figures come off an equipment list, and the
+outlet numbers come from walking the rack with a torch. Refusing the
+half-finished state would make the model unusable exactly while it is being
+adopted, which is the wrong trade for a fact that is missing rather than wrong.
+
+**Suppress with** `W137` / `NG-E016`, or an annotation on the device. The
+legitimate case is a device fed from something the inventory does not model as a
+`pdu` — a wall socket, a bench supply, a UPS nothing has a document for — where
+the draw is worth recording and there is no outlet to name.
+
 ### Info
 
 #### `I001` — locally administered MAC address
@@ -1638,7 +1860,7 @@ schema rule is a usage error:
 <!-- run: rc=2 -->
 ```console
 $ netgraph validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 Every mechanism accepts both spellings of an id — `W102` and `NG-C010` select

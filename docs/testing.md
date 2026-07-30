@@ -21,6 +21,13 @@ $ pip install --editable ".[dev]"
 $ pytest
 ```
 
+The suite runs with the parse cache **on**, redirected to a temporary directory
+for the session (`isolate_the_parse_cache` in `tests/conftest.py`). It is not
+switched off on purpose: the cache is on in every command, so a suite that
+disabled it would leave the warm path tested only by `tests/test_cache.py` while
+every golden, transcript and end-to-end assertion kept exercising the cold one.
+Nothing is read from or written to your own cache.
+
 ## Platforms
 
 netgraph is published for Python 3.10–3.13 and is used on all three desktop

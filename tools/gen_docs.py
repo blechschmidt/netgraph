@@ -86,6 +86,9 @@ PAGE: Final[dict[str, str]] = {
     "schema": "schema.md",
     "config": "config.md",
     "config show": "config.md",
+    "cache": "cache.md",
+    "cache info": "cache.md",
+    "cache clear": "cache.md",
     "completion": "completion.md",
     "version": "version.md",
 }
@@ -108,6 +111,8 @@ INDEX_ORDER: Final = [
     "rules",
     "schema",
     "config show",
+    "cache info",
+    "cache clear",
     "completion",
     "version",
 ]
@@ -131,6 +136,8 @@ SUMMARY: Final[dict[str, str]] = {
     "rules": "List the validation rules and their ids.",
     "schema": "Write the JSON Schema for editor completion.",
     "config show": "Show the resolved settings and where each value came from.",
+    "cache info": "Report where the parse cache is and what is in it.",
+    "cache clear": "Delete this inventory's cached documents.",
     "completion": "Print the shell completion script.",
     "version": "Report the netgraph, Python and Graphviz versions in use.",
 }

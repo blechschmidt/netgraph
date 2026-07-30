@@ -4,6 +4,130 @@
   "layer": "l2",
   "nodes": [
     {
+      "id": "hosts/ap-ceiling-01",
+      "type": "element",
+      "name": "ap-ceiling-01",
+      "kind": "switch",
+      "namespace": "hosts",
+      "description": "Ceiling access point above the machine room, powered over its uplink:\n'powered_by: poe' says the run carrying its traffic is its only power path,\nso it declares no 'power.inputs' at all. The far end of that run is\nsw-access-01:GigabitEthernet1/0/1, reached across pp-r2-a — a run through a\npanel is electrically one run for power exactly as it is for frames.\n",
+      "labels": {
+        "env": "prod",
+        "role": "wireless",
+        "site": "hq"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Bridges the radio onto the wired uplink"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "In-band management address of the access point",
+          "addresses": [
+            "10.10.0.4/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "eth0",
+          "type": "ethernet",
+          "description": "PoE uplink, patched through pp-r2-a position 9",
+          "mac": "70:69:5a:0c:00:01",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "wlan0",
+          "type": "wifi",
+          "description": "5 GHz radio, one SSID",
+          "mac": "70:69:5a:0c:00:10",
+          "mtu": 1500
+        }
+      ]
+    },
+    {
+      "id": "hosts/cam-lobby-01",
+      "type": "element",
+      "name": "cam-lobby-01",
+      "kind": "computer",
+      "namespace": "hosts",
+      "description": "Lobby camera, cabled straight to the access switch and powered over that\ncable. A class-2 PSE port delivers 6.49 W at the powered device, which is\nwhat its 5 W draw is checked against (NG-E014).\n",
+      "labels": {
+        "env": "prod",
+        "role": "camera",
+        "site": "hq"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "eth0",
+          "type": "ethernet",
+          "description": "PoE uplink to sw-access-01",
+          "mac": "ac:cc:8e:0d:00:01",
+          "mtu": 1500,
+          "addresses": [
+            "10.10.0.31/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "hosts/laptop-lobby",
+      "type": "element",
+      "name": "laptop-lobby",
+      "kind": "computer",
+      "namespace": "hosts",
+      "description": "A fixed workstation on the lobby desk, associated to hq-staff. It is here so\nthe access point's radio is a link and not a spare port; a wireless\nassociation is an ordinary cable of `medium: wireless`.\n",
+      "labels": {
+        "role": "workstation",
+        "site": "hq"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "wlan0",
+          "type": "wifi",
+          "description": "Associated to hq-staff on 5 GHz",
+          "mac": "8c:8c:aa:0e:00:01",
+          "mtu": 1500,
+          "addresses": [
+            "10.10.0.41/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "hosts/srv-app-01",
       "type": "element",
       "name": "srv-app-01",
@@ -106,6 +230,82 @@
       ]
     },
     {
+      "id": "network/sw-access-01",
+      "type": "element",
+      "name": "sw-access-01",
+      "kind": "switch",
+      "namespace": "network",
+      "description": "PoE access switch in rack r2. Its uplink leaves the rack through the panel\nabove it, exactly as the server links do; its two PoE ports feed a ceiling\naccess point and a lobby camera, neither of which has a power cord.\n\nThe switch itself is dual-corded: 'psu1' to the A-side strip, 'psu2' to the\nB-side one. Both strips are in this rack, and they are on different input\nfeeds, which is what makes 'redundant: true' true (NG-E015).\n",
+      "labels": {
+        "env": "prod",
+        "role": "access",
+        "site": "hq"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "In-band management address of the access switch",
+          "addresses": [
+            "10.10.0.3/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/1",
+          "type": "ethernet",
+          "description": "ap-ceiling-01, patched through pp-r2-a position 9. The class-4\nreservation is what the 802.3at PSE takes out of the 370 W pool for\nthis port.\n",
+          "mac": "00:1b:0d:0b:00:01",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "description": "cam-lobby-01, cabled directly. A class-2 camera.",
+          "mac": "00:1b:0d:0b:00:02",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "GigabitEthernet1/0/24",
+          "type": "ethernet",
+          "description": "Uplink to sw-core-01, patched through pp-r2-a position 24",
+          "mac": "00:1b:0d:0b:00:18",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "network/sw-core-01",
       "type": "element",
       "name": "sw-core-01",
@@ -149,6 +349,19 @@
           "addresses": [
             "10.0.0.2/30"
           ]
+        },
+        {
+          "name": "GigabitEthernet1/0/2",
+          "type": "ethernet",
+          "description": "Uplink to sw-access-01 in rack r2, patched through pp-r1-a position 24.\n",
+          "mac": "00:1b:0d:0a:00:02",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
         },
         {
           "name": "GigabitEthernet1/0/7",
@@ -277,6 +490,133 @@
             "egress": "front/8"
           }
         ]
+      },
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "cables/cbl-sw-pp24",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "network/sw-core-01",
+          "interface": "GigabitEthernet1/0/2"
+        },
+        {
+          "node": "network/sw-access-01",
+          "interface": "GigabitEthernet1/0/24"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "P-024A",
+      "lengthM": 21.0,
+      "patch": {
+        "segments": [
+          "cables/cbl-sw-pp24",
+          "cables/cbl-tie-24",
+          "cables/cbl-pp-access24"
+        ],
+        "panels": [
+          {
+            "panel": "panels/pp-r1-a",
+            "ingress": "front/24",
+            "egress": "rear/24"
+          },
+          {
+            "panel": "panels/pp-r2-a",
+            "ingress": "rear/24",
+            "egress": "front/24"
+          }
+        ]
+      },
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "cables/cbl-access-pp09",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "network/sw-access-01",
+          "interface": "GigabitEthernet1/0/1"
+        },
+        {
+          "node": "hosts/ap-ceiling-01",
+          "interface": "eth0"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "P-009A",
+      "lengthM": 25.0,
+      "patch": {
+        "segments": [
+          "cables/cbl-access-pp09",
+          "cables/cbl-pp-ap09"
+        ],
+        "panels": [
+          {
+            "panel": "panels/pp-r2-a",
+            "ingress": "front/9",
+            "egress": "rear/9"
+          }
+        ]
+      },
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "cables/cbl-access-cam",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "hosts/cam-lobby-01",
+          "interface": "eth0"
+        },
+        {
+          "node": "network/sw-access-01",
+          "interface": "GigabitEthernet1/0/2"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "P-010",
+      "lengthM": 12.0,
+      "vlans": [
+        10
+      ]
+    },
+    {
+      "id": "cables/air-lobby",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "hosts/ap-ceiling-01",
+          "interface": "wlan0"
+        },
+        {
+          "node": "hosts/laptop-lobby",
+          "interface": "wlan0"
+        }
+      ],
+      "medium": "wireless",
+      "speed": 1200000000,
+      "speedText": "1200Mbps",
+      "wireless": {
+        "ssids": [
+          "hq-staff"
+        ],
+        "band": "5GHz",
+        "channel": 44,
+        "widthMhz": 80,
+        "accessPoint": "hosts/ap-ceiling-01:wlan0"
       },
       "vlans": [
         10

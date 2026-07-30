@@ -1,9 +1,10 @@
 # `netgraph list`
 
 `netgraph list` prints what the inventory declares, one subject at a time: the
-devices, the cables, the tunnels, the VLANs or the subnets. It answers "what is
-in here, and how much of it?" without drawing anything — which is what you want
-when the question is a count, a spelling or a missing row rather than a shape.
+devices, the cables, the tunnels, the VLANs, the subnets or the power strips. It
+answers "what is in here, and how much of it?" without drawing anything — which is
+what you want when the question is a count, a spelling or a missing row rather
+than a shape.
 
 ---
 
@@ -11,7 +12,7 @@ when the question is a count, a spelling or a missing row rather than a shape.
 
 <!-- generated: synopsis list -->
 ```text
-netgraph [GLOBAL OPTIONS] list [OPTIONS] [devices|cables|tunnels|vlans|bss|subnets]
+netgraph [GLOBAL OPTIONS] list [OPTIONS] [devices|cables|tunnels|vlans|bss|subnets|power]
 ```
 <!-- /generated -->
 
@@ -31,6 +32,7 @@ about one element:
 | `vlans` | `VLAN`, `NAME`, `ELEMENTS`, `PORTS` |
 | `bss` | `SSID`, `RADIO`, `ROLE`, `CHANNEL`, `BSSID`, `VLAN`, `SECURITY` |
 | `subnets` | `SUBNET`, `IP`, `ADDRESSES`, `ELEMENTS`, `VLANS`, and `VRF` when anything is in one |
+| `power` | `PDU`, `FEED`, `OUTLETS`, `USED`, `FREE`, `CAPACITY`, `LOAD`, `FAILOVER`, `UTIL`, `LOADS` |
 
 The columns that are not self-evident:
 
@@ -52,6 +54,12 @@ The columns that are not self-evident:
 | `RADIO` | `bss` | The `element:interface` of the radio serving or joining the BSS. |
 | `ROLE` | `bss` | `ap` for a radio that beacons the SSID, `station` or `mesh` for one associated to it. |
 | `CHANNEL` | `bss` | `36/5GHz` — the primary channel and its band, or `-` when the document states neither. |
+| `PDU`, `FEED` | `power` | The strip's own name, and the `input_feed` it is on — `utility-a`, `ups-1`, `-` when the document does not say. |
+| `OUTLETS`, `USED`, `FREE` | `power` | How many outlets the unit has, how many are claimed by a power supply, and how many are left. |
+| `CAPACITY` | `power` | `spec.capacity_watts`, or `-` when the rating is not recorded — in which case nothing is graded against it. |
+| `LOAD`, `FAILOVER` | `power` | The two load figures — see below. |
+| `UTIL` | `power` | `LOAD` as a percentage of `CAPACITY`, or `-` without one. |
+| `LOADS` | `power` | How many elements are plugged into the unit. |
 
 `bss` is one row per SSID per radio, which is the unit an operator works with: a
 dual-band access point serving three networks has six of them, each with its own
@@ -60,17 +68,68 @@ network?" is a question the listing answers. A hidden SSID is marked as such
 rather than left out — it is still on the air. See
 [§6.2.6 of the schema](../schema.md#626-wireless).
 
+### `power`: one row per PDU, and two load figures
+
+`power` is one row per `pdu` document
+([§17.6 of the schema](../schema.md#176-netgraph-list-power)), shaped after the
+[`netgraph ipam`](ipam.md) utilisation table and for the same reason: the question
+is capacity planning, so the columns are what is there, what is used, what is left,
+and the percentage that decides whether anybody has to act.
+
+The interesting part is the pair of load columns.
+
+* **`LOAD`** is the **normal-operation** figure. A dual-corded device draws through
+  both cords, so each of its *n* feeds carries `typical / n` — a 420 W server on
+  two strips puts 210 W on each. This is the state the plant is in on every day
+  that nothing has failed, so it is the figure
+  [`E039`](../validation-rules.md#e039--pdu-load-exceeds-its-capacity) grades
+  against `CAPACITY`, and the one `UTIL` is computed from.
+* **`FAILOVER`** counts each load **whole**, because that is what this strip
+  carries the moment the other one in the pair dies. It is reported without a
+  verdict: a pair of PDUs each sized for half a rack is a design, not an error, and
+  a rule that graded the failover number would fail every correctly built A/B
+  cabinet.
+
+**The gap between the two is the redundancy plan**, stated where somebody can read
+it. A single-fed rack has `LOAD` and `FAILOVER` the same, which is exactly the
+diagnosis worth having: nothing is dual-corded, so there is nothing to fail over
+to.
+
+<!-- run: -->
+```console
+$ netgraph -q -i examples/patch-room list power
+PDU       FEED       OUTLETS  USED  FREE  CAPACITY   LOAD  FAILOVER   UTIL  LOADS
+--------  ---------  -------  ----  ----  --------  -----  --------  -----  -----
+pdu-r1-a  utility-a       24     2    22      3680   41.5        83   1.1%      2
+pdu-r1-b  ups-1           24     2    22      3680   41.5        83   1.1%      2
+pdu-r2-a  utility-a        8     3     5      1840  492.5       985  26.8%      3
+pdu-r2-b  ups-1            8     3     5      1840  492.5       985  26.8%      3
+```
+
+Four strips, two racks, one A/B design. Each r2 unit carries 492.5 W of the
+985 W its three loads draw between them and would carry all 985 W alone — 53.5 %
+of its 1840 W rating rather than 26.8 %, which is the headroom the second feed
+buys. Where each of those watts comes from and goes to is
+[`--layer power`](../rendering.md#power-the-pdus-and-what-they-feed) and
+[`netgraph export power`](export.md).
+
 ## Computed, not transcribed
 
-`vlans` and `subnets` are computed from the resolved graph, not from what each
-document literally says: a host on an untagged access port is listed as a member
-of that VLAN even though it declares none. Loopback and link-local prefixes are
-left out of `subnets`, since listing `127.0.0.0/8` once per machine would say
-nothing about the addressing plan.
+`vlans`, `subnets` and `power` are computed from the resolved graph, not from what
+each document literally says: a host on an untagged access port is listed as a
+member of that VLAN even though it declares none, and a PDU's row is built from the
+`spec.power.inputs` of everything plugged into it rather than from anything the PDU
+declares about itself — nothing on a strip names its own downstream devices
+([§17.4](../schema.md#174-how-power-paths-are-resolved)). Loopback and link-local
+prefixes are left out of `subnets`, since listing `127.0.0.0/8` once per machine
+would say nothing about the addressing plan.
 
 The point of computing them is that they cannot disagree with the pictures.
 `subnets` is the same grouping
 [`--layer l3`](../rendering.md#l3-prefixes-and-who-is-addressed-in-them) draws,
+`power` the same resolution
+[`--layer power`](../rendering.md#power-the-pdus-and-what-they-feed) and
+[`netgraph export power`](export.md) use,
 and `tunnels` the same resolution
 [`--layer overlay`](../rendering.md#overlay-tunnels-and-what-runs-inside-what)
 draws. A tunnel whose endpoints do not resolve is still listed — you are most
@@ -155,7 +214,7 @@ answer to everything else, and is usually faster to act on:
 <!-- generated: arguments list -->
 | Argument | Required | Count | Default |
 |---|---|---|---|
-| `[devices\|cables\|tunnels\|vlans\|bss\|subnets]` | no | 1 | `devices` |
+| `[devices\|cables\|tunnels\|vlans\|bss\|subnets\|power]` | no | 1 | `devices` |
 <!-- /generated -->
 
 ---
@@ -191,7 +250,10 @@ own: validation is not run and findings do not change the code.
   name.
 * [`netgraph ipam`](ipam.md) and [`docs/ipam.md`](../ipam.md) — `list subnets`
   says which prefixes exist; `ipam` says whether the plan is healthy.
-* [`docs/rendering.md`](../rendering.md#layers-one-inventory-seven-questions) — the
-  layers whose groupings `subnets` and `tunnels` print as tables.
+* [`docs/rendering.md`](../rendering.md#layers-one-inventory-eight-questions) — the
+  layers whose groupings `subnets`, `tunnels` and `power` print as tables.
+* [`netgraph export power`](export.md) and [`docs/export.md`](../export.md#power) —
+  `list power` says whether each strip has room; the load schedule says which outlet
+  every cord is in.
 * [`docs/validation.md`](../validation.md) — the command to run when `list` warns
   that a document is missing from its output.

@@ -55,15 +55,24 @@ else re-implements it.
 ## Stage 1: load
 
 **Owner:** `src/netgraph/loader/` — `tree.py` (the walk), `documents.py` (the strict YAML
-parser), `inventory.py` (the index), plus `ranges.py`, `templates.py`, `provenance.py`,
-`ignore.py`.
+parser), `inventory.py` (the index), `cache.py` (parsed files, remembered by content), plus
+`ranges.py`, `templates.py`, `provenance.py`, `ignore.py`.
 
 ```python
-def load_tree(root: Path, *, keep_provenance: bool = False) -> Inventory: ...
+def load_tree(
+    root: Path, *, keep_provenance: bool = False, cache: DocumentCache | None = None
+) -> Inventory: ...
 def load_stream(
     text: str, *, name: str = STREAM_NAME, keep_provenance: bool = False
 ) -> Inventory: ...
 ```
+
+`cache` makes a *repeated* load incremental without making it stateful: every file is still
+read and hashed on every load, so the tree on disk remains the only thing that decides the
+result, and what is skipped is turning bytes that have been seen before back into elements.
+A hit is indistinguishable from a parse — same elements, same diagnostics, same order — which
+is what `tests/test_cache.py` asserts over every committed example. See
+[`docs/configuration.md`](configuration.md#cache--remembering-parsed-files).
 
 **May assume** nothing. `root` is checked, and a path that does not exist or is neither a
 directory nor a YAML file is the *only* thing that raises (`LoaderError`). Everything a
@@ -307,7 +316,7 @@ Verified against the tree: every path below exists.
 | `src/netgraph/validate.py` | semantic validation engine |
 | `src/netgraph/graph.py` | the same resolved topology as a `networkx.MultiGraph`, for analysis |
 | `src/netgraph/models/` | pydantic models for every element kind; `fielddocs.py` holds one prose description and YANG path per field, for both generators |
-| `src/netgraph/loader/` | recursive YAML inventory loader: `tree.py` the walk and the two-phase build templates make necessary, `documents.py` the strict safe parser and the libyaml / pure-Python choice, `inventory.py` the index and `LoadError`, `ranges.py` bracket expansion of `interfaces[].range`, `templates.py` the registry and the spec merge, `provenance.py` which file and line each field came from, `ignore.py` `.netgraphignore` with gitignore semantics |
+| `src/netgraph/loader/` | recursive YAML inventory loader: `tree.py` the walk and the two-phase build templates make necessary, `documents.py` the strict safe parser and the libyaml / pure-Python choice, `inventory.py` the index and `LoadError`, `ranges.py` bracket expansion of `interfaces[].range`, `templates.py` the registry and the spec merge, `provenance.py` which file and line each field came from, `ignore.py` `.netgraphignore` with gitignore semantics, `cache.py` the content-addressed store of parsed-and-validated files |
 | `src/netgraph/render/` | graph construction and output renderers: `graph.py` turns an inventory into nodes, edges, VLAN membership and subnets and filters them, `aggregate.py` collapses namespaces and bundles links, `options.py` is `RenderOptions` (what to draw, never what exists), `registry.py` is one entry per format — the CLI reads it, never a list of names |
 | `src/netgraph/render/dot.py` | Graphviz DOT and the SVG/PNG/PDF it produces, laid out by `templates/graph.dot.j2`; `html.py` the self-contained interactive page (`-f html`) from `templates/page.html.j2`; `mermaid.py` the flowchart exporter; `jsonexport.py` the canonical JSON graph |
 | `src/netgraph/render/details.py` | per-element hover records and tooltip text; `ids.py` the stable id each drawn node, edge and cluster carries; `links.py` the `--link-template` URL back to the document; `highlight.py` the emphasis a reader asked for; `icons.py` icon themes (a directory of images named after element kinds, the bundled ones under `iconsets/`) |

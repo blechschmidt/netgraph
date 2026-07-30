@@ -1,0 +1,138 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: ap-ceiling-01
+  description: |
+    Ceiling access point above the machine room, powered over its uplink:
+    'powered_by: poe' says the run carrying its traffic is its only power path,
+    so it declares no 'power.inputs' at all. The far end of that run is
+    sw-access-01:GigabitEthernet1/0/1, reached across pp-r2-a — a run through a
+    panel is electrically one run for power exactly as it is for frames.
+  labels:
+    site: hq
+    role: wireless
+    env: prod
+spec:
+  vendor: Cisco
+  model: C9120AXI
+  interfaces:
+    - name: br0
+      type: bridge
+      description: Bridges the radio onto the wired uplink
+      members:
+        - eth0
+        - wlan0
+
+    - name: Vlan10
+      type: vlan
+      description: In-band management address of the access point
+      ipv4:
+        addresses: [10.10.0.4/24]
+        gateway: 10.10.0.1
+      vlan:
+        mode: access
+        access_vlan: 10
+      parent: br0
+
+    - name: eth0
+      type: ethernet
+      description: PoE uplink, patched through pp-r2-a position 9
+      mac: '70:69:5a:0c:00:01'
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+
+    - name: wlan0
+      type: wifi
+      description: 5 GHz radio, one SSID
+      mac: '70:69:5a:0c:00:10'
+      mtu: 1500
+      wireless:
+        role: ap
+        band: 5GHz
+        channel: 44
+        width_mhz: 80
+        tx_power_dbm: 20
+        bss:
+          - ssid: hq-staff
+            bssid: '70:69:5a:0c:00:11'
+            vlan: 10
+            security: wpa2-eap
+  bridge:
+    name: br0
+    type: customer-vlan-bridge
+    address: '70:69:5a:0c:00:00'
+  vlans:
+    - id: 10
+      name: servers
+  power:
+    draw_watts:
+      typical: 22
+      maximum: 25.5
+    powered_by: poe
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: cam-lobby-01
+  description: |
+    Lobby camera, cabled straight to the access switch and powered over that
+    cable. A class-2 PSE port delivers 6.49 W at the powered device, which is
+    what its 5 W draw is checked against (NG-E014).
+  labels:
+    site: hq
+    role: camera
+    env: prod
+spec:
+  vendor: Axis
+  model: P3265-LV
+  interfaces:
+    - name: eth0
+      type: ethernet
+      description: PoE uplink to sw-access-01
+      mac: 'ac:cc:8e:0d:00:01'
+      mtu: 1500
+      ipv4:
+        addresses: [10.10.0.31/24]
+        gateway: 10.10.0.1
+      vlan:
+        mode: access
+        access_vlan: 10
+  power:
+    draw_watts: 5
+    powered_by: poe
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: laptop-lobby
+  description: |
+    A fixed workstation on the lobby desk, associated to hq-staff. It is here so
+    the access point's radio is a link and not a spare port; a wireless
+    association is an ordinary cable of `medium: wireless`.
+  labels:
+    site: hq
+    role: workstation
+spec:
+  vendor: Lenovo
+  model: ThinkPad T14
+  interfaces:
+    - name: wlan0
+      type: wifi
+      description: Associated to hq-staff on 5 GHz
+      mac: '8c:8c:aa:0e:00:01'
+      mtu: 1500
+      ipv4:
+        addresses: [10.10.0.41/24]
+        gateway: 10.10.0.1
+      vlan:
+        mode: access
+        access_vlan: 10
+      wireless:
+        role: station
+        band: 5GHz
+        channel: 44
+        bss:
+          - ssid: hq-staff
+            security: wpa2-eap

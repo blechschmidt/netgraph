@@ -25,6 +25,7 @@ from collections.abc import Iterable, Iterator, Mapping
 from typing import Final
 
 from netgraph.errors import RenderError
+from netgraph.models import format_watts
 from netgraph.render.aggregate import AGGREGATE_KIND, AggregateView
 from netgraph.render.graph import (
     PATCHPANEL_KIND,
@@ -99,8 +100,12 @@ _DOTTED: Final = ("-.-", "-. {label} .-")
 #: rely on their label. See :func:`_edges`. A BGP session is deliberately *not*
 #: one of them — it is drawn solid, as it is in DOT, because the whole point of
 #: the routing view is telling a configured session from a discovered adjacency.
+#:
+#: ``poe`` is dashed for the same reason a tunnel is: the power rides on a run the
+#: diagram draws elsewhere. An ``outlet`` feed is a cord of its own and stays
+#: solid.
 _LOGICAL_EDGE_KINDS: Final[frozenset[EdgeKind]] = frozenset(
-    {EdgeKind.TUNNEL, EdgeKind.ENCAPSULATION, EdgeKind.OSPF}
+    {EdgeKind.TUNNEL, EdgeKind.ENCAPSULATION, EdgeKind.OSPF, EdgeKind.POE}
 )
 
 _INDENT: Final = "    "
@@ -280,6 +285,11 @@ def _node_text(node: Node, options: RenderOptions, layer: Layer) -> str:
         routing.extend(node.routing.routes)
         return "\n".join(routing)
 
+    if node.power is not None:
+        # What this box draws, distributes or hands out: the same content the DOT
+        # record holds, and the whole reason the node is drawn at this layer.
+        return "\n".join([node.name, f"[{node.kind}]", *node.power.describe()])
+
     parts = [node.name, f"[{node.kind}]"]
     # At layer 3 the addresses live on the edges, where they say which interface
     # holds them; see the DOT renderer for the same reasoning.
@@ -330,6 +340,11 @@ def _edge_text(edge: Edge, layer: Layer, options: RenderOptions) -> str:
     if edge.kind is EdgeKind.SUBNET:
         if options.show_ips and edge.addresses:
             parts.append(", ".join(edge.addresses))
+        return " · ".join(parts)
+
+    if edge.kind.is_power and edge.feed is not None:
+        if edge.feed.reserved_watts:
+            parts.append(f"{format_watts(edge.feed.reserved_watts)} W")
         return " · ".join(parts)
 
     if layer is Layer.L2:

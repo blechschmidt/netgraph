@@ -16,6 +16,7 @@ from netgraph.models.base import NetgraphModel
 from netgraph.models.diagnostics import field_error
 from netgraph.models.element import ElementBase
 from netgraph.models.interface import Interface, InterfaceList, InterfaceType
+from netgraph.models.power import PowerConfig
 from netgraph.models.routing import RoutingConfig, StaticRoute, VrfDefinition
 from netgraph.models.scalars import Boolean, ElementName, MacAddress, VlanId
 
@@ -102,6 +103,9 @@ class DeviceSpec(NetgraphModel):
     routes: list[StaticRoute] = Field(default_factory=list)
     #: The dynamic routing protocols the device takes part in (§16.3).
     routing: RoutingConfig | None = None
+    #: What the device draws, which outlets feed it, and how much PoE it hands
+    #: out (§17.2). Absent means the inventory records nothing about its power.
+    power: PowerConfig | None = None
 
     @model_validator(mode="after")
     def _check_interfaces(self) -> DeviceSpec:
