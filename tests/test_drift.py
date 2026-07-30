@@ -719,8 +719,15 @@ def test_render_drift_rejects_a_format_it_does_not_write(home_lab: Inventory) ->
 
 
 def test_the_text_header_prefers_a_relative_root(tmp_path: Path) -> None:
+    """Relative where it can be, and forward slashes either way.
+
+    The separator is the report's, not the platform's: every other path netgraph
+    prints uses ``/``, and a header that did not would need a second copy of
+    every transcript that quotes it.
+    """
     assert _root_text(Path.cwd()) == "."
-    assert _root_text(tmp_path / "elsewhere") == str(tmp_path / "elsewhere")
+    assert _root_text(tmp_path / "elsewhere") == (tmp_path / "elsewhere").as_posix()
+    assert "\\" not in _root_text(tmp_path / "a" / "b")
 
 
 def test_an_empty_report_says_so(home_lab: Inventory, runner: CliRunner, tmp_path: Path) -> None:

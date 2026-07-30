@@ -79,7 +79,7 @@ from netgraph.report import (
 )
 from netgraph.report.stamp import NO_TIMESTAMP
 
-from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path
+from platform_marks import ON_WINDOWS, requires_dot  # isort: skip -- tests/ is on sys.path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -814,6 +814,17 @@ def test_a_missing_template_directory_is_refused(tmp_path: Path) -> None:
         )
 
 
+#: The link target a hostile namespace would open. ``javascript:`` is the worst
+#: case and is what runs on POSIX; Windows forbids a colon in a path, so the
+#: target there is an ordinary relative one. Nothing is lost by the substitution:
+#: what the test is about is whether the ``]`` in front of it is escaped, and the
+#: scheme only says why that matters.
+_SMUGGLED_TARGET = "(evil.md)" if ON_WINDOWS else "(javascript:alert(1))"
+
+#: A directory name that would close a link label and open a target of its own.
+SMUGGLING_NAMESPACE = f"a]{_SMUGGLED_TARGET}"
+
+
 def test_a_namespace_cannot_smuggle_a_link_into_a_page(tmp_path: Path) -> None:
     """A namespace is a *directory name*, and nothing validates it as a name.
 
@@ -821,7 +832,7 @@ def test_a_namespace_cannot_smuggle_a_link_into_a_page(tmp_path: Path) -> None:
     the brackets of the link it may be wrapped in, which are what would otherwise
     let a directory called ``a](javascript:…)`` publish a live link.
     """
-    directory = tmp_path / "a](javascript:alert(1))"
+    directory = tmp_path / SMUGGLING_NAMESPACE
     directory.mkdir()
     (directory / "sw.yaml").write_text(
         "apiVersion: netgraph.dev/v1alpha1\n"
@@ -837,12 +848,13 @@ def test_a_namespace_cannot_smuggle_a_link_into_a_page(tmp_path: Path) -> None:
     bundle, _ = generate(load_tree(tmp_path), options=options_for("markdown", diagrams=False))
     # An unescaped ``]`` closes a link label; the escaped form is a literal
     # bracket to a Markdown parser and closes nothing, which is the whole point.
-    smuggled = re.compile(r"(?<!\\)\]\((?:javascript|data|vbscript):", re.IGNORECASE)
+    smuggled = re.compile(r"(?<!\\)\]" + re.escape(_SMUGGLED_TARGET))
+    escaped = f"a\\]{_SMUGGLED_TARGET}"
     exercised = False
     for path in bundle.paths:
         text = bundle.text(path)
-        assert not smuggled.search(text), f"{path} carries a script URL as a link"
-        exercised = exercised or "javascript" in text
+        assert not smuggled.search(text), f"{path} carries the namespace as a live link"
+        exercised = exercised or escaped in text
     assert exercised, "the fixture stopped exercising this: no page names the namespace"
 
 
