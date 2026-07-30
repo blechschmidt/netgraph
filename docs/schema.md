@@ -2418,6 +2418,12 @@ everything else with `NG-D002` rather than guessing. When a second version
 exists, documents of different versions may coexist in one inventory; the
 loader converts older documents to the current internal model on read.
 
+This section is normative for the schema. The same policy for netgraph's *other*
+public surfaces — the CLI, the JSON output documents, the exit codes, the rule
+ids, the published integrations — and the four things a breaking change to any of
+them has to carry, are in [`releasing.md`](releasing.md#what-is-public-api).
+Each release records what changed in [`CHANGELOG.md`](../CHANGELOG.md).
+
 ### 12.1 Deferred to a later revision
 
 Deliberately out of scope for `v1alpha1`, listed so that nobody designs around

@@ -18,6 +18,7 @@ assume — read [docs/architecture.md](docs/architecture.md) first.
 - [Recipe: add a renderer](#recipe-add-a-renderer)
 - [Profiling and benchmarks](#profiling-and-benchmarks)
 - [Commits and pull requests](#commits-and-pull-requests)
+- [The changelog](#the-changelog)
 - [See also](#see-also)
 
 ---
@@ -578,9 +579,42 @@ Before opening the pull request:
 3. new behaviour has an example test, and a new invariant has a property test;
 4. new documentation has its markers and `python tools/check_examples.py` reports
    0 failures;
-5. CI is green. It has to be — the generator drift checks, the link checks and the
+5. anything a user would notice has a bullet under `## [Unreleased]` in
+   [CHANGELOG.md](CHANGELOG.md) — see [The changelog](#the-changelog);
+6. CI is green. It has to be — the generator drift checks, the link checks and the
    documented transcripts are all part of the suite, so a red run means something
    in the tree contradicts something else in the tree.
+
+## The changelog
+
+[CHANGELOG.md](CHANGELOG.md) has an `## [Unreleased]` section at the top. A change a
+*user* would notice goes there in the same pull request, under `### Added`,
+`### Changed`, `### Fixed` or `### Removed`:
+
+* a command, a flag, a schema field, a validation rule, an output format, an exit code;
+* a diagram that comes out different, or a diagnostic that now fires where it did not.
+
+A refactor, a test, an internal performance win and a documentation edit do not, unless
+they change one of the above. `git log` is the record for those, and a changelog padded
+with them is a changelog nobody reads.
+
+Two entries are not optional, because a reader of the changelog is deciding whether to
+upgrade:
+
+* **A breaking change to a public surface** — the CLI, the `netgraph.dev/v1alpha1`
+  schema, a JSON output document, an exit code, a rule id, a published integration.
+  It needs a `### Changed`/`### Removed` bullet naming the old shape and the new one,
+  plus a migration line saying literally what to edit. The full list of public surfaces
+  and the four things such a change needs are in
+  [docs/releasing.md](docs/releasing.md#what-is-public-api).
+* **A fix for something previously released**, so somebody on the old version can tell
+  whether it was their bug.
+
+The release workflow refuses to publish a version whose changelog section is missing or
+empty, and [tests/test_release.py](tests/test_release.py) checks the file's shape on every
+pull request — so an entry forgotten here is caught long before a tag is pushed.
+[docs/releasing.md](docs/releasing.md) has the rest: the versioning policy and how a
+release is actually cut.
 
 ## See also
 
@@ -592,3 +626,5 @@ Before opening the pull request:
   which is worth reading once before changing it.
 * [docs/follow-ups.md](docs/follow-ups.md) — the deferred-work list, and the format
   an entry takes.
+* [docs/releasing.md](docs/releasing.md) — what a `0.x` version promises, which surfaces
+  are public API, and the mechanics of cutting a release.

@@ -37,6 +37,24 @@ reports — see [`docs/yang-mapping.md`](docs/yang-mapping.md).
 
 netgraph needs **Python 3.10 or newer**.
 
+<!-- norun: installs from PyPI into the reader's environment -->
+```bash
+pip install netgraph
+pipx install netgraph        # or, to keep it out of your project environments
+uv tool install netgraph     # same idea, faster
+```
+
+Check what you got — the version, and the Python and Graphviz it found:
+
+<!-- norun: the Graphviz and Python versions are properties of the reader's machine -->
+```bash
+netgraph --version
+netgraph version --json      # the same report, for a bug report
+```
+
+From a checkout instead, when you are working on netgraph itself or want an unreleased
+change:
+
 ```bash
 pip install -e .            # from a checkout
 pip install -e '.[dev]'     # including the development tooling
@@ -63,13 +81,16 @@ including the PowerShell completion script and the `.gitattributes` an inventory
 Git on Windows wants — are in
 [`docs/getting-started.md`](docs/getting-started.md#on-windows-and-macos).
 
-Or install nothing at all. [`docker-compose.yml`](docker-compose.yml) runs the CLI, the
-live preview and the browser editor out of a container that already has Graphviz in it:
+Or install nothing at all. The published image already has Graphviz in it, and runs the
+CLI, the live preview and the browser editor:
 
 <!-- norun: needs a Docker daemon -->
 ```bash
-docker compose run --rm netgraph validate    # see docs/docker.md
+docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netgraph:latest validate
 ```
+
+See [`docs/docker.md`](docs/docker.md), which also covers
+[`docker-compose.yml`](docker-compose.yml) for the two servers.
 
 ## Quickstart
 
@@ -181,6 +202,7 @@ report.txt` both do what they look like they do.
 | [`netgraph schema`](docs/commands/schema.md) | Write the JSON Schema for editor completion. | [schema.md](docs/commands/schema.md) |
 | [`netgraph config show`](docs/commands/config.md) | Show the resolved settings and where each value came from. | [config.md](docs/commands/config.md) |
 | [`netgraph completion`](docs/commands/completion.md) | Print the shell completion script. | [completion.md](docs/commands/completion.md) |
+| [`netgraph version`](docs/commands/version.md) | Report the netgraph, Python and Graphviz versions in use. | [version.md](docs/commands/version.md) |
 <!-- /generated -->
 
 Every flag of every command, the global options and the exit codes:

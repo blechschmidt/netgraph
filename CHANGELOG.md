@@ -1,0 +1,121 @@
+# Changelog
+
+All notable changes to netgraph are recorded here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the versioning follows
+[Semantic Versioning](https://semver.org/spec/v2.0.0.html), with the `0.x` caveats spelled
+out in [`docs/releasing.md`](docs/releasing.md).
+
+What belongs in an entry is what a *user* would notice: a flag, a schema field, a rule, an
+output format, an exit code, a diagram that comes out different. Refactors, test additions
+and internal performance work are only listed when they change one of those. The rest is in
+`git log`.
+
+Every release is cut from the section named after it, and the release workflow refuses to
+publish a version whose section is missing or empty — see
+[`tools/release.py`](tools/release.py).
+
+## [Unreleased]
+
+_Nothing yet._
+
+## [0.1.0] - 2026-07-30
+
+First release. netgraph reads a folder tree of YAML documents describing a network, checks
+that the documents agree with each other, and renders the result.
+
+### Added
+
+- **The inventory format.** `apiVersion: netgraph.dev/v1alpha1` documents in nine kinds —
+  `switch`, `router`, `hub`, `computer`, `server`, `adapter`, `cable`, `tunnel` and
+  `patchpanel` — discovered recursively under a root folder, where the folder a document
+  sits in becomes its namespace. Field names and value spaces follow RFC 8343
+  (`ietf-interfaces`), RFC 8344 (`ietf-ip`) and the IEEE 802.1Q bridge model. Normative
+  specification in [`docs/schema.md`](docs/schema.md).
+- **Interfaces, addressing and VLANs.** Physical and logical interfaces with MAC addresses,
+  IPv4/IPv6 addresses and prefixes, DHCP, `access`/`trunk`/`routed` port modes, native and
+  tagged VLANs, LAGs, bridges and sub-interfaces. Interface *ranges*
+  (`ethernet-1/1..1/48`) and reusable device templates so a 48-port switch is not 48 blocks
+  of YAML.
+- **Wireless detail.** SSIDs, bands, channels and widths, and the BSS-to-SSID mapping, with
+  station associations drawn as links.
+- **Routing.** VRFs, static routes and protocol adjacencies (OSPF, BGP, IS-IS), following
+  RFC 8349, plus a `routing` layer that draws them.
+- **Tunnels as a first-class kind.** WireGuard, IPsec, OpenVPN, PPTP, GRE, L2TP and VXLAN,
+  including tunnels carried inside other tunnels.
+- **Passive plant.** Patch panels with derived ports, racks, rack units and a rack-elevation
+  view.
+- **`netgraph validate`** — three passes (schema, reference resolution, semantics) over a
+  catalogue of graded rules, each with an `NG-*` alias, a documented reason and a fix.
+  `--strict` promotes warnings, `--disable` silences by id or alias, and the machine-readable
+  forms are `--output-format json|sarif|github` for pipelines, code scanning and inline
+  annotations. Exit codes: `0` clean, `1` findings, `2` usage.
+- **`netgraph render`** — seven layers (`l1`, `l2`, `l3`, `overlay`, `routing`, `rack`,
+  `logical`) to `svg`, `png`, `pdf`, `dot`, `mermaid`, `json` and a self-contained
+  interactive `html` page. Filters by namespace, VLAN, kind and neighbourhood; namespace
+  collapsing and link bundling for inventories too large to read whole; `--icons cisco` for
+  device pictures. SVG output carries per-element tooltips, `--link-template` links back to
+  the YAML, and stable element ids for deep-linking.
+- **`netgraph web`** and **`netgraph watch`** — the inventory edited in one browser pane and
+  drawn in the other, and a live preview that re-renders on every save.
+- **`netgraph path`** — trace how two elements reach each other, at any layer, with the
+  answer optionally drawn.
+- **`netgraph ipam`** — subnet utilisation, free space, the next free block, aggregation and
+  overlap detection.
+- **`netgraph export`** — hosts file, DNS zone, DHCP reservations, Ansible inventory and
+  Prometheus targets, generated from the same documents.
+- **`netgraph import`** — bootstrap a first inventory from LLDP, `ip -j addr`, `show`
+  command output or a cabling CSV.
+- **`netgraph drift`** — the declared inventory compared against what the live network
+  reports, with per-element coverage so an unchecked device is not silently counted as
+  agreeing.
+- **`netgraph fmt`** — one canonical form for inventory YAML, with `--check` and `--diff`.
+- **`netgraph list`**, **`show`**, **`rules`**, **`schema`**, **`config`** — interrogate an
+  inventory, the rule catalogue and the resolved configuration from the shell.
+- **`netgraph init`** — scaffold a small, valid inventory, including the JSON Schema and the
+  editor wiring.
+- **`netgraph completion`** — completion scripts for bash, zsh, fish and PowerShell, with
+  completion of element names, namespaces, kinds, layers, formats, profiles and rule ids.
+- **`netgraph version`** — the netgraph, Python and Graphviz versions in use, the selected
+  YAML parser and the resolved dependency versions; `--json` for pasting into a bug report.
+  `netgraph --version` prints the same text.
+- **JSON Schema output** (`netgraph schema`) so an editor underlines a typo'd key as it is
+  typed, checked into `schema/` and wired up by `netgraph init`.
+- **`netgraph.toml`** — per-inventory render defaults and named profiles, so the flags a
+  diagram needs live next to the inventory instead of in shell history.
+- **CI integrations** — a `netgraph-validate` composite GitHub Action, three `pre-commit`
+  hooks (`netgraph-validate`, `netgraph-fmt`, `netgraph-fmt-check`) and a documented GitLab
+  recipe.
+- **Published artefacts.** `pip install netgraph` (also `pipx` and `uv tool install`), from
+  PyPI via Trusted Publishing, and a `linux/amd64` + `linux/arm64` container image at
+  `ghcr.io/blechschmidt/netgraph` that already has Graphviz in it and runs unprivileged on a
+  read-only root filesystem. The wheel, the sdist and the image carry build provenance
+  attestations, and each release attaches an SBOM for the wheel's dependency closure and one
+  for the image. [`docs/releasing.md`](docs/releasing.md) records what the version number
+  promises and which surfaces it promises it about.
+- **A compose file** for the three ways the tool is used in a container — one command at a
+  time, as a live preview, and as the browser editor.
+- **Windows and macOS support**, tested in CI. Graphviz installed without landing on `PATH`
+  is found in the documented install locations, and `NETGRAPH_DOT` names the binary outright.
+
+### Changed
+
+- `netgraph validate` is about 3.1× faster on a 10 000-element inventory, and loading is
+  about 1.4× faster; both were driven by a committed profiler rather than by guesswork
+  (`tools/profile_validate.py`, `tools/bench_pipeline.py`).
+- The `html` output no longer grows with the number of layers in it: the views share one
+  document instead of each carrying a copy.
+- The documentation was reorganised into a lean `README.md` and a navigable `docs/` set with
+  one page per command; every flag table is generated from the CLI and every shell transcript
+  is either executed by the test suite or marked with the reason it cannot be.
+
+### Fixed
+
+- Six loader and renderer defects found by property-based and fuzz testing, all of them cases
+  where a hand-written but unusual document was mis-parsed or crashed rather than being
+  reported: see `tests/test_properties.py` and `tests/test_fuzz_loader.py` for the
+  regression examples.
+- Mermaid front matter escaped `"` but not `\`, so a title containing a backslash produced a
+  diagram Mermaid would not parse.
+
+[Unreleased]: https://github.com/blechschmidt/netgraph/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/blechschmidt/netgraph/releases/tag/v0.1.0

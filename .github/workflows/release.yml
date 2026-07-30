@@ -1,0 +1,743 @@
+name: release
+
+# Two triggers, and the difference between them is the whole design.
+#
+# A ``v*`` tag is the real thing: it publishes to PyPI, pushes the container
+# image to GHCR, signs both with build provenance and creates the GitHub release.
+# None of that can be taken back.
+#
+# ``workflow_dispatch`` is the dry run. It executes every step above except the
+# irreversible ones -- the same checks, the same build, the same clean-virtualenv
+# installs on three operating systems, the same two-architecture image -- and
+# publishes to TestPyPI instead of PyPI. So the only thing a green dry run leaves
+# untested is the upload itself.
+#
+# The full write-up, including what counts as public API and what to do when a
+# job fails half way through, is in docs/releasing.md.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+# The floor. Every job that needs more than this says so itself, next to the
+# reason -- the ``permissions`` block of a job that publishes is the whole of its
+# blast radius, so it is not written once at the top where it would apply to
+# jobs that have no business with it.
+permissions:
+  contents: read
+
+# Never cancel a release in flight. A run stopped after the PyPI upload and
+# before the GitHub release leaves a published version with no release notes,
+# which is exactly the state this file exists to avoid.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PIP_NO_INPUT: "1"
+  PYTHONUNBUFFERED: "1"
+  FORCE_COLOR: "1"
+  # ``github.repository`` is already lowercase for this project, which is what
+  # GHCR requires of a repository name.
+  IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  # --------------------------------------------------------------------------- #
+  # 1. Refuse the release before anything is built
+  # --------------------------------------------------------------------------- #
+  guard:
+    name: guard
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      tag: ${{ steps.check.outputs.tag }}
+      minor: ${{ steps.check.outputs.minor }}
+      prerelease: ${{ steps.check.outputs.prerelease }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      # The three facts that have to agree: the tag, the version in
+      # pyproject.toml and a dated, non-empty CHANGELOG.md section. The logic is
+      # in tools/release.py rather than in bash here, because tests/test_release.py
+      # drives it against bad input -- a guard only exercised by the release it
+      # guards is not a guard.
+      #
+      # On workflow_dispatch there is no tag, so the version in pyproject.toml is
+      # taken as the intended one: a dry run then checks exactly what the next
+      # tag will check.
+      - name: Check the tag, the version and the changelog agree
+        id: check
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            python tools/release.py check --ref "${GITHUB_REF}" --notes release-notes.md
+          else
+            echo "::notice::dry run -- checking the version in pyproject.toml, no tag involved"
+            python tools/release.py check --notes release-notes.md
+          fi
+
+      - name: Show the notes that will become the release body
+        run: |
+          set -euo pipefail
+          echo "## Release notes for ${{ steps.check.outputs.tag }}" >>"$GITHUB_STEP_SUMMARY"
+          cat release-notes.md >>"$GITHUB_STEP_SUMMARY"
+
+      # Carried as an artefact rather than re-extracted later, so the GitHub
+      # release body and the changelog cannot end up disagreeing.
+      - name: Upload the release notes
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+
+  # --------------------------------------------------------------------------- #
+  # 2. The whole CI gate, at this exact commit
+  # --------------------------------------------------------------------------- #
+  #
+  # ci.yml called as a reusable workflow, not a copy of a subset of it: "it was
+  # green on main" is a different statement from "it is green at this tag", and a
+  # release-only copy of the gate is a copy that drifts.
+  ci:
+    name: ci
+    needs: guard
+    permissions:
+      contents: read
+      # The called workflow uploads SARIF for each example inventory. A reusable
+      # workflow cannot hold more than its caller grants, so the grant is here.
+      security-events: write
+    uses: ./.github/workflows/ci.yml
+
+  # --------------------------------------------------------------------------- #
+  # 3. Build the distributions
+  # --------------------------------------------------------------------------- #
+  build:
+    name: build
+    needs: [guard, ci]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Install the build tooling
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+          python -m pip list
+
+      - name: Build the sdist and the wheel
+        run: |
+          set -euo pipefail
+          python -m build
+          ls -la dist/
+
+      # ``--strict`` turns a README that PyPI would render badly into a failure
+      # rather than a page nobody notices is broken.
+      - name: twine check --strict
+        run: twine check --strict dist/*
+
+      # A wheel whose file name disagrees with the tag is the failure mode the
+      # guard job cannot see: it checks the source, this checks the artefact.
+      - name: Confirm the artefacts carry the released version
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          built=(dist/*)
+
+          wheel="dist/netgraph-${VERSION}-py3-none-any.whl"
+          sdist="dist/netgraph-${VERSION}.tar.gz"
+          for expected in "$wheel" "$sdist"; do
+            if [ ! -s "$expected" ]; then
+              echo "::error::expected ${expected}; dist/ holds: ${built[*]}"
+              exit 1
+            fi
+          done
+
+          # Exactly two files: a stale artefact from a cached build directory
+          # would otherwise be uploaded and published alongside the real ones.
+          if [ "${#built[@]}" -ne 2 ]; then
+            echo "::error::dist/ holds ${#built[@]} files, expected 2: ${built[*]}"
+            exit 1
+          fi
+          echo "ok: $(basename "$wheel"), $(basename "$sdist")"
+
+      # The SBOM is taken from an environment the wheel was *installed* into
+      # rather than from the wheel file, because the interesting content of a
+      # netgraph SBOM is the dependency closure -- pydantic, PyYAML, click,
+      # networkx, Jinja2 and what they pull in -- and a wheel only declares its
+      # requirements, it does not resolve them.
+      - name: Install the wheel into an environment to be inventoried
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          python -m venv sbom-env
+          ./sbom-env/bin/pip install --upgrade pip
+          ./sbom-env/bin/pip install "dist/netgraph-${VERSION}-py3-none-any.whl"
+          ./sbom-env/bin/pip list
+
+      - name: Generate a CycloneDX SBOM of the wheel and its closure
+        uses: anchore/sbom-action@7b36ad622f042cab6f59a75c2ac24ccb256e9b45 # v0.20.4
+        with:
+          path: sbom-env
+          format: cyclonedx-json
+          artifact-name: netgraph-${{ needs.guard.outputs.version }}-wheel.cdx.json
+          output-file: sbom/netgraph-${{ needs.guard.outputs.version }}-wheel.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Check the SBOM names netgraph and its dependencies
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import glob
+          import json
+
+          [path] = glob.glob("sbom/*-wheel.cdx.json")
+          document = json.load(open(path, encoding="utf-8"))
+          # Folded, because a distribution's declared name changes case between
+          # releases -- Jinja2 became jinja2 in 3.1.3 -- and a release must not
+          # fail over that.
+          names = {component.get("name", "").lower() for component in document["components"]}
+          print(f"{path}: {len(names)} components")
+          expected = {"netgraph", "pydantic", "pyyaml", "click", "networkx", "jinja2"}
+          missing = expected - names
+          if missing:
+              raise SystemExit(f"::error::the SBOM never names {sorted(missing)}")
+          PY
+
+      - name: Upload the distributions
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+      - name: Upload the SBOM
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sbom-wheel
+          path: sbom/
+          if-no-files-found: error
+
+  # --------------------------------------------------------------------------- #
+  # 4. Install what was built, on every platform that is claimed
+  # --------------------------------------------------------------------------- #
+  #
+  # Not "does the repository work" -- ci.yml answered that. This answers "does
+  # the *artefact* work", which is a different question and the one that goes
+  # wrong on release day: a package missing from the wheel, a data file left out
+  # of the sdist, a console script that does not get generated, an sdist that
+  # unpacks but does not build.
+  #
+  # Nothing here touches the checkout except for the dist/ it downloaded, and
+  # Graphviz is deliberately *not* installed: ``netgraph --version`` must work
+  # without it and say so, which is also what a user filing a bug report will run.
+  verify:
+    name: verify (${{ matrix.os }})
+    needs: [guard, build]
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-24.04", "macos-14", "windows-latest"]
+
+    defaults:
+      run:
+        # Git Bash on Windows, as in ci.yml, so the steps below are written once.
+        shell: bash
+
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Download the distributions
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist
+
+      - name: Install the wheel into a clean virtualenv and run it
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          python -m venv from-wheel
+          bin="from-wheel/bin"
+          [ "$RUNNER_OS" = "Windows" ] && bin="from-wheel/Scripts"
+
+          "$bin/python" -m pip install --upgrade pip
+          "$bin/python" -m pip install "dist/netgraph-${VERSION}-py3-none-any.whl"
+
+          # The console script, by name, from the environment's bin directory --
+          # not ``python -m netgraph``. A wheel can be importable and still ship
+          # no entry point, and the entry point is what a user types.
+          "$bin/netgraph" --version
+          "$bin/netgraph" version --json >version.json
+          "$bin/python" - <<'PY'
+          import json
+          import os
+
+          report = json.load(open("version.json", encoding="utf-8"))
+          expected = os.environ["VERSION"]
+          print(json.dumps(report, indent=2))
+          if report["netgraph"] != expected:
+              raise SystemExit(f"::error::the wheel reports {report['netgraph']}, expected {expected}")
+          if report["schemaVersion"] != 1:
+              raise SystemExit(f"::error::unexpected report version {report['schemaVersion']}")
+          if not report["python"]["version"]:
+              raise SystemExit("::error::the report names no Python version")
+          PY
+
+      # Renders a real inventory from a real installed console script, with no
+      # checkout involved. ``-f dot`` needs no Graphviz, which is the point: this
+      # step must not pass or fail for a reason that has nothing to do with the
+      # wheel.
+      - name: Draw something with the installed console script
+        run: |
+          set -euo pipefail
+          bin="from-wheel/bin"
+          [ "$RUNNER_OS" = "Windows" ] && bin="from-wheel/Scripts"
+
+          "$bin/netgraph" init smoke-test
+          "$bin/netgraph" --inventory smoke-test validate --strict
+          "$bin/netgraph" --inventory smoke-test render -f dot -o smoke.dot
+          if ! grep -q "digraph\|graph " smoke.dot; then
+            echo "::error::the render produced no DOT graph"
+            cat smoke.dot
+            exit 1
+          fi
+          echo "ok: $(wc -c <smoke.dot) bytes of DOT"
+
+      # The sdist, installed the same way. ``pip install <sdist>`` runs the build
+      # backend, so this is also the check that the sdist *builds* -- an sdist
+      # that unpacks but cannot be built is the classic release-day surprise, and
+      # PyPI will happily host one.
+      - name: Build and install the sdist in a clean virtualenv
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          python -m venv from-sdist
+          bin="from-sdist/bin"
+          [ "$RUNNER_OS" = "Windows" ] && bin="from-sdist/Scripts"
+
+          "$bin/python" -m pip install --upgrade pip
+          "$bin/python" -m pip install "dist/netgraph-${VERSION}.tar.gz"
+
+          reported="$("$bin/netgraph" --version | head -n 1)"
+          echo "$reported"
+          if [ "$reported" != "netgraph ${VERSION}" ]; then
+            echo "::error::the sdist install reports '${reported}', expected 'netgraph ${VERSION}'"
+            exit 1
+          fi
+
+  # --------------------------------------------------------------------------- #
+  # 5. Publish
+  # --------------------------------------------------------------------------- #
+  #
+  # From here on the work is irreversible, which is why every check is above.
+  pypi:
+    name: pypi
+    needs: [guard, verify]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    # Named so the PyPI trusted publisher can be scoped to it: without the
+    # environment, any workflow in this repository could mint an upload token.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/netgraph/${{ needs.guard.outputs.version }}
+    permissions:
+      # The OIDC token the runner exchanges for a short-lived upload token. This
+      # is the whole reason no PyPI credential is stored in this repository:
+      # there is nothing here to leak, and nothing to rotate.
+      id-token: write
+
+    steps:
+      - name: Download the distributions
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@7f25271a4aa483500f742f9492b2ab5648d61011 # v1.12.4
+        with:
+          # Deliberately *not* skip-existing: a version already on PyPI means the
+          # release is being run twice and the second run must stop, loudly.
+          skip-existing: false
+          print-hash: true
+
+  testpypi:
+    name: testpypi (dry run)
+    needs: [guard, verify]
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/netgraph/
+    permissions:
+      id-token: write
+
+    steps:
+      - name: Download the distributions
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist
+
+      - name: Publish to TestPyPI
+        uses: pypa/gh-action-pypi-publish@7f25271a4aa483500f742f9492b2ab5648d61011 # v1.12.4
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          # Unlike the real upload: dry-running the same version twice is a
+          # normal thing to do and must not fail.
+          skip-existing: true
+          print-hash: true
+
+  # --------------------------------------------------------------------------- #
+  # 6. Provenance for the Python artefacts
+  # --------------------------------------------------------------------------- #
+  #
+  # A separate job so that ``attestations: write`` is held by nothing that also
+  # builds. ``gh attestation verify netgraph-X.Y.Z-py3-none-any.whl --repo
+  # blechschmidt/netgraph`` then ties a downloaded file to this repository, this
+  # workflow and this commit.
+  provenance:
+    name: provenance
+    needs: [guard, verify, pypi]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Download the distributions
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist
+
+      - name: Attest the sdist and the wheel
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: |
+            dist/*.whl
+            dist/*.tar.gz
+
+  # --------------------------------------------------------------------------- #
+  # 7. The container image
+  # --------------------------------------------------------------------------- #
+  image:
+    name: image
+    needs: [guard, ci, verify]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      # Pushing to GHCR needs nothing but GITHUB_TOKEN with this; there is no
+      # registry credential to store either.
+      packages: write
+      # The image's own provenance attestation, as for the wheel above.
+      id-token: write
+      attestations: write
+
+    outputs:
+      digest: ${{ steps.push.outputs.digest }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      # arm64 is emulated on an amd64 runner. It is slow -- a few minutes, mostly
+      # apt-get inside the arm64 layer -- and it is the architecture a growing
+      # share of laptops and cheap servers actually are, so it is built rather
+      # than promised.
+      - name: Set up QEMU for the arm64 build
+        uses: docker/setup-qemu-action@29109295f81e9208d7d86ff1c6c12d2833863392 # v3.6.0
+        with:
+          platforms: arm64
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+
+      # Build the native architecture first and load it, so the image is *run*
+      # before it is pushed. A multi-architecture build cannot be loaded into the
+      # local daemon, so this is a separate, cached, single-platform pass rather
+      # than an extra output of the push below.
+      - name: Build linux/amd64 and load it
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: netgraph:smoke
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run the image before publishing it
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          # The entrypoint is netgraph itself, so this is ``netgraph --version``.
+          reported="$(docker run --rm netgraph:smoke --version | head -n 1)"
+          echo "$reported"
+          if [ "$reported" != "netgraph ${VERSION}" ]; then
+            echo "::error::the image reports '${reported}', expected 'netgraph ${VERSION}'"
+            exit 1
+          fi
+          # Graphviz is in the image; an image that cannot draw is not worth
+          # publishing, and this is the one check ``--version`` alone would miss.
+          docker run --rm netgraph:smoke version --json >image-version.json
+          python - <<'PY'
+          import json
+
+          report = json.load(open("image-version.json", encoding="utf-8"))
+          graphviz = report["graphviz"]
+          if graphviz["version"] is None:
+              raise SystemExit(f"::error::no usable Graphviz in the image: {graphviz}")
+          print("graphviz", graphviz["version"], "at", graphviz["path"])
+          PY
+
+          # And a real render, through the entrypoint, from a mounted tree.
+          docker run --rm -v "$PWD/examples/home-lab:/inventory:ro" netgraph:smoke \
+            render --layer l2 -f svg >topology.svg
+          grep -q "<svg" topology.svg
+          echo "ok: $(wc -c <topology.svg) bytes of SVG"
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Three tags: the exact version, the minor line so that ``:0.1`` follows
+      # patch releases, and ``latest`` -- withheld from a pre-release, which must
+      # not become what an unqualified ``docker pull`` gets.
+      - name: Work out the tags and the labels
+        id: meta
+        uses: docker/metadata-action@902fa8ec7d6ecbf8d84d538b9b233a880e428804 # v5.7.0
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=${{ needs.guard.outputs.version }}
+            type=raw,value=${{ needs.guard.outputs.minor }}
+            type=raw,value=latest,enable=${{ github.event_name == 'push' && needs.guard.outputs.prerelease == 'false' }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.guard.outputs.version }}
+            org.opencontainers.image.documentation=https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/docs/docker.md
+
+      - name: Build both architectures and push
+        id: push
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name == 'push' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # In-toto attestations attached to the manifest itself, so ``docker
+          # buildx imagetools inspect`` and ``syft`` find them without a side
+          # channel. Both need a registry to be written to, hence the condition:
+          # a dry run has nowhere to put them.
+          provenance: ${{ github.event_name == 'push' && 'mode=max' || 'false' }}
+          sbom: ${{ github.event_name == 'push' }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # A second, standalone SBOM of the image, in SPDX, so that the GitHub
+      # release carries one as a plain file for anyone who does not want to talk
+      # to a registry to read it. The one buildx attached above is the
+      # authoritative copy; this is the readable one.
+      - name: Generate an SPDX SBOM of the published image
+        if: github.event_name == 'push'
+        uses: anchore/sbom-action@7b36ad622f042cab6f59a75c2ac24ccb256e9b45 # v0.20.4
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.push.outputs.digest }}
+          format: spdx-json
+          artifact-name: netgraph-${{ needs.guard.outputs.version }}-image.spdx.json
+          output-file: sbom/netgraph-${{ needs.guard.outputs.version }}-image.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Attest the image
+        if: github.event_name == 'push'
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          # Written into the registry beside the manifest, so ``gh attestation
+          # verify oci://...`` works for someone who only has the image.
+          push-to-registry: true
+
+      - name: Upload the image SBOM
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sbom-image
+          path: sbom/
+          if-no-files-found: error
+
+      - name: Report what was published
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Container image"
+            echo
+            if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+              echo "Pushed \`${DIGEST}\` as:"
+            else
+              echo "Dry run -- built, ran and discarded. Would have pushed:"
+            fi
+            echo
+            while IFS= read -r tag; do
+              [ -n "$tag" ] && echo "* \`${tag}\`"
+            done <<<"$TAGS"
+          } >>"$GITHUB_STEP_SUMMARY"
+
+  # --------------------------------------------------------------------------- #
+  # 8. The GitHub release
+  # --------------------------------------------------------------------------- #
+  #
+  # Last, so that a release exists only once the thing it describes has been
+  # published. Re-runnable: ``--clobber`` and the create-or-edit branch below mean
+  # a failure here is the one failure in this workflow that costs nothing.
+  github-release:
+    name: github release
+    needs: [guard, build, pypi, provenance, image]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    permissions:
+      # To create the release and attach the files. Nothing else in this workflow
+      # can write to the repository.
+      contents: write
+
+    steps:
+      - name: Download the distributions
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: dist
+          path: dist
+
+      - name: Download the release notes
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: release-notes
+          path: notes
+
+      - name: Download the SBOMs
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: sbom-*
+          path: sbom
+          merge-multiple: true
+
+      # The body is the changelog section verbatim, plus the two things a
+      # changelog cannot know: how to install this exact version, and the digest
+      # that was actually published.
+      - name: Assemble the release body
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+          MINOR: ${{ needs.guard.outputs.minor }}
+          DIGEST: ${{ needs.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          {
+            cat notes/release-notes.md
+            echo
+            echo "## Install"
+            echo
+            echo '```bash'
+            echo "pip install netgraph==${VERSION}"
+            echo "pipx install netgraph==${VERSION}"
+            echo "uv tool install netgraph==${VERSION}"
+            echo '```'
+            echo
+            echo "Or the container image, which already has Graphviz in it:"
+            echo
+            echo '```bash'
+            echo "docker run --rm -v \"\$PWD:/inventory:ro\" ${IMAGE}:${VERSION} validate"
+            echo '```'
+            echo
+            echo "| Image | Value |"
+            echo "|---|---|"
+            echo "| Tags | \`${VERSION}\`, \`${MINOR}\`, \`latest\` |"
+            echo "| Platforms | \`linux/amd64\`, \`linux/arm64\` |"
+            echo "| Digest | \`${DIGEST}\` |"
+            echo
+            echo "## Provenance"
+            echo
+            echo "The wheel, the sdist and the image carry build provenance attestations."
+            echo "Verify a download before trusting it:"
+            echo
+            echo '```bash'
+            echo "gh attestation verify netgraph-${VERSION}-py3-none-any.whl --repo ${GITHUB_REPOSITORY}"
+            echo "gh attestation verify oci://${IMAGE}@${DIGEST} --repo ${GITHUB_REPOSITORY}"
+            echo '```'
+            echo
+            echo "SBOMs for the wheel's dependency closure (CycloneDX) and for the image (SPDX)"
+            echo "are attached below."
+          } >body.md
+          cat body.md
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.guard.outputs.tag }}
+          VERSION: ${{ needs.guard.outputs.version }}
+          PRERELEASE: ${{ needs.guard.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          flags=(--title "netgraph ${VERSION}" --notes-file body.md --verify-tag)
+          if [ "$PRERELEASE" = "true" ]; then
+            flags+=(--prerelease)
+          fi
+
+          # Create, or -- when this job is being re-run after a failure further
+          # down -- update what is already there. Either way the body and the
+          # assets end up as this run produced them.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice::${TAG} already has a release; updating it"
+            gh release edit "$TAG" --title "netgraph ${VERSION}" --notes-file body.md
+            gh release upload "$TAG" dist/* sbom/* --clobber
+          else
+            gh release create "$TAG" "${flags[@]}" dist/* sbom/*
+          fi
+
+          gh release view "$TAG"

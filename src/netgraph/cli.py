@@ -89,7 +89,6 @@ import click.core
 import yaml
 from click.core import ParameterSource
 
-from netgraph import __version__
 from netgraph.completion import (
     SHELLS,
     complete_element,
@@ -210,6 +209,9 @@ from netgraph.trace import DEFAULT_MAX_HOPS, TraceError, TraceResult, render_tra
 from netgraph.trace import REPORT_FORMATS as TRACE_FORMATS
 from netgraph.validate import Finding
 from netgraph.validate import validate as run_validation
+from netgraph.version import as_dict as version_as_dict
+from netgraph.version import collect as collect_version
+from netgraph.version import format_text as format_version
 from netgraph.watch import (
     DEFAULT_DEBOUNCE_MS,
     DEFAULT_HOST,
@@ -327,8 +329,31 @@ class AppContext:
         return config
 
 
+def _show_version(ctx: click.Context, param: click.Parameter, value: bool) -> None:
+    """``-V``/``--version``: the report, then exit before anything is loaded.
+
+    Eager and ``expose_value=False``, the way click's own ``version_option`` is,
+    so ``netgraph --version`` answers from a directory that holds no inventory.
+    """
+    if not value or ctx.resilient_parsing:
+        return
+    click.echo(format_version(collect_version()), nl=False)
+    ctx.exit()
+
+
 @click.group(context_settings=CONTEXT_SETTINGS, invoke_without_command=True)
-@click.version_option(__version__, "-V", "--version", prog_name="netgraph")
+@click.option(
+    "-V",
+    "--version",
+    is_flag=True,
+    is_eager=True,
+    expose_value=False,
+    callback=_show_version,
+    help=(
+        "Show the netgraph, Python and Graphviz versions in use, and exit. "
+        "'netgraph version --json' is the same report, machine-readably."
+    ),
+)
 @click.option(
     "-i",
     "--inventory",
@@ -3828,6 +3853,34 @@ def _validate_source(config: Config, key: str) -> str:
     default = ValidationConfig()
     current = getattr(config.validation, {"severity": "severity"}.get(key, key))
     return "file [validate]" if current != getattr(default, key) else "default"
+
+
+@cli.command("version")
+@click.option(
+    "--json",
+    "as_json",
+    is_flag=True,
+    default=False,
+    help="Emit the report as a JSON object instead of aligned text.",
+)
+def version_command(as_json: bool) -> None:
+    """Print the netgraph, Python and Graphviz versions in use.
+
+    'netgraph --version' prints the same text. This command exists for the
+    '--json' form, which is what to paste into a bug report: it also carries the
+    interpreter path, the platform, which YAML parser was selected and the
+    resolved version of every runtime dependency.
+    """
+    report = collect_version()
+    if as_json:
+        click.echo(json.dumps(version_as_dict(report), indent=2, sort_keys=False))
+        return
+    click.echo(format_version(report), nl=False)
+
+
+# --------------------------------------------------------------------------- #
+# rules
+# --------------------------------------------------------------------------- #
 
 
 @cli.command("rules")

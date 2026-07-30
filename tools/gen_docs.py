@@ -87,6 +87,7 @@ PAGE: Final[dict[str, str]] = {
     "config": "config.md",
     "config show": "config.md",
     "completion": "completion.md",
+    "version": "version.md",
 }
 
 #: One line per command for the index tables, in the order a reader meets them.
@@ -108,6 +109,7 @@ INDEX_ORDER: Final = [
     "schema",
     "config show",
     "completion",
+    "version",
 ]
 
 #: What each command is for, in one clause. ``short_help`` is a sentence aimed
@@ -130,6 +132,7 @@ SUMMARY: Final[dict[str, str]] = {
     "schema": "Write the JSON Schema for editor completion.",
     "config show": "Show the resolved settings and where each value came from.",
     "completion": "Print the shell completion script.",
+    "version": "Report the netgraph, Python and Graphviz versions in use.",
 }
 
 

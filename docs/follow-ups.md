@@ -1327,6 +1327,41 @@ through the same tracer by construction.
 
 ---
 
+## 13. `netgraph --version --json` is not the spelling that works
+
+**Status:** deliberate, 2026-07-30. The machine-readable report is
+`netgraph version --json`.
+
+`--version` is an *eager* Click option: its callback runs before any other
+parameter is processed, which is why `netgraph --version` answers from a directory
+holding no inventory and does not care whether `-i` names a path that exists.
+Click parses the whole argument list before running any callback, though, so
+`netgraph --version --json` fails during parsing with `No such option '--json'` —
+the eager callback never gets the chance to notice the second flag.
+
+Three ways to make that exact spelling work were considered and none is worth it:
+
+- **A hidden `--json` on the group.** Click processes eager parameters in the order
+  they appear on the command line, so `--version` would still be handled first and
+  would print text having silently ignored `--json`. Worse than an error.
+- **Make `--version` non-eager** and print from the group body. Then `-i` is
+  validated first, so `netgraph -i /nonexistent --version` would fail to report a
+  version — precisely when a user most wants one.
+- **An optional value** (`--version=json`). This one works, but it is a spelling
+  nobody guesses, and it would sit next to `netgraph version --json` doing the same
+  job.
+
+So the report lives on a command instead: `netgraph version` for the text and
+`netgraph version --json` for the document, with `-V`/`--version` kept as the eager
+shortcut for the text form. The flag's own help text names the command, and
+`docs/commands/version.md` documents both.
+
+**What would justify revisiting this.** Click growing a way to order eager
+parameters independently of the command line, at which point the hidden-flag
+approach becomes correct rather than merely tempting.
+
+---
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

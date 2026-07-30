@@ -6,10 +6,50 @@ neither a Python environment nor a system package is welcome — a shared CI run
 jump host, a colleague's laptop — a container is the shortest route from a folder of
 YAML to a diagram.
 
-Two files in this repository do that: [`Dockerfile`](../Dockerfile) builds the image, and
-[`docker-compose.yml`](../docker-compose.yml) wires up the mount, the ports and the user
-id for the three ways the tool is used — one command at a time, as a live preview, and as
-the browser editor.
+Every release publishes one, so there is nothing to build:
+
+<!-- norun: needs a Docker daemon -->
+```bash
+docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netgraph:latest validate
+```
+
+## The published image
+
+`ghcr.io/blechschmidt/netgraph`, built and pushed by
+[`.github/workflows/release.yml`](../.github/workflows/release.yml) from the
+[`Dockerfile`](../Dockerfile) in this repository.
+
+| | |
+|---|---|
+| Registry | `ghcr.io/blechschmidt/netgraph` — no login needed to pull |
+| Tags | `X.Y.Z` (exact), `X.Y` (follows patch releases), `latest` (the newest non-pre-release) |
+| Platforms | `linux/amd64`, `linux/arm64` |
+| Provenance | a build provenance attestation and an SBOM, both attached to the manifest |
+
+Pin a tag in anything that matters. `latest` is convenient on a laptop and is the wrong
+choice in a pipeline, where a release you did not ask for should not change what your build
+does:
+
+<!-- norun: needs a Docker daemon -->
+```bash
+docker pull ghcr.io/blechschmidt/netgraph:0.1.0
+```
+
+The image is signed with GitHub's build provenance, so you can check that the thing you
+pulled came from this repository's release workflow and not from somewhere else. The digest
+is in each release's notes:
+
+<!-- norun: needs the gh CLI, a Docker daemon and a real digest -->
+```bash
+gh attestation verify oci://ghcr.io/blechschmidt/netgraph:0.1.0 \
+  --repo blechschmidt/netgraph
+```
+
+## Or with compose, for the two servers
+
+[`docker-compose.yml`](../docker-compose.yml) wires up the mount, the ports and the user id
+for the three ways the tool is used — one command at a time, as a live preview, and as the
+browser editor:
 
 <!-- norun: needs a Docker daemon, and the last two start servers that never exit -->
 ```bash
@@ -18,9 +58,13 @@ docker compose up web                          # the browser editor, http://127.
 docker compose up watch                        # the live preview,   http://127.0.0.1:8080/
 ```
 
-The first run builds the image; after that it is reused. `docker compose build --pull`
-rebuilds it, which is also how a change to your checkout of `src/` reaches the container —
-the image holds an installed copy, not a mount of the source.
+The compose file **builds** the image from the checkout it sits in rather than pulling the
+published one, and that is deliberate: it is the development path, where the point is to
+run the code in front of you. The first `docker compose run` builds it; after that it is
+reused, and `docker compose build --pull` is how a change to your `src/` reaches the
+container — the image holds an installed copy, not a mount of the source. To run the
+*published* image instead, use `docker run` as above, or edit the two lines of
+`docker-compose.yml` that say `build:` and `image:`.
 
 ## What is in the image
 
@@ -160,18 +204,22 @@ applies to `watch`, and the compose file is a starting point, not an interface.
 
 ## Without compose
 
-Nothing above needs compose; it only saves typing. The equivalents:
+Nothing above needs compose; it only saves typing. The equivalents, against the published
+image:
 
-<!-- norun: needs a Docker daemon, and the second starts a server that never exits -->
+<!-- norun: needs a Docker daemon, and the last starts a server that never exits -->
 ```bash
-docker build -t netgraph:local .
+image=ghcr.io/blechschmidt/netgraph:latest
 
-docker run --rm -v "$PWD:/inventory:ro" netgraph:local validate
+docker run --rm -v "$PWD:/inventory:ro" "$image" validate
 docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/inventory" \
-  netgraph:local render -f svg -o topology.svg
+  "$image" render -f svg -o topology.svg
 docker run --rm --init -p 127.0.0.1:8080:8080 -v "$PWD:/inventory:ro" \
-  netgraph:local watch --serve --host 0.0.0.0
+  "$image" watch --serve --host 0.0.0.0
 ```
+
+Substitute `netgraph:local` after a `docker build -t netgraph:local .` to run your own
+checkout instead.
 
 `--init` matters for the servers. netgraph is PID 1 in the container and a Python process
 that has installed no `SIGTERM` handler ignores that signal when it is PID 1 — so without
@@ -184,19 +232,38 @@ The image is a way to run `netgraph validate` on a runner with no Python:
 
 <!-- norun: needs a Docker daemon, and is a fragment of somebody else's pipeline -->
 ```bash
-docker run --rm -v "$PWD:/inventory:ro" netgraph:local \
+docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netgraph:0.1.0 \
   validate --strict --output-format github
 ```
+
+An exact version rather than `latest`, for the reason above: a pipeline whose behaviour
+changes because somebody else cut a release is a pipeline that will fail on a day nobody
+touched it.
 
 Exit codes and output formats are unchanged by the container — `0` clean, `1` findings,
 and `--output-format json|sarif|github` as documented in [ci.md](ci.md). If your runner
 does have Python, the [GitHub Action](ci.md#the-github-action) and the
 [pre-commit hooks](ci.md#pre-commit) are lighter: no image to build, no daemon to reach.
 
-This repository publishes no image to a registry. The compose file builds one locally
-because that is the only version that is certainly the code in front of you; a `netgraph`
-tag on Docker Hub would be a promise about a release, and 0.1.0 does not make release
-promises yet.
+## What version am I running
+
+The image's entrypoint is netgraph itself, so:
+
+<!-- norun: needs a Docker daemon; the versions are properties of the image -->
+```bash
+docker run --rm ghcr.io/blechschmidt/netgraph:latest version --json
+```
+
+That prints the netgraph, Python and Graphviz versions inside the container, which is the
+first thing worth pasting into a bug report about a render — see
+[`netgraph version`](commands/version.md). The image also carries the usual OCI labels, so
+`docker inspect` answers the same question without running anything:
+
+<!-- norun: needs a Docker daemon -->
+```bash
+docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' \
+  ghcr.io/blechschmidt/netgraph:latest
+```
 
 ## How this is kept honest
 
@@ -209,3 +276,10 @@ ends up unprivileged with `netgraph` as its entrypoint. The `docker` job in
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) then builds the image for real,
 runs a command through each service and fetches a page from each server, so a compose file
 that parses but does not work fails there.
+
+The published image gets the same treatment before it is published: the `image` job of
+[`.github/workflows/release.yml`](../.github/workflows/release.yml) builds `linux/amd64`,
+loads it, runs `--version`, checks that Graphviz inside it answers, renders an example to
+SVG through the entrypoint — and only then builds both architectures and pushes. So an image
+that cannot draw never reaches the registry. See
+[`docs/releasing.md`](releasing.md#what-the-release-workflow-does).

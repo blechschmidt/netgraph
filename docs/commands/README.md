@@ -29,6 +29,7 @@ a flag that is documented exists. The prose around them is written by hand.
 | [`netgraph schema`](schema.md) | Write the JSON Schema for editor completion. | [schema.md](schema.md) |
 | [`netgraph config show`](config.md) | Show the resolved settings and where each value came from. | [config.md](config.md) |
 | [`netgraph completion`](completion.md) | Print the shell completion script. | [completion.md](completion.md) |
+| [`netgraph version`](version.md) | Report the netgraph, Python and Graphviz versions in use. | [version.md](version.md) |
 <!-- /generated -->
 
 ## Global options
@@ -39,7 +40,7 @@ works on and how loudly it reports.
 <!-- generated: options  -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
-| `-V`, `--version` | — | off | Show the version and exit. |
+| `-V`, `--version` | — | off | Show the netgraph, Python and Graphviz versions in use, and exit. 'netgraph version --json' is the same report, machine-readably. |
 | `-i`, `--inventory` | `PATH` | current directory | Root folder of the YAML inventory tree, or a single YAML file. |
 | `-q`, `--quiet` | — | off | Only report errors. |
 | `-v`, `--verbose` | `INTEGER, >= 0` | `0` | Increase verbosity; repeatable. |

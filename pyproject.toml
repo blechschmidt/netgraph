@@ -109,6 +109,10 @@ include = [
     "/.env.example",
     "/README.md",
     "/LICENSE",
+    # tests/test_release.py reads both: the changelog must have a dated, non-empty
+    # section for the version in this file, and the release workflow must keep its
+    # actions pinned. Neither check can run from an sdist that omits them.
+    "/CHANGELOG.md",
 ]
 
 [tool.ruff]

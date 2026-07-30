@@ -26,6 +26,7 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
 | look up a command's flags | [commands/](commands/README.md) |
 | see how an inventory maps onto RFC 8343, RFC 8344 and 802.1Q | [yang-mapping.md](yang-mapping.md) |
 | work on netgraph itself | [architecture.md](architecture.md), [../CONTRIBUTING.md](../CONTRIBUTING.md) |
+| know whether upgrading will break your inventory | [releasing.md](releasing.md), [../CHANGELOG.md](../CHANGELOG.md) |
 | understand how netgraph is tested | [testing.md](testing.md) |
 
 ## The pages, by kind
@@ -86,6 +87,11 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
   profiles, and how to reproduce a failure.
 * **[follow-ups.md](follow-ups.md)** — the running list of known gaps and deliberate
   deferrals, each with the reasoning that deferred it.
+* **[releasing.md](releasing.md)** — what a `0.x` version number promises, which surfaces
+  are public API and which are internal, how a breaking change has to be recorded, and the
+  mechanics of cutting a release.
+* **[../CHANGELOG.md](../CHANGELOG.md)** — what changed in each release, and what you have
+  to do about it.
 
 ## How the documentation is kept honest
 
