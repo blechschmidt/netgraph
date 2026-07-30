@@ -113,6 +113,38 @@ def regen_golden(request: pytest.FixtureRequest) -> bool:
     return bool(request.config.getoption("--regen-golden"))
 
 
+#: Environment variables that decide, before any code in netgraph runs, whether
+#: its output is styled. ``NO_COLOR`` and ``FORCE_COLOR`` are read by
+#: :meth:`netgraph.console.Console._detect`; the rest are what the libraries
+#: underneath consult for the same question.
+_COLOUR_ENV_VARS: Final = ("NO_COLOR", "FORCE_COLOR", "CLICOLOR", "CLICOLOR_FORCE")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def take_colour_out_of_the_environment() -> Iterator[None]:
+    """Decide styling by the stream, never by the ambient environment.
+
+    A dozen assertions in this suite are about *whether* netgraph styles its
+    output — that a redirect drops the escapes, that a table's header is plain
+    when it is piped. Those are properties of the stream, and the environment can
+    overrule the stream: ``FORCE_COLOR`` says "style anyway".
+
+    CI sets exactly that, so every one of those assertions failed there and
+    passed on the developer's machine — the worst shape a test failure comes in.
+    The environment is therefore cleared for the whole session rather than
+    per test, because several tests run netgraph in a subprocess, which inherits
+    it. A test that wants styling asks for it explicitly (``--color``, or a fake
+    tty), which is the path a user takes too.
+    """
+    previous = {name: os.environ.pop(name, None) for name in _COLOUR_ENV_VARS}
+    try:
+        yield
+    finally:
+        for name, value in previous.items():
+            if value is not None:
+                os.environ[name] = value
+
+
 @pytest.fixture(scope="session", autouse=True)
 def isolate_the_parse_cache(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Path]:
     """Point :data:`~netgraph.loader.CACHE_DIR_ENV_VAR` at a throwaway directory.

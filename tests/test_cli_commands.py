@@ -837,6 +837,29 @@ def test_no_color_wins_over_the_terminal(runner: CliRunner) -> None:
     assert "\x1b[" not in result.output
 
 
+def test_force_color_styles_output_that_is_not_going_to_a_terminal(
+    runner: CliRunner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """https://force-color.org, and what CI sets so a log keeps its colours.
+
+    Set through ``monkeypatch`` rather than read from the environment the suite
+    happens to run in: ``tests/conftest.py`` clears both of these for the whole
+    session precisely so that no other assertion depends on them, which leaves
+    the two branches here as the only place either is exercised.
+    """
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    result = invoke(runner, "-i", str(BROKEN), "validate")
+    assert "\x1b[" in result.output
+
+
+def test_no_color_wins_over_force_color(runner: CliRunner, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Both set is a contradiction, and no-color.org says which way it resolves."""
+    monkeypatch.setenv("FORCE_COLOR", "1")
+    monkeypatch.setenv("NO_COLOR", "1")
+    result = runner.invoke(cli, ["-i", str(BROKEN), "validate"], color=True)
+    assert "\x1b[" not in result.output
+
+
 def test_a_single_yaml_file_is_a_valid_inventory(runner: CliRunner) -> None:
     """`load_tree` accepts one file, so the CLI must not insist on a directory."""
     result = invoke(runner, "-i", str(HOME_LAB / "switches" / "sw-home.yaml"), "list", "devices")

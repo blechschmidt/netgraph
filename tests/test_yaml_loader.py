@@ -276,6 +276,41 @@ def test_a_custom_tag_on_a_mapping_is_refused(base: type[NodeLoader]) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# Guarantee 3b: a string the tool cannot write back is refused
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "escape",
+    [
+        pytest.param(r"\udcff", id="low-surrogate"),
+        pytest.param(r"\ud800", id="high-surrogate"),
+        # A well-formed UTF-16 pair, which is still two unencodable code points
+        # once YAML has turned each escape into its own character.
+        pytest.param(r"\ud800\udc00", id="surrogate-pair"),
+    ],
+)
+def test_a_surrogate_escape_is_refused(base: type[NodeLoader], escape: str) -> None:
+    """Not encodable as UTF-8, so every artefact netgraph writes would raise on it.
+
+    Parametrised over both bases because they refuse it in different places and at
+    different depths: libyaml while scanning the escape, the pure-Python parser
+    not at all until netgraph's own constructor looks at the result. What matters
+    is that *neither* returns a value, so which wheel is installed cannot decide
+    whether an inventory loads.
+    """
+    with pytest.raises(yaml.YAMLError):
+        load(base, f'description: "{escape}"\n')
+
+
+def test_a_backslash_u_escape_of_something_real_is_untouched(base: type[NodeLoader]) -> None:
+    """The guard is about the surrogate range and nothing else."""
+    assert load(base, r'description: "café \U0001F600"' + "\n") == [
+        {"description": "café \U0001f600"}
+    ]
+
+
+# --------------------------------------------------------------------------- #
 # Guarantee 4: a merge key is not a duplicate
 # --------------------------------------------------------------------------- #
 

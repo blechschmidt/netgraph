@@ -402,28 +402,43 @@ def _front_matter(text: str) -> str | None:
     return text[4:end]
 
 
-@requires_dot
-@settings(max_examples=capped(15), suppress_health_check=[HealthCheck.too_slow])
-@given(ng.inventory_plans())
-def test_dot_output_is_accepted_by_graphviz(plan: ng.InventoryPlan) -> None:
-    """The DOT source parses — asserted by the program that has to read it.
+def assert_graphviz_parses(source: str) -> None:
+    """Hand ``source`` to ``dot -Tcanon`` and fail with its diagnostic.
 
-    ``dot -Tcanon`` is a parse-and-print: it fails on anything the real grammar
+    ``-Tcanon`` is a parse-and-print: it fails on anything the real grammar
     refuses, which is a far stronger claim than "the string starts with
     ``digraph``".
+
+    The encoding is named rather than left to the locale. ``text=True`` alone
+    encodes with the ANSI code page on Windows, so a label carrying a combining
+    accent — which every property below is in the business of generating —
+    raises :class:`UnicodeEncodeError` before ``dot`` is even started, a failure
+    of this call rather than of the DOT it was checking. netgraph's own
+    invocation hands over bytes it encoded itself
+    (:mod:`netgraph.render.dot`); this is the same decision, made once, for the
+    three properties that shell out here.
     """
-    with written(plan) as (_, inventory):
-        assert_loaded(inventory)
-        source = RENDERERS["dot"].text(build_graph(inventory, layer=Layer.L2), RenderOptions())
     completed = subprocess.run(
         ["dot", "-Tcanon"],
         input=source,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         check=False,
         timeout=60,
     )
     assert completed.returncode == 0, completed.stderr
+
+
+@requires_dot
+@settings(max_examples=capped(15), suppress_health_check=[HealthCheck.too_slow])
+@given(ng.inventory_plans())
+def test_dot_output_is_accepted_by_graphviz(plan: ng.InventoryPlan) -> None:
+    """The DOT source parses — asserted by the program that has to read it."""
+    with written(plan) as (_, inventory):
+        assert_loaded(inventory)
+        source = RENDERERS["dot"].text(build_graph(inventory, layer=Layer.L2), RenderOptions())
+    assert_graphviz_parses(source)
 
 
 @requires_dot
@@ -623,10 +638,7 @@ def test_graphviz_accepts_a_rendering_of_awkward_names(element: str, interface: 
         source = RENDERERS["dot"].text(
             build_graph(inventory, layer=Layer.L2), RenderOptions(element_ids=True)
         )
-    completed = subprocess.run(
-        ["dot", "-Tcanon"], input=source, capture_output=True, text=True, check=False, timeout=60
-    )
-    assert completed.returncode == 0, completed.stderr
+    assert_graphviz_parses(source)
 
 
 @pytest.mark.parametrize("payload", ng.BREAKOUT_PAYLOADS)
@@ -641,15 +653,7 @@ def test_no_text_can_break_out_of_a_dot_string(payload: str) -> None:
 @pytest.mark.parametrize("payload", ng.BREAKOUT_PAYLOADS)
 def test_graphviz_accepts_dot_output_carrying_a_payload(payload: str) -> None:
     """The skeleton check says the tokens match; this says Graphviz agrees."""
-    completed = subprocess.run(
-        ["dot", "-Tcanon"],
-        input=_rendered(payload, "dot"),
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=60,
-    )
-    assert completed.returncode == 0, completed.stderr
+    assert_graphviz_parses(_rendered(payload, "dot"))
 
 
 @pytest.mark.parametrize("payload", ng.BREAKOUT_PAYLOADS)

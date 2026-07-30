@@ -56,6 +56,26 @@ publish a version whose section is missing or empty — see
 - **`[cache]` in `netgraph.toml`** — `enabled`, `dir` and `max-size`, for an inventory that
   needs to say where its cache goes on the machines it is used on.
 
+### Fixed
+
+- **netgraph could not start on Python 3.11.** Every command raised `ValueError: mutable
+  default <class 'mappingproxy'>` while importing the configuration layer. 3.10 and 3.12
+  were unaffected, which is why it survived a full test matrix — the interpreter in the
+  middle was the only one that refuses that spelling of a dataclass default.
+- **A lone surrogate escape now fails to load under either YAML parser.** `description:
+  "\ud800"` names a code point UTF-8 cannot encode, so every artefact netgraph writes would
+  have raised on it. libyaml refused it and the pure-Python parser accepted it, meaning
+  whether an inventory loaded depended on which PyYAML wheel was installed.
+- **The nesting-depth guard is now a limit both parsers survive.** It was 1024, which is
+  past the pure-Python composer's own ceiling, so a document exactly at the documented limit
+  was refused there and accepted with libyaml. It is 256 — still four hundred times deeper
+  than the schema goes, and the same answer on both.
+- **`W129` reported its two tunnels in the order the files happened to be walked in.**
+  Splitting one inventory across directories differently changed the finding's text, and
+  where one pair of tunnels clashed on two elements, which element was named.
+- **`netgraph drift` wrote the inventory path with backslashes on Windows.** Every other
+  path netgraph prints uses forward slashes.
+
 ## [0.1.0] - 2026-07-30
 
 First release. netgraph reads a folder tree of YAML documents describing a network, checks

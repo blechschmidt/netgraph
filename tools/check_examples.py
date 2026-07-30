@@ -39,6 +39,7 @@ import re
 import shlex
 import subprocess
 import sys
+import sysconfig
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -272,15 +273,20 @@ def entry_point() -> list[str]:
     see. The installed console script is therefore preferred, and the module form
     is the fallback for a checkout that has not been installed.
 
-    ``.exe`` is tried as well as the bare name, because that is what the console
-    script is called on Windows -- and falling through to the module form there
-    would make every documented usage line fail the comparison on that platform
-    alone, which reads like a bug in netgraph rather than in this lookup.
+    Where to look for it is ``sysconfig``'s answer and not "next to the
+    interpreter", because those are the same directory only on POSIX: Windows
+    installs console scripts into ``Scripts\\`` beside ``python.exe``, so the
+    naive lookup found nothing there, fell through to the module form, and made
+    every documented usage line fail the comparison on that platform alone --
+    which reads like a bug in netgraph rather than in this lookup. ``.exe`` is
+    tried as well as the bare name for the same reason.
     """
-    for suffix in ("", ".exe"):
-        script = Path(sys.executable).with_name(f"netgraph{suffix}")
-        if script.is_file():
-            return [str(script)]
+    directories = [Path(sysconfig.get_path("scripts")), Path(sys.executable).parent]
+    for directory in directories:
+        for suffix in ("", ".exe"):
+            script = directory / f"netgraph{suffix}"
+            if script.is_file():
+                return [str(script)]
     return [sys.executable, "-m", "netgraph"]
 
 

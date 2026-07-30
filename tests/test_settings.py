@@ -25,13 +25,18 @@ from typing import Any
 
 import click
 import pytest
-import tomllib
 from click.shell_completion import ShellComplete
 from click.testing import CliRunner, Result
 
 from netgraph.cli import CONFIGURABLE, cli, main
 from netgraph.completion import PROG_NAME, complete_profile
-from netgraph.config import CONFIG_FILE_NAME, load_config, parse_config
+
+# The TOML parser netgraph itself uses. Taken from there rather than imported
+# directly because ``tomllib`` only entered the standard library in 3.11 and this
+# package supports 3.10, where the dependency is ``tomli``: a bare ``import
+# tomllib`` here made the whole module uncollectable on the oldest interpreter
+# the project claims to support.
+from netgraph.config import CONFIG_FILE_NAME, load_config, parse_config, tomllib
 from netgraph.errors import ConfigurationError
 from netgraph.render import FORMATS, NODE_KINDS, RANKDIRS, Layer
 from netgraph.scaffold import build_scaffold

@@ -67,6 +67,14 @@ skipped for a **capability the platform does not have**, never for a platform:
 | a FIFO is not loaded; a FIFO is not a valid root | `os.mkfifo` does not exist on Windows, and a Windows named pipe is not a filesystem entry the loader could walk into | `requires_mkfifo` |
 | the generated route script passes `sh -n` | no POSIX shell. The script's *content* is still asserted line by line there; only the second opinion from `sh` is missing | `requires_posix_shell` |
 
+One more is skipped on **macOS** rather than on Windows, and by the same rule.
+`docs/commands/completion.md` documents what `netgraph completion bash` prints;
+Click inspects the host's bash first and adds a warning on anything older than
+4.4, which is what Apple has shipped as `/bin/bash` since 2007. The transcript is
+correct, and so is the extra line — so the block is skipped where the shell adds
+it (`HAVE_BASH_COMPLETION`, measured exactly as Click measures it) rather than
+documented twice.
+
 The marks live in `tests/platform_marks.py`, one per capability, with the reason
 in the mark rather than in a comment — so a skipped run says why in its own
 output. `tests/test_platform.py::test_no_test_module_skips_a_whole_platform`

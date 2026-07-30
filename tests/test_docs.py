@@ -38,6 +38,8 @@ import pytest
 from netgraph.diagnostics import LOAD_RULE
 from netgraph.rules import RULES
 
+from platform_marks import HAVE_BASH_COMPLETION  # isort: skip -- tests/ is on sys.path
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DOCS = REPO_ROOT / "docs"
 COMMAND_DOCS = DOCS / "commands"
@@ -425,6 +427,13 @@ def test_the_examples_are_mostly_executed() -> None:
     )
 
 
+#: A documented command whose *output* depends on the host's bash, not on
+#: netgraph. Click inspects ``bash --version`` before handing over the script it
+#: generates and prints a warning when it is older than 4.4, so the transcript
+#: gains a line on a machine that has an old one.
+_NEEDS_BASH_COMPLETION = "netgraph completion bash"
+
+
 @pytest.mark.parametrize("block", _BLOCKS, ids=[block.id for block in _BLOCKS])
 def test_the_documented_example_is_what_netgraph_prints(block: Any) -> None:
     """Run the transcript and diff it, or check the excuse gives a reason.
@@ -432,5 +441,12 @@ def test_the_documented_example_is_what_netgraph_prints(block: Any) -> None:
     A ``run`` block is executed through the installed console script, so a usage
     error it documents carries the program name a reader would actually see.
     """
+    if not HAVE_BASH_COMPLETION and any(
+        step.command.startswith(_NEEDS_BASH_COMPLETION) for step in EXAMPLES.steps_of(block)
+    ):
+        pytest.skip(
+            "bash is older than 4.4, so Click adds a warning to what this block documents; "
+            "the transcript is what a machine with a supported bash sees"
+        )
     problem = EXAMPLES.check(block)
     assert problem is None, f"{block.id}: {problem}"

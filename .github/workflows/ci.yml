@@ -2,9 +2,17 @@ name: CI
 
 on:
   push:
+    # Both halves of the ref space are named, and that is not redundant: a
+    # ``push`` filter that mentions tags and not branches means "tags only".
+    # Written with ``tags-ignore`` alone -- as it was between 2026-07-30 and this
+    # commit -- this workflow stopped running on every push to every branch, and
+    # said nothing while it did, because a workflow that is never triggered has
+    # no run to be red. Three commits reached ``main`` ungated that way.
+    branches:
+      - "**"
     # ``release.yml`` calls this workflow for a ``v*`` tag, so a tag push that
     # also triggered it here would run the whole matrix twice against the same
-    # commit. Branch pushes are unaffected.
+    # commit.
     tags-ignore:
       - "v*"
   pull_request:
@@ -12,6 +20,10 @@ on:
   # gate a pull request does rather than a copy of a subset of it. Nothing about
   # the jobs below changes when it is called: the difference is only who asked.
   workflow_call:
+  # So a run can be asked for by hand -- against a branch whose last push was
+  # gated by something else, or to re-run the gate after a runner image changes
+  # under a commit that has not moved.
+  workflow_dispatch:
 
 # Nothing here writes to the repository or the package registry.
 permissions:

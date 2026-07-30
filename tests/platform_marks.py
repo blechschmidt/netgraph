@@ -17,12 +17,20 @@ Two of the marks are not about Windows at all. ``requires_dot`` and
 ``requires_node`` are about a tool that may not be installed, on any platform,
 and they live here because the reason to skip is the same kind of reason: the
 environment cannot run the test, so the test says so rather than failing.
+
+Not everything here is a mark. :data:`ON_WINDOWS`, :data:`PWSH` and
+:data:`HAVE_BASH_COMPLETION` are the same measurements exposed as values, for the
+tests that do not skip on the answer but change what they expect — a directory
+name the platform will accept, a transcript the platform's own shell adds a line
+to.
 """
 
 from __future__ import annotations
 
 import os
+import re
 import shutil
+import subprocess
 from pathlib import Path
 from typing import Final
 
@@ -31,6 +39,7 @@ import pytest
 from netgraph.render.dot import find_dot
 
 __all__ = [
+    "HAVE_BASH_COMPLETION",
     "ON_WINDOWS",
     "PWSH",
     "requires_dot",
@@ -104,6 +113,36 @@ requires_posix_shell = pytest.mark.skipif(
     shutil.which("sh") is None,
     reason="POSIX-only: no 'sh' to syntax-check the generated shell script with",
 )
+
+
+def _bash_is_modern_enough_for_completion() -> bool:
+    """Is the ``bash`` on ``PATH`` new enough for Click's completion script?
+
+    Click refuses to vouch for the script it generates on anything older than
+    4.4 and says so on stderr — which is a line of output, and therefore part of
+    any transcript that runs ``netgraph completion bash``.
+
+    macOS is where this bites: Apple has shipped ``/bin/bash`` 3.2 since 2007,
+    for licensing reasons that have nothing to do with the shell, so the warning
+    is the *correct* behaviour there and the documented transcript is the
+    correct one everywhere else. Measured exactly as Click measures it, so the
+    two cannot disagree.
+    """
+    if shutil.which("bash") is None:
+        return False
+    try:
+        completed = subprocess.run(
+            ["bash", "-c", 'echo "${BASH_VERSION}"'], capture_output=True, text=True, timeout=30
+        )
+    except (OSError, subprocess.SubprocessError):  # pragma: no cover - no bash to ask
+        return False
+    match = re.match(r"(\d+)\.(\d+)", completed.stdout.strip())
+    return match is not None and (int(match[1]), int(match[2])) >= (4, 4)
+
+
+#: Bash 4.4 or newer, which is what Click's generated completion script needs.
+#: See :func:`_bash_is_modern_enough_for_completion`.
+HAVE_BASH_COMPLETION: Final = _bash_is_modern_enough_for_completion()
 
 #: The Graphviz layout engine. Not a platform question — it is a system package
 #: on every platform, and CI installs it on all three — but a test that shells

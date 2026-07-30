@@ -112,8 +112,10 @@ class ValidationConfig:
     #: Canonical ids of rules that are not reported at all. May hold
     #: :data:`~netgraph.rules.WILDCARD` to disable validation entirely.
     ignore: frozenset[str] = frozenset()
-    #: Severity overrides, keyed by canonical rule id.
-    severity: Mapping[str, Severity] = _EMPTY_SEVERITIES
+    #: Severity overrides, keyed by canonical rule id. A factory for the same
+    #: reason as :attr:`~netgraph.settings.RenderConfig.values`: a ``mappingproxy``
+    #: is not accepted as a plain dataclass default before Python 3.12.
+    severity: Mapping[str, Severity] = field(default_factory=lambda: _EMPTY_SEVERITIES)
     #: Promote every warning that survives :attr:`ignore` to an error.
     strict: bool = False
 

@@ -58,7 +58,7 @@ from netgraph.render import (
     to_json,
     to_mermaid,
 )
-from netgraph.render.dot import DOT_ENV_VAR, find_dot
+from netgraph.render.dot import DOT_ENV_VAR, find_dot, graphviz_install_hint
 from netgraph.render.registry import DEFAULT_MEDIA_TYPE
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
@@ -1351,9 +1351,14 @@ def test_a_missing_graphviz_executable_is_explained(
         render(build_graph(home_lab), "svg")
     # It must say what is missing, how to get it, where to point netgraph when it
     # is installed somewhere the search cannot reach, and what to do meanwhile.
+    #
+    # The install command is asked for rather than spelled out: it is chosen for
+    # the platform (netgraph.render.dot._INSTALL_HINTS), and a hard-coded
+    # ``apt install`` asserts the Debian answer on Windows, where it is the wrong
+    # one and the message deliberately does not give it.
     message = str(caught.value)
     assert "'dot' executable was not found" in message
-    assert "apt install graphviz" in message
+    assert graphviz_install_hint() in message
     assert DOT_ENV_VAR in message
     assert "--format dot" in message
 

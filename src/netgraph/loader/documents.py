@@ -76,6 +76,10 @@ LOADER_MODES: Final = ("auto", "python", "libyaml")
 #: stay strings and are therefore rejected by the strict boolean model type.
 _BOOL_RE: Final = re.compile(r"^(?:true|True|TRUE|false|False|FALSE)$")
 
+#: The UTF-16 surrogate range, which is not encodable as UTF-8. See
+#: :meth:`_StrictLoaderMixin.construct_yaml_str`.
+_SURROGATE_RE: Final = re.compile("[\ud800-\udfff]")
+
 
 class YamlSyntaxError(LoaderError):
     """Raised when a file is not well-formed YAML or uses an unsupported tag."""
@@ -162,6 +166,30 @@ class _StrictLoaderMixin(SafeConstructor):
         mapping: dict[Any, Any] = super().construct_mapping(node, deep=deep)
         return mapping
 
+    def construct_yaml_str(self, node: yaml.ScalarNode) -> str:
+        """Build a string, refusing one that cannot be encoded back to UTF-8.
+
+        A lone surrogate — ``"\\udcff"`` — is a code point UTF-8 has no encoding
+        for, so a name or description carrying one is a value every output netgraph
+        writes would raise on, from a rendered diagram to a JSON export.
+
+        libyaml refuses the escape while scanning; the pure-Python scanner builds
+        the character and hands it over. That divergence is the whole reason this
+        override exists: which parser is in use depends on the PyYAML wheel, and it
+        must not decide whether a document loads. The check is confined to
+        double-quoted scalars because that is the only way in — the source bytes
+        were decoded as strict UTF-8, which cannot itself produce a surrogate.
+        """
+        value: str = super().construct_yaml_str(node)  # type: ignore[no-untyped-call]
+        if node.style == '"' and _SURROGATE_RE.search(value):
+            raise ConstructorError(
+                "while constructing a string",
+                node.start_mark,
+                "found a lone surrogate escape, which is not encodable as UTF-8",
+                node.start_mark,
+            )
+        return value
+
     def _reject_duplicate_keys(self, node: yaml.MappingNode) -> None:
         # Runs before ``flatten_mapping``: keys pulled in by a ``<<`` merge are
         # meant to be overridden by explicit ones and are not duplicates.
@@ -195,11 +223,27 @@ class _StrictLoaderMixin(SafeConstructor):
                 continue
 
 
+def _register_strict_string_constructor(loader: type[Any]) -> None:
+    """Point the ``str`` tag at the mixin's constructor on ``loader``.
+
+    PyYAML dispatches through a class-level table of tag -> *function*, filled in
+    once by :class:`~yaml.constructor.SafeConstructor` itself. Overriding
+    ``construct_yaml_str`` as a method therefore changes nothing on its own: the
+    table still holds the base implementation. This points it at the override.
+
+    Untyped throughout because PyYAML's stubs name the ten concrete loader
+    classes and bind the constructor's first parameter to one of them, which is
+    the one thing a mixin is not.
+    """
+    loader.add_constructor(STR_TAG, _StrictLoaderMixin.construct_yaml_str)
+
+
 class PureStrictSafeLoader(_StrictLoaderMixin, yaml.SafeLoader):
     """The strict loader over PyYAML's pure-Python parser. Always available."""
 
 
 PureStrictSafeLoader.add_implicit_resolver(BOOL_TAG, _BOOL_RE, list("tTfF"))  # type: ignore[no-untyped-call]
+_register_strict_string_constructor(PureStrictSafeLoader)
 
 #: Was PyYAML built with the libyaml bindings? Most wheels are; not all.
 HAVE_LIBYAML: Final = hasattr(yaml, "CSafeLoader")
@@ -224,6 +268,7 @@ if HAVE_LIBYAML:
         """
 
     CStrictSafeLoader.add_implicit_resolver(BOOL_TAG, _BOOL_RE, list("tTfF"))  # type: ignore[no-untyped-call]
+    _register_strict_string_constructor(CStrictSafeLoader)
     _libyaml_loader = CStrictSafeLoader
 
 
@@ -440,7 +485,16 @@ def parse_documents(
 #: thousand. Which of the two is in use depends on the PyYAML wheel, so an
 #: inventory that is a diagnostic on one machine would be a killed process on
 #: another. Refusing here makes them agree.
-MAX_NESTING_DEPTH: Final = 1024
+#:
+#: The number is therefore chosen to sit *below* the lower of the two ceilings,
+#: not between them: the pure-Python composer spends about two Python frames per
+#: level, so with CPython's default limit of 1000 it gives out somewhere past 450
+#: — and lower than that when netgraph is called from a stack that is already
+#: deep, as it is under pytest. At 256 a document exactly at the limit still
+#: loads on both parsers with room to spare, which is what makes "refused" and
+#: "accepted" mean the same thing everywhere. Anything past it is refused by the
+#: guard before either composer recurses at all.
+MAX_NESTING_DEPTH: Final = 256
 
 _OPENING_TOKENS: Final = (
     yaml.FlowSequenceStartToken,

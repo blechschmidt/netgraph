@@ -29,6 +29,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import sysconfig
 from pathlib import Path
 from typing import Any
 
@@ -719,8 +720,12 @@ def _complete(tmp_path: Path, line: str) -> dict[str, str]:
     assumed: ``pytest`` run as ``.venv/bin/pytest`` does not add the venv to
     ``PATH``, and a test that quietly returned no candidates because of that would
     assert nothing at all.
+
+    Which directory that is comes from ``sysconfig`` rather than from
+    ``sys.executable``'s parent: the two agree on POSIX and do not on Windows,
+    where console scripts are installed into ``Scripts\\`` beside ``python.exe``.
     """
-    scripts = Path(sys.executable).parent
+    scripts = Path(sysconfig.get_path("scripts"))
     assert (scripts / "netgraph").exists() or (scripts / "netgraph.exe").exists(), (
         f"the netgraph console script is not in {scripts}; install with 'pip install -e .'"
     )

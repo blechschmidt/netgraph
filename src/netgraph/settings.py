@@ -54,7 +54,7 @@ tell whether a setting arrived from the command line or from a file.
 from __future__ import annotations
 
 from collections.abc import Callable, Container, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from types import MappingProxyType
@@ -402,7 +402,13 @@ class RenderConfig:
     #: Profile name; ``None`` for the ``[render]`` table itself.
     name: str | None = None
     #: Click parameter name -> parsed value. A key that is absent was not set.
-    values: Mapping[str, Any] = _EMPTY
+    #:
+    #: Spelled as a factory returning the one shared empty mapping rather than as
+    #: a plain default: ``dataclasses`` on Python 3.11 refuses any default whose
+    #: *class* declares no ``__hash__``, and ``mappingproxy`` only gained one in
+    #: 3.12. The factory is the portable spelling and costs one call per instance
+    #: that does not pass ``values`` at all.
+    values: Mapping[str, Any] = field(default_factory=lambda: _EMPTY)
 
     def __contains__(self, param: str) -> bool:
         return param in self.values

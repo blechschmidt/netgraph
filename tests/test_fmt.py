@@ -45,6 +45,7 @@ from netgraph.fmt import (
 from netgraph.fmt.order import ENVELOPE_ORDER, LOADER_KEYS, check_order, document_shape, order_keys
 from netgraph.fmt.scalars import looks_like_mac, quote_style
 from netgraph.fmt.verify import comments, meaning, verify
+from netgraph.fsio import write_text
 from netgraph.scaffold import build_scaffold
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -680,12 +681,21 @@ def test_an_unreadable_encoding_is_reported_not_raised(tmp_path: Path) -> None:
 
 @pytest.fixture
 def messy(tmp_path: Path) -> Path:
-    """A tree with one file that needs formatting and one that does not."""
-    (tmp_path / "ok.yaml").write_text(DEVICE, encoding="utf-8")
-    (tmp_path / "messy.yaml").write_text(
+    """A tree with one file that needs formatting and one that does not.
+
+    Written through :func:`netgraph.fsio.write_text`, which translates no line
+    endings, rather than through :meth:`Path.write_text`, which on Windows turns
+    every ``\\n`` into ``\\r\\n``. The canonical form is defined in bytes and LF
+    is part of it (see :func:`netgraph.fmt.runner._format_file`), so the
+    convenient spelling would have made ``ok.yaml`` genuinely non-canonical on
+    that platform and the fixture would have been asserting the opposite of its
+    own name.
+    """
+    write_text(tmp_path / "ok.yaml", DEVICE)
+    write_text(
+        tmp_path / "messy.yaml",
         "kind: switch\napiVersion: netgraph.dev/v1alpha1\nmetadata:\n  name: sw2\n"
         "spec:\n  interfaces:\n    - name: e0\n      type: ethernet\n",
-        encoding="utf-8",
     )
     return tmp_path
 

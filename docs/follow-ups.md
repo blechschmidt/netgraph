@@ -1276,9 +1276,17 @@ somebody else's cliff. It costs a C-speed `str.count` on every document and a
 full scan only for one carrying more than `MAX_NESTING_DEPTH` flow openers —
 every example inventory in this repository has fewer than 110 in total — so the
 price is right, but the guard exists because *libyaml crashes the process*
-rather than because 1024 levels of nesting is a meaningful schema limit. A
-document that nests 1025 deep is refused with an accurate diagnostic that
+rather than because 256 levels of nesting is a meaningful schema limit. A
+document that nests 257 deep is refused with an accurate diagnostic that
 describes netgraph's limit and not the real one.
+
+The number was 1024 until it was measured against the parser it was protecting
+rather than against the one that crashes. The pure-Python composer spends two
+Python frames per level, so under CPython's default recursion limit it gives out
+somewhere past 450 — and sooner when netgraph is called from a stack that is
+already deep. A limit above that ceiling is a limit at which the two parsers
+still disagree, which is the one thing this guard exists to prevent: a document
+*at* the documented maximum was refused by one and accepted by the other.
 
 **What would justify revisiting this.** libyaml growing a depth limit of its
 own, or PyYAML exposing one. Either would let the guard be dropped in favour of

@@ -78,6 +78,8 @@ from netgraph.loader import Inventory, load_tree
 from netgraph.render import build_graph, filter_graph
 from netgraph.render.graph import FilterSpec, Layer
 
+from platform_marks import ON_WINDOWS  # isort: skip -- tests/ is on sys.path, not a package
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
 GOLDEN_DIR = Path(__file__).resolve().parent / "fixtures" / "export"
@@ -825,7 +827,15 @@ spec:
 """
 
 #: A namespace is a directory name, which no grammar in the schema constrains.
-HOSTILE_NAMESPACE = 'Building A, "main"/rüm 1'
+#:
+#: The quote is dropped on Windows, where it is one of the nine characters a file
+#: name may not contain: ``mkdir`` fails with ERROR_INVALID_NAME and the fixture
+#: never gets as far as an export. Substituted rather than skipped, because what
+#: this namespace is here to prove is that a *directory* name reaches the five
+#: grammars at all — carrying a comma, a space and a non-ASCII letter, all of
+#: which survive. Quoting itself is exercised by the quotes in :data:`HOSTILE`
+#: above, which are element content and travel to the same exporters.
+HOSTILE_NAMESPACE = "Building A, 'main'/rüm 1" if ON_WINDOWS else 'Building A, "main"/rüm 1'
 
 
 @pytest.fixture(scope="module")

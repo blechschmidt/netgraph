@@ -3683,6 +3683,13 @@ def _check_vni_clash(ctx: _Context) -> Iterator[_Draft]:
     A VXLAN identifier names a virtual network *on a VTEP*. Two tunnels reusing
     one on the same element are either the same overlay written twice or two
     overlays that will bridge into each other.
+
+    Both the groups and the names within a group are sorted before anything is
+    reported. ``ctx.tunnel_ends`` is in discovery order, which is the order the
+    files were walked in, so without the sort the *same* inventory split across
+    directories differently produced the two tunnel names in the other order —
+    and, where one pair of tunnels clashes on two elements at once, reported the
+    other element. Neither is a different network.
     """
     by_key: dict[tuple[str, int], list[str]] = {}
     for end in ctx.tunnel_ends:
@@ -3694,7 +3701,8 @@ def _check_vni_clash(ctx: _Context) -> Iterator[_Draft]:
             holders.append(end.tunnel_fqn)
 
     reported: set[tuple[str, ...]] = set()
-    for (owner_fqn, vni), holders in by_key.items():
+    for (owner_fqn, vni), unsorted_holders in sorted(by_key.items()):
+        holders = sorted(unsorted_holders)
         if len(holders) < 2 or tuple(holders) in reported:
             continue
         reported.add(tuple(holders))

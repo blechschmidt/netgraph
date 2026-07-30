@@ -42,6 +42,7 @@ from netgraph.render import (
     theme_choices,
     to_dot,
 )
+from netgraph.render.dot import _dot_string
 from netgraph.render.icons import CISCO, ICON_SUFFIXES, NO_ICONS, suffix_order
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
@@ -243,10 +244,16 @@ def test_a_themed_node_is_drawn_as_its_icon_instead_of_a_shape(home_lab: Invento
 
 
 def test_the_theme_directory_appears_once_as_imagepath(home_lab: Inventory) -> None:
-    """One machine-specific string per document, not one per node."""
+    """One machine-specific string per document, not one per node.
+
+    The expected text goes through the same DOT quoting the renderer uses rather
+    than being pasted in raw: a Windows path is full of backslashes, every one of
+    which is doubled on its way into a DOT string, so the raw form is a string
+    that correctly *never* appears in the output.
+    """
     source = to_dot(build_graph(home_lab), RenderOptions(icons=CISCO))
     assert source.count("imagepath=") == 1
-    assert f'imagepath="{CISCO.directory}"' in source
+    assert f"imagepath={_dot_string(CISCO.directory)}" in source
     assert str(CISCO.directory) not in source.partition("\n  node [")[2]
 
 

@@ -518,6 +518,32 @@ def test_the_ci_workflow_can_be_called_by_the_release(release_workflow: dict[Any
     assert release_workflow["jobs"]["ci"]["uses"] == "./.github/workflows/ci.yml"
 
 
+def test_every_push_triggered_workflow_names_the_branches_it_runs_on() -> None:
+    """A ``push`` filter that mentions tags and not branches means "tags only".
+
+    That is a GitHub rule and a silent one: the workflow simply stops being
+    triggered, and a workflow that is never triggered has no run to show as red.
+    ``ci.yml`` was in exactly that state for three commits — the whole gate,
+    absent, with a green-looking history because there was no history at all.
+    Asserted for every workflow rather than for that one, because the next
+    ``tags-ignore`` will be added to a different file.
+    """
+    for path in sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")):
+        triggers = yaml.safe_load(path.read_text(encoding="utf-8"))[True]
+        push = triggers.get("push")
+        if not isinstance(push, dict):
+            continue
+        names_tags = {"tags", "tags-ignore"} & set(push)
+        names_branches = {"branches", "branches-ignore"} & set(push)
+        if names_tags and not names_branches:
+            # A workflow that is *meant* to be tag-only says so with ``tags``,
+            # which is the positive form; ``tags-ignore`` alone is the accident.
+            assert "tags" in push, (
+                f"{path.name} filters pushes by {sorted(names_tags)} and names no "
+                "branches, so GitHub will not run it for any branch push"
+            )
+
+
 # --------------------------------------------------------------------------- #
 # The version report
 # --------------------------------------------------------------------------- #

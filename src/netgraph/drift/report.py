@@ -102,11 +102,17 @@ def _root_text(root: Path) -> str:
     the output that differs between two machines looking at the same tree. The
     JSON envelope keeps the absolute form, because a consumer of that is not
     reading, it is resolving.
+
+    Written with forward slashes, as every other path netgraph prints is
+    (``netgraph fmt``, every diagnostic, every namespaced element name): the
+    separator is the platform's, but the report is a document, and one that
+    changed shape on Windows would need a second copy of every transcript that
+    quotes it.
     """
     try:
-        return str(root.relative_to(Path.cwd()))
+        return root.relative_to(Path.cwd()).as_posix()
     except (OSError, ValueError):
-        return str(root)
+        return root.as_posix()
 
 
 def _write_group(console: Console, group: ElementDrift) -> None:
