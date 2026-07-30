@@ -52,10 +52,21 @@ single-file inventory is watched through its directory, because editors replace 
 file rather than rewrite it and a watch on the file itself would not survive the
 first save.
 
-`--debounce` (300 ms by default) is how long a burst of filesystem events is
-collected before re-rendering. One editor save is several events — a temporary
-file, a rename, a metadata change — and re-rendering each of them would render
-three times and show the middle one.
+`--debounce` is how long a burst of filesystem events is collected before
+re-rendering. One editor save is several events — a temporary file, a rename, a
+metadata change — and re-rendering each of them would render three times and show
+the middle one.
+
+The default is **300 ms on Linux and 700 ms on macOS and Windows**, because the
+window has to be wider than the span those events arrive over and that span
+belongs to the backend rather than to the editor. `inotify` delivers each event as
+it happens, so one save lands within a millisecond or two. `FSEvents` coalesces
+and delivers on its own schedule, and `ReadDirectoryChangesW` spreads a
+save-by-rename noticeably further — often as two bursts, which at 300 ms would be
+two renders for one keystroke.
+
+Raise it for a large inventory, lower it if you want the diagram to keep up with
+you and do not mind the occasional double render.
 
 ## Every render option applies
 
@@ -138,7 +149,7 @@ netgraph watch --serve --host 0.0.0.0 --port 9000        # deliberate, and warne
 | `--serve` | — | off | Also host the render over HTTP, on a page that reloads itself. |
 | `--host` | `ADDRESS` | `127.0.0.1` | Address --serve binds to. The default keeps the preview on this machine; an inventory describes internal topology, so publishing it is an explicit act. |
 | `--port` | `INTEGER, 0-65535` | `8080` | Port --serve binds to. 0 lets the operating system choose one. |
-| `--debounce` | `MS` | `300` | How long a burst of filesystem events is collected before re-rendering. |
+| `--debounce` | `MS` | 300 on Linux, 700 on macOS and Windows | How long a burst of filesystem events is collected before re-rendering. |
 <!-- /generated -->
 
 ## Exit codes

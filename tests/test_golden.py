@@ -23,12 +23,12 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
 
+from netgraph.fsio import write_text
 from netgraph.loader import Inventory, load_tree
 from netgraph.render import (
     GRAPH_KIND,
@@ -42,6 +42,7 @@ from netgraph.render import (
     render_text,
     suffix_for,
 )
+from netgraph.render.dot import find_dot
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -354,7 +355,12 @@ def test_rendering_matches_its_golden_file(
 
     if regen_golden:
         golden.parent.mkdir(parents=True, exist_ok=True)
-        golden.write_text(actual, encoding="utf-8")
+        # ``netgraph.fsio.write_text`` rather than ``Path.write_text``: a golden
+        # is a byte-for-byte artefact, and regenerating one on Windows through
+        # Python's text mode would rewrite every line ending in the file. See
+        # ``.gitattributes``, which keeps the committed copy at LF for the same
+        # reason.
+        write_text(golden, actual)
         pytest.skip(f"regenerated {golden.name}")
 
     assert golden.exists(), (
@@ -429,7 +435,7 @@ def test_reloading_the_inventory_reproduces_the_golden() -> None:
 def test_the_dot_golden_is_something_graphviz_accepts(case: Case) -> None:
     """A stable file that ``dot`` rejects would be a stable bug."""
     graphviz = pytest.importorskip("graphviz")
-    if not shutil.which("dot"):
+    if not find_dot():
         pytest.skip("the Graphviz 'dot' executable is not installed")
     source = case.golden("dot").read_text(encoding="utf-8")
     # ``pipe`` raises CalledProcessError on a syntax error, which fails the test.

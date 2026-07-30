@@ -36,7 +36,6 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import subprocess
 import tempfile
 from collections.abc import Iterator, Mapping, Sequence
@@ -58,11 +57,10 @@ from netgraph.render.registry import draws_racks
 from netgraph.trace import TraceError, trace
 from netgraph.validate import validate
 
+from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
+
 import strategies as ng  # isort: skip -- tests/ is on sys.path, not a package
 
-requires_dot = pytest.mark.skipif(
-    shutil.which("dot") is None, reason="the Graphviz 'dot' executable is not installed"
-)
 
 #: Layers a topology can be drawn at. Every one of them has to survive every
 #: inventory, including the ones where the layer is empty.

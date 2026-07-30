@@ -24,6 +24,7 @@ the application, and lives with it.
 
 from __future__ import annotations
 
+import os
 import socket
 import threading
 from collections.abc import Callable
@@ -257,11 +258,36 @@ class LocalHandler(BaseHTTPRequestHandler):
 
 
 class LocalServer(ThreadingHTTPServer):
-    """The socket side: threaded, and restartable in a loop."""
+    """The socket side: threaded, and restartable in a loop.
+
+    ``SO_REUSEADDR`` is the one socket option here that does not mean the same
+    thing everywhere, and the difference is not cosmetic. On POSIX it means "do
+    not refuse this bind merely because the port is in ``TIME_WAIT``", which is
+    what lets ``netgraph watch`` be stopped and restarted on a fixed port without
+    a minute's wait. On Windows it means "bind this port even if another socket
+    is *actively listening* on it": two servers then share the port and the
+    kernel hands each incoming connection to whichever it likes, so a second
+    ``netgraph web --port 8080`` would appear to start and then answer half the
+    requests with the other inventory.
+
+    So the option is set only where it is safe, and Windows gets
+    ``SO_EXCLUSIVEADDRUSE`` instead — which is the Windows way to say what a
+    plain bind already says on POSIX: this port is mine, and a second bind must
+    fail. That failure is what :func:`bind` turns into "cannot serve … address
+    already in use", which is the message the user needs.
+    """
 
     daemon_threads = True
-    # A server restarted in a loop must not trip over its own TIME_WAIT sockets.
-    allow_reuse_address = True
+    allow_reuse_address = os.name != "nt"
+
+    def server_bind(self) -> None:
+        # Guarded with ``getattr`` rather than a platform check so that a type
+        # checker running with ``--platform linux`` sees the same code the
+        # Windows interpreter runs.
+        exclusive = getattr(socket, "SO_EXCLUSIVEADDRUSE", None)
+        if exclusive is not None:  # pragma: no cover - Windows only
+            self.socket.setsockopt(socket.SOL_SOCKET, exclusive, 1)
+        super().server_bind()
 
 
 def bind(

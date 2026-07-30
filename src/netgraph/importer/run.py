@@ -39,6 +39,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Final
 
 from netgraph.errors import NetgraphError, clip_text, echo_value
+from netgraph.fsio import write_text
 from netgraph.importer.csvlinks import read_csv_links
 from netgraph.importer.draft import Draft
 from netgraph.importer.emit import render_draft
@@ -349,7 +350,10 @@ def write_files(files: dict[str, str], target: Path, *, force: bool = False) -> 
         path = target.joinpath(*PurePosixPath(relative).parts)
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(content, encoding="utf-8")
+            # LF on every platform; see netgraph.fsio. An imported tree is the
+            # first thing a user commits, and it is compared against the next
+            # import of the same capture.
+            write_text(path, content)
         except OSError as exc:
             raise ImportSourceError(f"cannot write {path}: {exc.strerror or exc}") from exc
         written.append(path)

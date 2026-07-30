@@ -14,7 +14,6 @@ someone may have typed by hand, so writing into an occupied directory needs
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 
 import pytest
@@ -33,9 +32,7 @@ from netgraph.scaffold import (
 )
 from netgraph.schema import build_schema
 
-requires_dot = pytest.mark.skipif(
-    shutil.which("dot") is None, reason="Graphviz 'dot' is not installed"
-)
+from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
 
 @pytest.fixture
@@ -342,12 +339,17 @@ def test_an_unwritable_target_is_reported_rather_than_raised_raw(
     """A full disk or a read-only mount is a diagnostic, not a traceback.
 
     Simulated rather than staged with permissions: the suite has to behave the
-    same for the root user of a container, for whom mode 0o500 is no obstacle.
+    same for the root user of a container, for whom mode 0o500 is no obstacle —
+    and on Windows, which has no such mode at all.
+
+    ``Path.open`` is the thing patched because that is what
+    :func:`netgraph.fsio.write_text` calls; it opens explicitly so it can pass
+    ``newline=""``, which is what keeps the scaffold LF on every platform.
     """
 
     def refuse(*_args: object, **_kwargs: object) -> None:
         raise OSError(30, "Read-only file system")
 
-    monkeypatch.setattr(Path, "write_text", refuse)
+    monkeypatch.setattr(Path, "open", refuse)
     with pytest.raises(ScaffoldError, match="cannot write"):
         write_scaffold(build_scaffold(), tmp_path / "readonly")

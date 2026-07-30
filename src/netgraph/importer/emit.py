@@ -33,6 +33,7 @@ from collections.abc import Iterable, Iterator, Sequence
 from typing import Any, Final
 
 from netgraph.errors import clip_text
+from netgraph.fsio import safe_file_stem
 from netgraph.importer.draft import Draft, DraftCable, DraftDevice, DraftInterface
 from netgraph.models import API_VERSION
 from netgraph.scaffold import SCHEMA_FILE_NAME
@@ -343,18 +344,30 @@ def render_draft(draft: Draft, *, schema: bool = True) -> dict[str, str]:
 
 
 def _device_paths(devices: Sequence[DraftDevice]) -> Iterator[tuple[DraftDevice, str]]:
-    """One file per device, with case-insensitive collisions broken apart.
+    """One file per device, named so the tree can be checked out anywhere.
+
+    Two names a network reports quite happily are not two file names on every
+    platform, and this is the only command that turns data it did not write into
+    paths — so it is the only place that has to care. The rewrite is always on
+    the *file*; every document still declares the name its device actually has.
 
     ``SW1`` and ``sw1`` are two elements to netgraph and one file name on macOS
-    and Windows, so the second one gets a suffix rather than silently replacing
-    the first. The suffix is on the *file*; both documents still declare the
-    name their device actually has.
+    and Windows, so the second one gets a numeric suffix rather than silently
+    replacing the first.
+
+    ``nul``, ``con``, ``aux``, ``com3`` and the rest are MS-DOS device names
+    Windows reserves in every directory and under any extension, so ``nul.yaml``
+    is not a file there at all — a ``git clone`` of such a tree fails outright.
+    :func:`~netgraph.fsio.safe_file_stem` handles those, and it does so on every
+    platform: a tree written on Linux is a tree somebody else checks out on
+    Windows, so producing one that only works here would be the bug.
     """
     taken: set[str] = set()
     for device in devices:
-        stem, index = device.name, 1
+        base = safe_file_stem(device.name)
+        stem, index = base, 1
         while f"{stem.lower()}.yaml" in taken:
             index += 1
-            stem = f"{device.name}-{index}"
+            stem = f"{base}-{index}"
         taken.add(f"{stem.lower()}.yaml")
         yield device, f"{DEVICES_DIR}/{stem}.yaml"

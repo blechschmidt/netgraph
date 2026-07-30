@@ -31,6 +31,8 @@ from netgraph.loader.ignore import compile_rules, parse_ignore_file
 from netgraph.loader.tree import _Builder, _deferred_gc, _load_file, _schema_errors
 from netgraph.models import Adapter, Cable, Switch, parse_document
 
+from platform_marks import requires_mkfifo, requires_posix_permissions, requires_symlinks  # isort: skip -- tests/ is on sys.path, not a package
+
 API_VERSION = "netgraph.dev/v1alpha1"
 
 SWITCH = """\
@@ -331,6 +333,7 @@ def test_an_empty_tree_loads_to_an_empty_inventory(tmp_path: Path) -> None:
     assert not inventory.has_errors
 
 
+@requires_posix_permissions
 def test_unreadable_directory_is_reported_not_raised(tmp_path: Path) -> None:
     root = tmp_path / "inv"
     write(root, "ok.yaml", switch("ok"))
@@ -696,6 +699,7 @@ def test_the_strict_boolean_rule_does_not_leak_into_pyyaml() -> None:
 # -- symlinks (NG-L003) ---------------------------------------------------
 
 
+@requires_symlinks
 def test_symlink_that_escapes_the_root_is_an_error(tmp_path: Path) -> None:
     root = tmp_path / "inv"
     outside = tmp_path / "outside"
@@ -711,6 +715,7 @@ def test_symlink_that_escapes_the_root_is_an_error(tmp_path: Path) -> None:
     assert all("escapes the inventory root" in error.message for error in inventory.errors)
 
 
+@requires_symlinks
 def test_symlink_cycle_is_an_error(tmp_path: Path) -> None:
     root = tmp_path / "inv"
     write(root, "sub/keep.yaml", switch("keep"))
@@ -723,6 +728,7 @@ def test_symlink_cycle_is_an_error(tmp_path: Path) -> None:
     assert "forms a cycle" in error.message
 
 
+@requires_symlinks
 def test_directory_reachable_twice_is_loaded_once(tmp_path: Path) -> None:
     root = tmp_path / "inv"
     write(root, "a/keep.yaml", switch("keep"))
@@ -735,6 +741,7 @@ def test_directory_reachable_twice_is_loaded_once(tmp_path: Path) -> None:
     assert "already part of the inventory" in error.message
 
 
+@requires_symlinks
 def test_symlinked_file_inside_the_root_is_followed(tmp_path: Path) -> None:
     root = tmp_path / "inv"
     write(root, "real/sw.yaml", switch("sw"))
@@ -818,6 +825,7 @@ def test_a_scanner_error_at_the_very_start_is_reported(tmp_path: Path) -> None:
     assert error.path is not None and error.path.name == "tabs.yaml"
 
 
+@requires_mkfifo
 def test_special_files_are_not_loaded(tmp_path: Path) -> None:
     root = tmp_path / "inv"
     write(root, "keep.yaml", switch("keep"))
@@ -864,6 +872,7 @@ def test_more_ignore_patterns(pattern: str, path: str, expected: bool) -> None:
     assert IgnoreStack().push(rules_from(pattern)).is_ignored(path, is_dir=False) is expected
 
 
+@requires_symlinks
 def test_a_dangling_symlink_is_skipped(tmp_path: Path) -> None:
     root = tmp_path / "inv"
     write(root, "keep.yaml", switch("keep"))
@@ -874,6 +883,7 @@ def test_a_dangling_symlink_is_skipped(tmp_path: Path) -> None:
     assert list(inventory.elements) == ["keep"]
 
 
+@requires_mkfifo
 def test_root_that_is_neither_a_directory_nor_a_file_is_rejected(tmp_path: Path) -> None:
     pipe = tmp_path / "pipe"
     os.mkfifo(pipe)

@@ -21,7 +21,6 @@ trusts most.
 from __future__ import annotations
 
 import re
-import shutil
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -47,12 +46,11 @@ from netgraph.render import (
 from netgraph.render.details import MAX_DETAIL_LENGTH
 from netgraph.render.ids import slug
 
+from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
 
-requires_dot = pytest.mark.skipif(
-    shutil.which("dot") is None, reason="the Graphviz 'dot' executable is not installed"
-)
 
 #: A template using every placeholder there is, so one expansion exercises them all.
 EVERY_FIELD = "https://git.example.invalid/{namespace}/{kind}/{file}#L{line}?n={name}"

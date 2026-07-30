@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 import subprocess
 from collections.abc import Iterator
 from html.parser import HTMLParser
@@ -52,16 +51,11 @@ from netgraph.render import (
 )
 from netgraph.render.html import DATA_ELEMENT_ID, PAGE_KIND
 
+from platform_marks import requires_dot, requires_node  # isort: skip -- tests/ is on sys.path, not a package
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
 ASSETS = REPO_ROOT / "src" / "netgraph" / "render" / "assets"
-
-requires_dot = pytest.mark.skipif(
-    shutil.which("dot") is None, reason="the Graphviz 'dot' executable is not installed"
-)
-requires_node = pytest.mark.skipif(
-    shutil.which("node") is None, reason="Node.js is not installed; 'node --check' cannot run"
-)
 
 
 # --------------------------------------------------------------------------- #

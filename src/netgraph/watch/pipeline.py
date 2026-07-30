@@ -15,8 +15,6 @@ diagram they are looking at must not.
 
 from __future__ import annotations
 
-import os
-import tempfile
 import threading
 import time
 from collections.abc import Iterable, Sequence
@@ -27,6 +25,7 @@ from typing import Final
 
 from netgraph.config import load_config
 from netgraph.errors import NetgraphError, RenderError, format_path
+from netgraph.fsio import write_bytes_atomically
 from netgraph.loader import Inventory, LoadError, load_tree
 from netgraph.render import (
     AggregateSpec,
@@ -352,32 +351,18 @@ def write_atomically(path: Path, payload: bytes) -> None:
     A watch run rewrites its output while something else — a browser, an image
     viewer, another netgraph — may be reading it. Writing to a sibling temporary
     file and renaming means a reader sees either the old diagram or the new one,
-    never half of each.
+    never half of each. On Windows a rename over a file another process has open
+    is refused rather than allowed, which :func:`netgraph.fsio.replace_atomically`
+    absorbs for as long as it is plausibly transient.
+
+    ``0o644`` is passed rather than left to the umask, because a diagram is not a
+    secret and somebody who asked for a picture did not ask for one only they can
+    read — which is what a shell with a restrictive umask would otherwise produce.
 
     Raises:
         RenderError: The destination cannot be written.
     """
-    handle = None
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        handle = tempfile.NamedTemporaryFile(  # noqa: SIM115 - closed explicitly below
-            dir=path.parent,
-            prefix=f".{path.name}.",
-            suffix=".tmp",
-            delete=False,
-        )
-        temporary = Path(handle.name)
-        try:
-            handle.write(payload)
-            handle.flush()
-            os.fsync(handle.fileno())
-        finally:
-            handle.close()
-        # ``NamedTemporaryFile`` creates with 0600; the diagram is not a secret
-        # and users expect it to be readable like any other rendered artefact.
-        os.chmod(temporary, 0o644)
-        os.replace(temporary, path)
+        write_bytes_atomically(path, payload, mode=0o644)
     except OSError as exc:
-        if handle is not None:
-            Path(handle.name).unlink(missing_ok=True)
         raise RenderError(f"cannot write {path}: {exc.strerror or exc}") from exc

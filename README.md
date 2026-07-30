@@ -54,9 +54,14 @@ choco install graphviz           # Windows
 
 Check it with `dot -V`. The `dot`, `mermaid` and `json` formats are written by netgraph
 itself and need none of that, so if you only want DOT to feed into another tool you can
-skip the install. Full instructions, including the editor setup that gives you
-completion and inline errors, are in
-[`docs/getting-started.md`](docs/getting-started.md).
+skip the install.
+
+Linux, macOS and Windows are all tested in CI. On Windows and macOS Graphviz is often
+installed without landing on `PATH`; netgraph looks in the usual install locations too,
+and `NETGRAPH_DOT` names the binary outright when that is not enough. Full instructions —
+including the PowerShell completion script and the `.gitattributes` an inventory kept in
+Git on Windows wants — are in
+[`docs/getting-started.md`](docs/getting-started.md#on-windows-and-macos).
 
 Or install nothing at all. [`docker-compose.yml`](docker-compose.yml) runs the CLI, the
 live preview and the browser editor out of a container that already has Graphviz in it:

@@ -22,7 +22,6 @@ trimmed input is a reader that does not work.
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 from typing import Any
 
@@ -55,15 +54,13 @@ from netgraph.loader import load_tree
 from netgraph.rules import Severity
 from netgraph.validate import validate
 
+from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
+
 FIXTURES = Path(__file__).parent / "fixtures" / "import"
 PC_ALICE = FIXTURES / "pc-alice.lldp.json"
 SW_CORE = FIXTURES / "sw-core-01.lldp.json"
 SRV_HYPER = FIXTURES / "srv-hyper.addr.json"
 PATCH_PANEL = FIXTURES / "patch-panel.csv"
-
-requires_dot = pytest.mark.skipif(
-    shutil.which("dot") is None, reason="Graphviz 'dot' is not installed"
-)
 
 
 # --------------------------------------------------------------------------- #
@@ -1145,10 +1142,14 @@ def test_a_refusal_summarises_a_long_list_of_clashes(tmp_path: Path) -> None:
 
 
 def test_an_unwritable_target_is_reported(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # ``Path.open`` rather than ``Path.write_text``: netgraph.fsio opens with an
+    # explicit ``newline=""`` (see the module docstring there), so a patch on
+    # ``write_text`` would intercept nothing and this test would assert that a
+    # successful write raises.
     def refuse(*args: Any, **kwargs: Any) -> None:
         raise OSError(13, "Permission denied")
 
-    monkeypatch.setattr(Path, "write_text", refuse)
+    monkeypatch.setattr(Path, "open", refuse)
     with pytest.raises(ImportSourceError, match="cannot write"):
         write_files({"a.yaml": "x"}, tmp_path)
 

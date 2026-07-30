@@ -437,8 +437,13 @@ class PlannedDocument:
 
     #: ``""`` for the inventory root, otherwise a ``/``-joined directory path.
     namespace: str
-    #: File stem hint. Unique across the plan, so a per-document layout can use
-    #: it directly without two documents landing in the same file.
+    #: File stem *hint*. Derived from the element name and truncated, so it is
+    #: nearly always unique across the plan but not guaranteed to be:
+    #: :meth:`InventoryPlan.per_document` is what makes the file names unique, and
+    #: it has to, for two reasons. Two names differing only past the truncation
+    #: point produce one stem; two names differing only in case produce one *file*
+    #: on macOS and Windows. Either way a document would be silently dropped, and
+    #: a property comparing layouts would fail with no hint as to why.
     stem: str
     data: dict[str, Any]
 
@@ -490,11 +495,25 @@ class InventoryPlan:
     # -- layouts ---------------------------------------------------------
 
     def per_document(self) -> dict[str, str]:
-        """One file per document, named after it."""
+        """One file per document, named after it, one file per document.
+
+        The clause is repeated because it is the invariant, and ``stem`` alone does
+        not deliver it. Names are unique, stems are truncated, and file systems
+        disagree about case — so ``per_document`` compares *folded* paths and
+        suffixes a clash rather than letting the second document overwrite the
+        first. Without that, a property quantified over layouts would fail on
+        macOS and Windows for a reason nothing in the failure output mentions.
+        """
         files: dict[str, str] = {}
+        taken: set[str] = set()
         for document in self.documents:
             prefix = f"{document.namespace}/" if document.namespace else ""
-            files[f"{prefix}{document.stem}.yaml"] = dump_documents([document.data])
+            path, index = f"{prefix}{document.stem}.yaml", 1
+            while path.casefold() in taken:
+                index += 1
+                path = f"{prefix}{document.stem}-{index}.yaml"
+            taken.add(path.casefold())
+            files[path] = dump_documents([document.data])
         return files
 
     def per_namespace(self) -> dict[str, str]:

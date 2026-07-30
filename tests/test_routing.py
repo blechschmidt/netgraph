@@ -59,6 +59,8 @@ from netgraph.render.options import RenderOptions
 from netgraph.subnets import subnets_of
 from netgraph.validate import validate
 
+from platform_marks import requires_posix_shell  # isort: skip -- tests/ is on sys.path, not a package
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CAMPUS = REPO_ROOT / "examples" / "campus"
 
@@ -1191,6 +1193,7 @@ def test_list_subnets_grows_a_vrf_column_only_when_needed(
     assert "VRF" not in result.output
 
 
+@requires_posix_shell
 def test_the_route_script_is_valid_shell(tmp_path: Path) -> None:
     """``sh -n`` is the only opinion worth having about generated shell."""
     script = tmp_path / "routes.sh"

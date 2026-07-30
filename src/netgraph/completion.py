@@ -1,4 +1,4 @@
-"""Shell completion for bash, zsh and fish.
+"""Shell completion for bash, zsh, fish and PowerShell.
 
 Click generates the mechanical half for free: the subcommand names, the option
 names, and the values of every ``click.Choice``. What it cannot know is
@@ -27,16 +27,28 @@ completers below close that gap:
 Every completer answers from the same registries the commands themselves use,
 so a format, kind, layer or rule added elsewhere completes without a line
 changing here.
+
+Click generates the script for bash, zsh and fish itself. PowerShell it does
+not, so :class:`PowerShellComplete` supplies the missing half — the same
+completers, reached through the same protocol, with the shell-side glue written
+out below. It is registered with Click on import of this module, which is why
+``netgraph completion powershell`` works at all.
 """
 
 from __future__ import annotations
 
+import os
 from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
 from typing import Final
 
 import click
-from click.shell_completion import CompletionItem, get_completion_class
+from click.shell_completion import (
+    CompletionItem,
+    ShellComplete,
+    add_completion_class,
+    get_completion_class,
+)
 
 from netgraph.errors import NetgraphError, count_text
 from netgraph.export import EXPORTERS
@@ -48,6 +60,7 @@ from netgraph.rules import RULES, WILDCARD
 __all__ = [
     "PROG_NAME",
     "SHELLS",
+    "PowerShellComplete",
     "complete_element",
     "complete_export_format",
     "complete_format",
@@ -60,9 +73,10 @@ __all__ = [
     "completion_script",
 ]
 
-#: The shells netgraph ships a completion script for. Click can generate for
-#: exactly these three; anything else needs its own generator, not a flag.
-SHELLS: Final[tuple[str, ...]] = ("bash", "zsh", "fish")
+#: The shells netgraph ships a completion script for. Click generates the first
+#: three; ``powershell`` is :class:`PowerShellComplete`, below. Anything else
+#: needs its own generator, not a flag.
+SHELLS: Final[tuple[str, ...]] = ("bash", "zsh", "fish", "powershell")
 
 #: The name the console script is installed under. It decides the name of the
 #: environment variable the generated script sets, so the two must agree.
@@ -78,6 +92,151 @@ _LAYER_HELP: Final[dict[str, str]] = {
     Layer.ROUTING.value: "BGP sessions and OSPF adjacencies, clustered by VRF",
     Layer.RACK.value: "rack elevations: what is bolted where, and what is free",
 }
+
+
+# --------------------------------------------------------------------------- #
+# PowerShell
+# --------------------------------------------------------------------------- #
+
+#: What separates the three fields of one candidate on the wire. A tab, not the
+#: comma Click's own scripts use: every ``help`` here is a prose summary written
+#: for a human, and several of them contain commas.
+_FIELD_SEPARATOR: Final = "\t"
+
+#: The shell half. PowerShell has no ``compgen``: a native completer is a script
+#: block registered against the command name, which is handed the parsed AST and
+#: returns ``CompletionResult`` objects. So the glue is longer than the bash
+#: equivalent, and it does three things.
+#:
+#: It flattens the AST into one word per line. Passing the raw command line and
+#: re-splitting it in Python would mean reimplementing PowerShell's quoting
+#: rules; taking ``StringConstantExpressionAst.Value`` instead gets the
+#: *unquoted* word from the parser that already did the work, so ``-i 'my net'``
+#: arrives as one argument with a space in it.
+#:
+#: It restores whatever the three environment variables held before, rather than
+#: deleting them. A completer runs in the user's own session, and clearing a
+#: variable somebody had set for their own reasons would be a side effect of
+#: pressing Tab.
+#:
+#: And it quotes a candidate that needs it. A namespace comes from a directory
+#: name, so ``sites/Building A`` is a legal completion; inserted bare it would
+#: become two arguments.
+#:
+#: Interpolated with ``%``, so any literal percent sign here must be doubled.
+#: There are none, deliberately -- ``%`` is also PowerShell's alias for
+#: ``ForEach-Object``, and the two spellings would be indistinguishable.
+_POWERSHELL_SOURCE: Final = """\
+# PowerShell completion for %(prog_name)s.
+#
+# Load it in the current session:
+#
+#     %(prog_name)s completion powershell | Out-String | Invoke-Expression
+#
+# Or install it permanently, by putting that same line in your profile:
+#
+#     notepad $PROFILE
+#
+# Requires PowerShell 5.1 or newer. Completion is inventory-aware: it loads the
+# tree named by -i, so '%(prog_name)s show <Tab>' offers your own element names.
+
+Register-ArgumentCompleter -Native -CommandName %(prog_name)s, %(prog_name)s.exe -ScriptBlock {
+    param($wordToComplete, $commandAst, $cursorPosition)
+
+    $stringAst = [System.Management.Automation.Language.StringConstantExpressionAst]
+    $words = @()
+    foreach ($element in $commandAst.CommandElements) {
+        if ($element -is $stringAst) {
+            $words += $element.Value
+        } else {
+            $words += $element.Extent.Text
+        }
+    }
+    # An empty $wordToComplete means the cursor sits after a space: a new,
+    # still-empty word is being completed rather than the last one typed.
+    if ([string]::IsNullOrEmpty($wordToComplete)) {
+        $words += ''
+    }
+
+    $names = @('%(complete_var)s', 'COMP_WORDS', 'COMP_CWORD')
+    $saved = @{}
+    foreach ($name in $names) {
+        $saved[$name] = [Environment]::GetEnvironmentVariable($name)
+    }
+
+    try {
+        [Environment]::SetEnvironmentVariable('%(complete_var)s', 'powershell_complete')
+        [Environment]::SetEnvironmentVariable('COMP_WORDS', ($words -join "`n"))
+        [Environment]::SetEnvironmentVariable('COMP_CWORD', ($words.Count - 1))
+
+        & $commandAst.CommandElements[0].Extent.Text 2>$null | ForEach-Object {
+            $fields = $_ -split "`t", 3
+            if ($fields.Count -lt 2) { return }
+            $value = $fields[1]
+            $tooltip = if ($fields.Count -ge 3 -and $fields[2].Trim()) { $fields[2] } else { $value }
+            # A candidate holding a space is one argument, not two.
+            $insert = if ($value -match '\\s') { "'" + $value.Replace("'", "''") + "'" } else { $value }
+            [System.Management.Automation.CompletionResult]::new(
+                $insert, $value, 'ParameterValue', $tooltip)
+        }
+    } finally {
+        foreach ($name in $names) {
+            [Environment]::SetEnvironmentVariable($name, $saved[$name])
+        }
+    }
+}
+"""
+
+
+class PowerShellComplete(ShellComplete):
+    """Click's completion protocol, spoken to PowerShell.
+
+    Click ships generators for bash, zsh and fish only, so this is the one shell
+    netgraph has to supply itself. It is *only* the transport: every candidate
+    still comes from the completers in this module, so ``--profile <Tab>`` reads
+    the same ``netgraph.toml`` on Windows as it does anywhere else.
+
+    Registered with Click on import (see the call below the class), which is what
+    makes :func:`click.shell_completion.get_completion_class` know the name and
+    therefore what makes ``_NETGRAPH_COMPLETE=powershell_complete`` do anything.
+    """
+
+    name = "powershell"
+    source_template = _POWERSHELL_SOURCE
+
+    def get_completion_args(self) -> tuple[list[str], str]:
+        """The words typed so far, and the one being completed.
+
+        ``COMP_WORDS`` is newline-separated because a newline is the one
+        character no shell word can contain, which makes the split exact —
+        splitting on whitespace would rejoin ``-i 'my net'`` into two arguments
+        the parser then rejects.
+
+        A missing or unparseable ``COMP_CWORD`` falls back to the last word
+        rather than raising: a completer that throws is a shell that prints a
+        traceback under the user's cursor.
+        """
+        words = os.environ.get("COMP_WORDS", "").split("\n")
+        try:
+            cword = int(os.environ["COMP_CWORD"])
+        except (KeyError, ValueError):
+            cword = len(words) - 1
+        cword = max(0, min(cword, len(words) - 1))
+        # ``words[0]`` is the program name, which Click supplies itself.
+        return words[1:cword], words[cword]
+
+    def format_completion(self, item: CompletionItem) -> str:
+        """One candidate as ``type<TAB>value<TAB>help``.
+
+        The help text is flattened onto one line: PowerShell shows a tooltip in
+        a single-line strip, and a newline in it would be read as the end of the
+        candidate rather than rendered.
+        """
+        help_text = " ".join((item.help or "").split()) or " "
+        return _FIELD_SEPARATOR.join((item.type, item.value, help_text))
+
+
+add_completion_class(PowerShellComplete)
 
 
 # --------------------------------------------------------------------------- #

@@ -76,7 +76,6 @@ import csv
 import io
 import itertools
 import json
-import shutil
 import sys
 import threading
 import webbrowser
@@ -121,6 +120,7 @@ from netgraph.export import (
     layers_for,
 )
 from netgraph.export import FORMATS as EXPORT_FORMATS
+from netgraph.fsio import write_text
 from netgraph.importer import (
     DIALECTS,
     Draft,
@@ -188,7 +188,12 @@ from netgraph.render import (
     supports_layers,
     theme_choices,
 )
-from netgraph.render.dot import DOT_EXECUTABLE
+from netgraph.render.dot import (
+    DOT_ENV_VAR,
+    DOT_EXECUTABLE,
+    find_dot,
+    graphviz_install_hint,
+)
 from netgraph.report import FORMATS as REPORT_FORMATS
 from netgraph.report import Diagnostic, build_report, render_report
 from netgraph.rules import RULES, Severity
@@ -2134,7 +2139,12 @@ def _write_highlight(
     "--debounce",
     type=click.IntRange(0, 60_000),
     default=DEFAULT_DEBOUNCE_MS,
-    show_default=True,
+    # Spelled out rather than left to Click, because the value is per-platform
+    # (see netgraph.watch.loop) and ``show_default=True`` would make --help, and
+    # the generated flag table in docs/commands/watch.md, say something different
+    # on each one -- which reads as documentation drift rather than as a fact
+    # about the filesystem-event backends.
+    show_default="300 on Linux, 700 on macOS and Windows",
     metavar="MS",
     help="How long a burst of filesystem events is collected before re-rendering.",
 )
@@ -2419,10 +2429,11 @@ def web_command(
     exposure = describe_exposure(host, subject="the web interface")
     if exposure is not None:
         console.warn(exposure)
-    if shutil.which(DOT_EXECUTABLE) is None:
+    if find_dot() is None:
         console.warn(
-            f"the Graphviz {DOT_EXECUTABLE!r} executable was not found on PATH; the page "
-            "will load but every render will report that it cannot draw anything"
+            f"the Graphviz {DOT_EXECUTABLE!r} executable was not found; the page will load "
+            f"but every render will report that it cannot draw anything. "
+            f"Install it ({graphviz_install_hint()}), or set {DOT_ENV_VAR} to its full path"
         )
 
     server = WebServer.create(
@@ -3877,7 +3888,11 @@ def schema_command(kind: str | None, emit_all: bool, output: Path | None) -> Non
         click.echo(document, nl=False)
         return
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(document, encoding="utf-8")
+    # ``write_text`` from netgraph.fsio rather than Path's: a JSON Schema is
+    # checked into a repository next to the inventory it describes, and one
+    # written with CRLF on Windows would show up as a whole-file diff against
+    # the same schema written anywhere else.
+    write_text(output, document)
 
 
 # --------------------------------------------------------------------------- #
@@ -3888,12 +3903,17 @@ def schema_command(kind: str | None, emit_all: bool, output: Path | None) -> Non
 @cli.command("completion")
 @click.argument("shell", type=click.Choice(SHELLS))
 def completion_command(shell: str) -> None:
-    """Print the shell completion script for bash, zsh or fish.
+    """Print the shell completion script for bash, zsh, fish or PowerShell.
 
     \b
     bash:  netgraph completion bash > ~/.local/share/bash-completion/completions/netgraph
     zsh:   netgraph completion zsh  > ~/.zfunc/_netgraph   # with ~/.zfunc on $fpath
     fish:  netgraph completion fish > ~/.config/fish/completions/netgraph.fish
+
+    \b
+    PowerShell evaluates its script rather than sourcing it, so on Windows (or
+    under pwsh anywhere) the line to run -- and to put in $PROFILE -- is:
+    netgraph completion powershell | Out-String | Invoke-Expression
 
     Then start a new shell. Beyond the commands and flags, completion is
     inventory-aware: 'netgraph show <TAB>' and '--neighbors-of <TAB>' offer the

@@ -24,26 +24,62 @@ env:
 
 jobs:
   test:
-    name: test (python ${{ matrix.python-version }}, yaml ${{ matrix.yaml-loader }})
-    runs-on: ubuntu-24.04
+    name: test (${{ matrix.os }}, python ${{ matrix.python-version }}, yaml ${{ matrix.yaml-loader }})
+    runs-on: ${{ matrix.os }}
     strategy:
       # One version failing should not hide the result for the others.
       fail-fast: false
       matrix:
+        os: ["ubuntu-24.04"]
         python-version: ["3.10", "3.11", "3.12"]
         # ``auto`` picks libyaml whenever the PyYAML wheel carries it, which on
-        # this runner it always does -- so these three entries only ever
-        # exercise the fast parser.
+        # this runner it always does -- so these entries only ever exercise the
+        # fast parser.
         yaml-loader: ["auto"]
         include:
           # PyYAML ships libyaml in most wheels but not all, so the pure-Python
           # parser is a path real users land on. Without this entry it would be
           # dead code in CI and the two loaders could drift apart unnoticed.
-          - python-version: "3.12"
+          - os: "ubuntu-24.04"
+            python-version: "3.12"
             yaml-loader: "python"
+
+          # The package claims 3.10-3.13 on PyPI and every job above runs on
+          # Linux, so nothing proved the tool works on the platforms most of its
+          # likely users are on. These two entries are that proof.
+          #
+          # One Python version each, and the middle of the supported range: the
+          # things they are here to catch -- a path separator, a line ending, a
+          # socket option, a filesystem-event backend -- are properties of the
+          # operating system, not of the interpreter, so a second version would
+          # double the cost and check the same thing twice. The interpreter range
+          # is covered on Linux, where it is cheapest.
+          #
+          # ``coverage-floor`` is lower than the Linux gate on purpose and by a
+          # measured amount: a handful of tests are skipped here for capabilities
+          # the platform genuinely lacks (see tests/platform_marks.py), and the
+          # lines they cover are counted as missed. Failing the job for that
+          # would make the honest skip look like a regression.
+          - os: "windows-latest"
+            python-version: "3.12"
+            yaml-loader: "auto"
+            coverage-floor: 80
+          - os: "macos-14"
+            python-version: "3.12"
+            yaml-loader: "auto"
+            coverage-floor: 85
 
     env:
       NETGRAPH_YAML_LOADER: ${{ matrix.yaml-loader }}
+
+    defaults:
+      run:
+        # bash on all three runners, including Windows -- where it is Git Bash,
+        # which the image ships. Without it every step below would have to be
+        # written twice, once for POSIX ``sh`` and once for PowerShell, and the
+        # two copies would drift. The PowerShell that netgraph *generates* is
+        # exercised by tests/test_platform.py, not by this shell choice.
+        shell: bash
 
     steps:
       - name: Check out the repository
@@ -51,13 +87,54 @@ jobs:
 
       # ``graphviz`` (the PyPI package) is only a wrapper: it shells out to the
       # ``dot`` binary, which is not bundled. The svg/png/pdf tests fail without
-      # the system package.
-      - name: Install Graphviz
+      # the system package -- or rather they *skip*, which is worse, because the
+      # job would then go green having drawn nothing.
+      - name: Install Graphviz (Linux)
+        if: runner.os == 'Linux'
         run: |
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install --no-install-recommends --yes graphviz
           dot -V
+
+      - name: Install Graphviz (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          # Already present on the image more often than not; ``|| true`` keeps a
+          # "already installed" from failing the job, and ``dot -V`` below is the
+          # check that actually matters.
+          brew install graphviz || brew link --overwrite graphviz || true
+          dot -V
+
+      - name: Install Graphviz (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          choco install graphviz --no-progress --yes
+
+          # choco runs the official installer, which puts the binary under Program
+          # Files but does not add it to PATH in the *current* process -- so the
+          # directory is found and exported for the steps that follow.
+          #
+          # netgraph does not depend on this: find_dot() searches exactly these
+          # locations itself (netgraph/render/dot.py), which is the behaviour the
+          # "Confirm netgraph finds Graphviz" step below checks. PATH is set for
+          # everything else in the job -- `dot -V`, and the handful of tests that
+          # shell out to `dot` directly rather than through netgraph.
+          $dot = Get-ChildItem -Path 'C:\Program Files', 'C:\Program Files (x86)' `
+              -Filter 'dot.exe' -Recurse -ErrorAction SilentlyContinue |
+              Where-Object { $_.FullName -like '*Graphviz*' } |
+              Select-Object -First 1
+          if (-not $dot) {
+              Write-Output '::error::choco reported success but no Graphviz dot.exe was found'
+              Get-ChildItem -Path 'C:\Program Files' -Filter '*Graphviz*' -ErrorAction SilentlyContinue
+              exit 1
+          }
+          Write-Output "found $($dot.FullName)"
+          Add-Content -Path $env:GITHUB_PATH -Value $dot.DirectoryName
+          & $dot.FullName -V
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -72,6 +149,27 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install --editable ".[dev]"
           python -m pip list
+
+      # ``dot -V`` above proved the *shell* can find Graphviz. This proves
+      # netgraph can, which on Windows is a different question: the installer
+      # frequently leaves ``bin`` off PATH, so find_dot() also looks in the
+      # documented install locations. Without this step a broken lookup would show
+      # up as fifty skipped tests and a green job -- which is exactly the failure
+      # this whole matrix entry exists to prevent.
+      - name: Confirm netgraph finds Graphviz on this platform
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import subprocess
+          from netgraph.render.dot import find_dot
+
+          found = find_dot()
+          print(f"os.name={os.name} find_dot()={found!r}")
+          if found is None:
+              raise SystemExit("::error::netgraph cannot find Graphviz; the image tests would skip")
+          print(subprocess.run([found, "-V"], capture_output=True, text=True).stderr.strip())
+          PY
 
       # Without this the "python" entry is worth nothing: if the env var were
       # misspelt, or the selection logic silently fell back, the job would go
@@ -144,10 +242,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .hypothesis
-          key: hypothesis-${{ matrix.python-version }}-${{ matrix.yaml-loader }}-${{ github.run_id }}
+          # ``matrix.os`` is in the key because a counterexample found on Windows
+          # is often a Windows counterexample: sharing the database across
+          # platforms would let one runner's find be replayed as another's, which
+          # is fine, but a *save* from a different platform overwriting the entry
+          # is not what the restore keys below are for.
+          key: hypothesis-${{ matrix.os }}-${{ matrix.python-version }}-${{ matrix.yaml-loader }}-${{ github.run_id }}
           restore-keys: |
-            hypothesis-${{ matrix.python-version }}-${{ matrix.yaml-loader }}-
-            hypothesis-${{ matrix.python-version }}-
+            hypothesis-${{ matrix.os }}-${{ matrix.python-version }}-${{ matrix.yaml-loader }}-
+            hypothesis-${{ matrix.os }}-${{ matrix.python-version }}-
+            hypothesis-${{ matrix.os }}-
 
       - name: pytest
         id: pytest
@@ -160,13 +264,40 @@ jobs:
         # ``--cov=netgraph`` and the coverage floor also live in pyproject.toml
         # (addopts / fail_under); they are repeated here so this command is
         # correct on its own and a local edit cannot silently lower the gate.
+        #
+        # The floor is 85 unless the matrix entry says otherwise; see the
+        # ``coverage-floor`` note on the Windows entry for why it is lower there.
         run: |
           pytest \
             --cov \
-            --cov-fail-under=85 \
+            --cov-fail-under=${{ matrix.coverage-floor || 85 }} \
             --cov-report=xml:coverage.xml \
             --cov-report=html:htmlcov \
             --junitxml=junit.xml
+
+      # A skip is a behaviour nothing checked, so the *number* of them is a
+      # figure worth having in the log rather than buried in the pytest tail --
+      # and on Windows and macOS it is the number this whole matrix entry is
+      # about. Reported, not gated: the gate is
+      # tests/test_platform.py::test_no_test_module_skips_a_whole_platform, which
+      # fails if a skip is spelled as a platform rather than as a capability.
+      - name: Summarise what was skipped on this platform
+        if: ${{ !cancelled() && steps.pytest.outcome != 'skipped' }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("junit.xml").getroot()
+          skipped = [
+              (case.get("classname", ""), case.get("name", ""), skip.get("message", ""))
+              for case in root.iter("testcase")
+              for skip in case.findall("skipped")
+          ]
+          print(f"{len(skipped)} skipped")
+          for classname, name, message in sorted(skipped):
+              print(f"  {classname}::{name} -- {message}")
+          PY
 
       - name: Upload the coverage report
         # Runs whether pytest passed or failed -- the report of a failing run is
@@ -176,7 +307,10 @@ jobs:
         if: ${{ !cancelled() && steps.pytest.outcome != 'skipped' }}
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report-python-${{ matrix.python-version }}-yaml-${{ matrix.yaml-loader }}
+          # ``matrix.os`` is in the name because artefact names must be unique
+          # across the matrix: without it the Windows and macOS entries would
+          # collide with the Linux 3.12 one and the upload would fail.
+          name: coverage-report-${{ matrix.os }}-python-${{ matrix.python-version }}-yaml-${{ matrix.yaml-loader }}
           path: |
             coverage.xml
             htmlcov/

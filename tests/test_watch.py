@@ -21,7 +21,6 @@ import http.client
 import json
 import socket
 import threading
-import time
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -347,7 +346,17 @@ def test_a_path_outside_the_root_is_judged_on_its_name(tmp_path: Path) -> None:
 
 
 def test_a_real_edit_reaches_the_loop(inventory: Path) -> None:
-    """The one test that goes through watchfiles rather than around it."""
+    """The one test that goes through watchfiles rather than around it.
+
+    The edit is repeated until the watcher reports it, rather than made once
+    after a fixed pause. How long a backend takes to arm is not something a test
+    can know: ``inotify`` is ready within a millisecond, FSEvents and
+    ``ReadDirectoryChangesW`` set up a subscription and can take appreciably
+    longer, so a single write timed against ``sleep(0.5)`` is a coin flip on
+    macOS and Windows. Rewriting the same file every 250ms makes the test wait
+    for the watcher instead of guessing at it, and still fails within the guard
+    if no event ever arrives.
+    """
     stop = threading.Event()
     changes = file_changes(
         [inventory],
@@ -356,20 +365,22 @@ def test_a_real_edit_reaches_the_loop(inventory: Path) -> None:
         stop=stop,
     )
     target = inventory / "added.yaml"
+    content = WARNING_ONLY.read_text(encoding="utf-8")
+    done = threading.Event()
 
     def edit() -> None:
-        # The watcher needs a moment to arm before an event can be seen.
-        time.sleep(0.5)
-        target.write_text(WARNING_ONLY.read_text(encoding="utf-8"), encoding="utf-8")
+        while not done.wait(0.25):
+            target.write_text(content, encoding="utf-8")
 
-    writer = threading.Thread(target=edit)
-    guard = threading.Timer(20, stop.set)  # Never hang the suite.
+    writer = threading.Thread(target=edit, daemon=True)
+    guard = threading.Timer(30, stop.set)  # Never hang the suite.
     writer.start()
     guard.start()
     try:
         batch = next(changes, None)
     finally:
-        writer.join()
+        done.set()
+        writer.join(timeout=5)
         guard.cancel()
         stop.set()
         changes.close()

@@ -15,6 +15,7 @@ report — both are shown below — but the shape of a document is worth typing 
 
 - [Installation](#installation)
   - [Graphviz is a system prerequisite](#graphviz-is-a-system-prerequisite)
+  - [On Windows and macOS](#on-windows-and-macos)
 - [Faster routes to the same tree](#faster-routes-to-the-same-tree)
 - [1. Make a folder](#1-make-a-folder)
 - [2. Declare a router](#2-declare-a-router)
@@ -55,6 +56,64 @@ choco install graphviz           # Windows
 Check it with `dot -V`. The `dot`, `mermaid` and `json` formats are written by
 netgraph itself and work without it — so if you only need DOT output to feed
 into another tool, you can skip the install.
+
+### On Windows and macOS
+
+netgraph is tested on `windows-latest` and `macos-14` as well as Linux; see
+[testing.md](testing.md) for what each job covers. Everything on this page works
+unchanged on all three. Four notes are worth having up front.
+
+**Graphviz is often installed without being on `PATH`.** This is the normal
+outcome of the Windows installer and of `choco install graphviz`, and it also
+happens on macOS whenever a process was started without `/opt/homebrew/bin` in
+its environment — a GUI-launched editor, most often. netgraph therefore looks in
+the documented install locations too, so `netgraph render -f svg` usually works
+anyway. When it does not, name the binary outright rather than fighting `PATH`:
+
+```powershell
+# Windows, PowerShell
+$env:NETGRAPH_DOT = 'C:\Program Files\Graphviz\bin\dot.exe'
+```
+
+```bash
+# macOS
+export NETGRAPH_DOT=/opt/homebrew/bin/dot
+```
+
+If Graphviz cannot be found at all, netgraph says so and says how to install it
+for *your* platform — it does not raise a `FileNotFoundError`.
+
+**Shell completion is a PowerShell script, and it is evaluated rather than
+sourced.** One line, and the same line goes in `$PROFILE`:
+
+```powershell
+netgraph completion powershell | Out-String | Invoke-Expression
+```
+
+See [completion.md](commands/completion.md). `bash`, `zsh` and `fish` are also
+generated, which covers Git Bash and WSL on Windows and the default shell on
+macOS.
+
+**Line endings.** Everything netgraph writes — a formatted document, a rendered
+diagram, an exported artefact, a generated schema — uses `\n` on every platform,
+because the canonical form `netgraph fmt` enforces is defined in bytes. If you
+keep an inventory in Git on Windows, add a `.gitattributes` next to it so Git
+does not translate them back:
+
+```gitattributes
+*.yaml text eol=lf
+*.yml  text eol=lf
+```
+
+Without it, `git config core.autocrlf true` (the Windows default) hands netgraph
+CRLF files, `netgraph fmt` rewrites them to LF, and Git reports every file as
+modified — a loop that is confusing and entirely avoidable. This repository has
+such a file for the same reason.
+
+**`netgraph watch` waits a little longer before re-rendering.** 700 ms of quiet
+on Windows and macOS against 300 ms on Linux, because the filesystem-event
+backends there deliver one save as events spread over a wider span; a shorter
+window would re-render twice per keystroke. `--debounce MS` overrides it.
 
 ---
 

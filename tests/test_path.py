@@ -30,6 +30,7 @@ import pytest
 from click.testing import CliRunner
 
 from netgraph.cli import cli
+from netgraph.fsio import write_text
 from netgraph.loader import Inventory, load_tree
 from netgraph.render import Layer, RenderOptions, build_graph, render_text
 from netgraph.trace import (
@@ -1155,7 +1156,12 @@ def test_a_trace_matches_its_golden_file(case: Case, regen_golden: bool) -> None
         golden = GOLDEN_DIR / f"{case.name}{suffix}"
         actual = _rendered(case, suffix)
         if regen_golden:
-            golden.write_text(actual, encoding="utf-8")
+            # ``netgraph.fsio.write_text`` rather than ``Path.write_text``: a
+            # golden is a byte-for-byte artefact, and regenerating one on Windows
+            # through Python's text mode would rewrite every line ending in the
+            # file. See ``.gitattributes``, which keeps the committed copies at
+            # LF for the same reason.
+            write_text(golden, actual)
             continue
         assert golden.exists(), (
             f"missing golden {golden.relative_to(REPO_ROOT)}; "

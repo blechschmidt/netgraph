@@ -58,15 +58,36 @@ _INVOKES: Final = re.compile(r"(?:^|[|(]\s*|&&\s*|;\s*)(?:\$\s+)?netgraph\b")
 
 #: Environment that makes output reproducible: no colour, a fixed width, and no
 #: inherited configuration.
+#:
+#: The environment is *built* rather than inherited, which is the point -- a
+#: reader's ``netgraph.toml`` or ``NO_COLOR`` must not change what the docs are
+#: checked against. That makes the platform-specific entries below load-bearing
+#: rather than defensive: on Windows a process started without ``SYSTEMROOT``
+#: cannot initialise, and one started without ``PYTHONUTF8`` writes its output in
+#: the ANSI code page, so every em dash and box-drawing character in a documented
+#: transcript would come back mangled.
 ENV: Final = {
     "NO_COLOR": "1",
     "TERM": "dumb",
     "COLUMNS": "80",
     "LINES": "40",
     "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-    "HOME": os.environ.get("HOME", "/tmp"),
     "PYTHONHASHSEED": "0",
+    # POSIX honours the first, Windows the second and third. All three say the
+    # same thing: this program's input and output are UTF-8.
     "LC_ALL": "C.UTF-8",
+    "PYTHONUTF8": "1",
+    "PYTHONIOENCODING": "utf-8",
+    **{
+        # Passed through when the platform has them, absent when it does not, so
+        # neither branch carries an empty value that means something else.
+        # ``HOME``/``USERPROFILE`` keep a command that resolves ``~`` from writing
+        # into the real one; the rest are what CPython and the Windows loader need
+        # to start at all.
+        name: value
+        for name in ("HOME", "USERPROFILE", "SYSTEMROOT", "SYSTEMDRIVE", "TEMP", "TMP", "PATHEXT")
+        if (value := os.environ.get(name))
+    },
 }
 
 ELLIPSIS: Final = "..."
@@ -250,10 +271,16 @@ def entry_point() -> list[str]:
     under ``python -m netgraph`` would document a usage line no reader will ever
     see. The installed console script is therefore preferred, and the module form
     is the fallback for a checkout that has not been installed.
+
+    ``.exe`` is tried as well as the bare name, because that is what the console
+    script is called on Windows -- and falling through to the module form there
+    would make every documented usage line fail the comparison on that platform
+    alone, which reads like a bug in netgraph rather than in this lookup.
     """
-    script = Path(sys.executable).with_name("netgraph")
-    if script.is_file():
-        return [str(script)]
+    for suffix in ("", ".exe"):
+        script = Path(sys.executable).with_name(f"netgraph{suffix}")
+        if script.is_file():
+            return [str(script)]
     return [sys.executable, "-m", "netgraph"]
 
 
@@ -278,6 +305,11 @@ def run(block: Block) -> tuple[list[str], int]:
             argv_for(step.command),
             capture_output=True,
             text=True,
+            # Named rather than left to the locale: ``text=True`` decodes with
+            # the ANSI code page on Windows, where an em dash in a documented
+            # transcript comes back as two mojibake characters -- or raises.
+            encoding="utf-8",
+            errors="replace",
             cwd=cwd,
             env=ENV,
             timeout=120,

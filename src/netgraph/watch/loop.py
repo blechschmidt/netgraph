@@ -14,6 +14,7 @@ nothing.
 from __future__ import annotations
 
 import os
+import sys
 from collections.abc import Callable, Generator, Iterable, Sequence
 from dataclasses import replace
 from pathlib import Path, PurePosixPath
@@ -42,13 +43,33 @@ __all__ = [
     "run_watch",
 ]
 
-#: Milliseconds of quiet before a burst of changes is treated as one edit. A
-#: single "save" in an editor is several inotify events (truncate, write,
-#: rename, chmod); rendering each one would be both slow and wrong.
-DEFAULT_DEBOUNCE_MS: Final = 300
+#: Milliseconds of quiet before a burst of changes is treated as one edit, per
+#: platform. A single "save" in an editor is several filesystem events
+#: (truncate, write, rename, chmod); rendering each one would be both slow and
+#: wrong, so the window has to be wider than the span those events arrive over —
+#: and that span is a property of the backend ``watchfiles`` uses, not of the
+#: editor.
+#:
+#: ``inotify`` delivers each event as it happens, so on Linux the events of one
+#: save land within a millisecond or two of each other and 300ms is already
+#: generous. ``FSEvents`` on macOS coalesces events and delivers them in batches
+#: on its own schedule, and ``ReadDirectoryChangesW`` on Windows spreads a
+#: save-by-rename over a noticeably longer period — an editor writing a
+#: temporary file, flushing it, renaming it over the original and updating the
+#: timestamps can arrive as two bursts. Keeping 300ms there would re-render
+#: twice for one keystroke, which is what the debounce exists to prevent.
+#:
+#: These are defaults, not limits: ``--debounce`` overrides them, and a slow
+#: inventory on a fast disk is a reason to raise the number rather than a bug.
+_DEBOUNCE_MS: Final[dict[str, int]] = {"linux": 300, "darwin": 700, "win32": 700}
+
+#: The debounce window for the platform netgraph is running on.
+DEFAULT_DEBOUNCE_MS: Final = _DEBOUNCE_MS.get(sys.platform, 300)
 
 #: How long the Rust watcher blocks before handing control back so a stop
-#: request can be noticed. Only affects shutdown latency.
+#: request can be noticed. Only affects shutdown latency, and it is the reason
+#: Ctrl-C is answered within a second rather than at the next file change:
+#: without it the watcher would sit in a blocking read on every platform.
 _RUST_TIMEOUT_MS: Final = 1_000
 
 #: Directory names never worth descending into, on top of the loader's own

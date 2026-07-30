@@ -1,0 +1,71 @@
+# Line endings, decided here rather than by whoever cloned the repository.
+#
+# netgraph's contract with its files is a byte contract. `netgraph fmt` compares
+# the canonical form of a document against the file *as bytes* on purpose, so
+# that a stray CRLF or byte-order mark is reported rather than silently kept
+# forever (see netgraph/fmt/runner.py). The renderer goldens under
+# tests/fixtures/golden/ are asserted byte for byte for the same reason: that is
+# what makes a change to the DOT output show up as a readable diff.
+#
+# Both of those break under `core.autocrlf=true`, which is the default on a
+# Windows install of Git: every YAML file in the checkout arrives CRLF, so
+# `netgraph fmt --check examples` reports all of examples/ as unformatted and
+# every golden comparison fails on every line. Neither is a netgraph bug and
+# neither has a fix in netgraph -- the fix is to stop Git translating.
+#
+# `eol=lf` is therefore not a style preference. It is the same instruction the
+# code gives Python when it writes these files (`newline=""`, netgraph/fsio.py),
+# stated to the other program that touches them.
+
+# Everything text-like is LF in the working tree, whatever the clone's config
+# says. Git still normalises on commit; this line is about the checkout.
+* text=auto eol=lf
+
+# ---------------------------------------------------------------------------
+# The two sets of files where this is load-bearing rather than tidy.
+# ---------------------------------------------------------------------------
+
+# Inventory YAML: `netgraph fmt --check` is a CI gate over examples/, and the
+# canonical form it checks against is LF.
+*.yaml text eol=lf
+*.yml  text eol=lf
+
+# Renderer, trace and export goldens: compared byte for byte by tests/test_golden.py,
+# tests/test_path.py and tests/test_export.py, and regenerated with
+# `pytest --regen-golden`. A CRLF checkout would make the regenerated file
+# differ from the committed one in every line.
+tests/fixtures/** text eol=lf
+
+# ---------------------------------------------------------------------------
+# Files that are not text, and must never be translated or diffed as such.
+# ---------------------------------------------------------------------------
+*.png binary
+*.jpg binary
+*.gif binary
+*.pdf binary
+*.ico binary
+*.woff  binary
+*.woff2 binary
+
+# SVG is XML, so it is text -- and it is committed output (docs/images/), which
+# means it has to be reproducible from a `netgraph render` on any platform.
+*.svg text eol=lf
+
+# ---------------------------------------------------------------------------
+# Scripts, where the shell decides rather than the platform.
+# ---------------------------------------------------------------------------
+
+# A shebang line followed by \r is a shell reporting "bad interpreter", so these
+# stay LF even when checked out on Windows and run under WSL or Git Bash.
+*.sh text eol=lf
+
+# PowerShell reads LF perfectly well, and the completion script netgraph
+# generates is written with LF (netgraph/completion.py), so a committed one
+# should match what the command emits.
+*.ps1 text eol=lf
+
+# ---------------------------------------------------------------------------
+# Generated files, marked so a diff of them is collapsed by default in review.
+# ---------------------------------------------------------------------------
+# Written by tools/gen_json_schema.py; the source is the pydantic models.
+schema/netgraph.schema.json linguist-generated=true

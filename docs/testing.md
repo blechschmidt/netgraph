@@ -21,6 +21,82 @@ $ pip install --editable ".[dev]"
 $ pytest
 ```
 
+## Platforms
+
+netgraph is published for Python 3.10–3.13 and is used on all three desktop
+platforms, so all three are in CI. They are not covered to the same depth, and
+the table says which is which rather than leaving it to be inferred from
+`.github/workflows/ci.yml`.
+
+| Platform | Python | What runs | Depth |
+|---|---|---|---|
+| `ubuntu-24.04` | 3.10, 3.11, 3.12 | the whole suite, both YAML parsers, `ruff`, `mypy`, `netgraph fmt --check`, the coverage gate at 85 % | **primary** — every gate, every version |
+| `macos-14` (Apple Silicon) | 3.12 | the whole suite, `ruff`, `mypy`, `netgraph fmt --check`, coverage at 85 % | **full** — one interpreter |
+| `windows-latest` | 3.12 | the same, coverage at 80 % | **full minus the POSIX-only tests** — see below |
+
+One Python version each on macOS and Windows, and the middle of the supported
+range. What those jobs are there to catch — a path separator, a line ending, a
+socket option, a filesystem-event backend, a rename over an open file — is a
+property of the operating system rather than of the interpreter, so a second
+version would double the cost and check the same thing twice. The interpreter
+range is covered on Linux, where it is cheapest.
+
+Three things are **not** covered anywhere, and are worth knowing:
+
+* **Python 3.13.** Claimed in the PyPI classifiers, not in the matrix.
+* **Docker.** The `docker` job is Linux-only; the image is a Linux image.
+* **The `netgraph web` and `netgraph watch` browser front ends** are asserted
+  through HTTP and through the DOM they emit, never through a real browser.
+
+### What is skipped on Windows, and why
+
+Six tests, all in `tests/test_loader.py` and `tests/test_routing.py`. Each one is
+skipped for a **capability the platform does not have**, never for a platform:
+
+| Skipped | Capability | Marked with |
+|---|---|---|
+| an unreadable directory is reported, not raised | POSIX permission bits — `chmod(0o000)` on Windows sets a read-only flag and leaves the directory readable, so there is nothing for the loader to report | `requires_posix_permissions` |
+| five symlink cases: escaping the root, a cycle, reached twice, followed, dangling | creating a symlink needs `SeCreateSymbolicLinkPrivilege`, which an unelevated CI process does not hold. *Measured*, not assumed, so these do run on a machine with Developer Mode on | `requires_symlinks` |
+| a FIFO is not loaded; a FIFO is not a valid root | `os.mkfifo` does not exist on Windows, and a Windows named pipe is not a filesystem entry the loader could walk into | `requires_mkfifo` |
+| the generated route script passes `sh -n` | no POSIX shell. The script's *content* is still asserted line by line there; only the second opinion from `sh` is missing | `requires_posix_shell` |
+
+The marks live in `tests/platform_marks.py`, one per capability, with the reason
+in the mark rather than in a comment — so a skipped run says why in its own
+output. `tests/test_platform.py::test_no_test_module_skips_a_whole_platform`
+fails if a skip is ever written as `skipif(sys.platform == "win32")` instead,
+because that is how "the platform lacks this" quietly becomes "netgraph is
+broken here and nobody is looking".
+
+The Windows coverage floor is 80 rather than 85 for exactly those six tests: the
+lines they exercise are counted as missed, and failing the job for an honest skip
+would make it look like a regression.
+
+### Platform behaviour asserted everywhere
+
+`tests/test_platform.py` is the other half, and it runs on all three platforms
+by design. Most of what it checks is *about* Windows — the newline policy, the
+retry around `os.replace`, the reserved device names, the Graphviz search, the
+socket option, the PowerShell completion script — and guarding it with `skipif`
+would mean none of it was checked until somebody happened to run the suite there.
+So the platform-dependent branch is reached by naming the platform
+(`monkeypatch.setattr(os, "name", "nt")`) and the platform-independent contract
+is asserted directly.
+
+That leaves three things only a real runner can settle, which is what the two
+jobs buy: a real `os.replace` against a real open handle, a real
+`ReadDirectoryChangesW` / FSEvents watcher, and a checkout under
+`core.autocrlf=true` — which is what `.gitattributes` exists to neutralise, and
+what `netgraph fmt --check examples` on the Windows job proves it did.
+
+The PowerShell completion script is the one Windows-shaped thing checked *by the
+real shell* on every platform. `pwsh` is preinstalled on all three runner images,
+so the generated script is parsed by PowerShell's own parser, registered with
+`Register-ArgumentCompleter`, and then driven through
+`[CommandCompletion]::CompleteInput` — the same entry point the shell uses on Tab.
+That last test completes an element name out of an inventory whose path contains a
+space, which is the case that would break if the words travelled to Python
+whitespace-separated instead of newline-separated.
+
 ## The properties
 
 `tests/test_properties.py` asserts the statements that are universally

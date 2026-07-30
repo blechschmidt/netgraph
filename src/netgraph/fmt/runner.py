@@ -20,13 +20,15 @@ from __future__ import annotations
 
 import difflib
 import enum
-import os
+import re
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Final
 
 from netgraph.fmt.canonical import FormatSyntaxError, format_stream
 from netgraph.fmt.verify import verify
+from netgraph.fsio import write_text_atomically
 from netgraph.loader.inventory import LoadError
 from netgraph.loader.tree import iter_inventory_files
 
@@ -44,6 +46,10 @@ __all__ = [
 
 #: What a stream read from stdin is called in diffs and diagnostics.
 STDIN_NAME = "<stdin>"
+
+#: An absolute path as :func:`display_path` spells one: a leading slash, or a
+#: Windows drive letter. Both are paths a diff header must not prefix.
+_ABSOLUTE: Final = re.compile(r"^(?:/|[A-Za-z]:/)")
 
 
 class Mode(enum.Enum):
@@ -135,11 +141,17 @@ def display_path(path: Path) -> str:
     for a noisy file list and, worse, a diff header of ``a//home/you/net/x.yaml``
     that ``git apply -p1`` cannot strip. Relative is what a person typed and
     what a patch wants.
+
+    The separator is always ``/``, including on Windows: this string ends up in
+    a unified diff header, and every tool that reads one — ``git apply``,
+    ``patch``, a review UI — spells a path that way whatever produced it. A
+    Windows-native ``examples\\home-lab\\sw.yaml`` in a ``+++ b/`` line is a
+    patch nothing can apply.
     """
     try:
-        return str(path.relative_to(Path.cwd()))
+        return path.relative_to(Path.cwd()).as_posix()
     except ValueError:
-        return str(path)
+        return path.as_posix()
 
 
 def format_source(text: str, *, name: str) -> str:
@@ -168,9 +180,12 @@ def diff_text(before: str, after: str, *, name: str) -> str:
 
     A relative name gets git's ``a/``/``b/`` prefixes so ``git apply`` reads the
     result; an absolute one does not, because ``a//home/you/x.yaml`` is neither
-    a path ``-p1`` can strip nor something anyone wants to look at.
+    a path ``-p1`` can strip nor something anyone wants to look at. A Windows
+    path is absolute in a second way — ``C:/net/x.yaml``, a drive letter rather
+    than a leading slash — which :data:`_ABSOLUTE` is here to recognise;
+    prefixing that would produce ``a/C:/net/x.yaml``, equally unusable.
     """
-    prefixed = not name.startswith("/")
+    prefixed = not _ABSOLUTE.match(name)
     lines = difflib.unified_diff(
         before.splitlines(keepends=True),
         after.splitlines(keepends=True),
@@ -259,19 +274,18 @@ def _write(path: Path, text: str) -> None:
     matters more than usual when the thing being rewritten is the only copy of a
     network's configuration.
 
+    :mod:`netgraph.fsio` owns both halves of the platform behaviour: no newline
+    translation, because the canonical form is defined in bytes and is the same
+    bytes everywhere (a CRLF-translated write would produce a file this very
+    function's ``--check`` mode then reports as unformatted), and a rename that
+    tolerates the transient sharing violation Windows raises when something else
+    still has the file open.
+
+    No ``mode`` is asked for, so the rewritten file gets whatever the umask
+    gives — which is what this function has always done, and what an ordinary
+    editor writing the same file would do.
+
     Raises:
         OSError: The file or its directory cannot be written.
     """
-    temporary = path.with_name(f".{path.name}.netgraph-fmt")
-    try:
-        # ``newline=""`` stops Python translating the ``\n`` the emitter
-        # produced into the platform's separator: the canonical form is defined
-        # in bytes, and it is the same bytes on every platform.
-        with temporary.open("w", encoding="utf-8", newline="") as handle:
-            handle.write(text)
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary, path)
-    except OSError:
-        temporary.unlink(missing_ok=True)
-        raise
+    write_text_atomically(path, text)

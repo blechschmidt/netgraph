@@ -60,6 +60,23 @@ your tests both ways:
 NETGRAPH_YAML_LOADER=python pytest
 ```
 
+It also runs the whole suite on `windows-latest` and `macos-14`, on 3.12 each.
+[`docs/testing.md`](docs/testing.md#platforms) says what each platform covers and
+which six tests are skipped on Windows, with the capability each one needs. Two
+rules follow from it and are worth knowing before you write the code, not after
+CI tells you:
+
+* **Write files through `netgraph.fsio`**, never `Path.write_text`. It is the one
+  call that silently varies by platform — Python's text mode translates `\n` to
+  `\r\n` on Windows — and the canonical form `netgraph fmt` enforces is defined in
+  bytes. `tests/test_platform.py` fails if a new call site reintroduces it.
+* **Skip on a capability, not on a platform.** The marks in
+  `tests/platform_marks.py` are per capability (`requires_symlinks`,
+  `requires_mkfifo`, …) and carry their reason. A bare
+  `skipif(sys.platform == "win32")` is how "the platform lacks this" quietly
+  becomes "netgraph is broken here and nobody is looking", so it is a test failure
+  rather than a convention.
+
 ## The gates
 
 These are the commands `.github/workflows/ci.yml` runs, in the order it runs

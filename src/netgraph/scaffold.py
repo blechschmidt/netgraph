@@ -29,6 +29,7 @@ from typing import Final
 
 from netgraph.config import CONFIG_FILE_NAME
 from netgraph.errors import NetgraphError
+from netgraph.fsio import write_text
 from netgraph.schema import build_schema
 
 __all__ = [
@@ -348,7 +349,10 @@ def write_scaffold(scaffold: Scaffold, target: Path, *, force: bool = False) -> 
         path = target.joinpath(*PurePosixPath(relative).parts)
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(content, encoding="utf-8")
+            # LF on every platform: the scaffold is a starting point somebody
+            # commits, and a tree that arrives CRLF on Windows would be a
+            # whole-file diff the first time anyone runs 'netgraph fmt'.
+            write_text(path, content)
         except OSError as exc:
             raise ScaffoldError(f"cannot write {path}: {exc.strerror or exc}") from exc
         written.append(path)

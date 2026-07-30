@@ -262,12 +262,22 @@ Ids are permanent: once assigned, one is never reused, so a suppression in someb
 inventory keeps meaning what it meant. Keeping the catalogue in its own module is what
 lets `config.py` resolve and check rule ids without importing the validator.
 
-Two smaller ones. `console.py` holds tables, colour and TTY detection, and a `Console` is
+Three smaller ones. `console.py` holds tables, colour and TTY detection, and a `Console` is
 handed to a command rather than constructed by it, so `--quiet`, `--verbose` and `--color`
 are honoured without each command re-deciding. `httpserve.py` holds what the two local
 servers promise — loopback binding, the default content-security policy, security headers,
 a Host check — because `watch` and `web` are different applications but what they promise
 about *being a local server* has to be identical.
+
+`fsio.py` holds the three questions about writing a file that must have the same answer
+everywhere netgraph runs: what a line ending is (`\n`, never the platform's, because a
+canonical form and a golden file are defined in bytes), how a file is replaced (through a
+sibling temporary and `os.replace`, retried for the sharing violation only Windows
+raises), and what a generated file may be called (not `nul.yaml`, which is a device on
+Windows and not a file). Each of those had two implementations and one of them was
+missing the newline argument, which is the shape of bug this module exists to make
+impossible: `tests/test_platform.py` fails if any call site goes back to
+`Path.write_text`.
 
 ## Module map
 
@@ -288,7 +298,8 @@ Verified against the tree: every path below exists.
 | `src/netgraph/errors.py` | shared exception hierarchy, and the diagnostic text helpers |
 | `src/netgraph/config.py` | per-inventory settings (`netgraph.toml`); `settings.py` owns the `[render]` table, the named profiles and the precedence ladder |
 | `src/netgraph/scaffold.py` | the starter inventory `netgraph init` writes |
-| `src/netgraph/httpserve.py` | what the two local servers promise: loopback, headers, host check |
+| `src/netgraph/httpserve.py` | what the two local servers promise: loopback, headers, host check, and the socket options that differ by platform |
+| `src/netgraph/fsio.py` | one newline policy, one atomic replace, one reserved-file-name rule, for every platform |
 | `src/netgraph/rules.py` | catalogue of validation rules and severities |
 | `src/netgraph/report.py` | `validate` as json, SARIF 2.1.0 and GitHub workflow commands |
 | `src/netgraph/schema.py` | JSON Schema emitted for editors (`netgraph schema`) |

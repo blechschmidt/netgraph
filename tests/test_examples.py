@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import html
 import itertools
-import shutil
 from pathlib import Path
 
 import pytest
@@ -25,6 +24,8 @@ from netgraph.loader import Inventory, load_tree, namespace_of
 from netgraph.models import Adapter, Device, PatchPanel
 from netgraph.rules import RULE_IDS
 from netgraph.validate import validate
+
+from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -268,7 +269,7 @@ def _render_svg(inventory: Inventory) -> str:
     return str(graph.pipe(format="svg", encoding="utf-8"))
 
 
-@pytest.mark.skipif(shutil.which("dot") is None, reason="Graphviz 'dot' is not installed")
+@requires_dot
 @pytest.mark.parametrize("name", sorted(EXAMPLE_SHAPES))
 def test_an_example_inventory_renders_to_svg(name: str) -> None:
     inventory = load_example(name)

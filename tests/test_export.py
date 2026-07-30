@@ -73,6 +73,7 @@ from netgraph.export.names import (
     sanitise_label,
     transliterate,
 )
+from netgraph.fsio import write_text
 from netgraph.loader import Inventory, load_tree
 from netgraph.render import build_graph, filter_graph
 from netgraph.render.graph import FilterSpec, Layer
@@ -247,7 +248,12 @@ def test_the_artefact_matches_its_golden_file(
 
     if regen_golden:
         golden.parent.mkdir(parents=True, exist_ok=True)
-        golden.write_text(actual, encoding="utf-8")
+        # ``netgraph.fsio.write_text`` rather than ``Path.write_text``: a golden
+        # is a byte-for-byte artefact, and regenerating one on Windows through
+        # Python's text mode would rewrite every line ending in the file. See
+        # ``.gitattributes``, which keeps the committed copy at LF for the same
+        # reason.
+        write_text(golden, actual)
         pytest.skip(f"regenerated {golden.name}")
 
     assert golden.exists(), (

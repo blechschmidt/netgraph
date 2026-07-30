@@ -71,6 +71,26 @@ The sequence rule is the one worth stating twice, because YAML permits three
 spellings of it. `interfaces:` sits at column 2, its dashes at column 4, and the
 keys of each entry at column 6.
 
+The last two rows are also stated twice, because they are the two the comparison
+is made in **bytes** for. A byte-order mark and a CRLF line ending both decode to
+an identical `str`, so a formatter comparing text would declare such a file
+unchanged and let it keep them forever. `netgraph fmt` compares the encoded bytes
+instead, which is why it reports — and rewrites — both.
+
+That has one consequence on Windows worth knowing before it surprises you. Git's
+`core.autocrlf` defaults to `true` there, so every YAML file arrives CRLF, and
+`netgraph fmt` then rewrites it to LF: `--check` fails on a fresh clone, and
+`git status` reports every file as modified after a run. Neither is a netgraph
+bug and neither has a fix in netgraph — the fix is to stop Git translating, with a
+`.gitattributes` next to the inventory:
+
+```gitattributes
+*.yaml text eol=lf
+*.yml  text eol=lf
+```
+
+This repository ships exactly that file for exactly that reason.
+
 ### Key order
 
 Mapping keys are ordered to match **the field order of

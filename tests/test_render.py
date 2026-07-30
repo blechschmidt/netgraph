@@ -17,7 +17,6 @@ from __future__ import annotations
 import dataclasses
 import json
 import re
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -59,7 +58,10 @@ from netgraph.render import (
     to_json,
     to_mermaid,
 )
+from netgraph.render.dot import DOT_ENV_VAR, find_dot
 from netgraph.render.registry import DEFAULT_MEDIA_TYPE
+
+from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -949,7 +951,7 @@ def test_graphviz_parses_a_diagram_whose_device_names_carry_quotes_and_braces(
     Hand-checking the escaping can only confirm what the test author imagined;
     feeding it to Graphviz confirms what Graphviz accepts.
     """
-    if shutil.which("dot") is None:
+    if find_dot() is None:
         pytest.skip("the Graphviz 'dot' executable is not installed")
     svg = render_image(_hostile_graph(tmp_path), format="svg").decode("utf-8")
     # Graphviz round-trips the node name into the SVG, XML-escaped.
@@ -1003,7 +1005,7 @@ def test_a_record_label_escapes_markup_rather_than_embedding_it(tmp_path: Path) 
     assert source.count(">];") == 1
 
 
-@pytest.mark.skipif(shutil.which("dot") is None, reason="Graphviz 'dot' is not installed")
+@requires_dot
 def test_graphviz_accepts_a_record_label_full_of_markup(tmp_path: Path) -> None:
     """The real proof: ``dot`` parses it, and without a warning."""
     svg = to_image(_html_hostile_graph(tmp_path), format="svg").decode("utf-8")
@@ -1344,13 +1346,15 @@ def test_a_missing_graphviz_executable_is_explained(
     home_lab: Inventory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The message has to name the fix; a bare FileNotFoundError does not."""
-    monkeypatch.setattr(shutil, "which", lambda _name: None)
+    monkeypatch.setattr("netgraph.render.dot.find_dot", lambda: None)
     with pytest.raises(RenderError, match="Install Graphviz") as caught:
         render(build_graph(home_lab), "svg")
-    # It must say what is missing, how to get it, and what to do meanwhile.
+    # It must say what is missing, how to get it, where to point netgraph when it
+    # is installed somewhere the search cannot reach, and what to do meanwhile.
     message = str(caught.value)
     assert "'dot' executable was not found" in message
     assert "apt install graphviz" in message
+    assert DOT_ENV_VAR in message
     assert "--format dot" in message
 
 
@@ -1393,7 +1397,7 @@ def test_an_empty_layout_is_not_passed_off_as_an_image(
         render(build_graph(home_lab), "svg")
 
 
-@pytest.mark.skipif(shutil.which("dot") is None, reason="Graphviz 'dot' is not installed")
+@requires_dot
 @pytest.mark.parametrize("output_format", ["svg", "png", "pdf"])
 def test_graphviz_lays_the_example_out(home_lab: Inventory, output_format: str) -> None:
     payload = render(build_graph(home_lab), output_format)

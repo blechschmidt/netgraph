@@ -599,6 +599,35 @@ Graphviz on the `PATH`; `dot`, `mermaid` and `json` do not.
 `png` and `pdf` are binary, so `-o/--output` is required for them when stdout is
 a terminal. `-o` creates parent directories.
 
+### When `dot` is installed but not on `PATH`
+
+The usual state of Graphviz on Windows — neither the installer nor
+`choco install graphviz` reliably adds `bin` to `PATH` — and a common one on
+macOS, where a process started outside a login shell does not inherit
+`/opt/homebrew/bin`. netgraph therefore looks in three places, most explicit
+first:
+
+1. `NETGRAPH_DOT`, if set, is taken as the full path to the binary.
+2. `PATH`, which resolves `dot.exe` on Windows and `dot` elsewhere.
+3. The default install locations for the platform — `C:\Program Files\Graphviz\bin`,
+   `/opt/homebrew/bin`, `/usr/local/bin`, `/opt/local/bin`, `/usr/bin`.
+
+So step 3 usually means it works with no configuration at all. When it does not,
+set the variable rather than editing `PATH`:
+
+```bash
+export NETGRAPH_DOT=/opt/homebrew/bin/dot          # macOS
+```
+
+```powershell
+$env:NETGRAPH_DOT = 'C:\Program Files\Graphviz\bin\dot.exe'   # Windows
+```
+
+Nothing is cached, so installing Graphviz while `netgraph watch` is running is
+enough — the next re-render finds it. And when it genuinely is not there, the
+error names the install command **for your platform** and says what to do
+instead; it is never a `FileNotFoundError` traceback.
+
 <!-- run: -->
 ```console
 $ netgraph -i examples/quickstart render -f mermaid

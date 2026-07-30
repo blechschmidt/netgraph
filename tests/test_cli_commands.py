@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import json
 import re
-import shutil
 from pathlib import Path
 
 import pytest
@@ -24,6 +23,8 @@ from click.testing import CliRunner, Result
 from netgraph.cli import cli, main
 from netgraph.errors import ConfigurationError, RenderError
 from netgraph.render import MERMAID_MAX_EDGES
+
+from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -382,7 +383,7 @@ def test_watch_takes_the_same_flags(runner: CliRunner) -> None:
     assert "unknown --link-template placeholder {unknown}" in result.output
 
 
-@pytest.mark.skipif(shutil.which("dot") is None, reason="Graphviz 'dot' is not installed")
+@requires_dot
 def test_a_format_that_cannot_carry_the_attributes_says_so(
     runner: CliRunner, tmp_path: Path
 ) -> None:
@@ -405,7 +406,7 @@ def test_a_format_that_cannot_carry_the_attributes_says_so(
     assert "dot, svg" in result.stderr
 
 
-@pytest.mark.skipif(shutil.which("dot") is None, reason="Graphviz 'dot' is not installed")
+@requires_dot
 def test_a_raster_render_that_asked_for_nothing_extra_is_quiet(
     runner: CliRunner, tmp_path: Path
 ) -> None:
@@ -504,7 +505,7 @@ def test_an_unwritable_destination_is_reported(
     assert "cannot write" in capsys.readouterr().err
 
 
-@pytest.mark.skipif(shutil.which("dot") is None, reason="Graphviz 'dot' is not installed")
+@requires_dot
 @pytest.mark.parametrize(
     ("output_format", "magic"),
     [("svg", b"<svg"), ("png", b"\x89PNG"), ("pdf", b"%PDF")],

@@ -1,7 +1,8 @@
 # `netgraph completion`
 
 `netgraph completion SHELL` prints a shell completion script on stdout for
-`bash`, `zsh` or `fish`. Installing it gets you the commands and flags, which any
+`bash`, `zsh`, `fish` or `powershell`. Installing it gets you the commands and
+flags, which any
 Click program gives you for free — and, more usefully, the values that depend on
 *your* inventory: element names, namespaces, rule ids and the profiles your
 `netgraph.toml` declares. The command itself needs no inventory; the completers
@@ -13,7 +14,7 @@ it installs do.
 
 <!-- generated: synopsis completion -->
 ```text
-netgraph [GLOBAL OPTIONS] completion [OPTIONS] {bash|zsh|fish}
+netgraph [GLOBAL OPTIONS] completion [OPTIONS] {bash|zsh|fish|powershell}
 ```
 <!-- /generated -->
 
@@ -36,6 +37,18 @@ mkdir -p ~/.zfunc && netgraph completion zsh > ~/.zfunc/_netgraph
 netgraph completion fish > ~/.config/fish/completions/netgraph.fish
 ```
 
+PowerShell — on Windows, or `pwsh` anywhere — does not source a file; it
+evaluates the script. One line, and the same line goes in `$PROFILE` to have it
+in every session:
+
+<!-- norun: writes into the reader's PowerShell profile -->
+```powershell
+netgraph completion powershell | Out-String | Invoke-Expression
+
+# permanently:
+Add-Content -Path $PROFILE -Value 'netgraph completion powershell | Out-String | Invoke-Expression'
+```
+
 Start a new shell afterwards. To try it without installing anything, source it in
 the current shell instead — `eval "$(netgraph completion bash)"`,
 `eval "$(netgraph completion zsh)"`, `netgraph completion fish | source`.
@@ -55,17 +68,19 @@ _netgraph_completion() {
 _netgraph_completion_setup;
 ```
 
-Only these three shells are on offer, because Click can generate for exactly
-these three; anything else would need its own generator rather than a flag, and
-asking for one says so:
+Only these four are on offer. Click generates the first three; `powershell` is
+netgraph's own generator (`PowerShellComplete` in `netgraph/completion.py`),
+because PowerShell's completion protocol is a registered script block rather
+than a `compgen` call. Anything else would need a generator of its own rather
+than a flag, and asking for one says so:
 
 <!-- run: rc=2 -->
 ```console
-$ netgraph completion pwsh
-Usage: netgraph completion [OPTIONS] {bash|zsh|fish}
+$ netgraph completion tcsh
+Usage: netgraph completion [OPTIONS] {bash|zsh|fish|powershell}
 Try 'netgraph completion --help' for help.
 
-Error: Invalid value for '{bash|zsh|fish}': 'pwsh' is not one of 'bash', 'zsh', 'fish'.
+Error: Invalid value for '{bash|zsh|fish|powershell}': 'tcsh' is not one of 'bash', 'zsh', 'fish', 'powershell'.
 ```
 
 ## What gets completed
@@ -124,7 +139,7 @@ a reasonable first thing to do after installing netgraph, and
 <!-- generated: arguments completion -->
 | Argument | Required | Count | Default |
 |---|---|---|---|
-| `{bash\|zsh\|fish}` | yes | 1 | — |
+| `{bash\|zsh\|fish\|powershell}` | yes | 1 | — |
 <!-- /generated -->
 
 ## Options

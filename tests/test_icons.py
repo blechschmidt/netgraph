@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import base64
 import re
-import shutil
 import struct
 import subprocess
 import sys
@@ -45,12 +44,10 @@ from netgraph.render import (
 )
 from netgraph.render.icons import CISCO, ICON_SUFFIXES, NO_ICONS, suffix_order
 
+from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
-
-requires_dot = pytest.mark.skipif(
-    shutil.which("dot") is None, reason="Graphviz 'dot' is not installed"
-)
 
 
 @pytest.fixture(scope="module")

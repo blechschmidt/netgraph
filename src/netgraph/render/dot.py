@@ -77,6 +77,7 @@ useless. Nothing here iterates a set without sorting it.
 from __future__ import annotations
 
 import base64
+import os
 import re
 import shutil
 import subprocess
@@ -120,8 +121,12 @@ from netgraph.render.links import LinkTemplate
 from netgraph.render.options import DEFAULT_RANKDIR, RenderOptions
 
 __all__ = [
+    "DOT_ENV_VAR",
     "DOT_EXECUTABLE",
     "IMAGE_FORMATS",
+    "find_dot",
+    "graphviz_install_hint",
+    "missing_dot_message",
     "render_dot",
     "render_image",
     "to_dot",
@@ -134,7 +139,115 @@ IMAGE_FORMATS: Final[tuple[str, ...]] = ("svg", "png", "pdf")
 #: The layout program shelled out to. Looked up on ``PATH``; never run through a
 #: shell, and always with an argument list, so nothing in an inventory can reach
 #: the command line.
+#:
+#: Spelled without ``.exe`` on purpose: :func:`shutil.which` consults
+#: ``PATHEXT`` on Windows, so this one name finds ``dot.exe`` there and ``dot``
+#: everywhere else. Appending the extension ourselves would *break* the lookup
+#: on POSIX rather than help it on Windows.
 DOT_EXECUTABLE: Final = "dot"
+
+#: Names the ``dot`` binary outright, for the case ``PATH`` cannot be fixed.
+#: The Windows Graphviz installer and the ``choco`` package do not always put
+#: ``bin`` on ``PATH``, and a GUI-launched editor on macOS inherits a ``PATH``
+#: without ``/opt/homebrew/bin`` — so an escape hatch that needs no shell
+#: configuration is worth having on exactly the two platforms this repository
+#: has least visibility into.
+DOT_ENV_VAR: Final = "NETGRAPH_DOT"
+
+#: Directories to look in when ``PATH`` does not have it, per :data:`os.name`.
+#: Nothing here is a guess at a version number or a wildcard: each entry is the
+#: default install location of a package manager or an installer, so a hit is a
+#: real Graphviz and a miss costs one :meth:`~pathlib.Path.is_file` call.
+_WELL_KNOWN_DIRS: Final[dict[str, tuple[str, ...]]] = {
+    # The MSI/EXE installer and the ``choco`` package both land under Program
+    # Files; the 32-bit path is there because the installer still offers it.
+    "nt": (
+        r"C:\Program Files\Graphviz\bin",
+        r"C:\Program Files (x86)\Graphviz\bin",
+        r"C:\Program Files\Graphviz\release\bin",
+    ),
+    # Homebrew on Apple Silicon, Homebrew on Intel, MacPorts, and the two
+    # ordinary Unix prefixes -- which also covers a Linux desktop session that
+    # was started with a minimal environment.
+    "posix": (
+        "/opt/homebrew/bin",
+        "/usr/local/bin",
+        "/opt/local/bin",
+        "/usr/bin",
+    ),
+}
+
+#: The install command for the platform netgraph is running on, first, followed
+#: by the others as a note: a Windows user told to run ``apt install`` has been
+#: given a worse error than no advice at all.
+_INSTALL_HINTS: Final[dict[str, tuple[str, ...]]] = {
+    "nt": ("winget install Graphviz.Graphviz", "choco install graphviz"),
+    "posix": (
+        "brew install graphviz (macOS)",
+        "apt install graphviz (Debian/Ubuntu)",
+        "dnf install graphviz (Fedora/RHEL)",
+    ),
+}
+
+
+def graphviz_install_hint() -> str:
+    """How to install Graphviz, phrased for the platform this is running on."""
+    return ", or ".join(_INSTALL_HINTS.get(os.name, _INSTALL_HINTS["posix"]))
+
+
+def find_dot() -> str | None:
+    """The Graphviz ``dot`` executable, or ``None`` if it is not installed.
+
+    Three places, most explicit first:
+
+    1. :data:`DOT_ENV_VAR`, taken as given. A value that is not an executable
+       file is *not* silently ignored — it is returned anyway, so that the
+       subprocess failure names the path the user set rather than pretending
+       they never set it.
+    2. ``PATH``, via :func:`shutil.which`, which resolves ``dot.exe`` on Windows
+       and ``dot`` elsewhere.
+    3. :data:`_WELL_KNOWN_DIRS`, because "installed but not on ``PATH``" is the
+       normal state of Graphviz on Windows and a common one on macOS. The result
+       is an absolute path, so nothing about the caller's ``PATH`` matters
+       afterwards.
+
+    The answer is not cached: a user who installs Graphviz and re-runs
+    ``netgraph watch`` in the same session should get a diagram, not the
+    conclusion the first render reached.
+    """
+    override = os.environ.get(DOT_ENV_VAR, "").strip()
+    if override:
+        return override
+
+    found = shutil.which(DOT_EXECUTABLE)
+    if found is not None:
+        return found
+
+    for directory in _WELL_KNOWN_DIRS.get(os.name, ()):
+        # ``which`` with an explicit ``path`` still applies PATHEXT, so this
+        # finds ``dot.exe`` under Program Files without naming the extension.
+        candidate = shutil.which(DOT_EXECUTABLE, path=directory)
+        if candidate is not None:
+            return candidate
+    return None
+
+
+def missing_dot_message(*, subject: str) -> str:
+    """What to tell a user who asked for ``subject`` without Graphviz installed.
+
+    Kept next to :func:`find_dot` so the search and the explanation of what it
+    searched cannot drift: the message names the environment variable *because*
+    the lookup honours it, and says ``dot`` is looked for on ``PATH`` *because*
+    that is the second place it looks.
+    """
+    return (
+        f"cannot render {subject}: the Graphviz {DOT_EXECUTABLE!r} executable was not found "
+        f"on PATH, nor in the usual install locations for this platform. "
+        f"Install Graphviz ({graphviz_install_hint()}), set {DOT_ENV_VAR} to the full path of "
+        f"the binary if it is installed somewhere unusual, or render with '--format dot' and "
+        f"convert the file separately."
+    )
+
 
 #: How long a single layout may take before it is abandoned. Graphviz is
 #: superlinear in the number of edges, so a large inventory rendered without a
@@ -440,14 +553,9 @@ def to_image(graph: Graph, options: RenderOptions | None = None, *, format: str)
         supported = ", ".join(IMAGE_FORMATS)
         raise RenderError(f"{format!r} is not a Graphviz image format; expected one of {supported}")
 
-    executable = shutil.which(DOT_EXECUTABLE)
+    executable = find_dot()
     if executable is None:
-        raise RenderError(
-            f"cannot render {format}: the Graphviz {DOT_EXECUTABLE!r} executable was not found "
-            "on PATH. Install Graphviz (Debian/Ubuntu: 'apt install graphviz', "
-            "macOS: 'brew install graphviz', Windows: 'winget install Graphviz.Graphviz'), "
-            "or render with '--format dot' and convert the file separately."
-        )
+        raise RenderError(missing_dot_message(subject=format))
 
     opts = options or RenderOptions()
     source = to_dot(graph, opts, target=format)
@@ -470,7 +578,16 @@ def to_image(graph: Graph, options: RenderOptions | None = None, *, format: str)
             "or render with '--format dot' and lay it out separately."
         ) from exc
     except OSError as exc:
-        raise RenderError(f"cannot render {format}: could not run {executable!r}: {exc}") from exc
+        # Reachable in two ways worth telling apart. ``NETGRAPH_DOT`` naming a
+        # path that is not there is a typo the user can fix, and the message says
+        # where to fix it. Anything else -- a binary that will not exec, a
+        # permission problem, an exhausted process table -- is reported as
+        # itself; guessing "install Graphviz" for those would send the reader
+        # after the wrong thing.
+        detail = f"could not run {executable!r}: {exc.strerror or exc}"
+        if isinstance(exc, FileNotFoundError) and os.environ.get(DOT_ENV_VAR, "").strip():
+            detail += f" ({DOT_ENV_VAR} names it; unset it to search PATH instead)"
+        raise RenderError(f"cannot render {format}: {detail}") from exc
 
     if completed.returncode != 0:
         detail = _decode(completed.stderr) or f"{DOT_EXECUTABLE} exited with {completed.returncode}"

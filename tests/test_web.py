@@ -22,7 +22,6 @@ from __future__ import annotations
 import http.client
 import json
 import re
-import shutil
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -51,12 +50,10 @@ from netgraph.web import (
     render_source,
 )
 
+from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HOME_LAB = REPO_ROOT / "examples" / "home-lab"
-
-requires_dot = pytest.mark.skipif(
-    shutil.which("dot") is None, reason="Graphviz 'dot' is not installed"
-)
 
 
 def stream_of(root: Path) -> str:
@@ -257,7 +254,7 @@ def test_a_failure_that_is_not_a_sentence_is_made_into_one(monkeypatch: Any) -> 
 
 
 def test_a_missing_graphviz_is_reported_rather_than_raised(monkeypatch: Any) -> None:
-    monkeypatch.setattr("netgraph.render.dot.shutil.which", lambda name: None)
+    monkeypatch.setattr("netgraph.render.dot.find_dot", lambda: None)
     preview = render_source(TWO_HOSTS)
     assert preview.status is Status.FAILED
     assert "Graphviz" in preview.message
