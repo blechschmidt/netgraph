@@ -2,13 +2,14 @@
 
 The suite is in two halves, and they answer different questions.
 
-**Example tests** — everything in `tests/` except the two files below — say what
+**Example tests** — everything in `tests/` except the three files below — say what
 a feature *does*. Each one names an inventory somebody wrote, calls one thing,
 and asserts one outcome. When they fail, the failure is a sentence.
 
-**Property tests** — `tests/test_properties.py` and `tests/test_fuzz_loader.py`
-— say what netgraph may *never* do, for every input rather than for the ones
-somebody thought of. They are driven by [Hypothesis][hypothesis] and by the
+**Property tests** — `tests/test_properties.py`, `tests/test_edit_properties.py`
+and `tests/test_fuzz_loader.py` — say what netgraph may *never* do, for every
+input rather than for the ones somebody thought of. They are driven by
+[Hypothesis][hypothesis] and by the
 strategies in `tests/strategies.py`, which generate whole inventories the loader
 accepts: unicode-bearing free text, near-boundary names, interfaces with
 consistent types and members, cables whose endpoints resolve, nested tunnel
@@ -130,6 +131,14 @@ quantified, and therefore the ones an example test can only ever sample:
 | no *name* can become syntax either | the half a constrained grammar makes look safe |
 | `validate` depends on the inventory and nothing else | findings that move when a file is renamed |
 | a traced path only crosses edges the graph has | a route that does not exist |
+
+`tests/test_edit_properties.py` asserts the two that the write path lives or dies
+by:
+
+| Property | What it rules out |
+|---|---|
+| a sequence of operations, undone, restores the tree byte for byte | an undo that quietly restyles a file |
+| the edited tree and a tree written in that shape are one network | an editor that produces trees nobody would write |
 
 `tests/test_fuzz_loader.py` covers the one component with a real trust
 boundary. The loader reads files a user did not write — `netgraph import`

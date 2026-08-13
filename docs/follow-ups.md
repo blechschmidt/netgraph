@@ -1584,6 +1584,41 @@ than merely racing on one key.
 
 ---
 
+## 15. A cached element forgets which endpoint was written first
+
+**Status:** open, and not currently reachable from any command.
+
+`InterfaceRef.document_index` records where an endpoint sat in the *document*
+before `sort_endpoints` moved it (§7.1), so that a diagnostic about
+`spec.endpoints[1]` points at the line that actually holds it rather than at the
+other end of the cable. It is a `PrivateAttr`, and the parse cache stores an
+element as **pydantic serialises it** — sorted — so a cache hit reconstructs the
+endpoints in canonical order and every `document_index` comes back as the
+canonical position.
+
+Nothing surfaces it today. The only consumer is `_Endpoint.field_path` in
+`netgraph.validate`, whose field paths reach the user solely through the
+machine-readable `validate` formats — and those pass `keep_provenance=True`,
+which disables the cache by construction. The text format reports a document,
+not a field.
+
+It was found by the edit layer, which needed the same fact for a different
+reason: to rewrite the right endpoint of a cable when an element is renamed.
+That is why `netgraph.edit.references.locate_reference` does not trust the
+index it is given. It uses it as a hint, checks that the value there reads as
+the reference the model reported, and otherwise searches the sibling entries for
+the unique one that does — which is the right behaviour regardless, since a
+document may write its endpoints in either order.
+
+A fix would have to make the serialised form carry the written order, most
+plausibly by emitting `spec.endpoints` in document order and letting
+`sort_endpoints` re-derive the index on the way back in. That is a change to a
+model serializer shared by `netgraph show` and by every consumer of
+`model_dump`, so it wants its own change and its own golden review rather than
+being smuggled in beside an unrelated feature.
+
+---
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

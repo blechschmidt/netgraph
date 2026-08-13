@@ -223,12 +223,13 @@ Everything else hangs off one of the five stages and adds no sixth.
 | `listing.py` | stage 3 | `LISTINGS[subject](inventory) -> Listing` — the tables `netgraph list` prints, and the ones a report shows |
 | `report/` | stages 2, 3 and 4 | `generate(inventory, *, options, diagnostics, …) -> (Bundle, Diagrams)` — the as-built document, built from `listing.py`, `ipam.py`, `export/cables.py`, `power.py` and the layer graphs |
 | `fmt/` | before stage 1 | `format_paths(roots, *, mode) -> Summary` — its own round-trip parser, never on the loading path |
+| `edit/` | before stage 1, gated on 1 and 2 | `EditSession(root).apply(operation)`, then `.diff()` / `.commit()` — the only write path, and the only thing that loads the tree *as it would be* through `loader.Overlay` |
 | `importer/` | before stage 1 | `read_inputs` → `build_draft` → `build_files` → `write_files`, producing a tree stage 1 then loads |
 | `schema.py` | stage 1's models | `build_schema(kind=None) -> dict[str, Any]` — the JSON Schema an editor consumes |
 | `watch/` | all five | `run_cycle(request) -> CycleResult`, repeated by `run_watch`, published through `LiveRender`, served by `PreviewServer` |
 | `web/` | all five, on a string | `render_source(source, view=None) -> Preview`, over `load_stream` rather than `load_tree` |
 
-Three are worth a sentence more. `netgraph.graph` sits *beside* the renderers, not under
+Four are worth a sentence more. `netgraph.graph` sits *beside* the renderers, not under
 them: it hands the graph `build_graph` already resolved to networkx so that connectivity
 questions are answered by graph algorithms, and it declares its own `filter_graph` — over
 `nx.MultiGraph`, with keyword predicates rather than a `FilterSpec` — so check which one an
@@ -236,7 +237,12 @@ import means. `fmt/` is the one part that does not share a parser with the rest:
 `ruamel.yaml`'s round-trip loader keeps the comments, blank lines and quoting style a
 formatter cannot discard, every formatted document is handed back to the strict loader
 before it is written (`fmt/verify.py`), and nothing on the loading path imports it, so
-`validate` pays nothing for it. And `export/` is scoped like a render on purpose: the same
+`validate` pays nothing for it. `edit/` is the mirror of `fmt/` and shares its parser for the same reason, but not its
+remit: `fmt` rewrites whole files and `edit` re-emits only the documents an operation
+named, so that every other byte of a file survives an edit. It is the one branch that runs
+*two* stages of the pipeline as a check — it loads and validates the tree it would write,
+through `loader.Overlay`, and refuses if the edit would introduce a new error. And
+`export/` is scoped like a render on purpose: the same
 `FilterSpec` narrows both, so `--namespace sites/north --kind switch` means the same thing
 to a diagram and to a hosts file, and each emitter records what it had to drop
 (`export/manifest.py`) instead of dropping it quietly.
@@ -328,6 +334,7 @@ Verified against the tree: every path below exists.
 | `src/netgraph/listing.py` | the tables of `netgraph list`, in a form a report can show: headers, alignment, formatted cells and the same rows as records |
 | `src/netgraph/report/` | `netgraph report`: the as-built document. `collect.py` works out the scopes and the shared derivations, `pages.py` says what each page carries, `model.py` is the format-independent document, `layout.py` the file names and cross-references, `diagrams.py` the drawings and the links inside them, `write.py` the templates and the escaping, `bundle.py` the files and how they are written, `stamp.py` the timestamp and the git revision; `templates/` and `assets/` are the editable layout (`--template DIR`) |
 | `src/netgraph/fmt/` | the canonical form of an inventory file (`netgraph fmt`): `canonical.py` shapes it, `order.py` holds the key order, `verify.py` re-reads it strictly, `runner.py` walks the paths |
+| `src/netgraph/edit/` | the write path (`netgraph edit`, and the web editor to come): `operations.py` is the closed set of typed changes and their JSON form, `apply.py` turns each into a change and its inverse, `roundtrip.py` holds a file as documents that can be edited without touching the others, `references.py` reads the references off the models and re-spells them, `placement.py` decides where a new document goes, `tree.py` journals and hashes what may be written, `session.py` runs the validation and conflict gates |
 | `src/netgraph/importer/` | `netgraph import`: a first inventory from live-network output. `run.py` reads the inputs, sniffs each dialect and writes the tree; `lldp.py` turns `lldpctl`/`lldpcli` neighbour records into cables, both ends at once; `iproute.py` turns `ip -j link`/`addr` into one host's interfaces, bridges, bonds and VLANs; `csvlinks.py` reads `device,port,device,port` rows (and says why not NetJSON); `draft.py` is the neutral inventory every reader appends to, and the dedup; `emit.py` writes it as commented YAML in `docs/schema.md` field order |
 | `src/netgraph/watch/` | live re-rendering (`netgraph watch`): `pipeline.py` is one load → validate → render cycle and its published state, `loop.py` decides what counts as a change, `server.py` is the loopback preview and its self-reloading page |
 | `src/netgraph/web/` | the interactive interface (`netgraph web`): `preview.py` is one pass over a document stream, `svgdoc.py` is `render/fragment.py` with the preview's answers filled in, `server.py` is five routes over all of it, `assets/` the dependency-free client |

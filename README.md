@@ -190,6 +190,17 @@ report.txt` both do what they look like they do.
 | [`netgraph drift`](docs/commands/drift.md) | Compare a live network against the declared inventory. | [drift.md](docs/commands/drift.md) |
 | [`netgraph validate`](docs/commands/validate.md) | Check the inventory; the gate for CI and pre-commit. | [validate.md](docs/commands/validate.md) |
 | [`netgraph fmt`](docs/commands/fmt.md) | Rewrite inventory YAML into the canonical form. | [fmt.md](docs/commands/fmt.md) |
+| [`netgraph edit set`](docs/commands/edit.md) | Set a field on an element, in place, comments and all. | [edit.md](docs/commands/edit.md) |
+| [`netgraph edit unset`](docs/commands/edit.md) | Remove a field from an element. | [edit.md](docs/commands/edit.md) |
+| [`netgraph edit create`](docs/commands/edit.md) | Declare a new element and place its document. | [edit.md](docs/commands/edit.md) |
+| [`netgraph edit delete`](docs/commands/edit.md) | Remove an element, and what cannot survive it. | [edit.md](docs/commands/edit.md) |
+| [`netgraph edit rename`](docs/commands/edit.md) | Rename an element and every reference to it. | [edit.md](docs/commands/edit.md) |
+| [`netgraph edit move`](docs/commands/edit.md) | Move an element's document to another file. | [edit.md](docs/commands/edit.md) |
+| [`netgraph edit connect`](docs/commands/edit.md) | Cable two interfaces together. | [edit.md](docs/commands/edit.md) |
+| [`netgraph edit disconnect`](docs/commands/edit.md) | Remove a cable. | [edit.md](docs/commands/edit.md) |
+| [`netgraph edit add-interface`](docs/commands/edit.md) | Add an interface to an element. | [edit.md](docs/commands/edit.md) |
+| [`netgraph edit remove-interface`](docs/commands/edit.md) | Remove an interface from an element. | [edit.md](docs/commands/edit.md) |
+| [`netgraph edit apply`](docs/commands/edit.md) | Apply operations given as JSON; the programmatic face. | [edit.md](docs/commands/edit.md) |
 | [`netgraph render`](docs/commands/render.md) | Draw the graph as SVG, PNG, PDF, DOT, Mermaid, JSON or HTML. | [render.md](docs/commands/render.md) |
 | [`netgraph watch`](docs/commands/watch.md) | Re-render on every save, optionally serving the result. | [watch.md](docs/commands/watch.md) |
 | [`netgraph web`](docs/commands/web.md) | Edit the YAML and see the diagram side by side in a browser. | [web.md](docs/commands/web.md) |

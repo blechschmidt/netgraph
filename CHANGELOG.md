@@ -18,6 +18,26 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **`netgraph edit`, the write path.** The first way to *change* an inventory that is as
+  careful as the way netgraph reads one. Eleven typed operations — create, delete, rename,
+  move, set, unset, add-interface, remove-interface, connect, disconnect, and any of them as
+  JSON on stdin — each applied through a round-trip parser, so comments, blank lines, key
+  order and quoting style survive byte for byte and a diff of an edit is the edit. Each one
+  is **reversible exactly**: it returns the operations that undo it, so an undo stack is a
+  list and undo restores the tree comment for comment. Each one is **reference-aware**: a
+  rename rewrites every mention of the element across the whole tree, keeping the spelling
+  each document chose, and a delete either takes the cables and tunnels that terminate on
+  the element with it (`--cascade`) or refuses and names them. New documents are **placed**
+  by the conventions in [`docs/inventory-layout.md`](docs/inventory-layout.md), and the last
+  document leaving a file takes the file — and the folder — with it. Two gates stand between
+  an edit and the disk: the tree is loaded and validated *as it would be* and the write is
+  refused if it would introduce a new error (`--force` overrides), and every file is hashed
+  when it is read and checked again before it is written, so a file that changed underneath
+  is a reported conflict rather than a lost edit. `--dry-run` prints the unified diff it
+  would write, `--json` prints the applied operations and their inverses. See
+  [`docs/commands/edit.md`](docs/commands/edit.md) and
+  [`docs/editing.md`](docs/editing.md).
+
 - **A container image published on every push.** `ghcr.io/blechschmidt/netgraph` now also
   carries unreleased work, tagged after the ref it was built from: `<branch>` for every
   branch pushed (slashes become dashes, so `feature/vlans` is `feature-vlans`),

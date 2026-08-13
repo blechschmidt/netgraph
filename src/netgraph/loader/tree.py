@@ -34,7 +34,7 @@ from __future__ import annotations
 
 import gc
 import os
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
@@ -58,6 +58,7 @@ __all__ = [
     "STREAM_NAME",
     "YAML_SUFFIXES",
     "InventoryFile",
+    "Overlay",
     "iter_inventory_files",
     "load_stream",
     "load_tree",
@@ -92,6 +93,48 @@ class InventoryFile:
 
 
 @dataclass(frozen=True, slots=True)
+class Overlay:
+    """Files to read from memory instead of from the disk.
+
+    :mod:`netgraph.edit` has to answer one question before it writes anything:
+    *would* this change leave the tree loadable, and would it introduce an error
+    the tree does not already have? The only honest way to answer it is to load
+    the tree as it would be after the write — which must not mean writing it
+    first. An overlay is that: the same walk, the same discovery rules, the same
+    ordering, with a handful of paths answered from a string.
+
+    ``files`` maps a POSIX path relative to the inventory root to the text that
+    file should be taken to hold, or to ``None`` when it should be taken not to
+    exist. A path the walk never reaches is *added* to it, in the position
+    ``NG-L005`` puts it, so a document written into a new folder is loaded into
+    the namespace that folder names.
+    """
+
+    files: Mapping[str, str | None]
+
+    def applies_to(self, relative: str) -> bool:
+        return relative in self.files
+
+    def text_for(self, relative: str) -> str | None:
+        return self.files.get(relative)
+
+    def apply(self, entries: list[InventoryFile], root: Path) -> list[InventoryFile]:
+        """``entries`` with the overlay's deletions removed and its files added."""
+        kept = [
+            entry for entry in entries if self.files.get(entry.relative.as_posix(), "") is not None
+        ]
+        known = {entry.relative.as_posix() for entry in kept}
+        for relative, text in self.files.items():
+            if text is None or relative in known:
+                continue
+            kept.append(
+                InventoryFile(path=root / PurePosixPath(relative), relative=PurePosixPath(relative))
+            )
+        kept.sort(key=lambda entry: entry.sort_key)
+        return kept
+
+
+@dataclass(frozen=True, slots=True)
 class _Pending:
     """A directory queued for traversal."""
 
@@ -103,7 +146,11 @@ class _Pending:
 
 
 def load_tree(
-    root: Path, *, keep_provenance: bool = False, cache: DocumentCache | None = None
+    root: Path,
+    *,
+    keep_provenance: bool = False,
+    cache: DocumentCache | None = None,
+    overlay: Overlay | None = None,
 ) -> Inventory:
     """Load every YAML document below ``root`` into an :class:`Inventory`.
 
@@ -140,6 +187,10 @@ def load_tree(
             Ignored when ``keep_provenance`` is set: provenance *is* the YAML
             node tree, and a cache that stored those would defeat the reason
             they are dropped.
+        overlay: Files to read from memory rather than from disk
+            (:class:`Overlay`), or ``None`` to load what is there. An overlaid
+            file never consults the cache — its bytes are not the bytes on disk,
+            so an entry keyed by them would be a lie about a file that exists.
 
     Returns:
         The populated inventory, possibly holding errors.
@@ -153,8 +204,11 @@ def load_tree(
     builder = _Builder(inventory, keep_provenance=keep_provenance)
     store = None if keep_provenance else cache
     with _deferred_gc():
-        for entry in iter_inventory_files(root, errors=inventory.errors):
-            _load_file(entry, builder, store)
+        entries = iter_inventory_files(root, errors=inventory.errors)
+        if overlay is not None:
+            entries = overlay.apply(entries, root)
+        for entry in entries:
+            _load_file(entry, builder, store, overlay)
         builder.finish()
     if store is not None:
         store.flush()
@@ -459,7 +513,12 @@ def _is_yaml_name(name: str) -> bool:
 # -- parsing --------------------------------------------------------------
 
 
-def _load_file(entry: InventoryFile, builder: _Builder, cache: DocumentCache | None = None) -> None:
+def _load_file(
+    entry: InventoryFile,
+    builder: _Builder,
+    cache: DocumentCache | None = None,
+    overlay: Overlay | None = None,
+) -> None:
     """Turn one file into slots, from the cache when its bytes are known.
 
     The file is read either way — its bytes are the key — so a cache hit saves
@@ -467,6 +526,11 @@ def _load_file(entry: InventoryFile, builder: _Builder, cache: DocumentCache | N
     is: on the benchmark tree the read is 2 ms of a 440 ms load.
     """
     relative = entry.relative.as_posix()
+    if overlay is not None and overlay.applies_to(relative):
+        text = overlay.text_for(relative)
+        if text is not None:  # ``None`` is filtered out by ``Overlay.apply``.
+            _parse_text(text, entry, builder)
+        return
     try:
         content = entry.path.read_bytes()
     except OSError as exc:
@@ -499,11 +563,25 @@ def _load_file(entry: InventoryFile, builder: _Builder, cache: DocumentCache | N
 
 
 def _parse_file(content: bytes, entry: InventoryFile, builder: _Builder) -> None:
-    """Parse one file's bytes and hand every document it holds to ``builder``."""
+    """Parse one file's bytes and hand every document it holds to ``builder``.
+
+    Decoding happens inside the same guard as parsing, because "these bytes are
+    not UTF-8" is reported the same way as "this text is not YAML": as a
+    :class:`LoadError` against the file, never as an exception that would end
+    the walk.
+    """
+    _feed(lambda: decode_text(content, entry.path), entry, builder)
+
+
+def _parse_text(text: str, entry: InventoryFile, builder: _Builder) -> None:
+    """Parse one file's decoded text and hand every document it holds to ``builder``."""
+    _feed(lambda: text, entry, builder)
+
+
+def _feed(source: Callable[[], str], entry: InventoryFile, builder: _Builder) -> None:
+    """Decode, parse and feed one file, recording whatever went wrong."""
     try:
-        for document in parse_documents(
-            decode_text(content, entry.path), path=entry.path, relative=entry.relative
-        ):
+        for document in parse_documents(source(), path=entry.path, relative=entry.relative):
             builder.feed(document, entry=entry)
     except YamlSyntaxError as exc:
         builder.inventory.record(

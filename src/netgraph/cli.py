@@ -117,6 +117,25 @@ from netgraph.diagnostics import render_report as render_diagnostics
 from netgraph.drift import FORMATS as DRIFT_FORMATS
 from netgraph.drift import CompareSpec, DriftReport, check_drift, render_drift
 from netgraph.drift import write_text as write_drift
+from netgraph.edit import (
+    AddInterface,
+    AddressError,
+    CascadeRequired,
+    Connect,
+    CreateElement,
+    DeleteElement,
+    Disconnect,
+    EditError,
+    EditSession,
+    MoveElement,
+    Operation,
+    RemoveInterface,
+    RenameElement,
+    SetField,
+    UnsetField,
+    ValidationRefused,
+    operations_from_json,
+)
 from netgraph.errors import (
     ConfigurationError,
     LoaderError,
@@ -178,7 +197,7 @@ from netgraph.loader import (
     read_documents,
     subset,
 )
-from netgraph.models import DOCUMENT_KINDS, Element
+from netgraph.models import DOCUMENT_KINDS, KINDS, Element, Medium
 from netgraph.render import (
     DEFAULT_RANKDIR,
     FORMATS,
@@ -1142,6 +1161,558 @@ def _report_formatting(console: Console, summary: Summary, *, mode: Mode) -> Non
     if summary.failures:
         parts.append(f"{len(summary.failures)} failed")
     console.info(", ".join(parts))
+
+
+# --------------------------------------------------------------------------- #
+# edit
+# --------------------------------------------------------------------------- #
+
+
+#: The three flags every ``edit`` subcommand shares. Declared once because they
+#: mean the same thing everywhere — what to do instead of writing, what to
+#: print, and what to override — and declaring them per command would be twelve
+#: chances for one of them to drift.
+_EDIT_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
+    click.option(
+        "-n",
+        "--dry-run",
+        is_flag=True,
+        help="Write nothing; print the unified diff the edit would apply.",
+    ),
+    click.option(
+        "--json",
+        "as_json",
+        is_flag=True,
+        help=(
+            "Print the applied operations and their inverses as JSON, so a caller can keep "
+            "an undo stack."
+        ),
+    ),
+    click.option(
+        "--force",
+        is_flag=True,
+        help=(
+            "Write even when the edit would introduce a new error. The check for files that "
+            "changed on disk is never skipped."
+        ),
+    ),
+)
+
+
+def _edit_flags(command: Any) -> Any:
+    """Apply :data:`_EDIT_OPTIONS`, keeping their written order in ``--help``."""
+    for option in reversed(_EDIT_OPTIONS):
+        command = option(command)
+    return command
+
+
+@cli.group("edit", invoke_without_command=True)
+@click.pass_context
+def edit_command(ctx: click.Context) -> None:
+    """Change the inventory: one typed, reversible, comment-preserving operation.
+
+    Every subcommand is one operation from ``netgraph.edit``. It is applied to an
+    in-memory copy of the tree, the tree is loaded and validated as it would be
+    once written, and the files are only written if the edit introduces no new
+    error -- so the inventory on disk stays loadable.
+
+    Untouched lines are not rewritten: comments, blank lines, key order and
+    quoting survive byte for byte, and ``--dry-run`` shows exactly the hunk that
+    would change.
+
+    With no subcommand, operations are read as JSON from stdin -- see
+    'netgraph edit apply'.
+    """
+    if ctx.invoked_subcommand is None:
+        ctx.invoke(edit_apply_command)
+
+
+@edit_command.command("apply")
+@click.option(
+    "-f",
+    "--file",
+    "source",
+    type=click.Path(exists=True, dir_okay=False, readable=True, path_type=Path),
+    help="Read the operations from this file instead of from stdin.",
+)
+@_edit_flags
+@click.pass_obj
+def edit_apply_command(
+    app: AppContext, source: Path | None, dry_run: bool, as_json: bool, force: bool
+) -> None:
+    """Apply operations given as JSON, one object or a list of them.
+
+    This is the programmatic face of the command, and the one the web editor and
+    'netgraph plan' are described in terms of. Each object carries an "op" naming
+    what it does and the keys that operation takes:
+
+    \b
+        [{"op": "set", "address": "core-sw", "path": "spec.model", "value": "C9300"},
+         {"op": "connect", "a": "core-sw:Gi1/0/3", "b": "acc-sw:Gi1/0/1"}]
+
+    The whole list is applied in order and judged as one change: an operation
+    that is only valid once a later one has run is fine.
+    """
+    text = source.read_text(encoding="utf-8") if source is not None else sys.stdin.read()
+    _run_edit(
+        app,
+        operations_from_json(text),
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+    )
+
+
+@edit_command.command("set")
+@click.argument("address", shell_complete=complete_element)
+@click.argument("path")
+@click.argument("value")
+@click.option(
+    "--string",
+    "as_string",
+    is_flag=True,
+    help="Take VALUE literally instead of reading it as YAML, so 1500 stays a string.",
+)
+@_edit_flags
+@click.pass_obj
+def edit_set_command(
+    app: AppContext,
+    address: str,
+    path: str,
+    value: str,
+    as_string: bool,
+    dry_run: bool,
+    as_json: bool,
+    force: bool,
+) -> None:
+    """Set a field on an element: netgraph edit set core-sw spec.model 'C9300'.
+
+    PATH is a field path -- ``spec.model``, ``spec.interfaces[2].mtu``,
+    ``metadata.labels.site`` -- and the mappings on the way to it are created if
+    they are not there. VALUE is read as a YAML scalar, so ``1500`` is a number,
+    ``true`` is a boolean and ``[10, 20]`` is a list; ``--string`` turns that off.
+    """
+    _run_edit(
+        app,
+        [SetField(address=address, path=path, value=value if as_string else _scalar(value))],
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+    )
+
+
+@edit_command.command("unset")
+@click.argument("address", shell_complete=complete_element)
+@click.argument("path")
+@_edit_flags
+@click.pass_obj
+def edit_unset_command(
+    app: AppContext, address: str, path: str, dry_run: bool, as_json: bool, force: bool
+) -> None:
+    """Remove a field from an element."""
+    _run_edit(
+        app,
+        [UnsetField(address=address, path=path)],
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+    )
+
+
+@edit_command.command("create")
+@click.argument("kind", type=click.Choice(KINDS))
+@click.argument("name")
+@click.option(
+    "--namespace",
+    default="",
+    help="Folder to declare it in, relative to the inventory root. The root by default.",
+)
+@click.option(
+    "--spec",
+    "spec_json",
+    default="{}",
+    show_default=True,
+    help="The element's spec, as JSON.",
+)
+@click.option(
+    "--metadata",
+    "metadata_json",
+    default="{}",
+    show_default=True,
+    help="Description, labels and annotations, as JSON.",
+)
+@click.option(
+    "--file",
+    "target",
+    help=(
+        "File to write it to, relative to the inventory root. Chosen by the layout "
+        "conventions when absent."
+    ),
+)
+@_edit_flags
+@click.pass_obj
+def edit_create_command(
+    app: AppContext,
+    kind: str,
+    name: str,
+    namespace: str,
+    spec_json: str,
+    metadata_json: str,
+    target: str | None,
+    dry_run: bool,
+    as_json: bool,
+    force: bool,
+) -> None:
+    """Declare a new element.
+
+    The document is checked against the schema of its KIND before anything is
+    written, and it lands in the file that already holds elements of that kind in
+    that namespace, or in a new one named by the conventions in
+    docs/inventory-layout.md.
+    """
+    _run_edit(
+        app,
+        [
+            CreateElement(
+                kind=kind,
+                name=name,
+                namespace=namespace,
+                spec=_json_object(spec_json, "--spec"),
+                metadata=_json_object(metadata_json, "--metadata"),
+                file=target,
+            )
+        ],
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+    )
+
+
+@edit_command.command("delete")
+@click.argument("address", shell_complete=complete_element)
+@click.option(
+    "--cascade",
+    is_flag=True,
+    help="Also delete the cables and tunnels that terminate on it, and clear the "
+    "optional references to it.",
+)
+@_edit_flags
+@click.pass_obj
+def edit_delete_command(
+    app: AppContext, address: str, cascade: bool, dry_run: bool, as_json: bool, force: bool
+) -> None:
+    """Remove an element, and the file if it was the last document in it.
+
+    Refuses, and names them, when other elements refer to it.
+    """
+    _run_edit(
+        app,
+        [DeleteElement(address=address, cascade=cascade)],
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+    )
+
+
+@edit_command.command("rename")
+@click.argument("address", shell_complete=complete_element)
+@click.argument("new_name")
+@_edit_flags
+@click.pass_obj
+def edit_rename_command(
+    app: AppContext, address: str, new_name: str, dry_run: bool, as_json: bool, force: bool
+) -> None:
+    """Rename an element, and every reference to it across the tree.
+
+    A reference keeps the spelling its author chose: a short name stays short
+    where a short name still resolves, and a qualified one stays qualified.
+    """
+    _run_edit(
+        app,
+        [RenameElement(address=address, new_name=new_name)],
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+    )
+
+
+@edit_command.command("move")
+@click.argument("address", shell_complete=complete_element)
+@click.argument("file")
+@_edit_flags
+@click.pass_obj
+def edit_move_command(
+    app: AppContext, address: str, file: str, dry_run: bool, as_json: bool, force: bool
+) -> None:
+    """Move an element's document to another file, verbatim.
+
+    FILE is relative to the inventory root. Moving to another folder changes the
+    element's namespace, and the references to it are rewritten with it.
+    """
+    _run_edit(
+        app,
+        [MoveElement(address=address, file=file)],
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+    )
+
+
+@edit_command.command("connect")
+@click.argument("a")
+@click.argument("b")
+@click.option(
+    "--medium",
+    type=click.Choice([medium.value for medium in Medium]),
+    default=Medium.COPPER.value,
+    show_default=True,
+    help="What the link is made of.",
+)
+@click.option("--speed", help="Negotiated link rate, e.g. 1Gbps.")
+@click.option("--label", help="The identifier printed on the cable.")
+@click.option("--name", help="metadata.name of the cable; derived from the endpoints when absent.")
+@click.option(
+    "--namespace",
+    default=None,
+    help="Folder to declare it in. The nearest folder containing both ends by default.",
+)
+@click.option("--file", "target", help="File to write it to, relative to the inventory root.")
+@_edit_flags
+@click.pass_obj
+def edit_connect_command(
+    app: AppContext,
+    a: str,
+    b: str,
+    medium: str,
+    speed: str | None,
+    label: str | None,
+    name: str | None,
+    namespace: str | None,
+    target: str | None,
+    dry_run: bool,
+    as_json: bool,
+    force: bool,
+) -> None:
+    """Cable two interfaces together: netgraph edit connect sw1:Gi1/0/1 pc:eno1.
+
+    Both ends are ``device:interface``, and both interfaces have to exist -- a
+    cable to a port nothing declares is the mistake NG-C002 exists to catch.
+    """
+    spec: dict[str, Any] = {"medium": medium}
+    if speed:
+        spec["speed"] = speed
+    if label:
+        spec["label"] = label
+    _run_edit(
+        app,
+        [Connect(a=a, b=b, spec=spec, name=name, namespace=namespace, file=target)],
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+    )
+
+
+@edit_command.command("disconnect")
+@click.argument("address", shell_complete=complete_element)
+@_edit_flags
+@click.pass_obj
+def edit_disconnect_command(
+    app: AppContext, address: str, dry_run: bool, as_json: bool, force: bool
+) -> None:
+    """Remove a cable. The devices it joined are untouched."""
+    _run_edit(
+        app,
+        [Disconnect(address=address)],
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+    )
+
+
+@edit_command.command("add-interface")
+@click.argument("address", shell_complete=complete_element)
+@click.argument("name")
+@click.option(
+    "--type",
+    "interface_type",
+    default="ethernet",
+    show_default=True,
+    help="Interface type, as spec.interfaces[].type spells it.",
+)
+@click.option("--description", help="What the port is for.")
+@click.option(
+    "--field",
+    "fields",
+    multiple=True,
+    metavar="PATH=VALUE",
+    help="Any other key of the interface, e.g. --field mtu=9000. Repeatable.",
+)
+@_edit_flags
+@click.pass_obj
+def edit_add_interface_command(
+    app: AppContext,
+    address: str,
+    name: str,
+    interface_type: str,
+    description: str | None,
+    fields: tuple[str, ...],
+    dry_run: bool,
+    as_json: bool,
+    force: bool,
+) -> None:
+    """Add an interface to an element."""
+    interface: dict[str, Any] = {"name": name, "type": interface_type}
+    if description:
+        interface["description"] = description
+    for entry in fields:
+        key, separator, value = entry.partition("=")
+        if not separator:
+            raise click.BadParameter(f"{entry!r} is not PATH=VALUE", param_hint="--field")
+        interface[key] = _scalar(value)
+    _run_edit(
+        app,
+        [AddInterface(address=address, interface=interface)],
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+    )
+
+
+@edit_command.command("remove-interface")
+@click.argument("address", shell_complete=complete_element)
+@click.argument("name")
+@click.option(
+    "--cascade",
+    is_flag=True,
+    help="Also remove the cables and tunnels that terminate on the interface.",
+)
+@_edit_flags
+@click.pass_obj
+def edit_remove_interface_command(
+    app: AppContext,
+    address: str,
+    name: str,
+    cascade: bool,
+    dry_run: bool,
+    as_json: bool,
+    force: bool,
+) -> None:
+    """Remove an interface from an element.
+
+    Only an interface the document itself declares: one that came from a
+    ``range`` or from a template has to be removed where it was written.
+    """
+    _run_edit(
+        app,
+        [RemoveInterface(address=address, name=name, cascade=cascade)],
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+    )
+
+
+def _scalar(text: str) -> Any:
+    """A command-line value, read the way YAML would read it.
+
+    ``1500`` is a number, ``true`` is a boolean, ``[10, 20]`` is a list and
+    everything else is the string it looks like -- which is the same set of
+    rules that decides what the value would have meant had it been typed into
+    the document by hand. ``--string`` is there for the times that is wrong.
+    """
+    try:
+        return yaml.safe_load(text)
+    except yaml.YAMLError:
+        return text
+
+
+def _json_object(text: str, hint: str) -> dict[str, Any]:
+    """Parse a JSON object given on the command line."""
+    try:
+        value = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise click.BadParameter(f"not JSON: {exc}", param_hint=hint) from exc
+    if not isinstance(value, dict):
+        raise click.BadParameter(
+            f"expected a JSON object, got {type(value).__name__}", param_hint=hint
+        )
+    return value
+
+
+def _run_edit(
+    app: AppContext,
+    operations: Sequence[Operation],
+    *,
+    dry_run: bool,
+    as_json: bool,
+    force: bool,
+) -> None:
+    """Apply operations to the inventory and report what happened.
+
+    One path for every subcommand, so ``--dry-run``, ``--json`` and the
+    diagnostics read the same whichever operation produced them.
+    """
+    console = app.console()
+    root = app.inventory if app.inventory.is_dir() else app.inventory.parent
+    session = EditSession(root=root, config=_edit_config(app), cache=app.cache())
+    try:
+        session.apply_all(operations)
+        if not session.changes:
+            console.info("nothing to change")
+            if as_json:
+                console.print(json.dumps(session.summary().to_dict(), indent=2))
+            return
+        # Captured before the commit: writing makes the pending set empty, and
+        # the report is about what was written.
+        changes = dict(session.changes)
+        diff = session.diff()
+        if dry_run:
+            problems = session.check()
+            written: tuple[str, ...] = ()
+        else:
+            written = session.commit(force=force)
+            problems = ()
+    except EditError as exc:
+        _report_edit_error(console, exc)
+        raise click.exceptions.Exit(EXIT_INVALID) from exc
+
+    summary = session.summary(written=written, changes=changes)
+    if as_json:
+        console.print(json.dumps(summary.to_dict(), indent=2))
+    elif dry_run:
+        console.print(diff.rstrip("\n"))
+    for problem in problems:
+        console.warn(str(problem))
+    for applied in summary.applied:
+        console.info(applied.summary)
+    verb = "would change" if dry_run else "changed"
+    console.info(f"{verb} {len(summary.changes)} file(s): {', '.join(sorted(summary.changes))}")
+
+
+def _edit_config(app: AppContext) -> Config | None:
+    """``netgraph.toml``, when there is one worth reading.
+
+    A configuration error must not stop an edit: the validation gate grades with
+    the defaults instead, which is stricter than the file would be and therefore
+    the safe way to be wrong.
+    """
+    try:
+        return app.config()
+    except ConfigurationError:
+        return None
+
+
+def _report_edit_error(console: Console, error: EditError) -> None:
+    """One refusal, with whatever the caller needs to do about it."""
+    console.error(str(error))
+    if isinstance(error, CascadeRequired):
+        for dependent in error.dependents:
+            console.info(f"  {dependent}")
+    elif isinstance(error, ValidationRefused):
+        for problem in error.problems:
+            console.info(f"  {problem}")
+    elif isinstance(error, AddressError):
+        for candidate in error.candidates:
+            console.info(f"  {candidate}")
 
 
 # --------------------------------------------------------------------------- #

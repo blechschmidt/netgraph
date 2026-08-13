@@ -17,6 +17,17 @@ a flag that is documented exists. The prose around them is written by hand.
 | [`netgraph drift`](drift.md) | Compare a live network against the declared inventory. | [drift.md](drift.md) |
 | [`netgraph validate`](validate.md) | Check the inventory; the gate for CI and pre-commit. | [validate.md](validate.md) |
 | [`netgraph fmt`](fmt.md) | Rewrite inventory YAML into the canonical form. | [fmt.md](fmt.md) |
+| [`netgraph edit set`](edit.md) | Set a field on an element, in place, comments and all. | [edit.md](edit.md) |
+| [`netgraph edit unset`](edit.md) | Remove a field from an element. | [edit.md](edit.md) |
+| [`netgraph edit create`](edit.md) | Declare a new element and place its document. | [edit.md](edit.md) |
+| [`netgraph edit delete`](edit.md) | Remove an element, and what cannot survive it. | [edit.md](edit.md) |
+| [`netgraph edit rename`](edit.md) | Rename an element and every reference to it. | [edit.md](edit.md) |
+| [`netgraph edit move`](edit.md) | Move an element's document to another file. | [edit.md](edit.md) |
+| [`netgraph edit connect`](edit.md) | Cable two interfaces together. | [edit.md](edit.md) |
+| [`netgraph edit disconnect`](edit.md) | Remove a cable. | [edit.md](edit.md) |
+| [`netgraph edit add-interface`](edit.md) | Add an interface to an element. | [edit.md](edit.md) |
+| [`netgraph edit remove-interface`](edit.md) | Remove an interface from an element. | [edit.md](edit.md) |
+| [`netgraph edit apply`](edit.md) | Apply operations given as JSON; the programmatic face. | [edit.md](edit.md) |
 | [`netgraph render`](render.md) | Draw the graph as SVG, PNG, PDF, DOT, Mermaid, JSON or HTML. | [render.md](render.md) |
 | [`netgraph watch`](watch.md) | Re-render on every save, optionally serving the result. | [watch.md](watch.md) |
 | [`netgraph web`](web.md) | Edit the YAML and see the diagram side by side in a browser. | [web.md](web.md) |

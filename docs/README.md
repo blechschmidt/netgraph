@@ -18,6 +18,7 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
 | check subnet utilisation, find free space, hunt overlaps | [ipam.md](ipam.md) |
 | find out how two machines reach each other | [paths.md](paths.md) |
 | keep the YAML in one canonical form | [format.md](format.md) |
+| change the inventory safely, from a script or an editor | [editing.md](editing.md) |
 | gate a pull request on the inventory validating | [ci.md](ci.md) |
 | bootstrap an inventory from a network that already exists | [importing.md](importing.md) |
 | stop retyping the same flags | [configuration.md](configuration.md) |
@@ -51,6 +52,9 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
   scanning, inline annotations, the GitHub Action, pre-commit, GitLab.
 * **[format.md](format.md)** — the canonical form `netgraph fmt` writes, and why each
   decision in it is the way it is.
+* **[editing.md](editing.md)** — the write path: what an operation is, what its inverse
+  is, how a rename finds every reference, and the two gates between an edit and the
+  disk. The web editor and `apply` will both be described in terms of it.
 * **[ipam.md](ipam.md)** — utilisation, free space, the next free block, aggregation and
   conflicts, with the arithmetic spelled out.
 * **[paths.md](paths.md)** — how the trace works, what counts as a hop, several paths and
