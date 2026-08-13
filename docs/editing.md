@@ -118,7 +118,7 @@ undo stack a list and undo a loop:
 
 ```python
 applied = session.apply(RenameElement(address="sw-old", new_name="sw-new"))
-session.apply_all(applied.inverse)      # back where we started, byte for byte
+session.apply_all(applied.inverse)  # back where we started, byte for byte
 ```
 
 The inverse is **exact**: after applying it, the tree is the tree you started
@@ -254,9 +254,9 @@ session = EditSession(root=Path("inventory"))
 session.apply(SetField(address="sites/hq/core-sw", path="spec.model", value="C9300"))
 applied = session.apply(Connect(a="core-sw:Gi1/0/3", b="acc-sw:Gi1/0/1"))
 
-print(session.diff())                 # what it would write, as a unified diff
-print(session.check())                # problems it would introduce, if any
-session.commit()                      # validated, conflict-checked, written
+print(session.diff())  # what it would write, as a unified diff
+print(session.check())  # problems it would introduce, if any
+session.commit()  # validated, conflict-checked, written
 
 undo = EditSession(root=Path("inventory"))
 undo.apply_all(applied.inverse)
