@@ -224,7 +224,15 @@ def _style_for(text: str) -> tuple[IndentStyle, Any, bool]:
     ``fmt`` exists.
 
     Raises:
-        RoundTripError: ``text`` is not well-formed YAML.
+        RoundTripError: The round-trip parser cannot read the document. Not the
+            same thing as "the document is invalid": ``ruamel`` resolves scalars
+            by YAML 1.1 rules and then converts them, and the two do not quite
+            agree — an interface named ``-._`` matches its float pattern and
+            reaches ``float("-.")``. netgraph's own loader reads that scalar as
+            the string it plainly is, so this arrives on a document ``validate``
+            accepts, and it has to be a refusal rather than a traceback. The
+            same case is handled the same way in
+            :func:`netgraph.fmt.canonical.format_stream`.
     """
     first: Any = None
     for index, style in enumerate(STYLES):
@@ -232,6 +240,16 @@ def _style_for(text: str) -> tuple[IndentStyle, Any, bool]:
             data = _yaml(style).load(text)
         except YAMLError as exc:
             raise RoundTripError(f"cannot parse document: {exc}") from exc
+        except (ArithmeticError, LookupError, TypeError, ValueError) as exc:
+            # By category rather than by type: what these have in common is that
+            # they are what a *parser* fails with, and which one arrives depends
+            # on the scalar pattern the document tripped.
+            raise RoundTripError(
+                f"the round-trip parser could not read this document "
+                f"({type(exc).__name__}: {exc}). It may hold a scalar that parser "
+                f"resolves differently from the loader; quoting the value makes "
+                f"both agree, and 'netgraph fmt' reports the same thing."
+            ) from exc
         if index == 0:
             first = data
         if dump_document(data, style) == text:

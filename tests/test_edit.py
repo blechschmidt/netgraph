@@ -196,6 +196,27 @@ def test_an_inline_document_marker_renders_but_refuses_to_be_edited() -> None:
         parsed.documents[1].touch()
 
 
+def test_a_scalar_the_round_trip_parser_reads_differently_is_a_refusal(tmp_path: Path) -> None:
+    """``-._`` is a legal interface name and matches ruamel's float pattern.
+
+    The loader reads it as the string it plainly is, so the document is valid and
+    the inventory renders; the round-trip parser reaches ``float("-.")`` and
+    raises a bare ``ValueError``. That has to arrive as a refusal naming the
+    file, the way ``netgraph fmt`` reports it, and not as a traceback.
+    """
+    (tmp_path / "sw.yaml").write_text(
+        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: sw\n"
+        "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n"
+        "    - name: -._\n      type: ethernet\n",
+        encoding="utf-8",
+    )
+    assert not load_tree(tmp_path).errors, "the document is valid; only the editor balks"
+    session = EditSession(root=tmp_path)
+    with pytest.raises(RoundTripError, match="resolves differently from the loader"):
+        session.apply(SetField(address="sw", path="spec.vendor", value="X"))
+    assert not session.changes
+
+
 def test_a_file_of_nothing_but_comments_has_no_documents() -> None:
     text = "# nothing here yet\n"
     parsed = YamlFile.parse(text, relative="empty.yaml")
