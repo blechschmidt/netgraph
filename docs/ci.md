@@ -11,9 +11,12 @@ $ netgraph --inventory . validate --strict
 no problems found
 ```
 
+`netgraph test` is the second gate, and it answers a different question — see
+[below](#netgraph-test-assertions-as-a-gate).
+
 This page covers the rest: the machine-readable output formats, the composite
-GitHub Action, the pre-commit hook, and complete workflows for the two ways
-findings can reach a pull request.
+GitHub Action, the pre-commit hook, and complete workflows for the ways findings
+can reach a pull request.
 
 * [Output formats](#output-formats)
 * [Exit codes](#exit-codes)
@@ -23,6 +26,7 @@ findings can reach a pull request.
 * [The GitHub Action](#the-github-action)
 * [Workflow: upload SARIF](#workflow-upload-sarif)
 * [Workflow: annotate the diff](#workflow-annotate-the-diff)
+* [`netgraph test`: assertions as a gate](#netgraph-test-assertions-as-a-gate)
 * [Workflow: a scheduled drift check](#workflow-a-scheduled-drift-check)
 * [pre-commit](#pre-commit)
 * [Other CI systems](#other-ci-systems)
@@ -289,6 +293,75 @@ Without the action, the same thing by hand:
       - run: netgraph --inventory inventory validate --output-format github --strict
 ```
 
+## `netgraph test`: assertions as a gate
+
+`validate` answers "do these files cohere?" Every rule it applies is a statement
+about inventories *in general* — a cable endpoint resolves, an address is inside
+its subnet — which is exactly why none of them can say that the ward switch must
+not be the only path to the ward. That is a fact about *this* network, known only
+to the people who built it.
+
+[`netgraph test`](commands/test.md) grades the facts they wrote down. A
+`kind: testsuite` document ([§20](schema.md#20-test-suites-executable-assertions))
+holds named assertions — reachable, not-reachable, same VLAN, within a prefix,
+unique management addresses, no single point of failure — and the command exits 1
+when one of them has stopped being true. It probes nothing and contacts no
+device, so it belongs on a pull request beside `validate` rather than on a
+schedule:
+
+```yaml
+      - run: pip install netgraph
+      - run: netgraph --inventory inventory validate --strict
+      - run: netgraph --inventory inventory test
+```
+
+Both gates in one job, in that order: an inventory that does not load cannot be
+meaningfully tested, and `test` refuses to try unless `--force` is given — a
+dangling cable is exactly the kind of thing that makes an assertion pass for the
+wrong reason.
+
+**`-F junit` is what to publish.** One `<testcase>` per assertion, grouped by
+suite, each carrying the file and line of the assertion. GitHub, GitLab and
+Jenkins all render it natively, so a failure arrives as a named row somebody can
+click rather than as a line in a log:
+
+```yaml
+      - run: netgraph --inventory inventory test -F junit -o test-results.xml
+        continue-on-error: true
+      - uses: mikepenz/action-junit-report@v5
+        if: always()
+        with:
+          report_paths: test-results.xml
+```
+
+`continue-on-error` plus `if: always()` is the usual pair: the step has to fail
+the job, and the report has to be published anyway, or the failures are invisible
+in the run that had them.
+
+On GitLab the same two lines, and the report is picked up by name:
+
+```yaml
+netgraph:
+  image: python:3.12-slim
+  script:
+    - pip install netgraph
+    - netgraph --inventory inventory validate --strict
+    - netgraph --inventory inventory test -F junit -o test-results.xml
+  artifacts:
+    when: always
+    reports:
+      junit: test-results.xml
+```
+
+**A test run that checked nothing fails.** A `SUITE` argument matching no suite,
+and a selector matching no element, are both errors rather than vacuous passes:
+a green pipeline that graded zero assertions is the one failure mode a test
+suite exists to prevent.
+
+The two bundled examples ship suites — `examples/home-lab/tests.yaml` and
+`examples/campus/tests.yaml` — which are the shortest way to see what a useful
+assertion looks like.
+
 ## Workflow: a scheduled drift check
 
 `validate` answers "is this inventory self-consistent?" — a question about the
@@ -398,11 +471,12 @@ drift:
 ## pre-commit
 
 netgraph ships `.pre-commit-hooks.yaml`, so an inventory repository can run the
-same checks before the commit is written. Three hooks are published:
+same checks before the commit is written. Four hooks are published:
 
 | Hook | What it does |
 |---|---|
 | `netgraph-validate` | Validates the whole tree. Takes no filenames. |
+| `netgraph-test` | Grades the tree's own assertions. Takes no filenames. |
 | `netgraph-fmt` | Rewrites the staged files into canonical form. |
 | `netgraph-fmt-check` | Reports staged files that are not canonical, rewriting nothing. |
 
@@ -432,6 +506,24 @@ option has to go:
         args: [--strict]
         files: ^inventory/.*\.ya?ml$
 ```
+
+### Assertions
+
+`netgraph-test` grades the `kind: testsuite` documents the tree declares, so a
+commit that quietly removes somebody's second path fails before it lands. Like
+`netgraph-validate` it takes no filenames — an assertion is about the whole tree
+— and it is worth pairing the two:
+
+```yaml
+      - id: netgraph-validate
+        args: [--strict]
+      - id: netgraph-test
+```
+
+The hook is a no-op cost only when the tree declares no suite, and in that case
+it fails rather than passing: see
+[`netgraph test`](commands/test.md#exit-codes). Leave it out until there is
+something to assert.
 
 ### Formatting
 

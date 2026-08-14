@@ -110,6 +110,7 @@ __all__ = [
     "FRAME_PATH",
     "GRAPH_PATH",
     "HISTORY_PATH",
+    "IMPACT_PATH",
     "MAX_SOURCE_BYTES",
     "OPS_PATH",
     "PRESENCE_PATH",
@@ -142,6 +143,10 @@ OPS_PATH: Final = "/api/ops"
 CHANGES_PATH: Final = "/api/changes"
 #: The same tree, drawn as a diff against a baseline (``?against=session|git``).
 DIFF_PATH: Final = "/api/diff"
+#: What would stop being reachable if the named elements failed
+#: (``?fail=<address>&layer=l1``). Read-only: the failure overlay changes no
+#: file, no revision and no undo stack.
+IMPACT_PATH: Final = "/api/impact"
 #: The commits that changed this inventory, for the timeline scrubber.
 HISTORY_PATH: Final = "/api/history"
 #: One of them, drawn as the diff against its parent (``?rev=<commit>``).
@@ -303,6 +308,15 @@ class _Handler(LocalHandler):
             self._json(
                 HTTPStatus.OK,
                 {"revision": revision, "against": against} | preview.to_dict(),
+                body=body,
+            )
+        elif path == IMPACT_PATH:
+            self._json(
+                HTTPStatus.OK,
+                session.impact(
+                    query.get("fail", []),
+                    layer=query.get("layer", ["l1"])[-1],
+                ),
                 body=body,
             )
         elif path == HISTORY_PATH:

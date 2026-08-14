@@ -262,6 +262,41 @@ spec:
   speed: 1Gbps
 """
 
+_TESTS: Final = """\
+# What this network is *for*, written down so it can be checked. 'netgraph
+# validate' says whether the documents agree with each other; 'netgraph test'
+# says whether they still say what somebody built the network to say, and exits
+# non-zero when one of these claims stops being true.
+apiVersion: netgraph.dev/v1alpha1
+kind: testsuite
+metadata:
+  name: office
+spec:
+  description: the office reaches the internet, and nothing is addressed twice
+  assertions:
+    - assert: reachable
+      name: the desk reaches the gateway
+      from: pc-alice
+      to: rtr-gw
+
+    - assert: within-prefix
+      name: the office is addressed out of 192.168.10.0/24
+      # 'select' is the vocabulary 'netgraph render --kind ... --name ...'
+      # filters with, written as one scalar. A bare word is a name glob.
+      select: kind=computer, kind=switch
+      prefix: 192.168.10.0/24
+
+    - assert: unique
+      name: no two hosts claim the same address
+      select: kind=computer, kind=router, kind=switch
+      field: spec.interfaces[type!=loopback].ipv4.addresses[].ip
+
+    - assert: count
+      name: there is exactly one gateway router
+      select: kind=router
+      equals: 1
+"""
+
 #: ``--minimal``: the envelope and nothing else. Every line is a comment, so the
 #: tree holds no elements at all and still validates — the point is to show the
 #: four keys and the values they take, not to hand out a network someone has to
@@ -293,6 +328,7 @@ _EXAMPLE_DOCUMENTS: Final[tuple[tuple[str, str], ...]] = (
     ("devices/sw-office.yaml", _SWITCH),
     ("devices/pc-alice.yaml", _COMPUTER),
     ("cables/links.yaml", _CABLES),
+    ("tests.yaml", _TESTS),
 )
 
 #: ``--minimal``: one commented template instead of the three devices.

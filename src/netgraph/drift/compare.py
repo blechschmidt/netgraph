@@ -3,11 +3,19 @@
 ``netgraph import`` reads a live network and writes YAML. This inverts it: the
 YAML is the assertion and the capture is the evidence, and what comes out is the
 list of places where the two disagree. The parsing is the importer's, verbatim —
-:mod:`netgraph.importer.lldp`, :mod:`netgraph.importer.iproute` and
-:mod:`netgraph.importer.csvlinks` produce the same
+:mod:`netgraph.importer.lldp`, :mod:`netgraph.importer.iproute`,
+:mod:`netgraph.importer.csvlinks` and the six configuration readers in
+:mod:`netgraph.importer.config` produce the same
 :class:`~netgraph.importer.draft.Draft` here as they do there — so a dialect
 netgraph can import is a dialect netgraph can check against, with no second
 parser to keep in step.
+
+Those six close the loop the other way as well. :mod:`netgraph.export.config`
+writes the configuration a device would run, in the same six dialects, so
+``netgraph export netplan`` and ``netgraph drift --from netplan`` are two ends of
+one round trip: generate what the inventory says the box should have, collect
+what it does have, and compare the two with no format in between that only one
+side understands.
 
 **The rule that makes the answer trustworthy.** A capture is always partial, so
 the comparison never treats an absence as a deletion unless the dialect that
@@ -57,7 +65,7 @@ from dataclasses import dataclass, field
 from fnmatch import fnmatchcase
 from typing import Final
 
-from netgraph.drift.coverage import Coverage, coverage_of
+from netgraph.drift.coverage import CAPABILITIES, Coverage, coverage_of
 from netgraph.drift.model import Change, Direction, DriftReport, Unobserved
 from netgraph.importer.draft import Draft, DraftCable, DraftDevice, DraftInterface, Endpoint
 from netgraph.loader.inventory import Inventory, namespace_of, short_name
@@ -65,13 +73,6 @@ from netgraph.models import Adapter, Cable, Device, ElementBase, format_bitrate
 from netgraph.models.interface import Interface, VlanMode
 
 __all__ = ["EVERYTHING", "CompareSpec", "compare"]
-
-#: Declared interface types no dialect can report, so their absence from a
-#: capture is never a deletion. ``loopback`` is skipped by
-#: :mod:`netgraph.importer.iproute` by design (it terminates no cable and holds
-#: only host-scope addresses); ``tunnel`` is a two-ended element that ``ip``
-#: only ever shows one end of.
-_UNIMPORTED_TYPES: Final[frozenset[str]] = frozenset({"loopback", "tunnel"})
 
 #: Scalar interface fields compared when both sides carry a value. ``type`` is
 #: absent because it needs :meth:`_Comparison._compare_type`'s judgement about
@@ -84,6 +85,13 @@ _NIC_TYPES: Final[frozenset[str]] = frozenset({"ethernet", "wifi"})
 
 #: Scalar cable fields, likewise.
 _CABLE_FIELDS: Final[tuple[str, ...]] = ("medium", "speed", "label")
+
+#: The dialects that report a neighbour, named in the diagnostic for a cable
+#: nothing saw. Derived from the capability table rather than written out, so a
+#: dialect added there cannot leave this sentence claiming the old set.
+_LINK_DIALECTS: Final[str] = ", ".join(
+    f"'{name}'" for name, capability in CAPABILITIES.items() if capability.links
+)
 
 #: Kinds that are netgraph's own abstraction rather than a thing on the wire. No
 #: capture format has a word for any of them, so an observed ``kind`` is never
@@ -401,10 +409,11 @@ class _Comparison:
                 f"no input lists every interface of this device; {dialects} reports only the "
                 "ports it happened to see"
             )
-        if interface.type.value in _UNIMPORTED_TYPES:
+        if not self.coverage.lists_type(device, interface.type.value):
+            dialects = ", ".join(self.coverage.dialects_of(device)) or "the capture"
             return (
-                f"the 'iproute' dialect does not import {interface.type.value} interfaces, so "
-                "this one could not appear in the capture"
+                f"a {interface.type.value} interface is not something {dialects} lists, so "
+                f"its absence from the capture says nothing"
             )
         if self.spec.ignores_interface(interface.name):
             return "--exclude-interface kept this interface out of the capture"
@@ -893,8 +902,9 @@ class _Comparison:
         ]
         if not observing:
             return (
-                "no input reported the neighbours of either end; 'lldp' and 'csv' do, "
-                "'iproute' does not"
+                f"no input reported the neighbours of either end; {_LINK_DIALECTS} do, and "
+                f"nothing else netgraph reads does — a configuration says what a box does "
+                f"with a port, never what is plugged into it"
             )
         return (
             f"{', '.join(observing)} reported no neighbour on this port; a device that does "

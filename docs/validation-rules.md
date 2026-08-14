@@ -201,6 +201,9 @@ one mistake.
 | `NG-M004` | A device only inherits from a template that itself resolved. | The template's own errors are reported once, against the template; the device says only that it cannot use it. |
 | `NG-M005` | A `template` document's `spec` is a mapping of device-spec keys. | It is a partial device spec; a key no device has could never be merged into one. |
 | `NG-M006` | `spec.from` appears only on the five device kinds. | A cable has no device spec for a template to contribute to. |
+| `NG-K001` | Test suite names are unique within their namespace. | Same reason as `NG-N002`, in the separate index suites live in. The first declaration wins, which keeps loading deterministic. |
+| `NG-K002` | A `testsuite` document's `spec.assertions` holds between one and 1024 entries. | A suite that asserts nothing reports a green run having checked nothing, which is worse than no suite at all. |
+| `NG-K003` | Every key an assertion carries belongs to the assertion its `assert` names, every key that assertion requires is present, and a `count` compares against a bound it can satisfy. | `hops` on a `same-vlan` is a bound nobody is checking; ignoring it silently is how a suite comes to mean less than it reads. |
 
 ## Pass 3 — semantics
 
@@ -1159,6 +1162,88 @@ the better fix, because every export of this inventory has the same problem.
 
 ### Warnings
 
+#### `E047` — declared gateway redundancy is not met
+
+*Severity: error.*
+
+An element carries `netgraph/redundancy: gateway` — a promise that no *single*
+failure can cut it off from its default gateway — and the topology does not keep
+it. The finding names every failure that would: each cut vertex and each bridge
+lying between the element and the gateway, by the name a person would use for
+it.
+
+The gateway is not a kind or a flag. It is the element holding the address some
+interface of this one names as its `gateway`, which is the one definition the
+files already carry. An IPv6 link-local first hop (`fe80::1`) is exempt: it is
+on-link by definition and is almost never written down as an address of the
+router that answers for it, exactly as [`E020`](#e020--first-hop-is-not-on-link)
+exempts it.
+
+Three shapes, reported apart because the fix differs:
+
+* **nothing to check** — the element declares the expectation and no interface
+  declares a `gateway`, or the gateway address is configured on nothing in this
+  inventory. Add one, or drop the expectation;
+* **nothing to lose** — there is no path to the gateway even now. That is a
+  worse problem than a non-redundant one, and is said as such;
+* **one path** — the ordinary case. A path exists and one element or one cable
+  carries all of it.
+
+**Why it matters.** Redundancy is the one property of a network that is
+invisible in the state where it is working. A second uplink that was
+decommissioned, a pair that was re-patched into one switch, a spare that was
+quietly reused — none of them changes anything anybody can see until the day the
+first path fails, and then all of them do. Writing the expectation down is what
+turns "somebody will notice" into a build failure on the pull request that
+removed it.
+
+**How it is decided.** "Survives any single failure" is exactly "two-connected",
+so the check is a search for the separators between the two elements
+([`netgraph.connectivity.separators`](../src/netgraph/connectivity.py)) rather
+than a simulation — an exact answer in one pass over the graph instead of an
+approximate one in a thousand. Two cables between the same pair of devices count
+as two: cutting one leaves the other. A run through a patch panel is one path,
+and the panel position is named when it is the thing in the way (§15.2).
+
+**Suppress with** `E047`, or an annotation on the element. The honest fix is
+usually to drop the expectation: an annotation claiming redundancy that does not
+exist is worse than no annotation, because it reads in review as though somebody
+checked.
+
+**See also.** [`netgraph impact`](commands/impact.md), which reports this rule
+alongside the simulation that explains it, and `netgraph impact --spof`, which
+finds the same separators without being asked about a particular element.
+
+#### `E048` — declared power redundancy is not met
+
+*Severity: error.*
+
+An element carries `netgraph/redundancy: power` — a promise that no *single*
+failure can switch it off — and the feeds do not keep it. The finding names
+every source whose loss would take the element with it.
+
+Distinct from [`E042`](#e042--redundant-power-that-is-not-redundant), which
+grades a device's own `power.redundant` claim about its two cords. This grades
+the stronger statement, and grades it over the whole feed chain rather than over
+the inputs of one document, so it catches what `E042` cannot see:
+
+* a device with **one cord**, which makes no `redundant` claim to be graded;
+* a device fed **over PoE** by a switch that is itself on one PDU — the
+  redundancy has to hold two steps up, and only the walk finds that;
+* two PDUs on **one building supply**, through their `input_feed`.
+
+An element that `E042` already reports is left alone. Two findings for one
+mistake teach people to read neither.
+
+**Why it matters.** Power is where redundancy is most often assumed and least
+often checked. Cabling redundancy is visible on a diagram and gets reviewed;
+which strip a cord is in is visible only from behind the rack, and a dual-corded
+server with both cords in the A side is the single most common way a
+"fully redundant" rack goes dark.
+
+**Suppress with** `E048`, or an annotation on the element. As with `E047`, the
+fix is a second independent feed or an honest annotation.
+
 #### `W101` — interface neither routes nor switches
 
 *Alias: `NG-I013`. Severity: warning.*
@@ -1948,6 +2033,32 @@ who was on a project — rather than a grant of access.
 
 ### Info
 
+#### `W141` — unknown redundancy expectation
+
+*Severity: warning.*
+
+A `netgraph/redundancy` annotation names something this build does not grade, or
+names it on an element there is nothing to grade. Two shapes:
+
+* an **unrecognised token** — a typo, or an expectation a newer netgraph
+  understands. The finding echoes the token verbatim and lists what is accepted;
+* an expectation on an element that **owns no interfaces and takes no power** — a
+  cable, a tunnel, a user, a group. There is no topology and no feed to hold it
+  to, so the annotation grades nothing.
+
+A warning rather than an error on purpose. An annotation is where a newer
+netgraph will put things this build has never heard of, and refusing to load an
+inventory because of a word in a comment-shaped field would make the annotation
+useless for exactly the forward compatibility it exists for.
+
+**Why it matters.** An expectation nothing grades is a promise nobody is
+keeping, and it is worse than silence: it reads in review as though the property
+were being checked. The failure mode is a pull request approved because
+`netgraph/redundancy: gatway` was in the diff.
+
+**Suppress with** `W141`, or an annotation on the element — appropriate when the
+inventory is shared with a newer netgraph that does understand the token.
+
 #### `I001` — locally administered MAC address
 
 *Alias: `NG-I010`. Severity: info.*
@@ -2114,7 +2225,7 @@ schema rule is a usage error:
 <!-- run: rc=2 -->
 ```console
 $ netgraph validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, I001, I002, I003, I004, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, I001, I002, I003, I004, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 Every mechanism accepts both spellings of an id — `W102` and `NG-C010` select

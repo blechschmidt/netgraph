@@ -12,16 +12,22 @@ different tool with a different threat model.
 
 **Decides which device each input describes.** ``ip -j link show`` and
 ``lldpctl -f json`` both describe one host and neither says which, so the name
-comes from ``NAME=PATH``, from ``--host``, or from the file name — in that
-order, most explicit first. A name that came from a file name is recorded as
-such in the generated document, because it is the one field the capture did not
-supply.
+comes from ``NAME=PATH``, from ``--host``, from the input's own ``netgraph-``
+banner when netgraph generated it, or from the file name — in that order, most
+explicit first. A name that came from a file name is recorded as such in the
+generated document, because it is the one field the capture did not supply; a
+name that came from a banner is not, because the file stated it.
 
-**Chooses a dialect.** ``--from`` names one; ``auto`` sniffs, which is reliable
-here because the three shapes are disjoint: an LLDP capture is a JSON object
-with an ``lldp`` key, an iproute capture is a JSON array of link records, and
-anything that is not JSON at all is the CSV. Sniffing is what makes ``netgraph
-import collected/*`` work on a directory holding all three.
+**Chooses a dialect.** ``--from`` names one; ``auto`` sniffs, and the nine
+dialects are disjoint enough for that to be reliable rather than lucky. An LLDP
+capture is a JSON object with an ``lldp`` key and an iproute capture is a JSON
+array of link records, so JSON is decided by its shape. Anything else is offered
+to the configuration sniffer, which reads the banner of a file netgraph wrote
+and otherwise matches a line only one of the six grammars can have
+(:func:`netgraph.importer.config.sniff`). The CSV is what is left: it is the one
+format with no shape of its own, so it is the fallback rather than a match.
+Sniffing is what makes ``netgraph import collected/*`` work on a directory
+holding several kinds at once.
 
 **Writes, or refuses to.** An existing file is never overwritten without
 ``--force``, and every clash is reported at once rather than one per run: an
@@ -40,12 +46,15 @@ from typing import Any, Final
 
 from netgraph.errors import NetgraphError, clip_text, echo_value
 from netgraph.fsio import write_text
+from netgraph.importer.config import CONFIG_DIALECT_NAMES, CONFIG_READERS, banner_element
+from netgraph.importer.config import sniff as sniff_config
 from netgraph.importer.csvlinks import read_csv_links
 from netgraph.importer.draft import Draft
 from netgraph.importer.emit import render_draft
 from netgraph.importer.iproute import read_iproute
 from netgraph.importer.lldp import read_lldp
 from netgraph.importer.names import element_name
+from netgraph.loader.inventory import short_name
 
 __all__ = [
     "DIALECTS",
@@ -58,8 +67,12 @@ __all__ = [
     "write_files",
 ]
 
-#: What ``--from`` accepts. ``auto`` is first because it is the default.
-DIALECTS: Final[tuple[str, ...]] = ("auto", "lldp", "iproute", "csv")
+#: What ``--from`` accepts. ``auto`` is first because it is the default; the
+#: three *capture* dialects follow, and then the six *configuration* dialects
+#: :mod:`netgraph.export.config` also writes. The split matters: a capture
+#: describes a running kernel, a configuration describes what somebody asked
+#: for, and :mod:`netgraph.drift.coverage` treats their silences differently.
+DIALECTS: Final[tuple[str, ...]] = ("auto", "lldp", "iproute", "csv", *CONFIG_DIALECT_NAMES)
 
 #: The conventional "read standard input" argument.
 STDIN_TOKEN: Final = "-"
@@ -264,13 +277,21 @@ def build_draft(
 def dialect_of(entry: ImportInput, requested: str = "auto") -> str:
     """The dialect to read ``entry`` as, sniffing it when ``auto`` was asked for.
 
+    The nine dialects fall into three shapes, and sniffing walks them in the
+    order that cannot be wrong. JSON is either an LLDP capture or an ``ip -j``
+    one. Anything else is offered to the configuration sniffer, which answers
+    from the file's own banner when netgraph wrote it and from a line only one
+    grammar can have otherwise (:func:`netgraph.importer.config.sniff`). What is
+    left is the CSV, which is where it has always been: it is the one format
+    with no shape of its own, so it is the fallback rather than a match.
+
     Raises:
         ImportSourceError: The input is JSON but no capture netgraph reads.
     """
     if requested != "auto":
         return requested
     if entry.text.lstrip()[:1] not in "[{":
-        return "csv"
+        return sniff_config(entry.text) or "csv"
 
     payload = entry.payload()
     if isinstance(payload, list):
@@ -292,22 +313,59 @@ def _feed(entry: ImportInput, dialect: str, *, draft: Draft, exclude: Sequence[s
         read_csv_links(entry.text, source=entry.name, draft=draft)
         return
 
-    host = _require_host(entry, dialect)
-    if dialect == "lldp":
+    host, guessed = _host_for(entry, dialect)
+    reader = CONFIG_READERS.get(dialect)
+    if reader is not None:
+        reader(entry.text, source=entry.name, host=host, draft=draft)
+    elif dialect == "lldp":
         read_lldp(entry.payload(), source=entry.name, host=host, draft=draft)
     else:
         read_iproute(entry.payload(), source=entry.name, host=host, draft=draft, exclude=exclude)
 
-    if entry.host_from_filename:
+    if guessed:
         draft.device(host).note(
-            f"the device name came from the file name {entry.name!r}; the capture itself does "
-            "not say which host it was taken on — pass --host to state it"
+            f"the device name came from the file name {entry.name!r}; the {dialect} input "
+            "itself does not say which host it describes — pass --host to state it"
         )
 
 
-def _require_host(entry: ImportInput, dialect: str) -> str:
+def _host_for(entry: ImportInput, dialect: str) -> tuple[str, bool]:
+    """``(device name, was it guessed from the file name)``.
+
+    Three sources, most authoritative first, and the middle one is what makes the
+    round trip a two-command operation:
+
+    1. **The command line.** ``--host NAME`` or ``NAME=PATH``. An operator
+       comparing one device's configuration against another's declaration is
+       doing it on purpose, so this always wins.
+    2. **The file's own banner.** Anything ``netgraph export`` wrote carries
+       ``netgraph-element:`` (:mod:`netgraph.export.config.header`), which names
+       the element it was generated from. Reading it back therefore needs no
+       ``--host`` at all, and the name is a statement rather than a guess — so
+       it beats the file name, which is only ever an inference.
+    3. **The file name.** ``sw-core-01.lldp.json`` → ``sw-core-01``. Recorded as
+       inferred, because it is the one field nothing in the input supplied.
+
+    Raises:
+        ImportSourceError: Nothing names the device.
+    """
+    if entry.host is not None and not entry.host_from_filename:
+        return entry.host, False
+    stated = banner_element(entry.text)
+    if stated is not None:
+        # The banner holds the fully-qualified name; a draft is keyed by the
+        # element's own name, which is what the comparison matches on.
+        name = element_name(short_name(stated))[0]
+        if name:
+            return name, False
     if entry.host is not None:
-        return entry.host
+        return entry.host, entry.host_from_filename
+    if dialect in CONFIG_READERS:
+        raise ImportSourceError(
+            f"{entry.name}: a {dialect} configuration describes one device and this one does "
+            "not name it; pass --host NAME, write the input as NAME=PATH, or name the file "
+            "after the device. A configuration 'netgraph export' wrote names it in its header"
+        )
     tool = "lldpctl" if dialect == "lldp" else "ip"
     raise ImportSourceError(
         f"{entry.name}: a {tool!r} capture describes one host and does not name it; "

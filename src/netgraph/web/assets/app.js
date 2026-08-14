@@ -163,6 +163,14 @@
   var views = {};
   var viewOrder = [];
   var currentView = null;
+  /** Failure mode: what the canvas is pretending has died, and what that costs.
+   *
+   *  `on` is the mode itself; `element` is the address most recently clicked in
+   *  it, or null when nothing has been. Read-only from end to end -- the server
+   *  route it calls builds a throwaway inventory and writes nothing -- so
+   *  leaving the mode is a matter of taking two classes off and redrawing
+   *  nothing. */
+  var failure = { on: false, element: null };
   /** Element addresses somebody else has selected, drawn faintly. */
   var remote = {};
 
@@ -350,6 +358,22 @@
     // commit it is, and what that commit did. The scrubber puts them beside
     // itself; app.js only has to say that a drawing arrived.
     if (mode === "session") { netgraphSession.drew(result); }
+    // A new drawing has none of the overlay's classes on it and the status line
+    // has just been overwritten by the summary, so the answer is asked for
+    // again rather than left half on screen. The mode itself survives the
+    // redraw: it is a way of looking at the diagram, not at one rendering of it.
+    if (failure.on) { refreshFailure(); }
+  }
+
+  /** Put the failure overlay back after the drawing underneath it changed. */
+  function refreshFailure() {
+    if (failure.element) {
+      var address = failure.element;
+      failure.element = null;
+      askImpact(address);
+      return;
+    }
+    sayFailure("failure mode: click an element to see what its loss would isolate");
   }
 
   /** Keep this view's drawing, dropping the least recently drawn if need be. */
@@ -648,6 +672,88 @@
     return window.CSS && window.CSS.escape ? window.CSS.escape(value) : value;
   }
 
+  /* ------------------------------------------------------- failure mode */
+
+  /** Turn failure mode on or off.
+   *
+   * Nothing is fetched here and nothing is redrawn: the mode is a class on the
+   * canvas and a line in the status bar until somebody clicks something. That
+   * is what makes leaving it instant, which matters -- a mode you have to wait
+   * to get out of is a mode people avoid entering.
+   */
+  function showFailure(next) {
+    if (mode !== "session") {
+      toast("failure mode needs a tree: start netgraph with a directory", "error");
+      return false;
+    }
+    failure.on = next === undefined ? !failure.on : !!next;
+    el.canvas.classList.toggle("failing", failure.on);
+    if (!failure.on) {
+      clearFailure();
+      el.summary.textContent = lastStatus.concat(culling()).join("  ·  ");
+      netgraphA11y.announce("failure mode off", false);
+      return true;
+    }
+    failure.element = null;
+    sayFailure("failure mode: click an element to see what its loss would isolate");
+    netgraphA11y.announce("failure mode on; click an element", false);
+    return true;
+  }
+
+  /** Ask the server what losing `address` would cost, and paint the answer. */
+  function askImpact(address) {
+    failure.element = address;
+    sayFailure("failure mode: working out what " + address + " would isolate…");
+    fetch("/api/impact?fail=" + encodeURIComponent(address), { cache: "no-store" })
+      .then(function (response) {
+        if (!response.ok) { return response.text().then(function (text) { throw new Error(text); }); }
+        return response.json();
+      })
+      .then(function (result) {
+        // The mode may have been left, or another shape clicked, while this was
+        // in flight. Painting a stale answer over a newer one is worse than
+        // dropping it: the reader has no way to tell which they are looking at.
+        if (!failure.on || failure.element !== address) { return; }
+        paintFailure(result);
+      })
+      .catch(function (error) {
+        if (!failure.on) { return; }
+        clearFailure();
+        sayFailure("failure mode: " + (error.message || "could not be worked out"));
+      });
+  }
+
+  /** Grey out what the answer says would be isolated, and mark what died. */
+  function paintFailure(result) {
+    var isolated = {};
+    (result.isolated || []).forEach(function (address) { isolated[address] = true; });
+    var gone = {};
+    (result.failed || []).forEach(function (address) { gone[address] = true; });
+    el.viewport.querySelectorAll("g.node, g.edge").forEach(function (group) {
+      var record = details[group.id];
+      group.classList.remove("isolated", "failed");
+      if (!record) { return; }
+      if (gone[record.id]) { group.classList.add("failed"); }
+      else if (isolated[record.id]) { group.classList.add("isolated"); }
+    });
+    sayFailure("failure mode: " + result.message);
+    netgraphA11y.announce(result.message, false);
+  }
+
+  /** Take the overlay off the drawing, leaving the mode as it was. */
+  function clearFailure() {
+    failure.element = null;
+    el.viewport.querySelectorAll("g.isolated, g.failed").forEach(function (group) {
+      group.classList.remove("isolated", "failed");
+    });
+  }
+
+  /** The status line while the mode is on. The ordinary summary is kept in
+   *  `lastStatus` and put back when the mode is left. */
+  function sayFailure(text) {
+    el.summary.textContent = text;
+  }
+
   function hideInfo(force) {
     if (pinned && !force) { return; }
     pinned = null;
@@ -827,6 +933,10 @@
     netgraphLinks.select(netgraphLinks.linkAt(event.target));
     var hit = recordAt(event.target);
     if (!hit) { hideInfo(true); return; }
+    // Failure mode owns the click: the gesture asks a question about the shape
+    // rather than opening it, and jumping the editor to a file nobody asked to
+    // edit would be the opposite of read-only.
+    if (failure.on) { askImpact(hit.record.id); return; }
     // In a session, clicking a shape reveals the document that declares it:
     // that mapping is the whole point of the command. `record.id` is the
     // element's address, which is what the tree keys documents by --
@@ -910,6 +1020,7 @@
         // a key you have to think about.
         if (K.dismiss()) { return; }
         if (!el.info.hidden) { hideInfo(true); netgraphA11y.select(null); return; }
+        if (failure.on) { showFailure(false); return; }
         if (mode === "session" && netgraphSession.isScrubbing()) {
           netgraphSession.showTimeline(false);
           return;
@@ -1002,6 +1113,10 @@
     K.define("view.vlans", { run: function () { toggle(el.showVlans, "VLANs"); } });
     K.define("view.group", { run: function () { toggle(el.group, "namespace grouping"); } });
     K.define("view.strict", { run: function () { toggle(el.strict, "strict"); } });
+    K.define("view.failure", {
+      run: function () { return showFailure(); },
+      enabled: function () { return mode === "session"; }
+    });
     K.define("view.vlanFilter", {
       run: function () {
         K.prompt({

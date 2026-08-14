@@ -262,7 +262,7 @@ to nothing, and the message lists what you could have meant:
 <!-- run: rc=2 -->
 ```console
 $ netgraph -i examples/quickstart validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, I001, I002, I003, I004, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, I001, I002, I003, I004, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 An unknown id in an *annotation* is ignored rather than fatal — inventory data
@@ -385,6 +385,8 @@ says why the rule exists, what it deliberately exempts, and how to suppress it.
 | [`E044`](validation-rules.md#e044--group-member-is-not-an-identity) | `NG-S011` | error | group member is not an identity |
 | [`E045`](validation-rules.md#e045--group-membership-cycle) | `NG-S012` | error | group membership cycle |
 | [`E046`](validation-rules.md#e046--duplicate-account-identifier) | `NG-S013` | error | duplicate account identifier |
+| [`E047`](validation-rules.md#e047--declared-gateway-redundancy-is-not-met) | — | error | declared gateway redundancy is not met |
+| [`E048`](validation-rules.md#e048--declared-power-redundancy-is-not-met) | — | error | declared power redundancy is not met |
 | [`W101`](validation-rules.md#w101--interface-neither-routes-nor-switches) | `NG-I013` | warning | interface neither routes nor switches |
 | [`W102`](validation-rules.md#w102--mtu-mismatch-across-a-link) | `NG-C010` | warning | MTU mismatch across a link |
 | [`W103`](validation-rules.md#w103--orphan-device) | `NG-C016` | warning | orphan device |
@@ -425,6 +427,7 @@ says why the rule exists, what it deliberately exempts, and how to suppress it.
 | [`W138`](validation-rules.md#w138--stale-diagram-geometry) | `NG-Y001` | warning | stale diagram geometry |
 | [`W139`](validation-rules.md#w139--group-with-no-members) | `NG-S014` | warning | group with no members |
 | [`W140`](validation-rules.md#w140--departed-user-still-in-a-group) | `NG-S015` | warning | departed user still in a group |
+| [`W141`](validation-rules.md#w141--unknown-redundancy-expectation) | — | warning | unknown redundancy expectation |
 | [`I001`](validation-rules.md#i001--locally-administered-mac-address) | `NG-I010` | info | locally administered MAC address |
 | [`I002`](validation-rules.md#i002--enabled-interface-terminates-no-cable) | `NG-C015` | info | enabled interface terminates no cable |
 | [`I003`](validation-rules.md#i003--tunnel-on-a-non-standard-port) | `NG-T015` | info | tunnel on a non-standard port |

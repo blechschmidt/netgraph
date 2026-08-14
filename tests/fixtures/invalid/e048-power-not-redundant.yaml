@@ -1,0 +1,56 @@
+# E048 - a computer promises to keep power under any single failure, and one PDU
+# feeds it.
+#
+# The annotation is the claim; the power plan is a single feed. Losing the one
+# PDU switches the machine off, so the claim is false and the fix is either a
+# second feed from an independent source or an honest deletion of the
+# annotation.
+apiVersion: netgraph.dev/v1alpha1
+kind: pdu
+metadata:
+  name: pdu-a
+spec:
+  outlets: 8
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses:
+          - 10.0.0.1/24
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+  annotations:
+    netgraph/redundancy: power
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses:
+          - 10.0.0.2/24
+        gateway: 10.0.0.1
+  power:
+    inputs:
+      - pdu: pdu-a
+        outlet: '1'
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a
+spec:
+  endpoints:
+    - rtr-a:eth0
+    - pc-a:eth0
+  medium: copper

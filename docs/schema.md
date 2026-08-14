@@ -55,6 +55,7 @@ expands §9 with the reasoning and with what is deliberately left uncovered.
 17. [Power](#17-power)
 18. [Layout: diagram geometry](#18-layout-diagram-geometry)
 19. [Identity: users and groups](#19-identity-users-and-groups)
+20. [Test suites: executable assertions](#20-test-suites-executable-assertions)
 
 ---
 
@@ -209,14 +210,16 @@ spec:
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
 | `apiVersion` | string | M | — | MUST be `netgraph.dev/v1alpha1` for this revision. See §12. |
-| `kind` | enum | M | — | One of `switch`, `router`, `hub`, `computer`, `server`, `cable`, `adapter`, `tunnel`, `patchpanel`, `pdu`, `user`, `group`, `template`, `layout`. Lower-case; other spellings are rejected. |
+| `kind` | enum | M | — | One of `switch`, `router`, `hub`, `computer`, `server`, `cable`, `adapter`, `tunnel`, `patchpanel`, `pdu`, `user`, `group`, `template`, `layout`, `testsuite`. Lower-case; other spellings are rejected. |
 | `metadata` | mapping | M | — | §3.1 |
-| `spec` | mapping | M | — | Shape depends on `kind`: §6 (devices), §7 (cable), §8 (adapter), §14 (tunnel), §15 (patchpanel), §17.1 (pdu), §19 (user, group), §6.6 (template), §18 (layout). |
+| `spec` | mapping | M | — | Shape depends on `kind`: §6 (devices), §7 (cable), §8 (adapter), §14 (tunnel), §15 (patchpanel), §17.1 (pdu), §19 (user, group), §6.6 (template), §18 (layout), §20 (testsuite). |
 
 The first twelve kinds are **elements**: each becomes a node or an edge of the
-graph. `template` is not an element — it declares a reusable partial device
-`spec` and is merged away by the loader (§6.6) — and neither is `layout`, which
-carries diagram geometry for elements declared elsewhere (§18).
+graph. The last three are not. `template` declares a reusable partial device
+`spec` and is merged away by the loader (§6.6); `layout` carries diagram geometry
+for elements declared elsewhere (§18); `testsuite` carries assertions about the
+network the other documents describe (§20). None of the three is ever drawn as a
+node, listed by `netgraph list`, or resolvable as a cable endpoint.
 
 ### 3.1 `metadata`
 
@@ -1153,7 +1156,7 @@ named. §10.10 maps them.
 |---|---|---|
 | `NG-D001` | error | The document is a mapping with the four envelope keys; `apiVersion`, `kind`, `metadata`, `spec` are all present. |
 | `NG-D002` | error | `apiVersion` is a recognised version string. |
-| `NG-D003` | error | `kind` is one of the twelve element kinds, `template` or `layout`, lower-case. |
+| `NG-D003` | error | `kind` is one of the twelve element kinds, `template`, `layout` or `testsuite`, lower-case. |
 | `NG-D004` | error | `spec` matches the shape required by `kind`. |
 | `NG-D005` | error | No unknown keys anywhere in the document. |
 | `NG-N001` | error | `metadata.name` matches the name grammar (§4.1). |
@@ -3998,3 +4001,173 @@ person access directly and putting them in nothing is a normal way to run an
 estate. It is printed because the opposite reading — "she is in no group,
 therefore she has no access" — is a claim an auditor wants confirmed rather than
 assumed.
+
+---
+
+## 20. Test suites: executable assertions
+
+An inventory records what the network *is*. A `kind: testsuite` document records
+what somebody is **relying on** — that the tills reach the payment gateway, that
+the guest VLAN reaches nothing else, that no two switches claim the same
+management address — and `netgraph test` grades it, exiting non-zero when one of
+those claims has stopped being true.
+
+The distinction from `netgraph validate` is the whole point of the kind.
+Validation says whether the *files* are coherent: a cable endpoint resolves, an
+address is inside its subnet, a VLAN is declared before it is trunked. Every one
+of its rules is a statement about inventories in general, which is exactly why it
+cannot say that the ward switch must not be the only path to the ward. That is a
+fact about *this* network, known only to the people who built it, and until it is
+written down it survives only as long as the person who remembers it.
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: testsuite
+metadata:
+  name: connectivity
+spec:
+  description: staff, servers and management reach what they are supposed to
+  assertions:
+    - assert: reachable
+      name: a north desk reaches its own file server
+      from: pc-north-01
+      to: srv-north-01
+      layer: l3
+
+    - assert: not-reachable
+      name: staff and servers are separated by a router, not by a switch
+      from: pc-north-01
+      to: srv-north-01
+      layer: l2
+
+    - assert: unique
+      name: no two switches claim the same management address
+      select: kind=switch
+      field: spec.interfaces[name=Vlan99].ipv4.addresses[].ip
+```
+
+A test suite is **not an element**, for the same reasons `layout` (§18) and
+`template` (§6.6) are not: it declares no device, terminates no cable, is never
+drawn as a node and is never listed by `netgraph list`. It is indexed in a name
+space of its own, so a suite called `core` next to a switch called `core` is not
+a clash — nothing ever resolves one where the other is meant.
+
+Where the suites live in the tree is a matter of taste and nothing else. One
+`tests.yaml` at the root is what both bundled examples do; a suite per site, next
+to the site, is the other arrangement that reads well.
+
+### 20.1 `spec`
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `description` | string | O | *unset* | What the suite is for, in one line. Printed as the suite's progress line. |
+| `assertions` | list | M | — | One to 1024 assertions (§20.2), graded in the order they are written (`NG-K002`). |
+
+`assertions` may not be empty. A suite that asserts nothing reports a green run
+having checked nothing, which is worse than having no suite at all — it is the
+false green that the exit code of this command exists to prevent.
+
+### 20.2 An assertion
+
+`assert` chooses the claim, and every other key is read in its light. A key that
+belongs to a *different* assertion is rejected by name (`NG-K003`) rather than
+ignored, so `hops` written on a `same-vlan` is a diagnostic naming both keys and
+not a silently unchecked bound.
+
+| `assert` | Required | Optional | Claim |
+|---|---|---|---|
+| `reachable` | `from`, `to` | `layer`, `vlan`, `max_hops` | A route exists. |
+| `not-reachable` | `from`, `to` | `layer`, `vlan`, `max_hops` | No route exists. |
+| `path-shorter-than` | `from`, `to`, `hops` | `layer`, `vlan`, `max_hops` | A route exists and crosses fewer than `hops` links. |
+| `same-vlan` | `select` | `vlan` | Every selected element shares a VLAN with every other; with `vlan`, that one. |
+| `distinct-vlan` | `select` | — | No two selected elements share a VLAN. |
+| `within-prefix` | `select`, `prefix` | — | Every routable address of the prefix's family, on a selected element, is inside it. |
+| `has-interface` | `select`, `interface` | — | Every selected element declares an interface matching the glob. |
+| `port-count-at-least` | `select`, `ports` | — | Every selected element declares at least `ports` interfaces. |
+| `unique` | `select`, `field` | — | No two selected elements produce the same value for the field expression (§20.4). |
+| `count` | `select`, one of `equals`/`at_least`/`at_most` | the other two | How many elements the selector matches. |
+| `no-single-point-of-failure` | — | `select`, `layer`, `min_isolated` | Nothing, alone, cuts an endpoint off from the designated gateways. |
+
+Two keys are shared by all of them:
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `name` | string | O | a rendering of the keys | How the claim is reported. Write a sentence somebody who has never seen the inventory can act on. |
+| `description` | string | O | *unset* | Why the claim is made. Printed under a failure, so it is where the ticket number or the standard that demands it belongs. |
+
+`layer` is `any` (the default), `l2` or `l3` on a reachability assertion, and
+`any`, `l1`, `l2`, `l3` or `power` on `no-single-point-of-failure`. It is what
+makes "reachable, but only through a router" expressible: the pair of assertions
+in the example above says that two hosts *do* reach each other and that a switch
+is not how, which is the shape a segmentation requirement actually has.
+
+### 20.3 Selectors
+
+`select` is written in the vocabulary `netgraph render` already filters with,
+spelled as one scalar because a YAML document has nowhere to put a repeated flag:
+
+```yaml
+select: kind=switch, namespace=sites/north, name=sw-*
+```
+
+Terms are comma-separated. A term is `key=value`, or a bare word which is short
+for `name=<word>` — so `select: sw-core` and `select: sw-*` both work. The keys
+are the long forms of the flags: `namespace`, `vlan`, `kind`, `name`,
+`neighbors-of` and `depth`. A repeated key is an *alternative* exactly as a
+repeated flag is (`kind=switch, kind=router` selects both); different keys are
+combined with AND. It parses to the very same filter the renderer uses, so an
+assertion and a diagram cannot disagree about what `kind=switch` selects.
+
+`from` and `to` take the three spellings `netgraph path` takes — an element,
+`element:interface`, or an IP address — and, when they contain `=` or a globbing
+character, a selector. `from: name=sw-*-acc-*` with `to: sw-dist-01` is "every
+access switch reaches the distribution switch", one line instead of twelve; the
+product of the two sides is capped, and an assertion above the cap is refused
+with a message saying to narrow one side.
+
+An empty selection **fails** every assertion except `count`, where `equals: 0` is
+a legitimate claim. A test graded against nothing is a test that reports green
+having checked nothing.
+
+### 20.4 Field expressions
+
+`unique` takes a path into the element as the loader resolved it — ranges
+expanded, template merged, shorthands normalised — so it sees what the graph
+sees rather than what the file happens to say:
+
+```yaml
+field: spec.interfaces[name=Vlan99].ipv4.addresses[].ip
+```
+
+Dotted keys, each optionally followed by bracket steps:
+
+| Step | Meaning |
+|---|---|
+| `[]` | Flatten: the value is a list, and evaluation continues once per item. |
+| `[key=value]` | Keep the list items whose `key` matches the glob `value`. |
+| `[key!=value]` | Keep the ones whose `key` does not. |
+
+The negated form is what makes "every address except the loopback" writable —
+`spec.interfaces[type!=loopback].ipv4.addresses[].ip` — and without it the most
+useful `unique` assertion of all, that no two hosts share an address, would be
+defeated by the `127.0.0.1` every host declares.
+
+A path that runs off the end of a document yields **nothing** rather than
+failing: a device with no `Vlan99` cannot collide with one that has one. The
+assertion still fails if *no* selected element produced a value, so a silent zero
+cannot be mistaken for a pass.
+
+### 20.5 Rules
+
+The group is lettered `K`, for *check*: `NG-C` was spent on cables and `NG-T` on
+tunnels, so neither obvious initial was available. `NG-K001` to `NG-K003` are
+reported while
+the document is read and are not suppressible. A false assertion is not a rule
+violation at all — it is a failing test, reported by `netgraph test` against the
+assertion's own file and line.
+
+| ID | Sev. | Rule |
+|---|---|---|
+| `NG-K001` | error | Two `testsuite` documents in one namespace do not share a name. The first declaration wins and the second is ignored, which keeps loading deterministic. |
+| `NG-K002` | error | `spec.assertions` holds between one and 1024 entries. |
+| `NG-K003` | error | Every key an assertion carries belongs to the assertion its `assert` names, every key that assertion requires is present, and a `count` compares against a bound it can satisfy. |

@@ -570,6 +570,43 @@ main {
   stroke-dasharray: 3 3;
 }
 
+/* Failure mode. The canvas is answering "what breaks if this dies", so the
+ * drawing is re-read as a casualty list: what died, what it took with it, and
+ * what survived.
+ *
+ * The survivors are dimmed rather than the casualties highlighted, because the
+ * question is about the casualties and there are usually far fewer of them --
+ * highlighting thirty things and leaving four hundred at full strength makes
+ * the answer harder to see, not easier. Nothing here changes a single file:
+ * the whole overlay is two class names, put on by app.js and taken off again
+ * when the mode is left. */
+.canvas.failing .viewport svg g.node,
+.canvas.failing .viewport svg g.edge {
+  opacity: 0.35;
+}
+
+.canvas.failing .viewport svg g.isolated,
+.canvas.failing .viewport svg g.failed {
+  opacity: 1;
+}
+
+/* What was clicked: gone, and drawn as gone. */
+.canvas.failing .viewport svg g.failed > *:not(text) {
+  stroke: var(--diff-removed);
+  stroke-width: 3;
+  stroke-dasharray: 2 3;
+}
+
+.canvas.failing .viewport svg g.failed text { fill: var(--diff-removed); }
+
+/* What it isolates: still there, and no longer reachable. */
+.canvas.failing .viewport svg g.isolated > *:not(text) {
+  stroke: var(--diff-changed);
+  stroke-width: 2.5;
+}
+
+.canvas.failing .viewport svg g.isolated text { fill: var(--diff-changed); }
+
 /* Where the keyboard is. Solid, heavy and haloed -- and violet, which is not a
  * hue this diagram uses for anything else, so it cannot be read as a state of
  * the network.

@@ -453,6 +453,7 @@ cable it, undo both — without dispatching a single mouse event.
 | `Alt-G` | Toggle namespace grouping | anywhere | — | Collapse each namespace into one box. |
 | `Alt-S` | Toggle strict | anywhere | — | Report warnings as errors. |
 | *palette only* | Filter by VLAN… | anywhere | — | Keep only elements participating in the VLANs given. |
+| `Alt-F` | Failure mode | anywhere | a folder | Click an element and everything it would isolate from the gateways greys out; the status line names the count. Reads only — nothing is written, and Escape or the same key puts the diagram back. |
 | `0` | Fit the diagram | anywhere | — | Undo the panning and zooming. |
 | `Plus` / `=` | Zoom in | anywhere | — | Around the middle of the canvas, so nothing jumps off screen. |
 | `Minus` | Zoom out | anywhere | — | Around the middle of the canvas. |

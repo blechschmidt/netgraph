@@ -608,6 +608,15 @@ class JUnitCase:
     detail: str = ""
     #: Why the case did not run. Takes precedence over :attr:`failure`.
     skipped: str | None = None
+    #: What kind of failure this is, written as the ``type`` of ``<failure>``.
+    #: Falls back to the whole report's kind when unset.
+    type: str | None = None
+    #: File the case is about, relative to the inventory root. GitLab links a
+    #: failed case to it; every other reader ignores an attribute it does not
+    #: know, so carrying it costs nothing.
+    file: str | None = None
+    #: 1-based line inside :attr:`file`.
+    line: int | None = None
 
     @property
     def state(self) -> str:
@@ -616,7 +625,13 @@ class JUnitCase:
         return "failed" if self.failure is not None else "passed"
 
 
-def as_junit(suite: str, cases: Sequence[JUnitCase], *, properties: Mapping[str, str] = {}) -> str:
+def as_junit(
+    suite: str,
+    cases: Sequence[JUnitCase],
+    *,
+    properties: Mapping[str, str] = {},
+    failure_type: str = "failure",
+) -> str:
     """``cases`` as a JUnit XML document with exactly one suite.
 
     The dialect is the widely-implemented one — ``<testsuites>`` wrapping one
@@ -646,13 +661,17 @@ def as_junit(suite: str, cases: Sequence[JUnitCase], *, properties: Mapping[str,
         )
         lines.append("    </properties>")
     for case in cases:
-        lines.extend(_junit_case(case))
+        lines.extend(_junit_case(case, failure_type))
     lines.extend(["  </testsuite>", "</testsuites>", ""])
     return "\n".join(lines)
 
 
-def _junit_case(case: JUnitCase) -> Iterator[str]:
+def _junit_case(case: JUnitCase, failure_type: str) -> Iterator[str]:
     head = f"    <testcase classname={quoteattr(case.classname)} name={quoteattr(case.name)}"
+    if case.file is not None:
+        head += f" file={quoteattr(case.file)}"
+    if case.line is not None:
+        head += f' line="{case.line}"'
     if case.skipped is not None:
         yield head + ">"
         yield f"      <skipped message={quoteattr(_xml_text(case.skipped))}/>"
@@ -661,8 +680,9 @@ def _junit_case(case: JUnitCase) -> Iterator[str]:
     if case.failure is None:
         yield head + "/>"
         return
+    kind = case.type or failure_type
     yield head + ">"
-    yield f'      <failure message={quoteattr(_xml_text(case.failure))} type="drift">'
+    yield (f"      <failure message={quoteattr(_xml_text(case.failure))} type={quoteattr(kind)}>")
     for line in _xml_text(case.detail).splitlines():
         yield xml_escape(line)
     yield "      </failure>"

@@ -37,6 +37,7 @@ the field maps to, with `…` standing for
 | `group` | [GroupSpec](#spec-of-a-group-document) | A named set of identities. `members` may name a `user` or another `group`, which is what makes a hierarchy expressible; the nesting must not loop (`NG-S012`). |
 | `template` | partial [DeviceSpec](#spec--switch-router-hub-computer-server) | A named partial device spec, merged into every device that names it in `spec.from`. Not an element: never drawn, never listed, never validated on its own. |
 | `layout` | [LayoutSpec](#spec-of-a-layout-document) | Diagram geometry for elements declared elsewhere, scoped by view. Not an element: it carries no network facts and is never drawn as a node. See `netgraph layout`. |
+| `testsuite` | [TestSuiteSpec](#spec-of-a-testsuite-document) | Named assertions about the network the other documents describe, graded by `netgraph test`. Not an element: it declares no device and is never drawn. |
 
 ## Document envelope
 
@@ -601,6 +602,47 @@ Two positive numbers, in points. `{width: 220, height: 90}` or `[220, 90]`.
 |---|---|---|---|---|---|
 | `width` | number, > 0.0 | **yes** | — | Width in points; strictly positive. | — |
 | `height` | number, > 0.0 | **yes** | — | Height in points; strictly positive. | — |
+
+## `spec` of a `testsuite` document
+
+Named claims about the network the other documents describe. `netgraph test` grades them and exits non-zero when one does not hold.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `description` | string | no | *unset* | What the suite is for, in one line. Printed as the suite's progress line. | — |
+| `assertions` | [Assertion](#one-assertion) list, 1–1024 entries | **yes** | — | The claims, graded in the order they are written. At least one: a suite that asserts nothing would report a green run having checked nothing. | — |
+
+* A suite must assert something (`NG-K002`). A suite that checked nothing would report a green run, which is worse than having no suite at all.
+* Assertions are graded in the order they are written, and a failure names the file and line of the assertion so an editor can jump to it.
+
+## One assertion
+
+`assert` chooses the claim; every other key is read in its light. A key that belongs to a different assertion is rejected by name (`NG-K003`) rather than ignored.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `assert` | `reachable` \| `not-reachable` \| `path-shorter-than` \| `same-vlan` \| `distinct-vlan` \| `within-prefix` \| `has-interface` \| `port-count-at-least` \| `unique` \| `count` \| `no-single-point-of-failure` | **yes** | — | What is being claimed: `reachable`, `not-reachable`, `path-shorter-than`, `same-vlan`, `distinct-vlan`, `within-prefix`, `has-interface`, `port-count-at-least`, `unique`, `count` or `no-single-point-of-failure`. Every other key is read in its light. | — |
+| `name` | string, ≤ 200 characters | no | *unset* | How the claim is reported — a sentence a reader who has never seen the inventory can act on. Defaults to a description built from the other keys. | — |
+| `description` | string | no | *unset* | Why the claim is made. Printed under a failure, so it is where the ticket number or the standard that demands it belongs. | — |
+| `from` | string, ≥ 1 character | no | *unset* | Where the trace starts: an element, `element:interface`, an IP address, or a selector matching several of them. The spellings `netgraph path` accepts. | — |
+| `to` | string, ≥ 1 character | no | *unset* | Where the trace ends, in the same four spellings as `from`. | — |
+| `max_hops` | integer, 1–64 | no | *unset* | Abandon a route that crosses more links than this. Defaults to the trace engine's own limit of 16. | — |
+| `hops` | integer, 1–64 | no | *unset* | `path-shorter-than`: the exclusive upper bound on the hop count of the shortest path. | — |
+| `vlan` | integer, 1–4094 | no | *unset* | Restrict a trace to one VLAN, or pin which VLAN `same-vlan` means. | — |
+| `layer` | `any` \| `l1` \| `l2` \| `l3` \| `power` | no | *unset* | Which view the claim is about: `any`, `l2` or `l3` for a trace; `any`, `l1`, `l2`, `l3` or `power` for `no-single-point-of-failure`. | — |
+| `select` | string, ≥ 1 character | no | *unset* | Which elements the claim is about, in `netgraph render`'s filter vocabulary: `kind=switch, namespace=sites/north, name=sw-*`. A bare word is a name glob. | — |
+| `prefix` | string, ≥ 1 character | no | *unset* | `within-prefix`: the CIDR every routable address on a selected element must lie inside. | — |
+| `interface` | string, ≥ 1 character | no | *unset* | `has-interface`: the interface name every selected element must declare, or a glob matching it. | — |
+| `ports` | integer, ≥ 0 | no | *unset* | `port-count-at-least`: the inclusive lower bound on how many interfaces each selected element declares. | — |
+| `field` | string, ≥ 1 character | no | *unset* | `unique`: the field expression whose values must all differ, e.g. `spec.interfaces[name=mgmt0].ipv4[]`. | — |
+| `equals` | integer, ≥ 0 | no | *unset* | `count`: how many elements the selector must match, exactly. | — |
+| `at_least` | integer, ≥ 0 | no | *unset* | `count`: the inclusive lower bound on how many elements the selector matches. | — |
+| `at_most` | integer, ≥ 0 | no | *unset* | `count`: the inclusive upper bound on how many elements the selector matches. | — |
+| `min_isolated` | integer, ≥ 1 | no | *unset* | `no-single-point-of-failure`: ignore a candidate that isolates fewer endpoints than this. 1, the default, reports every one of them. | — |
+
+* `reachable`, `not-reachable` and `path-shorter-than` take `from` and `to` in the spellings `netgraph path` accepts: an element, `element:interface`, an IP address, or a selector matching several of them.
+* `same-vlan`, `distinct-vlan`, `within-prefix`, `has-interface`, `port-count-at-least`, `unique` and `count` take `select`, in `netgraph render`'s filter vocabulary.
+* `no-single-point-of-failure` takes neither, and optionally narrows the candidates with `select` and the views with `layer`.
 
 ## Enumerations
 

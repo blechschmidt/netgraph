@@ -16,6 +16,7 @@ __all__ = [
     "KINDS",
     "LAYOUT_KIND",
     "TEMPLATE_KIND",
+    "TEST_SUITE_KIND",
     "ElementBase",
 ]
 
@@ -50,8 +51,13 @@ TEMPLATE_KIND: str = "template"
 #: versioned on its own. See :mod:`netgraph.models.layout`.
 LAYOUT_KIND: str = "layout"
 
-#: Every ``kind`` a document may declare: elements, templates and layouts.
-DOCUMENT_KINDS: tuple[str, ...] = (*KINDS, TEMPLATE_KIND, LAYOUT_KIND)
+#: The fifteenth kind (§20). A test suite declares no element either: it is a list
+#: of named assertions about the network the other documents describe, graded by
+#: ``netgraph test``. See :mod:`netgraph.models.testsuite`.
+TEST_SUITE_KIND: str = "testsuite"
+
+#: Every ``kind`` a document may declare: elements, templates, layouts and suites.
+DOCUMENT_KINDS: tuple[str, ...] = (*KINDS, TEMPLATE_KIND, LAYOUT_KIND, TEST_SUITE_KIND)
 
 
 class ElementBase(NetgraphModel):

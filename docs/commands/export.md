@@ -1,10 +1,15 @@
 # `netgraph export`
 
-`netgraph export` turns the inventory into files other tools consume: seven
+`netgraph export` turns the inventory into files other tools consume: fourteen
 deterministic, text-diffable emitters driven by the same resolved inventory and
 the same graph a diagram is drawn from — so the files that draw the picture also
 write the hosts file, the zone, the Ansible inventory, the monitoring targets,
-the cabling pull-list, the static-route script and the power load schedule. This page is the reference for the command;
+the cabling pull-list, the static-route script and the power load schedule.
+
+Eight of the fourteen describe the network. The other six *are* the network: they
+generate the configuration a device would actually run — netplan, systemd-networkd,
+ifupdown, FRR, WireGuard, and netgraph's own vendor-neutral grammar for everything
+those five have nothing to say about. This page is the reference for the command;
 [`docs/export.md`](../export.md) is the full treatment of every column, every
 option and exactly what each format drops.
 
@@ -13,9 +18,10 @@ option and exactly what each format drops.
 ## Contents
 
 - [Synopsis](#synopsis)
-- [The seven formats](#the-seven-formats)
+- [The fourteen formats](#the-fourteen-formats)
 - [Validation runs first](#validation-runs-first)
 - [Where the artefact goes, and the manifest](#where-the-artefact-goes-and-the-manifest)
+- [A configuration dialect writes a tree](#a-configuration-dialect-writes-a-tree)
 - [Scoping an export: the filters `render` takes](#scoping-an-export-the-filters-render-takes)
 - [Options, by the format they belong to](#options-by-the-format-they-belong-to)
 - [Exit codes](#exit-codes)
@@ -30,10 +36,12 @@ netgraph [GLOBAL OPTIONS] export [OPTIONS] FORMAT
 ```
 <!-- /generated -->
 
-## The seven formats
+## The fourteen formats
 
 `FORMAT` is the one required argument. Every emitter is lossy in its own way, and
-which way is the thing to know before you pick one:
+which way is the thing to know before you pick one.
+
+**Eight describe the network:**
 
 | `FORMAT` | Artefact | What it cannot hold |
 |---|---|---|
@@ -44,6 +52,22 @@ which way is the thing to know before you pick one:
 | [`cable-list`](../export.md#cable-list) | A CSV or Markdown pull-list, one row per physical run | Adapter attachments, tunnels and addressing |
 | [`routes`](../export.md#routes) | An iproute2 script, one shell function per device, of the static routes it declares | Everything that is not a static route: BGP and OSPF configuration is vendor syntax and is not invented |
 | [`power`](../export.md#power) | A CSV or JSON load schedule, one row per power feed: which outlet, on which strip, on which feed, powering which box in which rack unit | Everything that is not power; a feed has no medium, length or label, and the data run a PoE feed rides on is not described |
+| [`drawio`](../export.md#drawio) | An mxGraph diagram draw.io opens, edits and hands back | The model: a name, a kind, a link and a coordinate per cell, but no interfaces, addresses, VLANs or routing |
+
+**Six generate the configuration a device would run.** These write files at the
+paths the device keeps them at, and a dialect that cannot express something the
+inventory declares writes nothing at all rather than a device that is almost
+right —
+[Device configuration: the six dialects](../export.md#device-configuration-the-six-dialects):
+
+| `FORMAT` | Artefact | What it refuses |
+|---|---|---|
+| [`netplan`](../export.md#device-configuration-the-six-dialects) | `etc/netplan/10-netgraph.yaml` for a `computer`, `server` or `router` | The 802.1Q configuration of a bridge port, and a VRF: netplan's `vrfs` section needs a numeric routing table and an inventory states a route distinguisher |
+| [`networkd`](../export.md#device-configuration-the-six-dialects) | `etc/systemd/network/*.network` and `*.netdev`, one pair per link the host builds | A VRF, for the same missing table number — `[BridgeVLAN]` covers what netplan cannot |
+| [`ifupdown`](../export.md#device-configuration-the-six-dialects) | `etc/network/interfaces`, the Debian original, with routes as `up`/`down` hooks | A bridge port's 802.1Q, a VRF, and an `ap` radio, which is hostapd's job rather than a station's `wpa-ssid` |
+| [`frr`](../export.md#device-configuration-the-six-dialects) | `etc/frr/frr.conf`: VRFs, static routes, OSPF areas, BGP neighbours | Nothing — FRR's grammar is a superset of what the schema states about routing. It creates no interfaces, so those come from a host dialect |
+| [`wireguard`](../export.md#device-configuration-the-six-dialects) | `etc/wireguard/<interface>.conf`, one file per tunnel, keys written as `REPLACE-ME` | A `cipher` or an `auth` that is not WireGuard's own, which is the part deciding whether the two ends can speak |
+| [`interfaces`](../export.md#device-configuration-the-six-dialects) | `interfaces.conf` — netgraph's own vendor-neutral grammar, for **every** device | Nothing, ever. What it cannot do is be applied: no system reads it |
 
 What they have in common — a generated-by header, stable ordering, and no clock
 or hostname anywhere in the output, so re-exporting an unchanged inventory
@@ -114,6 +138,50 @@ Every `reason` code, and the `rewritten` half of the document that records a nam
 changed to fit a format's grammar, are in
 [The skip manifest](../export.md#the-skip-manifest).
 
+## A configuration dialect writes a tree
+
+The eight description formats produce one artefact, so `-o FILE` is the whole
+story. A configuration dialect produces a *tree* — netplan is one file per host,
+systemd-networkd a `.netdev` and a `.network` per stacked link, wg-quick one file
+per tunnel — and stdout is not a tree. `--out DIR` writes it: one directory per
+device, named after the device's fully-qualified name, holding each file at the
+path the device keeps it at.
+
+<!-- norun: writes a directory tree into the reader's checkout -->
+```console
+$ netgraph -q -i examples/overlay export networkd --out build/config
+```
+
+Three rules apply to that directory, and they are narrower than the ones
+[`netgraph import`](import.md) uses, because regenerating a configuration is the
+normal operation rather than an exceptional one. A file netgraph generated is
+**overwritten** without a flag, since its banner says so. A file netgraph did not
+generate is **refused**, with every clash listed and `--force` named — that is
+the `--out /etc` mistake, and the only one worth stopping. And nothing is ever
+**deleted**: files left by an earlier, wider run are reported as a count and left
+where they are, because deciding what to do about a device that is no longer
+configured belongs to an operator.
+
+Point `--out` at a directory outside the inventory: a generated
+`10-netgraph.yaml` under the tree netgraph loads is a document netgraph tries to
+load on the next run.
+
+Without `--out`, a selection of more than one device is a usage error rather than
+a stream nobody can split. One device is allowed, and is the case worth having:
+
+<!-- norun: needs a live host to ssh into -->
+```console
+$ netgraph -q -i examples/home-lab export netplan --name pc-desk | ssh pc-desk 'cat >/etc/netplan/10-netgraph.yaml'
+```
+
+A dialect that cannot express a field a selected device declares refuses the
+**whole run** with exit code `4`, naming every field it could not write. Nothing
+is written — not for the offending device and not for the ones that were fine —
+because a configuration missing one field is a device that is *almost* what the
+inventory says, with nothing in the file to say which part is missing. The
+distinction between that and an ordinary manifest skip is
+[Emitted, skipped, refused](../export.md#emitted-skipped-refused).
+
 ## Scoping an export: the filters `render` takes
 
 Every filter [`netgraph render`](render.md) takes, `export` takes, and they mean
@@ -146,6 +214,21 @@ Error: --port applies to 'prometheus-sd', not to 'hosts'
 
 **Every format**: `-o/--output`, `--manifest`, the filters above, `--strict` and
 `--force`.
+
+**The six configuration dialects**: `--out DIR` writes the tree instead of one
+artefact, and `--force` additionally means "overwrite files netgraph did not
+generate" there. `--out` is one of the format-specific options above, so giving
+it to a description format is a usage error rather than a flag that quietly did
+nothing:
+
+<!-- run: rc=2 -->
+```console
+$ netgraph -i examples/home-lab export hosts --out build/config
+Usage: netgraph export [OPTIONS] FORMAT
+Try 'netgraph export --help' for help.
+
+Error: --out applies to 'netplan', 'networkd', 'ifupdown', 'frr', 'wireguard' or 'interfaces', not to 'hosts'
+```
 
 **`dns-zone`**: `--origin NAME` is *required* — a zone file has no meaning without
 the domain its records hang under, so omitting it is a usage error before
@@ -198,6 +281,7 @@ host variables are set are [Groups](../export.md#groups),
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
 | `-o`, `--output` | `FILE` | — | Write the artefact to this file instead of stdout. |
+| `--out` | `DIRECTORY` | — | Write a configuration dialect as a tree: one directory per device, named after its fully-qualified name, holding the files at the paths the device keeps them at. Without it a single device's configuration goes to stdout. |
 | `--manifest` | `FILE` | — | Write the JSON record of what was skipped to this file. It goes to stderr when no file is named. |
 | `--namespace` | `NS` | — | Keep only elements in this namespace or below it. Repeatable. |
 | `--vlan` | `VID` | — | Keep only elements participating in this VLAN. Repeatable. |
@@ -235,7 +319,8 @@ host variables are set are [Groups](../export.md#groups),
 | `0` | The artefact was written. Elements skipped into the manifest are not a failure. |
 | `1` | The inventory was rejected — validation found errors, or `--strict` promoted a warning — and `--force` was not given. Nothing is written. |
 | `2` | Usage error — an unknown `FORMAT`, a format-specific option given to another format, or `dns-zone` without `--origin`. |
-| `3` | The inventory could not be discovered or read at all. |
+| `3` | The inventory could not be discovered or read at all, or the `--out` tree could not be written — the directory is a file, a write failed, or it holds files netgraph did not generate and `--force` was not given. |
+| `4` | A configuration dialect cannot express something a selected device declares. Every refusal is listed with the field that produced it, and **nothing** was written. |
 | `5` | The artefact or the manifest could not be written: `-o`, `--manifest` or stdout is not writable. |
 | `130` | Interrupted. |
 | `141` | The downstream end of a pipe closed first. |

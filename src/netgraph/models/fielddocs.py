@@ -61,6 +61,7 @@ from netgraph.models.routing import (
     StaticRoute,
     VrfDefinition,
 )
+from netgraph.models.testsuite import Assertion, TestSuiteSpec
 from netgraph.models.tunnel import TunnelSpec
 
 __all__ = [
@@ -132,6 +133,8 @@ DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
     GroupGeometry,
     Point,
     Size,
+    TestSuiteSpec,
+    Assertion,
 )
 
 #: What distinguishes one ``kind`` from the next, one sentence each.
@@ -159,6 +162,8 @@ KIND_NOTES: Final[dict[str, str]] = {
     "`spec.from`. Not an element: never drawn, never listed, never validated on its own.",
     "layout": "Diagram geometry for elements declared elsewhere, scoped by view. Not an "
     "element: it carries no network facts and is never drawn as a node. See `netgraph layout`.",
+    "testsuite": "Named assertions about the network the other documents describe, graded by "
+    "`netgraph test`. Not an element: it declares no device and is never drawn.",
 }
 
 #: One entry per ``(model name, field name)``. Checked for exact coverage.
@@ -932,6 +937,76 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("Point", "y"): Doc("Points from the bottom edge of the drawing, growing upwards."),
     ("Size", "width"): Doc("Width in points; strictly positive."),
     ("Size", "height"): Doc("Height in points; strictly positive."),
+    # -- assertions (§20) --------------------------------------------------
+    ("TestSuiteSpec", "description"): Doc(
+        "What the suite is for, in one line. Printed as the suite's progress line."
+    ),
+    ("TestSuiteSpec", "assertions"): Doc(
+        "The claims, graded in the order they are written. At least one: a suite that asserts "
+        "nothing would report a green run having checked nothing."
+    ),
+    ("Assertion", "assert_"): Doc(
+        "What is being claimed: `reachable`, `not-reachable`, `path-shorter-than`, `same-vlan`, "
+        "`distinct-vlan`, `within-prefix`, `has-interface`, `port-count-at-least`, `unique`, "
+        "`count` or `no-single-point-of-failure`. Every other key is read in its light."
+    ),
+    ("Assertion", "name"): Doc(
+        "How the claim is reported — a sentence a reader who has never seen the inventory can "
+        "act on. Defaults to a description built from the other keys."
+    ),
+    ("Assertion", "description"): Doc(
+        "Why the claim is made. Printed under a failure, so it is where the ticket number or "
+        "the standard that demands it belongs."
+    ),
+    ("Assertion", "from_"): Doc(
+        "Where the trace starts: an element, `element:interface`, an IP address, or a selector "
+        "matching several of them. The spellings `netgraph path` accepts."
+    ),
+    ("Assertion", "to"): Doc("Where the trace ends, in the same four spellings as `from`."),
+    ("Assertion", "max_hops"): Doc(
+        "Abandon a route that crosses more links than this. Defaults to the trace engine's own "
+        "limit of 16."
+    ),
+    ("Assertion", "hops"): Doc(
+        "`path-shorter-than`: the exclusive upper bound on the hop count of the shortest path."
+    ),
+    ("Assertion", "vlan"): Doc(
+        "Restrict a trace to one VLAN, or pin which VLAN `same-vlan` means."
+    ),
+    ("Assertion", "layer"): Doc(
+        "Which view the claim is about: `any`, `l2` or `l3` for a trace; `any`, `l1`, `l2`, "
+        "`l3` or `power` for `no-single-point-of-failure`."
+    ),
+    ("Assertion", "select"): Doc(
+        "Which elements the claim is about, in `netgraph render`'s filter vocabulary: "
+        "`kind=switch, namespace=sites/north, name=sw-*`. A bare word is a name glob."
+    ),
+    ("Assertion", "prefix"): Doc(
+        "`within-prefix`: the CIDR every routable address on a selected element must lie inside."
+    ),
+    ("Assertion", "interface"): Doc(
+        "`has-interface`: the interface name every selected element must declare, or a glob "
+        "matching it."
+    ),
+    ("Assertion", "ports"): Doc(
+        "`port-count-at-least`: the inclusive lower bound on how many interfaces each selected "
+        "element declares."
+    ),
+    ("Assertion", "field"): Doc(
+        "`unique`: the field expression whose values must all differ, e.g. "
+        "`spec.interfaces[name=mgmt0].ipv4[]`."
+    ),
+    ("Assertion", "equals"): Doc("`count`: how many elements the selector must match, exactly."),
+    ("Assertion", "at_least"): Doc(
+        "`count`: the inclusive lower bound on how many elements the selector matches."
+    ),
+    ("Assertion", "at_most"): Doc(
+        "`count`: the inclusive upper bound on how many elements the selector matches."
+    ),
+    ("Assertion", "min_isolated"): Doc(
+        "`no-single-point-of-failure`: ignore a candidate that isolates fewer endpoints than "
+        "this. 1, the default, reports every one of them."
+    ),
 }
 
 

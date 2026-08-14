@@ -197,6 +197,10 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
+# Every test in this suite is a function. Collecting classes as well would only
+# ever pick up an import -- ``TestSuite`` and ``TestReport`` are netgraph types,
+# not test cases -- and warn about not being able to instantiate them.
+python_classes = []
 markers = [
     # tests/test_browser.py. Its own mark so the CI job that installs a browser
     # can select it (``-m browser``) and every other run can leave it out

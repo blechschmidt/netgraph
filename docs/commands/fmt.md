@@ -35,7 +35,7 @@ the files and nothing else.
 <!-- run: -->
 ```console
 $ netgraph fmt --check examples/campus
-0 file(s) would be reformatted, 17 already formatted
+0 file(s) would be reformatted, 18 already formatted
 ```
 
 **`--diff`** writes nothing and prints a unified diff of what would change, and

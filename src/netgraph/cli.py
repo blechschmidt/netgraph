@@ -73,6 +73,7 @@ status line every few seconds is commentary by any measure.
 from __future__ import annotations
 
 import csv
+import fnmatch
 import io
 import json
 import os
@@ -102,6 +103,7 @@ from netgraph.completion import (
     complete_node,
     complete_profile,
     complete_rule,
+    complete_test_suite,
     completion_script,
 )
 from netgraph.config import (
@@ -158,7 +160,9 @@ from netgraph.errors import (
     format_path,
 )
 from netgraph.export import (
+    CONFIG_FORMATS,
     EXPORTERS,
+    ConfigSet,
     ExportContext,
     ExportOptions,
     ExportResult,
@@ -168,9 +172,14 @@ from netgraph.export import (
     layers_for,
 )
 from netgraph.export import FORMATS as EXPORT_FORMATS
+from netgraph.export.config.write import stale_files, write_config
 from netgraph.fixes import FIXES, FixReport, repair, spec_for
 from netgraph.fsio import write_text
 from netgraph.history import Commit, Frame, HistoryError, Timeline
+from netgraph.impact import DEFAULT_LIMIT, ImpactError, render_impact
+from netgraph.impact import LAYERS as IMPACT_LAYERS
+from netgraph.impact import REPORT_FORMATS as IMPACT_REPORT_FORMATS
+from netgraph.impact import simulate as run_impact
 from netgraph.importer import (
     DIALECTS,
     Draft,
@@ -225,6 +234,7 @@ from netgraph.loader import (
     load_tree,
     open_cache,
     read_documents,
+    short_name,
     subset,
 )
 from netgraph.models import DOCUMENT_KINDS, KINDS, Element, Medium
@@ -307,6 +317,8 @@ from netgraph.settings import (
     resolve_settings,
 )
 from netgraph.subnets import IPNetwork, subnets_of
+from netgraph.testing import FORMATS as TEST_FORMATS
+from netgraph.testing import render_test_report, run_tests, suite_location
 from netgraph.trace import DEFAULT_MAX_HOPS, TraceError, TraceResult, render_trace, trace
 from netgraph.trace import REPORT_FORMATS as TRACE_FORMATS
 from netgraph.validate import Finding
@@ -351,6 +363,16 @@ CONTEXT_SETTINGS = {
 #: Exit status when an inventory is rejected. The task of every command that
 #: checks an inventory is to answer "is this usable?", so they share one answer.
 EXIT_INVALID: Final = 1
+
+#: Report formats ``impact`` accepts only with ``--redundancy``: both describe
+#: problems in files, and an analysis of a network is not one.
+DIAGNOSTIC_ONLY_FORMATS: Final[tuple[str, ...]] = ("sarif", "github")
+
+#: Every value ``impact --output-format`` accepts.
+IMPACT_FORMATS: Final[tuple[str, ...]] = (*IMPACT_REPORT_FORMATS, *DIAGNOSTIC_ONLY_FORMATS)
+
+#: How many candidate names an ambiguous ``--fail`` lists before giving up.
+_MAX_CANDIDATES: Final = 10
 
 #: Colour per severity, used for both the group headings and the rule ids.
 _SEVERITY_COLOUR: Final[dict[Severity, str]] = {
@@ -612,7 +634,7 @@ def init_command(
     console.info(f"created {_plural(len(written), 'file')} in {path}:")
     for file in written:
         console.info(f"  {_display_path(file, path)}")
-    for line in _next_steps(path, with_schema=with_schema):
+    for line in _next_steps(path, with_schema=with_schema, minimal=minimal):
         console.info(line)
 
 
@@ -624,18 +646,22 @@ def _display_path(file: Path, root: Path) -> str:
         return str(file)
 
 
-def _next_steps(path: Path, *, with_schema: bool) -> Iterator[str]:
+def _next_steps(path: Path, *, with_schema: bool, minimal: bool = False) -> Iterator[str]:
     """What to run now, as a copy-pasteable block.
 
-    ``cd`` is printed only when it is needed: the two netgraph commands below it
-    are run from the inventory root, which is already the shell's directory when
-    ``init`` was given no argument.
+    ``cd`` is printed only when it is needed: the netgraph commands below it are
+    run from the inventory root, which is already the shell's directory when
+    ``init`` was given no argument. ``netgraph test`` is offered only for the
+    example tree: ``--minimal`` declares no element, so it ships no assertions
+    and the command would have nothing to grade.
     """
     yield ""
     yield "next steps:"
     if path.resolve() != Path.cwd():
         yield f"  cd {path}"
     yield "  netgraph validate"
+    if not minimal:
+        yield "  netgraph test"
     yield "  netgraph render -f svg -o network.svg"
     if with_schema:
         yield ""
@@ -701,9 +727,11 @@ def import_group() -> None:
     default="auto",
     show_default=True,
     help=(
-        "Input dialect. 'auto' sniffs each input on its own, so one run may mix all three: "
+        "Input dialect. 'auto' sniffs each input on its own, so one run may mix all nine: "
         "lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', "
-        "csv is 'device,port,device,port' cabling rows."
+        "csv is 'device,port,device,port' cabling rows, and netplan, networkd, ifupdown, "
+        "frr, wireguard and interfaces are a device's running configuration in the same "
+        "dialects 'netgraph export' writes."
     ),
 )
 @click.option(
@@ -1148,7 +1176,9 @@ FAIL_ON: Final[tuple[str, ...]] = ("drift", "none")
     help=(
         "Input dialect, as for 'netgraph import'. 'auto' sniffs each input on its own: "
         "lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', "
-        "csv is 'device,port,device,port' cabling rows."
+        "csv is 'device,port,device,port' cabling rows, and netplan, networkd, ifupdown, "
+        "frr, wireguard and interfaces are the running configuration in the same dialects "
+        "'netgraph export' writes."
     ),
 )
 @click.option(
@@ -3117,6 +3147,16 @@ def _path_options(command: _Command) -> _Command:
     return _apply((*_DISPLAY_OPTIONS, *_VALIDATION_OPTIONS, *_CONFIG_OPTIONS), command)
 
 
+def _validation_options(command: _Command) -> _Command:
+    """Apply :data:`_VALIDATION_OPTIONS` alone.
+
+    For a command that reads the inventory and draws nothing: it still has to
+    decide what to do about an inventory with errors, and it has no diagram to
+    describe.
+    """
+    return _apply(_VALIDATION_OPTIONS, command)
+
+
 def _report_flags(command: _Command) -> _Command:
     """Apply the options ``report`` shares: the filters, then the validation flags."""
     return _apply((*_FILTER_OPTIONS, *_VALIDATION_OPTIONS), command)
@@ -4619,6 +4659,333 @@ def path_command(
         raise click.exceptions.Exit(EXIT_INVALID)
 
 
+@cli.command("impact")
+@click.option(
+    "--fail",
+    "failed",
+    multiple=True,
+    metavar="ELEMENT",
+    shell_complete=complete_element,
+    help=(
+        "Remove this element and report what breaks. Takes a name, a "
+        "fully-qualified name, or a kind-qualified one such as 'device/sw1' or "
+        "'cable/rack1-a3'. Repeatable: several failures are simulated together."
+    ),
+)
+@click.option(
+    "--from",
+    "anchors",
+    multiple=True,
+    metavar="ELEMENT",
+    shell_complete=complete_element,
+    help=("Measure reachability from here instead of from the designated gateways. Repeatable."),
+)
+@click.option(
+    "--path",
+    "paths",
+    multiple=True,
+    metavar="SRC=DST",
+    help=(
+        "Re-run this trace on both sides of the failure and report whether it survived. "
+        "Repeatable. Each end takes the spellings 'netgraph path' takes."
+    ),
+)
+@click.option(
+    "--spof",
+    is_flag=True,
+    default=False,
+    help=(
+        "Enumerate the single points of failure instead of simulating one, ranked by how "
+        "many endpoints each isolates. The default when no --fail is given."
+    ),
+)
+@click.option(
+    "--redundancy",
+    is_flag=True,
+    default=False,
+    help=(
+        "Check the redundancy expectations elements declare in their "
+        "'netgraph/redundancy' annotation, and report E047, E048 and W141 through the "
+        "ordinary rule machinery."
+    ),
+)
+@click.option(
+    "--layer",
+    "layers_wanted",
+    multiple=True,
+    type=click.Choice(IMPACT_LAYERS),
+    help="Which views to analyse. Repeatable; all three by default.",
+)
+@click.option(
+    "--limit",
+    type=click.IntRange(0),
+    default=DEFAULT_LIMIT,
+    show_default=True,
+    metavar="N",
+    help="Report at most this many single points of failure. 0 reports every one of them.",
+)
+@click.option(
+    "--min-isolated",
+    "minimum",
+    type=click.IntRange(1),
+    default=1,
+    show_default=True,
+    metavar="N",
+    help="Ignore a single point of failure that isolates fewer endpoints than this.",
+)
+@click.option(
+    "-F",
+    "--output-format",
+    "report_format",
+    type=click.Choice(IMPACT_FORMATS),
+    default="text",
+    show_default=True,
+    help=(
+        "text is the report; json is the whole analysis for tooling. sarif and github "
+        "carry the --redundancy findings alone, for a code-scanning upload."
+    ),
+)
+@click.option(
+    "--fail-on",
+    type=click.Choice(("impact", "none")),
+    default="impact",
+    show_default=True,
+    help=(
+        "Exit 1 when something was isolated, a checked path broke or a declared expectation "
+        "was not met, or never. Enumerating single points of failure never fails the run."
+    ),
+)
+@_validation_options
+@click.pass_obj
+def impact_command(
+    app: AppContext,
+    /,
+    failed: tuple[str, ...],
+    anchors: tuple[str, ...],
+    paths: tuple[str, ...],
+    spof: bool,
+    redundancy: bool,
+    layers_wanted: tuple[str, ...],
+    limit: int,
+    minimum: int,
+    report_format: str,
+    fail_on: str,
+    strict: bool,
+    force: bool,
+) -> None:
+    """Simulate failures: what breaks, what is a single point of failure.
+
+    \b
+    netgraph impact --spof
+    netgraph impact --fail device/sw1 --fail cable/rack1-a3
+    netgraph impact --fail pdu/pdu-r1-a --path pc-alice=srv-web
+    netgraph impact --redundancy -F github
+
+    With --fail, the named elements are removed from the inventory, every layer
+    is derived again without them, and the report says per layer which elements
+    stop being reachable from the designated gateways, which namespaces are
+    partitioned, and which of the paths named with --path no longer exist. A PDU
+    that fails takes everything it solely feeds with it, transitively, so a
+    switch that sources PoE for six access points is reported as losing all
+    seven.
+
+    With --spof, nothing is removed: every articulation point and every bridge of
+    every layer is enumerated in one pass, ranked by how many endpoints it
+    isolates, and a device whose only power feed is one PDU is reported beside
+    them — redundant cabling does not survive a single power source.
+
+    With --redundancy, the expectations elements declare in their
+    'netgraph/redundancy' annotation are graded by E047, E048 and W141, which is
+    what lets CI fail a change that quietly removed somebody's second path.
+
+    Exits 1 when a simulated failure isolated something, a checked path broke, or
+    a declared expectation was not met. Enumerating single points of failure does
+    not fail the run: every network of any size has them.
+    """
+    console = app.console()
+    notes = console.to_stderr() if report_format != "text" else console
+    wanted_spof = spof or not (failed or redundancy)
+    if report_format in DIAGNOSTIC_ONLY_FORMATS and not redundancy:
+        raise click.UsageError(
+            f"-F {report_format} carries findings about files, which only --redundancy "
+            f"produces; use -F json for the analysis."
+        )
+
+    inventory = app.load()
+    findings = _run_validation(app, inventory, strict=strict)
+    if _is_rejected(inventory, findings):
+        _report_problems(notes, inventory.errors, findings)
+        if not force:
+            notes.error(
+                "refusing to simulate failures on an inventory with errors; a dangling cable "
+                "is exactly the kind of thing that makes a blast radius wrong. Fix them, or "
+                "pass --force"
+            )
+            raise click.exceptions.Exit(EXIT_INVALID)
+        notes.warn("analysing despite errors (--force): the answer may not match the inventory")
+
+    try:
+        report = run_impact(
+            inventory,
+            fail=failed,
+            anchors=anchors,
+            paths=paths,
+            wanted_layers=layers_wanted or IMPACT_LAYERS,
+            spof=wanted_spof,
+            redundancy=redundancy,
+            limit=limit,
+            minimum=minimum,
+        )
+    except ImpactError as exc:
+        hint = "'--fail'" if failed else "'--from' / '--path'"
+        if exc.candidates:
+            notes.info("candidates: " + ", ".join(exc.candidates[:_MAX_CANDIDATES]))
+        raise click.BadParameter(str(exc), param_hint=hint) from exc
+
+    if report_format in DIAGNOSTIC_ONLY_FORMATS:
+        document = render_diagnostics(build_diagnostics(inventory, report.findings), report_format)
+        if document:
+            console.print(document)
+    else:
+        console.print(render_impact(report, report_format).rstrip("\n"))
+
+    if fail_on == "impact" and report.impacted:
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+
+# --------------------------------------------------------------------------- #
+# test
+# --------------------------------------------------------------------------- #
+
+
+@cli.command("test")
+@click.argument("suites", nargs=-1, metavar="[SUITE]...", shell_complete=complete_test_suite)
+@click.option(
+    "-F",
+    "--output-format",
+    "report_format",
+    type=click.Choice(TEST_FORMATS),
+    default="text",
+    show_default=True,
+    help=(
+        "text is the progress report; json is the whole run for a script; junit is the XML "
+        "GitHub, GitLab and Jenkins all render as a test report."
+    ),
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
+    default=None,
+    help="Write the report to this file instead of stdout. Usual for -F junit.",
+)
+@click.option(
+    "--max-hops",
+    type=click.IntRange(1, 64),
+    default=DEFAULT_MAX_HOPS,
+    show_default=True,
+    help="Abandon a traced route that crosses more links than this, unless the assertion "
+    "sets its own 'max_hops'.",
+)
+@click.option(
+    "--list",
+    "list_only",
+    is_flag=True,
+    default=False,
+    help="List the suites and their assertions without grading any of them.",
+)
+@_validation_options
+@click.pass_obj
+def test_command(
+    app: AppContext,
+    /,
+    suites: tuple[str, ...],
+    report_format: str,
+    output: Path | None,
+    max_hops: int,
+    list_only: bool,
+    strict: bool,
+    force: bool,
+) -> None:
+    """Grade the assertions the inventory declares in its 'kind: testsuite' documents.
+
+    \b
+    netgraph test
+    netgraph test connectivity segmentation
+    netgraph test -F junit -o test-results.xml
+
+    An assertion says what somebody is relying on — that the tills reach the
+    payment gateway, that the guest VLAN reaches nothing else, that no
+    management address is used twice — and every one of them is checked against
+    the same graphs 'netgraph render' draws and the same search 'netgraph path'
+    runs. Nothing is probed and no device is contacted.
+
+    A failure names the assertion, the elements it is about, what the graph
+    actually contained, and the file and line the assertion is written on, so an
+    editor and a CI annotation can both link straight to it.
+
+    SUITE narrows the run to the suites whose name matches; a glob that matches
+    nothing fails the run rather than quietly grading zero assertions.
+
+    Exits 1 when an assertion failed. A skipped assertion does not fail the run.
+    """
+    console = app.console()
+    notes = console.to_stderr() if report_format != "text" or output is not None else console
+
+    inventory = app.load(keep_provenance=True)
+    findings = _run_validation(app, inventory, strict=strict)
+    if _is_rejected(inventory, findings):
+        _report_problems(notes, inventory.errors, findings, commentary=True)
+        if not force:
+            notes.error(
+                "refusing to test an inventory with errors: a dangling cable is exactly the "
+                "kind of thing that makes an assertion pass for the wrong reason. Fix them, "
+                "or pass --force"
+            )
+            raise click.exceptions.Exit(EXIT_INVALID)
+        notes.warn("testing despite errors (--force): a verdict may not match the inventory")
+
+    if list_only:
+        _list_test_suites(console, inventory, suites)
+        return
+
+    report = run_tests(inventory, names=suites, max_hops=max_hops)
+    document = render_test_report(report, report_format, verbose=app.verbosity > 0)
+    if output is None:
+        console.print(document.rstrip("\n"))
+    else:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        write_text(output, document if document.endswith("\n") else document + "\n")
+        notes.info(f"wrote {report.total} assertion(s) to {output}")
+
+    if not report.ok:
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+
+def _list_test_suites(console: Console, inventory: Inventory, wanted: Sequence[str]) -> None:
+    """Print what would be graded, without grading it.
+
+    The point is to be able to answer "what does this inventory actually check?"
+    without waiting for a thousand-device tree to be traced — and to see the
+    file and line of every assertion, which is what somebody editing one needs.
+    """
+    matched = False
+    for fqn, suite in inventory.test_suites.items():
+        if wanted and not any(
+            fnmatch.fnmatchcase(fqn, pattern) or fnmatch.fnmatchcase(short_name(fqn), pattern)
+            for pattern in wanted
+        ):
+            continue
+        matched = True
+        described = f"  ({suite.spec.description})" if suite.spec.description else ""
+        console.print(f"{fqn}  {_plural(len(suite.assertions), 'assertion')}{described}")
+        for index, assertion in enumerate(suite.assertions):
+            where = suite_location(inventory, fqn, ("spec", "assertions", index))
+            console.print(f"  {assertion.title}  [{assertion.type}]  {where}")
+    if not matched:
+        console.print("no test suite matches" if wanted else "no 'kind: testsuite' document here")
+
+
 def _reject_diagram_options_without_highlight(ctx: click.Context, highlight: bool) -> None:
     """Fail on ``-f``/``-o`` without ``--highlight`` instead of ignoring them.
 
@@ -5768,6 +6135,7 @@ _EXPORT_OPTION_SCOPE: Final[dict[str, tuple[str, tuple[str, ...]]]] = {
     "labels": ("--label", ("prometheus-sd",)),
     "table_format": ("--table-format", ("cable-list",)),
     "schedule_format": ("--schedule-format", ("power",)),
+    "out_dir": ("--out", CONFIG_FORMATS),
     "view": ("--view", ("drawio",)),
     "icon_theme_option": ("--icons", ("drawio",)),
     "compress": ("--compress", ("drawio",)),
@@ -6064,6 +6432,17 @@ def _describe_exports() -> str:
     help="Write the artefact to this file instead of stdout.",
 )
 @click.option(
+    "--out",
+    "out_dir",
+    type=click.Path(file_okay=False, writable=True, path_type=Path),
+    default=None,
+    help=(
+        "Write a configuration dialect as a tree: one directory per device, named after its "
+        "fully-qualified name, holding the files at the paths the device keeps them at. "
+        "Without it a single device's configuration goes to stdout."
+    ),
+)
+@click.option(
     "--manifest",
     "manifest_path",
     type=click.Path(dir_okay=False, writable=True, path_type=Path),
@@ -6080,20 +6459,33 @@ def export_command(
     /,
     export_format: str,
     output: Path | None,
+    out_dir: Path | None,
     manifest_path: Path | None,
     **_options: Any,
 ) -> None:
     """Turn the inventory into an operational artefact.
 
-    FORMAT is one of hosts, dns-zone, ansible-inventory, prometheus-sd or
-    cable-list. Every one of them is deterministic and text-diffable, is scoped
-    by the same filters a render takes, and is lossy in its own way — so what it
-    could not represent is reported as a JSON manifest on stderr rather than
-    dropped in silence.
+    FORMAT is a description of the network — hosts, dns-zone,
+    ansible-inventory, prometheus-sd, cable-list, routes, power, drawio — or
+    the configuration a device would actually run: netplan, networkd, ifupdown,
+    frr, wireguard, interfaces. Every one of them is deterministic and
+    text-diffable, is scoped by the same filters a render takes, and is lossy in
+    its own way, so what it could not represent is reported as a JSON manifest
+    on stderr rather than dropped in silence.
+
+    A configuration dialect writes a tree: --out DIR gives one directory per
+    device, and stdout carries a single device's configuration. A dialect that
+    cannot express something a device declares writes nothing and says which
+    field, rather than generating a device that is almost right.
 
     Validation runs first, exactly as it does for a render: an artefact
     generated from an inventory with a dangling cable would misrepresent the
     network, so errors refuse the export unless --force is given.
+
+    \b
+    netgraph -i net export hosts -o /etc/hosts.d/net
+    netgraph -i net export netplan --out build/config
+    netgraph -i net export netplan --name pc-desk | ssh pc-desk 'cat >/etc/netplan/10.yaml'
     """
     app: AppContext = ctx.obj
     params = ctx.params
@@ -6130,11 +6522,73 @@ def export_command(
         ),
     )
 
-    _write_output(result.encode(), output=output)
+    if result.bundle is not None and out_dir is not None:
+        destination = _write_config_tree(
+            console,
+            result.bundle,
+            out_dir,
+            force=bool(params["force"]),
+            inventory_root=inventory.root,
+        )
+    else:
+        _refuse_multi_device_stdout(result, output=output, out_dir=out_dir)
+        _write_output(result.encode(), output=output)
+        destination = f", written to {output}" if output is not None else ""
     _report_manifest(console, result, manifest_path=manifest_path)
-    console.info(
-        f"exported {export_format}: {result.manifest.summary()}"
-        + (f", written to {output}" if output is not None else "")
+    console.info(f"exported {export_format}: {result.manifest.summary()}{destination}")
+
+
+def _write_config_tree(
+    console: Console,
+    bundle: ConfigSet,
+    out_dir: Path,
+    *,
+    force: bool,
+    inventory_root: Path,
+) -> str:
+    """Write a configuration set under ``out_dir`` and report what happened.
+
+    Returns the clause the run summary ends with. Stale files — generated by an
+    earlier run and not rewritten by this one — are named as a count rather than
+    removed: a device dropped from the inventory should stop being configured,
+    and deciding that is the operator's, not a flag's.
+    """
+    stale = stale_files(bundle, out_dir)
+    written = write_config(bundle, out_dir, force=force, inventory_root=inventory_root)
+    if stale:
+        console.warn(
+            f"{len(stale)} file(s) under {out_dir} were generated by an earlier run and this "
+            f"one did not rewrite them; nothing was deleted -- the first is {stale[0]}"
+        )
+    return f", {len(written)} file(s) for {len(bundle.devices)} device(s) written under {out_dir}"
+
+
+def _refuse_multi_device_stdout(
+    result: ExportResult, *, output: Path | None, out_dir: Path | None
+) -> None:
+    """Refuse to print more than one device's configuration as one stream.
+
+    A configuration dialect's artefact is a tree, and stdout is not one. A single
+    device is the case that works — it is a file, and piping it into ``netplan
+    apply`` or ``ssh`` is the point — so that is allowed and anything wider is a
+    usage error naming the two ways out: narrow the selection, or ask for the
+    tree.
+
+    Raises:
+        click.UsageError: The selection holds more than one device and no
+            ``--out`` was given.
+    """
+    bundle = result.bundle
+    if bundle is None or len(bundle.devices) <= 1 or out_dir is not None:
+        return
+    listed = ", ".join(device.element for device in bundle.devices[:4])
+    if len(bundle.devices) > 4:
+        listed += f", and {len(bundle.devices) - 4} more"
+    target = "the file" if output is not None else "stdout"
+    raise click.UsageError(
+        f"{result.export_format} would write {bundle.file_count} file(s) for "
+        f"{len(bundle.devices)} device(s), and {target} holds one: {listed}. Write the tree "
+        f"with '--out DIR', or narrow the selection to one device with '--name NAME'"
     )
 
 
@@ -6149,13 +6603,25 @@ def _reject_irrelevant_export_options(ctx: click.Context, export_format: str) ->
     typed = _explicit(ctx)
     for parameter, (option, formats) in _EXPORT_OPTION_SCOPE.items():
         if parameter in typed and export_format not in formats:
-            applies = " or ".join(formats)
-            raise click.UsageError(f"{option} applies to '{applies}', not to '{export_format}'")
+            applies = _join_alternatives(formats)
+            raise click.UsageError(f"{option} applies to {applies}, not to '{export_format}'")
     if export_format == "dns-zone" and not ctx.params.get("origin"):
         raise click.UsageError(
             "dns-zone needs --origin: a zone file has no meaning without the domain its "
             "records hang under, e.g. --origin example.com"
         )
+
+
+def _join_alternatives(names: Sequence[str]) -> str:
+    """``'a'``, ``'a' or 'b'``, ``'a', 'b' or 'c'`` — a readable list of formats.
+
+    ``' or '.join`` was fine when the longest scope held two names; the six
+    configuration dialects made it a sentence nobody could parse.
+    """
+    quoted = [f"'{name}'" for name in names]
+    if len(quoted) < 2:
+        return "".join(quoted)
+    return f"{', '.join(quoted[:-1])} or {quoted[-1]}"
 
 
 def _export_options(params: Mapping[str, Any], export_format: str) -> ExportOptions:

@@ -39,12 +39,14 @@ from typing import Any, Final
 
 from pydantic import TypeAdapter
 
+from netgraph.models.base import NetgraphModel
 from netgraph.models.device import Switch
 from netgraph.models.document import ELEMENT_MODELS, Element, element_model_for
 from netgraph.models.element import (
     DOCUMENT_KINDS,
     LAYOUT_KIND,
     TEMPLATE_KIND,
+    TEST_SUITE_KIND,
     ElementBase,
 )
 from netgraph.models.fielddocs import (
@@ -69,6 +71,7 @@ from netgraph.models.scalars import (
     VLAN_SET_PATTERN,
 )
 from netgraph.models.template import INHERIT_KEY
+from netgraph.models.testsuite import TestSuite
 
 __all__ = [
     "SCHEMA_DIALECT",
@@ -105,6 +108,32 @@ _TEMPLATE_DEF: Final = "Template"
 
 #: Name of the ``$defs`` entry holding the ``kind: layout`` envelope (§18).
 _LAYOUT_DEF: Final = "Layout"
+
+#: Name of the ``$defs`` entry holding the ``kind: testsuite`` envelope (§20).
+_TEST_SUITE_DEF: Final = "TestSuite"
+
+#: The two document kinds that declare no element and have a model of their own.
+#: Both generate straight from pydantic and skip every element-shaped pass, so
+#: the two of them are one code path rather than two near-identical ones.
+_SIDECAR_MODELS: Final[dict[str, type[NetgraphModel]]] = {
+    LAYOUT_KIND: Layout,
+    TEST_SUITE_KIND: TestSuite,
+}
+
+#: Where each sidecar's envelope lands in ``$defs``.
+_SIDECAR_DEFS: Final[dict[str, str]] = {
+    LAYOUT_KIND: _LAYOUT_DEF,
+    TEST_SUITE_KIND: _TEST_SUITE_DEF,
+}
+
+#: What each sidecar's ``spec`` holds, for the hover text on the key itself.
+_SIDECAR_SPEC_NOTES: Final[dict[str, str]] = {
+    LAYOUT_KIND: "The body of a `layout` document: one arrangement per view.",
+    TEST_SUITE_KIND: (
+        "The body of a `testsuite` document: named assertions about the network, graded by "
+        "`netgraph test`."
+    ),
+}
 _TEMPLATE_SPEC_DEF: Final = "TemplateSpec"
 
 
@@ -642,8 +671,9 @@ def build_schema(kind: str | None = None) -> dict[str, Any]:
         definitions = _reachable(root, definitions)
     elif kind is None:
         _register_template_branch(root)
-        _register_layout_branch(root, definitions)
-    _document_layout(definitions)
+        for sidecar in _SIDECAR_MODELS:
+            _register_sidecar_branch(root, definitions, sidecar)
+    _document_sidecars(definitions)
 
     return _envelope(root, definitions, kind)
 
@@ -662,13 +692,15 @@ def _generate(kind: str | None) -> tuple[dict[str, Any], dict[str, Any], bool]:
     # A template has no model of its own to generate from: it is a device spec
     # with nothing required. Any device kind pulls in the same ``$defs``, so one
     # stands in as the carrier and is dropped again once they are collected.
-    if kind == LAYOUT_KIND:
-        # A layout has a model of its own, and it is nothing like an element:
-        # no interfaces, no spec shorthands, no loader sugar. It generates
-        # directly, and every pass below finds nothing of its own to change.
-        root = Layout.model_json_schema(mode="validation", by_alias=True)
+    if kind in _SIDECAR_MODELS:
+        # A layout and a test suite each have a model of their own, and neither
+        # is anything like an element: no interfaces, no spec shorthands, no
+        # loader sugar. They generate directly, and every pass below finds
+        # nothing of its own to change.
+        sidecar = _SIDECAR_MODELS[kind]
+        root = sidecar.model_json_schema(mode="validation", by_alias=True)
         definitions = dict(root.pop("$defs", {}))
-        definitions[Layout.__name__] = root
+        definitions[sidecar.__name__] = root
         return root, definitions, False
 
     model = Switch if kind == TEMPLATE_KIND else element_model_for(kind)
@@ -715,8 +747,8 @@ def _register_template_branch(root: dict[str, Any]) -> None:
     discriminator["mapping"] = dict(sorted(mapping.items()))
 
 
-def _document_layout(definitions: dict[str, Any]) -> None:
-    """Describe the ``kind: layout`` envelope, borrowing the element's wording.
+def _document_sidecars(definitions: dict[str, Any]) -> None:
+    """Describe the ``layout`` and ``testsuite`` envelopes in the element's words.
 
     ``apiVersion``, ``kind`` and ``metadata`` mean exactly what they mean on an
     element, so they take :class:`~netgraph.models.element.ElementBase`'s
@@ -724,53 +756,54 @@ def _document_layout(definitions: dict[str, Any]) -> None:
     and ``spec`` are per-kind, which is the same split
     :func:`_document_element_bodies` makes.
     """
-    definition = definitions.get(_LAYOUT_DEF)
-    if definition is None:
-        return
-    properties = definition.get("properties", {})
-    for name, field in Layout.model_fields.items():
-        target = properties.get(field.alias or name)
-        if target is None:  # pragma: no cover - every field is a property
+    for kind, model in _SIDECAR_MODELS.items():
+        definition = definitions.get(_SIDECAR_DEFS[kind])
+        if definition is None:
             continue
-        target["title"] = field.alias or name
-        doc = FIELD_DOCS.get(("ElementBase", name))
-        if doc is not None:
-            target["description"] = _describe(doc.description, doc.yang)
-    if (kind_property := properties.get("kind")) is not None:
-        kind_property["description"] = f"Selects the shape of `spec`. {KIND_NOTES[LAYOUT_KIND]}"
-        # As for every element: a document's ``kind`` is never optional, and a
-        # default would let a branch of the union match a document without one.
-        kind_property.pop("default", None)
-    required = definition.setdefault("required", [])
-    if "kind" not in required:
-        required.insert(min(1, len(required)), "kind")
-    if (spec := properties.get("spec")) is not None:
-        spec["description"] = _markdown(
-            "The body of a `layout` document: one arrangement per view."
-        )
+        properties = definition.get("properties", {})
+        for name, field in model.model_fields.items():
+            target = properties.get(field.alias or name)
+            if target is None:  # pragma: no cover - every field is a property
+                continue
+            target["title"] = field.alias or name
+            doc = FIELD_DOCS.get(("ElementBase", name))
+            if doc is not None:
+                target["description"] = _describe(doc.description, doc.yang)
+        if (kind_property := properties.get("kind")) is not None:
+            kind_property["description"] = f"Selects the shape of `spec`. {KIND_NOTES[kind]}"
+            # As for every element: a document's ``kind`` is never optional, and
+            # a default would let a branch of the union match one without it.
+            kind_property.pop("default", None)
+        required = definition.setdefault("required", [])
+        if "kind" not in required:
+            required.insert(min(1, len(required)), "kind")
+        if (spec := properties.get("spec")) is not None:
+            spec["description"] = _markdown(_SIDECAR_SPEC_NOTES[kind])
 
 
-def _register_layout_branch(root: dict[str, Any], definitions: dict[str, Any]) -> None:
-    """Add ``layout`` to the union the all-kinds schema discriminates on (§18).
+def _register_sidecar_branch(root: dict[str, Any], definitions: dict[str, Any], kind: str) -> None:
+    """Add ``layout`` (§18) or ``testsuite`` (§20) to the all-kinds union.
 
     Generated separately and merged rather than being part of the element union,
-    because it is not an element: pydantic never sees it in ``Element``, and the
-    element passes above have nothing to say about a coordinate. The shared
-    definitions it pulls in — ``Metadata``, ``Location`` — are the same models
-    the elements use, so the versions already decorated with field docs win.
+    because neither is an element: pydantic never sees them in ``Element``, and
+    the element passes above have nothing to say about a coordinate or a claim.
+    The shared definitions they pull in — ``Metadata``, ``Location`` — are the
+    same models the elements use, so the versions already decorated with field
+    docs win.
     """
-    schema = Layout.model_json_schema(mode="validation", by_alias=True)
-    for name, definition in schema.pop("$defs", {}).items():
-        definitions.setdefault(name, definition)
-    definitions[_LAYOUT_DEF] = schema
+    name = _SIDECAR_DEFS[kind]
+    schema = _SIDECAR_MODELS[kind].model_json_schema(mode="validation", by_alias=True)
+    for defined, definition in schema.pop("$defs", {}).items():
+        definitions.setdefault(defined, definition)
+    definitions[name] = schema
 
     branches: list[dict[str, Any]] = root.setdefault("oneOf", [])
-    branches.append({"$ref": f"#/$defs/{_LAYOUT_DEF}"})
+    branches.append({"$ref": f"#/$defs/{name}"})
     discriminator = root.get("discriminator")
     if discriminator is None:  # pragma: no cover - pydantic always emits one
         return
     mapping: dict[str, str] = discriminator["mapping"]
-    mapping[LAYOUT_KIND] = f"#/$defs/{_LAYOUT_DEF}"
+    mapping[kind] = f"#/$defs/{name}"
     discriminator["mapping"] = dict(sorted(mapping.items()))
 
 

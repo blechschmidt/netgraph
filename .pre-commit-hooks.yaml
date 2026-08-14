@@ -31,6 +31,19 @@
   # several workers, each loading the whole tree to report the same findings.
   require_serial: true
 
+- id: netgraph-test
+  name: netgraph test
+  description: >-
+    Grade the assertions a netgraph inventory declares about itself, so a
+    commit that quietly removes somebody's second path fails before it lands.
+  entry: netgraph test
+  language: python
+  # Like netgraph-validate, and for the same reason: an assertion is about the
+  # whole tree, so the pattern decides *whether* to run and not what to run on.
+  files: \.ya?ml$
+  pass_filenames: false
+  require_serial: true
+
 - id: netgraph-fmt
   name: netgraph fmt
   description: >-

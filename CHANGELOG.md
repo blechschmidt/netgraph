@@ -18,6 +18,87 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **`netgraph export` now writes the configuration a device would actually run.** Six new
+  formats — `netplan`, `networkd`, `ifupdown`, `frr`, `wireguard` and `interfaces` —
+  generate `etc/netplan/10-netgraph.yaml`, a `.network`/`.netdev` pair per stacked link,
+  `etc/network/interfaces`, `etc/frr/frr.conf`, a wg-quick `.conf` per tunnel, and
+  netgraph's own vendor-neutral grammar for every device the other five have nothing to
+  say about.
+
+  Everything netgraph exported until now was *about* the network — a hosts file, a zone,
+  a pull list, a monitoring target. None of them is the network. The configuration a
+  device runs is, and until this existed the inventory was a document beside the truth
+  rather than the source of it: somebody still typed the addresses into the box, and the
+  typing is where the two started to disagree.
+
+  Nothing is invented. A value the inventory does not state is not in the output; where a
+  dialect *requires* one netgraph deliberately does not hold — a WireGuard private key, a
+  wifi passphrase — an un-runnable `REPLACE-ME` is written instead, because an inventory
+  holding key material would be a secret in version control (`docs/schema.md` §14.2).
+  Three values are derived rather than read, and each is a derivation from stated facts
+  rather than a guess: a peer's WireGuard `Endpoint`, from the underlay port its tunnel
+  interface names and the address that port declares; a static route's interface, from the
+  port whose prefix covers the next hop, which `E032` already requires to be on-link; and
+  whether a `vlan` block is a filter on a port or a description of a broadcast domain.
+
+  A field a dialect cannot express is a **refusal**, not a silent omission: the whole run
+  fails with exit code `4`, every refusal names the field as the document spells it
+  (`spec.interfaces[2].vlan`), and nothing is written — a configuration missing one field
+  is a device that is almost what the inventory says, with nothing in the file to say
+  which part. A field merely outside a dialect's remit is a manifest **skip** naming the
+  dialect that does cover it, and the file is still written.
+
+  `--out DIR` writes the tree: one directory per device, named after its fully-qualified
+  name, each file at the path the device keeps it at. A file netgraph generated is
+  overwritten; one it did not is refused until `--force`; nothing is ever deleted, and
+  stale files from an earlier run are reported. Without `--out`, a single device goes to
+  stdout, so `netgraph export netplan --name pc-desk | ssh pc-desk 'cat >…'` works and a
+  wider selection is a usage error rather than a stream nobody can split.
+
+  Every generated file carries `netgraph-dialect`, `netgraph-element` and one
+  `netgraph-source` per inventory document behind it. `netgraph drift` and
+  `netgraph import` read those keys and the same six dialects back, so
+  generate-then-compare needs neither `--from` nor `--host` and the round trip is exact.
+  `frr` and `wireguard` describe part of a device rather than all of it and are therefore
+  additive-only in a drift report; the other four are whole-device inputs. `docs/export.md`
+  has the full treatment and `docs/commands/drift.md` the capability table.
+
+- **`netgraph test`: the inventory can now be tested the way code is.** A new
+  `kind: testsuite` document (`docs/schema.md` §20) holds named assertions about the
+  network, and the command grades them and exits non-zero when one has stopped being true.
+
+  `netgraph validate` answers "do these files cohere?" — a cable endpoint resolves, an
+  address is inside its subnet. Every rule it applies is a statement about inventories *in
+  general*, which is exactly why none of them can say that the ward switch must not be the
+  only path to the ward. That is a fact about *this* network, known only to the people who
+  built it, and until it is written down it survives only as long as the person who
+  remembers it.
+
+  Eleven assertions: `reachable` / `not-reachable` between two endpoints on a named layer,
+  `path-shorter-than` a hop count, `same-vlan` / `distinct-vlan`, `within-prefix`,
+  `has-interface`, `port-count-at-least`, `unique` over a field expression, `count`
+  comparisons, and `no-single-point-of-failure`. All of them run over the graphs
+  `netgraph render` draws and the search `netgraph path` runs, so a failing test and a
+  drawn diagram cannot disagree about what is connected to what.
+
+  Selectors reuse the filter vocabulary `netgraph render` already parses — `select:
+  kind=switch, namespace=sites/north, name=sw-*` — so nobody has to learn a second query
+  language, and `from`/`to` take the three spellings `netgraph path` takes plus a selector,
+  which turns "every access switch reaches the core" into one line.
+
+  A failure names the assertion, the elements, what the graph actually contained, and the
+  **file and line the assertion is written on**, taken from the loader's provenance, so an
+  editor and a CI annotation both link straight to it. `-F json` is the whole run for a
+  script; `-F junit` is the XML GitHub, GitLab and Jenkins all render natively, one
+  `<testcase>` per assertion with the source location as attributes. `--list` prints what
+  would be graded without grading it.
+
+  A run that checked nothing fails: an empty selection, a `SUITE` glob matching no suite,
+  and an inventory declaring no suite are all errors rather than vacuous passes. Suites
+  ship for both bundled examples (`examples/home-lab/tests.yaml`,
+  `examples/campus/tests.yaml`); `docs/commands/test.md` is the reference and `docs/ci.md`
+  has the pipeline snippets.
+
 - **The editor is usable on a thousand-device inventory.** Every feature so far had been
   built against a five-device example. `tools/bench_editor.py` (new) opens the 1056-device,
   2106-document tree `tools/bench_pipeline.py` generates in a real browser and reports what

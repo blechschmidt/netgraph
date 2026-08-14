@@ -399,7 +399,7 @@ Inputs are only read with `--from-live`, and take the same `[NAME=]INPUT` form
 | `--from` | `REF\|DIR` | — | Take the current state from a git ref or another folder instead of from the inventory. A directory that exists is a folder; anything else is a git ref, exported read-only — the working tree is never touched. |
 | `--to` | `REF\|DIR` | — | Take the desired state from a git ref or another folder. Defaults to the inventory. |
 | `--from-live` | — | off | Take the desired state from a live capture: the inventory as it would read if it agreed with what the network reports. Reads the same inputs 'netgraph import' and 'netgraph drift' do. |
-| `--dialect` | `[auto\|lldp\|iproute\|csv]` | `auto` | Input dialect for --from-live, as 'netgraph drift --from' takes it. |
+| `--dialect` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|wireguard\|interfaces]` | `auto` | Input dialect for --from-live, as 'netgraph drift --from' takes it. |
 | `--host` | `NAME` | — | Device every --from-live input was captured on, when the input does not name it. |
 | `--only` | `GLOB` | — | Adopt only elements whose name matches this glob (--from-live only). Repeatable. |
 | `--exclude` | `GLOB` | — | Leave elements matching this glob out of the adoption (--from-live only). Repeatable. |

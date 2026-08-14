@@ -95,6 +95,8 @@ from netgraph.edit.tree import digest_of
 from netgraph.errors import NetgraphError
 from netgraph.fixes import Fix, apply_fix, fixes_for, offers_for
 from netgraph.history import FrameCache, HistoryError, Timeline
+from netgraph.impact import LAYERS as IMPACT_LAYERS
+from netgraph.impact import ImpactError, ImpactReport, simulate
 from netgraph.loader import (
     YAML_SUFFIXES,
     DocumentCache,
@@ -102,6 +104,7 @@ from netgraph.loader import (
     LoadError,
     load_tree,
 )
+from netgraph.loader.inventory import short_name
 from netgraph.loader.tree import InventoryFile, iter_inventory_files
 from netgraph.plan import PlanSourceError
 from netgraph.plan import diff as diff_states
@@ -1260,6 +1263,58 @@ class EditingSession:
         preview = render_diff(before, inventory, plan, options, settings=settings, known=known)
         return preview, revision
 
+    # -- the failure overlay ---------------------------------------------
+
+    def impact(self, failed: Sequence[str], *, layer: str = "l1") -> dict[str, Any]:
+        """What would stop being reachable if ``failed`` failed. Reads only.
+
+        The editor's failure mode: click an element, and everything it would
+        isolate greys out. Nothing about this touches a file, a revision or the
+        undo stack — it is a question asked of the tree as it stands, and the
+        answer is thrown away when the next element is clicked.
+
+        Args:
+            failed: Elements to remove, in the spellings
+                :func:`~netgraph.impact.resolve_element` takes. Usually one: the
+                shape the pointer was on.
+            layer: Which view to measure in, one of
+                :data:`~netgraph.impact.LAYERS`.
+
+        Returns:
+            The addresses that were removed, the addresses that lose their path
+            to a gateway, and one line naming the count — everything the overlay
+            needs and nothing it does not. The full analysis is ``netgraph
+            impact``; a canvas has room for a number.
+
+        Raises:
+            SessionError: ``layer`` is not a layer, or nothing carries the name.
+        """
+        if layer not in IMPACT_LAYERS:
+            raise SessionError(f"unknown layer {layer!r}; expected {', '.join(IMPACT_LAYERS)}")
+        with self._lock:
+            inventory = self.inventory()
+            revision = self._revision
+        try:
+            report = simulate(inventory, fail=list(failed), wanted_layers=(layer,))
+        except ImpactError as exc:
+            raise SessionError(str(exc)) from exc
+        result = report.layers[0] if report.layers else None
+        isolated = list(result.isolated) if result is not None else ()
+        removed = [failure.element for failure in report.failures]
+        return {
+            "revision": revision,
+            "layer": layer,
+            "failed": removed,
+            "isolated": list(isolated),
+            "anchors": list(report.anchors),
+            "counts": {
+                "failed": len(removed),
+                "isolated": len(isolated),
+                "served": result.served_before if result is not None else 0,
+            },
+            "message": _impact_summary(report, len(isolated), len(removed)),
+        }
+
     def baselines(self) -> tuple[str, ...]:
         """Which baselines this session can draw against, in menu order.
 
@@ -1802,6 +1857,25 @@ class TreeWatcher:
             debounce_ms=self.debounce_ms or DEFAULT_DEBOUNCE_MS,
             stop=self._stop,
         )
+
+
+def _impact_summary(report: ImpactReport, isolated: int, removed: int) -> str:
+    """The one line the status bar has room for.
+
+    Written to be read at a glance while the pointer is still over the shape:
+    what would go, how much would go with it, and — when the answer is "nothing"
+    — the reason, because "0 isolated" invites the reader to wonder whether the
+    question was asked at all.
+    """
+    subject = short_name(report.failures[0].element) if report.failures else "nothing"
+    if removed > 1:
+        subject = f"{subject} and {removed - 1} more"
+    if not report.anchors:
+        return f"{subject}: no gateway is declared, so nothing can be measured"
+    if not isolated:
+        return f"{subject} isolates nothing: every other element keeps a path to a gateway"
+    noun = "element" if isolated == 1 else "elements"
+    return f"{subject} isolates {isolated} {noun} from the gateways"
 
 
 #: Re-exported so a caller catching "the session refused" catches one name.

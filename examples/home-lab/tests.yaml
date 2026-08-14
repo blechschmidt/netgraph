@@ -1,0 +1,75 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: testsuite
+metadata:
+  name: home
+  description: |
+    What this network is for, written down so it can be checked. Four devices
+    and a router is small enough that everything here is obvious — which is the
+    point: the assertions are readable, and they are exactly the ones that stop
+    holding the day somebody re-patches the hallway cabinet.
+spec:
+  description: the house reaches the internet, and the guest VLAN stays guest
+  assertions:
+    - assert: reachable
+      name: the desktop reaches the NAS
+      description: Backups run nightly over this path; it is the one that matters.
+      from: pc-desk
+      to: srv-nas
+      layer: l2
+
+    - assert: reachable
+      name: the laptop reaches the router through its USB dongle
+      description: |
+        The laptop has no built-in Ethernet, so this path only exists if the
+        adapter is still declared and still cabled.
+      from: laptop
+      to: rtr-home
+
+    - assert: not-reachable
+      name: the guest VLAN carries none of the house's traffic
+      description: |
+        The guest SSID is bridged into VLAN 20 and nothing of the house is in
+        it. Restricting the trace to that VLAN is how the claim is made: if a
+        port is ever moved into 20 by accident, this fails.
+      from: pc-desk
+      to: srv-nas
+      vlan: 20
+
+    - assert: path-shorter-than
+      name: nothing in the house is more than three hops from the router
+      from: name=pc-*, name=srv-*
+      to: rtr-home
+      hops: 4
+
+    - assert: same-vlan
+      name: the wired house is one broadcast domain
+      vlan: 10
+
+      select: name=pc-desk, name=srv-nas, name=laptop
+    - assert: within-prefix
+      name: the house is addressed out of 192.168.10.0/24
+      select: kind=switch, kind=server, kind=computer, kind=adapter
+      prefix: 192.168.10.0/24
+
+    - assert: has-interface
+      name: both switches have a management SVI
+      select: kind=switch
+      interface: Vlan10
+
+    - assert: unique
+      name: no two hosts claim the same address
+      description: |
+        A static lease copied between two machines is the classic Sunday
+        afternoon outage; this is the assertion that catches it in review.
+      select: kind=switch, kind=router, kind=server, kind=computer, kind=adapter
+      field: spec.interfaces[type!=loopback].ipv4.addresses[].ip
+
+    - assert: count
+      name: there is exactly one router
+      select: kind=router
+      equals: 1
+
+    - assert: count
+      name: the access point is the only wireless switch
+      select: kind=switch, name=ap-*
+      equals: 1

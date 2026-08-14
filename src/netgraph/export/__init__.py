@@ -25,10 +25,16 @@ Format             What it is
 ``drawio``         An mxGraph diagram draw.io opens already arranged, carrying
                    the identity of each element in its cell so that the edited
                    file can be brought back (``docs/drawio.md``).
+``netplan``,       The configuration a device would actually run, one directory
+``networkd``,      per device: :mod:`netgraph.export.config`. These are the only
+``ifupdown``,      formats here whose artefact is a *tree* rather than one
+``frr``,           document, and the only ones that can refuse — a dialect that
+``wireguard``,     cannot express a declared field writes nothing and says which
+``interfaces``     field, rather than emitting a device that is almost right.
 =================  =========================================================
 
-Four promises hold across all eight, and they are why this is a package rather
-than eight ad-hoc printers:
+Four promises hold across all fourteen, and they are why this is a package
+rather than fourteen ad-hoc printers:
 
 **Deterministic.** Every collection is sorted by an explicit canonical key —
 never by dict order, never by the loader's directory traversal. Two runs over an
@@ -65,9 +71,19 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from functools import partial
 from typing import Final
 
 from netgraph.export import ansible, cables, dnszone, drawio, hosts, power, prometheus, routes
+from netgraph.export.config import (
+    CONFIG_DIALECTS,
+    CONFIG_FORMATS,
+    CONFIG_LAYERS,
+    ConfigSet,
+    UnsupportedConfigError,
+)
+from netgraph.export.config import emit as config_emit
+from netgraph.export.config import generate as generate_config
 from netgraph.export.context import ExportContext, ExportOptions
 from netgraph.export.manifest import MANIFEST_KIND, Manifest, Reason, Recorder, Skip
 from netgraph.export.names import ansible_identifier, domain_name, is_domain_name, sanitise_label
@@ -75,9 +91,12 @@ from netgraph.export.prometheus import is_assignable_label, is_label_name
 from netgraph.render.graph import Layer
 
 __all__ = [
+    "CONFIG_DIALECTS",
+    "CONFIG_FORMATS",
     "EXPORTERS",
     "FORMATS",
     "MANIFEST_KIND",
+    "ConfigSet",
     "ExportContext",
     "ExportOptions",
     "ExportResult",
@@ -86,7 +105,9 @@ __all__ = [
     "Reason",
     "Recorder",
     "Skip",
+    "UnsupportedConfigError",
     "ansible_identifier",
+    "bundle_for",
     "domain_name",
     "export",
     "is_assignable_label",
@@ -119,6 +140,11 @@ class Exporter:
     #: fixed layer would either build the wrong graph or build all nine.
     #: :attr:`layers` stays the honest default for ``--help`` and the docs.
     select: Callable[[ExportOptions], tuple[Layer, ...]] | None = None
+    #: For a format whose artefact is a *tree of files* rather than one
+    #: document — the six configuration dialects, which write one directory per
+    #: device (:mod:`netgraph.export.config`). ``--out DIR`` writes the tree;
+    #: :attr:`emit` remains the single-stream form stdout gets.
+    bundle: Callable[[ExportContext], ConfigSet] | None = None
 
 
 #: The registry. Insertion order is the order ``--help`` lists them in, chosen
@@ -201,6 +227,22 @@ EXPORTERS: Final[Mapping[str, Exporter]] = {
         emit=drawio.emit,
         select=lambda options: drawio.layers_for_options(options.view),
     ),
+    # The configuration dialects, generated from their own registry so that
+    # adding one there is the only edit needed: their descriptions, their
+    # lossiness and their order all come from :data:`CONFIG_DIALECTS`, and the
+    # two registries cannot disagree about what ``FORMAT`` accepts.
+    **{
+        name: Exporter(
+            name=name,
+            description=dialect.description,
+            layers=CONFIG_LAYERS,
+            suffix=dialect.suffix,
+            lossy=dialect.lossy,
+            emit=config_emit(name),
+            bundle=partial(generate_config, name),
+        )
+        for name, dialect in CONFIG_DIALECTS.items()
+    },
 }
 
 #: The format names, in registry order, for ``click.Choice`` and completion.
@@ -213,9 +255,14 @@ class ExportResult:
 
     export_format: str
     #: The artefact itself, as text. Every format here is text; nothing in this
-    #: package emits bytes, which is what makes all five of them diffable.
+    #: package emits bytes, which is what makes all of them diffable.
     payload: str
     manifest: Manifest
+    #: The same artefact as a tree of files, for the six configuration dialects;
+    #: ``None`` for every format whose artefact is one document. When it is set,
+    #: :attr:`payload` was derived from it rather than generated separately, so
+    #: the two cannot describe different devices.
+    bundle: ConfigSet | None = None
 
     def encode(self) -> bytes:
         """The artefact as UTF-8, which is what a file or stdout wants."""
@@ -247,6 +294,20 @@ def suffix_for(export_format: str) -> str:
     return EXPORTERS[export_format].suffix
 
 
+def bundle_for(export_format: str) -> Callable[[ExportContext], ConfigSet] | None:
+    """The tree-of-files builder of ``export_format``, or ``None``.
+
+    ``None`` for the eight formats whose artefact is one document. The six
+    configuration dialects return a builder, and it is what ``--out DIR`` writes
+    from: a device that produces four files produces four files, rather than one
+    concatenation somebody would then have to split.
+
+    Raises:
+        KeyError: No such format.
+    """
+    return EXPORTERS[export_format].bundle
+
+
 def export(
     export_format: str,
     context_factory: Callable[[Recorder], ExportContext],
@@ -257,14 +318,29 @@ def export(
     recorder the emitter writes to is the same one this function seals: an
     emitter cannot be handed a recorder whose contents are then thrown away.
 
+    A format with a :attr:`Exporter.bundle` is run through *that* and its
+    single-stream form derived from the result, rather than being run twice —
+    once for ``--out`` and once for stdout. Two runs would be two passes over the
+    inventory producing two manifests, and the one the caller kept would be the
+    one describing the artefact they did not use.
+
     Raises:
         KeyError: No such format.
+        UnsupportedConfigError: A configuration dialect was asked to write a
+            device declaring something it cannot express. Nothing was produced.
     """
     exporter = EXPORTERS[export_format]
     recorder = Recorder()
-    payload = exporter.emit(context_factory(recorder))
+    context = context_factory(recorder)
+    bundle = exporter.bundle(context) if exporter.bundle is not None else None
+    payload = (
+        bundle.as_stream(CONFIG_DIALECTS[export_format].comment)
+        if bundle is not None
+        else exporter.emit(context)
+    )
     return ExportResult(
         export_format=export_format,
         payload=payload,
         manifest=recorder.sealed(export_format),
+        bundle=bundle,
     )

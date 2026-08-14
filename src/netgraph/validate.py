@@ -57,7 +57,10 @@ from dataclasses import dataclass, field, replace
 from typing import Final, TypeAlias
 
 from netgraph.config import ValidationConfig
+from netgraph.connectivity import Graph as ConnectivityGraph
+from netgraph.connectivity import Separator, reachable, separators
 from netgraph.errors import count_text
+from netgraph.expectations import Declaration, Expectation, declarations, expectation_names
 from netgraph.identity import IdentityPlan, identity_plan
 from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of
 from netgraph.loader.provenance import Site
@@ -4367,6 +4370,286 @@ def _check_missing_power_path(ctx: _Context) -> Iterator[_Draft]:
 
 
 # --------------------------------------------------------------------------- #
+# Declared survivability (:mod:`netgraph.expectations`)
+# --------------------------------------------------------------------------- #
+
+
+def _check_gateway_redundancy(ctx: _Context) -> Iterator[_Draft]:
+    """E047 — a declared ``gateway`` expectation the topology does not meet.
+
+    ``netgraph/redundancy: gateway`` is a promise that no *one* failure can cut
+    this element off from its default gateway. That is exactly the statement
+    "the two are two-connected", so the check is a search for the cut vertices
+    and bridges between them (:func:`netgraph.connectivity.separators`) rather
+    than a simulation — an exact answer in one pass instead of an approximate
+    one in a thousand.
+
+    Three ways to fail it, reported apart because the fix differs: nothing to
+    check (no gateway is declared, or it is configured on nothing), nothing to
+    lose (there is no path even now), and the ordinary one — a path exists and
+    one element or one cable carries all of it.
+
+    Nothing here runs unless an element declares the expectation. The whole
+    check is a graph build and one depth-first search, and an inventory that
+    made no promise should not pay for the machinery that grades them.
+    """
+    wanted = [
+        declaration
+        for declaration in declarations(ctx.inventory)
+        if declaration.wants(Expectation.GATEWAY) and declaration.element in ctx.owners
+    ]
+    if not wanted:
+        return
+
+    graph = _topology_graph(ctx)
+    # ``ctx.address_owners`` is built only when something declares a BGP peer —
+    # it exists for ``W135``, and building it for every inventory would be a
+    # scan nothing else needed. Here it is needed, so it is built here.
+    owners_by_address = ctx.address_owners or _index_addresses(ctx.owners)
+    for declaration in wanted:
+        fqn = declaration.element
+        owner = ctx.owners[fqn]
+        addresses = [address for _, address in _declared_gateways(owner)]
+        if not addresses:
+            yield _Draft(
+                f"element {_q(fqn)} declares a 'gateway' redundancy expectation, but none of "
+                f"its interfaces declares a 'gateway': there is nothing to stay connected to. "
+                f"Add one, or drop the expectation.",
+                (fqn,),
+                declaration.field_path,
+            )
+            continue
+        for address in addresses:
+            if address.is_link_local:
+                # ``fe80::1`` is on-link by definition and is almost never
+                # written down as an address of the router that answers for it,
+                # exactly as ``E020`` exempts it. Grading it would report every
+                # correctly-configured IPv6 host.
+                continue
+            placement = owners_by_address.get(address)
+            if placement is None:
+                yield _Draft(
+                    f"element {_q(fqn)} declares a 'gateway' redundancy expectation, but its "
+                    f"gateway {address} is configured on nothing in this inventory, so no "
+                    f"survivability claim about it can be checked",
+                    (fqn,),
+                    declaration.field_path,
+                )
+                continue
+            gateway = placement[0]
+            if gateway == fqn:
+                continue  # it is its own first hop; there is no route to lose
+            yield from _gateway_drafts(graph, declaration, fqn, gateway, address)
+
+
+def _gateway_drafts(
+    graph: ConnectivityGraph,
+    declaration: Declaration,
+    fqn: str,
+    gateway: str,
+    address: object,
+) -> Iterator[_Draft]:
+    """The E047 drafts for one ``(element, gateway)`` pair."""
+    if gateway not in reachable(graph, (fqn,)):
+        yield _Draft(
+            f"element {_q(fqn)} declares a 'gateway' redundancy expectation but cannot reach "
+            f"its gateway {address} on {_q(gateway)} at all: the topology joins them by no "
+            f"path, redundant or otherwise",
+            (fqn, gateway),
+            declaration.field_path,
+        )
+        return
+    found = separators(graph, fqn, gateway)
+    if not found:
+        return
+    described = _join_plain([_separator_label(graph, separator) for separator in found])
+    yield _Draft(
+        f"element {_q(fqn)} declares a 'gateway' redundancy expectation, but "
+        f"{count_text(len(found), 'single failure')} would cut it off from its gateway "
+        f"{address} on {_q(gateway)}: {described}. Add a second path, or drop the "
+        f"expectation.",
+        (fqn, gateway, *(separator.id for separator in found if separator.is_node)),
+        declaration.field_path,
+    )
+
+
+def _separator_label(graph: ConnectivityGraph, separator: Separator) -> str:
+    """Name one separator the way a person would: the box, or the cable."""
+    if separator.is_node:
+        panel, _, position = separator.id.partition("#")
+        return f"panel {panel} at {position}" if position else separator.id
+    return separator.id
+
+
+def _declared_gateways(owner: InterfaceOwner) -> Iterator[tuple[int, _IPAddress]]:
+    """Every first hop the element configures, in interface then family order."""
+    for interface in owner.interfaces:
+        yield from interface.gateways()
+
+
+def _topology_graph(ctx: _Context) -> ConnectivityGraph:
+    """The physical plant as a searchable graph, panels spliced through.
+
+    The same edges ``W121`` counts islands over, so the two rules cannot
+    disagree about what is joined to what — including the detail that a run
+    through a patch panel is one path and two runs through *different* positions
+    of one panel are two (§15.2).
+    """
+    links = list(_topology_edges(ctx))
+    nodes = list(
+        dict.fromkeys([*ctx.owners, *(node for _, left, right in links for node in (left, right))])
+    )
+    return ConnectivityGraph.of(nodes, links, endpoints=ctx.owners)
+
+
+def _topology_edges(ctx: _Context) -> Iterator[tuple[str, str, str]]:
+    """:func:`_topology_links`, with each link carrying the name of what it is.
+
+    The pairs alone are enough to count islands, which is all ``W121`` needs. A
+    finding that has to *name* the cable somebody would have to lay a second one
+    beside needs the identity too, and the cable's fully-qualified name is the
+    identity every other part of the tool uses for it.
+    """
+    for cable_fqn, first, second in ctx.endpoint_pairs:
+        left, right = _coupler_node(first), _coupler_node(second)
+        if left is not None and right is not None:
+            yield f"cable {cable_fqn}", left, right
+    for attachment in ctx.attachments:
+        if attachment.host_fqn is not None:
+            yield (
+                f"attachment {attachment.adapter_fqn}",
+                attachment.adapter_fqn,
+                attachment.host_fqn,
+            )
+
+
+def _check_declared_power_redundancy(ctx: _Context) -> Iterator[_Draft]:
+    """E048 — a declared ``power`` expectation the feeds do not meet.
+
+    Distinct from ``E042``, which grades a device's own ``power.redundant``
+    claim about its two cords. This grades the stronger statement an operator
+    writes on the elements that matter: *nothing* whose failure takes the power
+    away. That covers what ``E042`` cannot see — a device with one cord, a
+    device fed over PoE by a switch that is itself on one PDU, two PDUs on one
+    building supply — because it walks the whole feed chain rather than the
+    inputs of one document.
+
+    A device that ``E042`` already reports is left alone: two findings for one
+    mistake teach people to read neither.
+    """
+    wanted = [
+        declaration
+        for declaration in declarations(ctx.inventory)
+        if declaration.wants(Expectation.POWER) and declaration.element in ctx.inventory.elements
+    ]
+    if not wanted:
+        return
+
+    sources = _feed_sources(ctx.power)
+    dark_after = {
+        source: frozenset(_unpowered(ctx.power, {source})) | {source}
+        for source in dict.fromkeys(feed.source for feed in ctx.power.feeds)
+    }
+    for declaration in wanted:
+        fqn = declaration.element
+        feeding = sources.get(fqn, ())
+        if not feeding:
+            yield _Draft(
+                f"element {_q(fqn)} declares a 'power' redundancy expectation but has no "
+                f"resolved power feed: add 'power.inputs' naming the outlets it is plugged "
+                f"into, or 'powered_by: poe'",
+                (fqn,),
+                declaration.field_path,
+            )
+            continue
+        if _reported_by_e042(ctx, fqn):
+            continue
+        singles = [source for source, dark in dark_after.items() if fqn in dark and source != fqn]
+        if not singles:
+            continue
+        yield _Draft(
+            f"element {_q(fqn)} declares a 'power' redundancy expectation, but losing any one "
+            f"of {_join(sorted(singles))} switches it off; it is fed through "
+            f"{_join(sorted(feeding))}. Add a feed from an independent source, or drop the "
+            f"expectation.",
+            (fqn, *sorted(singles)),
+            declaration.field_path,
+        )
+
+
+def _reported_by_e042(ctx: _Context, fqn: str) -> bool:
+    """Is this device already ``E042``'s finding — two cords into one PDU?"""
+    element = ctx.inventory.devices.get(fqn)
+    power = element.spec.power if element is not None else None
+    if power is None or not power.redundant:
+        return False
+    feeds = [feed for feed in ctx.power.feeds_into(fqn) if feed.kind is FeedKind.OUTLET]
+    return len(feeds) >= 2
+
+
+def _feed_sources(plan: PowerPlan) -> dict[str, tuple[str, ...]]:
+    """``element -> the distinct sources feeding it``, in resolution order."""
+    sources: dict[str, list[str]] = {}
+    for feed in plan.feeds:
+        found = sources.setdefault(feed.element, [])
+        if feed.source not in found:
+            found.append(feed.source)
+    return {element: tuple(found) for element, found in sources.items()}
+
+
+def _unpowered(plan: PowerPlan, failed: set[str]) -> set[str]:
+    """Everything that goes dark when ``failed`` does, transitively.
+
+    The same walk :func:`netgraph.impact.graphs.unpowered` makes, kept here as
+    six lines over the plan rather than as an import: the validator must not
+    depend on the impact engine, which depends on the validator.
+    """
+    sources = _feed_sources(plan)
+    dark = set(failed)
+    while True:
+        added = {
+            element
+            for element, feeding in sources.items()
+            if element not in dark and all(source in dark for source in feeding)
+        }
+        if not added:
+            return dark - failed
+        dark |= added
+
+
+def _check_unknown_expectation(ctx: _Context) -> Iterator[_Draft]:
+    """W141 — a redundancy expectation nothing understands, or one out of place.
+
+    A warning rather than an error on purpose. An annotation is where a newer
+    netgraph will put things this build has never heard of, and refusing to load
+    an inventory because of a word in a comment-shaped field would make the
+    annotation useless for exactly the forward compatibility it exists for. It
+    is still worth saying loudly: an expectation nothing grades is a promise
+    nobody is keeping, and it reads in review as though somebody checked.
+    """
+    accepted = _join_plain(list(expectation_names()))
+    for declaration in declarations(ctx.inventory):
+        for token in declaration.unknown:
+            yield _Draft(
+                f"element {_q(declaration.element)} declares the redundancy expectation "
+                f"{_q(token)}, which this build does not understand; it grades {accepted}",
+                (declaration.element,),
+                declaration.field_path,
+            )
+        if not declaration.expectations:
+            continue
+        element = ctx.inventory.elements.get(declaration.element)
+        if element is not None and declaration.element not in ctx.owners:
+            yield _Draft(
+                f"element {_q(declaration.element)} is a {element.kind}, which owns no "
+                f"interfaces and takes no power: a redundancy expectation on it grades "
+                f"nothing. Put it on the device the expectation is about.",
+                (declaration.element,),
+                declaration.field_path,
+            )
+
+
+# --------------------------------------------------------------------------- #
 # Identity (§19)
 # --------------------------------------------------------------------------- #
 
@@ -4613,6 +4896,8 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("E044", _check_member_is_identity),
     ("E045", _check_membership_cycle),
     ("E046", _check_account_identifiers),
+    ("E047", _check_gateway_redundancy),
+    ("E048", _check_declared_power_redundancy),
     ("W101", _check_unaddressed_interface),
     ("W102", _check_mtu_mismatch),
     ("W103", _check_orphan_device),
@@ -4653,6 +4938,7 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("W138", _check_stale_geometry),
     ("W139", _check_empty_group),
     ("W140", _check_departed_member),
+    ("W141", _check_unknown_expectation),
     ("I001", _check_local_mac),
     ("I002", _check_uncabled_interface),
     ("I003", _check_nonstandard_port),

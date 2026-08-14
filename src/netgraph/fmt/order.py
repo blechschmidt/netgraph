@@ -38,6 +38,7 @@ from netgraph.models.device import DeviceSpec
 from netgraph.models.document import ELEMENT_MODELS
 from netgraph.models.element import ElementBase
 from netgraph.models.template import INHERIT_KEY, Template
+from netgraph.models.testsuite import TestSuite
 
 __all__ = [
     "ENVELOPE_ORDER",
@@ -166,7 +167,7 @@ def _reachable_models() -> list[type[NetgraphModel]]:
     Built by running the shape builder for its side effect on ``memo``, whose
     keys are exactly the models it recursed into.
     """
-    roots: list[type[NetgraphModel]] = [ElementBase, Template, *ELEMENT_MODELS]
+    roots: list[type[NetgraphModel]] = [ElementBase, Template, TestSuite, *ELEMENT_MODELS]
     memo: dict[Any, Shape] = {}
     for model in roots:
         _model_shape(model, memo)
@@ -322,6 +323,12 @@ def _build() -> dict[str, Shape]:
         order=template.order,
         children={**template.children, "spec": device_spec},
     )
+    # A test suite is not an element either, but unlike a layout its ``spec`` is
+    # a modelled shape all the way down, so it orders exactly like one: 'assert'
+    # first on every assertion, then what is being asserted about.
+    suite = _model_shape(TestSuite, memo)
+    assert isinstance(suite, MappingShape)  # the envelope is a mapping
+    shapes[TestSuite.model_fields["kind"].default] = suite
     return shapes
 
 

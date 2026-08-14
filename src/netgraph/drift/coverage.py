@@ -9,13 +9,44 @@ first time somebody ran it against a partial capture, which is every time.
 
 So each dialect declares what it observes, as a :class:`Capability`:
 
-=========  ==========  =====  =========  =======  =========================
-``--from`` interfaces  links  addresses  members  what the absence of a thing means
-=========  ==========  =====  =========  =======  =========================
-lldp       no          yes    no         no       nothing, except on a port where LLDP did see a neighbour
-iproute    yes         no     yes        yes      the host does not have it
-csv        no          yes    no         no       nothing, except on a port the list does mention
-=========  ==========  =====  =========  =======  =========================
+==========  ==========  =====  =========  =======  =========================
+``--from``  interfaces  links  addresses  members  what the absence of a thing means
+==========  ==========  =====  =========  =======  =========================
+lldp        no          yes    no         no       nothing, except on a port where LLDP did see a neighbour
+iproute     yes         no     yes        yes      the host does not have it
+csv         no          yes    no         no       nothing, except on a port the list does mention
+netplan     yes         no     yes        yes      the host is not configured to have it
+networkd    yes         no     yes        yes      the host is not configured to have it
+ifupdown    yes         no     yes        yes      the host is not configured to have it
+interfaces  yes         no     yes        yes      the device is not configured to have it
+frr         no          no     no         no       nothing at all
+wireguard   no          no     no         no       nothing at all
+==========  ==========  =====  =========  =======  =========================
+
+The six configuration dialects are the ones :mod:`netgraph.export.config` writes,
+read back (:mod:`netgraph.importer.config`), and they split into two groups for
+one reason: **does this file describe the whole device, or a part of it?**
+
+``netplan``, ``networkd``, ``ifupdown`` and ``interfaces`` describe the whole of
+a host's networking. An interface absent from a netplan document is an interface
+that host does not bring up, so its absence is a difference and is reported as
+one. That makes them the strongest inputs in the table — stronger, in one way,
+than ``ip``: they say what the box was *told* to be, which is the thing an
+inventory also says.
+
+``frr`` and ``wireguard`` describe a *part*. An frr.conf configures the
+interfaces the routing daemon cares about and is silent about every other link on
+the box; a wg-quick file is one tunnel. Reporting a declared interface as missing
+because it is not in one of those would be nonsense, so both are given the empty
+capability. They can still contribute a difference — an address FRR configures
+that the inventory does not declare is real drift in the ``undeclared``
+direction — which is exactly the asymmetry the table is for.
+
+One caveat applies to all six and is why they are worth having at all: a
+*configuration* is intent, not observation. It says what the device was asked to
+do, which may not be what it is doing. That is a different question from the one
+``ip -j addr show`` answers, and both are worth asking; ``netgraph drift`` reports
+which dialects saw each device, so the answer says which question was asked.
 
 A device's coverage is the union over every dialect that observed it
 (:meth:`Coverage.of`), because two captures of one host are the ordinary case:
@@ -87,6 +118,18 @@ CAPABILITIES: Final[dict[str, Capability]] = {
     "lldp": Capability(interfaces=False, links=True, addresses=False, members=False),
     "iproute": Capability(interfaces=True, links=False, addresses=True, members=True),
     "csv": Capability(interfaces=False, links=True, addresses=False, members=False),
+    # The four whole-device configuration dialects. None of them reports a
+    # neighbour: a configuration says what a box does with a port, never what is
+    # plugged into it.
+    "netplan": Capability(interfaces=True, links=False, addresses=True, members=True),
+    "networkd": Capability(interfaces=True, links=False, addresses=True, members=True),
+    "ifupdown": Capability(interfaces=True, links=False, addresses=True, members=True),
+    "interfaces": Capability(interfaces=True, links=False, addresses=True, members=True),
+    # The two partial ones. Deliberately identical to :data:`BLIND`, and spelled
+    # out rather than omitted: a dialect missing from this table would get the
+    # same answer by accident, and the point is that it is a decision.
+    "frr": Capability(interfaces=False, links=False, addresses=False, members=False),
+    "wireguard": Capability(interfaces=False, links=False, addresses=False, members=False),
 }
 
 #: A device no capability was found for: it sees nothing, so nothing about it is
@@ -94,6 +137,31 @@ CAPABILITIES: Final[dict[str, Capability]] = {
 #: is what keeps a hand-built :class:`Draft` in a test from claiming coverage it
 #: never declared.
 BLIND: Final = Capability(interfaces=False, links=False, addresses=False, members=False)
+
+#: Interface types no dialect lists, whatever else it lists. A ``loopback`` is
+#: skipped by :mod:`netgraph.importer.iproute` by design — it terminates no cable
+#: and holds only host-scope addresses — and every configuration dialect leaves it
+#: to the kernel for the same reason. A ``tunnel`` is a two-ended element that a
+#: capture only ever shows one end of.
+_UNLISTED_EVERYWHERE: Final[frozenset[str]] = frozenset({"loopback", "tunnel"})
+
+#: Types a *particular* dialect cannot list, over and above those. One entry, and
+#: it is here rather than folded into the set above because folding it in would
+#: cost a real check: ``ip -j link show`` does list a radio, so a declared ``wifi``
+#: missing from an ``iproute`` capture is drift and must stay drift.
+#:
+#: netplan is the exception. Its ``wifis:`` section requires at least one access
+#: point and netplan refuses the whole file without one, so a radio the inventory
+#: names no SSID on cannot be written — and its absence from the file is netplan's
+#: grammar rather than the network's answer.
+_UNLISTED_BY_DIALECT: Final[dict[str, frozenset[str]]] = {
+    "netplan": _UNLISTED_EVERYWHERE | {"wifi"},
+}
+
+
+def unlisted_types(dialect: str) -> frozenset[str]:
+    """Interface types whose absence from a ``dialect`` capture means nothing."""
+    return _UNLISTED_BY_DIALECT.get(dialect, _UNLISTED_EVERYWHERE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +216,22 @@ class Coverage:
     def observes_members(self, device: str) -> bool:
         """Is bridge and bond membership complete for ``device``?"""
         return self.of(device).members
+
+    def lists_type(self, device: str, interface_type: str) -> bool:
+        """Would an interface of this type have appeared in the capture at all?
+
+        :meth:`observes_interfaces` answers "is the list complete"; this answers
+        "complete *of what*", and the two are different questions because every
+        dialect leaves some type out by construction. One dialect that both lists
+        interfaces and can hold this type is enough — a host captured with both
+        ``ip -j link show`` and a netplan file has its radio listed by the first
+        even though the second could not carry it.
+        """
+        return any(
+            CAPABILITIES.get(dialect, BLIND).interfaces
+            and interface_type not in unlisted_types(dialect)
+            for dialect in self.dialects_of(device)
+        )
 
     def observes_trunk_vlans(self, device: str) -> bool:
         """Always false: no dialect netgraph reads prints a port's VLAN set.

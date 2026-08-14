@@ -17,6 +17,7 @@ a flag that is documented exists. The prose around them is written by hand.
 | [`netgraph import drawio`](import.md) | Bring an edited draw.io diagram back as a reviewable changeset. | [import.md](import.md) |
 | [`netgraph drift`](drift.md) | Compare a live network against the declared inventory. | [drift.md](drift.md) |
 | [`netgraph validate`](validate.md) | Check the inventory; the gate for CI and pre-commit. | [validate.md](validate.md) |
+| [`netgraph test`](test.md) | Grade the assertions the inventory declares about itself. | [test.md](test.md) |
 | [`netgraph fmt`](fmt.md) | Rewrite inventory YAML into the canonical form. | [fmt.md](fmt.md) |
 | [`netgraph edit set`](edit.md) | Set a field on an element, in place, comments and all. | [edit.md](edit.md) |
 | [`netgraph edit unset`](edit.md) | Remove a field from an element. | [edit.md](edit.md) |
@@ -39,6 +40,7 @@ a flag that is documented exists. The prose around them is written by hand.
 | [`netgraph web`](web.md) | Edit the YAML and see the diagram side by side in a browser. | [web.md](web.md) |
 | [`netgraph lsp`](lsp.md) | Serve completion, diagnostics and rename to an editor over LSP. | [lsp.md](lsp.md) |
 | [`netgraph path`](path.md) | Trace how two elements reach each other, hop by hop. | [path.md](path.md) |
+| [`netgraph impact`](impact.md) | Simulate a failure: blast radius, single points of failure, promises. | [impact.md](impact.md) |
 | [`netgraph list`](list.md) | Tabulate devices, cables, tunnels, VLANs, BSSs or subnets. | [list.md](list.md) |
 | [`netgraph ipam`](ipam.md) | Report utilisation, free space, overlaps and aggregates. | [ipam.md](ipam.md) |
 | [`netgraph export`](export.md) | Emit hosts files, DNS zones, Ansible, Prometheus, cable lists. | [export.md](export.md) |

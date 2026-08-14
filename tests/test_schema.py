@@ -124,10 +124,12 @@ def test_an_unknown_kind_is_refused() -> None:
 def test_kind_is_required_in_every_branch() -> None:
     """Without it a document missing ``kind`` matches every branch at once."""
     schema = build_schema()
-    for name in schema["discriminator"]["mapping"]:
+    for name, pointer in schema["discriminator"]["mapping"].items():
         model = element_model_for(name)
-        # ``template`` is the one branch with no element model behind it.
-        definition_name = model.__name__ if model is not None else name.capitalize()
+        # ``template``, ``layout`` and ``testsuite`` have no element model
+        # behind them, so their branch is found through the pointer rather than
+        # by guessing what the definition is called.
+        definition_name = model.__name__ if model is not None else pointer.rpartition("/")[2]
         definition = schema["$defs"][definition_name]
         assert "kind" in definition["required"]
         assert "default" not in definition["properties"]["kind"]

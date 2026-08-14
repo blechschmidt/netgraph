@@ -1,0 +1,112 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: testsuite
+metadata:
+  name: connectivity
+  description: |
+    What the campus is for. Every assertion here is a sentence somebody would
+    say out loud in a design review, written down so that `netgraph test` can
+    fail a pull request that quietly stops it being true.
+spec:
+  description: staff, servers and management reach what they are supposed to
+  assertions:
+    - assert: reachable
+      name: a north desk reaches its own file server
+      description: |
+        Staff (VLAN 10) and servers (VLAN 20) are separate broadcast domains, so
+        this is a routed path and it has to cross the distribution switch.
+      from: pc-north-01
+      to: srv-north-01
+      layer: l3
+
+    - assert: reachable
+      name: a north desk reaches a south server across the backbone
+      from: pc-north-01
+      to: srv-south-01
+      layer: l3
+
+    - assert: not-reachable
+      name: staff and servers are separated by a router, not by a switch
+      description: |
+        VLAN 10 and VLAN 20 are different broadcast domains. The two hosts
+        *are* reachable — routed, as the assertion above says — so the claim
+        has to name the layer it is about.
+      from: pc-north-01
+      to: srv-north-01
+      layer: l2
+
+    - assert: distinct-vlan
+      name: a desk and a server share no broadcast domain
+      select: name=pc-north-01, name=srv-north-01
+
+    - assert: reachable
+      name: every access switch reaches its site distribution switch
+      from: name=sw-north-acc-*
+      to: sw-north-dist-01
+
+    - assert: path-shorter-than
+      name: north staff reach their server without leaving the site
+      description: |
+        Access, distribution, router, distribution, access is five hops. A path
+        longer than that means the traffic went out over the backbone and came
+        back, which is what a mis-pointed default route looks like.
+      from: pc-north-01
+      to: srv-north-01
+      hops: 7
+
+    - assert: same-vlan
+      name: every north access switch is in the management VLAN
+      vlan: 99
+
+      select: namespace=sites/north, kind=switch
+    - assert: within-prefix
+      name: north stays inside 10.1.0.0/16
+      description: RFC 1918 space is allocated a /16 per site; see sites/README.
+      select: namespace=sites/north, kind=switch
+      prefix: 10.1.0.0/16
+
+    - assert: within-prefix
+      name: south stays inside 10.2.0.0/16
+      select: namespace=sites/south, kind=switch
+      prefix: 10.2.0.0/16
+
+    - assert: within-prefix
+      name: west stays inside 10.3.0.0/16
+      select: namespace=sites/west, kind=switch
+      prefix: 10.3.0.0/16
+
+    - assert: has-interface
+      name: every switch has a management SVI
+      description: |
+        The management address lives on an SVI rather than on a port (NG-V009),
+        so a switch without one cannot be reached to be configured.
+      select: kind=switch
+      interface: Vlan99
+
+    - assert: port-count-at-least
+      name: every access switch has at least one uplink and four access ports
+      select: kind=switch, name=*-acc-*
+      ports: 5
+
+    - assert: unique
+      name: no two switches claim the same management address
+      description: |
+        The one assertion that has caught a real outage more than once: a copied
+        template with the address left in place takes the original off the
+        network the moment both are powered on.
+      select: kind=switch
+      field: spec.interfaces[name=Vlan99].ipv4.addresses[].ip
+
+    - assert: unique
+      name: no two routers claim the same loopback
+      select: kind=router
+      field: spec.interfaces[name=lo0].ipv4.addresses[].ip
+
+    - assert: count
+      name: there are three site routers, one per campus
+      select: kind=router
+      equals: 3
+
+    - assert: count
+      name: every site has at least two access switches
+      select: kind=switch, name=*-acc-*
+      at_least: 6

@@ -8,7 +8,7 @@ that into a picture. `netgraph export` turns it into files other tools consume:
 > load schedule.**
 
 ```
-netgraph export FORMAT [-o FILE] [--manifest FILE] [FILTERS] [FORMAT OPTIONS]
+netgraph export FORMAT [-o FILE] [--out DIR] [--manifest FILE] [FILTERS] [FORMAT OPTIONS]
 ```
 
 Nothing is probed and no device is contacted. Every artefact is a pure function
@@ -19,7 +19,7 @@ export cannot disagree with a diagram of the same tree.
 
 ## Contents
 
-- [The eight formats](#the-eight-formats)
+- [The eight formats that describe the network](#the-eight-formats-that-describe-the-network)
 - [`hosts`](#hosts)
 - [`dns-zone`](#dns-zone)
 - [`ansible-inventory`](#ansible-inventory)
@@ -28,6 +28,7 @@ export cannot disagree with a diagram of the same tree.
 - [`routes`](#routes)
 - [`power`](#power)
 - [`drawio`](#drawio)
+- [Device configuration: the six dialects](#device-configuration-the-six-dialects)
 - [What every format guarantees](#what-every-format-guarantees)
 - [Names, and how they are folded](#names-and-how-they-are-folded)
 - [The skip manifest](#the-skip-manifest)
@@ -38,7 +39,7 @@ export cannot disagree with a diagram of the same tree.
 
 ---
 
-## The eight formats
+## The eight formats that describe the network
 
 | Format | Artefact | Default extension |
 |---|---|---|
@@ -54,6 +55,10 @@ export cannot disagree with a diagram of the same tree.
 With no `-o`, the artefact goes to **stdout** and everything else — progress
 notes, validation findings and the [skip manifest](#the-skip-manifest) — goes to
 **stderr**, so `netgraph export prometheus-sd | jq` does what it looks like.
+
+Six further formats are not descriptions of the network but the configuration a
+device would run from:
+[Device configuration: the six dialects](#device-configuration-the-six-dialects).
 
 ---
 
@@ -632,6 +637,618 @@ the file opens the way your diagrams actually look.
 
 [drawio.md](drawio.md) is the whole workflow, including the part that matters
 most: what a draw.io user may and may not safely change.
+
+---
+
+## Device configuration: the six dialects
+
+Everything above is *about* the network. A hosts file, a zone, a pull-list, a
+monitoring target — each is a description some other tool consumes, and none of
+them is the network. The configuration a device actually runs is, and until
+netgraph could write one the inventory was a document *beside* the truth rather
+than the source of it: somebody still typed the addresses into the box, and the
+typing is where the two started to disagree.
+
+These six formats close that loop. Each is a pure function from one device's
+resolved inventory to a set of files, named at the paths that device keeps them
+at, so the output is something to copy into place rather than something to
+translate first:
+
+| Dialect | Writes | Devices it covers | What it refuses |
+|---|---|---|---|
+| `netplan` | `etc/netplan/10-netgraph.yaml`, one document per host | `computer`, `server`, `router` | The 802.1Q configuration of a bridge port, and a VRF — netplan's `vrfs` section needs a numeric routing table and an inventory states a route distinguisher |
+| `networkd` | `etc/systemd/network/10-<port>.network`, plus a `20-<name>.netdev` and `.network` for every link the host *builds* | `computer`, `server`, `router` | A VRF, for the same missing table number. Nothing else: `[BridgeVLAN]` says the thing netplan cannot |
+| `ifupdown` | `etc/network/interfaces` — the Debian original, with routes as `up`/`down` hooks | `computer`, `server`, `router` | A bridge port's 802.1Q, a VRF, and an `ap` radio: `wpa-ssid` configures a *station*, so pointing it at the SSID the radio is meant to beacon would make it a client of its own network |
+| `frr` | `etc/frr/frr.conf` — VRFs, static routes, OSPF areas, BGP neighbours | Any device declaring `spec.routing`, `spec.routes` or `spec.vrfs` | Nothing. FRR's grammar is a superset of what [§16](schema.md#16-routing) can state about routing, and inventing a refusal to have one would be dishonest |
+| `wireguard` | `etc/wireguard/<interface>.conf`, one file per tunnel with an end here | Any device terminating a `wireguard` tunnel | A `cipher` other than WireGuard's own, and an `auth` that is not `public-key` — that is the part deciding whether the two ends can speak at all |
+| `interfaces` | `interfaces.conf` — netgraph's own vendor-neutral grammar | **Every** device | Nothing, ever. It is not somebody else's format; it is defined as whatever holds one device's interface configuration completely |
+
+The first five are somebody else's grammar and therefore cover only the devices
+that grammar is for. `interfaces` is the fallback that makes the set complete: a
+Catalyst, a MikroTik, an access point and a hub all get a file, because an export
+that silently covers a third of an estate is worse than one that covers none —
+the missing third is the third somebody will assume is fine. Nothing consumes
+`interfaces.conf`; it is what a person reads before typing into a vendor CLI,
+what a diff shows when a switch's configuration is meant to change, and what
+[`netgraph drift`](commands/drift.md) reads back.
+
+One device selected by name goes to stdout, which is the case worth optimising
+for — it is a file, and piping it somewhere is the point:
+
+<!-- run: -->
+```console
+$ netgraph -q -i examples/home-lab export netplan --name pc-desk
+# Generated by 'netgraph export netplan' -- do not edit.
+# netgraph 0.1.0. Re-run the command to regenerate from the inventory.
+# netgraph-dialect: netplan
+# netgraph-element: hosts/pc-desk (computer)
+# netgraph-source: hosts/pc-desk.yaml
+# Apply with 'netplan try' first: this file replaces the interface configuration
+# of the host, and nothing here was read off the running system.
+#
+network:
+  version: 2
+  ethernets:
+    eno1:
+      addresses:
+        - 192.168.10.20/24
+        - 2001:db8:10::20/64
+      macaddress: "3c:97:0e:20:01:01"
+      mtu: 1500
+```
+
+The radio `wlp1s0` is in the inventory and not in that file, and the manifest on
+stderr says why: netplan's `wifis:` section requires at least one access point
+and *refuses the whole document* without one, so a radio the inventory names no
+SSID on cannot be written — and netgraph will not invent an SSID to fill the key
+in. That is a skip rather than a refusal, because the rest of the file is still
+correct for the rest of the host, and `netgraph drift` knows netplan cannot list
+a radio, so the absence reads as a blind spot rather than as a deletion.
+
+The three host dialects differ in shape rather than in content, and the shape is
+the format's, not netgraph's. ifupdown's `iface` carries a single `address`, so a
+dual-stacked port is two stanzas — the `eno1:0` idiom is a 2.x-era *label* on an
+address rather than a second address, and generating labels would put names into
+`ip addr` output the inventory never mentions:
+
+<!-- run: -->
+```console
+$ netgraph -q -i examples/home-lab export ifupdown --name srv-nas
+# Generated by 'netgraph export ifupdown' -- do not edit.
+# netgraph 0.1.0. Re-run the command to regenerate from the inventory.
+# netgraph-dialect: ifupdown
+# netgraph-element: hosts/srv-nas (server)
+# netgraph-source: hosts/srv-nas.yaml
+# This is the whole file: 'ifup -a' reads it in order, so it replaces
+# /etc/network/interfaces rather than adding to it. The distribution's 'lo'
+# stanza and any 'source' line are not reproduced here -- keep them.
+# Nothing below was read off the running system; try 'ifup --no-act <iface>'.
+#
+
+auto eth0
+iface eth0 inet static
+    address 192.168.10.10/24
+    mtu 1500
+    hwaddress ether 00:11:32:40:01:01
+iface eth0 inet6 static
+    address 2001:db8:10::10/64
+```
+
+### Emitted, skipped, refused
+
+The whole design turns on a three-way distinction, and it is worth learning
+before anything else here, because it is what decides whether you get a file:
+
+**Emitted.** The inventory states it and the dialect can write it. It is in the
+file.
+
+**Skipped.** The field is outside the dialect's remit. A PoE budget in netplan,
+an OSPF area in ifupdown, a radio's SSID in systemd-networkd: none of them makes
+the generated file *wrong*, because the file was never the place for them. So it
+is recorded in the [skip manifest](#the-skip-manifest), naming the dialect that
+*does* cover it, and the file is written. Skipping a whole device works the same
+way — netplan has nothing to say about a switch:
+
+<!-- run: -->
+```console
+$ netgraph -i examples/home-lab export netplan --name sw-home
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "ExportManifest",
+  "format": "netplan",
+  "counts": {
+    "considered": 1,
+    "emitted": 0,
+    "skipped": 1,
+    "rewritten": 0
+  },
+  "skipped": [
+    {
+      "subject": "switches/sw-home",
+      "reason": "not-representable",
+      "detail": "netplan is rendered by a Linux host; a switch is configured through its own CLI, so 'netgraph export interfaces' is what describes this device"
+    }
+  ],
+  "rewritten": []
+}
+exported netplan: 0 of 1 emitted, 1 skipped (not-representable 1)
+```
+
+The detail names the command to run instead. That is the whole difference
+between a skip and a hole — and it works at the level of a single field, too. A
+campus core router gets a perfectly good netplan file *and* two skips, one for
+its OSPF and BGP configuration and one for its loopback:
+
+<!-- run: -->
+```console
+$ netgraph -i examples/campus export netplan --name rtr-north-core-01
+# Generated by 'netgraph export netplan' -- do not edit.
+...
+      "subject": "sites/north/core/rtr-north-core-01",
+      "reason": "not-representable",
+      "detail": "'spec.routing' is a routing protocol; netplan configures interfaces. Generate it with 'netgraph export frr'"
+    },
+...
+exported netplan: 1 of 1 emitted, 2 skipped (not-representable 2)
+```
+
+Do as it says, and the routing that netplan had no business with comes out of the
+dialect that does:
+
+<!-- run: -->
+```console
+$ netgraph -q -i examples/campus export frr --name rtr-north-core-01
+! Generated by 'netgraph export frr' -- do not edit.
+...
+ip route 10.1.0.0/16 blackhole
+ip route 10.2.99.0/24 198.51.100.2 xe-0/0/1
+!
+! The area is enabled per interface, with 'ip ospf area' in the interface blocks
+! above, rather than with 'network' statements: a network statement enables OSPF
+! on whatever interface happens to hold a matching address, and the inventory
+! names interfaces. The two agree only until the address plan changes.
+!
+! This is OSPFv2. The inventory states one OSPF instance and no protocol version,
+! so no 'router ospf6' is inferred from the interfaces' IPv6 addresses.
+router ospf
+ ospf router-id 192.0.2.1
+...
+```
+
+Two lines a generator would normally emit are missing from that file on purpose,
+and it says so where they would have been: `frr version`/`frr defaults`, because
+the `traditional` and `datacenter` profiles differ in timers and in what a
+session advertises; and `no bgp ebgp-requires-policy`, because turning a safety
+default off quietly is the kind of thing nobody finds until the session is up.
+
+A third omission is smaller and shows the rule at its sharpest. Both routes above
+declare a `metric:`, and neither carries one here. The number FRR takes in that
+position is an *administrative distance* — which protocol's answer wins for a
+prefix, 1 to 255 — while a metric ranks routes within one protocol over the whole
+32-bit range. They are different quantities that happen to sit in the same
+column, so writing one where the other belongs would turn a metric of `200` into
+a distance of `200` and a metric of `1000` into a syntax error. Both are reported
+in the manifest instead.
+
+**Refused.** The field is *inside* the dialect's remit and the dialect has no
+syntax for it, so writing the file without it would configure the device to
+behave differently from what the inventory declares. Nothing is written **for
+the entire run** — not for the offending device, not for the four that were
+fine — every refusal is listed with the field path that produced it, and the
+exit code is `4`.
+
+That is deliberately harsher than skipping, and the reason is what an operator
+would otherwise be left holding: a device that is *almost* what the inventory
+says, with nothing in the file to say which part is missing. A directory that
+looks like a complete estate and is not is worst of all in a pipeline, which is
+why every selected device is asked for its limits before a single byte is
+rendered.
+
+No inventory shipped with netgraph refuses anything, so here is a constructed
+one — two files in a temporary directory, not part of this repository. A Linux
+virtualisation host with a trunk port into a bridge, which is an entirely
+ordinary thing to build and exactly what netplan cannot express:
+
+```yaml
+# /tmp/vlan-host/kvm-host.yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: kvm-host
+spec:
+  interfaces:
+    - name: eno1
+      type: ethernet
+      vlan:
+        mode: trunk
+        trunk_vlans: [10, 20]
+    - name: br0
+      type: bridge
+      members: [eno1]
+      ipv4:
+        addresses: [10.0.10.2/24]
+  routes:
+    - prefix: 10.0.20.0/24
+      via: 10.0.10.1
+```
+
+<!-- norun: a constructed inventory in a temporary directory, which is not part of this repository -->
+```console
+$ netgraph -q -i /tmp/vlan-host export netplan --name kvm-host
+error: the 'netplan' dialect cannot express 1 field(s) of 1 device(s); nothing was written, because a configuration missing one of these would put the device out of step with the inventory it was generated from
+  kvm-host: spec.interfaces[0].vlan -- eno1 is a trunk carrying VLAN 10,20; without the tagged set the port would admit every VLAN there is. netplan creates VLAN sub-interfaces but has no syntax for the 802.1Q configuration of a bridge port
+```
+
+`spec.interfaces[0].vlan` is a path you can grep the YAML for, which is the
+difference between a diagnostic and a complaint. And a refusal is a property of
+the *dialect*, never of the device: systemd-networkd has `[BridgeVLAN]`, so the
+same inventory generates cleanly there, VLAN filtering on the bridge and all —
+
+<!-- norun: the same constructed inventory, and it writes a directory tree -->
+```console
+$ netgraph -q -i /tmp/vlan-host export networkd --out /tmp/vlan-out
+$ cat /tmp/vlan-out/kvm-host/etc/systemd/network/10-eno1.network
+...
+[Match]
+Name=eno1
+
+[Network]
+Bridge=br0
+
+[BridgeVLAN]
+VLAN=10
+VLAN=20
+$ cat /tmp/vlan-out/kvm-host/etc/systemd/network/20-br0.netdev
+...
+[NetDev]
+Name=br0
+Kind=bridge
+
+[Bridge]
+VLANFiltering=yes
+$ cat /tmp/vlan-out/kvm-host/etc/systemd/network/20-br0.network
+...
+[Match]
+Name=br0
+
+[Network]
+Address=10.0.10.2/24
+
+[Route]
+Destination=10.0.20.0/24
+Gateway=10.0.10.1
+```
+
+(The `...` in each file stands for the six-line banner.)
+
+— and so does `interfaces`, which has a spelling for everything the schema can
+state:
+
+<!-- run: -->
+```console
+$ netgraph -q -i examples/home-lab export interfaces --name sw-home
+# Generated by 'netgraph export interfaces' -- do not edit.
+...
+interface port5
+    type ethernet
+    description PoE injector for ap-home; trunks the guest VLAN up to it
+    mac 00:22:07:aa:00:05
+    mtu 1500
+    vlan-mode trunk
+    vlan-native 10
+    vlan-tagged 10,20
+    vlan-acceptable-frames admit-all-frames
+```
+
+`VLANFiltering=yes` above is derived from the bridge members' own `vlan` blocks
+and from nothing else. Which brings us to the three places netgraph reasons
+rather than transcribes.
+
+### Three derivations, and why none of them is a guess
+
+A generated configuration is trustworthy exactly to the degree that every value
+in it can be traced to something a person wrote. Three values here cannot be
+copied out of a single field, and all three are *derivations from stated facts*
+rather than inventions — each is recorded as such, and each would be a different
+kind of mistake to get wrong.
+
+**A WireGuard peer's `Endpoint`.** wg-quick needs a `host:port` for the outer
+packets. The inventory never states one, and the chain that produces it is
+entirely inside the inventory: the peer's tunnel interface names its underlay
+port in `parent` ([§14.4](schema.md#144-yang-mapping)), that port declares an
+address, and the tunnel document declares a port. In
+[`examples/overlay`](../examples/overlay), `rtr-branch-a:wg0` has
+`parent: ether1`, `ether1` has `198.51.100.6/30`, and `wg-mesh` listens on
+`51820`:
+
+<!-- run: -->
+```console
+$ netgraph -q -i examples/overlay export wireguard --name rtr-hq
+# Generated by 'netgraph export wireguard' -- do not edit.
+# netgraph 0.1.0. Re-run the command to regenerate from the inventory.
+# netgraph-dialect: wireguard
+# netgraph-element: sites/hq/rtr-hq (router)
+# netgraph-source: sites/hq/router.yaml
+# netgraph-source: tunnels/overlays.yaml
+# One tunnel, not one host: 'wg-quick up wg0' reads this file.
+# It is chmod 600 material -- a WireGuard private key belongs in it, and this
+# file holds REPLACE-ME where the keys go, because netgraph stores no key
+# material (docs/schema.md section 14.2). Fill them in before the tunnel is used.
+#
+# tunnels/wg-mesh
+[Interface]
+Address = 10.255.0.1/24
+ListenPort = 51820
+MTU = 1420
+PrivateKey = REPLACE-ME  # private key of rtr-hq; netgraph holds no key material (docs/schema.md section 14.2)
+
+# sites/branch-a/rtr-branch-a:wg0
+[Peer]
+PublicKey = REPLACE-ME  # public key of rtr-branch-a:wg0
+AllowedIPs = 10.255.0.2/32
+Endpoint = 198.51.100.6:51820
+
+# sites/branch-b/rtr-branch-b:wg0
+[Peer]
+PublicKey = REPLACE-ME  # public key of rtr-branch-b:wg0
+AllowedIPs = 10.255.0.3/32
+Endpoint = 198.51.100.10:51820
+```
+
+Break any link of that chain — no `parent`, an undeclared underlay, an underlay
+with no routable address — and there is **no** `Endpoint` and a comment saying
+which link was missing. That is not a degraded answer: it is the ordinary case
+of a peer behind NAT, which WireGuard calls roaming and configures by leaving
+`Endpoint` out. Note `AllowedIPs` beside it, which is not a derivation at all:
+the peer declares `10.255.0.2/24` *inside* the tunnel, and it is narrowed to a
+`/32` host route rather than widened to the `/24`, because widening would route
+every address of that prefix down the tunnel — a policy nobody wrote down.
+
+**A static route's interface.** netplan and systemd-networkd hang a route off an
+interface; `spec.routes` does not have to name one. Where the route states `dev`
+there is nothing to derive. Otherwise netgraph takes the interface whose declared
+prefix contains the next hop — in the constructed example above, `10.0.10.1` is
+inside `br0`'s `10.0.10.2/24`, so the route lands on `br0`. This is not a
+preference among candidates: a next hop must be on-link for the route to work at
+all, which the validator enforces as
+[`E032`](validation-rules.md#e032--next-hop-is-not-on-link), so the interface
+holding the covering prefix is the only interface the route could use. When no
+declared address covers the next hop the route is *skipped* rather than attached
+to whichever interface came first, because attaching it would put a route on a
+port that cannot reach its own gateway.
+
+**Access or trunk.** An `interfaces[].vlan` block means two different things
+depending on what it is attached to, and the dialects with no 802.1Q port syntax
+have to tell them apart. On a `vlan` sub-interface it is the encapsulation VID,
+which every dialect here writes. On a port frames arrive at — ethernet, radio,
+LAG, bridge — it is 802.1Q port configuration, and then the question is whether
+*dropping* it would change what the device does:
+
+* A **trunk** cannot be dropped. "Admits VLAN 10 and 20 tagged" becomes "admits
+  every VLAN there is" the moment the line is missing, which is a different
+  device. Refused.
+* An **access** port usually can. "VLAN 10, untagged" describes which broadcast
+  domain the wire is in — a fact about the network, not a knob on the host — and
+  a plain interface with no VLAN configuration carries it exactly. Refusing here
+  would refuse most ordinary Linux hosts for stating something true.
+* The **exception** is an access port enslaved to a bridge that also carries a
+  *different* VLAN. That bridge must filter for either port to behave as
+  declared, so a dialect that cannot say so would merge two broadcast domains
+  into one. Refused, and named specifically rather than folded into the general
+  access case.
+
+### Key material is never invented
+
+There is nowhere in the schema to put a private key, a pre-shared key, a
+passphrase or a certificate, and the field names people reach for are rejected
+by name ([`docs/schema.md` §14.2](schema.md#142-what-a-tunnel-does-not-hold)). An
+inventory is a file in version control that gets rendered into diagrams and
+pasted into tickets; it is the wrong place for a secret, and a schema that
+accepted one would be inviting the mistake.
+
+So every dialect that needs one writes `REPLACE-ME`, with a comment saying why.
+Two properties of that placeholder are deliberate:
+
+* It is **not a key of any length**, so nothing it is fed to will accept it. A
+  placeholder that parses is a placeholder that reaches production.
+* It is **written rather than omitted**. Leaving `PrivateKey` out gives a file
+  wg-quick rejects with a message about its own schema, which sends the reader
+  looking in the wrong place; leaving netplan's `password` out does the same.
+
+A generated WireGuard file is therefore a skeleton with the topology already
+correct, not a configuration waiting to be applied unread — which is the
+intended shape.
+
+### The provenance header
+
+Every generated file opens with a banner, and it answers one more question than
+the header on a hosts file does: *which YAML is this the shadow of?* Months
+later, holding a file under `/etc` on a box, that is the only question worth
+asking, and the generated file is the only thing in front of the person asking.
+
+```
+# Generated by 'netgraph export netplan' -- do not edit.
+# netgraph 0.1.0. Re-run the command to regenerate from the inventory.
+# netgraph-dialect: netplan
+# netgraph-element: hosts/pc-desk (computer)
+# netgraph-source: hosts/pc-desk.yaml
+```
+
+The three `netgraph-*` keys are the machine-readable half, prefixed so they
+cannot collide with a directive of the format they sit in:
+
+| Key | Contents | Read by |
+|---|---|---|
+| `netgraph-dialect` | Which of the six wrote the file | [`drift`](commands/drift.md) and [`import`](commands/import.md), so neither needs `--from`; and `--out`, to tell a file netgraph generated from one it did not |
+| `netgraph-element` | The fully-qualified name and kind of the device | `drift` and `import`, so neither needs `--host` |
+| `netgraph-source` | Every inventory document behind this file, relative to the root. Repeated when there is more than one — a router's own YAML *and* the tunnel document that gave it a peer | A person, editing |
+
+FRR's banner uses `!` and everything else here uses `#`, so the comment is inert
+in the format it sits in.
+
+Nothing in the banner is derived from the clock, the host or the directory the
+command ran in, for the same reason nothing else here is: two exports of an
+unchanged inventory must be byte-identical, or a diff in a generated file stops
+meaning "the network changed".
+
+### `--out DIR`, and the one-device stdout rule
+
+A configuration set is a *tree* — netplan is one file per host, systemd-networkd
+is a pair per stacked link, wg-quick is one file per tunnel — and stdout is not a
+tree. `--out DIR` writes it: one directory per device, named after the device's
+fully-qualified name, holding each file at the path the device keeps it at.
+
+<!-- norun: writes a directory tree and a manifest into the reader's checkout -->
+```console
+$ netgraph -i examples/overlay export networkd --out build/config --manifest build/manifest.json
+manifest written to build/manifest.json
+exported networkd: 7 of 7 emitted, 6 skipped (not-representable 6), 3 renamed, 26 file(s) for 7 device(s) written under build/config
+```
+
+```console
+$ find build/config -type f | sort | head -6
+build/config/sites/branch-a/pc-branch-a/etc/systemd/network/10-enp3s0.network
+build/config/sites/branch-a/rtr-branch-a/etc/systemd/network/10-ether1.network
+build/config/sites/branch-a/rtr-branch-a/etc/systemd/network/10-ether2.network
+build/config/sites/branch-a/rtr-branch-a/etc/systemd/network/20-wg0.netdev
+build/config/sites/branch-a/rtr-branch-a/etc/systemd/network/20-wg0.network
+build/config/sites/branch-b/pc-branch-b/etc/systemd/network/10-enp3s0.network
+```
+
+The tree is shaped like the inventory tree, which is what makes `diff -r` between
+two exports readable, and it cannot collide, because a fully-qualified name is
+unique by construction. The `3 renamed` in the summary is the interface-name fold
+that made `ge-0/0/0` into a file called `10-ge-0-0-0.network`; like every other
+fold it is recorded in the [manifest](#the-skip-manifest).
+
+An `--out` that resolves inside the inventory is refused, and the reason is
+worth knowing rather than merely obeying: a generated `10-netgraph.yaml` sitting
+under the tree netgraph loads is a document netgraph will try to load on the next
+run, and `NG-D001` reports it as YAML with no `kind:` — a diagnostic with no
+obvious relation to what you did. The generated tree is a build artefact and
+belongs outside the source, the same way a rendered diagram does.
+
+<!-- run: rc=3 -->
+```console
+$ netgraph -q -i examples/home-lab export netplan --out examples/home-lab/build
+error: refusing to write a configuration tree into the inventory: examples/home-lab/build is under the inventory root, and the loader reads every YAML document there -- so the next command would try to load the generated files as elements. Point --out outside the inventory, or pass --force
+```
+
+`--force` still allows it, because "outside the source" is a convention and
+somebody's layout will disagree — but they will have said so.
+
+Without `--out`, a selection of more than one device is a usage error rather than
+a stream nobody can split:
+
+<!-- run: rc=2 -->
+```console
+$ netgraph -q -i examples/home-lab export netplan
+Usage: netgraph export [OPTIONS] FORMAT
+Try 'netgraph export --help' for help.
+
+Error: netplan would write 5 file(s) for 5 device(s), and stdout holds one: hosts/laptop, hosts/pc-desk, hosts/phone, hosts/srv-nas, and 1 more. Write the tree with '--out DIR', or narrow the selection to one device with '--name NAME'
+```
+
+Both ways out are named because both are reasonable. One device is allowed and is
+the interesting case — the artefact is a file, so
+`netgraph export netplan --name pc-desk | ssh pc-desk 'cat >/etc/netplan/10-netgraph.yaml'`
+is what closing the loop looks like from a laptop. Where a dialect writes several
+files for a single device — a `.netdev` and a `.network`, two tunnels — stdout
+carries them separated by a `# ==> path <==` banner in the dialect's own comment
+syntax, so the reader can tell where one ends.
+
+### Overwriting, and what is never deleted
+
+`--out` is the one place netgraph writes a tree it will be asked to write again
+tomorrow, so the rule is narrower than the one [`netgraph import`](commands/import.md)
+uses. An imported tree is hand-edited immediately and clobbering it is a real
+loss; a generated configuration says *do not edit* on its first line, and a
+command that demanded `--force` on every run would simply train everybody to pass
+`--force` on every run.
+
+**A file netgraph generated is overwritten**, no flag required. It carries the
+banner, so there is no doubt about who owns it.
+
+**A file netgraph did not generate is refused**, with every clash listed at once.
+That is the case worth stopping — an operator who pointed `--out` at `/etc`
+rather than at a staging directory:
+
+<!-- norun: needs a foreign file already sitting in the output directory -->
+```console
+$ netgraph -q -i examples/home-lab export netplan --out /tmp/cfg
+error: refusing to overwrite 1 file(s) under /tmp/cfg that netgraph did not generate: hosts/pc-desk/etc/netplan/10-netgraph.yaml; pass --force to replace them, or point --out at a directory this command owns
+```
+
+**Nothing is ever deleted.** A device dropped from the inventory, a filter
+narrowed since the last run, or a dialect swapped for another all leave files
+behind. They are found and counted rather than removed, because a stale
+configuration nobody applies is harmless while a tree removed by a tool is not,
+and deciding which is which is an operator's job:
+
+<!-- norun: needs an output directory left over from a previous, wider run -->
+```console
+$ netgraph -q -i examples/home-lab export netplan --name pc-desk --out /tmp/cfg2
+warning: 4 file(s) under /tmp/cfg2 were generated by an earlier run and this one did not rewrite them; nothing was deleted -- the first is /tmp/cfg2/hosts/laptop/etc/netplan/10-netgraph.yaml
+```
+
+### The round trip: generate, then compare
+
+The same six dialects are read *back* by [`netgraph drift`](commands/drift.md),
+which is what makes generate-then-compare symmetric rather than approximately
+symmetric. The banner is why: a generated file names its own dialect and its own
+element, so neither `--from` nor `--host` is needed for the half of the round
+trip netgraph wrote itself.
+
+<!-- norun: writes want.yaml into the reader's directory -->
+```console
+$ netgraph -q -i examples/home-lab export netplan --name pc-desk -o want.yaml
+$ netgraph -i examples/home-lab drift --only pc-desk want.yaml
+drift of examples/home-lab against 1 input (netplan)
+
+unobserved (3)
+  declared, but outside what these dialects see; never counted as drift
+  cables/cbl-sw-desk hosts/pc-desk:eno1, switches/sw-home:port2: no input reported the neighbours of either end; 'lldp', 'csv' do, and nothing else netgraph reads does — a configuration says what a box does with a port, never what is plugged into it
+  hosts/pc-desk:eno1 enabled: the capture reports no value for these fields, so the declared ones could not be checked
+  hosts/pc-desk:lo: the 'iproute' dialect does not import loopback interfaces, so this one could not appear in the capture
+
+no drift: 1 element compared, 3 unobserved
+```
+
+No drift, which is the answer that proves the loop closes: what the emitter
+writes is exactly what the reader understands. Replace `want.yaml` with the file
+actually running on the box and the same command answers the question worth
+asking:
+
+<!-- norun: needs the file that is really running on pc-desk, and the unobserved section is elided -->
+```console
+$ scp pc-desk:/etc/netplan/10-netgraph.yaml live.yaml
+$ netgraph -i examples/home-lab drift --only pc-desk live.yaml
+drift of examples/home-lab against 1 input (netplan)
+
+hosts/pc-desk (computer)
+  + eno1.ipv4                          the capture reports 192.168.10.21/24 here; the inventory does not declare it
+  - eno1.ipv4                          192.168.10.20/24 is declared here; the capture reports this host's addresses and that is not one of them
+...
+2 differences across 1 element (+1 undeclared, -1 missing); 3 unobserved
+```
+
+Two caveats keep the answer honest, and both are the point rather than a
+limitation.
+
+**A configuration is intent, not observation.** It says what the device was
+*asked* to be, which is not always what it is. `ip -j addr show` answers the
+other question. Both are worth asking, and `drift` reports which dialects saw
+each device so the answer says which question was asked.
+
+**`frr` and `wireguard` are additive-only.** The other four describe the whole of
+a host's networking, so an interface absent from a netplan document is an
+interface that host does not bring up, and that absence is a difference. An
+`frr.conf` configures the interfaces the routing daemon cares about and is silent
+about every other link on the box; a wg-quick file is one tunnel. Reading absence
+there as deletion would be nonsense, so both are given the empty capability: they
+can report an address FRR configures that the inventory does not declare, and
+they can never report anything as missing. The full table is
+[What each dialect can see](commands/drift.md#what-each-dialect-can-see).
 
 ---
 

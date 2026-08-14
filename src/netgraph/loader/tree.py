@@ -56,10 +56,12 @@ from netgraph.models import (
     DEVICE_KINDS,
     LAYOUT_KIND,
     TEMPLATE_KIND,
+    TEST_SUITE_KIND,
     Element,
     parse_document,
     parse_layout,
     parse_template,
+    parse_test_suite,
 )
 
 __all__ = [
@@ -649,6 +651,7 @@ class _Mark:
     errors: int
     templates: int
     layouts: int
+    suites: int
 
 
 @dataclass(eq=False)
@@ -681,6 +684,8 @@ class _Builder:
     _templates_seen: int = 0
     #: The same count for ``kind: layout``; see :meth:`harvest`.
     _layouts_seen: int = 0
+    #: The same count for ``kind: testsuite``; see :meth:`harvest`.
+    _suites_seen: int = 0
 
     # -- phase one: the walk ---------------------------------------------
 
@@ -694,6 +699,9 @@ class _Builder:
             return
         if kind == LAYOUT_KIND:
             self._add_layout(document, entry)
+            return
+        if kind == TEST_SUITE_KIND:
+            self._add_test_suite(document, entry)
             return
 
         reference = _inherit_reference(document.data)
@@ -780,6 +788,45 @@ class _Builder:
                 )
             )
 
+    def _add_test_suite(self, document: RawDocument, entry: InventoryFile) -> None:
+        """Register a ``kind: testsuite`` document, or record why it is unusable.
+
+        Indexed as it is read, like a layout: a suite refers to elements by name
+        and whether those names resolve is ``netgraph test``'s question rather
+        than the loader's. Its provenance is kept unconditionally — a failing
+        assertion has to be able to name its own file and line so an editor can
+        jump to it, there are never many suites, and their documents are small.
+        """
+        self._suites_seen += 1
+        try:
+            suite = parse_test_suite(document.data, source=document.source)
+        except SchemaError as exc:
+            for error in _schema_errors(exc, document):
+                self.inventory.record(error)
+            return
+        source = SourceLocation(
+            path=entry.path,
+            relative=entry.relative.as_posix(),
+            index=document.index,
+            line=document.line,
+            provenance=Provenance(base=document),
+        )
+        if self.inventory.add_test_suite(suite, namespace=entry.namespace, source=source) is None:
+            fqn = qualify(entry.namespace, suite.metadata.name)
+            first = self.inventory.test_suite_sources.get(fqn)
+            where = f" (first declared at {first})" if first is not None else ""
+            self.inventory.record(
+                LoadError(
+                    message=f"duplicate test suite name {fqn!r}{where}; this document is ignored",
+                    path=source.path,
+                    relative=source.relative,
+                    line=source.line,
+                    index=source.index,
+                    field_path=("metadata", "name"),
+                    rule="NG-K001",
+                )
+            )
+
     def mark(self) -> _Mark:
         """Where the builder stands before a file is fed to it."""
         return _Mark(
@@ -787,6 +834,7 @@ class _Builder:
             errors=len(self.inventory.errors),
             templates=self._templates_seen,
             layouts=self._layouts_seen,
+            suites=self._suites_seen,
         )
 
     def harvest(self, mark: _Mark) -> CachedFile | None:
@@ -802,15 +850,20 @@ class _Builder:
         * A device carrying ``spec.from``. Its element is the merge of this
           file's document with a template that may be declared anywhere, so a
           key over this file alone cannot notice the template changing.
-        * A file declaring a ``kind: layout``. Geometry is indexed apart from
-          the elements and a replayed slot list would not carry it, so a cached
-          file would silently lose the arrangement it declares.
+        * A file declaring a ``kind: layout`` or a ``kind: testsuite``. Both are
+          indexed apart from the elements and a replayed slot list would not
+          carry either, so a cached file would silently lose the arrangement, or
+          the assertions, that it declares.
 
         Both stay on the slow path forever, which is the honest cost of a
         per-file cache. They are counted, so ``netgraph cache info`` can say how
         much of the tree is not being cached and why.
         """
-        if self._templates_seen != mark.templates or self._layouts_seen != mark.layouts:
+        if (
+            self._templates_seen != mark.templates
+            or self._layouts_seen != mark.layouts
+            or self._suites_seen != mark.suites
+        ):
             return None
         slots: list[CachedSlot] = []
         for slot in self._slots[mark.slots :]:

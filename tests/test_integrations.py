@@ -56,7 +56,12 @@ def action() -> dict[str, Any]:
 #: Every hook this repository publishes, in file order. A hook id is an API --
 #: somebody else's ``.pre-commit-config.yaml`` names it -- so adding one is
 #: fine and renaming or removing one is a breaking change.
-PUBLISHED_HOOKS = ["netgraph-validate", "netgraph-fmt", "netgraph-fmt-check"]
+PUBLISHED_HOOKS = [
+    "netgraph-validate",
+    "netgraph-test",
+    "netgraph-fmt",
+    "netgraph-fmt-check",
+]
 
 
 def test_the_hook_file_declares_exactly_the_published_hooks(hooks: list[dict[str, Any]]) -> None:
@@ -77,12 +82,14 @@ def test_validation_takes_no_filenames_and_formatting_takes_them(
     """The one place the hooks deliberately differ, and why.
 
     A cable is only dangling when compared against the devices in the *other*
-    files, so validation is a property of the tree. Formatting is a property of
-    a file, so there is no reason to walk the tree to do it.
+    files, and an assertion is about the whole network, so both of those are
+    properties of the tree. Formatting is a property of a file, so there is no
+    reason to walk the tree to do it.
     """
     filenames = {hook["id"]: hook["pass_filenames"] for hook in hooks}
     assert filenames == {
         "netgraph-validate": False,
+        "netgraph-test": False,
         "netgraph-fmt": True,
         "netgraph-fmt-check": True,
     }
@@ -101,6 +108,7 @@ def test_every_hook_only_runs_when_yaml_changed(hooks: list[dict[str, Any]], hoo
     ("hook_id", "command", "options"),
     [
         ("netgraph-validate", "validate", ("--strict", "--disable", "--output-format")),
+        ("netgraph-test", "test", ("--output-format", "--list", "--max-hops")),
         ("netgraph-fmt", "fmt", ("--check", "--diff", "--stdin")),
         ("netgraph-fmt-check", "fmt", ("--check",)),
     ],

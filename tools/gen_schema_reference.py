@@ -46,6 +46,7 @@ from pydantic.fields import FieldInfo  # noqa: E402
 from netgraph.models import (  # noqa: E402
     AcceptableFrames,
     AdapterSpec,
+    Assertion,
     BgpConfig,
     BgpNeighbor,
     BridgeConfig,
@@ -85,6 +86,7 @@ from netgraph.models import (  # noqa: E402
     RoutingConfig,
     Size,
     StaticRoute,
+    TestSuiteSpec,
     TunnelAuth,
     TunnelMode,
     TunnelSpec,
@@ -104,7 +106,11 @@ from netgraph.models import (  # noqa: E402
     WirelessConfig,
 )
 from netgraph.models.document import ELEMENT_MODELS  # noqa: E402
-from netgraph.models.element import LAYOUT_KIND, TEMPLATE_KIND  # noqa: E402
+from netgraph.models.element import (  # noqa: E402
+    LAYOUT_KIND,
+    TEMPLATE_KIND,
+    TEST_SUITE_KIND,
+)
 from netgraph.models.fielddocs import (  # noqa: E402
     DOCUMENTED_MODELS,
     FIELD_DOCS,
@@ -577,6 +583,37 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "A size",
         "Two positive numbers, in points. `{width: 220, height: 90}` or `[220, 90]`.",
     ),
+    # Assertions (§20). Last, for the same reason geometry is late: it describes
+    # what somebody relies on rather than what is there, and a reader looking up
+    # a field of a device should not have to walk past it.
+    Section(
+        TestSuiteSpec,
+        "`spec` of a `testsuite` document",
+        "Named claims about the network the other documents describe. `netgraph test` grades "
+        "them and exits non-zero when one does not hold.",
+        notes=(
+            "A suite must assert something (`NG-K002`). A suite that checked nothing would "
+            "report a green run, which is worse than having no suite at all.",
+            "Assertions are graded in the order they are written, and a failure names the "
+            "file and line of the assertion so an editor can jump to it.",
+        ),
+    ),
+    Section(
+        Assertion,
+        "One assertion",
+        "`assert` chooses the claim; every other key is read in its light. A key that belongs "
+        "to a different assertion is rejected by name (`NG-K003`) rather than ignored.",
+        notes=(
+            "`reachable`, `not-reachable` and `path-shorter-than` take `from` and `to` in the "
+            "spellings `netgraph path` accepts: an element, `element:interface`, an IP address, "
+            "or a selector matching several of them.",
+            "`same-vlan`, `distinct-vlan`, `within-prefix`, `has-interface`, "
+            "`port-count-at-least`, `unique` and `count` take `select`, in `netgraph render`'s "
+            "filter vocabulary.",
+            "`no-single-point-of-failure` takes neither, and optionally narrows the candidates "
+            "with `select` and the views with `layer`.",
+        ),
+    ),
 )
 
 #: Enumerations rendered as value tables, with the note that explains them.
@@ -908,6 +945,10 @@ def _kind_table() -> Iterator[str]:
     yield (
         f"| `{LAYOUT_KIND}` | [LayoutSpec]({_MODEL_ANCHORS[LayoutSpec]}) | "
         f"{KIND_NOTES[LAYOUT_KIND]} |"
+    )
+    yield (
+        f"| `{TEST_SUITE_KIND}` | [TestSuiteSpec]({_MODEL_ANCHORS[TestSuiteSpec]}) | "
+        f"{KIND_NOTES[TEST_SUITE_KIND]} |"
     )
 
 

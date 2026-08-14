@@ -465,6 +465,18 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         detail="Keep only elements participating in the VLANs given.",
     ),
     Binding(
+        id="view.failure",
+        title="Failure mode",
+        section="The view",
+        keys=("Alt-F",),
+        detail=(
+            "Click an element and everything it would isolate from the gateways greys out; "
+            "the status line names the count. Reads only — nothing is written, and Escape or "
+            "the same key puts the diagram back."
+        ),
+        needs="session",
+    ),
+    Binding(
         id="view.fit",
         title="Fit the diagram",
         section="The view",

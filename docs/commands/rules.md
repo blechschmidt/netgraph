@@ -46,7 +46,7 @@ then infos, each numbered in the order they were added.
 ```console
 $ netgraph rules
 RULE  SEVERITY  ALIASES           SUMMARY
-----  --------  ----------------  ------------------------------------------------------------------------------
+----  --------  ----------------  ------------------------------------------------------------------------------------
 E001  error     NG-C002, NG-C003  A cable endpoint references an unknown device or interface.
 E002  error     NG-C005           An interface is terminated by more than one cable.
 E003  error     NG-I008           The same MAC address is used by two interfaces in the inventory.
@@ -93,6 +93,8 @@ E043  error     NG-S010           A group names a member the inventory does not 
 E044  error     NG-S011           A group names a member that is not a user or a group.
 E045  error     NG-S012           Group membership forms a cycle.
 E046  error     NG-S013           Two identities claim the same login, uid or gid.
+E047  error     -                 An element declares it must keep its gateway under any single failure, and does not.
+E048  error     -                 An element declares it must keep power under any single failure, and does not.
 W101  warning   NG-I013           An interface has neither IPv4 nor IPv6 and is not a switchport.
 W102  warning   NG-C010           The two endpoints of a cable disagree about the MTU.
 W103  warning   NG-C016           A device terminates no cable and hosts no adapter: an orphan node.
@@ -133,6 +135,7 @@ W137  warning   NG-E016           A device declares a power draw but no power pa
 W138  warning   NG-Y001           Diagram geometry names an element the inventory does not declare.
 W139  warning   NG-S014           A group has no members.
 W140  warning   NG-S015           A group still lists a user who has departed.
+W141  warning   -                 A redundancy expectation names something the tool does not understand.
 I001  info      NG-I010           A MAC address is locally administered rather than vendor-assigned.
 I002  info      NG-C015           An interface is enabled but terminates no cable.
 I003  info      NG-T015           A tunnel listens on a port other than the registered one for its type.

@@ -96,13 +96,15 @@ See [`docs/docker.md`](docs/docker.md), which also covers
 
 ## Quickstart
 
-Four commands. `init` writes a small, valid inventory; edit it into your own network.
+Five commands. `init` writes a small, valid inventory — devices, cables and a suite of
+assertions about them; edit it into your own network.
 
 <!-- norun: writes a directory in the reader's workspace, and stops in an editor -->
 ```bash
 netgraph init my-network && cd my-network
 $EDITOR devices/sw-office.yaml          # your switches, routers, hosts
 netgraph validate                       # do the documents agree with each other?
+netgraph test                           # do they still say what the network is for?
 netgraph render -f svg -o network.svg   # draw it
 ```
 
@@ -192,6 +194,7 @@ report.txt` both do what they look like they do.
 | [`netgraph import drawio`](docs/commands/import.md) | Bring an edited draw.io diagram back as a reviewable changeset. | [import.md](docs/commands/import.md) |
 | [`netgraph drift`](docs/commands/drift.md) | Compare a live network against the declared inventory. | [drift.md](docs/commands/drift.md) |
 | [`netgraph validate`](docs/commands/validate.md) | Check the inventory; the gate for CI and pre-commit. | [validate.md](docs/commands/validate.md) |
+| [`netgraph test`](docs/commands/test.md) | Grade the assertions the inventory declares about itself. | [test.md](docs/commands/test.md) |
 | [`netgraph fmt`](docs/commands/fmt.md) | Rewrite inventory YAML into the canonical form. | [fmt.md](docs/commands/fmt.md) |
 | [`netgraph edit set`](docs/commands/edit.md) | Set a field on an element, in place, comments and all. | [edit.md](docs/commands/edit.md) |
 | [`netgraph edit unset`](docs/commands/edit.md) | Remove a field from an element. | [edit.md](docs/commands/edit.md) |
@@ -214,6 +217,7 @@ report.txt` both do what they look like they do.
 | [`netgraph web`](docs/commands/web.md) | Edit the YAML and see the diagram side by side in a browser. | [web.md](docs/commands/web.md) |
 | [`netgraph lsp`](docs/commands/lsp.md) | Serve completion, diagnostics and rename to an editor over LSP. | [lsp.md](docs/commands/lsp.md) |
 | [`netgraph path`](docs/commands/path.md) | Trace how two elements reach each other, hop by hop. | [path.md](docs/commands/path.md) |
+| [`netgraph impact`](docs/commands/impact.md) | Simulate a failure: blast radius, single points of failure, promises. | [impact.md](docs/commands/impact.md) |
 | [`netgraph list`](docs/commands/list.md) | Tabulate devices, cables, tunnels, VLANs, BSSs or subnets. | [list.md](docs/commands/list.md) |
 | [`netgraph ipam`](docs/commands/ipam.md) | Report utilisation, free space, overlaps and aggregates. | [ipam.md](docs/commands/ipam.md) |
 | [`netgraph export`](docs/commands/export.md) | Emit hosts files, DNS zones, Ansible, Prometheus, cable lists. | [export.md](docs/commands/export.md) |
@@ -239,6 +243,7 @@ The files describe the network once; each command asks something different of th
 | You want to know | Ask |
 |---|---|
 | does the documentation contradict itself? | [`netgraph validate`](docs/validation.md) |
+| does the network still do what we built it to do? | [`netgraph test`](docs/commands/test.md) |
 | what does the physical topology look like? what does VLAN 10 reach? which subnets exist? | [`netgraph render --layer l1\|l2\|l3`](docs/rendering.md) |
 | what runs inside which tunnel? | [`netgraph render --layer overlay`](docs/rendering.md#overlay-tunnels-and-what-runs-inside-what) |
 | which SSID is on which channel, in which VLAN? | [`netgraph list bss`](docs/commands/list.md) |
@@ -247,6 +252,7 @@ The files describe the network once; each command asks something different of th
 | how do I move a switch on the diagram and have it stay there? | [`netgraph layout`](docs/commands/layout.md) |
 | how full is that /24, and where is the next free /28? | [`netgraph ipam`](docs/ipam.md) |
 | what should `/etc/hosts`, the DNS zone, the Ansible inventory, the pull list or the routing script say? | [`netgraph export`](docs/export.md) |
+| what should this device's netplan, systemd-networkd, ifupdown, FRR or WireGuard configuration say? | [`netgraph export netplan`](docs/export.md#device-configuration-the-six-dialects) |
 | can I hand the diagram to somebody who only has draw.io, and take their edits back? | [`netgraph export drawio`](docs/drawio.md) |
 | what do I hand over as the as-built documentation? | [`netgraph report`](docs/commands/report.md), and [an example of what it writes](docs/example-report/) |
 | what did that template and that interface range actually expand to? | [`netgraph show`](docs/commands/show.md) |

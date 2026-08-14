@@ -53,12 +53,14 @@ from netgraph.models.document import (
     parse_document,
     parse_layout,
     parse_template,
+    parse_test_suite,
 )
 from netgraph.models.element import (
     DOCUMENT_KINDS,
     KINDS,
     LAYOUT_KIND,
     TEMPLATE_KIND,
+    TEST_SUITE_KIND,
     ElementBase,
 )
 from netgraph.models.identity import (
@@ -165,6 +167,16 @@ from netgraph.models.scalars import (
     parse_bitrate,
 )
 from netgraph.models.template import INHERIT_KEY, TEMPLATE_SPEC_KEYS, Template
+from netgraph.models.testsuite import (
+    MAX_ASSERTIONS,
+    REACHABILITY_ASSERTIONS,
+    SELECTOR_ASSERTIONS,
+    Assertion,
+    AssertionLayer,
+    AssertionType,
+    TestSuite,
+    TestSuiteSpec,
+)
 from netgraph.models.tunnel import (
     MAX_VNI,
     Tunnel,
@@ -195,6 +207,7 @@ __all__ = [
     "LAYOUT_KIND",
     "LAYOUT_VIEWS",
     "LOGIN_PATTERN",
+    "MAX_ASSERTIONS",
     "MAX_EMAIL_LENGTH",
     "MAX_GROUP_MEMBERS",
     "MAX_LOGIN_LENGTH",
@@ -209,15 +222,21 @@ __all__ = [
     "POE_CLASS_MAX",
     "POE_PD_WATTS",
     "POE_PSE_WATTS",
+    "REACHABILITY_ASSERTIONS",
     "REAR",
     "RESERVED_LABEL_PREFIX",
+    "SELECTOR_ASSERTIONS",
     "TEMPLATE_KIND",
     "TEMPLATE_SPEC_KEYS",
+    "TEST_SUITE_KIND",
     "USER_KIND",
     "AcceptableFrames",
     "Adapter",
     "AdapterSpec",
     "Asn",
+    "Assertion",
+    "AssertionLayer",
+    "AssertionType",
     "Band",
     "BgpConfig",
     "BgpNeighbor",
@@ -281,6 +300,8 @@ __all__ = [
     "StaticRoute",
     "Switch",
     "Template",
+    "TestSuite",
+    "TestSuiteSpec",
     "Tunnel",
     "TunnelAuth",
     "TunnelMode",
@@ -311,5 +332,6 @@ __all__ = [
     "parse_outlet_range",
     "parse_port_range",
     "parse_template",
+    "parse_test_suite",
     "split_panel_port",
 ]

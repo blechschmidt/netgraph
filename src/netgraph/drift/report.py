@@ -211,6 +211,7 @@ def as_junit_report(report: DriftReport) -> str:
             "inputs": ",".join(report.inputs),
             "netgraph": report.version,
         },
+        failure_type="drift",
     )
 
 

@@ -18,6 +18,7 @@ from a laptop with no route to the network it is checking.
 - [What it reports](#what-it-reports)
 - [Drift and unobserved](#drift-and-unobserved)
 - [What each dialect can see](#what-each-dialect-can-see)
+- [Generate, then compare](#generate-then-compare)
 - [A worked example](#a-worked-example)
 - [Output formats](#output-formats)
 - [The JSON envelope](#the-json-envelope)
@@ -114,6 +115,35 @@ two dialects gets the union of both:
 | `lldp` | no — only the ports with a neighbour | yes | no | no |
 | `iproute` | yes | no | yes, from `ip -j addr show` | yes |
 | `csv` | no — only the ports the rows name | yes | no | no |
+| `netplan` | yes | no | yes | yes |
+| `networkd` | yes | no | yes | yes |
+| `ifupdown` | yes | no | yes | yes |
+| `interfaces` | yes | no | yes | yes |
+| `frr` | no | no | no | no |
+| `wireguard` | no | no | no | no |
+
+The last six are the configuration dialects
+[`netgraph export`](export.md#the-fourteen-formats) writes, read back, and they
+split into two groups for one reason: **does this file describe the whole device,
+or a part of it?**
+
+`netplan`, `networkd`, `ifupdown` and `interfaces` describe the whole of a host's
+networking. An interface absent from a netplan document is an interface that host
+does not bring up, so its absence is a difference and is reported as one. That
+makes them the strongest inputs in the table — stronger, in one way, than `ip`:
+they say what the box was *told* to be, which is the thing an inventory also
+says. What none of them reports is a **neighbour**. A configuration says what a
+box does with a port, never what is plugged into it, so every declared cable is
+unobserved unless an `lldp` or `csv` input covers it too.
+
+`frr` and `wireguard` describe a *part*, and are therefore blind on every axis. An
+`frr.conf` configures the interfaces the routing daemon cares about and is silent
+about every other link on the box; a wg-quick file is one tunnel. Reporting a
+declared interface as missing because it is not in one of those would be
+nonsense. Their capability is deliberately spelled out as empty rather than
+omitted, because it is a decision and not an oversight — and it is *directional*
+rather than useless: an address FRR configures that the inventory does not
+declare is still real drift in the `undeclared` direction.
 
 Three consequences worth knowing:
 
@@ -133,6 +163,60 @@ additionally requires that an address really was observed on the device. And a
 trunk's VLAN set is always a *lower bound*: netgraph derives the minimum implied
 by the sub-interfaces stacked on the port, so a VLAN there and not in the
 inventory is drift, while the converse is unobserved.
+
+---
+
+## Generate, then compare
+
+Six of the dialects above are the ones
+[`netgraph export`](export.md#a-configuration-dialect-writes-a-tree) writes, which
+makes the loop symmetric: what the emitter writes is exactly what this command
+reads. Two commands, and no bespoke collection script:
+
+<!-- norun: writes want.yaml into the reader's directory -->
+```console
+$ netgraph -q -i examples/home-lab export netplan --name pc-desk -o want.yaml
+$ netgraph -i examples/home-lab drift --only pc-desk want.yaml
+drift of examples/home-lab against 1 input (netplan)
+
+unobserved (3)
+  declared, but outside what these dialects see; never counted as drift
+  cables/cbl-sw-desk hosts/pc-desk:eno1, switches/sw-home:port2: no input reported the neighbours of either end; 'lldp', 'csv' do, and nothing else netgraph reads does — a configuration says what a box does with a port, never what is plugged into it
+  hosts/pc-desk:eno1 enabled: the capture reports no value for these fields, so the declared ones could not be checked
+  hosts/pc-desk:lo: a loopback interface is not something iproute lists, so its absence from the capture says nothing
+
+no drift: 1 element compared, 3 unobserved
+```
+
+Neither `--from` nor `--host` was given, and neither was needed: a file netgraph
+generated carries `netgraph-dialect:` and `netgraph-element:` in its banner, so it
+names its own dialect and its own device. A configuration collected off a real
+box has neither, and then the sniffer decides from the shape of the file and
+`--host` names the device — which is the form the check actually runs in:
+
+<!-- norun: needs the file that is really running on pc-desk -->
+```console
+$ ssh pc-desk 'cat /etc/netplan/*.yaml' | netgraph -i examples/home-lab drift --host pc-desk -
+```
+
+Two things follow from comparing against a *configuration* rather than against a
+capture, and both are the point rather than a limitation.
+
+**A configuration is intent, not observation.** It says what the device was asked
+to be, which is not always what it is doing: a link may be down, an address may
+have failed to apply, a file may not have been reloaded since it was edited.
+`ip -j addr show` answers the other question. Both are worth asking, and the
+report names the dialects that saw each device so the answer says which question
+was asked.
+
+**`frr` and `wireguard` can only add.** They see nothing, per the table above, so
+they never report a declared interface, address or member as missing — only
+something configured that the inventory does not declare. Use one of them to
+catch an address or a neighbour somebody added to a router by hand; do not expect
+either to notice that something was removed. For that, pass both files in one run
+— `netgraph drift --host rtr-edge frr.conf 10-netgraph.yaml`. Coverage is the
+union over every dialect that saw a device, so the netplan file supplies the
+interface, address and membership coverage the `frr.conf` cannot.
 
 ---
 
@@ -156,8 +240,8 @@ hosts/pc-desk (computer)
 
 unobserved (2)
   declared, but outside what these dialects see; never counted as drift
-  cables/cbl-sw-desk hosts/pc-desk:eno1, switches/sw-home:port2: no input reported the neighbours of either end; 'lldp' and 'csv' do, 'iproute' does not
-  hosts/pc-desk:lo: the 'iproute' dialect does not import loopback interfaces, so this one could not appear in the capture
+  cables/cbl-sw-desk hosts/pc-desk:eno1, switches/sw-home:port2: no input reported the neighbours of either end; 'lldp', 'csv' do, and nothing else netgraph reads does — a configuration says what a box does with a port, never what is plugged into it
+  hosts/pc-desk:lo: a loopback interface is not something iproute lists, so its absence from the capture says nothing
 
 3 differences across 1 element (+2 undeclared, ~1 disagrees); 2 unobserved
 ```
@@ -235,7 +319,7 @@ $ netgraph -i examples/home-lab drift --only pc-desk -F junit tests/fixtures/dri
   <testsuite name="netgraph drift" tests="2" failures="1" errors="0" skipped="1">
 ...
     <testcase classname="netgraph.drift.cable" name="cables/cbl-sw-desk">
-      <skipped message="no input reported the neighbours of either end; 'lldp' and 'csv' do, 'iproute' does not"/>
+      <skipped message="no input reported the neighbours of either end; 'lldp', 'csv' do, and nothing else netgraph reads does — a configuration says what a box does with a port, never what is plugged into it"/>
     </testcase>
     <testcase classname="netgraph.drift.computer" name="hosts/pc-desk">
       <failure message="3 differences from the captured network" type="drift">
@@ -319,7 +403,7 @@ from `NAME=PATH`, from `--host`, or from the file name, in that order.
 <!-- generated: options drift -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
-| `--from` | `[auto\|lldp\|iproute\|csv]` | `auto` | Input dialect, as for 'netgraph import'. 'auto' sniffs each input on its own: lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', csv is 'device,port,device,port' cabling rows. |
+| `--from` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|wireguard\|interfaces]` | `auto` | Input dialect, as for 'netgraph import'. 'auto' sniffs each input on its own: lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', csv is 'device,port,device,port' cabling rows, and netplan, networkd, ifupdown, frr, wireguard and interfaces are the running configuration in the same dialects 'netgraph export' writes. |
 | `--host` | `NAME` | — | Device every input was captured on. An lldp or iproute capture never names its own host. Without this the name comes from the file name, or from a 'NAME=path' argument. |
 | `--only` | `GLOB` | — | Compare only elements whose fully-qualified or short name matches this glob. Repeatable. |
 | `--exclude` | `GLOB` | — | Leave elements whose name matches this glob out of the comparison. Repeatable. |

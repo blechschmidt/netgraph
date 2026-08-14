@@ -34,6 +34,7 @@ from netgraph.models import (
     Layout,
     PatchPanel,
     Pdu,
+    TestSuite,
     Tunnel,
     User,
 )
@@ -226,10 +227,17 @@ class Inventory:
     #: element — it declares no network fact and is never drawn as a node — so
     #: it is indexed apart from :attr:`elements` and cannot collide with one.
     layouts: dict[str, Layout] = field(default_factory=dict)
+    #: Assertions about the network (§20), keyed by fully-qualified name. Not
+    #: elements either, and indexed apart for the same reason as :attr:`layouts`.
+    test_suites: dict[str, TestSuite] = field(default_factory=dict)
     #: Provenance of each element, keyed by fully-qualified name.
     sources: dict[str, SourceLocation] = field(default_factory=dict)
     #: Provenance of each layout document, keyed the same way.
     layout_sources: dict[str, SourceLocation] = field(default_factory=dict)
+    #: Provenance of each test suite document. Always carries the document's
+    #: field-level redirect table, whatever ``keep_provenance`` says: a failing
+    #: assertion has to name its own line, and there are never many suites.
+    test_suite_sources: dict[str, SourceLocation] = field(default_factory=dict)
     #: Problems found while loading, in the order they were encountered.
     errors: list[LoadError] = field(default_factory=list)
 
@@ -292,6 +300,27 @@ class Inventory:
             return None
         self.layouts[fqn] = layout
         self.layout_sources[fqn] = source
+        return fqn
+
+    def add_test_suite(
+        self, suite: TestSuite, *, namespace: str, source: SourceLocation
+    ) -> str | None:
+        """Index a suite of assertions under ``namespace``.
+
+        Suites have their own name space, for the same reason layouts do: a suite
+        called ``core`` next to a switch called ``core`` is not a clash, because
+        nothing ever resolves one where the other is meant.
+
+        Returns:
+            The fully-qualified name, or ``None`` when a suite of that name is
+            already indexed. The caller reports the clash (``NG-K001``) and the
+            first declaration wins, which keeps loading deterministic.
+        """
+        fqn = qualify(namespace, suite.metadata.name)
+        if fqn in self.test_suites:
+            return None
+        self.test_suites[fqn] = suite
+        self.test_suite_sources[fqn] = source
         return fqn
 
     def record(self, error: LoadError) -> None:

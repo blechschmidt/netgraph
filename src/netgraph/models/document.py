@@ -26,6 +26,7 @@ from netgraph.models.layout import Layout
 from netgraph.models.patchpanel import PatchPanel
 from netgraph.models.pdu import Pdu
 from netgraph.models.template import Template
+from netgraph.models.testsuite import TestSuite
 from netgraph.models.tunnel import Tunnel
 
 __all__ = [
@@ -35,6 +36,7 @@ __all__ = [
     "parse_document",
     "parse_layout",
     "parse_template",
+    "parse_test_suite",
 ]
 
 #: Every concrete element model, in the order kinds are listed in §3.
@@ -73,6 +75,7 @@ Element = Annotated[
 _ELEMENT_ADAPTER: Final[TypeAdapter[Element]] = TypeAdapter(Element)
 _TEMPLATE_ADAPTER: Final[TypeAdapter[Template]] = TypeAdapter(Template)
 _LAYOUT_ADAPTER: Final[TypeAdapter[Layout]] = TypeAdapter(Layout)
+_TEST_SUITE_ADAPTER: Final[TypeAdapter[TestSuite]] = TypeAdapter(TestSuite)
 
 #: pydantic error types that map onto a schema rule of §10.
 _RULE_BY_ERROR_TYPE: Final[dict[str, str]] = {
@@ -158,6 +161,28 @@ def parse_layout(document: Any, *, source: str | None = None) -> Layout:
         raise SchemaError(issues=[_not_a_mapping(document)], source=source)
     try:
         return _LAYOUT_ADAPTER.validate_python(dict(document))
+    except PydanticValidationError as exc:
+        raise SchemaError(issues=_issues_from(exc), source=source) from exc
+
+
+def parse_test_suite(document: Any, *, source: str | None = None) -> TestSuite:
+    """Parse one ``kind: testsuite`` document (§20).
+
+    Only the *shape* of each assertion is checked here — that it names a claim
+    netgraph can grade, and that every key it carries belongs to that claim
+    (``NG-T003``). Whether ``from: pc-alice`` names anything is not knowable from
+    one document, and it is not the validator's question either: an assertion
+    that names nothing is a **failing test**, reported by ``netgraph test``
+    against the assertion's own line, rather than a broken inventory.
+
+    Raises:
+        SchemaError: The document is not a mapping, or does not match the test
+            suite envelope.
+    """
+    if not isinstance(document, Mapping):
+        raise SchemaError(issues=[_not_a_mapping(document)], source=source)
+    try:
+        return _TEST_SUITE_ADAPTER.validate_python(dict(document))
     except PydanticValidationError as exc:
         raise SchemaError(issues=_issues_from(exc), source=source) from exc
 

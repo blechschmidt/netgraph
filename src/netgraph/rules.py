@@ -498,6 +498,20 @@ RULES: Final[tuple[Rule, ...]] = (
         title="duplicate account identifier",
     ),
     Rule(
+        "E047",
+        Severity.ERROR,
+        "An element declares it must keep its gateway under any single failure, and does not.",
+        (),
+        title="declared gateway redundancy is not met",
+    ),
+    Rule(
+        "E048",
+        Severity.ERROR,
+        "An element declares it must keep power under any single failure, and does not.",
+        (),
+        title="declared power redundancy is not met",
+    ),
+    Rule(
         "W101",
         Severity.WARNING,
         "An interface has neither IPv4 nor IPv6 and is not a switchport.",
@@ -776,6 +790,13 @@ RULES: Final[tuple[Rule, ...]] = (
         "A group still lists a user who has departed.",
         ("NG-S015",),
         title="departed user still in a group",
+    ),
+    Rule(
+        "W141",
+        Severity.WARNING,
+        "A redundancy expectation names something the tool does not understand.",
+        (),
+        title="unknown redundancy expectation",
     ),
     Rule(
         "I001",

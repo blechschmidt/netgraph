@@ -1,0 +1,91 @@
+# A deliberately fragile network: two desks and a router, everything hanging off
+# one switch. It is a perfectly *valid* inventory — `netgraph validate` has
+# nothing to say about it — which is the point. The things wrong with it are
+# things only somebody who knows what the network is for can state, and
+# `tests/fixtures/testsuite/tests.yaml` states them.
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      ipv4: [10.0.0.1/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw
+spec:
+  interfaces:
+    - name: br0
+      type: bridge
+      members: [port1, port2, port3]
+    - name: Vlan10
+      type: vlan
+      ipv4: [10.0.0.2/24]
+      vlan: {mode: access, access_vlan: 10}
+      parent: br0
+    - name: port1
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+    - name: port2
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+    - name: port3
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+  vlans:
+    - id: 10
+      name: office
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      ipv4:
+        addresses: [10.0.0.10/24]
+        gateway: 10.0.0.1
+      vlan: {mode: access, access_vlan: 10}
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      ipv4:
+        addresses: [10.0.0.11/24]
+        gateway: 10.0.0.1
+      vlan: {mode: access, access_vlan: 10}
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-rtr
+spec:
+  endpoints: [rtr:eth0, sw:port1]
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a
+spec:
+  endpoints: [pc-a:eth0, sw:port2]
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-b
+spec:
+  endpoints: [pc-b:eth0, sw:port3]
+  medium: copper

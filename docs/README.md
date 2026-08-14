@@ -24,10 +24,12 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
 | diff two inventory states, review the change, and apply it | [commands/plan.md](commands/plan.md), [commands/apply.md](commands/apply.md) |
 | adopt what a live network reports into the declared inventory | [commands/drift.md](commands/drift.md), [commands/plan.md](commands/plan.md) |
 | gate a pull request on the inventory validating | [ci.md](ci.md) |
+| write down what the network is *for*, and fail CI when it stops being true | [commands/test.md](commands/test.md) |
 | bootstrap an inventory from a network that already exists | [importing.md](importing.md) |
 | stop retyping the same flags | [configuration.md](configuration.md) |
 | run it without installing Python or Graphviz | [docker.md](docker.md) |
 | turn the inventory into hosts files, DNS zones, Ansible or Prometheus | [export.md](export.md) |
+| generate the netplan, systemd-networkd, ifupdown, FRR or WireGuard configuration a device would run | [export.md](export.md#device-configuration-the-six-dialects) |
 | hand a diagram to somebody who only has draw.io, and take it back | [drawio.md](drawio.md) |
 | hand over as-built documentation: a page per site and per device | [commands/report.md](commands/report.md) |
 | look up a command's flags | [commands/](commands/README.md) |
@@ -53,8 +55,12 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
   output format is good for.
 * **[validation.md](validation.md)** — the three passes, severities, `--strict`, the four
   ways to suppress a rule, and how to read a finding.
-* **[ci.md](ci.md)** — `netgraph validate` as a gate: the JSON envelope, SARIF and code
-  scanning, inline annotations, the GitHub Action, pre-commit, GitLab.
+* **[ci.md](ci.md)** — `netgraph validate` and `netgraph test` as gates: the JSON
+  envelope, SARIF and code scanning, inline annotations, JUnit, the GitHub Action,
+  pre-commit, GitLab.
+* **[commands/test.md](commands/test.md)** — `kind: testsuite` documents and the eleven
+  assertions `netgraph test` grades. Validation says whether the files cohere; this says
+  whether the network still does what somebody built it to do.
 * **[format.md](format.md)** — the canonical form `netgraph fmt` writes, and why each
   decision in it is the way it is.
 * **[editing.md](editing.md)** — the write path: what an operation is, what its inverse
@@ -68,8 +74,9 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
   conflicts, with the arithmetic spelled out.
 * **[paths.md](paths.md)** — how the trace works, what counts as a hop, several paths and
   none, and how to draw the answer.
-* **[export.md](export.md)** — the six operational artefacts, what each guarantees, what
-  each drops, and how names are folded.
+* **[export.md](export.md)** — the eight operational artefacts, what each guarantees, what
+  each drops, and how names are folded; then the six configuration dialects, which
+  generate the file a device would actually run from.
 * **[drawio.md](drawio.md)** — the draw.io round trip: what the exported diagram
   carries, what a draw.io user may and may not safely change, and how an edited file
   comes back as a reviewable changeset.

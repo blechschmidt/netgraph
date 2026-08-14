@@ -1,0 +1,31 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: testsuite
+metadata:
+  name: office
+spec:
+  description: what the office is supposed to guarantee
+  assertions:
+    - assert: reachable
+      name: both desks reach the router
+      from: name=pc-*
+      to: rtr
+
+    - assert: not-reachable
+      name: the two desks cannot see each other
+      description: Ticket NET-412 asked for client isolation on the office VLAN.
+      from: pc-a
+      to: pc-b
+
+    - assert: port-count-at-least
+      name: the office switch has room to grow
+      select: kind=switch
+      ports: 24
+
+    - assert: count
+      name: there is a second router for failover
+      select: kind=router
+      at_least: 2
+
+    - assert: no-single-point-of-failure
+      name: no single failure takes the office offline
+      layer: l1

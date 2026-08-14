@@ -24,6 +24,7 @@
       "server": "#/$defs/Server",
       "switch": "#/$defs/Switch",
       "template": "#/$defs/Template",
+      "testsuite": "#/$defs/TestSuite",
       "tunnel": "#/$defs/Tunnel",
       "user": "#/$defs/User"
     },
@@ -71,6 +72,9 @@
     },
     {
       "$ref": "#/$defs/Layout"
+    },
+    {
+      "$ref": "#/$defs/TestSuite"
     }
   ],
   "$defs": {
@@ -230,6 +234,271 @@
       ],
       "title": "AdapterSpec",
       "type": "object"
+    },
+    "Assertion": {
+      "additionalProperties": false,
+      "description": "One claim about the network, and everything needed to grade it (§20.2).",
+      "properties": {
+        "assert": {
+          "$ref": "#/$defs/AssertionType"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "from": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "From"
+        },
+        "to": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "To"
+        },
+        "max_hops": {
+          "anyOf": [
+            {
+              "maximum": 64,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Hops"
+        },
+        "hops": {
+          "anyOf": [
+            {
+              "maximum": 64,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hops"
+        },
+        "vlan": {
+          "anyOf": [
+            {
+              "maximum": 4094,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Vlan"
+        },
+        "layer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AssertionLayer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "select": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Select"
+        },
+        "prefix": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prefix"
+        },
+        "interface": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Interface"
+        },
+        "ports": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ports"
+        },
+        "field": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Field"
+        },
+        "equals": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Equals"
+        },
+        "at_least": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At Least"
+        },
+        "at_most": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "At Most"
+        },
+        "min_isolated": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Isolated"
+        }
+      },
+      "required": [
+        "assert"
+      ],
+      "title": "Assertion",
+      "type": "object"
+    },
+    "AssertionLayer": {
+      "description": "Which view of the network an assertion is made about.",
+      "enum": [
+        "any",
+        "l1",
+        "l2",
+        "l3",
+        "power"
+      ],
+      "title": "AssertionLayer",
+      "type": "string"
+    },
+    "AssertionType": {
+      "description": "What an assertion claims. The value is the word written in ``assert``.",
+      "enum": [
+        "reachable",
+        "not-reachable",
+        "path-shorter-than",
+        "same-vlan",
+        "distinct-vlan",
+        "within-prefix",
+        "has-interface",
+        "port-count-at-least",
+        "unique",
+        "count",
+        "no-single-point-of-failure"
+      ],
+      "title": "AssertionType",
+      "type": "string"
     },
     "Band": {
       "description": "§6.2.6 — the three bands 802.11 operates in.\n\nThe band is not derivable from the channel number: channels 1 to 13 exist in\nboth the 2.4 GHz and the 6 GHz plan and mean different frequencies, so a\ndocument that states a channel has to state the band with it (`NG-W003`).",
@@ -2884,6 +3153,74 @@
         }
       },
       "title": "TemplateSpec",
+      "type": "object"
+    },
+    "TestSuite": {
+      "additionalProperties": false,
+      "description": "A ``kind: testsuite`` document: named assertions about the network (§20).",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "testsuite",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. Named assertions about the network the other documents describe, graded by `netgraph test`. Not an element: it declares no device and is never drawn."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/TestSuiteSpec",
+          "title": "spec",
+          "description": "The body of a `testsuite` document: named assertions about the network, graded by `netgraph test`."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "title": "TestSuite",
+      "type": "object"
+    },
+    "TestSuiteSpec": {
+      "additionalProperties": false,
+      "description": "``spec`` of a ``testsuite`` document (§20.1).",
+      "properties": {
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "assertions": {
+          "items": {
+            "$ref": "#/$defs/Assertion"
+          },
+          "maxItems": 1024,
+          "minItems": 1,
+          "title": "Assertions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "assertions"
+      ],
+      "title": "TestSuiteSpec",
       "type": "object"
     },
     "Tunnel": {

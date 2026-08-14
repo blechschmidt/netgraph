@@ -37,12 +37,14 @@ import json
 import re
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Final
 
 import pytest
 from click.testing import CliRunner
 
 from netgraph.cli import cli
 from netgraph.export import (
+    CONFIG_FORMATS,
     EXPORTERS,
     FORMATS,
     ExportContext,
@@ -851,7 +853,11 @@ def test_a_hostile_inventory_exports_without_raising(
     export_format: str, hostile: Inventory
 ) -> None:
     result = run_export(hostile, export_format)
-    assert result.payload
+    # An empty payload is only legitimate for a configuration dialect that
+    # selected nothing — ``frr`` over an inventory with no routing, ``wireguard``
+    # over one with no tunnel. It then has to say so, which is the assertion that
+    # keeps "nothing to configure" apart from "the emitter fell over".
+    assert result.payload or (result.bundle is not None and result.manifest.skipped)
     # The manifest is itself a document a consumer parses, so it has to survive
     # the same input.
     assert json.loads(result.manifest.to_json())["kind"] == "ExportManifest"
@@ -1237,14 +1243,29 @@ def runner() -> CliRunner:
     return CliRunner()
 
 
+#: The example and the element that give each configuration dialect something to
+#: write. ``frr`` needs a device that declares routing and ``wireguard`` one that
+#: terminates a tunnel; the home lab has neither, and a dialect with nothing to
+#: say correctly writes nothing — which is asserted separately.
+_CONFIG_SUBJECTS: Final[dict[str, tuple[str, str]]] = {
+    "frr": ("campus", "sw-north-acc-01"),
+    "wireguard": ("overlay", "rtr-hq"),
+}
+
+
 @pytest.mark.parametrize("export_format", FORMATS)
 def test_the_cli_writes_the_artefact_to_stdout_and_the_manifest_to_stderr(
     export_format: str, runner: CliRunner
 ) -> None:
     """``netgraph export ... | consumer`` must not be polluted by commentary."""
-    arguments = ["-i", str(EXAMPLES / "home-lab"), "export", export_format]
+    example, name = _CONFIG_SUBJECTS.get(export_format, ("home-lab", "rtr-home"))
+    arguments = ["-i", str(EXAMPLES / example), "export", export_format]
     if export_format == "dns-zone":
         arguments += ["--origin", "example.com"]
+    if export_format in CONFIG_FORMATS:
+        # A configuration dialect's artefact is a tree, and stdout holds one
+        # device's; the multi-device form is ``--out DIR``.
+        arguments += ["--name", name]
     result = runner.invoke(cli, arguments, catch_exceptions=False)
     assert result.exit_code == 0, result.output
     assert result.stdout

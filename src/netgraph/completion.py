@@ -75,6 +75,7 @@ __all__ = [
     "complete_node",
     "complete_profile",
     "complete_rule",
+    "complete_test_suite",
     "completion_script",
 ]
 
@@ -370,6 +371,29 @@ def complete_node(
     a name the filter then rejects.
     """
     return _element_items(ctx, incomplete, nodes_only=True)
+
+
+def complete_test_suite(
+    ctx: click.Context, param: click.Parameter, incomplete: str
+) -> list[CompletionItem]:
+    """Every ``kind: testsuite`` document of the inventory named by ``-i``.
+
+    For ``netgraph test [SUITE]...``. A suite is not an element, so it is not in
+    the element index that :func:`complete_element` reads.
+    """
+    from netgraph.loader import load_tree  # imported late: completion must start fast
+
+    try:
+        inventory = load_tree(_inventory_path(ctx))
+    except Exception:  # see _load_elements: a completer never fails, it offers nothing
+        return []
+    return _items(
+        (
+            (fqn, count_text(len(suite.assertions), "assertion"))
+            for fqn, suite in inventory.test_suites.items()
+        ),
+        incomplete,
+    )
 
 
 def complete_namespace(
