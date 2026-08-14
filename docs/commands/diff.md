@@ -23,6 +23,7 @@ comparable to the one you had before.
 
 - [Synopsis](#synopsis)
 - [Where the two sides come from](#where-the-two-sides-come-from)
+- [Two revisions](#two-revisions)
 - [Reading the diagram](#reading-the-diagram)
 - [One layer at a time](#one-layer-at-a-time)
 - [Narrowing what is marked](#narrowing-what-is-marked)
@@ -77,6 +78,45 @@ checks it: a plan made against a tree that has since moved on is refused.
 $ netgraph -i tests/fixtures/diff/home-lab-proposed diff --from examples/home-lab -f json -o /dev/null
 diff at layer l1: 2 added, 4 changed, 2 removed
 ```
+
+---
+
+## Two revisions
+
+Neither side has to be the working tree. `--from` and `--to` each take any
+revision git resolves — a hash, a tag, a branch, `HEAD~10`, `origin/main@{2
+weeks ago}` — so any two points in the inventory's history can be drawn against
+each other:
+
+<!-- norun: the revisions are this reader's, not this repository's -->
+```console
+$ netgraph -i net diff --from v1.0 --to v2.0 -f svg -o release.svg
+$ netgraph -i net diff --from HEAD~1 --to HEAD -f svg -o last-change.svg
+$ netgraph -i net diff --from 'origin/main' -f html -o review.html
+```
+
+Both sides are read out of the **object database** with `git archive`, into a
+temporary directory that is removed afterwards. Nothing is checked out, the
+index is not touched, and an uncommitted change in the tree is neither used nor
+disturbed — so this is safe to run mid-edit, and safe to run while
+[`netgraph web`](web.md) has the same folder open.
+
+[`netgraph log`](log.md) is how you find the two revisions, and
+[the editor's timeline](web.md#the-history-timeline) is this command as a
+scrubber: one frame per commit, each drawn against its parent.
+
+Two failures are told apart, because they mean different things:
+
+<!-- norun: the repository is the reader's -->
+```console
+$ netgraph -i net diff --from v0.1
+error: v0.1 has no 'net' directory in it, so there is no inventory to read at that revision
+$ netgraph -i net diff --from v0.0
+error: git cannot read 'v0.0'; check that the ref exists and that the inventory directory is present in it
+```
+
+The first is a repository that grew its inventory folder later, which is a fact
+about the history; the second is a ref nobody has heard of, which is a typo.
 
 ---
 
@@ -253,6 +293,7 @@ so once per side.
 
 ## See also
 
+- [`netgraph log`](log.md) — which revisions there are to diff, and what each did.
 - [`netgraph plan`](plan.md) — the same changeset, as text.
 - [`netgraph apply`](apply.md) — executing one against the files.
 - [`netgraph render`](render.md) — the formats, the layers and the filters.

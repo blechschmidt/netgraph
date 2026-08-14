@@ -472,6 +472,45 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         detail="The session as a 'netgraph edit' script somebody else can review or run.",
         needs="session",
     ),
+    Binding(
+        id="timeline.toggle",
+        title="History timeline",
+        section="Files and history",
+        keys=("Ctrl-Shift-H",),
+        detail=(
+            "A scrubber over the commits that changed this inventory. The diagram becomes the "
+            "diff the selected commit carries against its parent, arranged as that revision "
+            "arranged it."
+        ),
+        needs="session",
+    ),
+    Binding(
+        id="timeline.prev",
+        title="Older revision",
+        section="Files and history",
+        keys=("Alt-ArrowLeft",),
+        detail="One commit back along the timeline. Stops the playback if it is running.",
+        needs="session",
+    ),
+    Binding(
+        id="timeline.next",
+        title="Newer revision",
+        section="Files and history",
+        keys=("Alt-ArrowRight",),
+        detail="One commit forward along the timeline.",
+        needs="session",
+    ),
+    Binding(
+        id="timeline.play",
+        title="Play the history",
+        section="Files and history",
+        keys=("Alt-P",),
+        detail=(
+            "Step through the range by itself, a frame at a time, until the newest revision or "
+            "until one that will not load."
+        ),
+        needs="session",
+    ),
 )
 
 

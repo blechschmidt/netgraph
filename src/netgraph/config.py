@@ -63,12 +63,16 @@ else:  # pragma: no cover - trivial version fork
 __all__ = [
     "CACHE_TABLE",
     "CONFIG_FILE_NAME",
+    "DEFAULT_MAX_REVISIONS",
+    "HISTORY_TABLE",
     "CacheConfig",
     "Config",
+    "HistoryConfig",
     "ValidationConfig",
     "load_config",
     "parse_cache",
     "parse_config",
+    "parse_history",
 ]
 
 #: Name of the per-inventory configuration file.
@@ -80,6 +84,18 @@ _VALIDATE_KEYS: Final[frozenset[str]] = frozenset({"strict", "ignore", "severity
 
 #: The table configuring the parse cache.
 CACHE_TABLE: Final = "cache"
+
+#: The table configuring how much history a timeline will look at.
+HISTORY_TABLE: Final = "history"
+
+#: How many revisions a range may hold before ``netgraph log`` and the editor's
+#: timeline refuse it. Each one costs two inventory loads and, in the editor,
+#: two Graphviz runs; a hundred is already more history than a scrubber can
+#: address one pixel at a time on a laptop. See :mod:`netgraph.history`.
+DEFAULT_MAX_REVISIONS: Final = 100
+
+#: Keys accepted inside ``[history]``.
+_HISTORY_KEYS: Final[frozenset[str]] = frozenset({"max-revisions"})
 
 #: Keys accepted inside ``[cache]``.
 _CACHE_KEYS: Final[frozenset[str]] = frozenset({"enabled", "dir", "max-size"})
@@ -181,6 +197,22 @@ class CacheConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class HistoryConfig:
+    """The ``[history]`` table: how far back a timeline is willing to go.
+
+    One key, because there is one decision. Drawing a range costs two Graphviz
+    runs per revision in it, so the number of revisions a command will accept
+    without being told twice is a property of the inventory and of the machine
+    it is read on — a five-commit home lab and a repository with a decade of
+    change reasonably answer differently.
+    """
+
+    #: Most revisions one range may hold before ``netgraph log`` and the
+    #: editor's timeline refuse it.
+    max_revisions: int = DEFAULT_MAX_REVISIONS
+
+
+@dataclass(frozen=True, slots=True)
 class Config:
     """Everything ``netgraph.toml`` configures."""
 
@@ -194,6 +226,8 @@ class Config:
     profiles: Mapping[str, RenderConfig] = field(default_factory=lambda: _EMPTY_PROFILES)
     #: The ``[cache]`` table.
     cache: CacheConfig = field(default_factory=CacheConfig)
+    #: The ``[history]`` table.
+    history: HistoryConfig = field(default_factory=HistoryConfig)
 
     @property
     def is_default(self) -> bool:
@@ -293,7 +327,32 @@ def parse_config(data: Mapping[str, Any], *, path: Path | None = None) -> Config
         render=parse_render(data.get(RENDER_TABLE, {}), prefix=where, base=base),
         profiles=parse_profiles(data.get(PROFILE_TABLE, {}), prefix=where, base=base),
         cache=parse_cache(data.get(CACHE_TABLE, {}), where=where, base=base),
+        history=parse_history(data.get(HISTORY_TABLE, {}), where=where),
     )
+
+
+def parse_history(value: Any, *, where: str = "") -> HistoryConfig:
+    """Parse the ``[history]`` table.
+
+    Raises:
+        ConfigurationError: The table holds an unknown key or a bad value.
+    """
+    if not isinstance(value, Mapping):
+        raise ConfigurationError(f"{where}'{HISTORY_TABLE}' must be a table, got {_kind(value)}")
+    unknown = sorted(set(value) - _HISTORY_KEYS)
+    if unknown:
+        known = ", ".join(sorted(_HISTORY_KEYS))
+        raise ConfigurationError(
+            f"{where}unknown key(s) in [{HISTORY_TABLE}]: {', '.join(unknown)}; "
+            f"expected one of {known}"
+        )
+    key = f"{HISTORY_TABLE}.max-revisions"
+    raw = value.get("max-revisions", DEFAULT_MAX_REVISIONS)
+    if isinstance(raw, bool) or not isinstance(raw, int):
+        raise ConfigurationError(f"{where}{key} must be a whole number, got {_kind(raw)}")
+    if raw < 1:
+        raise ConfigurationError(f"{where}{key} must be at least 1, got {raw}")
+    return HistoryConfig(max_revisions=raw)
 
 
 def parse_cache(value: Any, *, where: str = "", base: Path | None = None) -> CacheConfig:

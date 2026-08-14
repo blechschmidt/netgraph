@@ -132,6 +132,36 @@ DIRECT_MANIPULATION: Final = (
     "The test asserts what the gesture must write once direct manipulation lands"
 )
 
+#: A switch the history test adds in one of its commits, so that a frame of the
+#: timeline has one green box on it and not merely a faded diagram.
+NEW_SWITCH: Final = """\
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-lab
+  description: Added in a commit, so a frame of the history has something in it.
+spec:
+  interfaces:
+    - name: eth1
+      type: ethernet
+"""
+
+#: One placed node, committed by the arrangement test. Enough to make the frame
+#: report a stored geometry; the coordinates themselves are checked in
+#: ``tests/test_layout.py``.
+FIXED_LAYOUT: Final = """\
+apiVersion: netgraph.dev/v1alpha1
+kind: layout
+metadata:
+  name: layout
+spec:
+  views:
+    physical:
+      nodes:
+        routers/rtr-home:
+          position: {x: 1234, y: 4321}
+"""
+
 #: Which axe-core rule sets the page is held to. The standards, and only the
 #: standards: axe's ``best-practice`` tag carries opinions ("every region should
 #: be a landmark", "id attributes should be unique across the document") that a
@@ -1146,6 +1176,188 @@ def test_a_read_only_session_offers_the_drawer_but_no_revert(
 
 
 # --------------------------------------------------------------------------- #
+# The history timeline
+# --------------------------------------------------------------------------- #
+
+
+def _a_history(root: Path) -> list[str]:
+    """Put the home lab in a repository with four commits over it.
+
+    Built before the session opens, so ``open_editor`` finds the tree already
+    there and serves it as it is. Returns the subjects, oldest first.
+    """
+    root.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(HOME_LAB, root, dirs_exist_ok=True)
+
+    def git(*arguments: str) -> None:
+        subprocess.run(["git", *arguments], cwd=root, check=True, capture_output=True)
+
+    git("init", "-q", ".")
+    git("config", "user.email", "scrub@example.invalid")
+    git("config", "user.name", "Scrubber")
+    git("config", "commit.gpgsign", "false")
+    git("add", "-A")
+    git("commit", "-qm", "Bring the home lab under description")
+
+    (root / "switches" / "sw-lab.yaml").write_text(NEW_SWITCH, encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-qm", "Add a lab switch")
+
+    (root / "broken.yaml").write_text("this: [is not\n", encoding="utf-8")
+    git("add", "-A")
+    git("commit", "-qm", "Break the tree on purpose")
+
+    (root / "broken.yaml").unlink()
+    git("add", "-A")
+    git("commit", "-qm", "Unbreak the tree")
+    return [
+        "Bring the home lab under description",
+        "Add a lab switch",
+        "Break the tree on purpose",
+        "Unbreak the tree",
+    ]
+
+
+def test_the_timeline_scrubs_the_inventory_across_its_commits(
+    open_editor: OpenEditor, tmp_path: Path
+) -> None:
+    """The feature, end to end: open the scrubber, step back, watch it repaint.
+
+    What is asserted is what a reader would look at — the commit named beside
+    the control, the diagram becoming that commit's diff, and a revision that
+    will not load saying so instead of going quietly blank.
+    """
+    subjects = _a_history(tmp_path / "inventory")
+    editor = open_editor()
+    page = editor.page
+
+    expect(page.locator("#timeline")).to_be_hidden()
+    page.locator("#timeline-toggle").click()
+    expect(page.locator("#timeline")).to_be_visible()
+    expect(page.locator("#legend")).to_be_visible()
+
+    # It opens on the newest commit, named in full: a hash alone places nothing.
+    expect(page.locator("#timeline-subject")).to_have_text(subjects[-1])
+    expect(page.locator("#timeline-who")).to_contain_text("Scrubber")
+    expect(page.locator("#timeline-hash")).not_to_have_text("")
+    expect(page.locator("#timeline-range")).to_have_value("3")
+
+    # "Unbreak the tree" is drawn against a revision that does not load, so the
+    # frame says which one rather than presenting an empty diagram as an answer.
+    expect(page.locator("#timeline")).to_have_class(re.compile(r"\bbroken\b"))
+    expect(page.locator("#timeline-summary")).to_contain_text("does not load")
+    expect(page.locator("#placeholder")).to_be_visible()
+
+    page.locator("#timeline-prev").click()
+    expect(page.locator("#timeline-subject")).to_have_text(subjects[2])
+    expect(page.locator("#timeline-summary")).to_contain_text("does not load")
+
+    # Back one more and the history is readable again: the commit that added a
+    # switch is one green box on an otherwise untouched diagram.
+    page.locator("#timeline-prev").click()
+    expect(page.locator("#timeline-subject")).to_have_text(subjects[1])
+    expect(page.locator("#timeline-summary")).to_have_text("1 device added")
+    expect(page.locator("#timeline")).not_to_have_class(re.compile(r"\bbroken\b"))
+    expect(page.locator("#viewport svg")).to_be_visible()
+    expect(page.locator("#viewport")).to_contain_text("sw-lab")
+
+    # And the first commit of the repository is the whole network arriving.
+    page.locator("#timeline-prev").click()
+    expect(page.locator("#timeline-subject")).to_have_text(subjects[0])
+    expect(page.locator("#timeline-summary")).to_contain_text("devices added")
+    expect(page.locator("#timeline-prev")).to_be_disabled()
+
+    # Leaving the history puts the working tree back, switch and all.
+    page.locator("#timeline-now").click()
+    expect(page.locator("#timeline")).to_be_hidden()
+    expect(page.locator("#legend")).to_be_hidden()
+    expect(page.locator("#viewport")).to_contain_text("sw-lab")
+
+
+def test_the_timeline_plays_through_the_range(open_editor: OpenEditor, tmp_path: Path) -> None:
+    """The play control steps by itself, and stops where it cannot go on."""
+    _a_history(tmp_path / "inventory")
+    editor = open_editor()
+    page = editor.page
+
+    page.locator("#timeline-toggle").click()
+    expect(page.locator("#timeline-range")).to_have_value("3")
+    page.locator("#timeline-range").fill("0")
+    page.locator("#timeline-range").dispatch_event("input")
+    expect(page.locator("#timeline-range")).to_have_value("0")
+
+    page.locator("#timeline-play").click()
+
+    # It stops of its own accord at the revision that will not load, rather than
+    # flicking past the one frame worth stopping on. Where it stopped is what is
+    # asserted, not that it was ever seen mid-flight: a three-frame range can be
+    # over before a poll catches it, and a test that raced it would be flaky
+    # about the one thing that is deterministic.
+    expect(page.locator("#timeline-summary")).to_contain_text("does not load", timeout=TIMEOUT_MS)
+    expect(page.locator("#timeline-play")).to_have_attribute("aria-pressed", "false")
+    expect(page.locator("#timeline-range")).to_have_value("2")
+
+
+def test_the_timeline_keeps_each_revisions_own_arrangement(
+    open_editor: OpenEditor, tmp_path: Path
+) -> None:
+    """A diagram that was arranged stays arranged as you scrub back to it.
+
+    The layout document is part of the inventory, so it is read out of the same
+    revision as everything else. Nothing special happens here — which is the
+    claim being checked.
+    """
+    root = tmp_path / "inventory"
+    _a_history(root)
+    (root / "layout.yaml").write_text(FIXED_LAYOUT, encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-qm", "Arrange the diagram"], cwd=root, check=True, capture_output=True
+    )
+    editor = open_editor()
+    page = editor.page
+
+    page.locator("#timeline-toggle").click()
+    expect(page.locator("#timeline-subject")).to_have_text("Arrange the diagram")
+    arranged = editor.api(f"/api/frame?rev=HEAD&{PAGE_QUERY}")
+    assert arranged["geometry"] is not None
+
+    # The revision before it was committed has no arrangement, and says so
+    # rather than borrowing this one.
+    before = editor.api(f"/api/frame?rev=HEAD~1&{PAGE_QUERY}")
+    assert before["geometry"] is None
+    assert before["subject"] == "Unbreak the tree"
+
+
+def test_a_session_with_no_repository_says_so_in_the_timeline(
+    open_editor: OpenEditor,
+) -> None:
+    """No history is a thing to report, not a control that does nothing."""
+    editor = open_editor()
+    page = editor.page
+
+    page.locator("#timeline-toggle").click()
+
+    expect(page.locator("#timeline")).to_be_visible()
+    expect(page.locator("#timeline-subject")).to_contain_text("not inside a git repository")
+    expect(page.locator("#timeline-range")).to_be_disabled()
+    expect(page.locator("#timeline-play")).to_be_disabled()
+    editor.console.allow("400")
+
+
+def test_the_timeline_has_no_accessibility_violations(
+    open_editor: OpenEditor, tmp_path: Path
+) -> None:
+    _a_history(tmp_path / "inventory")
+    editor = open_editor()
+    editor.page.locator("#timeline-toggle").click()
+    expect(editor.page.locator("#timeline-subject")).not_to_have_text("")
+
+    violations = _violations(editor)
+    assert not violations, "the history timeline:\n" + _explain(violations)
+
+
+# --------------------------------------------------------------------------- #
 # Two tabs, one session
 # --------------------------------------------------------------------------- #
 
@@ -1673,10 +1885,21 @@ def test_a_keyboard_only_session_creates_connects_and_undoes(open_editor: OpenEd
 
 
 def _all_yaml(editor: Editor) -> str:
-    """Every document in the tree, concatenated. What was actually written."""
-    return "\n".join(
-        path.read_text(encoding="utf-8") for path in sorted(editor.root.rglob("*.yaml"))
-    )
+    """Every document in the tree, concatenated. What was actually written.
+
+    Polled by ``settles`` while the server is writing, so a file named by the
+    walk may be gone by the time it is read — an undo that removes the document
+    a gesture created does exactly that. A vanished file is not an error here;
+    it is the change being waited for.
+    """
+    return "\n".join(_read_if_there(path) for path in sorted(editor.root.rglob("*.yaml")))
+
+
+def _read_if_there(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return ""
 
 
 def test_a_letter_gesture_does_not_fire_while_typing_yaml(open_editor: OpenEditor) -> None:

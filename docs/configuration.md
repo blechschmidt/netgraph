@@ -42,6 +42,7 @@ declared the defaults, and `netgraph init` scaffolds a fully commented copy.
 - [Seeing what resolved, and why](#seeing-what-resolved-and-why)
 - [Every render setting](#every-render-setting)
 - [`[cache]` — remembering parsed files](#cache--remembering-parsed-files)
+- [`[history]` — how far back a timeline goes](#history--how-far-back-a-timeline-goes)
 - [Errors](#errors)
 
 ## Where the file is looked for
@@ -379,6 +380,32 @@ restores between builds and get the hit instead:
 Container images that run one command and exit should set `NETGRAPH_NO_CACHE=1`;
 this project's own image instead points `XDG_CACHE_HOME` at `/tmp`, so a
 read-only home directory is not a problem either way.
+
+## `[history]` — how far back a timeline goes
+
+```toml
+[history]
+max-revisions = 100
+```
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `max-revisions` | integer ≥ 1 | `100` | Most revisions of the inventory one range may hold before it is refused. |
+
+Read by [`netgraph log`](commands/log.md) and by the timeline in
+[`netgraph web`](commands/web.md#the-history-timeline). It exists because
+reading history is not free: summarising one commit means loading the inventory
+on both sides of it, and *drawing* one means a Graphviz layout as well. A
+hundred is already more history than a scrubber can address a pixel at a time,
+and a repository with a decade of commits would otherwise turn one command into
+several hundred renders.
+
+The two consumers spend it differently, on purpose. `netgraph log` **refuses** a
+range wider than this and says so, because a range is something you asked for by
+name. The editor **truncates** to the newest and says how many there are,
+because a scrubber that shows nothing is not a better answer than a scrubber
+that shows the recent past. `netgraph log --max-revisions` overrides the file
+for one invocation.
 
 ## Errors
 

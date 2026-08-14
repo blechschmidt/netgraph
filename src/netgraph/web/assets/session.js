@@ -58,6 +58,11 @@ var netgraphSession = (function () {
   var POLL_MS = 1000;
   /** How long the stream has to say hello before we give up on it. */
   var STREAM_TIMEOUT_MS = 4000;
+  /** How long one frame of the history is held before the next, in ms. Long
+   *  enough to read the subject beside it; short enough that a dozen commits
+   *  are a sequence rather than a slideshow. A frame slower than this makes the
+   *  next tick coalesce, which is the honest behaviour -- see playTimeline. */
+  var PLAY_MS = 1200;
   /** How many times a stream may drop and reconnect before we stop trusting it.
    *  EventSource retries by itself, so a couple of failures is a hiccup and a
    *  steady trickle of them is a proxy that will not carry this. */
@@ -74,6 +79,16 @@ var netgraphSession = (function () {
   /** The changes drawer: is it showing, what has it been told, and what is the
    *  diagram being drawn against while it is. */
   var changes = { open: false, against: "session", entries: [], commands: [], baselines: [] };
+  /** The history scrubber: the commits it can step over, oldest first, which
+   *  one is selected, and whether it is stepping through them by itself. */
+  var timeline = {
+    open: false, commits: [], index: -1, playing: false, timer: null,
+    bound: 0, message: "", loaded: false,
+    /** What each frame turned out to hold, keyed by commit hash. Remembered
+     *  rather than recomputed so that scrubbing back to a frame says what it
+     *  did before its picture has been fetched again. */
+    summaries: {}
+  };
   /** The push channel: the connection, where we are in its numbering, and
    *  whether we have given up on it and fallen back to polling. */
   var link = { source: null, id: 0, live: false, failures: 0, timer: null, why: "" };
@@ -101,6 +116,7 @@ var netgraphSession = (function () {
     el.filesRoot.textContent = initial.root || "";
     el.filesMode.textContent = initial.writable ? "read-write" : "read-only";
     el.filesMode.className = "hint " + (initial.writable ? "rw" : "ro");
+    el.timelineToggle.hidden = false;
     el.editorTitle.textContent = "no file open";
     el.editorHint.textContent = "choose a document on the left";
     el.source.readOnly = true;
@@ -123,6 +139,19 @@ var netgraphSession = (function () {
     el.changesAgainst.addEventListener("change", function () {
       changes.against = el.changesAgainst.value;
       if (changes.open) { host.render(); }
+    });
+    el.timelineToggle.addEventListener("click", function () { showTimeline(!timeline.open); });
+    el.timelineClose.addEventListener("click", function () { showTimeline(false); });
+    el.timelineNow.addEventListener("click", function () { showTimeline(false); });
+    el.timelinePlay.addEventListener("click", function () { playTimeline(); });
+    el.timelinePrev.addEventListener("click", function () { stopPlaying(); stepTimeline(-1); });
+    el.timelineNext.addEventListener("click", function () { stopPlaying(); stepTimeline(1); });
+    // `input` rather than `change`: dragging the slider should repaint as it
+    // goes, which is what makes it a scrubber rather than a chooser. Frames
+    // already drawn come out of the cache, so a drag over old ground is free.
+    el.timelineRange.addEventListener("input", function () {
+      stopPlaying();
+      stepTimeline(parseInt(el.timelineRange.value, 10) - timeline.index);
     });
     // Ctrl-S, Ctrl-Z and Escape used to be caught here. They are commands now,
     // registered in defineCommands() below and bound by netgraph.web.bindings,
@@ -783,11 +812,16 @@ var netgraphSession = (function () {
    * change is this file's business, and app.js only has to draw what comes back.
    */
   function graphPath(query) {
+    var frame = framePath(query);
+    if (frame) { return frame; }
     if (!changes.open) { return "/api/graph?" + query; }
     return "/api/diff?" + query + "&against=" + encodeURIComponent(changes.against);
   }
 
   function showChanges(next) {
+    // One canvas, two overlays; the history yields to the drawer as the drawer
+    // yields to it.
+    if (next && timeline.open) { showTimeline(false); }
     changes.open = !!next;
     el.changes.hidden = !changes.open;
     el.changesToggle.setAttribute("aria-expanded", changes.open ? "true" : "false");
@@ -1005,6 +1039,181 @@ var netgraphSession = (function () {
     if (ok) { done(); } else { host.toast("could not copy; select the text instead", "error"); }
   }
 
+  /* ------------------------------------------------------ history timeline */
+
+  /* The same overlay the changes drawer paints, over a different pair of
+   * states: a commit and its parent, instead of the working tree and a
+   * baseline. Everything downstream is shared -- the server renders it with the
+   * same code `netgraph diff` runs, app.js draws it into the same canvas, and
+   * the legend means the same four things.
+   *
+   * What is this file's own business:
+   *
+   *   * **The commit list is fetched once per opening, not per frame.** Listing
+   *     costs one `git log`; summarising a commit costs two inventory loads, so
+   *     only the *selected* one is summarised and that comes back with its
+   *     frame.
+   *   * **Oldest on the left.** The server answers newest-first, which is what a
+   *     log wants; a scrubber wants time running the way a reader expects, so
+   *     the list is reversed on arrival and the index is the slider's value.
+   *   * **Play advances on a timer and never overlaps.** app.js queues a render
+   *     that arrives while one is in flight, so a tick during a slow frame
+   *     coalesces rather than piling up; reaching the newest commit stops.
+   *   * **A refusal is shown in the bar, not swallowed.** No repository, no
+   *     history, a range wider than the bound: the scrubber says which and
+   *     stays open, because "why is this empty" is a question it should answer.
+   */
+
+  function showTimeline(next) {
+    timeline.open = !!next;
+    el.timeline.hidden = !timeline.open;
+    el.timelineToggle.setAttribute("aria-expanded", timeline.open ? "true" : "false");
+    el.timelineToggle.classList.toggle("on", timeline.open);
+    if (!timeline.open) {
+      stopPlaying();
+      host.render();
+      return;
+    }
+    // The two are one canvas and cannot both have it. Opening the history puts
+    // the drawer away rather than drawing this afternoon's edits over a commit
+    // from March.
+    if (changes.open) { showChanges(false); }
+    el.legend.hidden = false;
+    // Listed afresh on every opening, not once per session: a session outlives
+    // commits, and a scrubber missing the commit somebody just made is the same
+    // lie the changes drawer refuses to tell. It is one `git log`.
+    if (timeline.loaded) { paintTimeline(); host.render(); }
+    refreshTimeline();
+  }
+
+  function refreshTimeline() {
+    return fetch("/api/history", { cache: "no-store" })
+      .then(readBody)
+      .then(function (body) {
+        // Oldest first: see above.
+        timeline.commits = (body.commits || []).slice().reverse();
+        timeline.bound = body.bound || 0;
+        // Truncated, not refused -- and said so rather than implying that the
+        // newest hundred are all there ever were.
+        timeline.message = body.truncated
+          ? "the newest " + timeline.commits.length + " of " + body.total + " revisions"
+          : "";
+        timeline.loaded = true;
+        if (timeline.index < 0 || timeline.index >= timeline.commits.length) {
+          timeline.index = timeline.commits.length - 1;
+        }
+        paintTimeline();
+        host.render();
+      })
+      .catch(function (error) {
+        timeline.commits = [];
+        timeline.index = -1;
+        timeline.loaded = true;
+        timeline.message = String((error.body && error.body.message) || error.message || error);
+        paintTimeline();
+        host.render();
+      });
+  }
+
+  /** The commit the canvas is showing, or null when the history is not in use. */
+  function frameCommit() {
+    if (!timeline.open) { return null; }
+    return timeline.commits[timeline.index] || null;
+  }
+
+  function stepTimeline(delta) {
+    if (!timeline.commits.length) { return false; }
+    var next = timeline.index + delta;
+    if (next < 0 || next >= timeline.commits.length) { return false; }
+    timeline.index = next;
+    paintTimeline();
+    host.render();
+    return true;
+  }
+
+  function playTimeline(next) {
+    var wanted = next === undefined ? !timeline.playing : !!next;
+    if (wanted === timeline.playing) { return; }
+    if (!wanted) { stopPlaying(); return; }
+    if (timeline.index >= timeline.commits.length - 1) { timeline.index = 0; }
+    timeline.playing = true;
+    paintTimeline();
+    timeline.timer = window.setInterval(function () {
+      if (!stepTimeline(1)) { stopPlaying(); }
+    }, PLAY_MS);
+    host.render();
+  }
+
+  function stopPlaying() {
+    window.clearInterval(timeline.timer);
+    timeline.timer = null;
+    if (!timeline.playing) { return; }
+    timeline.playing = false;
+    paintTimeline();
+  }
+
+  /** Which URL a frame comes from, or null when the history is not showing. */
+  function framePath(query) {
+    var commit = frameCommit();
+    if (!commit) { return null; }
+    return "/api/frame?" + query + "&rev=" + encodeURIComponent(commit.hash);
+  }
+
+  function paintTimeline() {
+    var commit = frameCommit();
+    var range = el.timelineRange;
+    range.max = String(Math.max(0, timeline.commits.length - 1));
+    range.value = String(Math.max(0, timeline.index));
+    range.disabled = timeline.commits.length < 2;
+    el.timelinePlay.setAttribute("aria-pressed", timeline.playing ? "true" : "false");
+    el.timelinePlay.textContent = timeline.playing ? "❚❚" : "▶";
+    el.timelinePlay.disabled = timeline.commits.length < 2;
+    el.timelinePrev.disabled = timeline.index <= 0;
+    el.timelineNext.disabled = timeline.index >= timeline.commits.length - 1;
+    if (!commit) {
+      el.timelineHash.textContent = "";
+      el.timelineSubject.textContent = timeline.message
+        || "no commit has touched this inventory";
+      el.timelineWho.textContent = "";
+      el.timelineSummary.textContent = "";
+      el.timeline.classList.toggle("broken", !!timeline.message);
+      return;
+    }
+    el.timelineHash.textContent = commit.abbrev;
+    el.timelineSubject.textContent = commit.subject;
+    el.timelineSubject.title = commit.subject;
+    el.timelineWho.textContent = commit.author + " · " + (commit.date || "").slice(0, 10)
+      + (timeline.message ? " · " + timeline.message : "");
+    // The summary belongs to the *frame*, which is only known once it has been
+    // drawn once. Until then, say which of the range this is rather than
+    // leaving a gap that reads as "nothing changed".
+    var known = timeline.summaries[commit.hash];
+    el.timelineSummary.textContent = known
+      ? known.summary
+      : (timeline.index + 1) + " of " + timeline.commits.length;
+    el.timelineSummary.title = known ? known.summary : "";
+    el.timeline.classList.toggle("broken", !!(known && known.error));
+  }
+
+  /** app.js has drawn something. If it was a frame, say what it held.
+   *
+   * The answer is matched against the frame *currently* selected before it is
+   * allowed to stop anything. A render in flight when the selection moves still
+   * comes back, and a frame that failed two steps ago must not reach out of the
+   * past to halt a playback that has already gone by it. Its summary is
+   * remembered either way -- that is keyed by commit and is true whenever it
+   * arrives.
+   */
+  function drew(result) {
+    if (!timeline.open || !result || !result.hash) { return; }
+    timeline.summaries[result.hash] = { summary: result.summary || "", error: result.error };
+    var current = frameCommit();
+    // A revision that will not load stops the playback rather than being
+    // skipped: it is a fact about the history, and one worth stopping on.
+    if (result.error && current && current.hash === result.hash) { stopPlaying(); }
+    paintTimeline();
+  }
+
   /* ------------------------------------------------------- edit gestures */
 
   /* Everything below turns a keystroke into a batch of netgraph.edit
@@ -1120,6 +1329,29 @@ var netgraphSession = (function () {
       enabled: function () { return state.redo ? true : "nothing to redo"; }
     });
     K.define("changes.toggle", { run: function () { showChanges(!changes.open); } });
+    K.define("timeline.toggle", { run: function () { showTimeline(!timeline.open); } });
+    K.define("timeline.prev", {
+      run: function () { stopPlaying(); stepTimeline(-1); },
+      enabled: function () {
+        if (!timeline.open) { return "the history is not showing"; }
+        return timeline.index > 0 ? true : "this is the oldest revision listed";
+      }
+    });
+    K.define("timeline.next", {
+      run: function () { stopPlaying(); stepTimeline(1); },
+      enabled: function () {
+        if (!timeline.open) { return "the history is not showing"; }
+        return timeline.index < timeline.commits.length - 1
+          ? true : "this is the newest revision";
+      }
+    });
+    K.define("timeline.play", {
+      run: function () { playTimeline(); },
+      enabled: function () {
+        if (!timeline.open) { return "the history is not showing"; }
+        return timeline.commits.length > 1 ? true : "there is only one revision to show";
+      }
+    });
     K.define("changes.copy", {
       run: copyCommands,
       enabled: function () { return changes.commands.length ? true : "nothing to copy yet"; }
@@ -1459,7 +1691,16 @@ var netgraphSession = (function () {
     graphPath: graphPath,
     showChanges: showChanges,
     refreshChanges: refreshChanges,
-    isDiffing: function () { return changes.open; },
+    showTimeline: showTimeline,
+    stepTimeline: function (delta) { stopPlaying(); return stepTimeline(delta); },
+    selectRevision: function (index) {
+      stopPlaying();
+      return stepTimeline(index - timeline.index);
+    },
+    playTimeline: playTimeline,
+    drew: drew,
+    isScrubbing: function () { return timeline.open; },
+    isDiffing: function () { return changes.open || timeline.open; },
     isLive: function () { return link.live; }
   };
 })();

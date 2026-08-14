@@ -83,6 +83,18 @@
     changesCopy: document.getElementById("changes-copy"),
     changesCount: document.getElementById("changes-count"),
     changesAgainst: document.getElementById("changes-against"),
+    timeline: document.getElementById("timeline"),
+    timelineToggle: document.getElementById("timeline-toggle"),
+    timelineClose: document.getElementById("timeline-close"),
+    timelineNow: document.getElementById("timeline-now"),
+    timelinePlay: document.getElementById("timeline-play"),
+    timelinePrev: document.getElementById("timeline-prev"),
+    timelineNext: document.getElementById("timeline-next"),
+    timelineRange: document.getElementById("timeline-range"),
+    timelineHash: document.getElementById("timeline-hash"),
+    timelineSubject: document.getElementById("timeline-subject"),
+    timelineWho: document.getElementById("timeline-who"),
+    timelineSummary: document.getElementById("timeline-summary"),
     legend: document.getElementById("legend"),
     clients: document.getElementById("clients"),
     linkState: document.getElementById("link-state"),
@@ -264,6 +276,10 @@
     // the ones that reuse a cached SVG -- a view switched back to has to be as
     // legible as one drawn fresh.
     netgraphA11y.annotate(details, { view: el.layer.value });
+    // A frame of the history carries facts the canvas has nowhere to put: which
+    // commit it is, and what that commit did. The scrubber puts them beside
+    // itself; app.js only has to say that a drawing arrived.
+    if (mode === "session") { netgraphSession.drew(result); }
   }
 
   /** Keep this view's drawing, dropping the least recently drawn if need be. */
@@ -740,6 +756,10 @@
         // a key you have to think about.
         if (K.dismiss()) { return; }
         if (!el.info.hidden) { hideInfo(true); netgraphA11y.select(null); return; }
+        if (mode === "session" && netgraphSession.isScrubbing()) {
+          netgraphSession.showTimeline(false);
+          return;
+        }
         if (mode === "session" && netgraphSession.isDiffing()) {
           netgraphSession.showChanges(false);
           return;

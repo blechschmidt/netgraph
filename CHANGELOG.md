@@ -18,6 +18,44 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **A history timeline: `netgraph log`, two revisions on `netgraph diff`, and a scrubber
+  under the canvas.** The inventory is a folder of YAML in a repository, which means its
+  whole history is renderable — and nothing else in this space can show you when a network
+  became what it is.
+
+  **`netgraph log`** lists the commits that touched the inventory, newest first, with a
+  one-line summary of the changeset each one carries: `3 devices added, 1 link removed,
+  2 addresses moved`. The summary is a real changeset, computed by the same code
+  `netgraph plan` and `netgraph diff` use, so a commit that only reformatted a file says
+  `no change to the network`. `--from`/`--to` take a range, `-n` a count, `--json` a
+  document per commit, and `--no-summary` the commit list alone with nothing read.
+
+  **`netgraph diff --from <rev> --to <rev>`** now reads any two revisions — a tag against a
+  tag, `HEAD~10` against `HEAD` — with `--to` still defaulting to the working tree. Both
+  sides come out of the object database with `git archive`: nothing is checked out, the
+  index is untouched, and an uncommitted change is neither used nor disturbed.
+
+  **In the editor**, `History` (`Ctrl-Shift-H`) opens a scrubber along the bottom of the
+  canvas over those commits. The diagram repaints as the diff overlay for the selected
+  commit against its parent, with the subject, author, date and summary beside the control;
+  `Alt-Left`/`Alt-Right` step, `Alt-P` plays through the range. Positions come from the
+  layout document *as that revision had it*, so a diagram that was arranged stays arranged
+  as you scrub.
+
+  It is honest about its edges. A revision whose inventory does not load is shown as such —
+  and stops the playback — rather than being skipped; a revision from before the inventory
+  folder existed reads as an empty network rather than as a failure, and says so; a range
+  wider than `[history] max-revisions` (100 by default) is refused by `netgraph log` and
+  truncated-with-a-count by the editor rather than becoming two hundred Graphviz runs.
+  Frames are cached by the pair of tree hashes they sit between, so scrubbing back over
+  ground already covered is instant, and neighbouring revisions share their loaded state
+  and their parsed files. `tools/bench_history.py` measures all of it against the
+  1056-device benchmark tree.
+
+  [`docs/commands/log.md`](docs/commands/log.md),
+  [`docs/commands/diff.md`](docs/commands/diff.md#two-revisions) and
+  [`docs/commands/web.md`](docs/commands/web.md#the-history-timeline) document it.
+
 - **`netgraph lsp`, a language server, so the editor knows what netgraph knows.** An
   inventory is written by hand in a plain text editor, and until now the editor could be
   told the shape of one document — through the published JSON Schema — but nothing about

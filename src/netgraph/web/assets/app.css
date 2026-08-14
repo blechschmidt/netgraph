@@ -789,6 +789,76 @@ main {
 
 .count { color: var(--muted); }
 
+/* ------------------------------------------------------ history timeline */
+
+/* Along the bottom of the diagram rather than over it: the scrubber and the
+ * picture it selects are read together, so the picture must not be the thing
+ * it covers. It takes its height out of the pane, which is why the canvas is
+ * a flex child and this is not absolutely positioned like the drawer. */
+.timeline {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--edge);
+  background: var(--raised);
+  padding: .35rem .7rem .45rem;
+  font-size: 12px;
+}
+
+.timeline[hidden] { display: none; }
+
+.timeline-controls {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.timeline-controls input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 6rem;
+  accent-color: var(--selected);
+}
+
+.timeline-controls button { padding: 0 .45rem; }
+.timeline-controls button[aria-pressed="true"] { color: var(--selected); font-weight: 700; }
+
+/* One line, four facts, in the order they answer "which commit is this": the
+ * hash to name it, the subject to recognise it, who and when to place it, and
+ * what it did to the network. The subject is the one allowed to take the room.
+ */
+.timeline-meta {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  margin: .3rem 0 0;
+  min-height: 1.3em;
+  white-space: nowrap;
+}
+
+.timeline-meta .hash { flex: 0 0 auto; font-family: var(--mono); color: var(--warning); }
+
+/* The subject wins the room and the summary yields it: which commit this is
+ * has to be readable, and what it did is legible from the diagram itself. */
+.timeline-meta .subject {
+  flex: 1 1 12rem;
+  min-width: 4rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+.timeline-meta .who { flex: 0 0 auto; color: var(--muted); }
+.timeline-meta .summary {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+/* A revision that does not load is shown, not skipped: the frame says why in
+ * the place the changeset would have gone. */
+.timeline.broken .timeline-meta .summary { color: var(--error); font-weight: 600; }
+
 /* -------------------------------------------------------------- overlays */
 
 /* One shell for the palette, the reference and the prompt: one focus trap, one

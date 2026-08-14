@@ -107,7 +107,9 @@ __all__ = [
     "EVENTS_PATH",
     "FILE_PREFIX",
     "FIX_PATH",
+    "FRAME_PATH",
     "GRAPH_PATH",
+    "HISTORY_PATH",
     "MAX_SOURCE_BYTES",
     "OPS_PATH",
     "PRESENCE_PATH",
@@ -140,6 +142,10 @@ OPS_PATH: Final = "/api/ops"
 CHANGES_PATH: Final = "/api/changes"
 #: The same tree, drawn as a diff against a baseline (``?against=session|git``).
 DIFF_PATH: Final = "/api/diff"
+#: The commits that changed this inventory, for the timeline scrubber.
+HISTORY_PATH: Final = "/api/history"
+#: One of them, drawn as the diff against its parent (``?rev=<commit>``).
+FRAME_PATH: Final = "/api/frame"
 #: Put one logged gesture back.
 REVERT_PATH: Final = "/api/revert"
 #: Apply the mechanical repair for one diagnostic (:mod:`netgraph.fixes`).
@@ -297,6 +303,18 @@ class _Handler(LocalHandler):
                 {"revision": revision, "against": against} | preview.to_dict(),
                 body=body,
             )
+        elif path == HISTORY_PATH:
+            self._json(
+                HTTPStatus.OK,
+                session.history(limit=_integer(query, "limit")),
+                body=body,
+            )
+        elif path == FRAME_PATH:
+            view = ViewOptions.from_query(query, icons=self.icons)
+            rev = query.get("rev", [""])[-1]
+            if not rev:
+                raise SessionError("a frame is of one revision; give '?rev=<commit>'")
+            self._json(HTTPStatus.OK, session.frame(rev, view, known=_known(query)), body=body)
         elif path == CHANGES_PATH:
             self._json(
                 HTTPStatus.OK,

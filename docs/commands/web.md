@@ -126,6 +126,74 @@ changeset — the drawer and the diagram are two views of one answer.
 pull-request description or somebody else's terminal. The rendering is never
 lossy; see [`docs/editing.md`](../editing.md#as-a-script).
 
+### The history timeline
+
+The inventory is a folder of YAML in a repository, so its whole history is
+renderable. **History**, above the canvas, opens a scrubber along the bottom of
+it, over the commits [`netgraph log`](log.md) lists — and the diagram becomes
+the diff each one carries against its parent as you step:
+
+```text
+ ▶  ◀◀  ────────────●───────  ▶▶   Now   ×
+ e58b3c3a0  Add a lab switch   Scrubber · 2026-08-14   1 device added
+```
+
+Oldest on the left. Beside the control is the commit itself — the abbreviated
+hash, its subject, its author and date, and the one-line summary of what it did
+to the network — because a picture with a hash under it places nothing in time.
+
+| Control | |
+|---|---|
+| the slider | Any commit in the range. It repaints as it is dragged; ground already covered comes back out of the cache. |
+| `◀◀` / `▶▶` | One commit older or newer. `Alt-Left` and `Alt-Right`. |
+| `▶` | Play: step forward by itself, about a frame a second, until the newest revision or until one that will not load. `Alt-P`. |
+| **Now** | Leave the history and draw the working tree again. `Escape` does the same. |
+
+**Each frame is arranged the way that revision arranged it.** Both sides of the
+diff are read out of the commit, [layout document](layout.md) included, so a
+diagram that was hand-placed in March is still hand-placed when you scrub back
+to March — and one placed since is not retro-fitted onto a picture that never
+had it.
+
+The history and the [changes drawer](#reviewing-what-you-changed) are two
+overlays on one canvas, so opening either puts the other away. The legend means
+the same four things in both.
+
+#### What it will not pretend
+
+* **A revision whose inventory does not load** stops the playback and says which
+  revision and why, in the place the summary would have gone. It is not skipped:
+  a commit that broke the tree is the one worth stopping on.
+* **A revision from before the inventory existed** is an empty network, not an
+  error, so the commit that first added the folder reads as the whole network
+  arriving — noted as such beside the summary.
+* **A repository with more history than the bound** is truncated to the newest,
+  and the bar says "the newest 100 of 312 revisions" rather than implying that
+  is all there ever was. The bound is `[history] max-revisions` in
+  `netgraph.toml`, 100 by default; see [`netgraph log`](log.md#the-bound), where
+  an explicit range wider than it is refused outright rather than truncated.
+* **A tree that is not in a repository** says so where the commit would be,
+  rather than offering a control that does nothing.
+
+#### What it costs
+
+A frame is one inventory read, one changeset and one Graphviz layout — the same
+work drawing the tree at all costs, plus the read and the diff. Two things keep
+that interactive:
+
+* **Rendered frames are cached by tree hash**, in pairs: the before tree and the
+  after tree. Scrubbing back over ground already covered is a dictionary lookup,
+  and so is a revert, a cherry-pick or a rebase that lands on a pair of trees
+  already drawn.
+* **Neighbouring revisions share their loaded state and their parsed files.**
+  Stepping reads one revision rather than two, and the [parse
+  cache](cache.md) means that read parses the files the commit touched rather
+  than the two thousand it did not.
+
+`tools/bench_history.py` measures it. On the 1056-device benchmark tree, where
+one plain render of the working tree is about 1.5 s, a step is about 1.5× that
+and a frame already drawn comes back in about 13 ms.
+
 ### Reconciliation
 
 The session does not own the files. `watchfiles` watches the folder exactly as
@@ -195,6 +263,8 @@ is on loopback and none of the write routes exist unless `--write` was given.
 | `POST /api/undo`, `POST /api/redo` | Move the server-side history one step. |
 | `GET /api/changes` | The session's log — one entry per gesture, with its hunk, the files and addresses it touched, and the `netgraph edit` lines that replay it — plus the whole session as one command list and the baselines this tree can be diffed against. |
 | `GET /api/diff?against=session` | The same payload `/api/graph` answers, drawn as a diff, with `diff` holding the marks per node and edge and `diff.changeset` the whole [plan](plan.md). `against=git` compares with `HEAD`. |
+| `GET /api/history` | The commits that changed this inventory, newest first, each with its hash, parents, author, date, subject and the hash of the inventory tree at it. `bound` is the ceiling, `total` how many there are and `truncated` whether the list is the newest of more. `?limit=` asks for fewer. |
+| `GET /api/frame?rev=<commit>` | One of them, drawn as the diff against its parent: the `/api/diff` payload plus the commit's own facts and the one-line `summary` of what it did. `?known=` works as it does on `/api/graph`. A revision that will not load answers `200` with `status: failed` and the reason — it is a fact about the history, not a bad request. |
 | `POST /api/revert` | `{"id": 3, "revision": …}` — put one logged gesture back. |
 | `POST /api/fix` | `{"rule": "W138", "message": …, "fix": "prune", "revision": …}` — apply the mechanical repair for one diagnostic, as one gesture. The finding is named by rule and message, not by its place in the list, so a stale list is refused rather than misapplied. `fix` picks between the repairs a rule offers more than one of. |
 
@@ -335,6 +405,10 @@ cable it, undo both — without dispatching a single mouse event.
 | `Ctrl-Shift-Z` / `Ctrl-Y` | Redo | anywhere | `--write` | Applies the last undone change again. |
 | `Ctrl-B` | Changes drawer | anywhere | a folder | This session's changes, and the diagram repainted as the diff they add up to. |
 | *palette only* | Copy the equivalent commands | anywhere | a folder | The session as a 'netgraph edit' script somebody else can review or run. |
+| `Ctrl-Shift-H` | History timeline | anywhere | a folder | A scrubber over the commits that changed this inventory. The diagram becomes the diff the selected commit carries against its parent, arranged as that revision arranged it. |
+| `Alt-ArrowLeft` | Older revision | anywhere | a folder | One commit back along the timeline. Stops the playback if it is running. |
+| `Alt-ArrowRight` | Newer revision | anywhere | a folder | One commit forward along the timeline. |
+| `Alt-P` | Play the history | anywhere | a folder | Step through the range by itself, a frame at a time, until the newest revision or until one that will not load. |
 <!-- /generated -->
 
 ## The scratchpad
@@ -441,6 +515,11 @@ from them.
   same check as `/api/file/<path>`: relative, below the root, no component the
   loader skips, YAML suffix. It is a second door into the same room and it has
   the same lock.
+* **Nothing becomes a git *option*.** `?rev=` on `/api/frame` reaches a `git`
+  argument list, and `git log --output=<file>` writes a file while
+  `--upload-pack=<cmd>` runs a program. A revision that begins with `-` is
+  refused by name before any git process starts, on every path that takes one —
+  the route, the timeline, `netgraph log` and `netgraph diff --from` alike.
 
 The default port is 8081, one above the `watch` preview's, so a watch run and an
 editing session can be open at the same time. `--port 0` lets the operating system

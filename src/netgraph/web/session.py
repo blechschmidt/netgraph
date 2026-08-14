@@ -79,7 +79,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 from typing import Any, Final
 
-from netgraph.config import Config, ValidationConfig, load_config
+from netgraph.config import DEFAULT_MAX_REVISIONS, Config, ValidationConfig, load_config
 from netgraph.edit import (
     ConflictError,
     CreateElement,
@@ -94,6 +94,7 @@ from netgraph.edit import (
 from netgraph.edit.tree import digest_of
 from netgraph.errors import NetgraphError
 from netgraph.fixes import Fix, apply_fix, fixes_for, offers_for
+from netgraph.history import FrameCache, HistoryError, Timeline
 from netgraph.loader import (
     YAML_SUFFIXES,
     DocumentCache,
@@ -107,13 +108,14 @@ from netgraph.plan import diff as diff_states
 from netgraph.plan.sources import git_ref
 from netgraph.render import IconTheme
 from netgraph.validate import validate
-from netgraph.watch.pipeline import Problem, flatten_problems
+from netgraph.watch.pipeline import Problem, Status, flatten_problems
 from netgraph.web.events import EVENT_NAMES, EVENTS_PATH, HEARTBEAT_SECONDS, EventBus
 from netgraph.web.presence import Client, Presence
 from netgraph.web.preview import Preview, ViewOptions, render_diff, render_inventory
 
 __all__ = [
     "BASELINES",
+    "FRAME_CACHE_SIZE",
     "GIT_BASELINE",
     "MAX_FILE_BYTES",
     "SESSION_BASELINE",
@@ -132,6 +134,12 @@ __all__ = [
 #: answers — git may be behind or ahead of where the editing started, and a stack
 #: of steps is not a state.
 SESSION_BASELINE: Final = "session"
+
+#: How many rendered timeline frames one session keeps. Each is an SVG of a
+#: whole network, so the cap is on count rather than on bytes: a dozen is a
+#: comfortable scrub back and forth over recent history, and a hundred would be
+#: a session holding a repository's worth of pictures nobody is looking at.
+FRAME_CACHE_SIZE: Final = 12
 
 #: The other one: ``HEAD``, as the inventory root looks in it. Offered only when
 #: the root is in a repository, which is what :meth:`EditingSession.baselines`
@@ -474,6 +482,17 @@ class EditingSession:
     #: redo push onto the other stack. Held on the session rather than returned
     #: because :meth:`_commit` answers with the page's payload, not with mine.
     _last_inverse: tuple[Operation, ...] = field(default=(), init=False, repr=False)
+    #: The history of the tree, opened on first use. ``None`` until somebody
+    #: asks for it, because most sessions never open the timeline and opening it
+    #: costs a git process.
+    _timeline: Timeline | None = field(default=None, init=False, repr=False)
+    #: Rendered frames, keyed by the pair of tree hashes they are between and
+    #: the view they were drawn in. Bounded, because an SVG of a large network
+    #: is megabytes and a scrubbed history is a lot of them. Each entry holds
+    #: the changeset beside the picture, so a revisit recomputes neither.
+    _frames: FrameCache[tuple[dict[str, Any], Preview]] = field(
+        default_factory=lambda: FrameCache(FRAME_CACHE_SIZE), init=False, repr=False
+    )
 
     def __post_init__(self) -> None:
         self.root = Path(self.root)
@@ -1200,6 +1219,143 @@ class EditingSession:
                 return load_tree(exported)
         except PlanSourceError as exc:
             raise SessionError(str(exc)) from exc
+
+    # -- the history timeline --------------------------------------------
+
+    def timeline(self) -> Timeline:
+        """The history of this inventory, opened once and kept.
+
+        Kept rather than reopened because the caches hang off it: the loaded
+        inventory of the frame you just looked at is the one the next frame
+        needs, and the rendered frames are what make scrubbing back instant.
+        The commit *list* is not cached — a session outlives commits, and a
+        scrubber missing the commit somebody just made is the same lie the
+        changes drawer refuses to tell.
+
+        Raises:
+            SessionError: The root is not in a git repository, or ``git``
+                cannot be run at all.
+        """
+        self.inventory()  # ensures ``config`` matches the loaded revision
+        with self._lock:
+            if self._timeline is None:
+                bound = (
+                    self.config.history.max_revisions
+                    if self.config is not None
+                    else DEFAULT_MAX_REVISIONS
+                )
+                try:
+                    self._timeline = Timeline.open(self.root, max_revisions=bound, cache=self.cache)
+                except HistoryError as exc:
+                    raise SessionError(str(exc)) from exc
+            return self._timeline
+
+    def history(self, *, limit: int | None = None) -> dict[str, Any]:
+        """The commits a scrubber can step through, newest first.
+
+        Without their changesets: listing thirty commits costs one ``git log``,
+        and summarising them would cost sixty inventory loads for a panel that
+        shows one at a time. :meth:`frame` computes the changeset of the commit
+        actually selected.
+
+        A repository with more history than the bound allows is **truncated to
+        the newest** rather than refused — a scrubber that shows nothing because
+        there is too much to show is not the honest answer here, and the cost
+        the bound exists to prevent is per *frame*, which is drawn one at a
+        time. What is refused is an explicit range: ``netgraph log --from`` and
+        ``--to`` name what they want and are told when it is more than this
+        will read. Either way the count is reported, so the page can say it is
+        showing the newest hundred of three hundred rather than implying that
+        is all there is.
+
+        Raises:
+            SessionError: There is no history to read at all.
+        """
+        timeline = self.timeline()
+        bound = min(limit, timeline.max_revisions) if limit else timeline.max_revisions
+        try:
+            total = timeline.count()
+            commits = timeline.commits(limit=bound)
+        except HistoryError as exc:
+            raise SessionError(str(exc)) from exc
+        return {
+            "commits": [commit.to_dict() for commit in commits],
+            "bound": timeline.max_revisions,
+            "total": total,
+            "truncated": total > len(commits),
+            "root": timeline.prefix or ".",
+        }
+
+    def frame(
+        self,
+        rev: str,
+        view: ViewOptions | None = None,
+        *,
+        known: str | None = None,
+    ) -> dict[str, Any]:
+        """One commit of the history, drawn as the diff against its parent.
+
+        The positions come from the layout document *as that revision had it*,
+        because both sides of the diff are that revision's own tree — so a
+        diagram that was arranged when the commit was made stays arranged when
+        it is scrubbed back to.
+
+        Args:
+            rev: The commit to draw. A full hash from :meth:`history`; anything
+                git resolves also works, which is what makes the route usable
+                by hand.
+            view: Which graph to build and how to draw it.
+            known: A fingerprint the caller already holds this frame for, as
+                :meth:`graph` takes it.
+
+        Returns:
+            The rendering, the commit it is of, and the one-line summary of
+            what it did. A revision that cannot be read comes back as a failed
+            rendering carrying the reason, never as an exception and never as a
+            blank frame with no explanation.
+
+        Raises:
+            SessionError: There is no history, or no such revision.
+        """
+        timeline = self.timeline()
+        try:
+            commit = timeline.commit(rev)
+        except HistoryError as exc:
+            raise SessionError(str(exc)) from exc
+        options = view or ViewOptions()
+        if options.icons is None and self.icons is not None:
+            options = replace(options, icons=self.icons)
+
+        # Keyed before anything is read. The pair of tree hashes costs two
+        # object lookups and decides the whole answer — the changeset as much as
+        # the picture — so a frame scrubbed back to costs neither an export, nor
+        # a load, nor a diff, nor a Graphviz run.
+        key = (*timeline.trees(commit), options)
+        held = self._frames.get(key)
+        if held is None:
+            frame = timeline.frame(commit)
+            if not frame.ok:
+                # Not an exception: a revision that does not load is a fact
+                # about the history, and a scrubber must be able to stop on it
+                # and read why rather than jumping over it or going blank. Not
+                # cached either — the next attempt should try again, in case
+                # what could not be read was the disk rather than the commit.
+                return (
+                    commit.to_dict()
+                    | frame.derived()
+                    | Preview(status=Status.FAILED, message=frame.summary).to_dict()
+                )
+            assert frame.plan is not None  # frame.ok said so
+            preview = render_diff(
+                frame.before.require(), frame.after.require(), frame.plan, options
+            )
+            if preview.status is Status.FAILED:
+                return commit.to_dict() | frame.derived() | preview.to_dict()
+            held = self._frames.put(key, (frame.derived(), preview))
+        derived, preview = held
+        if known is not None and known == preview.graph_hash:
+            preview = replace(preview, svg=None, details={}, unchanged=True)
+        return commit.to_dict() | derived | preview.to_dict()
 
     def _restated(self, change: Change) -> Change:
         """``change`` with the stack depths as they are after the history moved."""

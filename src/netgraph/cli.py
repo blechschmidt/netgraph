@@ -114,7 +114,7 @@ from netgraph.config import (
 )
 from netgraph.console import Align, Console
 from netgraph.diagnostics import FORMATS as DIAGNOSTIC_FORMATS
-from netgraph.diagnostics import Diagnostic
+from netgraph.diagnostics import Diagnostic, dump_json
 from netgraph.diagnostics import build_report as build_diagnostics
 from netgraph.diagnostics import render_report as render_diagnostics
 from netgraph.diff import draw
@@ -161,6 +161,7 @@ from netgraph.export import (
 from netgraph.export import FORMATS as EXPORT_FORMATS
 from netgraph.fixes import FIXES, FixReport, repair, spec_for
 from netgraph.fsio import write_text
+from netgraph.history import Commit, Frame, HistoryError, Timeline
 from netgraph.importer import (
     DIALECTS,
     Draft,
@@ -3674,6 +3675,171 @@ def _is_a_terminal(stream: Any) -> bool:
 
 # --------------------------------------------------------------------------- #
 # path
+
+
+# --------------------------------------------------------------------------- #
+# netgraph log
+# --------------------------------------------------------------------------- #
+
+
+@cli.command("log")
+@click.option(
+    "--from",
+    "source",
+    metavar="REV",
+    default=None,
+    help=(
+        "Oldest revision to list, exclusive — as 'git log a..b' means it. The revision itself "
+        "is the state the oldest listed commit is drawn against, so it is not listed."
+    ),
+)
+@click.option(
+    "--to",
+    "target",
+    metavar="REV",
+    default="HEAD",
+    show_default=True,
+    help="Newest revision to list, inclusive.",
+)
+@click.option(
+    "-n",
+    "--limit",
+    type=click.IntRange(min=1),
+    default=20,
+    show_default=True,
+    help="List at most this many commits, newest first. 'netgraph log -n 1' is the last change.",
+)
+@click.option(
+    "--max-revisions",
+    "max_revisions",
+    type=click.IntRange(min=1),
+    default=None,
+    show_default="[history] max-revisions in netgraph.toml, or 100",
+    help=(
+        "Refuse a range holding more revisions than this rather than reading them all. "
+        "A limit narrows the range; this bounds what may be asked for."
+    ),
+)
+@click.option(
+    "--summary/--no-summary",
+    "with_summary",
+    default=True,
+    show_default=True,
+    help=(
+        "Say what each commit did to the network, which means loading the inventory on both "
+        "sides of it. --no-summary lists the commits alone and reads nothing."
+    ),
+)
+@click.option(
+    "--no-renames",
+    "no_renames",
+    is_flag=True,
+    default=False,
+    help="Count every rename as a removal and an addition rather than detecting it.",
+)
+@click.option(
+    "-F",
+    "--output-format",
+    type=click.Choice(("text", "json")),
+    default="text",
+    show_default=True,
+    help="text is for reading; json is for a script.",
+)
+@click.option("--json", "as_json", is_flag=True, default=False, help="Shorthand for '-F json'.")
+@click.pass_obj
+def log_command(
+    app: AppContext,
+    source: str | None,
+    target: str,
+    limit: int,
+    max_revisions: int | None,
+    with_summary: bool,
+    no_renames: bool,
+    output_format: str,
+    as_json: bool,
+) -> None:
+    """List the commits that changed the inventory, and what each one changed.
+
+    'git log' for the network rather than for the files: only commits that
+    touched the inventory directory are listed, and each carries a one-line
+    summary of its changeset — devices added, links removed, addresses moved —
+    computed by the same code 'netgraph plan' and 'netgraph diff' use.
+
+    Every revision is read out of the object database. The working tree, the
+    index and the checked-out branch are never touched.
+
+    \b
+    netgraph -i net log
+    netgraph -i net log --from v1.0 --to v2.0 --json
+    netgraph -i net log -n 1 --no-summary
+    """
+    console = app.console()
+    stream = console.to_stderr() if output_format == "json" or as_json else console
+    root = app.inventory if app.inventory.is_dir() else app.inventory.parent
+    bound = max_revisions if max_revisions is not None else app.config().history.max_revisions
+
+    try:
+        timeline = Timeline.open(root, max_revisions=bound)
+        commits = timeline.commits(since=source, until=target, limit=limit)
+    except HistoryError as exc:
+        stream.error(str(exc))
+        raise click.exceptions.Exit(EXIT_INVALID) from exc
+
+    # Walked in the order they were listed, so the cache does its job: each
+    # commit's parent state is the next commit's own state, and a linear history
+    # is read once rather than twice.
+    frames = list(timeline.frames(commits, renames=not no_renames)) if with_summary else []
+
+    if output_format == "json" or as_json:
+        listed: list[dict[str, Any]] = (
+            [frame.to_dict() for frame in frames]
+            if with_summary
+            else [commit.to_dict() for commit in commits]
+        )
+        console.print(
+            dump_json(
+                {
+                    "root": str(root),
+                    "range": {"from": source, "to": target},
+                    "maxRevisions": bound,
+                    "commits": listed,
+                }
+            )
+        )
+    else:
+        _write_log(console, commits, frames)
+    stream.info(
+        f"{count_text(len(commits), 'revision')} of {root}"
+        + (f", newest first, of at most {bound}" if len(commits) >= bound else "")
+    )
+
+
+def _write_log(console: Console, commits: Sequence[Commit], frames: Sequence[Frame]) -> None:
+    """Print one block per commit: the header line, then what it did.
+
+    Two lines rather than a table, because the subject is the widest column and
+    the one worth reading in full — a table would either truncate it or push the
+    summary off the right of an 80-column terminal. ``frames`` is empty under
+    ``--no-summary``, and then only the header line is printed.
+    """
+    if not commits:
+        console.print(console.dim("no commit has touched this inventory"))
+        return
+    width = max(len(commit.author) for commit in commits)
+    summaries = {frame.commit.hash: frame for frame in frames}
+    for commit in commits:
+        console.print(
+            f"{console.style(commit.abbrev, fg='yellow')}  {commit.date}  "
+            f"{commit.author.ljust(width)}  {console.bold(commit.subject)}"
+        )
+        frame = summaries.get(commit.hash)
+        if frame is None:
+            continue
+        indent = " " * (len(commit.abbrev) + 2)
+        if frame.ok:
+            console.print(f"{indent}{console.dim(frame.summary)}")
+        else:
+            console.print(f"{indent}{console.style('! ' + frame.summary, fg='red')}")
 
 
 # --------------------------------------------------------------------------- #

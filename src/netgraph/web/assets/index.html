@@ -89,6 +89,11 @@
       <span>diagram</span>
       <span class="hint">hover or focus a node for details &middot; drag or arrow keys to move &middot; scroll to zoom</span>
       <span class="spacer"></span>
+      <!-- Reading, not writing: offered in a read-only session too, which is
+           why it is here rather than beside Save and Undo. -->
+      <button id="timeline-toggle" type="button" class="ghost" hidden
+        aria-expanded="false" aria-controls="timeline"
+        title="Scrub the inventory across the commits that changed it (Ctrl-Shift-H)">History</button>
       <button id="fit" type="button" class="ghost">Fit</button>
     </div>
     <div id="canvas" class="canvas" tabindex="0" aria-label="Network diagram">
@@ -103,6 +108,35 @@
         <span class="key untouched"><span class="sigil" aria-hidden="true">·</span> untouched</span>
       </div>
     </div>
+
+    <!-- The history, along the bottom of the canvas. The inventory is a folder
+         of YAML in a repository, so every commit that touched it is a diagram
+         this page can draw; the scrubber steps over them and the canvas repaints
+         as the diff each one carries against its parent. Hidden until asked
+         for, because most sessions are about the tree as it is now. -->
+    <section id="timeline" class="timeline" hidden aria-label="History timeline">
+      <div class="timeline-controls">
+        <button id="timeline-play" type="button" class="ghost" aria-pressed="false"
+          title="Step through the range (Alt-P)">&#9654;</button>
+        <button id="timeline-prev" type="button" class="ghost"
+          title="Older revision (Alt-Left)">&#9664;&#9664;</button>
+        <input id="timeline-range" type="range" min="0" max="0" step="1" value="0"
+          aria-label="Revision">
+        <button id="timeline-next" type="button" class="ghost"
+          title="Newer revision (Alt-Right)">&#9654;&#9654;</button>
+        <button id="timeline-now" type="button" class="ghost"
+          title="Leave the history and draw the working tree">Now</button>
+        <button id="timeline-close" type="button" class="ghost" title="Close (Esc)">&times;</button>
+      </div>
+      <!-- Everything the commit is, beside the control that selects it: a hash
+           with no subject is a picture nobody can place in time. -->
+      <p id="timeline-meta" class="timeline-meta">
+        <span id="timeline-hash" class="hash"></span>
+        <span id="timeline-subject" class="subject"></span>
+        <span id="timeline-who" class="who"></span>
+        <span id="timeline-summary" class="summary"></span>
+      </p>
+    </section>
 
     <!-- The diagram as text. Off screen until something focuses it, at which
          point it becomes a real panel: a keyboard user gets the outline, and

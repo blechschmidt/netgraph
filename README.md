@@ -206,6 +206,7 @@ report.txt` both do what they look like they do.
 | [`netgraph plan`](docs/commands/plan.md) | Diff two inventory states into a reviewable changeset. | [plan.md](docs/commands/plan.md) |
 | [`netgraph diff`](docs/commands/diff.md) | Draw the difference between two inventory states as one diagram. | [diff.md](docs/commands/diff.md) |
 | [`netgraph apply`](docs/commands/apply.md) | Execute a plan against the inventory files. | [apply.md](docs/commands/apply.md) |
+| [`netgraph log`](docs/commands/log.md) | List the commits that changed the inventory, and what each one changed. | [log.md](docs/commands/log.md) |
 | [`netgraph render`](docs/commands/render.md) | Draw the graph as SVG, PNG, PDF, DOT, Mermaid, JSON or HTML. | [render.md](docs/commands/render.md) |
 | [`netgraph layout`](docs/commands/layout.md) | Store the diagram's arrangement, so a hand-placed node stays put. | [layout.md](docs/commands/layout.md) |
 | [`netgraph watch`](docs/commands/watch.md) | Re-render on every save, optionally serving the result. | [watch.md](docs/commands/watch.md) |
