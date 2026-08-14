@@ -452,6 +452,14 @@ jobs:
           # never there and the job proved nothing.
           if len(cases) - len(skipped) < 5:
               raise SystemExit("::error::the browser suite ran almost nothing; was chromium missing?")
+          # The accessibility gate is only a gate while it runs. axe-core is in
+          # the ``browser`` extra this job installs, so a skip here is a broken
+          # install rather than a contributor without it -- and a silently
+          # skipped gate is the failure mode a gate exists to prevent.
+          absent = [case for case in skipped if "axe-core is not installed" in
+                    (case.findall("skipped")[0].get("message") or "")]
+          if absent:
+              raise SystemExit("::error::the accessibility gate did not run; axe-core is missing")
           PY
 
       - name: Upload the failure evidence

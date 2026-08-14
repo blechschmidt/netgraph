@@ -79,6 +79,7 @@ from netgraph.httpserve import (
     is_loopback,
 )
 from netgraph.render import IconTheme
+from netgraph.web.bindings import payload as bindings_payload
 from netgraph.web.events import (
     EVENTS_PATH,
     HEARTBEAT_SECONDS,
@@ -99,6 +100,7 @@ from netgraph.web.session import (
 
 __all__ = [
     "ASSETS",
+    "BINDINGS_PATH",
     "CHANGES_PATH",
     "DEFAULT_PORT",
     "DIFF_PATH",
@@ -126,6 +128,10 @@ DEFAULT_PORT: Final = 8081
 SOURCE_PATH: Final = "/api/source"
 RENDER_PATH: Final = "/api/render"
 STATE_PATH: Final = "/api/state"
+#: The keyboard bindings and the command list, from :mod:`netgraph.web.bindings`.
+#: Answered in both faces: the scratchpad has fewer commands available, not fewer
+#: commands, and the palette says which are out of reach and why.
+BINDINGS_PATH: Final = "/api/bindings"
 TREE_PATH: Final = "/api/tree"
 GRAPH_PATH: Final = "/api/graph"
 OPS_PATH: Final = "/api/ops"
@@ -151,6 +157,8 @@ ASSETS: Final[dict[str, tuple[str, str]]] = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/app.css": ("app.css", "text/css; charset=utf-8"),
     "/detail.js": ("detail.js", "text/javascript; charset=utf-8"),
+    "/keys.js": ("keys.js", "text/javascript; charset=utf-8"),
+    "/a11y.js": ("a11y.js", "text/javascript; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/session.js": ("session.js", "text/javascript; charset=utf-8"),
 }
@@ -229,6 +237,9 @@ class _Handler(LocalHandler):
             return
         if path == STATE_PATH:
             self._json(HTTPStatus.OK, self._state(), body=body)
+            return
+        if path == BINDINGS_PATH:
+            self._json(HTTPStatus.OK, bindings_payload(), body=body)
             return
         if self.session is None:
             self._get_stream(path, body=body)

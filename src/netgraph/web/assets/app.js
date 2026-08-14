@@ -85,7 +85,19 @@
     changesAgainst: document.getElementById("changes-against"),
     legend: document.getElementById("legend"),
     clients: document.getElementById("clients"),
-    linkState: document.getElementById("link-state")
+    linkState: document.getElementById("link-state"),
+    /* Accessibility furniture. The two live regions are the only place this
+     * page says anything to a screen reader; the outline is the diagram as
+     * text. See a11y.js. */
+    announcer: document.getElementById("announcer"),
+    alert: document.getElementById("alert"),
+    outline: document.getElementById("outline"),
+    outlineList: document.getElementById("outline-list"),
+    outlineSummary: document.getElementById("outline-summary"),
+    commands: document.getElementById("commands"),
+    commandsKey: document.getElementById("commands-key"),
+    shortcuts: document.getElementById("shortcuts"),
+    shortcutsKey: document.getElementById("shortcuts-key")
   };
 
   /** How many rendered views are kept in memory, most recently drawn first.
@@ -247,6 +259,11 @@
       el.placeholder.textContent = result.message || "nothing rendered";
       currentView = null;
     }
+    // The picture is inert until this runs: roles, labels, the outline and the
+    // focus ring all come off the records above. Done on every apply, including
+    // the ones that reuse a cached SVG -- a view switched back to has to be as
+    // legible as one drawn fresh.
+    netgraphA11y.annotate(details, { view: el.layer.value });
   }
 
   /** Keep this view's drawing, dropping the least recently drawn if need be. */
@@ -317,10 +334,14 @@
     var counts = { error: 0, warning: 0, info: 0 };
     problems.forEach(function (problem) {
       counts[problem.severity] = (counts[problem.severity] || 0) + 1;
-      var row = document.createElement("div");
-      row.className = "problem " + problem.severity;
       var target = navigation(problem.location);
+      // A row that does something is a <button>: in the tab order, activated by
+      // Enter and by Space, announced as a control. A row that does nothing is
+      // a <div>, because a button that does nothing is a lie.
+      var row = document.createElement(target ? "button" : "div");
+      row.className = "problem " + problem.severity;
       if (target) {
+        row.type = "button";
         row.classList.add("locatable");
         row.title = target.title;
         row.addEventListener("click", target.go);
@@ -367,13 +388,21 @@
     return match ? parseInt(match[1], 10) : 0;
   }
 
-  /** Put the cursor on `line` of the editor and select it. */
-  function goToLine(line) {
+  /** Put the cursor on `line` of the editor and select it.
+   *
+   * `options.focus === false` leaves the keyboard where it is. That is what
+   * revealing from the *diagram* wants: somebody who pressed Enter on a node
+   * asked to see the document, not to be dropped into the middle of it -- and
+   * dragging the focus out of the canvas would end the arrow-key navigation
+   * they were in the middle of. Clicking a diagnostic is the other case, and
+   * does move the caret, because "go to this line" is the whole request.
+   */
+  function goToLine(line, options) {
     var lines = el.source.value.split("\n");
     if (!line || line > lines.length) { return; }
     var start = 0;
     for (var i = 0; i < line - 1; i++) { start += lines[i].length + 1; }
-    el.source.focus();
+    if (!options || options.focus !== false) { el.source.focus(); }
     el.source.setSelectionRange(start, start + lines[line - 1].length);
     // No API positions a textarea's scroll on a line, so estimate it from the
     // line height and centre the selection in the visible part.
@@ -383,13 +412,20 @@
 
   /* --------------------------------------------------------------- toast */
 
-  /** Say something for a moment: what was saved, what was refused, why. */
+  /** Say something for a moment: what was saved, what was refused, why.
+   *
+   * The bubble is `aria-hidden`; the words go to a live region instead, so they
+   * are heard once rather than twice and are heard even after the bubble has
+   * gone. A refusal interrupts, because "that was not applied" is not something
+   * to learn three actions later.
+   */
   function toast(text, kind) {
     window.clearTimeout(toastTimer);
     el.toast.textContent = text;
     el.toast.className = "toast " + (kind || "");
     el.toast.hidden = false;
     toastTimer = window.setTimeout(function () { el.toast.hidden = true; }, TOAST_MS);
+    netgraphA11y.announce(text, kind === "error");
   }
 
   /* ------------------------------------------------------------ info box */
@@ -399,11 +435,40 @@
     return group && details[group.id] ? { group: group, record: details[group.id] } : null;
   }
 
-  function showInfo(hit, event) {
+  function showInfo(hit, at) {
     el.info.replaceChildren(describe(hit.record));
     el.info.hidden = false;
-    place(event);
+    place(at);
     highlight(hit.record);
+  }
+
+  /** The inspector for whatever the keyboard has focused.
+   *
+   * Same box, same records, same highlight as the hover path -- the only thing
+   * that differs is where it is anchored, because there is no pointer to anchor
+   * it to. It is pinned, since a keyboard user has nothing to move away.
+   */
+  function inspectFocused() {
+    var here = netgraphA11y.focused();
+    if (!here) { toast("nothing is focused in the diagram", "error"); return false; }
+    var group = el.viewport.querySelector('[id="' + cssEscape(here.element) + '"]');
+    var box = group ? group.getBoundingClientRect() : null;
+    pinned = here.element;
+    showInfo({ record: here.record }, box
+      ? { clientX: box.right, clientY: box.bottom }
+      : { clientX: window.innerWidth / 2, clientY: window.innerHeight / 3 });
+    el.info.classList.add("pinned");
+    if (mode === "session") {
+      netgraphSession.reveal(here.record.id);
+      netgraphSession.select(here.record.id);
+      netgraphA11y.select(here.element);
+    }
+    netgraphA11y.announce("inspecting " + netgraphA11y.label(here.record), false);
+    return true;
+  }
+
+  function cssEscape(value) {
+    return window.CSS && window.CSS.escape ? window.CSS.escape(value) : value;
   }
 
   function hideInfo(force) {
@@ -414,13 +479,15 @@
     highlight(null);
   }
 
-  function place(event) {
+  /** `at` is anything with clientX/clientY: a mouse event, or a corner of the
+   *  focused shape when the keyboard opened the box. */
+  function place(at) {
     var margin = 14;
     var box = el.info.getBoundingClientRect();
-    var x = event.clientX + margin;
-    var y = event.clientY + margin;
-    if (x + box.width > window.innerWidth - margin) { x = event.clientX - box.width - margin; }
-    if (y + box.height > window.innerHeight - margin) { y = event.clientY - box.height - margin; }
+    var x = at.clientX + margin;
+    var y = at.clientY + margin;
+    if (x + box.width > window.innerWidth - margin) { x = at.clientX - box.width - margin; }
+    if (y + box.height > window.innerHeight - margin) { y = at.clientY - box.height - margin; }
     el.info.style.left = Math.max(margin, x) + "px";
     el.info.style.top = Math.max(margin, y) + "px";
   }
@@ -492,6 +559,32 @@
     applyView();
   }
 
+  /** Zoom about the middle of the canvas: what a keyboard means by "zoom in",
+   *  there being no cursor to keep a point under. */
+  function zoomCentre(factor) {
+    var box = el.canvas.getBoundingClientRect();
+    zoomAt(box.left + box.width / 2, box.top + box.height / 2, factor);
+  }
+
+  /** Pan until `box` -- a shape's rectangle in client coordinates -- is on
+   *  screen, with a margin. Called when the keyboard focuses something that has
+   *  been scrolled or zoomed out of sight; a no-op when it is already visible.
+   */
+  function bringIntoView(box) {
+    var frame = el.canvas.getBoundingClientRect();
+    var margin = 40;
+    var dx = 0;
+    var dy = 0;
+    if (box.left < frame.left + margin) { dx = frame.left + margin - box.left; }
+    else if (box.right > frame.right - margin) { dx = frame.right - margin - box.right; }
+    if (box.top < frame.top + margin) { dy = frame.top + margin - box.top; }
+    else if (box.bottom > frame.bottom - margin) { dy = frame.bottom - margin - box.bottom; }
+    if (!dx && !dy) { return; }
+    view.x += dx;
+    view.y += dy;
+    applyView();
+  }
+
   /* ---------------------------------------------------------- listeners */
 
   el.source.addEventListener("input", function () {
@@ -541,14 +634,11 @@
       // What this page is looking at, so the other tabs can draw it faintly.
       netgraphSession.select(hit.record.id);
     }
-    if (pinned === hit.record.element) { hideInfo(true); return; }
+    if (pinned === hit.record.element) { hideInfo(true); netgraphA11y.select(null); return; }
     pinned = hit.record.element;
     showInfo(hit, event);
     el.info.classList.add("pinned");
-  });
-
-  document.addEventListener("keydown", function (event) {
-    if (event.key === "Escape") { hideInfo(true); }
+    netgraphA11y.select(hit.record.element);
   });
 
   el.canvas.addEventListener("wheel", function (event) {
@@ -586,6 +676,171 @@
     window.addEventListener("mouseup", function () { dragging = false; });
   })();
 
+  /* ------------------------------------------------------------ commands */
+
+  /* Every command the page has, registered against the ids
+   * netgraph.web.bindings declares. The keyboard, the palette and the shortcut
+   * sheet all reach them through here, so there is exactly one implementation
+   * of "switch to the next layer" and exactly one place that says which key
+   * runs it.
+   *
+   * The edit gestures are session.js's -- they write files -- and are
+   * registered from there. The split is by what the command touches, not by
+   * which face is running: a scratchpad registers them too, and the palette
+   * shows them greyed with "open a folder with 'netgraph web DIR' for this"
+   * rather than pretending netgraph cannot do them.
+   */
+  function defineCommands() {
+    var K = netgraphKeys;
+
+    K.define("palette", { run: function () { K.palette(null, ""); } });
+    K.define("help", { run: function () { K.reference(); } });
+    K.define("dismiss", {
+      run: function () {
+        // In order of how modal each thing is. Anything else and Escape becomes
+        // a key you have to think about.
+        if (K.dismiss()) { return; }
+        if (!el.info.hidden) { hideInfo(true); netgraphA11y.select(null); return; }
+        if (mode === "session" && netgraphSession.isDiffing()) {
+          netgraphSession.showChanges(false);
+          return;
+        }
+        // Last: put the keyboard back on the page. A text pane you can only
+        // leave with a mouse is a text pane you are stuck in, and the canvas
+        // holds the arrow keys, so both need a way out that is not Tab.
+        if (document.activeElement === el.canvas || document.activeElement === el.source) {
+          document.activeElement.blur();
+        }
+      }
+    });
+
+    K.define("focus.files", { run: function () { focusPane(el.fileList); } });
+    K.define("focus.editor", { run: function () { el.source.focus(); } });
+    K.define("focus.canvas", { run: function () { el.canvas.focus(); } });
+    K.define("focus.outline", { run: function () { focusPane(el.outline); } });
+    K.define("render", { run: render });
+    K.define("validate", {
+      run: function () {
+        render();
+        focusPane(el.problems);
+        netgraphA11y.announce(el.problemCounts.textContent || "nothing to report", false);
+      }
+    });
+
+    K.define("node.move", {
+      run: function (context) {
+        var direction = {
+          ArrowRight: "right", ArrowLeft: "left", ArrowUp: "up", ArrowDown: "down"
+        }[context.key];
+        if (direction) { netgraphA11y.move(direction); }
+      }
+    });
+    K.define("node.link", {
+      run: function (context) { netgraphA11y.cycleLink(context.chord === "Shift-l" ? -1 : 1); }
+    });
+    K.define("node.first", { run: function () { netgraphA11y.first({ quiet: false }); } });
+    K.define("node.last", { run: function () { netgraphA11y.last({ quiet: false }); } });
+    K.define("node.inspect", { run: inspectFocused });
+    K.define("node.select", {
+      run: function () {
+        var here = netgraphA11y.focused();
+        if (!here) { return; }
+        pinned = here.element;
+        netgraphA11y.select(here.element);
+        if (mode === "session") { netgraphSession.select(here.record.id); }
+        inspectFocused();
+      }
+    });
+    K.define("element.goto", { run: function () { K.palette("elements", ""); } });
+
+    K.define("view.layer", { run: function () { K.palette("layers", ""); } });
+    K.define("view.layer.next", { run: function () { stepLayer(1); } });
+    K.define("view.layer.previous", { run: function () { stepLayer(-1); } });
+    /* Spelled out one by one rather than looped over a table of triples: the
+     * id has to be a literal in this file, because tests/test_web.py reads the
+     * registrations out of it to prove that every binding netgraph declares has
+     * something behind it. A loop would hide four of them from that check. */
+    K.define("view.ips", { run: function () { toggle(el.showIps, "IP addresses"); } });
+    K.define("view.vlans", { run: function () { toggle(el.showVlans, "VLANs"); } });
+    K.define("view.group", { run: function () { toggle(el.group, "namespace grouping"); } });
+    K.define("view.strict", { run: function () { toggle(el.strict, "strict"); } });
+    K.define("view.vlanFilter", {
+      run: function () {
+        K.prompt({
+          title: "Filter by VLAN",
+          detail: "Comma-separated ids, 1 to 4094. Empty keeps every element.",
+          fields: [{ name: "vlans", label: "VLAN ids", value: el.vlans.value }],
+          confirm: "Apply",
+          onSubmit: function (values) {
+            el.vlans.value = values.vlans;
+            render();
+          }
+        });
+      }
+    });
+    K.define("view.fit", {
+      run: function () { resetView(); netgraphA11y.announce("diagram fitted", false); }
+    });
+    K.define("view.zoomIn", { run: function () { zoomCentre(1.25); } });
+    K.define("view.zoomOut", { run: function () { zoomCentre(1 / 1.25); } });
+
+    /* The palette's other half: not commands but destinations. Each provider is
+     * asked afresh every time the palette opens, so what it offers is what is
+     * drawn and loaded now rather than what was there at boot. */
+    K.provide("layers", function () {
+      return Array.prototype.map.call(el.layer.options, function (option) {
+        return {
+          id: option.value,
+          title: "Layer: " + option.textContent,
+          detail: "switch the diagram to the " + option.value + " view",
+          group: "layer",
+          run: function () { el.layer.value = option.value; render(); }
+        };
+      });
+    });
+    K.provide("elements", function () {
+      return netgraphA11y.elements().map(function (entry) {
+        return {
+          id: entry.element,
+          title: entry.record.id || entry.record.name || entry.element,
+          detail: netgraphA11y.label(entry.record),
+          group: entry.record.type === "edge" ? "link" : "element",
+          run: function () {
+            el.canvas.focus();
+            netgraphA11y.focus(entry.element, { quiet: false });
+            inspectFocused();
+          }
+        };
+      });
+    });
+  }
+
+  /** Move the keyboard into a pane and say what it landed on.
+   *
+   * A pane is a container, not a control, so it is focused with `tabindex="-1"`
+   * and the first thing inside it that *is* a control takes over from there.
+   */
+  function focusPane(pane) {
+    if (!pane) { return; }
+    var first = pane.querySelector("button, [href], input, select, textarea");
+    (first || pane).focus();
+  }
+
+  /** Flip a display checkbox, redraw, and say which way it went. */
+  function toggle(control, said) {
+    control.checked = !control.checked;
+    render();
+    netgraphA11y.announce(said + (control.checked ? " on" : " off"), false);
+  }
+
+  function stepLayer(delta) {
+    var options = el.layer.options;
+    var next = (el.layer.selectedIndex + delta + options.length) % options.length;
+    el.layer.selectedIndex = next;
+    render();
+    netgraphA11y.announce(options[next].textContent, false);
+  }
+
   /* --------------------------------------------------------------- boot */
 
   /* What session.js is given: the elements it shares with this file, and the
@@ -598,18 +853,63 @@
     goToLine: goToLine,
     diagnostics: function (problems) { showProblems(problems || []); },
     remote: setRemote,
-    layer: function () { return el.layer.value; }
+    layer: function () { return el.layer.value; },
+    /** Put the focus ring back on an element after a change redrew the SVG. */
+    focusElement: function (address) {
+      var found = netgraphA11y.elements().filter(function (entry) {
+        return entry.record.id === address;
+      })[0];
+      if (!found) { return false; }
+      netgraphA11y.focus(found.element, { quiet: false });
+      return true;
+    }
   };
 
-  fetch("/api/state", { cache: "no-store" })
+  /* What keys.js is given: the questions only this file can answer about the
+   * state of the page, and the one thing a refused command has to do. */
+  var keyHost = {
+    isSession: function () { return mode === "session"; },
+    isWritable: function () { return mode === "session" && netgraphSession.isWritable(); },
+    hasFocus: function () { return !!netgraphA11y.focused(); },
+    inCanvas: function (node) {
+      return !!node && (node === el.canvas || el.canvas.contains(node));
+    },
+    refuse: function (why) { toast(why, "error"); }
+  };
+
+  netgraphA11y.attach({ el: el, bringIntoView: bringIntoView });
+  defineCommands();
+  netgraphSession.defineCommands(bridge);
+  netgraphKeys.attach(keyHost);
+
+  el.commands.addEventListener("click", function () { netgraphKeys.palette(null, ""); });
+  el.shortcuts.addEventListener("click", function () { netgraphKeys.reference(); });
+
+  /* The bindings are the page's own contract with the keyboard, so they are
+   * fetched before anything else: a page that draws before it can be driven is
+   * a page somebody presses Ctrl-K at and nothing happens. A failure here is
+   * survivable -- the pointer still works -- and says so once. */
+  fetch("/api/bindings", { cache: "no-store" })
     .then(function (response) { return response.json(); })
-    .then(function (state) {
-      if (state.mode !== "session") { return bootStream(); }
-      mode = "session";
-      netgraphSession.attach(bridge, state);
-      render();
+    .then(function (payload) {
+      netgraphKeys.load(payload);
+      el.commandsKey.textContent = netgraphKeys.chordFor("palette");
+      el.shortcutsKey.textContent = netgraphKeys.chordFor("help");
     })
-    .catch(bootStream);
+    .catch(function () { toast("the keyboard bindings could not be loaded", "error"); })
+    .then(bootFace);
+
+  function bootFace() {
+    return fetch("/api/state", { cache: "no-store" })
+      .then(function (response) { return response.json(); })
+      .then(function (state) {
+        if (state.mode !== "session") { return bootStream(); }
+        mode = "session";
+        netgraphSession.attach(bridge, state);
+        render();
+      })
+      .catch(bootStream);
+  }
 
   function bootStream() {
     mode = "stream";

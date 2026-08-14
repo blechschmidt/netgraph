@@ -18,6 +18,41 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **The editor can be driven entirely from the keyboard, and read without a screen.**
+  `netgraph web` was becoming pointer-only, which is where visual tools stop being usable
+  for the people who work fastest in them.
+
+  **`Ctrl-K` opens a command palette** over every command the page has — every `netgraph
+  edit` operation, every view and layer toggle, open-file, go-to-element, validate, the
+  changes drawer — searched in one field alongside every element address and file path in
+  the inventory. Each row prints the key that runs it, so the palette teaches the bindings;
+  a command that cannot run now is greyed with the reason rather than hidden. **`?` opens
+  the shortcut sheet.**
+
+  **The diagram is navigable.** `Tab` reaches the canvas, the arrow keys walk it — preferring
+  the elements the focused one is *linked to*, so a path is followed rather than a grid
+  swept — `Enter` opens the inspector, and `n`, `c`, `F2` and `Delete` are the create,
+  connect, rename and delete gestures. The focus ring is deliberately not the selection
+  ring: solid violet against a long dash, with another client's selection a short one.
+
+  **The SVG is no longer inert.** Every node and link carries a role and a label built from
+  the same record the info box uses — *"sw-home, switch, 8 interfaces, linked to
+  routers/rtr-home on port1"* — the canvas announces which element is current, `Alt-4`
+  opens the whole view as a textual outline, and every applied, refused or reverted gesture
+  is announced in a live region, once.
+
+  The interface now follows `prefers-color-scheme` with a palette per scheme (one set of
+  colours cannot clear 4.5:1 against both a white and a near-black background) and honours
+  `prefers-reduced-motion`. The diff legend prints `+`, `~` and `−` and three line styles
+  beside its three hues, so the encoding survives a greyscale print and a red-green reader.
+
+  It is gated: `tests/test_browser.py` runs axe-core over the page in both colour schemes
+  and fails CI on any WCAG 2.1 AA violation, and drives one end-to-end test — create a
+  device, cable it, undo both — without dispatching a mouse event. The bindings live in
+  `netgraph.web.bindings`, are served at `GET /api/bindings`, and are what
+  [`docs/commands/web.md`](docs/commands/web.md) documents, generated; a shortcut that is
+  documented and dead fails the suite.
+
 - **The editor pushes instead of polling, and a second tab is a feature rather than a
   race.** `netgraph web DIR` used to check a revision number once a second and, whenever it
   moved, refetch the whole file list and re-lay-out the whole diagram. It now opens a

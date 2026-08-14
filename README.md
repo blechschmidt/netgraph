@@ -8,6 +8,8 @@ netgraph reads the tree, checks that the documents agree with each other, and dr
 result as SVG, PNG, PDF, Graphviz DOT, Mermaid or JSON. It can also open the whole thing
 in a browser — `netgraph web` — where the YAML is edited on one side, drawn on the other,
 and every node and link answers a hover with its interfaces, addresses, VLANs and cabling.
+That page is driveable entirely from the keyboard, `Ctrl-K` for the command palette and `?`
+for the list; see [the bindings](docs/commands/web.md#the-keyboard).
 
 ![Layer-2 diagram of the home-lab example: a router, a switch, an access point, three computers, a server and a USB-to-Ethernet adapter, annotated with addresses, VLANs and the SSID a phone is associated to](docs/images/home-lab.svg)
 

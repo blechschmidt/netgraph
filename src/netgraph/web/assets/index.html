@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="/app.css">
 </head>
 <body>
+<a class="skip" href="#canvas">Skip to the diagram</a>
 <header>
   <h1>netgraph</h1>
   <span id="status" class="pill pending">waiting</span>
@@ -45,10 +46,12 @@
   <label class="check"><input id="group" type="checkbox"> group</label>
   <label class="check" title="Report warnings as errors"><input id="strict" type="checkbox"> strict</label>
   <button id="render" type="button">Render</button>
+  <button id="commands" type="button" class="ghost" title="Every command, searchable">Commands <kbd id="commands-key"></kbd></button>
+  <button id="shortcuts" type="button" class="ghost" title="Keyboard shortcuts">Keys <kbd id="shortcuts-key"></kbd></button>
 </header>
 
 <main>
-  <section id="files" class="pane files" hidden>
+  <section id="files" class="pane files" aria-label="Inventory files" hidden>
     <div class="pane-head">
       <span>inventory</span>
       <span id="files-root" class="hint"></span>
@@ -60,7 +63,7 @@
     <div id="file-list" class="file-list"><p class="empty">loading</p></div>
   </section>
 
-  <section class="pane editor">
+  <section class="pane editor" aria-label="Document text and problems">
     <div class="pane-head" id="editor-head">
       <span id="editor-title">YAML document stream</span>
       <span id="editor-hint" class="hint">one or more documents, separated by <code>---</code></span>
@@ -73,31 +76,42 @@
       <span>problems</span>
       <span id="problem-counts" class="hint"></span>
       <span class="spacer"></span>
-      <span class="hint">click one to jump to its file and line</span>
+      <span class="hint">click one, or press Enter on it, to jump to its file and line</span>
     </div>
-    <div id="problems" class="problems"><p class="empty">nothing to report</p></div>
+    <div id="problems" class="problems" tabindex="-1"><p class="empty">nothing to report</p></div>
   </section>
 
   <div id="splitter" class="splitter" role="separator" aria-orientation="vertical"
     aria-label="Resize the editor" tabindex="0"></div>
 
-  <section class="pane diagram">
+  <section class="pane diagram" aria-label="Diagram">
     <div class="pane-head">
       <span>diagram</span>
-      <span class="hint">hover a node or a link for details &middot; drag to pan &middot; scroll to zoom</span>
+      <span class="hint">hover or focus a node for details &middot; drag or arrow keys to move &middot; scroll to zoom</span>
       <span class="spacer"></span>
       <button id="fit" type="button" class="ghost">Fit</button>
     </div>
-    <div id="canvas" class="canvas">
+    <div id="canvas" class="canvas" tabindex="0" aria-label="Network diagram">
       <div id="viewport" class="viewport"></div>
       <p id="placeholder" class="empty">nothing rendered yet</p>
+      <!-- Not a colour key: each mark carries a sigil the diagram draws too, so
+           the legend survives a greyscale print and a red-green reader. -->
       <div id="legend" class="legend" hidden>
-        <span class="key added">added</span>
-        <span class="key changed">changed</span>
-        <span class="key removed">removed</span>
-        <span class="key untouched">untouched</span>
+        <span class="key added"><span class="sigil" aria-hidden="true">+</span> added</span>
+        <span class="key changed"><span class="sigil" aria-hidden="true">~</span> changed</span>
+        <span class="key removed"><span class="sigil" aria-hidden="true">−</span> removed</span>
+        <span class="key untouched"><span class="sigil" aria-hidden="true">·</span> untouched</span>
       </div>
     </div>
+
+    <!-- The diagram as text. Off screen until something focuses it, at which
+         point it becomes a real panel: a keyboard user gets the outline, and
+         nobody has to know it was hiding there. -->
+    <section id="outline" class="outline" tabindex="-1" aria-labelledby="outline-heading">
+      <h2 id="outline-heading">Diagram outline</h2>
+      <p id="outline-summary">nothing is drawn</p>
+      <ul id="outline-list"></ul>
+    </section>
 
     <section id="changes" class="drawer" hidden aria-label="Changes made in this session">
       <div class="pane-head">
@@ -118,9 +132,16 @@
   </section>
 </main>
 
-<aside id="info" class="info" hidden aria-live="polite"></aside>
-<div id="toast" class="toast" hidden role="status"></div>
+<aside id="info" class="info" hidden aria-label="Element details"></aside>
+<div id="toast" class="toast" hidden aria-hidden="true"></div>
+<!-- Every applied, refused and reverted gesture is said here, once. The polite
+     one is for what happened; the assertive one interrupts, and is for what was
+     refused -- which is not something to hear three actions later. -->
+<span id="announcer" class="visually-hidden" role="status" aria-live="polite"></span>
+<span id="alert" class="visually-hidden" role="alert" aria-live="assertive"></span>
 <script src="/detail.js"></script>
+<script src="/keys.js"></script>
+<script src="/a11y.js"></script>
 <script src="/session.js"></script>
 <script src="/app.js"></script>
 </body>

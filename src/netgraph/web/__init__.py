@@ -32,6 +32,10 @@ Six pieces, each usable on its own:
     Who else has the same session open, what they have selected, and which files
     they have unsaved edits in. Advisory throughout — the revision and the
     content hash remain the only gates on a write.
+:mod:`~netgraph.web.bindings`
+    Every command the page has and the keys that reach it. Served at
+    ``/api/bindings``, so the palette, the shortcut sheet and the ``keybindings``
+    region of ``docs/commands/web.md`` are three views of one table.
 
 The split is what makes the interesting half testable without a browser:
 :func:`~netgraph.web.preview.render_source` takes a string and returns the
@@ -41,6 +45,7 @@ diagram, the records and the problems, and no HTTP is involved.
 from __future__ import annotations
 
 from netgraph.render.details import DETAIL_OPTIONS, build_details
+from netgraph.web.bindings import BINDINGS, SECTIONS, Binding
 from netgraph.web.events import EVENT_NAMES, EVENTS_PATH, Event, EventBus
 from netgraph.web.presence import Client, Presence
 from netgraph.web.preview import (
@@ -53,6 +58,7 @@ from netgraph.web.preview import (
 )
 from netgraph.web.server import (
     ASSETS,
+    BINDINGS_PATH,
     DEFAULT_PORT,
     MAX_SOURCE_BYTES,
     PRESENCE_PATH,
@@ -65,6 +71,8 @@ from netgraph.web.svgdoc import prepare
 
 __all__ = [
     "ASSETS",
+    "BINDINGS",
+    "BINDINGS_PATH",
     "DEFAULT_PORT",
     "DETAIL_OPTIONS",
     "EVENTS_PATH",
@@ -73,7 +81,9 @@ __all__ = [
     "MAX_VLAN",
     "PRESENCE_PATH",
     "RENDER_PATH",
+    "SECTIONS",
     "SOURCE_PATH",
+    "Binding",
     "Client",
     "Event",
     "EventBus",

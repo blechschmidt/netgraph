@@ -172,12 +172,47 @@ the CI job is wired.
 | a read-only session disables every mutating control | no control that would write, *and* a 403 from every route that could, asked from the page's own origin |
 | the poll notices a change made outside the session | `$EDITOR` writes the file; a clean pane adopts it, a dirty one is marked conflicted and left alone |
 | a stale save is refused rather than clobbering | the content hash the save quotes is what refuses it, whether or not anything noticed first |
+| the page has no accessibility violations | axe-core over the session, its dialogs and the changes drawer, in both colour schemes — see below |
+| every node and link carries a role and a label | the SVG's semantics, checked against what the inventory says rather than against "some string is present" |
+| the outline reads the view as text | one entry per drawn element, off screen until focused and a real panel once it is |
+| a keyboard-only session creates, connects and undoes | the whole editor without one mouse event, asserted on the files it wrote |
+| the palette finds a command and an element | one field over commands, addresses and paths, each row printing its own key |
+| the shortcut sheet comes from the registered bindings | compared against `/api/bindings`, because a test with its own copy of the table would be a third copy |
 
 The two direct-manipulation tests **perform their gesture for real** and skip only
 when the tree did not move — which it does not, because a drag on the current
 canvas pans the diagram and writes nothing. They are not `xfail` and not
 commented out: the day the canvas grows the gesture, they start asserting its
 outcome without being touched. The skip reason says so in the run's own output.
+
+### The accessibility gate
+
+Four of the tests above run [axe-core][axe] over the page and **fail on any
+violation**, which is what makes it a gate rather than a report. What they check
+is deliberately scoped:
+
+* **the standards, and only the standards** — `wcag2a`, `wcag2aa`, `wcag21a`,
+  `wcag21aa`. axe's `best-practice` tag carries opinions a page embedding a
+  Graphviz drawing trips over for reasons unrelated to whether it can be used,
+  and a gate that shouts about taste is a gate people learn to ignore;
+* **the page as it really is** — with the file list drawn, the diagram annotated
+  and the dialogs open. A page audited empty is a page audited without the half
+  that is hard;
+* **both colour schemes.** One palette cannot clear 4.5:1 against both a white
+  and a near-black background, so `app.css` declares two and the dark one is
+  audited under `emulate_media(color_scheme="dark")`. The test asserts the dark
+  tokens actually took before believing the audit.
+
+axe-core rides in the `browser` extra as `axe-core-python`, which vendors the
+checker rather than fetching it, so the gate cannot change under you overnight.
+Without it those four tests skip and the rest of the module runs.
+
+Separately, `tests/test_web.py` holds the *keyboard* gate, and it needs no
+browser: every command in `netgraph.web.bindings` must have a handler registered
+in the page's JavaScript and every handler must have an entry in the table, no
+chord may be bound twice in one scope, and `docs/commands/web.md` must contain
+the table as generated. A shortcut that is documented and dead fails there, a
+second after it is typed.
 
 ### Two properties every test here has
 
@@ -207,6 +242,7 @@ and lets you step through the test against the live page. The temporary
 inventory each test copies is a real directory under pytest's `tmp_path`, so
 whatever the test wrote is still there to look at afterwards.
 
+[axe]: https://github.com/dequelabs/axe-core
 [playwright]: https://playwright.dev/python/
 
 ## The properties

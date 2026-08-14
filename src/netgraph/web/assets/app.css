@@ -1,23 +1,108 @@
 /* netgraph web interface.
  *
- * Three panes -- the inventory, the editor, the diagram -- and a floating info
- * box. The first is hidden in the document-stream scratchpad, which has no
- * files to list. The palette follows the diagram's own encoding -- green for
- * what is fine, red for an error, amber for a warning -- so the status pill, a
- * finding in the list and a file marked unsaved mean the same thing as the
- * colours in the picture next to them.
+ * Three panes -- the inventory, the editor, the diagram -- a floating info box,
+ * and the overlays the keyboard puts up: the command palette, the shortcut
+ * reference and the prompt an edit gesture asks its arguments with. The first
+ * pane is hidden in the document-stream scratchpad, which has no files to list.
+ *
+ * Colour
+ * ------
+ *
+ * Every colour is a token, declared twice: once for a light scheme and once
+ * under `prefers-color-scheme: dark`. That is not a preference, it is a
+ * contrast requirement -- `--error: #bc1c25` reads at 6.4:1 on white and at
+ * 1.4:1 on a dark canvas, so a page that follows the system into dark mode
+ * without changing its palette is a page that stops being readable there.
+ * Every token below clears 4.5:1 against its own `--bg`.
+ *
+ * For the same reason nothing here dims text with `opacity`. A 55%-opaque
+ * label is a contrast failure computed from the blend, so "quieter" is spelled
+ * `color: var(--muted)`, which is a colour chosen to still be legible.
+ *
+ * The palette follows the diagram's own encoding -- green for what is fine, red
+ * for an error, amber for a warning -- so the status pill, a finding in the list
+ * and a file marked unsaved mean the same thing as the colours in the picture
+ * next to them. Where a colour carries meaning it is never alone: the diff
+ * legend prints `+`, `~` and `−`, the same sigils Graphviz draws into the
+ * picture, so the encoding survives a greyscale print and a red-green reader.
+ *
+ * Focus
+ * -----
+ *
+ * The focus ring and the selection ring are deliberately different things:
+ * focus is where the keyboard is, selection is what the user said they were
+ * working on, and a tool that draws them the same way cannot be driven without
+ * a pointer. Focus is a solid violet halo, this tab's selection is a long dash,
+ * somebody else's is a short one -- three patterns, not three hues.
  */
 
 :root {
   color-scheme: light dark;
-  --edge: rgba(128, 128, 128, .35);
-  --ok: #1a7f37;
-  --error: #cf222e;
-  --warning: #9a6700;
-  --info: #0969da;
+
+  --bg: #ffffff;
+  --raised: #f6f7f9;
+  --fg: #1c2024;
+  /* Everything that used to be `opacity: .6`. Legible on --bg, on purpose. */
+  --muted: #5b6167;
+  --edge: #cbd1d7;
+  --line: #cbd1d7;
+
+  --ok: #0f6b2c;
+  --error: #bc1c25;
+  --warning: #7a5200;
+  --info: #0b5ed7;
+
+  /* Where the keyboard is, and what is selected. Never the same. */
+  --focus: #6b21a8;
+  --selected: #0b5ed7;
+
+  --diff-added: #15803d;
+  --diff-changed: #92400e;
+  --diff-removed: #b91c1c;
+  --diff-untouched: #5b6167;
+
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --pane: 40%;
   --files: 15rem;
+  --shadow: rgba(0, 0, 0, .28);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216;
+    --raised: #181c22;
+    --fg: #e6e9ee;
+    --muted: #a3acb8;
+    --edge: #333a42;
+    --line: #333a42;
+
+    --ok: #4ade80;
+    --error: #ff8189;
+    --warning: #e2b33c;
+    --info: #79b8ff;
+
+    --focus: #c4a2fc;
+    --selected: #79b8ff;
+
+    --diff-added: #4ade80;
+    --diff-changed: #e2b33c;
+    --diff-removed: #ff8189;
+    --diff-untouched: #a3acb8;
+
+    --shadow: rgba(0, 0, 0, .6);
+  }
+}
+
+/* Somebody who asked for less movement gets none. Declared once, over
+ * everything, because the alternative is remembering it at each new transition
+ * -- and the one that gets forgotten is the one that makes somebody ill. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -31,10 +116,47 @@ body {
   display: flex;
   flex-direction: column;
   font: 13px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  background: Canvas;
-  color: CanvasText;
+  background: var(--bg);
+  color: var(--fg);
   overflow: hidden;
 }
+
+/* One ring, everywhere, and never removed without a replacement. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+::placeholder { color: var(--muted); opacity: 1; }
+
+/* For a screen reader and for nobody else -- until it is focused, at which
+ * point hiding it from the person who just navigated to it would be absurd. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 40;
+  padding: .4rem .7rem;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--focus);
+  border-radius: 0 0 4px 0;
+}
+
+.skip:focus { left: 0; }
 
 /* ---------------------------------------------------------------- header */
 
@@ -68,7 +190,7 @@ header h1 {
 .pill.invalid, .pill.failed { color: var(--error); }
 .pill.pending, .pill.rendering { color: var(--warning); }
 
-.summary { font-family: var(--mono); opacity: .75; }
+.summary { font-family: var(--mono); color: var(--muted); }
 
 .field, .check {
   display: inline-flex;
@@ -76,14 +198,13 @@ header h1 {
   align-items: center;
   font-family: var(--mono);
   font-size: 12px;
-  opacity: .9;
 }
 
 select, input[type="text"], button {
   font: inherit;
   font-family: var(--mono);
   color: inherit;
-  background: Canvas;
+  background: var(--bg);
   border: 1px solid var(--edge);
   border-radius: 4px;
   padding: .2rem .35rem;
@@ -91,7 +212,18 @@ select, input[type="text"], button {
 
 button { cursor: pointer; }
 button:hover { border-color: currentColor; }
-button.ghost { border-color: transparent; opacity: .8; }
+button.ghost { border-color: transparent; }
+button:disabled { cursor: default; color: var(--muted); }
+
+kbd {
+  font: 600 10px/1.4 var(--mono);
+  padding: .05rem .25rem;
+  border: 1px solid var(--edge);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: var(--raised);
+  white-space: nowrap;
+}
 
 /* ----------------------------------------------------------------- panes */
 
@@ -122,14 +254,14 @@ main {
   font: 600 11px/1.6 var(--mono);
   text-transform: uppercase;
   letter-spacing: .05em;
-  opacity: .8;
+  color: var(--muted);
 }
 
 .pane-head .hint {
   font-weight: 400;
   text-transform: none;
   letter-spacing: 0;
-  opacity: .7;
+  color: var(--muted);
 }
 
 .problems-head { border-top: 1px solid var(--edge); }
@@ -139,13 +271,14 @@ main {
   min-height: 0;
   resize: none;
   border: 0;
-  outline: 0;
   padding: .6rem .7rem;
   font: 12px/1.55 var(--mono);
   tab-size: 2;
-  background: Canvas;
-  color: CanvasText;
+  background: var(--bg);
+  color: var(--fg);
 }
+
+#source:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
 
 .splitter {
   flex: 0 0 5px;
@@ -171,18 +304,27 @@ main {
   gap: .5rem;
   padding: .18rem .7rem;
   align-items: start;
+  text-align: left;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
 }
 
-/* Every problem carries a line, and clicking one puts the cursor on it. */
+/* Every problem carries a line, and activating one puts the cursor on it. A
+ * locatable row is a real <button>, so it is in the tab order and Enter works
+ * on it without this file inventing a keyboard for it. */
 .problem.locatable { cursor: pointer; }
-.problem:hover { background: color-mix(in srgb, CanvasText 6%, transparent); }
+.problem:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); }
 .problem .severity { font-weight: 700; }
 .problem.error .severity, .problem.error .rule { color: var(--error); }
 .problem.warning .severity, .problem.warning .rule { color: var(--warning); }
 .problem.info .severity, .problem.info .rule { color: var(--info); }
-.problem .where { opacity: .7; overflow-wrap: anywhere; }
+.problem .where { color: var(--muted); overflow-wrap: anywhere; }
 
-.empty { opacity: .55; padding: .6rem .7rem; margin: 0; }
+.empty { color: var(--muted); padding: .6rem .7rem; margin: 0; }
 
 /* ------------------------------------------------------------ file list */
 
@@ -199,7 +341,7 @@ main {
   font: 600 10px/1.6 var(--mono);
   text-transform: uppercase;
   letter-spacing: .07em;
-  opacity: .5;
+  color: var(--muted);
 }
 
 .file-list .file, .file-list .doc {
@@ -210,16 +352,23 @@ main {
   cursor: pointer;
   white-space: nowrap;
   overflow: hidden;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
 }
 
 .file-list .file { font-weight: 600; }
-.file-list .doc { padding-left: 1.5rem; opacity: .8; }
+.file-list .doc { padding-left: 1.5rem; }
 .file-list .file:hover, .file-list .doc:hover {
-  background: color-mix(in srgb, CanvasText 8%, transparent);
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
 }
 .file-list .file.current { background: color-mix(in srgb, var(--info) 18%, transparent); }
 .file-list .file.broken .name { color: var(--error); }
-.file-list .doc .kind { opacity: .55; font-size: 11px; }
+.file-list .doc .kind { color: var(--muted); font-size: 11px; }
 .file-list .name { overflow: hidden; text-overflow: ellipsis; }
 
 /* The honest per-file state. Two different things, two different colours:
@@ -236,18 +385,17 @@ main {
 .badge.dirty { color: var(--warning); }
 .badge.conflict, .badge.gone { color: var(--error); }
 /* Somebody else has unsaved edits here. Deliberately quieter than the two
- * above: it is advisory, it blocks nothing, and a badge that shouts would
- * suggest otherwise. */
-.badge.elsewhere { color: var(--info); opacity: .8; border-style: dashed; }
+ * above -- it is advisory, it blocks nothing, and a badge that shouts would
+ * suggest otherwise -- but quieter by line style, not by fading the text. */
+.badge.elsewhere { color: var(--info); border-style: dashed; }
 .hint.ro { color: var(--info); }
 .hint.rw { color: var(--ok); }
 
-/* Which channel this page is on. Only worth reading when it is not "live",
- * which is why "live" is the faintest of the three. */
+/* Which channel this page is on. Only worth reading when it is not "live". */
 .hint.link { text-transform: lowercase; letter-spacing: 0; }
-.hint.link.live { color: var(--ok); opacity: .55; }
+.hint.link.live { color: var(--ok); }
 .hint.link.polling { color: var(--warning); }
-.hint.link.reconnecting { color: var(--warning); opacity: .8; }
+.hint.link.reconnecting { color: var(--warning); }
 
 /* Who else has this inventory open. */
 .clients {
@@ -266,13 +414,15 @@ main {
   color: var(--info);
   cursor: default;
 }
-.clients .client.lagging { opacity: .55; border-style: dashed; }
+.clients .client.lagging { border-style: dashed; }
 
 .actions { display: inline-flex; gap: .3rem; }
 .actions[hidden] { display: none; }
 
 /* ---------------------------------------------------------------- toast */
 
+/* Visual only: `aria-hidden` in the markup, because the same words go to the
+ * live region below and hearing them twice is worse than not seeing them. */
 .toast {
   position: fixed;
   z-index: 20;
@@ -283,8 +433,8 @@ main {
   padding: .4rem .8rem;
   border: 1px solid var(--edge);
   border-radius: 999px;
-  background: Canvas;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, .3);
+  background: var(--bg);
+  box-shadow: 0 4px 18px var(--shadow);
   font-family: var(--mono);
   font-size: 12px;
 }
@@ -304,6 +454,10 @@ main {
 }
 
 .canvas.panning { cursor: grabbing; }
+
+/* The canvas is one tab stop and says so. Inside it the arrow keys move, which
+ * is why the ring here is on the container and the ring below is on a shape. */
+.canvas:focus-visible { outline: 2px solid var(--focus); outline-offset: -3px; }
 
 .viewport {
   position: absolute;
@@ -327,16 +481,84 @@ main {
 .viewport svg g.hot > * { stroke-width: 2.4; }
 .viewport svg g.faded { opacity: .28; }
 
-/* What somebody else has selected. A dashed halo rather than the hover
- * highlight, because "where the other person is looking" and "what is under my
- * pointer" must not be able to be mistaken for one another -- and faint,
- * because it is their attention, not mine. */
-.viewport svg g.remote > * {
+/* What *this* tab has selected. A long dash: a different pattern from the focus
+ * ring below and from the short dash above, so the three are told apart without
+ * relying on the three colours. */
+.viewport svg g.selected > *:not(text) {
+  stroke: var(--selected);
+  stroke-width: 2.5;
+  stroke-dasharray: 10 4;
+}
+
+/* What somebody *else* has selected. Short dash, and their attention, not
+ * mine -- so it must never look like either of the other two. */
+.viewport svg g.remote > *:not(text) {
   stroke: var(--info);
   stroke-width: 2;
-  stroke-dasharray: 4 3;
-  opacity: .85;
+  stroke-dasharray: 3 3;
 }
+
+/* Where the keyboard is. Solid, heavy and haloed -- and violet, which is not a
+ * hue this diagram uses for anything else, so it cannot be read as a state of
+ * the network.
+ *
+ * Last of the three on purpose. An element is very often focused *and*
+ * selected, and of the two the focus ring is the one that has to survive: the
+ * user can always see what they selected, and cannot see where the keyboard
+ * went if this rule loses the cascade. */
+.viewport svg g.focused > *:not(text) {
+  stroke: var(--focus);
+  stroke-width: 3.5;
+  stroke-dasharray: none;
+}
+.viewport svg g.focused { filter: drop-shadow(0 0 4px var(--focus)); }
+
+/* ------------------------------------------------------- diagram outline */
+
+/* The drawing as a list. Off screen until focused; a real panel once it is,
+ * because a keyboard user who navigates here should be able to see where they
+ * are, and because it is the fastest way to find an element by name. */
+.outline {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.outline:focus, .outline:focus-within {
+  left: 0;
+  top: 0;
+  width: min(30rem, 60%);
+  height: auto;
+  max-height: 100%;
+  overflow: auto;
+  z-index: 9;
+  padding: .5rem .7rem 1rem;
+  background: var(--bg);
+  border-right: 1px solid var(--edge);
+  border-bottom: 1px solid var(--edge);
+  box-shadow: 6px 0 24px var(--shadow);
+}
+
+.outline h2 { font: 600 12px/1.6 var(--mono); margin: 0; text-transform: uppercase; }
+.outline p { margin: .1rem 0 .4rem; color: var(--muted); font: 11px/1.5 var(--mono); }
+.outline ul { list-style: none; margin: 0; padding: 0; }
+
+.outline-entry {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  padding: .1rem .2rem;
+  font: 12px/1.5 var(--mono);
+}
+
+.outline-entry:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); }
 
 /* ------------------------------------------------------------- info box */
 
@@ -349,8 +571,8 @@ main {
   padding: .55rem .7rem .65rem;
   border: 1px solid var(--edge);
   border-radius: 6px;
-  background: Canvas;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, .28);
+  background: var(--bg);
+  box-shadow: 0 6px 24px var(--shadow);
   font-family: var(--mono);
   font-size: 12px;
   pointer-events: none;
@@ -368,11 +590,11 @@ main {
 
 .info h2 .kind {
   font-weight: 400;
-  opacity: .65;
+  color: var(--muted);
   text-transform: lowercase;
 }
 
-.info .pinhint { float: right; font-weight: 400; opacity: .55; font-size: 11px; }
+.info .pinhint { float: right; font-weight: 400; color: var(--muted); font-size: 11px; }
 /* A table is allowed to be wider than the box and scroll: breaking "ethernet"
  * across two lines to save a few pixels costs more than the scrollbar does. */
 .info section { margin-top: .5rem; overflow-x: auto; }
@@ -380,7 +602,7 @@ main {
   font: 600 10px/1.6 var(--mono);
   text-transform: uppercase;
   letter-spacing: .07em;
-  opacity: .6;
+  color: var(--muted);
   margin: 0 0 .15rem;
 }
 
@@ -391,14 +613,14 @@ main {
   margin: 0;
 }
 
-.info dt { opacity: .6; }
+.info dt { color: var(--muted); }
 .info dd { margin: 0; overflow-wrap: anywhere; }
 
 .info table { border-collapse: collapse; width: 100%; }
 .info th {
   text-align: left;
   font: 600 10px/1.6 var(--mono);
-  opacity: .55;
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .05em;
   padding-right: .6rem;
@@ -408,7 +630,7 @@ main {
   padding: .05rem .6rem .05rem 0;
   white-space: nowrap;
 }
-.info tr.off td { opacity: .5; text-decoration: line-through solid; }
+.info tr.off td { color: var(--muted); text-decoration: line-through solid; }
 .info .tag {
   display: inline-block;
   padding: 0 .3rem;
@@ -417,7 +639,7 @@ main {
   border-radius: 3px;
   font-size: 11px;
 }
-.info .note { opacity: .65; }
+.info .note { color: var(--muted); }
 
 /* -------------------------------------------------------- changes drawer */
 
@@ -436,9 +658,9 @@ main {
   width: min(30rem, 55%);
   display: flex;
   flex-direction: column;
-  background: Canvas;
+  background: var(--bg);
   border-left: 1px solid var(--edge);
-  box-shadow: -8px 0 24px rgba(0, 0, 0, .22);
+  box-shadow: -8px 0 24px var(--shadow);
 }
 
 .drawer[hidden] { display: none; }
@@ -458,7 +680,10 @@ main {
   padding: .45rem .7rem .55rem;
 }
 
-.change.reverted { opacity: .5; }
+/* A reverted entry is struck through rather than faded: it still has to be
+ * readable, because "what did I put back" is exactly the question being asked
+ * of it. */
+.change.reverted .label { text-decoration: line-through solid; color: var(--muted); }
 
 .change-head {
   display: flex;
@@ -466,14 +691,23 @@ main {
   align-items: baseline;
 }
 
-.change .n { opacity: .5; }
+.change .n { color: var(--muted); }
 .change .label { flex: 1 1 auto; overflow-wrap: anywhere; }
-.change .label.revealable { cursor: pointer; text-decoration: underline dotted; }
-.change .where { opacity: .6; font-size: 11px; overflow-wrap: anywhere; }
+.change .label.revealable {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+}
+.change .where { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
 
 /* The hunk is the point of the entry: it is what was written, in the form a
- * reviewer already reads. Coloured by the same three hues the diagram uses, so
- * a green line here and a green box there mean the same thing. */
+ * reviewer already reads. The `+` and `-` in column one are the encoding; the
+ * colour agrees with it rather than replacing it. */
 .change pre {
   margin: .35rem 0 0;
   padding: .35rem .5rem;
@@ -483,15 +717,15 @@ main {
   border-radius: 4px;
   font: 11px/1.45 var(--mono);
   white-space: pre;
-  background: color-mix(in srgb, CanvasText 4%, transparent);
+  background: var(--raised);
 }
 
-.change pre .add { color: var(--ok); }
-.change pre .del { color: var(--error); }
-.change pre .at { color: var(--info); opacity: .8; }
-.change pre .file { font-weight: 600; opacity: .75; }
+.change pre .add { color: var(--diff-added); }
+.change pre .del { color: var(--diff-removed); }
+.change pre .at { color: var(--info); }
+.change pre .file { font-weight: 600; }
 
-.change .commands { opacity: .7; }
+.change .commands { color: var(--muted); }
 
 /* --------------------------------------------------------------- legend */
 
@@ -502,15 +736,19 @@ main {
   left: .7rem;
   bottom: .7rem;
   display: flex;
-  gap: .5rem;
+  gap: .7rem;
   padding: .3rem .5rem;
   border: 1px solid var(--edge);
   border-radius: 4px;
-  background: Canvas;
+  background: var(--bg);
   font: 11px/1.4 var(--mono);
 }
 
 .legend[hidden] { display: none; }
+
+/* Swatch *and* sigil *and* line style: three carriers for one distinction, so
+ * losing any one of them still leaves the legend readable. The sigils are the
+ * ones netgraph.render.dot draws into the picture itself. */
 .legend .key::before {
   content: "";
   display: inline-block;
@@ -522,16 +760,163 @@ main {
   vertical-align: -1px;
 }
 
-.legend .added { color: #15803d; }
-.legend .changed { color: #b45309; }
-.legend .removed { color: #dc2626; }
-.legend .removed::before { border-style: dashed; }
-.legend .untouched { color: #a1a1aa; }
+.legend .sigil { font-weight: 700; margin-right: .15rem; }
+.legend .added { color: var(--diff-added); }
+.legend .changed { color: var(--diff-changed); }
+.legend .changed::before { border-style: dashed; }
+.legend .removed { color: var(--diff-removed); }
+.legend .removed::before { border-style: dotted; }
+.legend .untouched { color: var(--diff-untouched); }
+.legend .untouched::before { border-style: solid; border-width: 1px; }
 
-.count { opacity: .7; }
+.count { color: var(--muted); }
+
+/* -------------------------------------------------------------- overlays */
+
+/* One shell for the palette, the reference and the prompt: one focus trap, one
+ * Escape, one place the focus is returned to. See keys.js. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 8vh 1rem 1rem;
+  background: color-mix(in srgb, var(--fg) 35%, transparent);
+}
+
+/* The panel slides, the backdrop does not fade. A fade is an opacity, an
+ * opacity blends the text it contains, and text blended towards its background
+ * is text that fails contrast for as long as the animation lasts -- which is
+ * both a real (if brief) problem and one axe-core is right to report. */
+@keyframes panel-in {
+  from { transform: translateY(-6px); }
+  to { transform: none; }
+}
+
+.palette, .sheet, .prompt {
+  animation: panel-in 120ms ease-out;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  box-shadow: 0 12px 40px var(--shadow);
+  max-height: 84vh;
+  overflow: auto;
+}
+
+/* ------------------------------------------------------------- palette */
+
+.palette {
+  width: min(44rem, 100%);
+  padding: .5rem;
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+
+.palette-input {
+  width: 100%;
+  padding: .5rem .6rem;
+  font: 14px/1.4 var(--mono);
+  border: 1px solid var(--edge);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.palette-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: .6rem;
+  align-items: baseline;
+  padding: .25rem .5rem;
+  border-radius: 4px;
+  font: 12px/1.6 var(--mono);
+  cursor: pointer;
+}
+
+.palette-item.current { background: color-mix(in srgb, var(--focus) 18%, transparent); }
+/* Out of reach, and the row says why rather than disappearing: "where did that
+ * command go" is a worse question than "why is it greyed". */
+.palette-item.unavailable { cursor: not-allowed; }
+.palette-item.unavailable .palette-title { color: var(--muted); }
+.palette-group { color: var(--muted); text-transform: lowercase; }
+.palette-chord { font-weight: 600; color: var(--info); white-space: nowrap; }
+.palette-why { color: var(--warning); }
+.palette-status { margin: 0; padding: 0 .5rem; color: var(--muted); font: 11px/1.6 var(--mono); }
+
+/* ------------------------------------------------------------ reference */
+
+.sheet {
+  width: min(52rem, 100%);
+  padding: 1rem 1.2rem 1.2rem;
+}
+
+.sheet h2 { margin: 0 0 .2rem; font: 600 15px/1.4 var(--mono); }
+.sheet-lede { margin: 0 0 .8rem; color: var(--muted); font-size: 12px; }
+.sheet h3 {
+  margin: .9rem 0 .3rem;
+  font: 600 11px/1.6 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+}
+
+.sheet dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: .2rem .8rem;
+  margin: 0;
+  font-size: 12px;
+}
+
+.sheet dt { white-space: nowrap; }
+.sheet dd { margin: 0; }
+.sheet-why { color: var(--warning); }
+.palette-only { color: var(--muted); font: 11px/1.5 var(--mono); }
+.sheet-close { margin-top: 1rem; }
+
+/* --------------------------------------------------------------- prompt */
+
+.prompt {
+  width: min(32rem, 100%);
+  padding: 1rem 1.2rem 1.2rem;
+}
+
+.prompt h2 { margin: 0 0 .3rem; font: 600 14px/1.4 var(--mono); }
+.prompt-detail { margin: 0 0 .7rem; color: var(--muted); font-size: 12px; }
+.prompt-field { display: flex; flex-direction: column; gap: .15rem; margin: 0 0 .6rem; }
+.prompt-field label { font: 600 11px/1.6 var(--mono); text-transform: uppercase; }
+.prompt-field input, .prompt-field select { padding: .35rem .45rem; }
+.prompt-hint { color: var(--muted); font-size: 11px; }
+.prompt-error { margin: 0 0 .6rem; color: var(--error); font-size: 12px; min-height: 1.2em; }
+.prompt-actions { display: flex; gap: .4rem; margin: 0; }
+.prompt-actions button { padding: .3rem .8rem; }
+
+/* --------------------------------------------------------- high contrast */
+
+/* Windows high-contrast mode replaces every colour with the user's own. The
+ * one thing that must survive it is the *distinction* between the rings, which
+ * is why it is drawn with line style as well as with hue. */
+@media (forced-colors: active) {
+  .viewport svg g.focused > *:not(text) { stroke: Highlight; }
+  .palette-item.current { background: Highlight; color: HighlightText; forced-color-adjust: none; }
+  kbd { border-color: CanvasText; }
+}
 
 @media (max-width: 720px) {
   .drawer { width: 100%; }
+  .outline:focus, .outline:focus-within { width: 100%; }
 
   main { flex-direction: column; }
   .pane.editor { flex: 0 0 45%; border-right: 0; border-bottom: 1px solid var(--edge); }

@@ -72,7 +72,14 @@ dev = [
 # megabytes a contributor typing ``pytest`` did not ask for. The module skips
 # itself — with the command to run — when either half is missing, and
 # ``.github/workflows/ci.yml`` has a job that installs both. See docs/testing.md.
-browser = ["playwright>=1.44"]
+browser = [
+    "playwright>=1.44",
+    # The accessibility gate. Ships axe-core itself, so the check is pinned with
+    # the dependency rather than fetched from a CDN at test time -- a gate that
+    # can change under you overnight is a gate that fails for reasons nobody
+    # changed. tests/test_browser.py skips its axe tests without it.
+    "axe-core-python>=0.1",
+]
 
 [project.urls]
 # The canonical URLs. ``netgraph.rules.RULES_DOC_URL`` and the SARIF
@@ -181,7 +188,7 @@ ignore_missing_imports = true
 # does not have it installed. The module ships type hints, so wherever it *is*
 # installed this override changes nothing.
 [[tool.mypy.overrides]]
-module = ["playwright.*"]
+module = ["playwright.*", "axe_core_python.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

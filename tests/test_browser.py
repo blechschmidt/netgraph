@@ -86,6 +86,13 @@ try:
 except ImportError:  # pragma: no cover - the module skips itself below
     HAVE_PLAYWRIGHT = False
 
+try:
+    from axe_core_python.sync_playwright import Axe
+
+    HAVE_AXE = True
+except ImportError:  # pragma: no cover - the accessibility tests skip themselves
+    HAVE_AXE = False
+
 
 REPO_ROOT: Final = Path(__file__).resolve().parent.parent
 HOME_LAB: Final = REPO_ROOT / "examples" / "home-lab"
@@ -124,6 +131,30 @@ DIRECT_MANIPULATION: Final = (
     "the canvas does not edit yet: this gesture panned the diagram and changed no file. "
     "The test asserts what the gesture must write once direct manipulation lands"
 )
+
+#: Which axe-core rule sets the page is held to. The standards, and only the
+#: standards: axe's ``best-practice`` tag carries opinions ("every region should
+#: be a landmark", "id attributes should be unique across the document") that a
+#: page embedding a Graphviz drawing will trip over for reasons that have nothing
+#: to do with whether it can be used. A gate that shouts about taste is a gate
+#: people learn to ignore.
+AXE_TAGS: Final = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]
+
+#: A device with a spare port, added to the copied inventory by the keyboard
+#: test. ``examples/home-lab`` is fully patched -- every port of ``sw-home``
+#: terminates a cable -- so a test that must *connect* something needs somewhere
+#: for it to go that does not depend on the example never gaining a device.
+SPARE_HOST: Final = """\
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-spare
+  description: A host with a free port. Fixture for the keyboard-only test.
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+"""
 
 pytestmark = [
     pytest.mark.browser,
@@ -292,6 +323,42 @@ class Editor:
                 " return t.value.slice(t.selectionStart, t.selectionEnd); }"
             )
         )
+
+    # -- the keyboard ----------------------------------------------------
+
+    def press(self, *chords: str) -> None:
+        """Type, and nothing else. No test below may reach for the mouse."""
+        for chord in chords:
+            self.page.keyboard.press(chord)
+
+    def focus_ring(self) -> str:
+        """The SVG id the diagram's focus ring is on, or ``""``.
+
+        Read off ``aria-activedescendant`` rather than off the class, because
+        that attribute is what a screen reader follows: asserting on it is
+        asserting the thing that matters.
+        """
+        return str(
+            self.page.evaluate(
+                "() => document.getElementById('canvas')"
+                ".getAttribute('aria-activedescendant') || ''"
+            )
+        )
+
+    def focus_label(self) -> str:
+        """The accessible name of the focused element, as the page states it."""
+        return str(
+            self.page.evaluate(
+                "() => { const id = document.getElementById('canvas')"
+                ".getAttribute('aria-activedescendant');"
+                " const node = id && document.getElementById(id);"
+                " return node ? node.getAttribute('aria-label') || '' : ''; }"
+            )
+        )
+
+    def announced(self) -> str:
+        """What the polite live region last said."""
+        return str(self.page.locator("#announcer").inner_text())
 
     def drag(self, source: Locator, target: Locator, *, modifier: str | None = None) -> None:
         """A real press-move-release, because a synthetic event proves nothing."""
@@ -951,7 +1018,9 @@ def test_reverting_one_entry_puts_that_change_back(open_editor: OpenEditor) -> N
     assert editor.read(relative) != original
 
     page.locator("#changes-toggle").click()
-    page.locator("#changes-list .change button").first.click()
+    # Every row now has two controls -- the label reveals, the button reverts --
+    # because a row that does something has to be reachable with a keyboard.
+    page.locator("#changes-list .change button.revert").first.click()
 
     expect(page.locator("#toast")).to_contain_text("put change #1 back")
     assert editor.read(relative) == original, "a revert restores the file byte for byte"
@@ -1142,3 +1211,458 @@ def test_an_edit_that_does_not_move_the_picture_does_not_redraw_it(
     assert (
         page.evaluate("() => document.querySelector('#viewport svg').id || 'anonymous'") == before
     )
+
+
+# --------------------------------------------------------------------------- #
+# Accessibility
+# --------------------------------------------------------------------------- #
+
+#: Why the axe tests skip when the checker is not installed. The same shape as
+#: the Playwright skip above: never a hard failure for somebody who has one half
+#: of the browser layer and not the other.
+NO_AXE: Final = "axe-core is not installed; pip install '.[browser]' to run the accessibility gate"
+
+
+def _violations(editor: Editor, *, include: str | None = None) -> list[Mapping[str, Any]]:
+    """Run axe-core over the page and return what it objected to.
+
+    ``include`` narrows the audit to one selector, which is how a dialog is
+    checked without re-reporting the page behind it.
+    """
+    axe = Axe()
+    results = axe.run(
+        editor.page,
+        include,
+        {"runOnly": {"type": "tag", "values": AXE_TAGS}},
+    )
+    found = results["violations"]
+    assert isinstance(found, list)
+    return found
+
+
+def _left_edge(locator: Locator) -> float:
+    box = locator.bounding_box()
+    assert box is not None, "the element is not laid out at all"
+    return float(box["x"])
+
+
+def _explain(violations: list[Mapping[str, Any]]) -> str:
+    """A failure somebody can act on without opening the browser themselves."""
+    lines = []
+    for violation in violations:
+        lines.append(f"{violation['id']} ({violation['impact']}): {violation['help']}")
+        lines.append(f"  {violation['helpUrl']}")
+        for node in violation["nodes"][:4]:
+            lines.append(f"  at {' '.join(node['target'])}")
+            lines.append(f"    {node['failureSummary'].splitlines()[-1].strip()}")
+    return "\n".join(lines)
+
+
+@pytest.mark.skipif(not HAVE_AXE, reason=NO_AXE)
+def test_the_editing_session_has_no_accessibility_violations(open_editor: OpenEditor) -> None:
+    """The gate. A new WCAG 2.1 AA failure fails CI rather than shipping.
+
+    Run against the session with everything on screen that a session has: the
+    file list, the editor, the problems, the diagram and its annotated SVG. A
+    page audited empty is a page audited without the half that is hard.
+    """
+    editor = open_editor(writable=True)
+    expect(editor.page.locator("#file-list .file")).not_to_have_count(0)
+
+    violations = _violations(editor)
+    assert not violations, "axe-core found accessibility violations:\n" + _explain(violations)
+
+
+@pytest.mark.skipif(not HAVE_AXE, reason=NO_AXE)
+def test_the_dark_scheme_is_audited_too(open_editor: OpenEditor) -> None:
+    """Following the system into dark mode is where a palette usually breaks.
+
+    One set of colours cannot clear 4.5:1 against both a white and a near-black
+    background, so app.css declares two — and this is the test that says the
+    second one is not decorative.
+    """
+    editor = open_editor(writable=True)
+    editor.page.emulate_media(color_scheme="dark")
+    expect(editor.page.locator("#file-list .file")).not_to_have_count(0)
+    assert (
+        editor.page.evaluate("() => getComputedStyle(document.body).backgroundColor")
+        == "rgb(15, 18, 22)"
+    ), "the dark tokens did not take, so this audit would have proved nothing"
+
+    violations = _violations(editor)
+    assert not violations, "the dark scheme:\n" + _explain(violations)
+
+
+@pytest.mark.skipif(not HAVE_AXE, reason=NO_AXE)
+def test_the_overlays_have_no_accessibility_violations(open_editor: OpenEditor) -> None:
+    """The palette, the shortcut sheet and a prompt are dialogs, and are audited.
+
+    They are also the three things a keyboard user meets first, so a violation
+    here costs more than one anywhere else on the page.
+    """
+    editor = open_editor(writable=True)
+    page = editor.page
+
+    editor.press("Control+k")
+    expect(page.locator(".palette")).to_be_visible()
+    palette = _violations(editor)
+    assert not palette, "the command palette:\n" + _explain(palette)
+
+    editor.press("Escape", "?")
+    expect(page.locator(".sheet")).to_be_visible()
+    sheet = _violations(editor)
+    assert not sheet, "the shortcut sheet:\n" + _explain(sheet)
+
+    editor.press("Escape", "Alt+3", "n")
+    expect(page.locator(".prompt")).to_be_visible()
+    prompt = _violations(editor)
+    assert not prompt, "the create prompt:\n" + _explain(prompt)
+    editor.press("Escape")
+
+
+@pytest.mark.skipif(not HAVE_AXE, reason=NO_AXE)
+def test_the_changes_drawer_has_no_accessibility_violations(open_editor: OpenEditor) -> None:
+    """The diff view, which is where the colour-only encoding used to live.
+
+    Its contrast is checked here rather than argued about: the tokens are
+    declared per colour scheme in app.css precisely so this can pass.
+    """
+    editor = open_editor(writable=True)
+    _edit_a_file(editor)
+    editor.page.locator("#changes-toggle").click()
+    expect(editor.page.locator("#changes-list .change")).not_to_have_count(0)
+
+    violations = _violations(editor)
+    assert not violations, "the changes drawer:\n" + _explain(violations)
+
+
+def test_every_node_and_link_carries_a_role_and_a_label(open_editor: OpenEditor) -> None:
+    """A Graphviz drawing is inert; this is what makes it not.
+
+    The label has to come off the same record the info box uses, so the check is
+    that it says what the *inventory* says -- the kind, the port count, the
+    peers -- rather than merely that some string is present.
+    """
+    editor = open_editor()
+    switch = editor.shape("switches/sw-home")
+
+    expect(switch).to_have_attribute("role", "img")
+    label = switch.get_attribute("aria-label") or ""
+    assert label.startswith("sw-home, switch"), label
+    assert "interfaces" in label, label
+    # The peer is named by its address, which is what the rest of the interface
+    # calls it: a label that said 'rtr-home' would name something the file list
+    # and the palette do not have.
+    assert "linked to routers/rtr-home on port1" in label, label
+
+    # And a link says what it joins, in the same one line.
+    details: Mapping[str, Any] = editor.graph()["details"]
+    cable = next(key for key, record in details.items() if record.get("type") == "edge")
+    edge = editor.page.locator(f'#viewport [id="{cable}"]')
+    expect(edge).to_have_attribute("role", "img")
+    assert " to " in (edge.get_attribute("aria-label") or "")
+
+
+def test_the_outline_reads_the_view_as_text(open_editor: OpenEditor) -> None:
+    """The fallback that always works: no SVG to traverse, no pointer.
+
+    It is also the only part of the diagram a screen reader can read straight
+    through, so it has to have an entry per drawn element and no more.
+    """
+    editor = open_editor()
+    page = editor.page
+
+    drawn = len(editor.graph()["details"])
+    expect(page.locator("#outline-list li")).to_have_count(drawn)
+    expect(page.locator("#outline-summary")).to_contain_text("physical view")
+    assert "sw-home, switch" in page.locator("#outline-list").inner_text()
+
+    # Off screen until it is focused, and a real panel once it is.
+    assert _left_edge(page.locator("#outline")) < 0
+    editor.press("Alt+4")
+    assert _left_edge(page.locator("#outline")) >= 0
+
+    # And an entry is a control: activating one moves the diagram's focus.
+    page.locator("#outline-list button").first.press("Enter")
+    assert editor.focus_ring(), "activating an outline entry focuses that element"
+
+
+def test_a_gesture_is_announced_in_a_live_region(open_editor: OpenEditor) -> None:
+    """Applied, refused, reverted: every one of them is said out loud, once."""
+    editor = open_editor(writable=True)
+    page = editor.page
+
+    editor.press("Alt+3")
+    expect(page.locator("#announcer")).not_to_be_empty()
+
+    # A refusal interrupts, which is what the assertive region is for.
+    editor.press("Control+z")
+    expect(page.locator("#alert")).to_contain_text("nothing to undo")
+
+
+# --------------------------------------------------------------------------- #
+# The keyboard
+# --------------------------------------------------------------------------- #
+
+
+def test_the_palette_finds_a_command_and_an_element(open_editor: OpenEditor) -> None:
+    """Ctrl-K over commands, element addresses and file paths, in one field."""
+    editor = open_editor(writable=True)
+    page = editor.page
+
+    editor.press("Control+k")
+    expect(page.locator(".palette")).to_be_visible()
+
+    # A command, with the key that runs it printed against it -- which is how
+    # the palette teaches the bindings rather than replacing them.
+    page.keyboard.type("next layer")
+    first = page.locator(".palette-item").first
+    expect(first).to_contain_text("Next layer")
+    expect(first.locator(".palette-chord")).to_have_text("]")
+
+    # And an element of the inventory, in the same field.
+    page.keyboard.press("Control+a")
+    page.keyboard.type("sw-home")
+    expect(page.locator(".palette-item").first).to_contain_text("switches/sw-home")
+    editor.press("Enter")
+
+    expect(page.locator(".palette")).to_have_count(0)
+    assert "sw-home" in editor.focus_label()
+
+
+def test_the_palette_says_why_a_command_is_out_of_reach(open_editor: OpenEditor) -> None:
+    """A read-only session still lists the write commands, greyed, with a reason.
+
+    A command that vanishes teaches nothing; a command that says "restart it
+    with --write" answers the question the user actually has.
+    """
+    editor = open_editor(writable=False)
+    page = editor.page
+
+    editor.press("Control+k")
+    page.keyboard.type("Create an element")
+    row = page.locator(".palette-item").first
+    expect(row).to_have_class(re.compile(r"unavailable"))
+    expect(row).to_contain_text("read-only")
+    editor.press("Escape")
+
+
+def test_the_shortcut_sheet_comes_from_the_registered_bindings(open_editor: OpenEditor) -> None:
+    """`?` renders the same table the page bound its keys from.
+
+    Compared against ``/api/bindings`` rather than against a list in this file:
+    the point of the arrangement is that there is one table, and a test with its
+    own copy of it would be a third.
+    """
+    editor = open_editor()
+    page = editor.page
+
+    editor.press("?")
+    sheet = page.locator(".sheet")
+    expect(sheet).to_be_visible()
+
+    declared = editor.api("/api/bindings")["bindings"]
+    expect(page.locator(".sheet dd")).to_have_count(len(declared))
+    text = sheet.inner_text()
+    for binding in declared:
+        assert binding["title"] in text, binding["id"]
+    editor.press("Escape")
+    expect(sheet).to_have_count(0)
+
+
+def test_arrow_keys_walk_the_diagram_and_enter_opens_the_inspector(
+    open_editor: OpenEditor,
+) -> None:
+    """Tab in, arrow around, Enter to look: the whole diagram without a pointer."""
+    editor = open_editor()
+    page = editor.page
+
+    editor.press("Alt+3")
+    start = editor.focus_ring()
+    assert start, "focusing the canvas puts the ring on an element"
+
+    # Somewhere on this diagram there is a neighbour in one of the four
+    # directions; which one is Graphviz's business, not this test's.
+    for chord in ("ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"):
+        editor.press(chord)
+        if editor.focus_ring() != start:
+            break
+    else:  # pragma: no cover - a one-element diagram would not be a diagram
+        pytest.fail("no arrow key moved the focus ring")
+
+    editor.press("Enter")
+    expect(page.locator("#info")).to_be_visible()
+    assert editor.focus_label().split(",")[0] in page.locator("#info").inner_text()
+
+
+def test_the_focus_ring_is_not_the_selection_ring(open_editor: OpenEditor) -> None:
+    """Two states, two appearances. A tool that draws them alike cannot be driven.
+
+    Asserted on the computed stroke, because "they are different classes" is not
+    the claim -- the claim is that they *look* different.
+    """
+    editor = open_editor()
+    page = editor.page
+
+    # Enter selects what is focused, so move on afterwards: the two rings then
+    # sit on two elements, which is the state that has to be readable.
+    editor.press("Alt+3", "Enter")
+    for chord in ("ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp"):
+        editor.press(chord)
+        if page.locator("#viewport g.focused:not(.selected)").count():
+            break
+    else:  # pragma: no cover - a one-element diagram would not be a diagram
+        pytest.fail("no arrow key moved the focus ring off the selection")
+    expect(page.locator("#viewport g.selected")).to_have_count(1)
+
+    def stroke(selector: str) -> tuple[str, str]:
+        drawn = page.evaluate(
+            "(sel) => { const s = getComputedStyle("
+            "document.querySelector(sel + ' > *:not(text)'));"
+            " return [s.stroke, s.strokeDasharray]; }",
+            selector,
+        )
+        return str(drawn[0]), str(drawn[1])
+
+    focused = stroke("#viewport g.focused")
+    selected = stroke("#viewport g.selected")
+    assert focused[0] != selected[0], f"focus and selection are the same colour: {focused[0]}"
+    assert selected[1] not in ("", "none"), "the selection ring is dashed"
+    assert focused[1] in ("", "none"), "the focus ring is solid, so the two differ unlit too"
+
+
+def test_a_keyboard_only_session_creates_connects_and_undoes(open_editor: OpenEditor) -> None:
+    """The whole claim of this task, end to end, with the mouse unplugged.
+
+    Not one mouse event is dispatched: every step below is a keystroke, and the
+    outcome is asserted on the *files*, because the point of this editor is that
+    the picture and the text are one document. Two gestures, two undos, and the
+    tree ends where it started.
+    """
+    editor = open_editor(writable=True, extra={"hosts/pc-spare.yaml": SPARE_HOST})
+    page = editor.page
+    assert editor.session is not None
+    before = editor.session.revision
+
+    # -- create ---------------------------------------------------------
+    editor.press("Alt+3", "n")
+    expect(page.locator(".prompt")).to_be_visible()
+    editor.press("Tab")  # kind stays 'switch'; on to the name
+    page.keyboard.type("sw-kb")
+    editor.press("Enter")
+
+    assert editor.settles(
+        lambda: (editor.root / "sw-kb.yaml").exists(), timeout=TIMEOUT_MS / 1000
+    ), "the create gesture has to reach a file"
+    created = editor.read("sw-kb.yaml")
+    assert "kind: switch" in created and "name: sw-kb" in created
+    assert "name: eth0" in created, "the new device gets the port the prompt offered"
+
+    # -- connect --------------------------------------------------------
+    editor.press("c")
+    expect(page.locator(".prompt")).to_be_visible()
+    for value in ("sw-kb", "eth0", "hosts/pc-spare", "eth0"):
+        page.keyboard.press("Control+a")
+        page.keyboard.type(value)
+        page.keyboard.press("Tab")
+    editor.press("Enter")
+
+    # The endpoint, not merely "a cable": this tree already has five of those,
+    # and waiting for one to exist would be a condition that was true before the
+    # gesture ran.
+    assert editor.settles(lambda: "sw-kb:eth0" in _all_yaml(editor), timeout=TIMEOUT_MS / 1000), (
+        "the connect gesture has to become a cable somebody can read"
+    )
+    cabled = _all_yaml(editor)
+    assert "kind: cable" in cabled and "pc-spare:eth0" in cabled
+
+    # -- undo, twice ----------------------------------------------------
+    expect(page.locator("#undo")).to_be_enabled()
+    editor.press("Control+z")
+    assert editor.settles(
+        lambda: "sw-kb:eth0" not in _all_yaml(editor), timeout=TIMEOUT_MS / 1000
+    ), "the first undo puts the cable back"
+    editor.press("Control+z")
+    assert editor.settles(
+        lambda: not (editor.root / "sw-kb.yaml").exists(), timeout=TIMEOUT_MS / 1000
+    ), "the second undo puts the device back"
+
+    assert editor.session.revision != before
+    assert editor.api("/api/state")["undo"] == 0, "both gestures are off the stack"
+
+
+def _all_yaml(editor: Editor) -> str:
+    """Every document in the tree, concatenated. What was actually written."""
+    return "\n".join(
+        path.read_text(encoding="utf-8") for path in sorted(editor.root.rglob("*.yaml"))
+    )
+
+
+def test_a_letter_gesture_does_not_fire_while_typing_yaml(open_editor: OpenEditor) -> None:
+    """`n` creates a device on the canvas and types an `n` in the editor.
+
+    The one rule that makes single-letter gestures safe on a page with a text
+    pane in it, and the one that would be discovered the hard way.
+    """
+    editor = open_editor(writable=True)
+    page = editor.page
+    page.locator('#file-list .file[data-path="switches/sw-home.yaml"]').click()
+    expect(page.locator("#editor-title")).to_have_text("switches/sw-home.yaml")
+
+    page.locator("#source").focus()
+    page.keyboard.type("n")
+
+    expect(page.locator(".prompt")).to_have_count(0)
+    assert "n" in editor.selection() or page.locator("#editor-state").is_visible()
+
+
+def test_the_scratchpad_offers_the_same_commands_and_refuses_the_write(
+    open_editor: OpenEditor,
+) -> None:
+    """One command list, two faces. A scratchpad has no tree, not fewer commands."""
+    editor = open_editor(source=TWO_HOSTS)
+    page = editor.page
+
+    editor.press("Control+k")
+    page.keyboard.type("Open file")
+    row = page.locator(".palette-item").first
+    expect(row).to_contain_text("Open file")
+    expect(row).to_contain_text("open a folder")
+    editor.press("Escape")
+
+    # And the view commands, which need nothing, still work here.
+    editor.press("]")
+    expect(page.locator("#layer")).to_have_value("l1")
+
+
+def test_the_links_of_an_element_are_a_cycle_of_their_own(open_editor: OpenEditor) -> None:
+    """A cable is an element too, so there has to be a way to put focus on one.
+
+    The cycle belongs to the *node* it started from, which is the part that is
+    easy to get wrong: deriving the anchor from each link in turn hands it to
+    whichever end of that link the record happens to list first, and the cycle
+    walks off across the diagram instead of round one device.
+    """
+    editor = open_editor(writable=True)
+    page = editor.page
+
+    editor.press("Alt+3")
+    anchor = editor.focus_label()
+    assert "linked to" in anchor, "this test needs a starting point that has links"
+
+    editor.press("l")
+    first_link = editor.focus_label()
+    assert first_link != anchor
+    editor.press("l")
+    second = editor.focus_label()
+    editor.press("l")
+    assert editor.focus_label() == first_link, (
+        f"the cycle left its anchor: {first_link!r} -> {second!r} -> {editor.focus_label()!r}"
+    )
+
+    # And a focused link deletes as a disconnect, with the cable named for you.
+    editor.press("Delete")
+    expect(page.locator(".prompt")).to_be_visible()
+    assert page.locator(".prompt input").first.input_value(), "the cable is pre-filled"
+    editor.press("Enter")
+    expect(page.locator("#toast")).to_contain_text("disconnected")

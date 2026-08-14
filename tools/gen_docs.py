@@ -27,6 +27,10 @@ are:
     The table of every command, linked to its page under ``<prefix>``.
 ``rule-index``
     Every validation rule, with severity, schema alias and a deep link.
+``keybindings``
+    Every command the web interface has, and the keys that reach it, from
+    :data:`netgraph.web.bindings.BINDINGS` — which is also what the page fetches
+    to build its palette and its shortcut sheet.
 
 Usage::
 
@@ -54,6 +58,7 @@ import click  # noqa: E402
 
 from netgraph.cli import cli  # noqa: E402
 from netgraph.rules import RULES  # noqa: E402
+from netgraph.web.bindings import markdown_table  # noqa: E402
 
 DOCS: Final = REPO_ROOT / "docs"
 COMMANDS: Final = DOCS / "commands"
@@ -417,6 +422,8 @@ def body_for(spec: str) -> str:
         return command_index(base)
     if kind == "rule-index":
         return rule_index()
+    if kind == "keybindings":
+        return markdown_table()
     raise SystemExit(f"unknown generated region {spec!r}")
 
 

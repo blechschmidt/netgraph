@@ -124,14 +124,9 @@ var netgraphSession = (function () {
       changes.against = el.changesAgainst.value;
       if (changes.open) { host.render(); }
     });
-    document.addEventListener("keydown", function (event) {
-      if (event.key === "Escape" && changes.open) { showChanges(false); return; }
-      if (!(event.ctrlKey || event.metaKey)) { return; }
-      var key = event.key.toLowerCase();
-      if (key === "s") { event.preventDefault(); save(false); }
-      if (key === "z" && !event.shiftKey) { event.preventDefault(); step("undo"); }
-      if (key === "y" || (key === "z" && event.shiftKey)) { event.preventDefault(); step("redo"); }
-    });
+    // Ctrl-S, Ctrl-Z and Escape used to be caught here. They are commands now,
+    // registered in defineCommands() below and bound by netgraph.web.bindings,
+    // which is what put them in the palette and in docs/commands/web.md.
   }
 
   /* ------------------------------------------------------ the push channel */
@@ -529,8 +524,12 @@ var netgraphSession = (function () {
     });
   }
 
+  /* A row that opens a file is a <button>: in the tab order, activated by Enter
+   * and by Space, announced as a control. A <div> with a click handler is none
+   * of those things, and the file list is the first thing Tab reaches. */
   function fileRow(file) {
-    var row = document.createElement("div");
+    var row = document.createElement("button");
+    row.type = "button";
     row.className = "file";
     if (file.path === open.path) { row.classList.add("current"); }
     if (file.error) { row.classList.add("broken"); }
@@ -576,7 +575,8 @@ var netgraphSession = (function () {
   }
 
   function documentRow(file, entry) {
-    var row = document.createElement("div");
+    var row = document.createElement("button");
+    row.type = "button";
     row.className = "doc";
     row.dataset.address = entry.address || "";
     var kind = document.createElement("span");
@@ -594,8 +594,11 @@ var netgraphSession = (function () {
 
   /* ------------------------------------------------------------- one file */
 
-  /** Open `path`, optionally putting the cursor on `line`. */
-  function openFile(path, line) {
+  /** Open `path`, optionally putting the cursor on `line`.
+   *
+   * `options.focus === false` opens the file without taking the keyboard from
+   * wherever it is; see app.js's goToLine. */
+  function openFile(path, line, options) {
     if (open.dirty && open.path && open.path !== path) {
       if (!window.confirm(open.path + " has unsaved changes. Discard them?")) { return; }
     }
@@ -613,7 +616,7 @@ var netgraphSession = (function () {
           : "read-only session";
         mark(null, "");
         paintTree();
-        if (line) { host.goToLine(line); }
+        if (line) { host.goToLine(line, options); }
       })
       .catch(function (error) { host.toast(String(error.message || error), "error"); });
   }
@@ -737,7 +740,10 @@ var netgraphSession = (function () {
       var file = tree.files[i];
       for (var j = 0; j < file.documents.length; j++) {
         if (file.documents[j].address === address) {
-          openFile(file.path, file.documents[j].line || 1);
+          // Without the focus: the request was "show me this document", made
+          // from the diagram, and answering it by moving the keyboard into the
+          // text pane ends whatever navigation it was part of.
+          openFile(file.path, file.documents[j].line || 1, { focus: false });
           return true;
         }
       }
@@ -847,7 +853,10 @@ var netgraphSession = (function () {
     var number = document.createElement("span");
     number.className = "n";
     number.textContent = "#" + entry.id;
-    var label = document.createElement("span");
+    var address = (entry.addresses || [])[0];
+    var revealable = address || (entry.files || []).length;
+    var label = document.createElement(revealable ? "button" : "span");
+    if (revealable) { label.type = "button"; }
     label.className = "label";
     label.textContent = entry.label + (entry.reverted ? " (put back)" : "");
     // Click-to-reveal: the gesture names an element, the tree says which file
@@ -855,8 +864,7 @@ var netgraphSession = (function () {
     // diagram uses when a shape is clicked. A gesture that named no element --
     // a whole-file save, a deletion whose document is gone -- falls back to the
     // file it wrote, which is the next most useful place to be.
-    var address = (entry.addresses || [])[0];
-    if (address || (entry.files || []).length) {
+    if (revealable) {
       label.classList.add("revealable");
       label.title = "reveal " + (address || (entry.files || [])[0]);
       label.addEventListener("click", function () {
@@ -870,7 +878,7 @@ var netgraphSession = (function () {
     if (entry.revertible && state.writable) {
       var button = document.createElement("button");
       button.type = "button";
-      button.className = "ghost";
+      button.className = "ghost revert";
       button.textContent = "Revert";
       button.title = "Apply the inverse of this change as a new change";
       button.addEventListener("click", function () { revert(entry.id); });
@@ -967,6 +975,396 @@ var netgraphSession = (function () {
     if (ok) { done(); } else { host.toast("could not copy; select the text instead", "error"); }
   }
 
+  /* ------------------------------------------------------- edit gestures */
+
+  /* Everything below turns a keystroke into a batch of netgraph.edit
+   * operations, posted to /api/ops. That route is the *same* write path
+   * `netgraph edit` uses from a terminal -- the same operations, the same
+   * placement, the same validation gate -- so a device created with `n` here
+   * and one created with `netgraph edit create` there produce the same
+   * document, comments and all. There is no second, browser-shaped mutation
+   * layer, and this file could not invent one if it wanted to.
+   *
+   * Every gesture asks for its arguments in a prompt rather than reading them
+   * off the canvas, and every prompt's element field is pre-filled with
+   * whatever the diagram has focused. That is what makes each of them reachable
+   * two ways: as a letter on the canvas, and as a palette entry from anywhere,
+   * including from a page whose canvas has never been touched.
+   */
+
+  /** Post a batch and adopt what came back. */
+  function ops(list, said) {
+    return fetch("/api/ops", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ ops: list, revision: state.revision, client: me.id })
+    })
+      .then(readBody)
+      .then(function (result) {
+        applied(result, said, true);
+        paintHistory();
+        return result;
+      })
+      .catch(function (error) {
+        refused(error, false);
+        paintHistory();
+        throw error;
+      });
+  }
+
+  /** The address of whatever the diagram has focused, or "". */
+  function here() {
+    var focused = netgraphA11y.focused();
+    return focused ? String(focused.record.id || "") : "";
+  }
+
+  /** Is this address a link rather than an element? A cable is deleted by
+   *  disconnecting it, which is a different operation with a different name. */
+  function isLink(address) {
+    var found = recordFor(address);
+    return !!found && found.type === "edge";
+  }
+
+  function recordFor(address) {
+    var wanted = String(address || "");
+    var found = netgraphA11y.elements().filter(function (entry) {
+      return String(entry.record.id || "") === wanted;
+    })[0];
+    return found ? found.record : null;
+  }
+
+  /** Every address the diagram is showing, for a prompt's completion list. */
+  function addresses(kind) {
+    return netgraphA11y.elements()
+      .filter(function (entry) {
+        return kind === "edge" ? entry.record.type === "edge" : entry.record.type !== "edge";
+      })
+      .map(function (entry) { return String(entry.record.id || ""); })
+      .filter(Boolean);
+  }
+
+  /** The interface names declared on an element, for the connect prompt. */
+  function ports(address) {
+    var record = recordFor(address);
+    return record ? (record.interfaces || []).map(function (port) { return port.name; }) : [];
+  }
+
+  function paths() {
+    return tree.files.map(function (file) { return file.path; });
+  }
+
+  /** An address as `namespace/name`, the way the tree keys documents. */
+  function addressOf(namespace, name) {
+    return namespace ? namespace + "/" + name : name;
+  }
+
+  /** Put the focus ring back on an element once the redraw that created it has
+   *  landed. The render is a round trip, so this retries rather than guessing
+   *  how long one takes. */
+  function focusLater(address, tries) {
+    if (!host.focusElement || tries <= 0) { return; }
+    window.setTimeout(function () {
+      if (!host.focusElement(address)) { focusLater(address, tries - 1); }
+    }, 200);
+  }
+
+  /** Register every command that writes. Called at boot in both faces: a
+   *  scratchpad has them too, greyed, with the reason on the row. */
+  function defineCommands(bridge) {
+    host = bridge;
+    el = bridge.el;
+    var K = netgraphKeys;
+
+    K.define("file.open", { run: function () { K.palette("files", ""); } });
+    K.define("file.save", {
+      run: function () { save(false); },
+      enabled: function () { return open.path ? true : "no file is open"; }
+    });
+    K.define("history.undo", {
+      run: function () { step("undo"); },
+      enabled: function () { return state.undo ? true : "nothing to undo"; }
+    });
+    K.define("history.redo", {
+      run: function () { step("redo"); },
+      enabled: function () { return state.redo ? true : "nothing to redo"; }
+    });
+    K.define("changes.toggle", { run: function () { showChanges(!changes.open); } });
+    K.define("changes.copy", {
+      run: copyCommands,
+      enabled: function () { return changes.commands.length ? true : "nothing to copy yet"; }
+    });
+
+    K.define("element.create", {
+      run: function () {
+        var kinds = K.kinds();
+        K.prompt({
+          title: "Create an element",
+          detail: "The same thing 'netgraph edit create' does: a document, placed "
+            + "where the inventory's own convention puts it.",
+          fields: [
+            {
+              name: "kind",
+              label: "kind",
+              type: "select",
+              value: kinds.indexOf("switch") === -1 ? kinds[0] : "switch",
+              options: kinds.map(function (kind) { return { value: kind, label: kind }; })
+            },
+            { name: "name", label: "name", hint: "as metadata.name, e.g. sw-lab" },
+            {
+              name: "namespace",
+              label: "namespace",
+              hint: "optional; the folder the document goes in"
+            },
+            {
+              name: "interface",
+              label: "first interface",
+              value: "eth0",
+              hint: "left blank, the element is created with no ports"
+            }
+          ],
+          confirm: "Create",
+          onSubmit: function (values) {
+            if (!values.name) { return "a name is required"; }
+            var spec = {};
+            if (values.interface) {
+              spec.interfaces = [{ name: values.interface, type: "ethernet" }];
+            }
+            var address = addressOf(values.namespace, values.name);
+            ops([{
+              op: "create",
+              kind: values.kind,
+              name: values.name,
+              namespace: values.namespace,
+              spec: spec
+            }], "created " + values.kind + " " + address).then(function () {
+              focusLater(address, 12);
+            }, function () {});
+          }
+        });
+      }
+    });
+
+    K.define("element.connect", {
+      run: function () {
+        var from = here();
+        K.prompt({
+          title: "Connect two interfaces",
+          detail: "A cable, named and placed from its endpoints. 'netgraph edit connect'.",
+          fields: [
+            { name: "a", label: "from element", value: from, list: addresses("node") },
+            { name: "aPort", label: "from port", value: (ports(from)[0] || ""), list: ports(from) },
+            { name: "b", label: "to element", list: addresses("node") },
+            { name: "bPort", label: "to port", hint: "the far end's interface name" }
+          ],
+          confirm: "Connect",
+          onSubmit: function (values) {
+            if (!values.a || !values.aPort) { return "the near end needs an element and a port"; }
+            if (!values.b || !values.bPort) { return "the far end needs an element and a port"; }
+            ops([{
+              op: "connect",
+              a: values.a + ":" + values.aPort,
+              b: values.b + ":" + values.bPort
+            }], "connected " + values.a + ":" + values.aPort + " to "
+              + values.b + ":" + values.bPort).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.define("element.delete", {
+      run: function () {
+        var target = here();
+        K.prompt({
+          title: "Delete",
+          detail: "An element goes with whatever cannot survive it; a cable leaves "
+            + "both devices where they are.",
+          fields: [{
+            name: "address",
+            label: "element",
+            value: target,
+            list: addresses("node").concat(addresses("edge"))
+          }],
+          confirm: "Delete",
+          onSubmit: function (values) {
+            if (!values.address) { return "name what to delete"; }
+            var link = isLink(values.address);
+            ops([link
+              ? { op: "disconnect", address: values.address.split("#")[0] }
+              : { op: "delete", address: values.address }],
+              (link ? "disconnected " : "deleted ") + values.address).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.define("element.rename", {
+      run: function () {
+        K.prompt({
+          title: "Rename an element",
+          detail: "The element and every reference to it. 'netgraph edit rename'.",
+          fields: [
+            { name: "address", label: "element", value: here(), list: addresses("node") },
+            { name: "name", label: "new name" }
+          ],
+          confirm: "Rename",
+          onSubmit: function (values) {
+            if (!values.address || !values.name) { return "an element and a new name, please"; }
+            ops([{ op: "rename", address: values.address, new_name: values.name }],
+              "renamed " + values.address + " to " + values.name).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.define("element.set", {
+      run: function () {
+        K.prompt({
+          title: "Set a field",
+          detail: "'netgraph edit set'. The document keeps its comments and its order.",
+          fields: [
+            { name: "address", label: "element", value: here(), list: addresses("node") },
+            { name: "path", label: "field", hint: "a dotted path, e.g. spec.model" },
+            { name: "value", label: "value", hint: "JSON when it parses as JSON, text otherwise" }
+          ],
+          confirm: "Set",
+          onSubmit: function (values) {
+            if (!values.address || !values.path) { return "an element and a field, please"; }
+            ops([{
+              op: "set", address: values.address, path: values.path, value: scalar(values.value)
+            }], "set " + values.path + " on " + values.address).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.define("element.unset", {
+      run: function () {
+        K.prompt({
+          title: "Remove a field",
+          detail: "'netgraph edit unset'.",
+          fields: [
+            { name: "address", label: "element", value: here(), list: addresses("node") },
+            { name: "path", label: "field", hint: "a dotted path, e.g. spec.model" }
+          ],
+          confirm: "Remove",
+          onSubmit: function (values) {
+            if (!values.address || !values.path) { return "an element and a field, please"; }
+            ops([{ op: "unset", address: values.address, path: values.path }],
+              "removed " + values.path + " from " + values.address).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.define("element.move", {
+      run: function () {
+        K.prompt({
+          title: "Move a document",
+          detail: "'netgraph edit move'. The element is untouched; only the file it "
+            + "is declared in changes.",
+          fields: [
+            { name: "address", label: "element", value: here(), list: addresses("node") },
+            { name: "file", label: "file", hint: "relative to the inventory root", list: paths() }
+          ],
+          confirm: "Move",
+          onSubmit: function (values) {
+            if (!values.address || !values.file) { return "an element and a file, please"; }
+            ops([{ op: "move", address: values.address, file: values.file }],
+              "moved " + values.address + " to " + values.file).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.define("element.disconnect", {
+      run: function () {
+        K.prompt({
+          title: "Disconnect a cable",
+          detail: "'netgraph edit disconnect'. Both devices stay.",
+          fields: [{
+            name: "address",
+            label: "cable",
+            value: isLink(here()) ? here() : "",
+            list: addresses("edge")
+          }],
+          confirm: "Disconnect",
+          onSubmit: function (values) {
+            if (!values.address) { return "name the cable"; }
+            ops([{ op: "disconnect", address: values.address.split("#")[0] }],
+              "disconnected " + values.address).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.define("interface.add", {
+      run: function () {
+        K.prompt({
+          title: "Add an interface",
+          detail: "'netgraph edit add-interface'.",
+          fields: [
+            { name: "address", label: "element", value: here(), list: addresses("node") },
+            { name: "name", label: "name", hint: "e.g. eth1" },
+            { name: "type", label: "type", value: "ethernet" }
+          ],
+          confirm: "Add",
+          onSubmit: function (values) {
+            if (!values.address || !values.name) { return "an element and a name, please"; }
+            ops([{
+              op: "add-interface",
+              address: values.address,
+              interface: { name: values.name, type: values.type || "ethernet" }
+            }], "added " + values.name + " to " + values.address).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.define("interface.remove", {
+      run: function () {
+        K.prompt({
+          title: "Remove an interface",
+          detail: "'netgraph edit remove-interface'. A cable that terminated on it "
+            + "goes too.",
+          fields: [
+            { name: "address", label: "element", value: here(), list: addresses("node") },
+            { name: "name", label: "name", list: ports(here()) }
+          ],
+          confirm: "Remove",
+          onSubmit: function (values) {
+            if (!values.address || !values.name) { return "an element and a name, please"; }
+            ops([{ op: "remove-interface", address: values.address, name: values.name }],
+              "removed " + values.name + " from " + values.address).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.provide("files", function () {
+      return tree.files.map(function (file) {
+        return {
+          id: file.path,
+          title: file.path,
+          detail: (file.documents || []).map(function (entry) {
+            return entry.kind + " " + entry.name;
+          }).join(", "),
+          group: "file",
+          run: function () { openFile(file.path); }
+        };
+      });
+    });
+  }
+
+  /** A typed value, as JSON when it is JSON and as text when it is not.
+   *
+   * `mtu: 9000` has to arrive as a number and `model: C9300` as a string, and
+   * the difference is not something to ask the user about in a second field. */
+  function scalar(text) {
+    if (text === "") { return ""; }
+    try { return JSON.parse(text); } catch (error) { return text; }
+  }
+
   /* ------------------------------------------------------------- painting */
 
   function paintHistory() {
@@ -1019,7 +1417,9 @@ var netgraphSession = (function () {
 
   return {
     attach: attach,
+    defineCommands: defineCommands,
     markDirty: markDirty,
+    isWritable: function () { return !!state.writable; },
     reveal: reveal,
     locate: locate,
     select: select,

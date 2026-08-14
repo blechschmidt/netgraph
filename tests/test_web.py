@@ -37,8 +37,11 @@ from netgraph.render.ids import element_ids
 from netgraph.watch import Status
 from netgraph.web import (
     ASSETS,
+    BINDINGS,
+    BINDINGS_PATH,
     MAX_SOURCE_BYTES,
     RENDER_PATH,
+    SECTIONS,
     SOURCE_PATH,
     Preview,
     RequestError,
@@ -49,6 +52,7 @@ from netgraph.web import (
     prepare,
     render_source,
 )
+from netgraph.web.bindings import markdown_table
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -749,3 +753,117 @@ def _capture(
         raise port_error
 
     return create
+
+
+# --------------------------------------------------------------------------- #
+# The bindings: one table, three consumers
+# --------------------------------------------------------------------------- #
+
+
+def test_the_bindings_are_served_in_both_faces(server: WebServer) -> None:
+    """The page cannot be driven before it has them, so they are never a 404.
+
+    Answered by the scratchpad too: a stream has fewer commands *available*, not
+    fewer commands, and the palette says which are out of reach and why.
+    """
+    status, headers, body = request(server, BINDINGS_PATH)
+    assert status == 200
+    assert headers["Content-Type"] == "application/json"
+    payload = json.loads(body)
+    assert payload["sections"] == list(SECTIONS)
+    assert len(payload["bindings"]) == len(BINDINGS)
+    assert "switch" in payload["kinds"], "the create gesture builds its menu from these"
+
+
+def test_every_binding_is_well_formed() -> None:
+    """The table is data the page executes, so its vocabulary is closed."""
+    seen: set[str] = set()
+    for binding in BINDINGS:
+        assert binding.id not in seen, f"{binding.id} is declared twice"
+        seen.add(binding.id)
+        assert binding.section in SECTIONS, binding.id
+        assert binding.where in ("global", "canvas"), binding.id
+        assert binding.needs in ("", "session", "write", "focus"), binding.id
+        assert binding.detail.strip(), f"{binding.id} says nothing about itself"
+        for key in binding.keys:
+            # ``Ctrl-Shift-K``: modifiers in a fixed order, then one key. The
+            # matcher in keys.js builds exactly this string from a KeyboardEvent.
+            *modifiers, _ = key.split("-")
+            assert modifiers == [m for m in ("Ctrl", "Alt", "Shift") if m in modifiers], key
+
+
+def test_no_chord_runs_two_commands_in_one_place() -> None:
+    """A chord bound twice is a coin toss, and the loser is silently dead.
+
+    ``global`` and ``canvas`` may share a chord — ``Escape`` and a letter mean
+    different things depending on where the focus is — so the check is per
+    scope, which is exactly how keys.js resolves them.
+    """
+    for where in ("global", "canvas"):
+        claimed: dict[str, str] = {}
+        for binding in BINDINGS:
+            if binding.where != where:
+                continue
+            for key in binding.keys:
+                chord = _normalise_chord(key)
+                assert chord not in claimed, (
+                    f"{where}: {key} runs both {claimed[chord]} and {binding.id}"
+                )
+                claimed[chord] = binding.id
+
+
+def _normalise_chord(chord: str) -> str:
+    """The spelling keys.js compares against: a single-character key lower-cased."""
+    *modifiers, key = chord.split("-")
+    return "-".join([*modifiers, key.lower() if len(key) == 1 else key])
+
+
+#: Where a command's implementation may live. ``keys.js`` owns the machinery,
+#: ``app.js`` the view and navigation commands, ``session.js`` everything that
+#: writes — but which of the three a given id is in is not this test's business.
+_COMMAND_FILES = ("keys.js", "app.js", "session.js")
+
+
+def _registered() -> set[str]:
+    """Every id the page registers a handler for, read out of the assets.
+
+    A regex over JavaScript, which is a blunt instrument — and the right one
+    here. The alternative is running the page in a browser to ask it, which is
+    what ``tests/test_browser.py`` does and what this file exists to *not*
+    require: a binding added to the table without a handler should fail in the
+    fast suite, a second after it is typed.
+    """
+    found: set[str] = set()
+    for name in _COMMAND_FILES:
+        source = asset(name).decode("utf-8")
+        found.update(re.findall(r'(?:K|netgraphKeys)\.define\(\s*"([^"]+)"', source))
+    return found
+
+
+def test_every_binding_has_a_handler_and_every_handler_a_binding() -> None:
+    """The one direction neither the table nor the docs can check for itself.
+
+    A command in :data:`netgraph.web.bindings.BINDINGS` with nothing behind it
+    is a palette row that does nothing and a documented shortcut that is a lie;
+    a handler with no entry is a feature with no key, no palette row and no
+    line in ``docs/commands/web.md``. Both are silent, and both fail here.
+    """
+    declared = {binding.id for binding in BINDINGS}
+    registered = _registered()
+    assert declared - registered == set(), (
+        "declared in netgraph/web/bindings.py with no handler in "
+        f"{', '.join(_COMMAND_FILES)}: {sorted(declared - registered)}"
+    )
+    assert registered - declared == set(), (
+        "registered in the page with no entry in netgraph/web/bindings.py: "
+        f"{sorted(registered - declared)}"
+    )
+
+
+def test_the_shortcut_reference_is_the_documented_one() -> None:
+    """docs/commands/web.md holds this table, generated. Nothing is written twice."""
+    page = (REPO_ROOT / "docs" / "commands" / "web.md").read_text(encoding="utf-8")
+    assert "<!-- generated: keybindings -->" in page
+    assert markdown_table() in page
+    for binding in BINDINGS:
+        assert binding.title in page, binding.id

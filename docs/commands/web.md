@@ -176,6 +176,7 @@ is on loopback and none of the write routes exist unless `--write` was given.
 
 | Route | What it answers |
 |---|---|
+| `GET /api/bindings` | Every command the page has, its section, its keys, what it needs and what it does — plus the element kinds this build knows. Answered in both faces; it is `netgraph.web.bindings`, which is also what the table [below](#the-bindings) is generated from. |
 | `GET /api/state` | The tree revision, whether this session writes, the undo/redo depth, and who else is connected. `?since=<id>` adds the events published after that id — the polling client's half of the push channel. `?client=<id>` keeps that client's presence alive. |
 | `GET /api/events` | A `text/event-stream` of `tree-changed`, `file-changed`, `history-changed`, `disk-changed`, `presence`, opening with `hello` and beating every 15 s. Resumes from `Last-Event-ID`; a resume point older than the ring buffer opens with `resync`, meaning refetch. |
 | `POST /api/presence` | `{"client": …, "selection": [ … ], "editing": [ … ]}` — what this client is looking at and has unsaved edits in; answers with everybody. `{"leaving": true}` drops it at once. Advisory, and the one route here that a read-only session still accepts, because it writes nothing. |
@@ -192,6 +193,141 @@ is on loopback and none of the write routes exist unless `--write` was given.
 `<path>` is relative to the inventory root and is checked, not normalised: an
 absolute path, a `..`, a component the loader skips and a suffix that is not
 YAML are each refused by name. No other request ever becomes a file name.
+
+## The keyboard
+
+**Everything this page does is reachable without a pointer**, and the page says
+so out loud rather than making you find out. There are three ways in, and they
+are three views of one table:
+
+* **`Ctrl-K` — the command palette.** Every command below, fuzzy-matched by name,
+  plus everything the page can *go to*: every element address in the diagram and
+  every file path in the inventory. Each row prints its own shortcut, so the
+  palette is also how the bindings are learnt. A command that cannot run now is
+  shown greyed with the reason — "this session is read-only; restart it with
+  `--write`" — rather than quietly missing.
+* **`?` — the shortcut sheet.** The table below, in a dialog.
+* **the keys themselves.**
+
+A chord written `Ctrl-…` means the platform's command modifier: ⌘ on a Mac. A
+single letter is a *canvas* gesture and fires only while the diagram has focus —
+`n` creates a device there and types an `n` in the YAML pane, which is the
+distinction the **Where** column makes.
+
+### Driving the diagram
+
+`Tab` reaches the canvas like any other control; the diagram is one stop on the
+page's tab order and never a trap. From there the arrow keys walk it, preferring
+the elements the focused one is **linked to**, so a path is followed rather than
+a grid swept. `Enter` opens the inspector — and, in a session, the document that
+declares the element, at its line. `n`, `c` and `Delete` are the create, connect
+and delete gestures; each opens a small prompt whose element field is already
+filled in with whatever is focused, so the same command works from the palette
+with nothing focused at all.
+
+Two rings, deliberately different: **focus** is a solid violet halo — where the
+keyboard is — and **selection** is a long dash, with somebody else's selection a
+short one. Three patterns, not three shades, so they are told apart without
+colour.
+
+### Without a screen
+
+The rendered SVG is inert by default: Graphviz emits shapes, not semantics. This
+page adds them from the same records the info box is built from, so there is one
+description of an element rather than two that drift:
+
+* every node and link carries a role and an `aria-label` — *"sw-home, switch, 8
+  interfaces, linked to rtr-edge on eth0"*;
+* the canvas is an `application` that says which element is current, so arrowing
+  around it is announced;
+* **`Alt-4` opens the outline** — the whole view as a list, one line per element,
+  which is both the screen-reader fallback and the fastest way to find something
+  by name. It is off screen until focused and a real panel once it is;
+* every applied, refused and reverted gesture is announced in a live region,
+  once. A refusal interrupts; everything else is polite.
+
+The interface follows `prefers-color-scheme` with a palette per scheme — every
+colour clears 4.5:1 against its own background, which a single palette used on
+both cannot — and honours `prefers-reduced-motion`. Where a colour carries
+meaning it is never alone: the diff legend prints `+`, `~` and `−`, the same
+sigils the diagram draws, and the three diff line styles differ as well as the
+three hues.
+
+`tests/test_browser.py` runs axe-core over the page on every CI run and fails on
+a new WCAG 2.1 AA violation, and drives one end-to-end test — create a device,
+cable it, undo both — without dispatching a single mouse event.
+
+### The bindings
+
+<!-- generated: keybindings -->
+**Everywhere**
+
+| Keys | Command | Where | Needs | What it does |
+|---|---|---|---|---|
+| `Ctrl-K` / `Ctrl-Shift-P` | Command palette | anywhere | — | Every command on this page, searched by name — and every element address and file path in the inventory, so one field is also 'go to'. |
+| `?` / `F1` | Keyboard shortcuts | anywhere | — | This table, rendered from the bindings the page actually registered. |
+| `Escape` | Close what is open | anywhere | — | The palette, the reference, a prompt, the changes drawer, the inspector — in that order. |
+| `Alt-1` | Focus the inventory list | anywhere | a folder | The file list. Arrow keys move down it; Enter opens a file. |
+| `Alt-2` | Focus the YAML pane | anywhere | — | The text of the open document. Escape leaves it again. |
+| `Alt-3` | Focus the diagram | anywhere | — | Puts a focus ring on an element and turns on the gestures below. |
+| `Alt-4` | Focus the diagram outline | anywhere | — | The diagram as a list a screen reader can read straight through: one line per element, with what it is linked to. |
+| `Ctrl-Enter` | Render now | anywhere | — | Draw the diagram again without waiting for the editor to settle. |
+| `Ctrl-Shift-Enter` | Validate the inventory | anywhere | — | Re-run the checks and move focus to the problems list. |
+
+**Moving around**
+
+| Keys | Command | Where | Needs | What it does |
+|---|---|---|---|---|
+| `ArrowRight` / `ArrowLeft` / `ArrowUp` / `ArrowDown` | Move to the adjacent element | the diagram | — | Steps to the nearest element in that direction, preferring one this element is linked to — so a whole path can be walked with one hand. |
+| `l` / `Shift-L` | Cycle this element's links | the diagram | — | Focuses each cable or tunnel that terminates here in turn, so a link can be inspected or removed without a pointer. Tab is left alone: the diagram is one stop on the page's tab order, never a trap. |
+| `Home` | First element | the diagram | — | The first element of the outline, which is the diagram in reading order. |
+| `End` | Last element | the diagram | — | The last element of the outline. |
+| `Enter` | Open the inspector | the diagram | a focused element | Everything known about the focused element, and — in a session — the document that declares it, opened at its line. |
+| `Space` | Pin the inspector | the diagram | a focused element | Keeps the inspector up, and tells the other tabs what this one is looking at. |
+| `Ctrl-G` | Go to element… | anywhere | — | The palette, opened over element addresses alone. |
+| `Ctrl-O` | Open file… | anywhere | a folder | The palette, opened over the inventory's file paths alone. |
+
+**Editing the inventory**
+
+| Keys | Command | Where | Needs | What it does |
+|---|---|---|---|---|
+| `n` | Create an element… | the diagram | `--write` | Asks for a kind and a name, and writes the document. 'netgraph edit create'. |
+| `c` | Connect this element… | the diagram | `--write` | Cables the focused element to another, port to port. 'netgraph edit connect'. |
+| `Delete` / `Backspace` | Delete the focused element | the diagram | `--write` | Removes the element, or the cable when a link is focused. Asks first. 'netgraph edit delete' / 'disconnect'. |
+| `F2` | Rename the focused element… | the diagram | `--write` | Renames it and every reference to it. 'netgraph edit rename'. |
+| `e` | Set a field… | the diagram | `--write` | A dotted path and a YAML value, on the focused element. 'netgraph edit set'. |
+| *palette only* | Remove a field… | anywhere | `--write` | 'netgraph edit unset'. |
+| *palette only* | Move to another file… | anywhere | `--write` | Moves the element's document into a different file. 'netgraph edit move'. |
+| *palette only* | Disconnect a cable… | anywhere | `--write` | Removes a cable, leaving both devices. 'netgraph edit disconnect'. |
+| `i` | Add an interface… | the diagram | `--write` | 'netgraph edit add-interface'. |
+| *palette only* | Remove an interface… | anywhere | `--write` | 'netgraph edit remove-interface'. |
+
+**The view**
+
+| Keys | Command | Where | Needs | What it does |
+|---|---|---|---|---|
+| *palette only* | Switch layer… | anywhere | — | Physical, l1, l2, l3, overlay, routing, rack, power, identity. |
+| `]` | Next layer | anywhere | — | The next entry of the layer menu. |
+| `[` | Previous layer | anywhere | — | The previous entry of the layer menu. |
+| `Alt-I` | Toggle IP addresses | anywhere | — | Whether the picture prints addresses. The inspector shows them either way. |
+| `Alt-V` | Toggle VLANs | anywhere | — | Whether the picture prints VLAN membership. |
+| `Alt-G` | Toggle namespace grouping | anywhere | — | Collapse each namespace into one box. |
+| `Alt-S` | Toggle strict | anywhere | — | Report warnings as errors. |
+| *palette only* | Filter by VLAN… | anywhere | — | Keep only elements participating in the VLANs given. |
+| `0` | Fit the diagram | anywhere | — | Undo the panning and zooming. |
+| `Plus` / `=` | Zoom in | anywhere | — | Around the middle of the canvas, so nothing jumps off screen. |
+| `Minus` | Zoom out | anywhere | — | Around the middle of the canvas. |
+
+**Files and history**
+
+| Keys | Command | Where | Needs | What it does |
+|---|---|---|---|---|
+| `Ctrl-S` | Save the open file | anywhere | `--write` | Writes it back, stating the hash it was opened at. |
+| `Ctrl-Z` | Undo | anywhere | `--write` | The session's stack, not the browser's: it puts files back on disk. |
+| `Ctrl-Shift-Z` / `Ctrl-Y` | Redo | anywhere | `--write` | Applies the last undone change again. |
+| `Ctrl-B` | Changes drawer | anywhere | a folder | This session's changes, and the diagram repainted as the diff they add up to. |
+| *palette only* | Copy the equivalent commands | anywhere | a folder | The session as a 'netgraph edit' script somebody else can review or run. |
+<!-- /generated -->
 
 ## The scratchpad
 
