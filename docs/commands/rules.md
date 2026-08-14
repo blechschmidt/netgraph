@@ -165,7 +165,9 @@ of this vocabulary. See [Pass 2 — schema](../validation-rules.md#pass-2--schem
 ## Options
 
 <!-- generated: options rules -->
-*No options of its own; the global options apply.*
+| Flag | Value | Default | Meaning |
+|---|---|---|---|
+| `--fixable` | — | off | List only the rules 'netgraph validate --fix' can repair, and what each repair does. |
 <!-- /generated -->
 
 ## Exit codes

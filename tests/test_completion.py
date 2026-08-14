@@ -184,6 +184,22 @@ def test_rule_completion_ignores_case() -> None:
     assert "NG-C002" in values(["validate", "--disable"], "ng-c0")
 
 
+def test_only_the_rules_with_a_choice_to_make_are_offered_for_choose() -> None:
+    """A rule with one repair is applied without being asked about."""
+    offered = values(["validate", "--choose"])
+    assert offered == ["E001=", "W114="]
+    assert all(item.help for item in complete(["validate", "--choose"], ""))
+
+
+def test_choosing_narrows_to_that_rules_repairs() -> None:
+    items = complete(["validate", "--choose"], "W114=")
+    assert [item.value for item in items] == ["W114=list", "W114=drop"]
+    assert items[0].help == "adds the native VLAN to the trunk's VLAN set"
+    assert values(["validate", "--choose"], "W114=l") == ["W114=list"]
+    assert values(["validate", "--choose"], "W138=") == []
+    assert values(["validate", "--choose"], "nope=") == []
+
+
 # --------------------------------------------------------------------------- #
 # The inventory
 # --------------------------------------------------------------------------- #

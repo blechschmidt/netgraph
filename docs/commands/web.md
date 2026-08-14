@@ -46,6 +46,13 @@ The panes are wired to each other, which is the point of the command:
   and that mapping comes from the same load the diagram was built from.
 * **Clicking a problem navigates to its file *and* line**, opening the file if it
   is not the one on screen.
+* **A problem with a mechanical repair grows a `fix` button**, which applies it
+  as one logged, undoable gesture. Where a rule admits two repairs there are two
+  buttons and no default, because choosing between them is not the tool's to
+  make. It is the same catalogue `netgraph validate --fix` uses, under the same
+  gate: the repair is thrown away unless re-validating shows the finding gone and
+  no rule reporting more than it did.
+  [Fixing a finding](../validation-rules.md#fixing-a-finding) lists them.
 
 **Every file's state is shown as it is, not as it would be convenient.** A file
 you have typed into is `unsaved`. A file that changed on disk while you had
@@ -189,6 +196,7 @@ is on loopback and none of the write routes exist unless `--write` was given.
 | `GET /api/changes` | The session's log — one entry per gesture, with its hunk, the files and addresses it touched, and the `netgraph edit` lines that replay it — plus the whole session as one command list and the baselines this tree can be diffed against. |
 | `GET /api/diff?against=session` | The same payload `/api/graph` answers, drawn as a diff, with `diff` holding the marks per node and edge and `diff.changeset` the whole [plan](plan.md). `against=git` compares with `HEAD`. |
 | `POST /api/revert` | `{"id": 3, "revision": …}` — put one logged gesture back. |
+| `POST /api/fix` | `{"rule": "W138", "message": …, "fix": "prune", "revision": …}` — apply the mechanical repair for one diagnostic, as one gesture. The finding is named by rule and message, not by its place in the list, so a stale list is refused rather than misapplied. `fix` picks between the repairs a rule offers more than one of. |
 
 `<path>` is relative to the inventory root and is checked, not normalised: an
 absolute path, a `..`, a component the loader skips and a suffix that is not

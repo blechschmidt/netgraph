@@ -119,6 +119,130 @@ def test_findings_are_grouped_with_errors_before_warnings(
 
 
 # --------------------------------------------------------------------------- #
+# validate --fix
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def fixable(tmp_path: Path) -> Path:
+    """A writable copy of the tree whose only problems are repairable ones."""
+    root = tmp_path / "fixable"
+    root.mkdir()
+    for path in sorted((REPO_ROOT / "tests" / "fixtures" / "fixable").glob("*.yaml")):
+        (root / path.name).write_bytes(path.read_bytes())
+    return root
+
+
+def test_fix_applies_the_unambiguous_repairs_and_writes(runner: CliRunner, fixable: Path) -> None:
+    result = invoke(runner, "-i", str(fixable), "validate", "--fix")
+    assert result.exit_code == 0
+    assert "fixed 3 problems:" in result.output
+    assert "wrote 1 file: switches.yaml" not in result.output  # both files were written
+    assert "mac:" not in (fixable / "switches.yaml").read_text()
+    # The comment above it still says what the fixture is for; the entry is gone.
+    assert "sw-gone: " not in (fixable / "layout.yaml").read_text()
+
+
+def test_fix_leaves_a_rule_with_two_repairs_alone_and_names_them(
+    runner: CliRunner, fixable: Path
+) -> None:
+    result = invoke(runner, "-i", str(fixable), "validate", "--fix")
+    assert "--choose W114=list" in result.output
+    assert "--choose W114=drop" in result.output
+    assert "native_vlan: 30" in (fixable / "switches.yaml").read_text()
+
+
+def test_fix_with_a_choice_applies_it(runner: CliRunner, fixable: Path) -> None:
+    result = invoke(runner, "-i", str(fixable), "validate", "--fix", "--choose", "W114=drop")
+    assert result.exit_code == 0
+    assert "no problems found" in result.output
+    text = (fixable / "switches.yaml").read_text()
+    # sw-b keeps its own native VLAN; only the trunk that was reported changed.
+    assert text.count("native_vlan: 30") == 1
+
+
+def test_a_dry_run_prints_the_diff_and_writes_nothing(runner: CliRunner, fixable: Path) -> None:
+    before = (fixable / "switches.yaml").read_text()
+    result = invoke(runner, "-i", str(fixable), "validate", "--fix", "--dry-run")
+    assert result.exit_code == 0
+    assert "--- a/switches.yaml" in result.output
+    assert "-      mac: 00:11:22:33:44:55" in result.output
+    assert (fixable / "switches.yaml").read_text() == before
+
+
+def test_a_dry_run_reports_the_findings_the_repairs_would_leave(
+    runner: CliRunner, fixable: Path
+) -> None:
+    result = invoke(runner, "-i", str(fixable), "validate", "--fix", "--dry-run")
+    assert "1 warning" in result.output
+    assert "W113" not in result.output.split("warnings (1):")[1]
+
+
+def test_fix_says_so_when_there_is_nothing_to_repair(runner: CliRunner, tmp_path: Path) -> None:
+    (tmp_path / "orphan.yaml").write_text(WARNING_ONLY.read_text())
+    result = invoke(runner, "-i", str(tmp_path), "validate", "--fix")
+    assert "nothing here has a mechanical fix" in result.output
+    assert "W103" in result.output
+
+
+def test_a_structured_format_keeps_the_document_on_stdout(runner: CliRunner, fixable: Path) -> None:
+    result = runner.invoke(
+        cli,
+        ["-i", str(fixable), "validate", "--fix", "-F", "json"],
+        catch_exceptions=False,
+    )
+    assert result.exit_code == 0
+    document = json.loads(result.stdout)
+    assert [finding["rule"] for finding in document["findings"]] == ["W114"]
+
+
+@pytest.mark.parametrize(
+    ("argument", "message"),
+    [
+        ("--dry-run", "does nothing on its own"),
+        ("--choose", "does nothing on its own"),
+    ],
+)
+def test_the_fix_flags_do_nothing_on_their_own(
+    runner: CliRunner, argument: str, message: str
+) -> None:
+    extra = ["W114=list"] if argument == "--choose" else []
+    result = invoke(runner, "-i", str(HOME_LAB), "validate", argument, *extra)
+    assert result.exit_code == 2
+    assert message in result.output
+
+
+@pytest.mark.parametrize(
+    ("token", "message"),
+    [
+        ("W114", "takes RULE=FIX"),
+        ("nope=list", "no rule is called"),
+        ("E002=list", "has no mechanical fix"),
+        ("W114=nope", "offers list, drop"),
+        ("W138=nope", "nothing to choose between"),
+    ],
+)
+def test_a_bad_choice_is_a_usage_error(runner: CliRunner, token: str, message: str) -> None:
+    result = invoke(runner, "-i", str(HOME_LAB), "validate", "--fix", "--choose", token)
+    assert result.exit_code == 2
+    assert message in result.output
+
+
+def test_fix_refuses_a_single_file_inventory(runner: CliRunner) -> None:
+    """The edit session's unit is a tree; it would write the file's neighbours."""
+    result = invoke(runner, "-i", str(WARNING_ONLY), "validate", "--fix")
+    assert result.exit_code == 2
+    assert "works on an inventory folder" in result.output
+
+
+def test_rules_lists_what_can_be_fixed(runner: CliRunner) -> None:
+    result = invoke(runner, "rules", "--fixable")
+    assert result.exit_code == 0
+    assert "W138" in result.output and "E002" not in result.output
+    assert "list, drop" in result.output
+
+
+# --------------------------------------------------------------------------- #
 # render
 # --------------------------------------------------------------------------- #
 

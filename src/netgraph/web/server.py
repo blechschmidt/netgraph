@@ -106,6 +106,7 @@ __all__ = [
     "DIFF_PATH",
     "EVENTS_PATH",
     "FILE_PREFIX",
+    "FIX_PATH",
     "GRAPH_PATH",
     "MAX_SOURCE_BYTES",
     "OPS_PATH",
@@ -141,6 +142,8 @@ CHANGES_PATH: Final = "/api/changes"
 DIFF_PATH: Final = "/api/diff"
 #: Put one logged gesture back.
 REVERT_PATH: Final = "/api/revert"
+#: Apply the mechanical repair for one diagnostic (:mod:`netgraph.fixes`).
+FIX_PATH: Final = "/api/fix"
 UNDO_PATH: Final = "/api/undo"
 REDO_PATH: Final = "/api/redo"
 #: Everything after this is a path inside the inventory, and is checked as one.
@@ -458,7 +461,7 @@ class _Handler(LocalHandler):
         if path == PRESENCE_PATH:
             self._presence(session)
             return
-        if path not in (OPS_PATH, UNDO_PATH, REDO_PATH, REVERT_PATH):
+        if path not in (OPS_PATH, UNDO_PATH, REDO_PATH, REVERT_PATH, FIX_PATH):
             self.send_text(HTTPStatus.NOT_FOUND, f"nothing to post to at {path}")
             return
         try:
@@ -466,6 +469,15 @@ class _Handler(LocalHandler):
                 change = session.undo(client=_client_id(self._query))
             elif path == REDO_PATH:
                 change = session.redo(client=_client_id(self._query))
+            elif path == FIX_PATH:
+                payload = self._read_json()
+                change = session.fix(
+                    _required(payload, "rule"),
+                    _required(payload, "message"),
+                    key=_optional(payload, "fix"),
+                    revision=_revision(payload),
+                    client=_client(payload),
+                )
             elif path == REVERT_PATH:
                 payload = self._read_json()
                 change = session.revert(
@@ -768,6 +780,32 @@ def _entry_id(payload: dict[str, Any]) -> int:
     value = payload.get("id")
     if not isinstance(value, int) or isinstance(value, bool):
         raise RequestError("'id' must be the number of the change to put back")
+    return value
+
+
+def _required(payload: dict[str, Any], key: str) -> str:
+    """A required string field of a request body.
+
+    Raises:
+        RequestError: It is missing, empty or not a string.
+    """
+    value = payload.get(key)
+    if not isinstance(value, str) or not value:
+        raise RequestError(f"{key!r} must be a non-empty string")
+    return value
+
+
+def _optional(payload: dict[str, Any], key: str) -> str | None:
+    """The same, for a field a request may leave out.
+
+    Raises:
+        RequestError: It is present and is not a string.
+    """
+    value = payload.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise RequestError(f"{key!r} must be a non-empty string when it is given")
     return value
 
 

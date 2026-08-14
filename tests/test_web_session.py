@@ -57,6 +57,8 @@ from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path,
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HOME_LAB = REPO_ROOT / "examples" / "home-lab"
+#: A tree whose only problems are ones a diagnostic's Fix button can repair.
+FIXABLE = REPO_ROOT / "tests" / "fixtures" / "fixable"
 
 
 @pytest.fixture
@@ -825,3 +827,159 @@ def test_the_ordinary_graph_route_carries_no_diff(served: str) -> None:
     status, body = call(served, "/api/graph?view=l1")
     assert status == 200
     assert body["diff"] is None
+
+
+# --------------------------------------------------------------------------- #
+# Fixing a diagnostic
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture
+def broken(tmp_path: Path) -> Path:
+    """A writable copy of the repairable tree."""
+    root = tmp_path / "fixable"
+    root.mkdir()
+    for path in sorted(FIXABLE.glob("*.yaml")):
+        (root / path.name).write_bytes(path.read_bytes())
+    return root
+
+
+@pytest.fixture
+def repairable(broken: Path) -> EditingSession:
+    return EditingSession(root=broken, writable=True)
+
+
+def diagnostic(session: EditingSession, rule: str) -> dict[str, Any]:
+    payload = session.tree(diagnostics=True)["diagnostics"]
+    return next(entry for entry in payload if entry["rule"] == rule)
+
+
+def test_a_diagnostic_carries_the_repairs_on_offer(repairable: EditingSession) -> None:
+    assert diagnostic(repairable, "W138")["fixes"] == [
+        {"key": "prune", "title": "drop 'sw-gone' from the l1 view of layout 'default'"}
+    ]
+    assert [fix["key"] for fix in diagnostic(repairable, "W114")["fixes"]] == ["list", "drop"]
+
+
+def test_a_diagnostic_nothing_can_repair_offers_nothing(session: EditingSession) -> None:
+    for problem in session.tree(diagnostics=True)["diagnostics"]:
+        assert "fixes" not in problem
+
+
+def test_fixing_writes_the_file_and_is_one_undoable_gesture(
+    repairable: EditingSession, broken: Path
+) -> None:
+    problem = diagnostic(repairable, "W108")
+    change = repairable.fix(problem["rule"], problem["message"])
+
+    assert "mac:" not in (broken / "switches.yaml").read_text(encoding="utf-8")
+    assert change.undo_depth == 1
+    assert [entry["rule"] for entry in change.to_dict()["diagnostics"]] == ["W138", "W113", "W114"]
+
+    entry = repairable.changes()["entries"][0]
+    assert entry["label"].startswith("fix W108: remove the MAC address")
+    repairable.undo()
+    assert "mac:" in (broken / "switches.yaml").read_text(encoding="utf-8")
+
+
+def test_a_fix_can_be_reverted_from_the_journal(repairable: EditingSession) -> None:
+    problem = diagnostic(repairable, "W138")
+    repairable.fix(problem["rule"], problem["message"])
+    entry = repairable.changes()["entries"][0]
+    repairable.revert(entry["id"])
+    assert diagnostic(repairable, "W138")["message"] == problem["message"]
+
+
+def test_a_rule_with_two_repairs_has_to_be_told_which(repairable: EditingSession) -> None:
+    problem = diagnostic(repairable, "W114")
+    with pytest.raises(SessionError, match="more than one repair"):
+        repairable.fix(problem["rule"], problem["message"])
+    with pytest.raises(SessionError, match="offers list, drop"):
+        repairable.fix(problem["rule"], problem["message"], key="nope")
+    repairable.fix(problem["rule"], problem["message"], key="drop")
+    assert not any(
+        entry["rule"] == "W114" for entry in repairable.tree(diagnostics=True)["diagnostics"]
+    )
+
+
+def test_a_finding_the_tree_no_longer_reports_is_refused(repairable: EditingSession) -> None:
+    with pytest.raises(SessionError, match="no longer reports"):
+        repairable.fix("W138", "a message from another inventory")
+
+
+def test_a_finding_with_no_repair_is_refused(session: EditingSession, tree: Path) -> None:
+    (tree / "orphan.yaml").write_text(
+        "apiVersion: netgraph.dev/v1alpha1\nkind: computer\nmetadata:\n  name: pc-lost\n"
+        "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n      mtu: 1500\n"
+        "      ipv4:\n        - 10.9.9.9/24\n",
+        encoding="utf-8",
+    )
+    problem = diagnostic(session, "W103")
+    with pytest.raises(SessionError, match="no mechanical fix"):
+        session.fix(problem["rule"], problem["message"])
+
+
+def test_a_repair_that_would_make_things_worse_is_refused(tmp_path: Path) -> None:
+    root = tmp_path / "orphan"
+    root.mkdir()
+    (root / "net.yaml").write_text(
+        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: sw-a\n"
+        "spec:\n  interfaces:\n    - name: port1\n      type: ethernet\n      mtu: 1500\n"
+        "---\napiVersion: netgraph.dev/v1alpha1\nkind: computer\nmetadata:\n  name: pc-a\n"
+        "spec:\n  interfaces:\n    - name: eno1\n      type: ethernet\n      mtu: 1500\n"
+        "      ipv4:\n        - 10.0.0.9/24\n"
+        "---\napiVersion: netgraph.dev/v1alpha1\nkind: cable\nmetadata:\n  name: cbl-1\n"
+        "spec:\n  endpoints:\n    - sw-a:missing\n    - pc-a:eno1\n  medium: copper\n",
+        encoding="utf-8",
+    )
+    before = (root / "net.yaml").read_text(encoding="utf-8")
+    session = EditingSession(root=root, writable=True)
+    problem = diagnostic(session, "E001")
+    with pytest.raises(SessionError, match="would introduce"):
+        session.fix(problem["rule"], problem["message"], key="remove")
+    assert (root / "net.yaml").read_text(encoding="utf-8") == before
+
+
+def test_a_read_only_session_does_not_fix(broken: Path) -> None:
+    session = EditingSession(root=broken, writable=False)
+    problem = diagnostic(session, "W138")
+    with pytest.raises(ReadOnly):
+        session.fix(problem["rule"], problem["message"])
+
+
+def test_fixing_takes_the_revision_as_a_precondition(repairable: EditingSession) -> None:
+    problem = diagnostic(repairable, "W138")
+    with pytest.raises(Conflict):
+        repairable.fix(problem["rule"], problem["message"], revision=99)
+
+
+def test_the_api_fixes_a_diagnostic(served_repairable: str) -> None:
+    status, tree = call(served_repairable, "/api/tree")
+    problem = next(entry for entry in tree["diagnostics"] if entry["rule"] == "W113")
+    status, change = call(
+        served_repairable,
+        "/api/fix",
+        "POST",
+        {"rule": problem["rule"], "message": problem["message"], "revision": tree["revision"]},
+    )
+    assert status == 200
+    assert not any(entry["rule"] == "W113" for entry in change["diagnostics"])
+
+    status, refused = call(served_repairable, "/api/fix", "POST", {"rule": "W113"})
+    assert status == 400
+    assert "must be a non-empty string" in refused["message"]
+
+    status, refused = call(
+        served_repairable,
+        "/api/fix",
+        "POST",
+        {"rule": "W114", "message": problem["message"], "fix": 7},
+    )
+    assert status == 400
+    assert "non-empty string when it is given" in refused["message"]
+
+
+@pytest.fixture
+def served_repairable(repairable: EditingSession) -> Iterator[str]:
+    with WebServer.create(session=repairable, host="127.0.0.1", port=0) as server:
+        yield server.url.rstrip("/")

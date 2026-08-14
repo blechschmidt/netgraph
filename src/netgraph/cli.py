@@ -93,6 +93,7 @@ from netgraph.completion import (
     SHELLS,
     complete_element,
     complete_export_format,
+    complete_fix,
     complete_format,
     complete_kind,
     complete_layer,
@@ -157,6 +158,7 @@ from netgraph.export import (
     layers_for,
 )
 from netgraph.export import FORMATS as EXPORT_FORMATS
+from netgraph.fixes import FIXES, FixReport, repair, spec_for
 from netgraph.fsio import write_text
 from netgraph.importer import (
     DIALECTS,
@@ -280,7 +282,7 @@ from netgraph.report import FORMATS as REPORT_FORMATS
 from netgraph.report import JSON_FILE as REPORT_JSON_FILE
 from netgraph.report import Options as ReportOptions
 from netgraph.report import generate as generate_report
-from netgraph.rules import RULES, Severity
+from netgraph.rules import RULES, Severity, resolve_rule_id, rule_for
 from netgraph.scaffold import SCHEMA_FILE_NAME, build_scaffold, write_scaffold
 from netgraph.schema import build_schema
 from netgraph.settings import (
@@ -1008,9 +1010,42 @@ def _drift_summary(report: DriftReport) -> str:
     show_default=True,
     help="text is for reading; json, sarif and github are for CI.",
 )
+@click.option(
+    "--fix",
+    is_flag=True,
+    default=False,
+    help=(
+        "Repair every problem that has one unambiguous mechanical fix, then report what is "
+        "left. A fix that would introduce a new finding is undone and reported instead."
+    ),
+)
+@click.option(
+    "-n",
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="With --fix: print the unified diff the repairs would apply, and write nothing.",
+)
+@click.option(
+    "--choose",
+    "chosen",
+    multiple=True,
+    metavar="RULE=FIX",
+    shell_complete=complete_fix,
+    help=(
+        "Pick which repair to use for a rule that offers several, e.g. --choose W114=list. "
+        "Repeatable. 'netgraph rules --fixable' lists the keys."
+    ),
+)
 @click.pass_obj
 def validate_command(
-    app: AppContext, strict: bool, disabled: tuple[str, ...], output_format: str
+    app: AppContext,
+    strict: bool,
+    disabled: tuple[str, ...],
+    output_format: str,
+    fix: bool,
+    dry_run: bool,
+    chosen: tuple[str, ...],
 ) -> None:
     """Check the inventory for schema and semantic problems.
 
@@ -1021,7 +1056,31 @@ def validate_command(
     file a code-scanning upload accepts while a person watching the run still
     sees what happened. ``--quiet`` drops that summary; it never drops the
     document.
+
+    \b
+        netgraph validate --fix              repair what can be repaired
+        netgraph validate --fix --dry-run    ... and show the diff instead
+        netgraph validate --fix --choose W114=list   pick between two repairs
+
+    A fix is applied only if re-validating shows the finding gone and no rule
+    reporting more than it did before, so --fix cannot make an inventory worse.
+    docs/validation-rules.md lists which rules are fixable and what each fix does.
     """
+    if dry_run and not fix:
+        raise click.UsageError("--dry-run says how to --fix; it does nothing on its own")
+    if chosen and not fix:
+        raise click.UsageError("--choose says how to --fix; it does nothing on its own")
+    if fix:
+        _fix_inventory(
+            app,
+            strict=strict,
+            disabled=disabled,
+            output_format=output_format,
+            dry_run=dry_run,
+            choices=_fix_choices(chosen),
+        )
+        return
+
     # Only the structured formats report a line and a column, and paying for
     # them is a measurable amount of retained memory -- so the text path, which
     # locates a finding at its document, does not.
@@ -1061,6 +1120,149 @@ def _run_validation(
     findings = run_validation(inventory, settings)
     app.log(f"validation produced {len(findings)} finding(s)", level=1)
     return findings
+
+
+def _fix_choices(chosen: Sequence[str]) -> dict[str, str]:
+    """Parse ``--choose W114=list`` into ``{"W114": "list"}``.
+
+    Both halves are checked here rather than at use, so a typo is a usage error
+    before anything is loaded instead of a repair that silently did not happen.
+
+    Raises:
+        click.UsageError: The token is malformed, names no rule, names a rule
+            with no fix, or names a repair that rule does not offer.
+    """
+    choices: dict[str, str] = {}
+    for token in chosen:
+        name, separator, key = token.partition("=")
+        if not separator or not name.strip() or not key.strip():
+            raise click.UsageError(f"--choose takes RULE=FIX, not {token!r}")
+        try:
+            rule_id = resolve_rule_id(name.strip())
+        except KeyError:
+            raise click.UsageError(
+                f"--choose {token}: no rule is called {name.strip()!r}"
+            ) from None
+        spec = spec_for(rule_id)
+        if spec is None:
+            raise click.UsageError(f"--choose {token}: {rule_id} has no mechanical fix")
+        offered = [choice.key for choice in spec.choices]
+        if key.strip() not in offered:
+            listed = ", ".join(offered) if offered else "nothing to choose between"
+            raise click.UsageError(
+                f"--choose {token}: {rule_id} offers {listed}, not {key.strip()!r}"
+            )
+        choices[rule_id] = key.strip()
+    return choices
+
+
+def _fix_inventory(
+    app: AppContext,
+    *,
+    strict: bool,
+    disabled: Sequence[str],
+    output_format: str,
+    dry_run: bool,
+    choices: Mapping[str, str],
+) -> None:
+    """Repair what can be repaired, then report the inventory that is left.
+
+    The report is produced by loading and validating again rather than by
+    reusing what the repair loop last saw, so ``--fix -F sarif`` says exactly
+    what a plain ``-F sarif`` would say about the tree now on disk — lines,
+    columns and all. A dry run has nothing on disk to re-read, so it reports
+    what the repairs *would* leave, located at the document rather than the line.
+
+    Raises:
+        click.exceptions.Exit: The tree still has an error, or an edit failed.
+    """
+    console = app.console()
+    commentary = output_format != "text"
+    if not app.inventory.is_dir():
+        # An edit session's unit is a *tree*: it resolves addresses across every
+        # document under its root and may write any of them. Repairing findings
+        # that came from one file while writing its neighbours is not something
+        # a user can have meant, so the folder has to be named explicitly.
+        raise click.UsageError(
+            f"--fix works on an inventory folder; -i names the single file "
+            f"{app.inventory.name!r}. Point -i at the folder that holds it."
+        )
+    root = app.inventory
+    session = EditSession(root=root, config=_edit_config(app), cache=app.cache())
+    settings = app.config().validation.with_overrides(
+        strict=True if strict else None, ignore=disabled
+    )
+    try:
+        report = repair(session, settings=settings, choices=choices)
+        written = () if dry_run or not report.changed else session.commit()
+    except EditError as exc:
+        _report_edit_error(app.console(err=True), exc)
+        raise click.exceptions.Exit(EXIT_INVALID) from exc
+
+    _report_fixes(console, report, dry_run=dry_run, written=written, commentary=commentary)
+    if dry_run:
+        # The diff is the artefact of a dry run, so it goes to stdout -- unless
+        # stdout is a diagnostics document, in which case it is commentary like
+        # everything else that is not the document.
+        if report.diff:
+            (console.info if commentary else console.print)(report.diff.rstrip("\n"))
+        inventory, findings = session.inventory, list(report.remaining)
+    else:
+        inventory = app.load(keep_provenance=output_format != "text")
+        findings = _run_validation(app, inventory, strict=strict, disabled=disabled)
+
+    if output_format == "text":
+        _report_problems(console, inventory.errors, findings)
+    else:
+        _report_problems(console, inventory.errors, findings, commentary=True)
+        document = render_diagnostics(build_diagnostics(inventory, findings), output_format)
+        if document:
+            console.print(document)
+
+    if _is_rejected(inventory, findings):
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+
+def _report_fixes(
+    console: Console,
+    report: FixReport,
+    *,
+    dry_run: bool,
+    written: Sequence[str],
+    commentary: bool,
+) -> None:
+    """What the repair pass did, and what it deliberately did not do."""
+    write = console.info if commentary else console.print
+    verb = "would fix" if dry_run else "fixed"
+    if report.applied:
+        write(console.style(f"{verb} {count_text(len(report.applied), 'problem')}:", bold=True))
+        for entry in report.applied:
+            write(f"  {entry.finding.rule}  {entry.fix.title}")
+    else:
+        write("nothing here has a mechanical fix")
+
+    # The choices a rule offers are the same for every finding of that rule, and
+    # a tree with seventeen dangling cables would otherwise print them
+    # seventeen times. The refusal itself is per finding, because it names one.
+    detailed: set[str] = set()
+    for refusal in report.skipped:
+        rule = refusal.finding.rule
+        head = f"{rule} at {refusal.finding.location} not fixed: {refusal.reason}"
+        # Beside the findings rather than on stderr beneath them: in text output
+        # the findings *are* the data, and a refusal is a statement about one of
+        # them. It moves to stderr with everything else once stdout is a document.
+        write(console.style(head, fg=_SEVERITY_COLOUR[Severity.WARNING]))
+        for introduced in refusal.introduced:
+            write(f"    it would add: {introduced}")
+        if rule in detailed:
+            continue
+        detailed.add(rule)
+        for fix in refusal.fixes if len(refusal.fixes) > 1 else ():
+            write(f"    --choose {rule}={fix.key}  {fix.title}")
+    if report.skipped:
+        write()
+    if written:
+        write(f"wrote {count_text(len(written), 'file')}: {', '.join(written)}")
 
 
 def _is_rejected(inventory: Inventory, findings: Iterable[Finding]) -> bool:
@@ -5912,10 +6114,30 @@ def version_command(as_json: bool) -> None:
 
 
 @cli.command("rules")
+@click.option(
+    "--fixable",
+    is_flag=True,
+    default=False,
+    help="List only the rules 'netgraph validate --fix' can repair, and what each repair does.",
+)
 @click.pass_obj
-def rules_command(app: AppContext) -> None:
+def rules_command(app: AppContext, fixable: bool) -> None:
     """List the validation rules, their severity and their schema aliases."""
     console = app.console()
+    if fixable:
+        console.table(
+            ("RULE", "SEVERITY", "CHOICES", "WHAT THE FIX DOES"),
+            [
+                [
+                    spec.rule,
+                    str(rule_for(spec.rule).severity),
+                    ", ".join(choice.key for choice in spec.choices) or "-",
+                    spec.summary,
+                ]
+                for spec in FIXES
+            ],
+        )
+        return
     rows = [
         [rule.id, str(rule.severity), ", ".join(rule.aliases) or "-", rule.summary]
         for rule in RULES

@@ -409,6 +409,39 @@ spec:
   medium: copper
 """
 
+#: A layout document placing a switch nobody declares: one ``W138``, which is
+#: the smallest diagnostic that has exactly one mechanical repair.
+STALE_GEOMETRY: Final = """\
+apiVersion: netgraph.dev/v1alpha1
+kind: layout
+metadata:
+  name: default
+spec:
+  views:
+    l1:
+      nodes:
+        sw-home: {position: [54, 18]}
+        sw-gone: {position: [54, 234]}
+"""
+
+#: A trunk whose native VLAN is not in its ``trunk_vlans``: one ``W114``, the
+#: smallest diagnostic that has *two* repairs and no way to choose between them.
+AMBIGUOUS_TRUNK: Final = """\
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-spare
+spec:
+  interfaces:
+    - name: GigabitEthernet0/1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: trunk
+        trunk_vlans: "10"
+        native_vlan: 20
+"""
+
 #: The scratchpad's starting stream: two hosts and the cable between them.
 TWO_HOSTS: Final = """\
 apiVersion: netgraph.dev/v1alpha1
@@ -683,6 +716,54 @@ def test_a_diagnostic_row_jumps_to_its_location(open_editor: OpenEditor) -> None
     expect(page.locator("#editor-title")).to_have_text("cables/broken.yaml")
     assert editor.selection() == "apiVersion: netgraph.dev/v1alpha1"
     assert BROKEN_CABLE.splitlines()[3] == editor.selection(), "line 4 is the document's first"
+
+
+def test_a_fixable_diagnostic_grows_a_fix_button_that_repairs_it(
+    open_editor: OpenEditor,
+) -> None:
+    """The whole loop, in the browser: a warning, a button, a written file, an undo."""
+    editor = open_editor(writable=True, extra={"layout.yaml": STALE_GEOMETRY})
+    page = editor.page
+
+    row = page.locator("#problems .problem-entry", has_text="W138")
+    expect(row).to_be_visible()
+    button = row.locator("button.fix")
+    expect(button).to_have_text("fix")
+    expect(button).to_have_attribute("title", re.compile("sw-gone"))
+
+    button.click()
+
+    expect(page.locator("#problems")).not_to_contain_text("W138")
+    assert "sw-gone" not in editor.read("layout.yaml")
+    assert "sw-home" in editor.read("layout.yaml"), "only the dead entry goes"
+
+    # One gesture, so one Ctrl-Z, and the file comes back exactly.
+    page.keyboard.press("Control+Z")
+    expect(page.locator("#problems")).to_contain_text("W138")
+    assert editor.read("layout.yaml") == STALE_GEOMETRY
+
+
+def test_a_diagnostic_with_two_repairs_offers_both(open_editor: OpenEditor) -> None:
+    """Where the document cannot say which repair is meant, the page does not either."""
+    editor = open_editor(writable=True, extra={"switches/trunk.yaml": AMBIGUOUS_TRUNK})
+    page = editor.page
+
+    row = page.locator("#problems .problem-entry", has_text="W114")
+    expect(row.locator("button.fix")).to_have_count(2)
+    expect(row.locator("button.fix").nth(0)).to_have_text("fix: list")
+    expect(row.locator("button.fix").nth(1)).to_have_text("fix: drop")
+
+    row.locator("button.fix").nth(1).click()
+
+    expect(page.locator("#problems")).not_to_contain_text("W114")
+    assert "native_vlan" not in editor.read("switches/trunk.yaml")
+
+
+def test_a_read_only_session_offers_no_fix(open_editor: OpenEditor) -> None:
+    editor = open_editor(extra={"layout.yaml": STALE_GEOMETRY})
+    page = editor.page
+    expect(page.locator("#problems .problem", has_text="W138")).to_be_visible()
+    expect(page.locator("#problems button.fix")).to_have_count(0)
 
 
 # --------------------------------------------------------------------------- #

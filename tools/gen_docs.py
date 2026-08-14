@@ -27,6 +27,9 @@ are:
     The table of every command, linked to its page under ``<prefix>``.
 ``rule-index``
     Every validation rule, with severity, schema alias and a deep link.
+``fix-index``
+    Every rule ``netgraph validate --fix`` can repair, what the repair does, and
+    the keys ``--choose`` takes, from :data:`netgraph.fixes.FIXES`.
 ``keybindings``
     Every command the web interface has, and the keys that reach it, from
     :data:`netgraph.web.bindings.BINDINGS` — which is also what the page fetches
@@ -57,7 +60,8 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 import click  # noqa: E402
 
 from netgraph.cli import cli  # noqa: E402
-from netgraph.rules import RULES  # noqa: E402
+from netgraph.fixes import FIXES  # noqa: E402
+from netgraph.rules import RULES, rule_for  # noqa: E402
 from netgraph.web.bindings import markdown_table  # noqa: E402
 
 DOCS: Final = REPO_ROOT / "docs"
@@ -406,6 +410,27 @@ def rule_index() -> str:
     return "\n".join(lines) + "\n"
 
 
+def fix_index() -> str:
+    """Every mechanically repairable rule, and what repairing it does.
+
+    Generated so the page cannot claim a fix that no longer exists: adding an
+    entry to :data:`netgraph.fixes.FIXES` and forgetting the documentation fails
+    ``tests/test_docs.py`` instead of shipping.
+    """
+    lines = ["| Rule | Severity | What `--fix` does | `--choose` |", "|---|---|---|---|"]
+    for entry in FIXES:
+        rule = rule_for(entry.rule)
+        choices = (
+            "<br>".join(f"`{choice.key}` — {cell(choice.summary)}" for choice in entry.choices)
+            or "—"
+        )
+        anchor = f"#{rule.anchor}"
+        lines.append(
+            f"| [`{rule.id}`]({anchor}) | {rule.severity} | {cell(entry.summary)}. | {choices} |"
+        )
+    return "\n".join(lines) + "\n"
+
+
 def body_for(spec: str) -> str:
     """The content a region declares it holds."""
     kind, _, rest = spec.partition(" ")
@@ -422,6 +447,8 @@ def body_for(spec: str) -> str:
         return command_index(base)
     if kind == "rule-index":
         return rule_index()
+    if kind == "fix-index":
+        return fix_index()
     if kind == "keybindings":
         return markdown_table()
     raise SystemExit(f"unknown generated region {spec!r}")

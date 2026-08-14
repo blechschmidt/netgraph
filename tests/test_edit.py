@@ -33,6 +33,7 @@ from netgraph.edit import (
     INVENTORY_PLACEHOLDER,
     AddInterface,
     AddressError,
+    AppendItem,
     CascadeRequired,
     ConflictError,
     Connect,
@@ -294,6 +295,77 @@ def test_unsetting_something_that_is_not_there_is_refused(home: Path) -> None:
     with pytest.raises(OperationError, match="no such field"):
         session.apply(UnsetField(address="sw-home", path="spec.serial"))
     assert not session.changes
+
+
+# --------------------------------------------------------------------------- #
+# append
+# --------------------------------------------------------------------------- #
+
+
+def test_appending_adds_one_entry_and_leaves_the_rest_alone(home: Path) -> None:
+    before = (home / "switches/sw-home.yaml").read_text(encoding="utf-8")
+    apply_and_commit(home, AppendItem(address="sw-home", path="spec.vlans", value={"id": 42}))
+    after = (home / "switches/sw-home.yaml").read_text(encoding="utf-8")
+    removed, added = changed_lines(before, after)
+    assert removed == []
+    assert added == ["    - id: 42"]
+
+
+def test_appending_at_a_position_inserts_there(home: Path) -> None:
+    apply_and_commit(
+        home, AppendItem(address="sw-home", path="spec.vlans", value={"id": 42}, index=0)
+    )
+    text = (home / "switches/sw-home.yaml").read_text(encoding="utf-8")
+    assert text.index("id: 42") < text.index("id: 10")
+
+
+def test_appending_creates_the_sequence_when_it_is_not_there(home: Path) -> None:
+    apply_and_commit(home, AppendItem(address="pc-desk", path="spec.vlans", value={"id": 42}))
+    text = (home / "hosts/pc-desk.yaml").read_text(encoding="utf-8")
+    assert "vlans:" in text and "- id: 42" in text
+
+
+def test_the_inverse_of_an_append_removes_the_entry_it_added(home: Path) -> None:
+    session = EditSession(root=home)
+    applied = session.apply(AppendItem(address="sw-home", path="spec.vlans", value={"id": 42}))
+    assert applied.inverse == (UnsetField(address="switches/sw-home", path="spec.vlans[2]"),)
+
+
+def test_the_inverse_of_an_append_that_made_the_sequence_removes_the_key(home: Path) -> None:
+    session = EditSession(root=home)
+    applied = session.apply(AppendItem(address="pc-desk", path="spec.vlans", value={"id": 42}))
+    assert applied.inverse == (UnsetField(address="hosts/pc-desk", path="spec.vlans"),)
+
+
+def test_appending_and_undoing_it_restores_the_bytes(home: Path) -> None:
+    before = snapshot(home)
+    session = EditSession(root=home)
+    applied = session.apply(AppendItem(address="sw-home", path="spec.vlans", value={"id": 42}))
+    session.commit()
+    assert snapshot(home) != before
+    undo = EditSession(root=home)
+    undo.apply_all(applied.inverse)
+    undo.commit()
+    assert snapshot(home) == before
+
+
+def test_appending_to_something_that_is_not_a_sequence_is_refused(home: Path) -> None:
+    session = EditSession(root=home)
+    with pytest.raises(OperationError, match="no sequence"):
+        session.apply(AppendItem(address="sw-home", path="spec.model", value=1))
+    assert not session.changes
+
+
+def test_appending_outside_the_sequence_is_refused(home: Path) -> None:
+    session = EditSession(root=home)
+    with pytest.raises(OperationError, match="not a position"):
+        session.apply(AppendItem(address="sw-home", path="spec.vlans", value={"id": 1}, index=9))
+
+
+def test_appending_to_the_envelope_is_refused(home: Path) -> None:
+    session = EditSession(root=home)
+    with pytest.raises(OperationError, match="envelope"):
+        session.apply(AppendItem(address="sw-home", path="kind", value="x"))
 
 
 @pytest.mark.parametrize("path", ["kind", "metadata", "spec", "apiVersion"])
@@ -1412,6 +1484,7 @@ ROUND_TRIP_OPERATIONS = [
     MoveElement(address="a", file="b.yaml", index=2),
     SetField(address="a", path="spec.model", value=[1, 2]),
     UnsetField(address="a", path="spec.model"),
+    AppendItem(address="a", path="spec.vlans", value={"id": 20}, index=1),
     AddInterface(address="a", interface={"name": "eth0"}, index=1),
     RemoveInterface(address="a", name="eth0", cascade=True),
     Connect(a="a:eth0", b="b:eth0", spec={"medium": "fiber"}, name="c", namespace="n"),

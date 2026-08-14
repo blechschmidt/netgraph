@@ -272,6 +272,20 @@ by:
 | a sequence of operations, undone, restores the tree byte for byte | an undo that quietly restyles a file |
 | the edited tree and a tree written in that shape are one network | an editor that produces trees nobody would write |
 
+`tests/test_fixes.py` asserts the one the repair path lives or dies by:
+
+| Property | What it rules out |
+|---|---|
+| repairing an inventory leaves no rule reporting more than it did | a `--fix` that trades one problem for another |
+
+The generated inventories are *valid*, so on their own they would only exercise
+the empty path. Each example is given a layout document placing elements nobody
+declared, which guarantees at least one repair per run and leaves whatever the
+generator happened to produce to be quantified over as well. The same statement
+is asserted example-wise over every inventory in the repository — `examples/`,
+`tests/fixtures/fixable/` and every single-rule fixture in
+`tests/fixtures/invalid/`.
+
 `tests/test_fuzz_loader.py` covers the one component with a real trust
 boundary. The loader reads files a user did not write — `netgraph import`
 output, a third-party inventory, a generated tree — so the contract there is not

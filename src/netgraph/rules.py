@@ -24,7 +24,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Final
+from typing import TYPE_CHECKING, Final
+
+if TYPE_CHECKING:  # pragma: no cover - imported for typing only
+    from netgraph.fixes import FixProducer
 
 __all__ = [
     "RULES",
@@ -128,6 +131,32 @@ class Rule:
     def help_uri(self) -> str:
         """Permanent link to the write-up of this rule."""
         return f"{RULES_DOC_URL}#{self.anchor}"
+
+    @property
+    def fix(self) -> FixProducer | None:
+        """What repairs a finding of this rule, or ``None`` if nothing does.
+
+        A pure function from a :class:`~netgraph.validate.Finding` and the
+        inventory it was found in to the repairs on offer; see
+        :mod:`netgraph.fixes`. ``None`` is the ordinary answer, and it means the
+        repair is not mechanical — not that the rule is unimportant.
+
+        Resolved through a deferred import rather than held as a field, because
+        the catalogue must stay a *catalogue*: :mod:`netgraph.config` reads it to
+        check a rule id, and a producer reaches the whole write path and the
+        model layer. Naming a rule therefore costs nothing until somebody asks
+        what would repair it.
+        """
+        from netgraph.fixes import producer_for
+
+        return producer_for(self.id)
+
+    @property
+    def fixable(self) -> bool:
+        """Can a finding of this rule be repaired mechanically?"""
+        from netgraph.fixes import spec_for
+
+        return spec_for(self.id) is not None
 
     def __str__(self) -> str:
         return f"{self.id} ({self.severity}): {self.summary}"

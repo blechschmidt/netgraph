@@ -9,6 +9,7 @@ network is the exception.
 * [Pass 1 — discovery](#pass-1--discovery)
 * [Pass 2 — schema](#pass-2--schema)
 * [Pass 3 — semantics](#pass-3--semantics)
+* [Fixing a finding](#fixing-a-finding)
 * [Suppressing a rule](#suppressing-a-rule)
 * [Where this differs from the specification](#where-this-differs-from-the-specification)
 
@@ -2028,6 +2029,81 @@ that was *meant* to be in a group and is not looks exactly like this.
 **Suppress with** `I004` / `NG-S016`, or an annotation on the user. An inventory
 that models people without modelling groups at all should say
 `ignore = ["I004"]` in `netgraph.toml` once.
+
+## Fixing a finding
+
+Some of these rules describe a problem whose repair the inventory already
+determines. A layout document places a switch that has been deleted; there is
+nothing to decide, the entry is dead. `netgraph validate --fix` applies exactly
+those repairs and reports everything else:
+
+<!-- norun: 'inventory' is an illustrative tree, chosen to show one fix and one refusal -->
+```console
+$ netgraph -i inventory validate --fix
+fixed 2 problems:
+  W108  remove the MAC address from loopback sw-a:lo0
+  W138  drop 'ghost-device' from the l1 view of layout 'layout'
+W114 at net.yaml#0:6 not fixed: 2 repairs are possible; choose one with --choose W114=list|drop
+    --choose W114=list  list VLAN 30 in the trunk_vlans of sw-a:eth0
+    --choose W114=drop  remove the native_vlan of sw-a:eth0, so it tags every VLAN it carries
+
+wrote 1 file: net.yaml
+```
+
+`--fix --dry-run` prints the unified diff instead and writes nothing. Writes go
+through [the same path as `netgraph edit`](editing.md), so comments, key order
+and quoting survive: only the lines the repair is about change.
+
+**A fix never makes an inventory worse.** Each one is applied on its own and the
+tree is validated again; the fix is kept only if the finding it was aimed at has
+gone and no rule reports more than it did before. Otherwise the bytes are put
+back and the reason is printed — which is why "remove the cable" is refused on a
+two-device inventory where removing it would orphan a device. That is a decision
+for a person, and the tool says so rather than making it.
+
+**Where two repairs are plausible, both are offered and neither is picked.** A
+trunk whose `native_vlan` is missing from `trunk_vlans` is either a list that is
+short or a leftover `native_vlan`; the document cannot say which. `--fix` leaves
+it alone and names the choices; `--choose W114=list` decides it.
+
+The web editor puts a **Fix** button on each of these diagnostics, and applies
+the same operations as one logged, revertible gesture.
+
+### What is fixable
+
+Generated from `netgraph.fixes.FIXES`, so this table cannot drift from the code.
+
+<!-- generated: fix-index -->
+| Rule | Severity | What `--fix` does | `--choose` |
+|---|---|---|---|
+| [`E001`](#e001--unknown-cable-endpoint) | error | Re-points the endpoint at the port it was misspelled from, declares the missing interface, or removes the cable. | `retarget` — writes the one declared port whose name is a near miss<br>`declare` — adds the interface the cable expects to the element<br>`remove` — deletes the cable |
+| [`W108`](#w108--mac-address-on-a-loopback) | warning | Removes the MAC address from the loopback. | — |
+| [`W113`](#w113--undeclared-vlan-referenced) | warning | Adds the VLANs the port is a member of to the device's 'vlans' database. | — |
+| [`W114`](#w114--native-vlan-missing-from-trunk_vlans) | warning | Lists the native VLAN in 'trunk_vlans', or removes the 'native_vlan'. | `list` — adds the native VLAN to the trunk's VLAN set<br>`drop` — removes 'native_vlan', so the port tags everything it carries |
+| [`W136`](#w136--vrf-with-no-interface-bound-to-it) | warning | Removes the VRF declaration, when nothing at all references it. | — |
+| [`W138`](#w138--stale-diagram-geometry) | warning | Drops the stale entry from the layout document, as 'netgraph layout --prune' would. | — |
+| [`W140`](#w140--departed-user-still-in-a-group) | warning | Removes the departed account from the group, unless it is the last member. | — |
+<!-- /generated -->
+
+`netgraph rules --fixable` prints the same table.
+
+### What is not, and why
+
+Three kinds of problem look mechanical and are not:
+
+* **A rule with two readings and no tie-breaker.** Offered as a choice where the
+  readings are enumerable (`W114`, `E001`), and left alone where they are not: an
+  address in the wrong prefix (`W132`) could be repaired by changing the address
+  or the prefix, and which one is right is a fact about the network, not about
+  the file.
+* **A load error.** An interface declared twice or a document that does not parse
+  never reaches the semantic pass, so the element is not in the inventory and
+  there is nothing for a producer — which is a function *of the inventory* — to
+  read. Those are reported with the rule column `load` and repaired by hand.
+* **A spelling the loader has already normalised.** A MAC written `00-11-22-…`
+  or a prefix written `10.0.0.1/255.255.255.0` is canonicalised on load, so no
+  finding is ever raised about it. [`netgraph fmt`](commands/fmt.md) rewrites the
+  file itself.
 
 ## Suppressing a rule
 

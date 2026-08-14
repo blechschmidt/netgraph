@@ -1,0 +1,55 @@
+# Two switches trunking one link, and three things wrong with the first of them
+# that a mechanical repair can put right.
+#
+# 'sw-a' trunks VLANs 10, 20 and 30 and declares only 10 in its VLAN database
+# (W113); its native VLAN 30 is not listed in 'trunk_vlans' (W114); and its
+# loopback carries a hardware address copied from a physical port (W108).
+#
+# 'sw-b' declares no 'vlans' at all, which says "not modelled here" rather than
+# "none exist", so W113 does not apply to it -- and its trunk lists every VLAN
+# the link carries, so the two ends agree.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  vlans:
+    - id: 10
+      name: office
+  interfaces:
+    - name: GigabitEthernet0/1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: trunk
+        trunk_vlans: "10,20"
+        native_vlan: 30
+    - name: Loopback0
+      type: loopback
+      mac: 00:11:22:33:44:55
+      ipv4:
+        - 10.255.0.1/32
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-b
+spec:
+  interfaces:
+    - name: GigabitEthernet0/1
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: trunk
+        trunk_vlans: "10,20,30"
+        native_vlan: 30
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-sw-a-sw-b
+spec:
+  endpoints:
+    - sw-a:GigabitEthernet0/1
+    - sw-b:GigabitEthernet0/1
+  medium: copper

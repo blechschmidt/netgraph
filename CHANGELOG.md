@@ -18,6 +18,34 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **`netgraph validate --fix` repairs what the inventory itself determines, and the editor
+  puts a `fix` button on each of those diagnostics.** Half the value of a diagnostic is
+  knowing what to do about it, and for a good part of the catalogue the tree already says:
+  a `kind: layout` document placing an element that has been deleted, a MAC address on a
+  software loopback, a port trunking a VLAN its device's database does not declare, a VRF
+  nothing is bound to, a group still listing somebody who has left, a cable endpoint naming
+  a port one letter away from one that exists.
+
+  `--fix` applies every repair that has exactly one reading and reports the rest;
+  `--fix --dry-run` prints the unified diff and writes nothing; `--choose W114=list` decides
+  a rule that has two. Writes go through the same path as `netgraph edit`, so comments, key
+  order and quoting survive and only the lines the repair is about change.
+
+  **A fix never introduces a finding.** Each is applied on its own and the tree is validated
+  again; unless the finding it was aimed at is gone and no rule reports more than it did
+  before, the bytes are put back and the refusal is printed with the findings it would have
+  added. So "remove the cable" is offered, and refused on a two-device inventory where it
+  would orphan a device — which is a decision for a person.
+
+  `netgraph rules --fixable` lists what can be repaired and what each repair does;
+  [`docs/validation-rules.md`](docs/validation-rules.md#fixing-a-finding) says the same,
+  generated from the table so it cannot drift.
+
+- **A fourteenth edit operation, `append`**, which adds one entry to a sequence and creates
+  the sequence if it is absent. `set` cannot add a list entry that does not exist yet, and
+  replacing a whole list to add one would rewrite the comments beside the entries already
+  in it. Its inverse is an `unset` of the position it wrote.
+
 - **The editor can be driven entirely from the keyboard, and read without a screen.**
   `netgraph web` was becoming pointer-only, which is where visual tools stop being usable
   for the people who work fastest in them.

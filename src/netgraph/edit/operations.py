@@ -45,6 +45,7 @@ from netgraph.models.layout import LAYOUT_VIEWS
 __all__ = [
     "OPERATIONS",
     "AddInterface",
+    "AppendItem",
     "Connect",
     "CreateElement",
     "DeleteElement",
@@ -239,6 +240,49 @@ class UnsetField(Operation):
 
     def describe(self) -> str:
         return f"unset {self.address} {self.path}"
+
+
+@dataclass(frozen=True)
+class AppendItem(Operation):
+    """Add a value to a sequence, creating the sequence when it is absent.
+
+    The general form of the gap :class:`AddInterface` names: a sequence entry
+    cannot be written at a path that does not exist yet, so ``set`` cannot add
+    one and replacing the whole list would rewrite the comments beside the
+    entries that were already there. This adds one entry and leaves the rest of
+    the document alone, which is what repairing a device's VLAN database or a
+    group's member list needs.
+
+    :class:`AddInterface` stays as it is: it also has to know what an interface
+    *is* — where a new port belongs in the list, and what a duplicate name
+    means — and none of that is expressible here.
+    """
+
+    op: ClassVar[str] = "append"
+
+    address: str
+    path: str
+    value: Any = None
+    #: Where in the sequence it goes; ``None`` appends.
+    index: int | None = None
+
+    def __post_init__(self) -> None:
+        parse_field_path(self.path)
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "op": self.op,
+            "address": self.address,
+            "path": self.path,
+            "value": self.value,
+        }
+        if self.index is not None:
+            payload["index"] = self.index
+        return payload
+
+    def describe(self) -> str:
+        where = "append to" if self.index is None else f"insert at {self.index} of"
+        return f"{where} {self.address} {self.path}: {json.dumps(self.value, default=str)}"
 
 
 @dataclass(frozen=True)
@@ -492,6 +536,7 @@ OPERATIONS: Final[dict[str, type[Operation]]] = {
         MoveElement,
         SetField,
         UnsetField,
+        AppendItem,
         AddInterface,
         RemoveInterface,
         Connect,
@@ -514,6 +559,7 @@ _FIELDS: Final[dict[str, tuple[tuple[str, ...], tuple[str, ...]]]] = {
     "move": (("address", "file"), ("index",)),
     "set": (("address", "path", "value"), ()),
     "unset": (("address", "path"), ()),
+    "append": (("address", "path", "value"), ("index",)),
     "add-interface": (("address", "interface"), ("index",)),
     "remove-interface": (("address", "name"), ("cascade",)),
     "connect": (("a", "b"), ("spec", "name", "namespace", "file")),

@@ -930,6 +930,36 @@ var netgraphSession = (function () {
     return true;
   }
 
+  /** Apply the mechanical repair for one diagnostic, as one logged gesture.
+   *
+   * The finding is named by rule and message rather than by its place in the
+   * list, because the list may be several edits old by the time the button is
+   * pressed -- and position 3 of an old list is not a thing the server can
+   * recognise. If nothing still reports that finding the server says so and
+   * nothing is written.
+   *
+   * `key` picks between the repairs a rule offers more than one of, and is left
+   * out when it offers one. */
+  function fix(problem, key) {
+    if (!state.writable) { host.toast("this session is read-only", "error"); return; }
+    fetch("/api/fix", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({
+        rule: problem.rule,
+        message: problem.message,
+        fix: key || null,
+        revision: state.revision,
+        client: me.id
+      })
+    })
+      .then(readBody)
+      .then(function (result) { applied(result, "fixed " + problem.rule, true); })
+      .catch(function (error) { refused(error, false); })
+      .then(refreshChanges);
+  }
+
   function revert(id) {
     if (!state.writable) { return; }
     fetch("/api/revert", {
@@ -1425,6 +1455,7 @@ var netgraphSession = (function () {
     select: select,
     isOpen: function () { return !!open.path; },
     save: save,
+    fix: fix,
     graphPath: graphPath,
     showChanges: showChanges,
     refreshChanges: refreshChanges,

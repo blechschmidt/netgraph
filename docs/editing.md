@@ -56,7 +56,7 @@ are the whole design:
 
 ## The operations
 
-There are thirteen. Eleven are **semantic** — the vocabulary a person or a
+There are fourteen. Twelve are **semantic** — the vocabulary a person or a
 diagram uses:
 
 | Operation | JSON `op` | What it does |
@@ -67,6 +67,7 @@ diagram uses:
 | `MoveElement(address, file, index)` | `move` | Moves the document, verbatim, possibly to another namespace. |
 | `SetField(address, path, value)` | `set` | Writes a value at a field path. |
 | `UnsetField(address, path)` | `unset` | Removes it. |
+| `AppendItem(address, path, value, index)` | `append` | Adds one entry to a sequence, creating the sequence if it is absent. |
 | `AddInterface(address, interface, index)` | `add-interface` | Appends to `spec.interfaces`. |
 | `RemoveInterface(address, name, cascade)` | `remove-interface` | Removes a port, and what terminated on it. |
 | `Connect(a, b, spec, name, namespace, file)` | `connect` | Creates a cable between two interfaces. |
@@ -94,7 +95,15 @@ survives keeps the comment somebody wrote above it. It is the operation
 [`netgraph layout`](commands/layout.md) writes through, and the one a canvas will
 write through when a node is dragged.
 
-The set is deliberately closed. A fourteenth kind of change is a fourteenth
+`AppendItem` is the general form of the gap `AddInterface` names: a sequence
+entry cannot be written at a path that does not exist yet, so `set` cannot add
+one, and replacing the whole list to add an entry would rewrite the comments
+beside the entries that were already there. It is what a repair reaches for when
+it has to extend a device's VLAN database, and `AddInterface` stays as it is
+because a port also has to be *placed*, and a duplicate name has to mean
+something.
+
+The set is deliberately closed. A fifteenth kind of change is a fifteenth
 operation, defined here, and not a caller reaching for the file system.
 
 ## What an operation guarantees
@@ -154,6 +163,7 @@ not write:
 | `move` within a namespace | `move` back to the index it came from, the document travelling as text — unless the move emptied its source file |
 | `set` of a field that was absent | `unset` — the key was not there, and had no comment |
 | `add-interface` | `remove-interface` |
+| `append` | `unset` of the position it was inserted at — or of the key, when the sequence had to be created |
 
 `move` carries a condition of its own. A move that takes the last document out of
 a file deletes the file, so the inverse has to *make* it again — and a file

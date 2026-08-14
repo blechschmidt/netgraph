@@ -357,10 +357,49 @@
         cell.textContent = pair[1];
         row.appendChild(cell);
       });
-      el.problems.appendChild(row);
+      var repairs = fixButtons(problem);
+      if (!repairs) {
+        el.problems.appendChild(row);
+        return;
+      }
+      // A button inside a button is not markup a browser will keep, so the row
+      // and its repairs are siblings in a wrapper rather than nested.
+      var entry = document.createElement("div");
+      entry.className = "problem-entry";
+      entry.appendChild(row);
+      entry.appendChild(repairs);
+      el.problems.appendChild(entry);
     });
     el.problemCounts.textContent =
       counts.error + " errors, " + counts.warning + " warnings, " + counts.info + " notes";
+  }
+
+  /** The Fix control for a diagnostic, or null when nothing can repair it.
+   *
+   * One button when the rule offers one repair, and one per repair when it
+   * offers several -- because choosing between them is the user's to make, and
+   * a single button that picked for them would be picking for them. Each says
+   * what it would do in its tooltip, which is the same sentence
+   * `netgraph validate --fix` prints.
+   */
+  function fixButtons(problem) {
+    var offered = problem.fixes || [];
+    if (!offered.length || mode !== "session" || !netgraphSession.isWritable()) { return null; }
+    var box = document.createElement("div");
+    box.className = "fixes";
+    offered.forEach(function (offer) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "fix";
+      button.textContent = offered.length > 1 ? "fix: " + offer.key : "fix";
+      button.title = offer.title;
+      button.setAttribute("aria-label", offer.title);
+      button.addEventListener("click", function () {
+        netgraphSession.fix(problem, offered.length > 1 ? offer.key : null);
+      });
+      box.appendChild(button);
+    });
+    return box;
   }
 
   /** What clicking a problem should do, or null when it points nowhere.

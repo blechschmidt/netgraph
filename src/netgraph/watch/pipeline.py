@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import threading
 import time
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -83,6 +83,12 @@ class Problem:
     location: str
     rule: str
     message: str
+    #: The mechanical repairs on offer, as ``(key, title)`` pairs — empty for a
+    #: problem nothing can repair, and for every caller that did not ask. Held
+    #: as plain pairs rather than as :class:`netgraph.fixes.Fix` objects so that
+    #: a watch cycle, which never writes, does not drag the whole write path in
+    #: to describe a finding. :func:`flatten_problems` fills them in.
+    fixes: tuple[tuple[str, str], ...] = ()
 
     @classmethod
     def from_load_error(cls, error: LoadError) -> Problem:
@@ -97,12 +103,13 @@ class Problem:
         )
 
     @classmethod
-    def from_finding(cls, finding: Finding) -> Problem:
+    def from_finding(cls, finding: Finding, fixes: Sequence[tuple[str, str]] = ()) -> Problem:
         return cls(
             severity=finding.severity,
             location=finding.location,
             rule=finding.rule,
             message=finding.message,
+            fixes=tuple(fixes),
         )
 
     def __str__(self) -> str:
@@ -254,15 +261,30 @@ def _is_rejected(inventory: Inventory, findings: Iterable[Finding]) -> bool:
 
 
 def flatten_problems(
-    errors: Sequence[LoadError], findings: Sequence[Finding]
+    errors: Sequence[LoadError],
+    findings: Sequence[Finding],
+    *,
+    fixes: Mapping[tuple[str, str], Sequence[tuple[str, str]]] | None = None,
 ) -> tuple[Problem, ...]:
     """Flatten load errors and findings, most severe first, load order within.
 
     Shared with :mod:`netgraph.web.preview`: two front ends listing the same
     inventory's problems in two different orders would be a bug in one of them.
+
+    Args:
+        errors: What the loader could not read.
+        findings: What the validator found.
+        fixes: Repairs on offer, keyed by ``(rule, message)`` — the identity a
+            finding is recognised by everywhere. A caller that has computed them
+            (the editor, which puts a button on each) passes them; one that has
+            not (a watch cycle) leaves them out and every problem reports none.
     """
+    offers = fixes or {}
     flattened = [Problem.from_load_error(error) for error in errors]
-    flattened.extend(Problem.from_finding(finding) for finding in findings)
+    flattened.extend(
+        Problem.from_finding(finding, offers.get((finding.rule, finding.message), ()))
+        for finding in findings
+    )
     return tuple(sorted(flattened, key=lambda problem: problem.severity.rank))
 
 

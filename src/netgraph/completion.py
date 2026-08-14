@@ -14,6 +14,10 @@ completers below close that gap:
 ``--disable``
     Rule ids with their summaries, plus the ``NG-*`` aliases once the typed
     prefix looks like one, and the ``*`` wildcard.
+``--choose``
+    The ``RULE=FIX`` pairs ``validate --fix`` accepts, narrowed to that rule's
+    repairs once an ``=`` has been typed. Only the rules that admit more than
+    one repair are offered: the rest need no choosing.
 ``--profile``
     The names of the ``[profile.<name>]`` blocks in the inventory's
     ``netgraph.toml``, each described by the settings it overrides. A profile
@@ -55,7 +59,7 @@ from netgraph.export import EXPORTERS
 from netgraph.models import DOCUMENT_KINDS
 from netgraph.models.fielddocs import KIND_NOTES
 from netgraph.render import RENDERERS, Layer
-from netgraph.rules import RULES, WILDCARD
+from netgraph.rules import RULES, WILDCARD, resolve_rule_id
 
 __all__ = [
     "PROG_NAME",
@@ -63,6 +67,7 @@ __all__ = [
     "PowerShellComplete",
     "complete_element",
     "complete_export_format",
+    "complete_fix",
     "complete_format",
     "complete_kind",
     "complete_layer",
@@ -483,6 +488,39 @@ def _accepted(param: click.Parameter, default: Sequence[str]) -> Sequence[str]:
     if isinstance(param.type, click.Choice):
         return [str(choice) for choice in param.type.choices]
     return default
+
+
+def complete_fix(
+    ctx: click.Context, param: click.Parameter, incomplete: str
+) -> list[CompletionItem]:
+    """``RULE=FIX`` pairs for ``validate --choose``.
+
+    Only the rules that admit more than one repair are offered, because they are
+    the only ones there is anything to choose *for*: a rule with a single fix is
+    applied without being asked about. Once a rule and an ``=`` have been typed,
+    the candidates narrow to that rule's repairs and each carries what it does.
+    """
+    from netgraph.fixes import fixable_rules, spec_for
+
+    rule, separator, _ = incomplete.partition("=")
+    if separator:
+        spec = spec_for(resolve_rule_id(rule.strip(), strict=False))
+        if spec is None:
+            return []
+        return _items(
+            ((f"{rule}={choice.key}", choice.summary) for choice in spec.choices),
+            incomplete,
+            fold_case=True,
+        )
+    return _items(
+        (
+            (f"{rule_id}=", spec.summary)
+            for rule_id in fixable_rules()
+            if (spec := spec_for(rule_id)) is not None and spec.is_ambiguous
+        ),
+        incomplete,
+        fold_case=True,
+    )
 
 
 def _items(

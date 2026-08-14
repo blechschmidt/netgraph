@@ -93,6 +93,7 @@ from netgraph.edit import (
 )
 from netgraph.edit.tree import digest_of
 from netgraph.errors import NetgraphError
+from netgraph.fixes import Fix, apply_fix, fixes_for, offers_for
 from netgraph.loader import (
     YAML_SUFFIXES,
     DocumentCache,
@@ -387,13 +388,37 @@ def _file_entry(file: InventoryFile, documents: Mapping[str, Sequence[DocumentEn
     )
 
 
+def _choose_fix(fixes: Sequence[Fix], *, rule: str, key: str | None) -> Fix:
+    """The repair ``key`` names, or the only one there is.
+
+    Raises:
+        SessionError: There is no repair, or several and none was named, or the
+            name is not one of them.
+    """
+    if not fixes:
+        raise SessionError(f"{rule} has no mechanical fix here")
+    if key is None:
+        if len(fixes) > 1:
+            offered = ", ".join(fix.key for fix in fixes)
+            raise SessionError(f"{rule} offers more than one repair; pick one of {offered}")
+        return fixes[0]
+    chosen = next((fix for fix in fixes if fix.key == key), None)
+    if chosen is None:
+        offered = ", ".join(fix.key for fix in fixes)
+        raise SessionError(f"{rule} offers {offered}, not {key!r}")
+    return chosen
+
+
 def _problem(problem: Problem) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "severity": str(problem.severity),
         "location": problem.location,
         "rule": problem.rule,
         "message": problem.message,
     }
+    if problem.fixes:
+        payload["fixes"] = [{"key": key, "title": title} for key, title in problem.fixes]
+    return payload
 
 
 # --------------------------------------------------------------------------- #
@@ -600,9 +625,23 @@ class EditingSession:
         return payload
 
     def diagnostics(self, inventory: Inventory | None = None) -> tuple[Problem, ...]:
-        """Every load error and finding of the tree, most severe group first."""
+        """Every load error and finding of the tree, most severe group first.
+
+        Each finding carries the mechanical repairs on offer for it, which is
+        what the problems list turns into a **Fix** button. Computing them costs
+        one pass over the findings and no file access — a producer is a pure
+        function of the finding and the tree (:mod:`netgraph.fixes`) — so they
+        are not worth making optional and then having to ask for.
+        """
         loaded = self.inventory() if inventory is None else inventory
-        return flatten_problems(loaded.errors, validate(loaded, self.settings()))
+        findings = validate(loaded, self.settings())
+        offers = {
+            (offer.finding.rule, offer.finding.message): tuple(
+                (fix.key, fix.title) for fix in offer.fixes
+            )
+            for offer in offers_for(findings, loaded)
+        }
+        return flatten_problems(loaded.errors, findings, fixes=offers)
 
     def graph(
         self, view: ViewOptions | None = None, *, known: str | None = None
@@ -764,6 +803,77 @@ class EditingSession:
                 label += f" (+{len(operations) - 1} more)"
             return self._committed(
                 self._commit(operations, label=label, force=force, client=client)
+            )
+
+    def fix(
+        self,
+        rule: str,
+        message: str,
+        *,
+        key: str | None = None,
+        revision: int | None = None,
+        client: str | None = None,
+    ) -> Change:
+        """Apply the mechanical repair for one diagnostic, as one gesture.
+
+        The finding is named by what identifies it everywhere else — its rule
+        and its message — rather than by a position in a list, because the list
+        the page is looking at may be several edits old and position 3 of it is
+        not a thing that survives an edit. If nothing in the tree still reports
+        that finding, the repair is refused instead of applied to whatever has
+        taken its place.
+
+        The repair goes through the same gate ``netgraph validate --fix`` uses:
+        it is applied to a throwaway session and thrown away unless the finding
+        is gone and no rule reports more than it did. Only then is it committed,
+        as one labelled entry in the history and the journal — so the **Fix**
+        button is undoable by ``Ctrl-Z`` and revertible from the changes drawer
+        like anything else somebody did by hand.
+
+        Args:
+            rule: Canonical rule id of the finding, e.g. ``W138``.
+            message: Its message, exactly as it was reported.
+            key: Which repair to apply, for a rule that offers more than one.
+                Required in that case; the single repair needs no name.
+            revision: The tree the page was looking at, as a precondition.
+            client: Who asked, so their own tab is not told to reload.
+
+        Raises:
+            ReadOnly: This session does not write.
+            SessionError: The finding is not there, has no repair, or the repair
+                would leave the tree worse than it found it.
+            Conflict: ``revision`` is not the current one.
+            EditError: The repair cannot be applied; nothing is written.
+        """
+        self._require_writable()
+        with self._lock:
+            if revision is not None and revision != self._revision:
+                raise Conflict(
+                    f"the inventory has changed since revision {revision} "
+                    f"(it is now at {self._revision}); reload before fixing"
+                )
+            inventory = self.inventory()
+            findings = validate(inventory, self.settings())
+            finding = next(
+                (entry for entry in findings if entry.rule == rule and entry.message == message),
+                None,
+            )
+            if finding is None:
+                raise SessionError(
+                    f"this inventory no longer reports that {rule}; reload the problems list"
+                )
+            fix = _choose_fix(fixes_for(finding, inventory), rule=rule, key=key)
+            probe = EditSession(root=self.root, config=self.config, cache=self.cache)
+            outcome = apply_fix(probe, finding, fix, settings=self.settings(), before=findings)
+            if not outcome.kept:
+                raise SessionError(f"{rule} was not fixed: {outcome.reason}")
+            return self._committed(
+                self._commit(
+                    fix.operations,
+                    label=f"fix {rule}: {fix.title}",
+                    force=False,
+                    client=client,
+                )
             )
 
     def undo(self, *, client: str | None = None) -> Change:

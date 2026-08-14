@@ -324,6 +324,24 @@ main {
 .problem.info .severity, .problem.info .rule { color: var(--info); }
 .problem .where { color: var(--muted); overflow-wrap: anywhere; }
 
+/* A diagnostic with a mechanical repair. The row keeps its own grid and the
+ * buttons sit beside it, so a fixable problem reads as the same line as every
+ * other one with something offered at the end of it. */
+.problem-entry { display: flex; align-items: flex-start; gap: .3rem; }
+.problem-entry .problem { flex: 1 1 auto; min-width: 0; }
+.fixes { display: flex; gap: .2rem; padding: .18rem .5rem .18rem 0; flex: 0 0 auto; }
+.fixes .fix {
+  font: inherit;
+  cursor: pointer;
+  padding: 0 .4rem;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  background: none;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.fixes .fix:hover { color: var(--fg); border-color: var(--fg); }
+
 .empty { color: var(--muted); padding: .6rem .7rem; margin: 0; }
 
 /* ------------------------------------------------------------ file list */

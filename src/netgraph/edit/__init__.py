@@ -59,6 +59,7 @@ from netgraph.edit.errors import (
 from netgraph.edit.operations import (
     OPERATIONS,
     AddInterface,
+    AppendItem,
     Connect,
     CreateElement,
     DeleteElement,
@@ -89,6 +90,7 @@ __all__ = [
     "OPERATIONS",
     "AddInterface",
     "AddressError",
+    "AppendItem",
     "AppliedOperation",
     "CascadeRequired",
     "ConflictError",

@@ -18,6 +18,7 @@ rule.
 - [A clean inventory](#a-clean-inventory)
 - [An inventory with a problem](#an-inventory-with-a-problem)
 - [Warnings, `--strict` and `--disable`](#warnings---strict-and---disable)
+- [Repairing what can be repaired](#repairing-what-can-be-repaired)
 - [Machine-readable output](#machine-readable-output)
 - [Arguments](#arguments)
 - [Options](#options)
@@ -132,6 +133,116 @@ the four mechanisms side by side, and
 [Suppressing a rule](../validation-rules.md#suppressing-a-rule) gives each one in
 full.
 
+## Repairing what can be repaired
+
+`--fix` applies the repairs the inventory itself determines and reports
+everything else. `--dry-run` prints the unified diff instead of writing:
+
+<!-- run: -->
+```console
+$ netgraph -i tests/fixtures/fixable validate --fix --dry-run
+would fix 3 problems:
+  W138  drop 'sw-gone' from the l1 view of layout 'default'
+  W108  remove the MAC address from loopback sw-a:Loopback0
+  W113  declare VLANs 20, 30 in the 'vlans' database of 'sw-a'
+W114 at switches.yaml#0:11 not fixed: 2 repairs are possible; choose one with --choose W114=list|drop
+    --choose W114=list  list VLAN 30 in the trunk_vlans of sw-a:GigabitEthernet0/1
+    --choose W114=drop  remove the native_vlan of sw-a:GigabitEthernet0/1, so it tags every VLAN it carries
+
+--- a/layout.yaml
++++ b/layout.yaml
+@@ -9,4 +9,3 @@
+       nodes:
+         sw-a: {position: [54, 18]}
+         sw-b: {position: [54, 126]}
+-        sw-gone: {position: [54, 234]}
+--- a/switches.yaml
++++ b/switches.yaml
+@@ -16,6 +16,8 @@
+   vlans:
+     - id: 10
+       name: office
++    - id: 20
++    - id: 30
+   interfaces:
+     - name: GigabitEthernet0/1
+       type: ethernet
+@@ -26,7 +28,6 @@
+         native_vlan: 30
+     - name: Loopback0
+       type: loopback
+-      mac: 00:11:22:33:44:55
+       ipv4:
+         - 10.255.0.1/32
+ ---
+warnings (1):
+  switches.yaml#0:11  W114  trunk 'sw-a:GigabitEthernet0/1' has native VLAN 30, which is not in its trunk_vlans (10,20); it is carried untagged all the same, so list it
+
+1 warning
+```
+
+Three of these four warnings had exactly one sensible repair, so they were made.
+The fourth has two, and the command names them rather than choosing:
+`--choose W114=list` writes the native VLAN into `trunk_vlans`, `--choose
+W114=drop` removes the `native_vlan` instead. With one of those the tree comes
+out clean:
+
+<!-- run: -->
+```console
+$ netgraph -i tests/fixtures/fixable validate --fix --dry-run --choose W114=list
+would fix 4 problems:
+  W138  drop 'sw-gone' from the l1 view of layout 'default'
+  W108  remove the MAC address from loopback sw-a:Loopback0
+  W113  declare VLANs 20, 30 in the 'vlans' database of 'sw-a'
+  W114  list VLAN 30 in the trunk_vlans of sw-a:GigabitEthernet0/1
+--- a/layout.yaml
++++ b/layout.yaml
+@@ -9,4 +9,3 @@
+       nodes:
+         sw-a: {position: [54, 18]}
+         sw-b: {position: [54, 126]}
+-        sw-gone: {position: [54, 234]}
+--- a/switches.yaml
++++ b/switches.yaml
+@@ -16,17 +16,18 @@
+   vlans:
+     - id: 10
+       name: office
++    - id: 20
++    - id: 30
+   interfaces:
+     - name: GigabitEthernet0/1
+       type: ethernet
+       mtu: 1500
+       vlan:
+         mode: trunk
+-        trunk_vlans: "10,20"
++        trunk_vlans: "10,20,30"
+         native_vlan: 30
+     - name: Loopback0
+       type: loopback
+-      mac: 00:11:22:33:44:55
+       ipv4:
+         - 10.255.0.1/32
+ ---
+no problems found
+```
+
+Every repair is applied on its own and the tree is validated again; a repair is
+kept only if the finding it was aimed at is gone and no rule reports more than it
+did before. One that fails that test is rolled back to the byte and reported with
+the findings it would have introduced, so `--fix` cannot make an inventory worse
+and never needs a `--force`.
+
+Writes go through the same path as [`netgraph edit`](edit.md): comments, key
+order and quoting survive, and only the lines the repair is about change. `--fix`
+needs a *folder*, because an edit session resolves addresses across a whole tree;
+pointing `-i` at a single file is a usage error.
+
+[Fixing a finding](../validation-rules.md#fixing-a-finding) lists which rules are
+fixable and what each repair does, and `netgraph rules --fixable` prints the same
+table.
+
 ## Machine-readable output
 
 `-F, --output-format` is `text` to read; `json`, `sarif` or `github` for
@@ -174,6 +285,9 @@ composite GitHub Action and the pre-commit hook this repository ships.
 | `--strict` | — | off | Promote every warning to an error, so any finding fails the run. |
 | `--disable` | `RULE` | — | Silence a rule by id (E001, NG-C002, ...). Repeatable. |
 | `-F`, `--output-format` | `[text\|json\|sarif\|github]` | `text` | text is for reading; json, sarif and github are for CI. |
+| `--fix` | — | off | Repair every problem that has one unambiguous mechanical fix, then report what is left. A fix that would introduce a new finding is undone and reported instead. |
+| `-n`, `--dry-run` | — | off | With --fix: print the unified diff the repairs would apply, and write nothing. |
+| `--choose` | `RULE=FIX` | — | Pick which repair to use for a rule that offers several, e.g. --choose W114=list. Repeatable. 'netgraph rules --fixable' lists the keys. |
 <!-- /generated -->
 
 The global options apply as everywhere else: `-i/--inventory` names the tree,

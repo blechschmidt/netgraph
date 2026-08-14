@@ -20,6 +20,7 @@ reference for the command itself.
 - [Severities, and the exit code that follows](#severities-and-the-exit-code-that-follows)
 - [`--strict`, and when you want it](#--strict-and-when-you-want-it)
 - [Saying "not here": the four suppressions](#saying-not-here-the-four-suppressions)
+- [Repairing what can be repaired](#repairing-what-can-be-repaired)
 - [Output for a machine](#output-for-a-machine)
 - [Every rule](#every-rule)
 
@@ -272,6 +273,30 @@ anything.
 full: the exact TOML, the annotation grammar, the accepted separators, and what
 happens to an unknown key inside `[validate]`. Each rule's own section ends with
 a **Suppress with** line naming its ids and the elements worth annotating.
+
+## Repairing what can be repaired
+
+Suppression is one answer to a finding. The other is to fix it, and for a good
+part of the catalogue the inventory itself determines what the fix is: a layout
+document placing an element that has been deleted, a port trunking a VLAN its
+device's database does not declare, a VRF nothing is bound to.
+
+<!-- norun: three flag forms with trailing comments, and none names an inventory -->
+```bash
+netgraph validate --fix                     # apply them, and report the rest
+netgraph validate --fix --dry-run           # ... printing the diff instead
+netgraph validate --fix --choose W114=list  # decide a rule that has two repairs
+```
+
+Each repair is applied on its own and the tree is validated again; it is kept
+only if the finding it was aimed at is gone and no rule reports more than it did
+before, so `--fix` cannot make an inventory worse. Where two repairs are equally
+plausible the command names them and applies neither. The web editor puts the
+same repairs on a button beside each diagnostic.
+
+[Fixing a finding](validation-rules.md#fixing-a-finding) lists which rules are
+repairable and what each repair does, generated from the table in
+`netgraph.fixes` so it cannot drift; `netgraph rules --fixable` prints it too.
 
 ## Output for a machine
 

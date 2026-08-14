@@ -53,6 +53,7 @@ import yaml as pyyaml
 from netgraph.edit.errors import AddressError, CascadeRequired, EditError, OperationError
 from netgraph.edit.operations import (
     AddInterface,
+    AppendItem,
     Connect,
     CreateElement,
     DeleteElement,
@@ -539,6 +540,43 @@ def _is_faithful(context: _Context, located: _Located) -> bool:
     return context.tree.document(located.relative, located.index).faithful
 
 
+def _append(context: _Context, operation: AppendItem) -> tuple[Operation, ...] | None:
+    """Add one entry to a sequence, creating the sequence if it is not there.
+
+    The inverse is a semantic one whenever the document round-trips: removing
+    the entry that was just inserted restores the file, because nothing else in
+    the sequence was rewritten -- and a sequence this operation *created* is
+    undone by removing the key it created, not by leaving an empty list behind.
+    """
+    located = context.locate(operation.address)
+    path = parse_field_path(operation.path)
+    if path[:1] == ("kind",) or path[:2] == ("metadata", "name"):
+        raise OperationError(f"{operation.path} is not a sequence; it is part of the envelope")
+    document = context.document(located)
+    existing = get_field(document, path)
+    created = existing is MISSING
+    if created:
+        set_field(document, path, [])
+        existing = get_field(document, path)
+    if not isinstance(existing, list):
+        raise OperationError(
+            f"{operation.path}: there is no sequence to add to; it holds "
+            f"{'nothing' if existing is None else type(existing).__name__}"
+        )
+    position = len(existing) if operation.index is None else operation.index
+    if not 0 <= position <= len(existing):
+        raise OperationError(
+            f"{operation.path}: {operation.index} is not a position in a sequence of "
+            f"{len(existing)}"
+        )
+    existing.insert(position, operation.value)
+    if not _is_faithful(context, located):
+        return None
+    if created:
+        return (UnsetField(address=located.fqn, path=operation.path),)
+    return (UnsetField(address=located.fqn, path=f"{operation.path}[{position}]"),)
+
+
 def _add_interface(context: _Context, operation: AddInterface) -> tuple[Operation, ...] | None:
     located = context.locate(operation.address)
     name = operation.interface.get("name")
@@ -999,6 +1037,7 @@ _HANDLERS: Final[dict[type[Operation], _Handler]] = {
     MoveElement: _move,
     SetField: _set,
     UnsetField: _unset,
+    AppendItem: _append,
     AddInterface: _add_interface,
     RemoveInterface: _remove_interface,
     Connect: _connect,
