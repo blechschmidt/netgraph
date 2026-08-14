@@ -36,6 +36,7 @@ from netgraph.export.manifest import Reason, Recorder
 from netgraph.export.names import MAX_DNS_NAME, dns_name_parts
 from netgraph.loader.inventory import Inventory
 from netgraph.render.graph import Graph, Layer, Node, PortView
+from netgraph.render.icons import IconTheme
 from netgraph.subnets import IPNetwork
 
 __all__ = [
@@ -163,6 +164,24 @@ class ExportOptions:
     #: How the load schedule is laid out: ``csv`` for the sheet somebody signs,
     #: ``json`` for the same rows plus the per-PDU and per-PSE totals (§17.7).
     schedule_format: str = "csv"
+
+    # -- drawio ----------------------------------------------------------
+    #: Which view the diagram draws, as :class:`~netgraph.render.graph.Layer`
+    #: spells it. Unlike every other format here, ``drawio`` draws *one* view
+    #: and the reader chooses which — a cabling diagram and a routing diagram
+    #: are different pictures, and a stakeholder is being asked about one.
+    view: str = Layer.L1.value
+    #: The icon theme inlined into the file, or ``None`` for coloured boxes.
+    icons: IconTheme | None = None
+    #: Write the deflate+base64 encoding draw.io's desktop app writes by
+    #: default. Off by default here: a plain diagram is one that reviews.
+    compress: bool = False
+    #: Draw a container frame per namespace.
+    frames: bool = True
+    #: Does the exported diagram hold every element of the view? Set by the CLI
+    #: from whether a filter was given, and stamped into the file: importing a
+    #: filtered diagram must never read a missing cell as a deletion.
+    complete: bool = True
 
     @property
     def wants_forward(self) -> bool:

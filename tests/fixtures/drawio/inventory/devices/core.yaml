@@ -1,0 +1,67 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-core
+  description: Edge router. wan0 faces an ISP this inventory does not describe.
+  annotations:
+    netgraph/ignore: NG-C015
+spec:
+  vendor: MikroTik
+  model: hEX S
+  interfaces:
+    - name: wan0
+      type: ethernet
+      description: ISP hand-off
+      ipv4:
+        addresses: [203.0.113.2/30]
+    - name: lan0
+      type: ethernet
+      description: Downlink to sw-access
+      ipv4:
+        addresses: [192.168.20.1/24]
+      vlan:
+        mode: access
+        access_vlan: 20
+  vlans:
+    - id: 20
+      name: office
+  forwarding:
+    ipv4: true
+    ipv6: false
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-access
+  description: Access switch. port3 and port4 are patched to nothing yet.
+spec:
+  vendor: Cisco
+  model: C9200-24T
+  interfaces:
+    - name: port1
+      type: ethernet
+      description: Uplink to rtr-core
+      vlan:
+        mode: access
+        access_vlan: 20
+    - name: port2
+      type: ethernet
+      description: To srv-app
+      vlan:
+        mode: access
+        access_vlan: 20
+    - name: port3
+      type: ethernet
+      description: Spare, and free for a cable somebody draws in draw.io
+      vlan:
+        mode: access
+        access_vlan: 20
+    - name: port4
+      type: ethernet
+      description: Spare
+      vlan:
+        mode: access
+        access_vlan: 20
+  vlans:
+    - id: 20
+      name: office

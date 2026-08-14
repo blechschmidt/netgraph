@@ -188,7 +188,8 @@ report.txt` both do what they look like they do.
 | Command | What it does | Reference |
 |---|---|---|
 | [`netgraph init`](docs/commands/init.md) | Scaffold a new inventory, ready to validate and render. | [init.md](docs/commands/init.md) |
-| [`netgraph import`](docs/commands/import.md) | Build a first inventory from output captured on live devices. | [import.md](docs/commands/import.md) |
+| [`netgraph import captures`](docs/commands/import.md) | Build a first inventory from output captured on live devices. | [import.md](docs/commands/import.md) |
+| [`netgraph import drawio`](docs/commands/import.md) | Bring an edited draw.io diagram back as a reviewable changeset. | [import.md](docs/commands/import.md) |
 | [`netgraph drift`](docs/commands/drift.md) | Compare a live network against the declared inventory. | [drift.md](docs/commands/drift.md) |
 | [`netgraph validate`](docs/commands/validate.md) | Check the inventory; the gate for CI and pre-commit. | [validate.md](docs/commands/validate.md) |
 | [`netgraph fmt`](docs/commands/fmt.md) | Rewrite inventory YAML into the canonical form. | [fmt.md](docs/commands/fmt.md) |
@@ -246,6 +247,7 @@ The files describe the network once; each command asks something different of th
 | how do I move a switch on the diagram and have it stay there? | [`netgraph layout`](docs/commands/layout.md) |
 | how full is that /24, and where is the next free /28? | [`netgraph ipam`](docs/ipam.md) |
 | what should `/etc/hosts`, the DNS zone, the Ansible inventory, the pull list or the routing script say? | [`netgraph export`](docs/export.md) |
+| can I hand the diagram to somebody who only has draw.io, and take their edits back? | [`netgraph export drawio`](docs/drawio.md) |
 | what do I hand over as the as-built documentation? | [`netgraph report`](docs/commands/report.md), and [an example of what it writes](docs/example-report/) |
 | what did that template and that interface range actually expand to? | [`netgraph show`](docs/commands/show.md) |
 

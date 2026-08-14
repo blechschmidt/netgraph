@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 1,
+  "tool": {
+    "name": "netgraph",
+    "version": "0.1.0"
+  },
+  "source": {
+    "kind": "tree",
+    "description": "source"
+  },
+  "target": {
+    "kind": "tree",
+    "description": "target"
+  },
+  "summary": {
+    "create": 1,
+    "update": 2,
+    "delete": 1,
+    "rename": 1,
+    "total": 5
+  },
+  "empty": false,
+  "changes": [
+    {
+      "action": "delete",
+      "address": "device.hosts/pc-2",
+      "kind": "computer",
+      "document": {
+        "apiVersion": "netgraph.dev/v1alpha1",
+        "kind": "computer",
+        "metadata": {
+          "name": "pc-2",
+          "description": "The machine the edited diagram deletes."
+        },
+        "spec": {
+          "vendor": "Lenovo",
+          "model": "ThinkCentre M75q",
+          "interfaces": [
+            {
+              "name": "eno1",
+              "type": "ethernet",
+              "enabled": true,
+              "ipv4": {
+                "enabled": true,
+                "forwarding": false,
+                "addresses": [
+                  {
+                    "ip": "192.168.20.21",
+                    "prefix_length": 24
+                  }
+                ]
+              }
+            }
+          ],
+          "forwarding": {
+            "ipv4": false,
+            "ipv6": false
+          }
+        }
+      },
+      "source": "hosts/hosts.yaml#2:35"
+    },
+    {
+      "action": "rename",
+      "address": "device.hosts/srv-app",
+      "kind": "server",
+      "newAddress": "device.hosts/srv-web",
+      "source": "hosts/hosts.yaml#0:1"
+    },
+    {
+      "action": "create",
+      "address": "cable.cbl-pc-1-sw-access",
+      "kind": "cable",
+      "document": {
+        "apiVersion": "netgraph.dev/v1alpha1",
+        "kind": "cable",
+        "metadata": {
+          "name": "cbl-pc-1-sw-access"
+        },
+        "spec": {
+          "endpoints": [
+            "devices/sw-access:port3",
+            "hosts/pc-1:eno1"
+          ],
+          "medium": "copper",
+          "duplex": "full"
+        }
+      }
+    },
+    {
+      "action": "update",
+      "address": "cable.cables/cbl-access-app",
+      "kind": "cable",
+      "fields": [
+        {
+          "path": "spec.endpoints",
+          "before": [
+            "srv-app:eth0",
+            "sw-access:port2"
+          ],
+          "after": [
+            "srv-web:eth0",
+            "sw-access:port2"
+          ]
+        }
+      ],
+      "source": "cables/links.yaml#1:15"
+    },
+    {
+      "action": "update",
+      "address": "layout.layout",
+      "kind": "layout",
+      "fields": [
+        {
+          "path": "spec.views.l1.nodes.hosts/pc-1.position.x",
+          "before": 577.0,
+          "after": 697.0
+        }
+      ],
+      "document": {
+        "apiVersion": "netgraph.dev/v1alpha1",
+        "kind": "layout",
+        "metadata": {
+          "name": "layout"
+        },
+        "spec": {
+          "views": {
+            "l1": {
+              "nodes": {
+                "devices/rtr-core": {
+                  "position": {
+                    "x": 148.0,
+                    "y": 232.0
+                  }
+                },
+                "devices/sw-access": {
+                  "position": {
+                    "x": 277.0,
+                    "y": 43.0
+                  }
+                },
+                "hosts/pc-1": {
+                  "position": {
+                    "x": 697.0,
+                    "y": 232.0
+                  }
+                },
+                "hosts/pc-2": {
+                  "position": {
+                    "x": 733.0,
+                    "y": 232.0
+                  }
+                },
+                "hosts/srv-app": {
+                  "position": {
+                    "x": 407.0,
+                    "y": 232.0
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "source": "layout.yaml#0:1"
+    }
+  ]
+}

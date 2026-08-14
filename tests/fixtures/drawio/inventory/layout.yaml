@@ -1,0 +1,18 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: layout
+metadata:
+  name: layout
+spec:
+  views:
+    l1:
+      nodes:
+        devices/rtr-core:
+          position: {x: 148, y: 232}
+        devices/sw-access:
+          position: {x: 277, y: 43}
+        hosts/pc-1:
+          position: {x: 577, y: 232}
+        hosts/pc-2:
+          position: {x: 733, y: 232}
+        hosts/srv-app:
+          position: {x: 407, y: 232}

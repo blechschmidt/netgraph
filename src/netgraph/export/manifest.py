@@ -100,6 +100,11 @@ class Reason(str, Enum):
     #: :attr:`HALF_SELECTED` because the reader would otherwise go looking for
     #: an element that is right there in the artefact.
     NOT_SELECTED = "not-selected"
+    #: Nothing in the inventory said where to draw this, so the export invented
+    #: a position for it. The artefact is complete; it is the *arrangement*
+    #: that is netgraph's rather than the operator's, which matters because an
+    #: invented position is not written back on the return trip.
+    NOT_ARRANGED = "not-arranged"
 
     def __str__(self) -> str:
         return self.value

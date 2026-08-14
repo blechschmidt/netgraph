@@ -18,6 +18,45 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **A round trip with draw.io: `netgraph export drawio` and `netgraph import drawio`.**
+  netgraph's pitch is "draw.io for infrastructure, with the YAML as the source of truth".
+  This is where it meets the actual tool: a diagram can be handed to a stakeholder who has
+  never installed netgraph, edited in draw.io, and brought back as a reviewable changeset.
+
+  **Export.** `netgraph export drawio` writes an mxGraph model of one view — `--view` picks
+  which of the nine — carrying the stored arrangement (§18), so the file opens *already
+  arranged* rather than as a heap draw.io lays out afresh. One vertex per node, one edge per
+  link with its waypoints, a container frame per namespace so dragging a site carries its
+  devices, and the shipped icons inlined as data URIs so the file is self-contained.
+  `--icons`, `--frames/--no-frames` and `--compress/--no-compress` say how; the plain
+  encoding is the default because a diagram that is text is a diagram that reviews and
+  diffs, and draw.io opens both.
+
+  **Identity, not labels.** Each cell carries `netgraph:name`, `netgraph:kind`,
+  `netgraph:document`, `netgraph:hash` and the coordinates it left netgraph at. That is what
+  makes the label free to *mean* something on the way back.
+
+  **Import.** `netgraph import drawio FILE` reconciles by those attributes. A cell that
+  moved becomes a geometry write, one whose label was retyped becomes a `rename` with every
+  reference rewritten, one that is gone becomes a cascading `delete`, and an edge somebody
+  drew becomes a `connect` on the first free port at each end. Everything is expressed as
+  `netgraph edit` operations and shown as a `netgraph plan` changeset, confirmed before a
+  single file moves. `--dry-run`, `--auto-approve` and a switch per gesture.
+
+  **What it will not do.** A missing cell is a deletion only when the file says it held the
+  whole view: export narrowed by `--namespace` and nothing is ever deleted on the strength
+  of it. A file netgraph did not export carries no identity, so nothing is reconciled — it
+  is read and reported cell by cell, with the kind each one looks like, and netgraph will
+  not invent hardware from a rectangle. Re-importing an untouched export changes nothing at
+  all, which the suite asserts as an empty plan over every published example and every view.
+
+  `netgraph import` is now a group, and its original signature still works unchanged:
+  anything that is not the name of a sub-command is read as a capture file, so `netgraph
+  import caps/*.json` means what it always did.
+
+  [`docs/drawio.md`](docs/drawio.md) is the workflow, including what a draw.io user may and
+  may not safely change.
+
 - **Links are first-class geometry: waypoints, routing styles and label positions.** A
   `kind: layout` document already said where every node went; it now says how every cable
   gets there. In a hand-arranged diagram that was the last thing that did not stay where

@@ -19,7 +19,7 @@ export cannot disagree with a diagram of the same tree.
 
 ## Contents
 
-- [The seven formats](#the-seven-formats)
+- [The eight formats](#the-eight-formats)
 - [`hosts`](#hosts)
 - [`dns-zone`](#dns-zone)
 - [`ansible-inventory`](#ansible-inventory)
@@ -27,6 +27,7 @@ export cannot disagree with a diagram of the same tree.
 - [`cable-list`](#cable-list)
 - [`routes`](#routes)
 - [`power`](#power)
+- [`drawio`](#drawio)
 - [What every format guarantees](#what-every-format-guarantees)
 - [Names, and how they are folded](#names-and-how-they-are-folded)
 - [The skip manifest](#the-skip-manifest)
@@ -37,7 +38,7 @@ export cannot disagree with a diagram of the same tree.
 
 ---
 
-## The seven formats
+## The eight formats
 
 | Format | Artefact | Default extension |
 |---|---|---|
@@ -48,6 +49,7 @@ export cannot disagree with a diagram of the same tree.
 | [`cable-list`](#cable-list) | A CSV or Markdown pull-list, one row per physical run | `.csv` |
 | [`routes`](#routes) | An iproute2 script of the static routes each device declares | `.sh` |
 | [`power`](#power) | A load schedule, one row per power feed | `.csv` |
+| [`drawio`](#drawio) | An mxGraph diagram draw.io opens, edits and hands back | `.drawio` |
 
 With no `-o`, the artefact goes to **stdout** and everything else — progress
 notes, validation findings and the [skip manifest](#the-skip-manifest) — goes to
@@ -602,6 +604,37 @@ Only `--force` gets that far: the validator refuses both first.
 
 ---
 
+## `drawio`
+
+The one format here that a *person* opens rather than a machine — and, unlike
+the SVG a render produces, edits and hands back. It writes one
+[mxGraph](https://www.drawio.com/) model of one view: a vertex per node carrying
+the [stored arrangement](commands/layout.md) so the file opens already arranged,
+an edge per link with its waypoints, a container frame per namespace, and the
+shipped icons inlined as data URIs so the file is self-contained.
+
+What makes it more than a picture is the identity block on each cell —
+`netgraph:name`, `netgraph:kind`, `netgraph:document`, `netgraph:hash` — which is
+what lets [`netgraph import drawio`](commands/import.md) tell a moved switch from
+a new one when the file comes back.
+
+<!-- run: cwd=examples/home-lab -->
+```console
+$ netgraph export drawio --view l1 --icons none
+...
+exported drawio: 15 of 15 emitted, 1 skipped (not-arranged 1)
+```
+
+The skip is the interesting part of that line: `home-lab` has no stored
+arrangement, so the export laid its nodes out on a grid rather than reproducing
+one somebody chose. Run [`netgraph layout --write`](commands/layout.md) first and
+the file opens the way your diagrams actually look.
+
+[drawio.md](drawio.md) is the whole workflow, including the part that matters
+most: what a draw.io user may and may not safely change.
+
+---
+
 ## What every format guarantees
 
 **Deterministic.** Every collection is sorted by an explicit canonical key —
@@ -621,7 +654,8 @@ quoting — RFC 1035 labels, Ansible identifiers, RFC 4180 fields, Markdown cell
 [`netgraph/export/names.py`](../src/netgraph/export/names.py), with every fold
 recorded.
 
-**Text.** Nothing here emits bytes. All seven artefacts are diffable.
+**Text.** Nothing here emits bytes. All eight artefacts are diffable — `drawio`
+included, as long as you leave `--compress` off, which is why it is off.
 
 ---
 
@@ -753,6 +787,7 @@ Every format here is lossy. What each one drops, in one line:
 | `prometheus-sd` | Everything except one address and a handful of labels. No topology, no interface detail, no VLAN membership. An element with no routable address cannot be scraped and does not appear. |
 | `cable-list` | Adapter attachments — a USB-to-Ethernet dongle's upstream is a physical connection, but it is part of the adapter rather than a run somebody pulls, and it has no medium, length or label to carry. Tunnels and addressing are not physical and never appear. |
 | `routes` | Everything that is not a static route. `spec.routing` is a *protocol* — an inventory can say a router is in AS 65001 and OSPF area 0, but the configuration that makes it so is vendor syntax this emitter has no business inventing, so it is left to a template engine and the manifest says it was left. Nothing here computes a best path either: the routes are emitted in declaration order. |
+| `drawio` | The model. A `.drawio` file records a name, a kind, a link and a coordinate per cell; not interfaces, addresses, VLANs, routing or hardware detail. That is what the [round trip](drawio.md) reconciles *gestures* — move, rename, delete, connect — rather than replacing documents wholesale. |
 | `power` | Everything that is not power. A feed carries no medium, no length and no label, and the data run a PoE feed rides on is named by its two ports and the panels in `VIA` but not otherwise described — that is the `cable-list`'s job. No measured watts anywhere: `draw_watts` and `capacity_watts` are nameplate figures, and comparing them with a meter is [`netgraph drift`](commands/drift.md)'s business. |
 
 For the lossless view of an inventory, use
@@ -835,6 +870,15 @@ cabling record.
 | Option | Default | Effect |
 |---|---|---|
 | `--schedule-format csv\|json` | `csv` | How the load schedule is laid out. `json` adds the per-PDU and per-PSE totals; the feed rows are the same either way. |
+
+### `drawio`
+
+| Option | Default | Effect |
+|---|---|---|
+| `--view VIEW` | `l1` | Which view the diagram draws. Any of the nine layers a render draws. |
+| `--icons THEME\|DIR` | `cisco` | Icon theme inlined as data URIs, so the file needs nothing beside it. `none` draws coloured boxes. |
+| `--compress` / `--no-compress` | `--no-compress` | Write the deflate+base64 encoding draw.io writes by default. Off here: a plain diagram is one that reviews and diffs, and draw.io opens both. |
+| `--frames` / `--no-frames` | `--frames` | Draw a container frame per namespace, so dragging a site carries its devices. |
 
 Passing a format-specific option to a format that has no use for it is a usage
 error, not a silent no-op: a flag that is quietly dropped is worse than an

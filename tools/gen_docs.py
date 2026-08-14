@@ -80,6 +80,8 @@ REGION_RE: Final = re.compile(
 PAGE: Final[dict[str, str]] = {
     "init": "init.md",
     "import": "import.md",
+    "import captures": "import.md",
+    "import drawio": "import.md",
     "drift": "drift.md",
     "validate": "validate.md",
     "fmt": "fmt.md",
@@ -124,7 +126,8 @@ PAGE: Final[dict[str, str]] = {
 #: One line per command for the index tables, in the order a reader meets them.
 INDEX_ORDER: Final = [
     "init",
-    "import",
+    "import captures",
+    "import drawio",
     "drift",
     "validate",
     "fmt",
@@ -167,7 +170,8 @@ INDEX_ORDER: Final = [
 #: at ``--help``; an index table wants something shorter and comparable.
 SUMMARY: Final[dict[str, str]] = {
     "init": "Scaffold a new inventory, ready to validate and render.",
-    "import": "Build a first inventory from output captured on live devices.",
+    "import captures": "Build a first inventory from output captured on live devices.",
+    "import drawio": "Bring an edited draw.io diagram back as a reviewable changeset.",
     "drift": "Compare a live network against the declared inventory.",
     "validate": "Check the inventory; the gate for CI and pre-commit.",
     "fmt": "Rewrite inventory YAML into the canonical form.",

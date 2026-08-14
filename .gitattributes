@@ -51,6 +51,11 @@ tests/fixtures/** text eol=lf
 # means it has to be reproducible from a `netgraph render` on any platform.
 *.svg text eol=lf
 
+# A .drawio file is XML too, and the fixtures under tests/fixtures/drawio/ are
+# compared byte for byte against what `netgraph export drawio` writes. The
+# writer emits LF (netgraph/fsio.py), so the checkout has to hold LF.
+*.drawio text eol=lf
+
 # ---------------------------------------------------------------------------
 # Scripts, where the shell decides rather than the platform.
 # ---------------------------------------------------------------------------

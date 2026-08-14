@@ -13,7 +13,8 @@ a flag that is documented exists. The prose around them is written by hand.
 | Command | What it does | Reference |
 |---|---|---|
 | [`netgraph init`](init.md) | Scaffold a new inventory, ready to validate and render. | [init.md](init.md) |
-| [`netgraph import`](import.md) | Build a first inventory from output captured on live devices. | [import.md](import.md) |
+| [`netgraph import captures`](import.md) | Build a first inventory from output captured on live devices. | [import.md](import.md) |
+| [`netgraph import drawio`](import.md) | Bring an edited draw.io diagram back as a reviewable changeset. | [import.md](import.md) |
 | [`netgraph drift`](drift.md) | Compare a live network against the declared inventory. | [drift.md](drift.md) |
 | [`netgraph validate`](validate.md) | Check the inventory; the gate for CI and pre-commit. | [validate.md](validate.md) |
 | [`netgraph fmt`](fmt.md) | Rewrite inventory YAML into the canonical form. | [fmt.md](fmt.md) |

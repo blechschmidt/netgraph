@@ -1,0 +1,47 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-app
+  description: Application server. eth1 is spare, so a cable drawn to it lands there.
+spec:
+  vendor: Dell
+  model: R350
+  interfaces:
+    - name: eth0
+      type: ethernet
+      ipv4:
+        addresses: [192.168.20.10/24]
+    - name: eth1
+      type: ethernet
+      description: Spare, and free for a cable somebody draws in draw.io
+      vlan:
+        mode: access
+        access_vlan: 20
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-1
+  description: Desk machine, not cabled yet.
+spec:
+  vendor: Lenovo
+  model: ThinkCentre M75q
+  interfaces:
+    - name: eno1
+      type: ethernet
+      ipv4:
+        addresses: [192.168.20.20/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-2
+  description: The machine the edited diagram deletes.
+spec:
+  vendor: Lenovo
+  model: ThinkCentre M75q
+  interfaces:
+    - name: eno1
+      type: ethernet
+      ipv4:
+        addresses: [192.168.20.21/24]

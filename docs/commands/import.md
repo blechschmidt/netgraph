@@ -1,12 +1,22 @@
 # `netgraph import`
 
-`netgraph import` builds a first inventory out of output you already collected on
-live devices: LLDP neighbour tables, `ip -j` captures and `device,port,device,port`
-cabling lists become a `devices/` and `cables/` tree in the layout
-[`netgraph init`](init.md) writes. No host is contacted and no credential is
-read — you run the collection command and hand netgraph what it printed. This
-page is the reference; [importing a live network](../importing.md) is the task,
-including what to collect and how to correct what comes out.
+`netgraph import` brings something from outside the tree into the inventory.
+There are two sources, and they are different jobs:
+
+| Form | Reads | Produces |
+|---|---|---|
+| `netgraph import captures/*.json` | what live devices printed | a `devices/` and `cables/` tree, written |
+| `netgraph import drawio FILE` | a diagram somebody edited in draw.io | a [`netgraph plan`](plan.md) changeset, confirmed |
+
+The first is the original signature and needs no sub-command: anything that is
+not the name of one is read as a capture file, so `netgraph import caps/*.json`
+means what it always did. It is spelled `netgraph import captures …` when you
+want to be explicit.
+
+This page is the reference for both. [Importing a live network](../importing.md)
+is the task for the first; [draw.io round trips](../drawio.md) is the task for
+the second, including the one thing a reader most needs — what a draw.io user may
+and may not safely change.
 
 ---
 
@@ -17,6 +27,7 @@ including what to collect and how to correct what comes out.
 - [Naming the host a capture came from](#naming-the-host-a-capture-came-from)
 - [Writing, and refusing to](#writing-and-refusing-to)
 - [A worked example](#a-worked-example)
+- [`netgraph import drawio`](#netgraph-import-drawio)
 - [Arguments](#arguments)
 - [Options](#options)
 - [Exit codes](#exit-codes)
@@ -28,7 +39,19 @@ including what to collect and how to correct what comes out.
 
 <!-- generated: synopsis import -->
 ```text
-netgraph [GLOBAL OPTIONS] import [OPTIONS] [NAME=]INPUT...
+netgraph [GLOBAL OPTIONS] import [OPTIONS] COMMAND [ARGS]...
+```
+<!-- /generated -->
+
+<!-- generated: synopsis import captures -->
+```text
+netgraph [GLOBAL OPTIONS] import captures [OPTIONS] [NAME=]INPUT...
+```
+<!-- /generated -->
+
+<!-- generated: synopsis import drawio -->
+```text
+netgraph [GLOBAL OPTIONS] import drawio [OPTIONS] FILE
 ```
 <!-- /generated -->
 
@@ -132,19 +155,70 @@ whole of [importing a live network](../importing.md) is about those three.
 
 ---
 
+## `netgraph import drawio`
+
+A diagram that came back from draw.io is reconciled by the identity netgraph
+stamped into each cell when it exported it — never by the label and never by the
+position. Four gestures carry:
+
+| On the canvas | In the inventory |
+|---|---|
+| a cell moved | a geometry write, and nothing else |
+| a label retyped | `rename`, with every reference to it rewritten |
+| a cell deleted | `delete`, cascading to what cannot survive it |
+| two cells newly joined | `connect`, on the first free port at each end |
+
+Everything becomes a [`netgraph edit`](edit.md) operation and is shown as a
+[`netgraph plan`](plan.md) changeset before a single file is touched. `--dry-run`
+prints the changeset and the diff and writes nothing; without `--auto-approve`
+you are asked to confirm.
+
+`--view` is read from the file and is needed only for a diagram netgraph did not
+export. `--geometry`/`--no-geometry`, `--renames`/`--no-renames`,
+`--deletions`/`--no-deletions` and `--connections`/`--no-connections` each turn
+one of the four gestures off. `--name`, `--namespace` and `--file` say where new
+geometry is written; geometry for something an existing layout document already
+places goes back into *that* document. `--force` writes even if the result would
+introduce a new validation error, and `--json` reports the notes and the session
+as JSON.
+
+A cell that is simply missing is a deletion only when the file says it held the
+whole view. Export narrowed by `--namespace` and nothing is ever deleted on the
+strength of it: absence proves nothing about a diagram that was filtered before
+it was drawn. A file netgraph did not export carries no identity at all, so
+nothing is reconciled; it is read anyway and reported cell by cell, with the kind
+each one looks like, and netgraph will not invent hardware from a rectangle.
+
+<!-- norun: needs a diagram that has been round-tripped through draw.io -->
+```console
+$ netgraph export drawio -o site.drawio      # hand this out
+$ netgraph import drawio site.drawio -n      # see what came back
+$ netgraph import drawio site.drawio         # apply it
+```
+
+---
+
 ## Arguments
 
-<!-- generated: arguments import -->
+<!-- generated: arguments import captures -->
 | Argument | Required | Count | Default |
 |---|---|---|---|
 | `[NAME=]INPUT...` | no | any number | — |
+<!-- /generated -->
+
+<!-- generated: arguments import drawio -->
+| Argument | Required | Count | Default |
+|---|---|---|---|
+| `FILE` | yes | 1 | — |
 <!-- /generated -->
 
 ---
 
 ## Options
 
-<!-- generated: options import -->
+### `netgraph import captures`
+
+<!-- generated: options import captures -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
 | `--from` | `[auto\|lldp\|iproute\|csv]` | `auto` | Input dialect. 'auto' sniffs each input on its own, so one run may mix all three: lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', csv is 'device,port,device,port' cabling rows. |
@@ -156,6 +230,25 @@ whole of [importing a live network](../importing.md) is about those three.
 | `--exclude` | `PATTERN` | — | Leave out interfaces whose name matches this glob. Applies to 'iproute' captures, where 'veth*' and 'docker*' are rarely part of a physical topology. Repeatable. |
 <!-- /generated -->
 
+### `netgraph import drawio`
+
+<!-- generated: options import drawio -->
+| Flag | Value | Default | Meaning |
+|---|---|---|---|
+| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity]` | the view the file says it was exported from | Which view the diagram draws. Read from the file for anything netgraph exported; needed only for a diagram netgraph did not write. |
+| `--geometry`, `--no-geometry` | — | `--geometry` | Carry cells that were dragged back as stored geometry. |
+| `--renames`, `--no-renames` | — | `--renames` | Carry a retyped label back as a rename, rewriting every reference to it. |
+| `--deletions`, `--no-deletions` | — | `--deletions` | Carry a deleted cell back as a deleted element. Never applied to a diagram that was exported from a filtered view, whichever way this is set. |
+| `--connections`, `--no-connections` | — | `--connections` | Carry an edge drawn in draw.io back as a cable on the first free port at each end. |
+| `--name` | `NAME` | `layout` | metadata.name of the layout document new geometry goes into. Geometry for something an existing layout already places is written back into that one instead. |
+| `--namespace` | `PATH` | — | Folder to declare a new layout document in. The inventory root by default. |
+| `--file` | `PATH` | — | File to write a new layout document to. Chosen by the layout conventions when absent. |
+| `--auto-approve` | — | off | Do not ask before writing. For automation; a person should read the changeset first. |
+| `-n`, `--dry-run` | — | off | Write nothing; print the changeset and the unified diff it would produce. |
+| `--force` | — | off | Write even if the result would introduce new validation errors. |
+| `--json` | — | off | Report as JSON. |
+<!-- /generated -->
+
 ---
 
 ## Exit codes
@@ -165,7 +258,7 @@ whole of [importing a live network](../importing.md) is about those three.
 | 0 | The tree was written (or printed) and holds no error-level finding. |
 | 1 | The generated tree does not validate, or nothing could be imported from the inputs at all. The files are still written, so you can see what went wrong. |
 | 2 | Usage error, or an unusable `netgraph.toml`. |
-| 3 | An input was missing, unreadable, not UTF-8, oversized, not the dialect it was given as — or a file in the output tree would have been clobbered without `--force`. |
+| 3 | An input was missing, unreadable, not UTF-8, oversized, not the dialect it was given as — or a file in the output tree would have been clobbered without `--force`. `import drawio` also uses it for a file that is not a draw.io diagram it can read. |
 
 Warnings and infos do not fail the run: an imported inventory is partial by
 construction and
@@ -184,3 +277,7 @@ already ignores a rule does not produce a report contradicting it.
 * [`netgraph fmt`](fmt.md) — put the generated YAML into the canonical form
   before committing it.
 * [`netgraph validate`](validate.md) — the same check `import` runs, on demand.
+* [draw.io round trips](../drawio.md) — handing a diagram out, and what comes
+  back.
+* [`netgraph export`](export.md) — the other half of the round trip,
+  `export drawio`.

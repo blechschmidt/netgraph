@@ -118,6 +118,15 @@ from netgraph.diagnostics import Diagnostic, dump_json
 from netgraph.diagnostics import build_report as build_diagnostics
 from netgraph.diagnostics import render_report as render_diagnostics
 from netgraph.diff import draw
+from netgraph.drawio import (
+    Diagram,
+    DrawioFormatError,
+    ReconcileOptions,
+    Reconciliation,
+    parse_mxfile,
+    reconcile,
+)
+from netgraph.drawio import Level as DrawioLevel
 from netgraph.drift import FORMATS as DRIFT_FORMATS
 from netgraph.drift import CompareSpec, DriftReport, check_drift, render_drift
 from netgraph.drift import write_text as write_drift
@@ -640,8 +649,50 @@ def _next_steps(path: Path, *, with_schema: bool) -> Iterator[str]:
 # import
 # --------------------------------------------------------------------------- #
 
+#: The sub-command ``netgraph import`` runs when the first argument is not the
+#: name of one. It is what the command has always been, and keeping it reachable
+#: without typing it is not nostalgia: ``netgraph import caps/*.json`` is in
+#: everybody's shell history and in the documentation of two released versions.
+LEGACY_IMPORT: Final = "captures"
 
-@cli.command("import")
+
+class _ImportGroup(click.Group):
+    """``netgraph import`` — a group that still answers to its old signature.
+
+    The command started life taking capture files positionally, and now has to
+    grow a second source that reads something else entirely: an edited draw.io
+    diagram is not a capture, does not scaffold a tree, and reconciles rather
+    than writes. That is a sub-command, not a ``--from`` dialect.
+
+    So the group resolves a first argument it does not recognise as a
+    sub-command by handing the whole line to :data:`LEGACY_IMPORT`. ``netgraph
+    import drawio FILE`` reaches the new command, ``netgraph import caps/*.json``
+    reaches the old one, and neither has to know about the other. The one thing
+    the fallback must not swallow is a request for help about the *group*, which
+    is why the help options are checked before anything else.
+    """
+
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        if args and args[0] not in self.commands and args[0] not in self.get_help_option_names(ctx):
+            args = [LEGACY_IMPORT, *args]
+        return super().parse_args(ctx, args)
+
+
+@cli.group("import", cls=_ImportGroup)
+def import_group() -> None:
+    """Bring something from outside the tree into the inventory.
+
+    \b
+    netgraph import captures/*.json          from what live devices printed
+    netgraph import drawio diagram.drawio    from a diagram somebody edited
+
+    The first form is the original one and needs no sub-command: anything that
+    is not the name of one is read as a capture file, so 'netgraph import
+    caps/*.json' still means what it always did.
+    """
+
+
+@import_group.command(LEGACY_IMPORT)
 @click.argument("inputs", nargs=-1, metavar="[NAME=]INPUT...")
 @click.option(
     "--from",
@@ -705,7 +756,7 @@ def _next_steps(path: Path, *, with_schema: bool) -> Iterator[str]:
     ),
 )
 @click.pass_obj
-def import_command(
+def import_captures_command(
     app: AppContext,
     inputs: tuple[str, ...],
     dialect: str,
@@ -832,6 +883,250 @@ def _report_import_validation(console: Console, inventory: Inventory, *, root: P
 _EXPECTED_IMPORT_RULES: Final[frozenset[str]] = frozenset(
     {"I002", "W101", "W103", "W105", "W109", "W113", "W121"}
 )
+
+
+# --------------------------------------------------------------------------- #
+# import drawio
+# --------------------------------------------------------------------------- #
+
+
+@import_group.command("drawio")
+@click.argument(
+    "diagram_file",
+    metavar="FILE",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--view",
+    type=click.Choice([layer.value for layer in Layer]),
+    default=None,
+    shell_complete=complete_layer,
+    show_default="the view the file says it was exported from",
+    help=(
+        "Which view the diagram draws. Read from the file for anything netgraph exported; "
+        "needed only for a diagram netgraph did not write."
+    ),
+)
+@click.option(
+    "--geometry/--no-geometry",
+    default=True,
+    show_default=True,
+    help="Carry cells that were dragged back as stored geometry.",
+)
+@click.option(
+    "--renames/--no-renames",
+    default=True,
+    show_default=True,
+    help="Carry a retyped label back as a rename, rewriting every reference to it.",
+)
+@click.option(
+    "--deletions/--no-deletions",
+    default=True,
+    show_default=True,
+    help=(
+        "Carry a deleted cell back as a deleted element. Never applied to a diagram that was "
+        "exported from a filtered view, whichever way this is set."
+    ),
+)
+@click.option(
+    "--connections/--no-connections",
+    default=True,
+    show_default=True,
+    help="Carry an edge drawn in draw.io back as a cable on the first free port at each end.",
+)
+@click.option(
+    "--name",
+    "layout_name",
+    default=DEFAULT_LAYOUT_NAME,
+    show_default=True,
+    metavar="NAME",
+    help=(
+        "metadata.name of the layout document new geometry goes into. Geometry for something "
+        "an existing layout already places is written back into that one instead."
+    ),
+)
+@click.option(
+    "--namespace",
+    "layout_namespace",
+    default="",
+    metavar="PATH",
+    help="Folder to declare a new layout document in. The inventory root by default.",
+)
+@click.option(
+    "--file",
+    "layout_file",
+    default=None,
+    metavar="PATH",
+    help="File to write a new layout document to. Chosen by the layout conventions when absent.",
+)
+@click.option(
+    "--auto-approve",
+    is_flag=True,
+    default=False,
+    help="Do not ask before writing. For automation; a person should read the changeset first.",
+)
+@click.option(
+    "-n",
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Write nothing; print the changeset and the unified diff it would produce.",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Write even if the result would introduce new validation errors.",
+)
+@click.option("--json", "as_json", is_flag=True, default=False, help="Report as JSON.")
+@click.pass_obj
+def import_drawio_command(
+    app: AppContext,
+    diagram_file: Path,
+    view: str | None,
+    geometry: bool,
+    renames: bool,
+    deletions: bool,
+    connections: bool,
+    layout_name: str,
+    layout_namespace: str,
+    layout_file: str | None,
+    auto_approve: bool,
+    dry_run: bool,
+    force: bool,
+    as_json: bool,
+) -> None:
+    """Bring an edited draw.io diagram back into the inventory.
+
+    The file is reconciled by the identity netgraph stamped into each cell when
+    it exported it, not by what the cells are called or where they are: a cell
+    that moved is a geometry write, one whose label changed is a rename, one
+    that is gone is a deletion, and an edge somebody drew is a new cable. The
+    result is a 'netgraph plan' changeset, shown and confirmed before any file
+    is touched.
+
+    A diagram netgraph did not export carries no identity, so nothing can be
+    reconciled against it. It is read anyway and reported cell by cell, which
+    is the honest answer: netgraph will not invent hardware from a rectangle.
+
+    \b
+    netgraph export drawio -o site.drawio      # hand this out
+    netgraph import drawio site.drawio -n      # see what came back
+    netgraph import drawio site.drawio         # apply it
+    """
+    console = app.console()
+    root = app.inventory if app.inventory.is_dir() else app.inventory.parent
+
+    try:
+        diagram = parse_mxfile(
+            diagram_file.read_text(encoding="utf-8", errors="replace"), source=str(diagram_file)
+        )
+    except OSError as exc:
+        console.error(f"cannot read {diagram_file}: {exc.strerror or exc}")
+        raise click.exceptions.Exit(EXIT_INVALID) from exc
+    except DrawioFormatError as exc:
+        console.error(str(exc))
+        raise click.exceptions.Exit(exc.exit_code) from exc
+
+    layer = _diagram_layer(diagram, view)
+    inventory = app.load()
+    if inventory.errors:
+        _report_problems(console, inventory.errors, ())
+        console.error("refusing to reconcile a diagram against an inventory that does not load")
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+    result = reconcile(
+        diagram,
+        inventory,
+        build_graph(inventory, layer=layer),
+        ReconcileOptions(
+            layout=layout_name,
+            namespace=layout_namespace,
+            file=layout_file,
+            deletions=deletions,
+            renames=renames,
+            geometry=geometry,
+            connections=connections,
+        ),
+    )
+    _report_drawio_notes(console, result, as_json=as_json)
+    if result.failed:
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+    console.info(f"{diagram_file} ({layer} view): {result.summary()}")
+    if result.is_empty:
+        console.info("nothing to change")
+        return
+
+    session = EditSession(root=root, config=_edit_config(app), cache=app.cache())
+    before = session.baseline
+    try:
+        session.apply_all(result.operations)
+    except EditError as exc:
+        _report_edit_error(console, exc)
+        raise click.exceptions.Exit(EXIT_INVALID) from exc
+
+    plan = diff_states(
+        before,
+        session.inventory,
+        source=StateRef(kind="tree", description=str(root), digest=state_digest(before)),
+        target=StateRef(kind="drawio", description=str(diagram_file)),
+    )
+    if not as_json:
+        write_plan(console, plan, verbose=app.verbosity > 0)
+    if not dry_run and not auto_approve and not _confirm(console, plan):
+        console.info("aborted; nothing has been written")
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+    _run_edit_session(
+        app,
+        session,
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+        note=f"{len(result.operations)} operation(s) from {diagram_file}",
+    )
+
+
+def _diagram_layer(diagram: Diagram, view: str | None) -> Layer:
+    """Which view the diagram is of.
+
+    The file's own answer wins over the flag, because a diagram exported from
+    the routing view reconciled as though it were the cabling view would read
+    every cable as missing. ``--view`` is for the other case — a diagram
+    netgraph never exported, which says nothing about what it draws.
+
+    Raises:
+        click.UsageError: The flag contradicts the file.
+    """
+    if diagram.view and view is not None and view != diagram.view:
+        raise click.UsageError(
+            f"the diagram says it was exported from the {diagram.view} view, so it cannot be "
+            f"imported as the {view} one; drop --view"
+        )
+    if diagram.view:
+        return Layer(diagram.view)
+    return Layer(view) if view is not None else Layer.L1
+
+
+def _report_drawio_notes(console: Console, result: Reconciliation, *, as_json: bool) -> None:
+    """Everything the diagram said that did not become an operation.
+
+    Printed *before* the changeset, so "why is this cell not in the plan?" is
+    answered on the same screen as the plan. Warnings and errors go through the
+    console's own channels so ``--quiet`` and a redirect treat them the way they
+    treat every other diagnostic.
+    """
+    if as_json:
+        console.print(json.dumps([note.to_dict() for note in result.notes], indent=2))
+        return
+    for note in result.notes:
+        if note.level is DrawioLevel.ERROR:
+            console.error(str(note))
+        elif note.level is DrawioLevel.WARNING:
+            console.warn(str(note))
+        else:
+            console.info(str(note))
 
 
 # --------------------------------------------------------------------------- #
@@ -5473,7 +5768,16 @@ _EXPORT_OPTION_SCOPE: Final[dict[str, tuple[str, tuple[str, ...]]]] = {
     "labels": ("--label", ("prometheus-sd",)),
     "table_format": ("--table-format", ("cable-list",)),
     "schedule_format": ("--schedule-format", ("power",)),
+    "view": ("--view", ("drawio",)),
+    "icon_theme_option": ("--icons", ("drawio",)),
+    "compress": ("--compress", ("drawio",)),
+    "frames": ("--frames", ("drawio",)),
 }
+
+#: What ``export drawio`` draws nodes as when nobody says. The shipped theme
+#: rather than plain boxes: the file is going to be opened by somebody who was
+#: sent it, and a page of grey rectangles is not a network diagram.
+DEFAULT_DRAWIO_ICONS: Final = "cisco"
 
 
 def _resolve_domain(ctx: click.Context, param: click.Parameter, value: str | None) -> str | None:
@@ -5672,11 +5976,64 @@ _TARGET_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
     ),
 )
 
+#: What ``export drawio`` settles. A ``.drawio`` file is a *picture*, so it takes
+#: the two things a picture needs and no other command's format does: which view
+#: it draws, and what the nodes are drawn as.
+_DRAWIO_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
+    click.option(
+        "--view",
+        type=click.Choice([layer.value for layer in Layer]),
+        default=Layer.L1.value,
+        show_default=True,
+        shell_complete=complete_layer,
+        help=(
+            "Which view the drawio diagram draws. Unlike the other formats this one is a "
+            "picture, and the arrangement it opens with is the one stored for that view."
+        ),
+    ),
+    click.option(
+        "--icons",
+        "icon_theme_option",
+        default=DEFAULT_DRAWIO_ICONS,
+        show_default=True,
+        callback=_resolve_icons,
+        metavar="THEME|DIR",
+        help=(
+            "Icon theme inlined into the drawio file as data URIs, so the file needs nothing "
+            f"beside it. Built in: {', '.join(theme_choices())}. 'none' draws coloured boxes."
+        ),
+    ),
+    click.option(
+        "--compress/--no-compress",
+        "compress",
+        default=False,
+        show_default=True,
+        help=(
+            "Write the deflate+base64 encoding draw.io writes by default. Off here: a plain "
+            "diagram is one that reviews and diffs, and draw.io opens both."
+        ),
+    ),
+    click.option(
+        "--frames/--no-frames",
+        "frames",
+        default=True,
+        show_default=True,
+        help="Draw a container frame per namespace, so dragging a site carries its devices.",
+    ),
+)
+
 
 def _export_flags(command: _Command) -> _Command:
     """Apply every option ``export`` takes, in ``--help`` order."""
     return _apply(
-        (*_FILTER_OPTIONS, *_DNS_OPTIONS, *_TARGET_OPTIONS, *_VALIDATION_OPTIONS), command
+        (
+            *_FILTER_OPTIONS,
+            *_DNS_OPTIONS,
+            *_TARGET_OPTIONS,
+            *_DRAWIO_OPTIONS,
+            *_VALIDATION_OPTIONS,
+        ),
+        command,
     )
 
 
@@ -5764,7 +6121,7 @@ def export_command(
     spec = _filter_spec(params)
     graphs = {
         layer: _build_graph(app, inventory, layer=layer, spec=spec, console=console)
-        for layer in layers_for(export_format)
+        for layer in layers_for(export_format, options)
     }
     result = export(
         export_format,
@@ -5819,6 +6176,29 @@ def _export_options(params: Mapping[str, Any], export_format: str) -> ExportOpti
         labels=dict(params["labels"]),
         table_format=params["table_format"],
         schedule_format=params["schedule_format"],
+        view=params["view"],
+        icons=params["icon_theme_option"],
+        compress=bool(params["compress"]),
+        frames=bool(params["frames"]),
+        complete=not _is_narrowed(params),
+    )
+
+
+def _is_narrowed(params: Mapping[str, Any]) -> bool:
+    """Was the export scoped to less than the whole inventory?
+
+    Stamped into a ``.drawio`` file, where it decides something serious: a
+    diagram that holds every element of its view may be imported back with
+    deletions honoured, and a narrowed one may not. Absence proves nothing
+    about a diagram that was filtered before it was drawn, and the cost of
+    getting that wrong is an inventory with a site missing from it.
+    """
+    return bool(
+        params.get("namespaces")
+        or params.get("vlans")
+        or params.get("kinds")
+        or params.get("names")
+        or params.get("neighbors_of")
     )
 
 

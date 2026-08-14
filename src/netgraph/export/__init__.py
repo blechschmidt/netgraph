@@ -22,10 +22,13 @@ Format             What it is
                    static routes that device declares (§16.2).
 ``power``          The load schedule: one row per power feed, both ends
                    located, with the per-PDU and per-PSE totals (§17.7).
+``drawio``         An mxGraph diagram draw.io opens already arranged, carrying
+                   the identity of each element in its cell so that the edited
+                   file can be brought back (``docs/drawio.md``).
 =================  =========================================================
 
-Four promises hold across all seven, and they are why this is a package rather
-than seven ad-hoc printers:
+Four promises hold across all eight, and they are why this is a package rather
+than eight ad-hoc printers:
 
 **Deterministic.** Every collection is sorted by an explicit canonical key —
 never by dict order, never by the loader's directory traversal. Two runs over an
@@ -64,7 +67,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Final
 
-from netgraph.export import ansible, cables, dnszone, hosts, power, prometheus, routes
+from netgraph.export import ansible, cables, dnszone, drawio, hosts, power, prometheus, routes
 from netgraph.export.context import ExportContext, ExportOptions
 from netgraph.export.manifest import MANIFEST_KIND, Manifest, Reason, Recorder, Skip
 from netgraph.export.names import ansible_identifier, domain_name, is_domain_name, sanitise_label
@@ -111,6 +114,11 @@ class Exporter:
     #: and by ``docs/export.md``, because "lossy" is only useful with the *what*.
     lossy: str
     emit: Callable[[ExportContext], str]
+    #: For a format whose layers depend on what was asked for. Only ``drawio``
+    #: has one: it draws a single view and the reader picks it, so declaring a
+    #: fixed layer would either build the wrong graph or build all nine.
+    #: :attr:`layers` stays the honest default for ``--help`` and the docs.
+    select: Callable[[ExportOptions], tuple[Layer, ...]] | None = None
 
 
 #: The registry. Insertion order is the order ``--help`` lists them in, chosen
@@ -181,6 +189,18 @@ EXPORTERS: Final[Mapping[str, Exporter]] = {
         ),
         emit=power.emit,
     ),
+    "drawio": Exporter(
+        name="drawio",
+        description="an mxGraph diagram draw.io opens, edits and hands back",
+        layers=(Layer.L1,),
+        suffix=".drawio",
+        lossy=(
+            "a picture and an identity per cell: names, kinds and coordinates, but no "
+            "interfaces, addresses, VLANs or routing"
+        ),
+        emit=drawio.emit,
+        select=lambda options: drawio.layers_for_options(options.view),
+    ),
 }
 
 #: The format names, in registry order, for ``click.Choice`` and completion.
@@ -202,14 +222,24 @@ class ExportResult:
         return self.payload.encode("utf-8")
 
 
-def layers_for(export_format: str) -> tuple[Layer, ...]:
+def layers_for(export_format: str, options: ExportOptions | None = None) -> tuple[Layer, ...]:
     """The graph layers ``export_format`` needs built.
+
+    Args:
+        export_format: The registered name.
+        options: What the command line settled. A format that draws a view the
+            reader chose — ``drawio`` — needs them to know which layer to
+            build; the other seven ignore them, and a caller with nothing to
+            say gets each format's declared default.
 
     Raises:
         KeyError: No such format. The CLI validates with ``click.Choice``
             first, so reaching this is a programming error.
     """
-    return EXPORTERS[export_format].layers
+    exporter = EXPORTERS[export_format]
+    if exporter.select is not None and options is not None:
+        return exporter.select(options)
+    return exporter.layers
 
 
 def suffix_for(export_format: str) -> str:

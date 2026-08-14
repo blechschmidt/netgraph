@@ -85,6 +85,7 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from pathlib import Path
+from types import MappingProxyType
 from typing import Final
 
 from jinja2 import Environment, PackageLoader, StrictUndefined
@@ -144,9 +145,14 @@ from netgraph.render.options import DEFAULT_RANKDIR, RenderOptions
 from netgraph.render.routes import anchors_of, default_routing, route_table
 
 __all__ = [
+    "CLUSTER_PALETTE",
+    "DEFAULT_EDGE_PALETTE",
+    "DEFAULT_NODE_PALETTE",
     "DOT_ENV_VAR",
     "DOT_EXECUTABLE",
+    "EDGE_PALETTE",
     "IMAGE_FORMATS",
+    "NODE_PALETTE",
     "NOOP_ENGINE",
     "cluster_keys",
     "find_dot",
@@ -406,6 +412,47 @@ _OSPF_STYLE: Final[tuple[str, str]] = ("#0f766e", "dotted")
 #: greyscale print, which is why the distinction is not carried by hue alone.
 _OUTLET_STYLE: Final[tuple[str, str]] = ("#b45309", "solid")
 _POE_STYLE: Final[tuple[str, str]] = ("#ca8a04", "dashed")
+
+#: Fill and outline per element kind, without the Graphviz shape — for a
+#: renderer that draws its own glyphs but must colour a node the way a diagram
+#: does. Derived from :data:`_NODE_STYLE` rather than restated, so the mxGraph
+#: export (:mod:`netgraph.drawio.styles`) cannot drift away from the picture
+#: netgraph itself draws.
+NODE_PALETTE: Final[Mapping[str, tuple[str, str]]] = MappingProxyType(
+    {kind: (fill, stroke) for kind, (_shape, fill, stroke) in _NODE_STYLE.items()}
+)
+
+#: What a node of an unknown kind is coloured.
+DEFAULT_NODE_PALETTE: Final[tuple[str, str]] = (
+    _DEFAULT_NODE_STYLE[1],
+    _DEFAULT_NODE_STYLE[2],
+)
+
+#: Colour and Graphviz line style per *reason a link is drawn*: the three
+#: cable media first, then the edge kinds that are not cables at all. Same
+#: reasoning as :data:`NODE_PALETTE` — one table, two renderers.
+EDGE_PALETTE: Final[Mapping[str, tuple[str, str]]] = MappingProxyType(
+    {
+        **_MEDIUM_STYLE,
+        "attachment": _ATTACHMENT_STYLE,
+        "subnet": _SUBNET_EDGE_STYLE,
+        "tunnel": _TUNNEL_STYLE,
+        "cleartext-tunnel": _CLEARTEXT_TUNNEL_STYLE,
+        "encapsulation": _ENCAPSULATION_STYLE,
+        "membership": _MEMBERSHIP_STYLE,
+        "bgp": _BGP_STYLE,
+        "ospf": _OSPF_STYLE,
+        "outlet": _OUTLET_STYLE,
+        "poe": _POE_STYLE,
+    }
+)
+
+#: What a link netgraph has no palette entry for is drawn as.
+DEFAULT_EDGE_PALETTE: Final[tuple[str, str]] = _DEFAULT_MEDIUM_STYLE
+
+#: The frame a namespace cluster is drawn with, so a group container in an
+#: exported diagram is the same colour as the box a rendering draws.
+CLUSTER_PALETTE: Final[tuple[str, str]] = (_CLUSTER_STROKE, _CLUSTER_LABEL_COLOUR)
 
 #: Outline and text colour of something a :class:`~netgraph.render.highlight.Highlight`
 #: emphasises. Crimson is the one accent no element kind and no medium already
