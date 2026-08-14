@@ -1,0 +1,14 @@
+# I004 (NG-S016) - an active person belongs to no group.
+#
+# Information rather than a complaint: granting a person access directly and
+# putting them in nothing is a normal way to run an estate. It is printed
+# because "she is in no group, therefore she has no access" is a claim worth
+# confirming rather than assuming, and because an account that was meant to be
+# in a group looks exactly like this.
+apiVersion: netgraph.dev/v1alpha1
+kind: user
+metadata:
+  name: alice
+spec:
+  full_name: Alice Meyer
+  email: alice@example.com

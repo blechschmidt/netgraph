@@ -232,7 +232,7 @@ netgraph [GLOBAL OPTIONS] edit unset [OPTIONS] ADDRESS PATH
 
 <!-- generated: synopsis edit create -->
 ```text
-netgraph [GLOBAL OPTIONS] edit create [OPTIONS] {switch|router|hub|computer|server|cable|adapter|tunnel|patchpanel|pdu} NAME
+netgraph [GLOBAL OPTIONS] edit create [OPTIONS] {switch|router|hub|computer|server|cable|adapter|tunnel|patchpanel|pdu|user|group} NAME
 ```
 <!-- /generated -->
 

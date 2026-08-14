@@ -1071,6 +1071,91 @@ domains they stand for — two independent UPS strings both written `utility`, s
 — but naming the feeds apart is the better fix, because it makes the inventory
 right for every other device in that rack too.
 
+#### `E043` — group member does not exist
+
+*Alias: `NG-S010`. Severity: error.*
+
+A `group`'s `spec.members` names something the inventory does not declare, or
+names something ambiguously — the same two failures every reference in this
+schema can have, reported apart because the fix differs. An ambiguous name is one
+that matched several elements globally after the namespace-local and ancestor
+lookups both failed; the finding lists the candidates, and writing the reference
+fully qualified settles it.
+
+**Why it matters.** A group is a list of who may do something, and an access rule
+written against it is exactly as true as that list. A member that resolves to
+nothing is not a cosmetic problem: it is a person the group silently does not
+include, and nothing about reading the file says so. This is the one place the
+mistake is visible.
+
+**Suppress with** `E043` / `NG-S010`, or an annotation on the group. There is no
+good reason to: a member netgraph cannot resolve is a member no consumer of the
+inventory can resolve either.
+
+#### `E044` — group member is not an identity
+
+*Alias: `NG-S011`. Severity: error.*
+
+A member resolved, but to something that is not a `user` and not a `group` — a
+switch, a cable, a PDU. Names are unique within a namespace across all kinds
+(`NG-N002`) but not across the tree, so this is nearly always a name collision: a
+group meant `alice` in the `people/` directory and got the workstation called
+`alice` in `desks/`.
+
+**Why it matters.** Resolving it anyway would draw a membership edge between a
+group and a switch in the identity view and put the switch in the group's
+headcount, which is a picture of something that cannot be true. Refusing it also
+makes the collision findable, which is what actually needs fixing — usually by
+writing the member fully qualified.
+
+**Suppress with** `E044` / `NG-S011`, or an annotation on the group or on the
+element it landed on. Nothing legitimate is behind this one.
+
+#### `E045` — group membership cycle
+
+*Alias: `NG-S012`. Severity: error.*
+
+Groups contain groups, and somewhere the containment closes a loop:
+`everyone` → `engineering` → `everyone`. The finding names the loop in the order
+it was walked, starting from the group the search entered it through. A group
+naming *itself* is refused earlier, by the model, which needs no inventory to see
+it and can therefore point at the line.
+
+**Why it matters.** A cyclic group has no membership. Expanding it does not
+terminate, so no consumer can answer "who is in this?" — not netgraph, not the
+directory the inventory is applied to, not the person reading the file. Nesting
+is the whole point of groups and the loop is its one failure mode, so it is
+checked rather than hoped for.
+
+**Suppress with** `E045` / `NG-S012`, or an annotation on any group in the loop.
+Suppressing it does not make the membership computable; it only stops netgraph
+saying so.
+
+#### `E046` — duplicate account identifier
+
+*Alias: `NG-S013`. Severity: error.*
+
+Two `user` documents claim one `login`, two claim one `uid`, or two `group`
+documents claim one `gid`. A `login` defaults to `metadata.name`, so two users of
+that name in two namespaces trip this even though neither document writes a
+`login` at all — which is the intended reading, not an accident of it.
+
+Namespaces deliberately make no difference. Two switches called `sw-1` in two
+sites are two switches; two accounts called `alice` in two directories are one
+person's login written twice, and the reason to record a login rather than lean
+on `metadata.name` is that the account namespace is the estate, not the folder.
+
+**Why it matters.** All three are *the* key of the account in the system that
+consumes them. Two users with one login are one account with two owners and two
+sets of keys; two uids that collide make every file one of them creates readable
+and writable by the other, which is a permission boundary that silently does not
+exist. Neither shows up as a conflict anywhere except here.
+
+**Suppress with** `E046` / `NG-S013`, or an annotation on either claimant. The
+one defensible case is an estate that deliberately reuses a uid across two
+disjoint systems netgraph models as one tree; naming the two accounts apart is
+the better fix, because every export of this inventory has the same problem.
+
 ### Warnings
 
 #### `W101` — interface neither routes nor switches
@@ -1150,7 +1235,7 @@ splits a subnet into halves that cannot reach each other while every individual
 document still looks right. The other reading is just as useful — the neighbour
 exists but was never written down, so the diagram is missing a device. Only the
 layer-3 view can show this at all, which is why the rule arrived with it; see
-[`--layer l3`](rendering.md#layers-one-inventory-seven-questions).
+[`--layer l3`](rendering.md#layers-one-inventory-nine-questions).
 
 **Suppress with** `W105` / `NG-A008`, or an annotation on the element holding
 the address. A deliberately sparse management prefix, and a link whose peer is
@@ -1819,6 +1904,47 @@ the diagram's permission.
 The fix is normally `netgraph layout --prune`, which drops exactly these
 entries and writes nothing else.
 
+#### `W139` — group with no members
+
+*Alias: `NG-S014`. Severity: warning.*
+
+A `group` declares `members: []`, or omits `members` entirely.
+
+**Why it matters.** Anything granted to an empty group is granted to nobody,
+and — this is the part that costs an afternoon — it *looks* granted. The group
+exists, the rule referencing it exists, and the access does not. The failure is
+discovered on the day somebody needed it, which is always the worst day to
+discover it.
+
+A warning rather than an error, because an empty group is a normal intermediate
+state: a group created before the people who will be in it, or one deliberately
+emptied and kept so the name stays reserved. Both are reasonable, and neither is
+worth refusing to render an inventory over.
+
+**Suppress with** `W139` / `NG-S014`, or an annotation on the group. Worth
+annotating a group that is empty on purpose and expected to stay so — a
+placeholder for a team that does not exist yet, say — with the reason in
+`metadata.description`.
+
+#### `W140` — departed user still in a group
+
+*Alias: `NG-S015`. Severity: warning.*
+
+A group lists a `user` whose `status` is `departed`. Only `person` accounts are
+judged: a `shared` or `service` account has nobody to depart.
+
+**Why it matters.** This is the rule `status` exists for. The tempting response
+to somebody leaving is to delete their `user` document, which removes the person
+from the inventory *and* from every group naming them — losing exactly the list
+somebody has to work through. The memberships are the access still to be revoked;
+they cannot be revoked from a record that no longer exists. Marking the account
+`departed` keeps the work visible until it has been done, and this finding is the
+worklist.
+
+**Suppress with** `W140` / `NG-S015`, or an annotation on the group or on the
+user. The legitimate case is a group that is deliberately a historical record —
+who was on a project — rather than a grant of access.
+
 ### Info
 
 #### `I001` — locally administered MAC address
@@ -1884,6 +2010,25 @@ likely to have been copied from the tunnel next to it in the file.
 inventory that moves every tunnel off its default port should say
 `ignore = ["I003"]` in `netgraph.toml` once.
 
+#### `I004` — person in no group
+
+*Alias: `NG-S016`. Severity: info.*
+
+A `user` with `type: person` and `status: active` is named by no group's
+`members`. A `service` or `shared` account is not judged — being in no group is
+the normal shape of one — and neither is a suspended or departed account, which
+is what `W140` is about.
+
+**Why it matters.** Information rather than a complaint: plenty of estates grant
+a person access directly and put them in nothing. It is printed because the
+opposite reading — "this person is in no group, therefore they have no access" —
+is a claim an auditor wants confirmed rather than assumed, and because an account
+that was *meant* to be in a group and is not looks exactly like this.
+
+**Suppress with** `I004` / `NG-S016`, or an annotation on the user. An inventory
+that models people without modelling groups at all should say
+`ignore = ["I004"]` in `netgraph.toml` once.
+
 ## Suppressing a rule
 
 Four mechanisms, all additive. A finding is silenced if any of them applies.
@@ -1893,7 +2038,7 @@ schema rule is a usage error:
 <!-- run: rc=2 -->
 ```console
 $ netgraph validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, I001, I002, I003, I004, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 Every mechanism accepts both spellings of an id — `W102` and `NG-C010` select

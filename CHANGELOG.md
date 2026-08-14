@@ -18,6 +18,45 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **`user` and `group`, two new element kinds: who the network is for.** Every other kind
+  in the schema answers *what is there*. These answer *whose is it, and who may touch it* —
+  the question an audit asks first and the one an inventory of boxes and cables cannot
+  answer at all. Both are ordinary elements: they load, validate, format, diff, apply,
+  render and export through exactly the machinery every other kind goes through, and
+  neither owns interfaces, so an identity terminates no cable and appears in no data layer.
+
+  A `user` carries the account — `login` (defaulting to `metadata.name`), `full_name`,
+  `email`, `uid`, a `type` of `person`/`service`/`shared`, a `status` of
+  `active`/`suspended`/`departed`, and `ssh_keys`. Public keys only: a pasted **private**
+  key is refused with an explanation, which is the mistake the check exists for.
+
+  A `group` carries `members`, `gid` and `email`. A member may name a `user` **or another
+  `group`**, so a hierarchy is expressible: `everyone` holds `engineering` holds `ana`.
+  Membership is written on the group and nowhere else — a `user` does not list its groups,
+  because two spellings of one fact are how an inventory starts disagreeing with itself —
+  and the reverse index is derived where it is needed.
+
+  Ten new rules, lettered `S` for *subject*: `NG-S001`–`NG-S003` on the documents, and
+  `E043`–`E046`, `W139`, `W140` and `I004` on the tree. The one worth knowing about is
+  **`W140`**: a group that still lists somebody whose account is `departed`. Deleting a
+  leaver's document removes them from the inventory *and* from every group naming them,
+  losing exactly the list of access somebody has to go and revoke. `status: departed` keeps
+  that worklist visible until it has been worked through.
+
+- **`netgraph render --layer identity`**, the ninth layer: the users and groups, joined by
+  membership, and no hardware whatsoever. A user is drawn as an oval and a group as a
+  folder, in a rose palette no element kind had taken, and both have an icon in the bundled
+  theme. A membership edge runs from the group to the member — the direction the fact is
+  written in. Everything else is discarded, for the same reason the power view discards the
+  cabling: a cable between two servers says nothing about who may log into either.
+
+- **`netgraph list users` and `netgraph list groups`.** `users` prints a `GROUPS` column,
+  which is the one fact about a person their own document cannot state. `groups` prints two
+  member counts: `MEMBERS` is what the document names, `PEOPLE` is how many accounts the
+  group reaches once the nesting has been walked — the number an access rule actually
+  grants to, and the number no single document holds. Both tables also appear on the
+  Identity section of `netgraph report`.
+
 - **`netgraph plan` and `netgraph apply`: a typed changeset between two inventory states.**
   The inventory is meant to be a source of truth that can be *diffed and applied*, and until
   now only the read half existed: `netgraph drift` compared a live network against the

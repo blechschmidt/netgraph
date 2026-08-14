@@ -85,6 +85,13 @@ _NIC_TYPES: Final[frozenset[str]] = frozenset({"ethernet", "wifi"})
 #: Scalar cable fields, likewise.
 _CABLE_FIELDS: Final[tuple[str, ...]] = ("medium", "speed", "label")
 
+#: Kinds that are netgraph's own abstraction rather than a thing on the wire. No
+#: capture format has a word for any of them, so an observed ``kind`` is never
+#: evidence against one. Mirrors :data:`netgraph.plan.live._UNOBSERVABLE_KINDS`.
+_UNOBSERVABLE_KINDS: Final[frozenset[str]] = frozenset(
+    {"adapter", "patchpanel", "pdu", "user", "group"}
+)
+
 
 @dataclass(frozen=True, slots=True)
 class CompareSpec:
@@ -291,10 +298,10 @@ class _Comparison:
 
         ``computer`` is the importer's neutral fallback for a box nothing said
         anything about (:meth:`~netgraph.importer.draft.Draft.device`), so it is
-        never evidence. An adapter, a patch panel and a PDU are netgraph's own
-        abstractions, which no capture format has a word for.
+        never evidence. An adapter, a patch panel, a PDU, a user and a group are
+        netgraph's own abstractions, which no capture format has a word for.
         """
-        if observed.kind == "computer" or declared.kind in ("adapter", "patchpanel", "pdu"):
+        if observed.kind == "computer" or declared.kind in _UNOBSERVABLE_KINDS:
             return
         if observed.kind == declared.kind:
             return

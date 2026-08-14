@@ -3,7 +3,8 @@
 The smallest inventory that still exercises every element kind a home network
 needs: a router, a switch, an access point, two computers, a phone, a server,
 and a USB-to-Ethernet adapter. One user VLAN, plus a guest VLAN that exists on
-the air and on one trunk.
+the air and on one trunk. Two people, one robot and two groups, so the thing the
+cabling cannot say — who may touch any of it — is written down beside it.
 
 ```text
 home-lab/
@@ -16,6 +17,9 @@ home-lab/
 │   ├── phone.yaml
 │   ├── adp-usb-eth.yaml
 │   └── srv-nas.yaml
+├── people/
+│   ├── accounts.yaml          # three users in one file
+│   └── groups.yaml            # two groups, one nested in the other
 └── cables/links.yaml          # six documents in one file
 ```
 
@@ -98,5 +102,13 @@ nowhere is an error, because clients would associate and reach nothing.
   because the ISP at the far end is not an element of this inventory. The
   `netgraph/ignore: "NG-C015"` annotation on the router says so once, where the
   next reader will look for the reason.
+* **Membership is written on the group and nowhere else.** `household` names
+  `admins` rather than repeating `ana`, so she is in both without being listed
+  twice; `netgraph list groups` walks the nesting and says the group holds two
+  members and reaches two people. `netgraph list users` prints the reverse index,
+  which is the one fact about a person their own document cannot state.
+* **`backup` is `type: service`.** It belongs to no group, which for a robot is
+  the normal shape rather than an oversight — so `I004` says nothing about it.
+  Marking it as a service account is what makes that distinction.
 * **Every cabled interface states `mtu: 1500`**, so the two ends of each link
   agree and `NG-C010` stays quiet. The two radios do too — a link is a link.

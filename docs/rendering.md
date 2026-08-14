@@ -18,7 +18,7 @@ labelled links](images/home-lab.svg)
 
 ## Contents
 
-- [Layers: one inventory, seven questions](#layers-one-inventory-seven-questions)
+- [Layers: one inventory, nine questions](#layers-one-inventory-nine-questions)
   - [`physical` and `l1`: the cabling record and the network](#physical-and-l1-the-cabling-record-and-the-network)
   - [`l2`: the same graph, annotated with VLANs](#l2-the-same-graph-annotated-with-vlans)
   - [`l3`: prefixes and who is addressed in them](#l3-prefixes-and-who-is-addressed-in-them)
@@ -26,6 +26,7 @@ labelled links](images/home-lab.svg)
   - [`routing`: sessions, adjacencies and VRFs](#routing-sessions-adjacencies-and-vrfs)
   - [`rack`: a front elevation per cabinet](#rack-a-front-elevation-per-cabinet)
   - [`power`: the PDUs and what they feed](#power-the-pdus-and-what-they-feed)
+  - [`identity`: who is in what](#identity-who-is-in-what)
 - [Filters: drawing less of the network](#filters-drawing-less-of-the-network)
 - [Aggregation: one node per site, one line per bundle](#aggregation-one-node-per-site-one-line-per-bundle)
 - [Icons](#icons)
@@ -38,11 +39,11 @@ labelled links](images/home-lab.svg)
 
 ---
 
-<a id="layers-one-inventory-seven-questions"></a>
+<a id="layers-one-inventory-nine-questions"></a>
 
-## Layers: one inventory, eight questions
+## Layers: one inventory, nine questions
 
-One inventory, eight questions. `--layer` picks which one the diagram answers.
+One inventory, nine questions. `--layer` picks which one the diagram answers.
 
 | Layer | Nodes | Edges | Annotations | Reach for it when |
 |---|---|---|---|---|
@@ -54,6 +55,7 @@ One inventory, eight questions. `--layer` picks which one the diagram answers.
 | `routing` | the elements that take part in routing — anything declaring `routing`, `routes` or `vrfs` — grouped into one cluster per VRF | one per BGP session (solid, labelled with the AS pair) and one per OSPF adjacency (dotted, labelled with the area) | AS number, router id, area, the instances and static routes each device holds | "Who peers with whom, and in which table?" An iBGP mesh with a gap in it, an AS number typed twice, a VRF nothing is bound to. |
 | `rack` | one node per rack named by a `metadata.location` | none — a cable says nothing about where either end is bolted | a front elevation: one row per unit, occupied and empty alike, each occupant annotated with what it draws | "How much room is left in that cabinet, and what is above the UPS?" |
 | `power` | the PDUs, **plus** every element the inventory records power for | one per feed: an `outlet` cord from a PDU (solid amber) and a `poe` feed from a PSE port (dashed) | outlets used, load against capacity and the `input_feed` on a PDU; draw, redundancy and PoE budget on everything else | "Is this rack fed from one strip, and is there capacity left?" A single-fed cabinet, an oversubscribed PoE budget, a box nobody wrote a power path for. |
+| `identity` | one node per `user` and per `group` — no hardware whatsoever | one per membership: the group ↔ what it holds, nested groups included | the account, the uid, the status and the key count on a user; the headcount and the gid on a group | "Who can get at this, and how did they get the access?" A group nobody emptied when somebody left, an account in nothing at all. |
 
 The default is `l1`. `-f html` accepts `--layer` more than once and puts a
 switcher over the results; every other format holds one layer, and asking for
@@ -313,6 +315,56 @@ flowchart TB
 of the 370 W it may hand out. `ap-ceiling-01` has no cord at all, and the dashed
 line into it is the run it takes its traffic over.
 
+### `identity`: who is in what
+
+`identity` is the one layer that draws no network
+([`docs/schema.md` §19.3](schema.md#193-the-identity-view)). Every other view
+answers a question about equipment; this one answers "whose is it, and who may
+touch it", which the cabling cannot answer at all.
+
+**Nodes** are the `user` and `group` documents, and nothing else. An identity
+owns no interfaces ([§19.1](schema.md#191-user)), so it appears in no data layer
+and its node is built for this one: a user is drawn as an oval — the shape every
+organisation chart uses for a person — and a group as a folder, in a rose palette
+no element kind had taken, so an identity view cannot be misread as a fragment of
+a network one. Both have an icon in the bundled [themes](#icons).
+
+**Edges** are the memberships, one per entry of a group's `spec.members`, drawn
+from the group to the member. That is the direction the fact is written in and
+the direction a reader follows to answer "who is in this?". A nested group is an
+ordinary member, so the hierarchy is drawn as one: `everyone` → `engineering` →
+`ana`. A member that does not resolve is not drawn — `NG-S010` is the place that
+says so, and `--force` has to keep producing a picture.
+
+Everything else is discarded, for the same reason the power view discards the
+cabling: a cable between two servers says nothing about who may log into either,
+and drawing both graphs at once produces a picture in which neither is readable.
+
+<!-- run: -->
+```console
+$ netgraph -i examples/home-lab render --layer identity -f mermaid
+flowchart TB
+    n0(("ana<br/>[user]<br/>Ana Brandt<br/>ana@example.invalid<br/>uid 1000<br/>1 ssh key"))
+    n1(("kit<br/>[user]<br/>Kit Brandt<br/>kit@example.invalid<br/>uid 1001"))
+    n2(("backup<br/>[user]<br/>uid 900<br/>service"))
+    n3[\"admins<br/>[group]<br/>1 member<br/>gid 100"/]
+    n4[\"household<br/>[group]<br/>2 members<br/>gid 101"/]
+
+    n3 --- n0
+    n4 --- n3
+    n4 --- n1
+
+    classDef group fill:#fbcfe8,stroke:#9d174d,stroke-width:2px
+    classDef user fill:#fce7f3,stroke:#be185d,stroke-width:1px
+    class n3,n4 group
+    class n0,n1,n2 user
+rendered 5 node(s) and 3 edge(s) as mermaid at layer identity
+```
+
+`household` holds `admins`, so `ana` is in it without being listed twice — which
+is what the nesting is for, and what
+[`netgraph list groups`](commands/list.md#the-subject-argument) puts a number on.
+
 ## Filters: drawing less of the network
 
 **Filters** narrow what is drawn. Values *within* one option are alternatives;
@@ -325,7 +377,7 @@ themselves.
 |---|---|---|
 | `--namespace NS` | yes | Elements in `NS` or in any namespace below it. |
 | `--vlan VID` | yes | Elements participating in that VLAN (1–4094). A host on an untagged access port counts as a member. |
-| `--kind KIND` | yes | Elements of that kind: `switch`, `router`, `hub`, `computer`, `server`, `adapter`, `patchpanel`, `pdu`. A cable is an edge and so is a tunnel, so neither is selectable; both follow whichever elements survive. |
+| `--kind KIND` | yes | Elements of that kind: `switch`, `router`, `hub`, `computer`, `server`, `adapter`, `patchpanel`, `pdu`, `user`, `group`. A cable is an edge and so is a tunnel, so neither is selectable; both follow whichever elements survive. |
 | `--name GLOB` | yes | Elements whose short **or** fully-qualified name matches the shell-style glob. |
 | `--neighbors-of NAME` | no | Only the neighbourhood of one element. An unknown name is a usage error, with suggestions. |
 | `--depth N` | no | How many hops `--neighbors-of` reaches. Default 1. |
@@ -502,7 +554,8 @@ picture but a box holding several, and the folder shape says that better.
 **A directory** works just as well, which is how you use that library, or any
 other set, if you have it. A theme is nothing but a directory of images named
 after the kinds they stand for — `router`, `switch`, `hub`, `computer`,
-`server`, `adapter`, `patchpanel`, `pdu`, `subnet` and `tunnel`, with an `.svg`,
+`server`, `adapter`, `patchpanel`, `pdu`, `user`, `group`, `subnet` and `tunnel`,
+with an `.svg`,
 `.png`, `.jpg` or `.gif` extension:
 
 <!-- norun: the paths are illustrative -->

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="56" viewBox="0 0 72 56" role="img" aria-label="Group">
+  <title>Group</title>
+  <g stroke="#9d174d" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <circle cx="16" cy="21" r="7" fill="#f9a8d4"/>
+    <path d="M4 44 C4 35 9 31 16 31 C23 31 28 35 28 44 Z" fill="#f9a8d4"/>
+    <circle cx="56" cy="21" r="7" fill="#f9a8d4"/>
+    <path d="M44 44 C44 35 49 31 56 31 C63 31 68 35 68 44 Z" fill="#f9a8d4"/>
+    <circle cx="36" cy="17" r="9" fill="#fbcfe8"/>
+    <path d="M20 50 C20 39 27 34 36 34 C45 34 52 39 52 50 Z" fill="#fbcfe8"/>
+  </g>
+</svg>

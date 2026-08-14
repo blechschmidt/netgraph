@@ -54,6 +54,8 @@ TYPE_OF_KIND: Final[dict[str, str]] = {
     "tunnel": "tunnel",
     "patchpanel": "patchpanel",
     "pdu": "pdu",
+    "user": "user",
+    "group": "group",
     LAYOUT_KIND: LAYOUT_TYPE,
 }
 
@@ -66,6 +68,8 @@ ADDRESS_TYPES: Final[tuple[str, ...]] = (
     "tunnel",
     "patchpanel",
     "pdu",
+    "user",
+    "group",
     LAYOUT_TYPE,
 )
 

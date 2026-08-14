@@ -1,0 +1,28 @@
+# E044 (NG-S011) - a group names something that is not an identity.
+#
+# 'pdu-admins' was meant; 'pdu-r1-a' was typed. The name resolves, to a power
+# strip, and resolving it any further would put a strip in the group's headcount
+# and draw a membership edge to it in the identity view -- a picture of
+# something that cannot be true.
+apiVersion: netgraph.dev/v1alpha1
+kind: user
+metadata:
+  name: alice
+spec:
+  full_name: Alice Meyer
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: pdu
+metadata:
+  name: pdu-r1-a
+spec:
+  outlets: 8
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: group
+metadata:
+  name: ops
+spec:
+  members:
+    - alice
+    - pdu-r1-a

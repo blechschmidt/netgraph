@@ -58,7 +58,9 @@ _NIC_TYPES: Final[frozenset[str]] = frozenset({"ethernet", "wifi"})
 
 #: Kinds that are netgraph's own abstraction: no capture has a word for one, so
 #: an observed ``kind`` is never written over them.
-_UNOBSERVABLE_KINDS: Final[frozenset[str]] = frozenset({"adapter", "patchpanel", "pdu"})
+_UNOBSERVABLE_KINDS: Final[frozenset[str]] = frozenset(
+    {"adapter", "patchpanel", "pdu", "user", "group"}
+)
 
 #: Interface scalars taken verbatim from a capture that reported one.
 _SCALARS: Final[tuple[str, ...]] = ("enabled", "mac", "mtu", "parent")

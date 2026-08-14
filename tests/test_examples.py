@@ -35,7 +35,7 @@ INVALID_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "invalid"
 #: Pinning the counts keeps a stray file or a lost document visible.
 EXAMPLE_SHAPES: dict[str, dict[str, int]] = {
     "quickstart": {"devices": 3, "cables": 2, "adapters": 0, "tunnels": 0},
-    "home-lab": {"devices": 7, "cables": 6, "adapters": 1, "tunnels": 0},
+    "home-lab": {"devices": 7, "cables": 6, "adapters": 1, "tunnels": 0, "users": 3, "groups": 2},
     "campus": {"devices": 22, "cables": 22, "adapters": 0, "tunnels": 0},
     "overlay": {"devices": 7, "cables": 6, "adapters": 0, "tunnels": 5},
     "patch-room": {
@@ -76,6 +76,8 @@ def test_an_example_inventory_loads_without_errors(name: str) -> None:
     assert len(inventory.tunnels) == shape["tunnels"]
     assert len(inventory.patchpanels) == shape.get("patchpanels", 0)
     assert len(inventory.pdus) == shape.get("pdus", 0)
+    assert len(inventory.users) == shape.get("users", 0)
+    assert len(inventory.groups) == shape.get("groups", 0)
 
 
 @pytest.mark.parametrize("name", sorted(EXAMPLE_SHAPES))
@@ -106,7 +108,26 @@ def test_every_cable_endpoint_resolves(name: str) -> None:
 def test_the_home_lab_covers_every_element_kind_it_advertises() -> None:
     inventory = load_example("home-lab")
     kinds = sorted({element.kind for element in inventory})
-    assert kinds == ["adapter", "cable", "computer", "router", "server", "switch"]
+    assert kinds == [
+        "adapter",
+        "cable",
+        "computer",
+        "group",
+        "router",
+        "server",
+        "switch",
+        "user",
+    ]
+
+
+def test_the_home_lab_nests_one_group_inside_another() -> None:
+    """`admins` is in `household`, so `ana` is too without being listed twice."""
+    from netgraph.identity import identity_plan
+
+    plan = identity_plan(load_example("home-lab"))
+    assert plan.members_of("people/household") == ("people/admins", "people/kit")
+    assert plan.users_in("people/household") == ("people/kit", "people/ana")
+    assert plan.groups_of("people/ana") == ("people/admins",)
 
 
 def test_the_home_lab_puts_two_ssids_on_one_access_point() -> None:
@@ -294,7 +315,12 @@ def test_an_example_inventory_renders_to_svg(name: str) -> None:
     shape = EXAMPLE_SHAPES[name]
     legs = sum(len(tunnel.endpoints) - 1 for tunnel in inventory.tunnels.values())
     assert svg.count('class="node"') == (
-        shape["devices"] + shape["adapters"] + shape.get("patchpanels", 0) + shape.get("pdus", 0)
+        shape["devices"]
+        + shape["adapters"]
+        + shape.get("patchpanels", 0)
+        + shape.get("pdus", 0)
+        + shape.get("users", 0)
+        + shape.get("groups", 0)
     )
     assert svg.count('class="edge"') == shape["cables"] + shape["adapters"] + legs
     # Graphviz writes a hyphen as the character reference '&#45;'.

@@ -98,21 +98,26 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import TYPE_CHECKING, Final, TypeAlias
 
+from netgraph.identity import identities, identity_plan
 from netgraph.layout.geometry import Geometry
 from netgraph.layout.resolve import resolve_geometry
 from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of, short_name
 from netgraph.models import (
+    GROUP_KIND,
     PATCHPANEL_KIND,
     PDU_KIND,
+    USER_KIND,
     Adapter,
     Cable,
     Device,
+    Group,
     Interface,
     Medium,
     PatchPanel,
     Pdu,
     Tunnel,
     TunnelType,
+    User,
     format_bitrate,
 )
 from netgraph.models.metadata import Location
@@ -133,6 +138,7 @@ if TYPE_CHECKING:  # pragma: no cover - imported for typing only
     from netgraph.render.aggregate import AggregateView, BundleView
 
 __all__ = [
+    "GROUP_KIND",
     "NODE_KINDS",
     "PATCHPANEL_KIND",
     "PDU_KIND",
@@ -142,6 +148,7 @@ __all__ = [
     "SUBNET_KIND",
     "TUNNEL_ID_PREFIX",
     "TUNNEL_KIND",
+    "USER_KIND",
     "AdjacencyView",
     "Edge",
     "EdgeKind",
@@ -192,6 +199,9 @@ class Layer(str, Enum):
     #: Power: the PDUs and everything they feed, joined by outlet and PoE feeds
     #: (§17.5). A different graph again — a power path is not a data path.
     POWER = "power"
+    #: Identity: the users and groups, joined by membership (§19.3). Not a
+    #: network at all — it answers "who", which no other view can.
+    IDENTITY = "identity"
 
     def __str__(self) -> str:
         return self.value
@@ -205,12 +215,13 @@ class Layer(str, Enum):
     def builds_own_nodes(self) -> bool:
         """Does this layer replace the topology's node set with one of its own?
 
-        ``rack`` and ``power`` both do, and both therefore need the panels left in
-        the map they are built from: a panel occupies rack units, and a run to a
-        PoE device crosses one. Splicing panels out of a graph nobody draws would
-        cost nothing but the walk that finds the switch at the far end.
+        ``rack``, ``power`` and ``identity`` all do. The first two need the panels
+        left in the map they are built from: a panel occupies rack units, and a
+        run to a PoE device crosses one. Splicing panels out of a graph nobody
+        draws would cost nothing but the walk that finds the switch at the far
+        end. ``identity`` draws no hardware whatsoever.
         """
-        return self in (Layer.RACK, Layer.POWER)
+        return self in (Layer.RACK, Layer.POWER, Layer.IDENTITY)
 
 
 class NodeType(str, Enum):
@@ -286,6 +297,11 @@ class EdgeKind(str, Enum):
     BGP = "bgp"
     #: An OSPF adjacency: two routers in one area, on one link.
     OSPF = "ospf"
+    #: One entry of a group's ``spec.members`` (§19.3): this group holds that
+    #: identity. Directed in the only sense an undirected edge can be — source is
+    #: the group, target the member — because "who is in what" is the question
+    #: the view exists to answer.
+    MEMBERSHIP = "membership"
     #: A cord from a PDU outlet to a power supply (§17.5).
     OUTLET = "outlet"
     #: Power over the uplink: a PSE port feeding a device that declares
@@ -773,7 +789,7 @@ class Node:
     kind: str
     namespace: str
     #: The declared element, or ``None`` for a derived node such as a subnet.
-    element: Device | Adapter | PatchPanel | Pdu | None = None
+    element: Device | Adapter | PatchPanel | Pdu | User | Group | None = None
     ports: tuple[PortView, ...] = ()
     #: Every VLAN this element participates in, links included. See the module
     #: docstring. For a subnet: every VLAN an interface addressed in it is in.
@@ -839,6 +855,23 @@ class Node:
         )
 
     @classmethod
+    def for_identity(cls, fqn: str, element: User | Group) -> Node:
+        """The node standing for one user or one group (§19.3).
+
+        Like a PDU and unlike a subnet it is a declared element and keeps its own
+        namespace, so ``--group-by-namespace`` draws it inside the directory that
+        declared it. It carries no ports — an identity owns no interfaces
+        (§19.1) — so the label is the account and nothing else.
+        """
+        return cls(
+            fqn=fqn,
+            name=element.metadata.name,
+            kind=element.kind,
+            namespace=namespace_of(fqn),
+            element=element,
+        )
+
+    @classmethod
     def for_rack(cls, view: RackView) -> Node:
         """The node standing for one rack and its elevation.
 
@@ -893,12 +926,22 @@ class Node:
         return self.type is NodeType.AGGREGATE
 
     @property
+    def identity(self) -> User | Group | None:
+        """The user or group this node stands for, or ``None`` for everything else.
+
+        The narrowing exists so a renderer can ask one question instead of
+        pattern-matching on :attr:`kind`, which is what every other derived view
+        of a node does (:attr:`power`, :attr:`routing`).
+        """
+        return self.element if isinstance(self.element, (User, Group)) else None
+
+    @property
     def is_element(self) -> bool:
         """Does this node stand for a device or an adapter the reader can point at?"""
         return self.type is NodeType.ELEMENT
 
     @property
-    def _document(self) -> Device | Adapter | PatchPanel | Pdu | Tunnel | None:
+    def _document(self) -> Device | Adapter | PatchPanel | Pdu | User | Group | Tunnel | None:
         """The declared document behind the node, tunnels included."""
         if self.element is not None:
             return self.element
@@ -1259,6 +1302,8 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         nodes, edges = _rack_view(inventory)
     elif layer is Layer.POWER:
         nodes, edges = _power_view(inventory, nodes)
+    elif layer is Layer.IDENTITY:
+        nodes, edges = _identity_view(inventory)
     geometry = resolve_geometry(inventory, layer.value)
     return Graph(
         root=inventory.root,
@@ -1617,6 +1662,39 @@ def _power_view(
         if feed.source in kept and feed.element in kept
     )
     return kept, edges
+
+
+# --------------------------------------------------------------------------- #
+# Identity
+# --------------------------------------------------------------------------- #
+
+
+def _identity_view(inventory: Inventory) -> tuple[dict[str, Node], tuple[Edge, ...]]:
+    """The membership graph: the identities, joined by what holds what (§19.3).
+
+    None of the topology survives, and none of it should: a cable between two
+    servers says nothing about who may log into either, and drawing both graphs
+    at once would produce a picture in which neither is readable. This is the
+    same decision the power view makes for the same reason.
+
+    An edge runs from the group to the member, which is the direction the fact is
+    written in and the direction a reader follows to answer "who is in this?". A
+    member that does not resolve is simply not drawn: ``NG-S010`` is the place
+    that says so, and ``--force`` has to keep producing a picture.
+    """
+    nodes = {fqn: Node.for_identity(fqn, element) for fqn, element in identities(inventory)}
+    edges = tuple(
+        Edge(
+            id=f"{entry.group}#member{entry.index}",
+            kind=EdgeKind.MEMBERSHIP,
+            source=entry.group,
+            target=entry.member,
+            medium="",
+        )
+        for entry in identity_plan(inventory)
+        if entry.is_identity and entry.member is not None
+    )
+    return nodes, edges
 
 
 def _routed_view(
@@ -2372,6 +2450,8 @@ NODE_KINDS: Final[tuple[str, ...]] = (
     "adapter",
     "patchpanel",
     "pdu",
+    USER_KIND,
+    GROUP_KIND,
 )
 
 

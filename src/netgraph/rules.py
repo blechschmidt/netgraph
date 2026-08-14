@@ -8,7 +8,7 @@ without importing the validator itself.
 Two identifier vocabularies exist and both are accepted everywhere a rule can be
 named (``netgraph.toml``, the ``netgraph/ignore`` annotation, ``--disable``):
 
-* The **short ids** ``E001``…``E042``, ``W101``…``W137`` and ``I001``…``I003``
+* The **short ids** ``E001``…``E046``, ``W101``…``W140`` and ``I001``…``I004``
   used by the validation engine and printed in diagnostics. The letter is the
   default severity — ``E`` error, ``W`` warning, ``I`` info — as first
   assigned; a rule keeps its id when an inventory re-grades it.
@@ -441,6 +441,34 @@ RULES: Final[tuple[Rule, ...]] = (
         title="redundant power that is not redundant",
     ),
     Rule(
+        "E043",
+        Severity.ERROR,
+        "A group names a member the inventory does not declare.",
+        ("NG-S010",),
+        title="group member does not exist",
+    ),
+    Rule(
+        "E044",
+        Severity.ERROR,
+        "A group names a member that is not a user or a group.",
+        ("NG-S011",),
+        title="group member is not an identity",
+    ),
+    Rule(
+        "E045",
+        Severity.ERROR,
+        "Group membership forms a cycle.",
+        ("NG-S012",),
+        title="group membership cycle",
+    ),
+    Rule(
+        "E046",
+        Severity.ERROR,
+        "Two identities claim the same login, uid or gid.",
+        ("NG-S013",),
+        title="duplicate account identifier",
+    ),
+    Rule(
         "W101",
         Severity.WARNING,
         "An interface has neither IPv4 nor IPv6 and is not a switchport.",
@@ -707,6 +735,20 @@ RULES: Final[tuple[Rule, ...]] = (
         title="stale diagram geometry",
     ),
     Rule(
+        "W139",
+        Severity.WARNING,
+        "A group has no members.",
+        ("NG-S014",),
+        title="group with no members",
+    ),
+    Rule(
+        "W140",
+        Severity.WARNING,
+        "A group still lists a user who has departed.",
+        ("NG-S015",),
+        title="departed user still in a group",
+    ),
+    Rule(
         "I001",
         Severity.INFO,
         "A MAC address is locally administered rather than vendor-assigned.",
@@ -726,6 +768,13 @@ RULES: Final[tuple[Rule, ...]] = (
         "A tunnel listens on a port other than the registered one for its type.",
         ("NG-T015",),
         title="tunnel on a non-standard port",
+    ),
+    Rule(
+        "I004",
+        Severity.INFO,
+        "A person's account is a member of no group.",
+        ("NG-S016",),
+        title="person in no group",
     ),
 )
 

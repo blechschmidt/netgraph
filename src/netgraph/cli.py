@@ -4191,7 +4191,7 @@ def _open_browser(app: AppContext, url: str) -> None:
 )
 @click.pass_obj
 def list_command(app: AppContext, what: str, output_format: str) -> None:
-    """List the devices, cables, tunnels, VLANs, BSSs, subnets or PDUs of an inventory."""
+    """List the devices, cables, tunnels, VLANs, BSSs, subnets, PDUs or identities."""
     console = app.console()
     inventory = app.load()
     _warn_about_load_errors(console, inventory)

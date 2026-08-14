@@ -1,0 +1,12 @@
+# W139 (NG-S014) - a group with nobody in it.
+#
+# 'contractors' exists and holds nothing, so anything granted to it is granted
+# to nobody -- and looks granted. A warning rather than an error, because a
+# group created before the people who will be in it is a normal state, and so is
+# one deliberately emptied to keep its name reserved.
+apiVersion: netgraph.dev/v1alpha1
+kind: group
+metadata:
+  name: contractors
+spec:
+  gid: 210

@@ -15,6 +15,7 @@
       "adapter": "#/$defs/Adapter",
       "cable": "#/$defs/Cable",
       "computer": "#/$defs/Computer",
+      "group": "#/$defs/Group",
       "hub": "#/$defs/Hub",
       "layout": "#/$defs/Layout",
       "patchpanel": "#/$defs/PatchPanel",
@@ -23,7 +24,8 @@
       "server": "#/$defs/Server",
       "switch": "#/$defs/Switch",
       "template": "#/$defs/Template",
-      "tunnel": "#/$defs/Tunnel"
+      "tunnel": "#/$defs/Tunnel",
+      "user": "#/$defs/User"
     },
     "propertyName": "kind"
   },
@@ -57,6 +59,12 @@
     },
     {
       "$ref": "#/$defs/Pdu"
+    },
+    {
+      "$ref": "#/$defs/User"
+    },
+    {
+      "$ref": "#/$defs/Group"
     },
     {
       "$ref": "#/$defs/Template"
@@ -861,6 +869,41 @@
       "title": "Forwarding",
       "type": "object"
     },
+    "Group": {
+      "additionalProperties": false,
+      "description": "A named set of identities, which may hold other groups (§19.2).",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "group",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. A named set of identities. `members` may name a `user` or another `group`, which is what makes a hierarchy expressible; the nesting must not loop (`NG-S012`)."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/GroupSpec",
+          "title": "spec",
+          "description": "The body of a `group` document."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata"
+      ],
+      "title": "Group",
+      "type": "object"
+    },
     "GroupGeometry": {
       "additionalProperties": false,
       "description": "The box one namespace cluster is drawn as.\n\nUnlike a node, a group carries a required :attr:`size`: nothing else decides\nhow big it is, because a cluster is drawn around whatever the arrangement\nput inside it rather than around whatever Graphviz packed into it.",
@@ -877,6 +920,56 @@
         "size"
       ],
       "title": "GroupGeometry",
+      "type": "object"
+    },
+    "GroupSpec": {
+      "additionalProperties": false,
+      "description": "`spec` of a `group` document (§19.2).",
+      "properties": {
+        "members": {
+          "items": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*(?:/[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*)*$",
+            "type": "string"
+          },
+          "maxItems": 4096,
+          "title": "members",
+          "type": "array",
+          "description": "The users and nested groups in this group, as element references resolved outwards from the group's own namespace. Must resolve (`NG-S010`), must be an identity (`NG-S011`), and the nesting must not loop (`NG-S012`)."
+        },
+        "gid": {
+          "anyOf": [
+            {
+              "ge": 0,
+              "le": 4294967294,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "gid",
+          "description": "POSIX group id, when the estate assigns one. 0 to 4294967294; two groups claiming one is `NG-S013`."
+        },
+        "email": {
+          "anyOf": [
+            {
+              "maxLength": 254,
+              "minLength": 3,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "email",
+          "description": "Where mail to the whole group goes, when the group is also a distribution list."
+        }
+      },
+      "title": "GroupSpec",
       "type": "object"
     },
     "Hub": {
@@ -3024,6 +3117,150 @@
         "internal"
       ],
       "title": "UpstreamType",
+      "type": "string"
+    },
+    "User": {
+      "additionalProperties": false,
+      "description": "One identity: a person, a service account or a shared login (§19.1).",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "user",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. One identity: a person, a service account or a shared login. Owns no interfaces and terminates no cable; it is drawn only in the `identity` view."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/UserSpec",
+          "title": "spec",
+          "description": "The body of a `user` document."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata"
+      ],
+      "title": "User",
+      "type": "object"
+    },
+    "UserSpec": {
+      "additionalProperties": false,
+      "description": "`spec` of a `user` document (§19.1).",
+      "properties": {
+        "login": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "login",
+          "description": "The account name, when it differs from `metadata.name`; absent means the two are the same. Estate-wide, so two users claiming one login is `NG-S013`.\n\nYANG: `/ietf-system:system/authentication/user/name`"
+        },
+        "full_name": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "full_name",
+          "description": "The person's name as they write it. Free text: a real name is not a grammar."
+        },
+        "email": {
+          "anyOf": [
+            {
+              "maxLength": 254,
+              "minLength": 3,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "email",
+          "description": "Where mail reaches them, `local@domain.tld`. Also what ties the identity to a directory without netgraph having to model the directory."
+        },
+        "uid": {
+          "anyOf": [
+            {
+              "ge": 0,
+              "le": 4294967294,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "uid",
+          "description": "POSIX user id, when the estate assigns one. 0 to 4294967294; two users claiming one is `NG-S013`.\n\nYANG: `/ietf-system:system/authentication/user`"
+        },
+        "type": {
+          "$ref": "#/$defs/UserType",
+          "default": "person",
+          "title": "type",
+          "description": "`person`, `service` or `shared`. Decides whether `NG-S015` and `NG-S016` have anything to say: only a person can depart, and only a person is expected in a group."
+        },
+        "status": {
+          "$ref": "#/$defs/UserStatus",
+          "default": "active",
+          "title": "status",
+          "description": "`active`, `suspended` or `departed`. A departed account is kept rather than deleted so the memberships still to be revoked stay visible (`NG-S015`)."
+        },
+        "ssh_keys": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "maxItems": 32,
+          "title": "ssh_keys",
+          "type": "array",
+          "description": "Public keys the account authenticates with, `<algorithm> <base64> [comment]`. Normalised to single spaces; a private key is refused (`NG-S002`).\n\nYANG: `/ietf-system:system/authentication/user/authorized-key`"
+        }
+      },
+      "title": "UserSpec",
+      "type": "object"
+    },
+    "UserStatus": {
+      "description": "Whether the account should still work (§19.1).",
+      "enum": [
+        "active",
+        "suspended",
+        "departed"
+      ],
+      "title": "UserStatus",
+      "type": "string"
+    },
+    "UserType": {
+      "description": "What sort of account an identity is (§19.1).\n\nThe distinction is not cosmetic: three of the rules in the `S` group only\nmake sense for one of these. A service account belongs to no group in a great\nmany estates and reporting that as an oversight (`NG-S016`) would be noise;\na shared account has no single person to depart, so `NG-S015` has nothing\nto say about it.",
+      "enum": [
+        "person",
+        "service",
+        "shared"
+      ],
+      "title": "UserType",
       "type": "string"
     },
     "ViewGeometry": {

@@ -177,6 +177,8 @@ def _overview_page(context: Context, site_pages: Sequence[Page]) -> Page:
         )
     if inventory.pdus:
         sections.append(_power_section(context, scope))
+    if inventory.users or inventory.groups:
+        sections.append(_accounts_section(context, scope))
     return Page(
         path=path,
         kind="overview",
@@ -279,6 +281,8 @@ def _site_page(context: Context, group: str) -> Page:
     ]
     if inventory.pdus:
         sections.append(_power_section(context, scope))
+    if inventory.users or inventory.groups:
+        sections.append(_accounts_section(context, scope))
     sections.append(_external_section(context, scope))
     sections.append(
         _findings_section(
@@ -583,6 +587,53 @@ def _power_section(context: Context, scope: Scope) -> Section:
                 ),
                 empty="No PDU is declared here.",
                 record_key="pdu",
+            ),
+        ),
+    )
+
+
+def _accounts_section(context: Context, scope: Scope) -> Section:
+    """Who the network is for, from :func:`netgraph.identity.identity_plan` (§19).
+
+    Two tables rather than one. They answer different questions — "what accounts
+    exist" and "what does each grant" — and the second is the one that cannot be
+    read off any single document: PEOPLE is the group's membership after the
+    nesting has been walked.
+
+    An identity gets no page of its own, unlike every piece of hardware. A page
+    per device exists because a device has interfaces, addresses, a rack position
+    and a power feed — a paragraph's worth of facts that will not fit in a row.
+    An account is a row.
+    """
+    inventory = scope.inventory
+    return Section(
+        key="accounts",
+        title="Identity",
+        blurb="The accounts the network is for, and the groups that grant access.",
+        tables=(
+            table_from_listing(
+                context,
+                listing.users(inventory),
+                key="users",
+                title="Accounts",
+                note=(
+                    "GROUPS is the reverse of what the documents hold: no 'user' lists its "
+                    "groups, so this is the one fact about a person their own file cannot say."
+                ),
+                empty="No account is declared here.",
+                record_key="user",
+            ),
+            table_from_listing(
+                context,
+                listing.groups(inventory),
+                key="groups",
+                title="Groups",
+                note=(
+                    "HOLDS is what the document names; PEOPLE is how many accounts the group "
+                    "reaches once nested groups have been walked."
+                ),
+                empty="No group is declared here.",
+                record_key="group",
             ),
         ),
     )

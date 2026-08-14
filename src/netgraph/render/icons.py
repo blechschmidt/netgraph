@@ -41,7 +41,14 @@ from types import MappingProxyType
 from typing import Final
 
 from netgraph.errors import RenderError
-from netgraph.render.graph import PATCHPANEL_KIND, PDU_KIND, SUBNET_KIND, TUNNEL_KIND
+from netgraph.render.graph import (
+    GROUP_KIND,
+    PATCHPANEL_KIND,
+    PDU_KIND,
+    SUBNET_KIND,
+    TUNNEL_KIND,
+    USER_KIND,
+)
 
 __all__ = [
     "BUNDLED_THEMES",
@@ -57,7 +64,7 @@ __all__ = [
     "theme_choices",
 ]
 
-#: Every kind a theme may hold a picture for: the six element kinds that become
+#: Every kind a theme may hold a picture for: the element kinds that become
 #: nodes, the derived layer-3 subnet node, and the tunnel. ``cable`` is not here
 #: — a cable is an edge, and an edge has no icon. Neither is
 #: :data:`~netgraph.render.aggregate.AGGREGATE_KIND`: a collapsed namespace is
@@ -72,6 +79,12 @@ __all__ = [
 #: picture, and a reader who did not recognise the glyph would read its absence
 #: as "nothing to say". That stays a colour and a word, on the edge and in
 #: ``W127``.
+#:
+#: The identity pair (§19) is here for the same reason the others are: a user
+#: and a group become nodes, and a theme that could not draw them would leave the
+#: identity view as the one picture with no iconography at all. The glyphs are a
+#: person and three of them — the vocabulary every organisation chart already
+#: uses, and the only one that reads at a glance as "not equipment".
 ICON_KINDS: Final[tuple[str, ...]] = (
     "router",
     "switch",
@@ -81,6 +94,8 @@ ICON_KINDS: Final[tuple[str, ...]] = (
     "adapter",
     PATCHPANEL_KIND,
     PDU_KIND,
+    USER_KIND,
+    GROUP_KIND,
     SUBNET_KIND,
     TUNNEL_KIND,
 )

@@ -368,7 +368,7 @@ $ netgraph -i examples/patch-room export cable-list --table-format markdown
 the `SITE`/`ROOM` columns for both ends.)*
 
 **One row per cable document**, which is one run of cable an installer pulls.
-The graph is built at [`--layer physical`](rendering.md#layers-one-inventory-seven-questions)
+The graph is built at [`--layer physical`](rendering.md#layers-one-inventory-nine-questions)
 for exactly that reason: every other layer splices a run through a patch panel
 into the single logical link it is electrically equivalent to (§15.2), which is
 right for a diagram and wrong for a worklist — the two segments either side of a

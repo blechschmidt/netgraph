@@ -92,6 +92,7 @@ _LAYER_HELP: Final[dict[str, str]] = {
     Layer.ROUTING.value: "BGP sessions and OSPF adjacencies, clustered by VRF",
     Layer.RACK.value: "rack elevations: what is bolted where, and what is free",
     Layer.POWER.value: "power: PDUs, PoE budgets and the feeds into every load",
+    Layer.IDENTITY.value: "identity: users, groups and who is a member of what",
 }
 
 

@@ -45,7 +45,7 @@ inside what, `routing` for the BGP sessions and OSPF adjacencies clustered by
 VRF, `physical` for the cabling record with its patch panels, `rack` for a front
 elevation per rack, and `power` for the PDUs and the outlet and PoE feeds into
 everything they power. The table in
-[Layers](../rendering.md#layers-one-inventory-eight-questions) says what each one
+[Layers](../rendering.md#layers-one-inventory-nine-questions) says what each one
 draws and when to reach for it.
 
 `rack` is the one layer `-f mermaid` cannot draw, because an elevation is a grid
@@ -151,7 +151,7 @@ not look the way you expected.
 | `-o`, `--output` | `FILE` | — | Write to this file instead of stdout. |
 | `--namespace` | `NS` | — | Keep only elements in this namespace or below it. Repeatable. |
 | `--vlan` | `VID` | — | Keep only elements participating in this VLAN. Repeatable. |
-| `--kind` | `[switch\|router\|hub\|computer\|server\|adapter\|patchpanel\|pdu]` | — | Keep only elements of this kind. Repeatable. |
+| `--kind` | `[switch\|router\|hub\|computer\|server\|adapter\|patchpanel\|pdu\|user\|group]` | — | Keep only elements of this kind. Repeatable. |
 | `--name` | `GLOB` | — | Keep only elements whose name matches this glob. Repeatable. |
 | `--neighbors-of` | `NAME` | — | Keep only the neighbourhood of this element. |
 | `--depth` | `INTEGER, >= 0` | `1` | How many hops --neighbors-of reaches. |
@@ -168,7 +168,7 @@ not look the way you expected.
 | `--max-addresses` | `N` | `4` | Longest address list spelled out under a node before it is abbreviated to 'and N more'. 0 prints the count alone. |
 | `--rankdir` | `[tb\|lr\|bt\|rl]` | TB, top to bottom | Layout direction. A wide network reads better left to right; a deep one top to bottom. Honoured by the Graphviz backends and by mermaid. |
 | `--title` | `TEXT` | — | Caption for the diagram. |
-| `--layer` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power]` | `l1` | l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets and the elements addressed in them; overlay draws the tunnels; routing draws the BGP sessions and OSPF adjacencies, clustered by VRF; physical adds the patch panels l1 splices out; rack draws a front elevation per rack; power draws the PDUs and the feeds into everything they power. Repeatable for -f html, which draws each layer and puts a switcher over them. |
+| `--layer` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity]` | `l1` | l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets and the elements addressed in them; overlay draws the tunnels; routing draws the BGP sessions and OSPF adjacencies, clustered by VRF; physical adds the patch panels l1 splices out; rack draws a front elevation per rack; power draws the PDUs and the feeds into everything they power. Repeatable for -f html, which draws each layer and puts a switcher over them. |
 | `--strict` | — | off | Treat warnings as errors. |
 | `--force` | — | off | Proceed even when validation failed. The result may not match the files. |
 | `--profile` | `NAME` | — | Apply the [profile.NAME] block of netgraph.toml on top of its [render] table. Explicit flags still win over both. |

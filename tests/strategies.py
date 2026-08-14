@@ -76,6 +76,7 @@ __all__ = [
     "dump_documents",
     "element_names",
     "free_text",
+    "group_documents",
     "if_names",
     "interfaces",
     "inventory_plans",
@@ -89,6 +90,7 @@ __all__ = [
     "template_cases",
     "tunnel_documents",
     "unique_names",
+    "user_documents",
     "vlan_ids",
     "vlan_sets",
 ]
@@ -747,6 +749,57 @@ def pdu_documents(draw: st.DrawFn, *, name: str, namespace: str) -> PlannedDocum
     )
 
 
+@st.composite
+def user_documents(draw: st.DrawFn, *, name: str, namespace: str) -> PlannedDocument:
+    """A ``user``: an account, with whatever of it somebody happened to record (§19.1).
+
+    No ``login`` is generated. ``metadata.name`` is already the account name by
+    default, and a second generated identifier would collide across the plan for
+    reasons ``NG-S013`` is right about but that have nothing to do with the
+    loader, which is what these plans exist to exercise.
+    """
+    spec: dict[str, Any] = {}
+    if draw(st.booleans()):
+        spec["full_name"] = draw(free_text(min_size=1, max_size=3))
+    if draw(st.booleans()):
+        spec["type"] = draw(st.sampled_from(("person", "service", "shared")))
+    if draw(st.booleans()):
+        spec["status"] = draw(st.sampled_from(("active", "suspended", "departed")))
+    if draw(st.booleans()):
+        spec["ssh_keys"] = [f"ssh-ed25519 AAAAC3Nza{'A' * draw(st.integers(4, 12))}"]
+    return PlannedDocument(
+        namespace=namespace,
+        stem=f"usr-{name}"[:60],
+        data=_envelope("user", name, spec, draw(_metadata_extras())),
+    )
+
+
+@st.composite
+def group_documents(
+    draw: st.DrawFn, *, name: str, namespace: str, members: Sequence[str] = ()
+) -> PlannedDocument:
+    """A ``group`` over identities that already exist in the plan (§19.2).
+
+    Members are drawn from names the plan has already placed, so every reference
+    resolves by construction. A plan that placed no user produces an empty group,
+    which is a legal document — ``NG-S014`` is a warning, not a refusal — and
+    exactly the state a group created before its people is in — the same contract every other generated reference
+    here honours. Nesting is not generated: a nested group would have to be one
+    the plan has *and* one that cannot reach back, and proving that is
+    ``NG-S012``'s job rather than a generator's.
+    """
+    pool = list(members)
+    chosen = draw(st.lists(st.sampled_from(pool), max_size=len(pool), unique=True)) if pool else []
+    spec: dict[str, Any] = {"members": chosen} if chosen else {}
+    if draw(st.booleans()):
+        spec["gid"] = draw(st.integers(min_value=0, max_value=65_535))
+    return PlannedDocument(
+        namespace=namespace,
+        stem=f"grp-{name}"[:60],
+        data=_envelope("group", name, spec, draw(_metadata_extras())),
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class _Port:
     """One cableable interface of one element, as a cable endpoint names it."""
@@ -866,6 +919,7 @@ def inventory_plans(
     adapters: bool = True,
     panels: bool = True,
     pdus: bool = True,
+    identities: bool = True,
     tunnels: bool = True,
     cables: bool = True,
 ) -> InventoryPlan:
@@ -880,8 +934,10 @@ def inventory_plans(
     adapter_count = draw(st.integers(min_value=0, max_value=1)) if adapters else 0
     panel_count = draw(st.integers(min_value=0, max_value=1)) if panels else 0
     pdu_count = draw(st.integers(min_value=0, max_value=1)) if pdus else 0
+    user_count = draw(st.integers(min_value=0, max_value=2)) if identities else 0
+    group_count = draw(st.integers(min_value=0, max_value=1)) if identities else 0
 
-    total = device_count + adapter_count + panel_count + pdu_count
+    total = device_count + adapter_count + panel_count + pdu_count + user_count + group_count
     #: One pool for every name in the plan — elements, cables and tunnels alike.
     #: Uniqueness has to hold across kinds, not just within one: a cable named
     #: after a switch would be a second element with that short name, and a
@@ -922,6 +978,18 @@ def inventory_plans(
     for offset in range(pdu_count):
         index = device_count + adapter_count + panel_count + offset
         documents.append(draw(pdu_documents(name=names[index], namespace=namespace_for(index))))
+    accounts: list[str] = []
+    for offset in range(user_count):
+        index = device_count + adapter_count + panel_count + pdu_count + offset
+        documents.append(draw(user_documents(name=names[index], namespace=namespace_for(index))))
+        accounts.append(names[index])
+    for offset in range(group_count):
+        index = device_count + adapter_count + panel_count + pdu_count + user_count + offset
+        documents.append(
+            draw(
+                group_documents(name=names[index], namespace=namespace_for(index), members=accounts)
+            )
+        )
 
     # -- cables ----------------------------------------------------------
     used: set[str] = set()

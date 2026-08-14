@@ -1,0 +1,23 @@
+# E043 (NG-S010) - a group names a member the inventory has not got.
+#
+# 'engineering' lists 'ghost', which no document declares. The group still
+# renders, still has a member, and still looks like a list of two people --
+# which is the whole problem: an access rule written against it grants what the
+# list holds, and nothing about reading the file says the list is short.
+apiVersion: netgraph.dev/v1alpha1
+kind: user
+metadata:
+  name: alice
+spec:
+  full_name: Alice Meyer
+  uid: 1001
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: group
+metadata:
+  name: engineering
+spec:
+  gid: 100
+  members:
+    - alice
+    - ghost

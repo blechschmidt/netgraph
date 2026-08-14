@@ -140,6 +140,7 @@ _LAYER_LABELS: Final[Mapping[Layer, str]] = {
     Layer.OVERLAY: "overlay — tunnels",
     Layer.ROUTING: "routing — BGP and OSPF",
     Layer.POWER: "power — PDUs and feeds",
+    Layer.IDENTITY: "identity — users and groups",
 }
 
 #: Files inlined into every page, in the order they are concatenated. The

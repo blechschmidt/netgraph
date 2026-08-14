@@ -77,7 +77,7 @@ DECISIVE: Final[frozenset[str]] = frozenset({"id", "serial", "mac"})
 
 #: Address types matched in the first pass. Everything in the second pass may
 #: refer to one of them, so their names have to be settled first.
-_ANCHORS: Final[frozenset[str]] = frozenset({DEVICE_TYPE, "patchpanel", "pdu"})
+_ANCHORS: Final[frozenset[str]] = frozenset({DEVICE_TYPE, "patchpanel", "pdu", "user"})
 
 
 def detect_renames(

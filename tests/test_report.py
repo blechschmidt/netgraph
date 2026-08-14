@@ -196,7 +196,11 @@ def test_every_element_has_a_page_and_the_overview_links_it(name: str) -> None:
     bundle = report_of(name)
     overview = bundle.text("README.md")
     for fqn, element in inventory.elements.items():
-        if element.kind in {"cable", "tunnel"}:
+        if element.kind in {"cable", "tunnel", "user", "group"}:
+            # A link has no page because it is drawn on both of the pages it
+            # joins; an identity has none because an account is a row, not a
+            # paragraph. Both are named in a table instead, which the identity
+            # test below asserts.
             continue
         page = f"devices/{page_slug(fqn)}.md"
         assert page in bundle.files, f"{fqn} has no page"

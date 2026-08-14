@@ -1,7 +1,7 @@
 === README.md ===
 # home-lab — as-built network documentation
 
-14 element(s) across 1 site page(s), covering the whole inventory.
+19 element(s) across 1 site page(s), covering the whole inventory.
 
 | Fact | Value |
 |:---|:---|
@@ -138,6 +138,36 @@ Membership is derived: a host on an untagged access port counts as a member even
 | 20 | guest | [ap-home](devices/wireless_ap-home.md) | eth0 | trunk | — |
 
 A row with no port is an element that reaches the VLAN over a link rather than by configuring it — a host behind an access port, or a hub.
+
+
+<a id="accounts"></a>
+
+## Identity
+
+The accounts the network is for, and the groups that grant access.
+
+<a id="table-users"></a>
+
+**Accounts**
+
+| USER | LOGIN | FULL NAME | EMAIL | UID | TYPE | STATUS | KEYS | GROUPS |
+|:---|:---|:---|:---|---:|:---|:---|---:|:---|
+| ana | ana | Ana Brandt | ana@example.invalid | 1000 | person | active | 1 | admins |
+| kit | kit | Kit Brandt | kit@example.invalid | 1001 | person | active | 0 | household |
+| backup | backup | - | - | 900 | service | active | 0 | - |
+
+GROUPS is the reverse of what the documents hold: no 'user' lists its groups, so this is the one fact about a person their own file cannot say.
+
+<a id="table-groups"></a>
+
+**Groups**
+
+| GROUP | GID | EMAIL | MEMBERS | NESTED | PEOPLE | HOLDS |
+|:---|---:|:---|---:|---:|---:|:---|
+| admins | 100 | - | 1 | 0 | 1 | ana |
+| household | 101 | - | 2 | 1 | 2 | admins, kit |
+
+HOLDS is what the document names; PEOPLE is how many accounts the group reaches once nested groups have been walked.
 
 
 ---
@@ -1264,6 +1294,36 @@ Every BSS: which radio beacons which SSID, on what channel, into which VLAN.
 | home-guest | [wireless/ap-home:wlan0](../devices/wireless_ap-home.md) | ap | 36/5GHz | 78:8a:20:aa:00:12 | 20 | wpa2-psk |
 
 One row per SSID per radio: a dual-band AP serving three networks has six.
+
+
+<a id="accounts"></a>
+
+## Identity
+
+The accounts the network is for, and the groups that grant access.
+
+<a id="table-users"></a>
+
+**Accounts**
+
+| USER | LOGIN | FULL NAME | EMAIL | UID | TYPE | STATUS | KEYS | GROUPS |
+|:---|:---|:---|:---|---:|:---|:---|---:|:---|
+| ana | ana | Ana Brandt | ana@example.invalid | 1000 | person | active | 1 | admins |
+| kit | kit | Kit Brandt | kit@example.invalid | 1001 | person | active | 0 | household |
+| backup | backup | - | - | 900 | service | active | 0 | - |
+
+GROUPS is the reverse of what the documents hold: no 'user' lists its groups, so this is the one fact about a person their own file cannot say.
+
+<a id="table-groups"></a>
+
+**Groups**
+
+| GROUP | GID | EMAIL | MEMBERS | NESTED | PEOPLE | HOLDS |
+|:---|---:|:---|---:|---:|---:|:---|
+| admins | 100 | - | 1 | 0 | 1 | ana |
+| household | 101 | - | 2 | 1 | 2 | admins, kit |
+
+HOLDS is what the document names; PEOPLE is how many accounts the group reaches once nested groups have been walked.
 
 
 <a id="external"></a>

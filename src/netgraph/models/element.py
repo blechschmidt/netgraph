@@ -22,7 +22,7 @@ __all__ = [
 #: Re-exported for callers that build documents programmatically.
 DEFAULT_API_VERSION = API_VERSION
 
-#: The ten *element* kinds defined by ``netgraph.dev/v1alpha1`` (§3). Each one
+#: The twelve *element* kinds defined by ``netgraph.dev/v1alpha1`` (§3). Each one
 #: becomes a node or an edge of the graph.
 KINDS: tuple[str, ...] = (
     "switch",
@@ -35,14 +35,16 @@ KINDS: tuple[str, ...] = (
     "tunnel",
     "patchpanel",
     "pdu",
+    "user",
+    "group",
 )
 
-#: The eleventh kind (§6.6). A template declares no element: it is a named partial
+#: The thirteenth kind (§6.6). A template declares no element: it is a named partial
 #: device ``spec`` that the loader merges into the devices naming it in
 #: ``spec.from``, and it is gone by the time anything downstream sees the tree.
 TEMPLATE_KIND: str = "template"
 
-#: The twelfth kind (§18). A layout declares no element either: it is diagram
+#: The fourteenth kind (§18). A layout declares no element either: it is diagram
 #: geometry for elements declared elsewhere, kept in its own document so that a
 #: model file stays free of pixels and an arrangement can be dropped, diffed or
 #: versioned on its own. See :mod:`netgraph.models.layout`.

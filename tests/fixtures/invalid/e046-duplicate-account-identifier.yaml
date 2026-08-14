@@ -1,0 +1,30 @@
+# E046 (NG-S013) - two identities claim one account identifier.
+#
+# 'alice' and 'bob' were both given uid 1001, which to the filesystem makes them
+# one user: every file either of them creates is owned by the other as well.
+# Nothing anywhere else reports this -- the two documents are individually fine,
+# and the collision is only visible from above.
+apiVersion: netgraph.dev/v1alpha1
+kind: user
+metadata:
+  name: alice
+spec:
+  full_name: Alice Meyer
+  uid: 1001
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: user
+metadata:
+  name: bob
+spec:
+  full_name: Bob Rao
+  uid: 1001
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: group
+metadata:
+  name: staff
+spec:
+  members:
+    - alice
+    - bob

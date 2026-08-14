@@ -181,7 +181,7 @@ the failure this whole layer exists to prevent.
 
 A rename is not a rename until every reference to the old name names the new one,
 and a delete is not safe until the tree has been asked what would be left
-dangling. There are five places one document names another, and they are read off
+dangling. There are six places one document names another, and they are read off
 the *models* rather than found by looking for colons in strings:
 
 | Field | What it points at |
@@ -190,6 +190,7 @@ the *models* rather than found by looking for colons in strings:
 | `spec.over` | the tunnel a tunnel runs inside ([§14](schema.md#14-tunnels)) |
 | `spec.upstream.attached_to` | the host an adapter is plugged into ([§8](schema.md#8-adapters)) |
 | `spec.power.inputs[]` | the outlet feeding a power supply, `pdu:outlet` ([§17](schema.md#17-power)) |
+| `spec.members[]` | a user or a nested group in a group ([§19.2](schema.md#192-group)) |
 | `spec.from` | the template a device inherits ([§6.6](schema.md#66-template--reusable-partial-device-specs)) |
 
 ### Renaming keeps the spelling its author chose
@@ -222,8 +223,12 @@ error: switches/sw-home is referred to by cables/cbl-rtr-sw, cables/cbl-sw-ap, �
 a cable end, a tunnel's `over` — or optional. Structural references take the
 referring element with them, transitively, so deleting a device deletes its
 cables and deleting a tunnel deletes the tunnels stacked on it. Optional ones —
-an adapter's `attached_to`, a power input — are cleared, and the referring
-element survives.
+an adapter's `attached_to`, a power input, a group membership — are cleared, and
+the referring element survives. Deleting somebody who has left therefore empties
+their memberships rather than taking the groups with them, which is the right way
+round; marking the account `status: departed` instead keeps the memberships
+*visible* until they have been revoked
+([`W140`](validation-rules.md#w140--departed-user-still-in-a-group)).
 
 ## Placement
 

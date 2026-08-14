@@ -28,6 +28,7 @@ from netgraph.models.base import NetgraphModel
 from netgraph.models.cable import CableSpec, InterfaceRef
 from netgraph.models.device import BridgeConfig, DeviceSpec, Forwarding, VlanDefinition
 from netgraph.models.element import ElementBase
+from netgraph.models.identity import GroupSpec, UserSpec
 from netgraph.models.interface import (
     Bss,
     Interface,
@@ -120,6 +121,8 @@ DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
     PowerInput,
     PoeConfig,
     PduSpec,
+    UserSpec,
+    GroupSpec,
     LayoutSpec,
     ViewGeometry,
     NodeGeometry,
@@ -146,6 +149,10 @@ KIND_NOTES: Final[dict[str, str]] = {
     "pdu": "A power distribution unit. Its numbered outlets are derived from `outlets`; they "
     "are not interfaces, and a device names one in `power.inputs` rather than being cabled to "
     "it. Placed on a rack elevation like any other hardware.",
+    "user": "One identity: a person, a service account or a shared login. Owns no interfaces "
+    "and terminates no cable; it is drawn only in the `identity` view.",
+    "group": "A named set of identities. `members` may name a `user` or another `group`, which "
+    "is what makes a hierarchy expressible; the nesting must not loop (`NG-S012`).",
     "template": "A named partial device spec, merged into every device that names it in "
     "`spec.from`. Not an element: never drawn, never listed, never validated on its own.",
     "layout": "Diagram geometry for elements declared elsewhere, scoped by view. Not an "
@@ -750,6 +757,49 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "Which supply feeds the unit — `A`, `B`, `ups-1`, `utility`. Free text, compared only "
         "for equality: two PDUs on one feed do not make a device redundant (`NG-E015`).",
         "/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry",
+    ),
+    # -- identity ----------------------------------------------------------
+    ("UserSpec", "login"): Doc(
+        "The account name, when it differs from `metadata.name`; absent means the two are the "
+        "same. Estate-wide, so two users claiming one login is `NG-S013`.",
+        "/ietf-system:system/authentication/user/name",
+    ),
+    ("UserSpec", "full_name"): Doc(
+        "The person's name as they write it. Free text: a real name is not a grammar."
+    ),
+    ("UserSpec", "email"): Doc(
+        "Where mail reaches them, `local@domain.tld`. Also what ties the identity to a "
+        "directory without netgraph having to model the directory."
+    ),
+    ("UserSpec", "uid"): Doc(
+        "POSIX user id, when the estate assigns one. 0 to 4294967294; two users claiming one "
+        "is `NG-S013`.",
+        "/ietf-system:system/authentication/user",
+    ),
+    ("UserSpec", "type"): Doc(
+        "`person`, `service` or `shared`. Decides whether `NG-S015` and `NG-S016` have "
+        "anything to say: only a person can depart, and only a person is expected in a group."
+    ),
+    ("UserSpec", "status"): Doc(
+        "`active`, `suspended` or `departed`. A departed account is kept rather than deleted "
+        "so the memberships still to be revoked stay visible (`NG-S015`)."
+    ),
+    ("UserSpec", "ssh_keys"): Doc(
+        "Public keys the account authenticates with, `<algorithm> <base64> [comment]`. "
+        "Normalised to single spaces; a private key is refused (`NG-S002`).",
+        "/ietf-system:system/authentication/user/authorized-key",
+    ),
+    ("GroupSpec", "members"): Doc(
+        "The users and nested groups in this group, as element references resolved outwards "
+        "from the group's own namespace. Must resolve (`NG-S010`), must be an identity "
+        "(`NG-S011`), and the nesting must not loop (`NG-S012`)."
+    ),
+    ("GroupSpec", "gid"): Doc(
+        "POSIX group id, when the estate assigns one. 0 to 4294967294; two groups claiming one "
+        "is `NG-S013`."
+    ),
+    ("GroupSpec", "email"): Doc(
+        "Where mail to the whole group goes, when the group is also a distribution list."
     ),
     # -- power (device) ----------------------------------------------------
     ("PowerConfig", "draw_watts"): Doc(

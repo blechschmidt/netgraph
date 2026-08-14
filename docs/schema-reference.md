@@ -33,6 +33,8 @@ the field maps to, with `…` standing for
 | `tunnel` | [TunnelSpec](#spec--tunnel) | An undirected logical link between two or more `tunnel` interfaces. Owns no interfaces; `over` nests it inside another tunnel. |
 | `patchpanel` | [PatchPanelSpec](#spec--patchpanel) | A passive cross-connect. Its `front/<n>` and `rear/<n>` ports are derived from `ports`, and a coupler joins each front port to one rear port; it is not a hop. |
 | `pdu` | [PduSpec](#spec--pdu) | A power distribution unit. Its numbered outlets are derived from `outlets`; they are not interfaces, and a device names one in `power.inputs` rather than being cabled to it. Placed on a rack elevation like any other hardware. |
+| `user` | [UserSpec](#spec-of-a-user-document) | One identity: a person, a service account or a shared login. Owns no interfaces and terminates no cable; it is drawn only in the `identity` view. |
+| `group` | [GroupSpec](#spec-of-a-group-document) | A named set of identities. `members` may name a `user` or another `group`, which is what makes a hierarchy expressible; the nesting must not loop (`NG-S012`). |
 | `template` | partial [DeviceSpec](#spec--switch-router-hub-computer-server) | A named partial device spec, merged into every device that names it in `spec.from`. Not an element: never drawn, never listed, never validated on its own. |
 | `layout` | [LayoutSpec](#spec-of-a-layout-document) | Diagram geometry for elements declared elsewhere, scoped by view. Not an element: it carries no network facts and is never drawn as a node. See `netgraph layout`. |
 
@@ -485,6 +487,38 @@ This port is power sourcing equipment: it hands power down the cable. Only on a 
 * How much the port reserves is said once: a `class`, or a `budget_watts`, never both (`NG-E004`). With neither, the port reserves its standard's maximum, which is what a switch with no per-port configuration does.
 * A `poe` block on a port with nothing on it is a *capability* and takes no budget. A port that feeds something, or one with an explicit `budget_watts`, does — see `NG-E013`.
 
+## `spec` of a `user` document
+
+One identity: a person, a service account or a shared login. Owns no interfaces and terminates no cable — a person is not a host — so it appears only in the `identity` view.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `login` | string, 1–64 characters | no | *unset* | The account name, when it differs from `metadata.name`; absent means the two are the same. Estate-wide, so two users claiming one login is `NG-S013`. | `/ietf-system:system/authentication/user/name` |
+| `full_name` | string, ≤ 253 characters | no | *unset* | The person's name as they write it. Free text: a real name is not a grammar. | — |
+| `email` | string, 3–254 characters | no | *unset* | Where mail reaches them, `local@domain.tld`. Also what ties the identity to a directory without netgraph having to model the directory. | — |
+| `uid` | integer, 0–4294967294 | no | *unset* | POSIX user id, when the estate assigns one. 0 to 4294967294; two users claiming one is `NG-S013`. | `/ietf-system:system/authentication/user` |
+| `type` | `person` \| `service` \| `shared` | no | `person` | `person`, `service` or `shared`. Decides whether `NG-S015` and `NG-S016` have anything to say: only a person can depart, and only a person is expected in a group. | — |
+| `status` | `active` \| `suspended` \| `departed` | no | `active` | `active`, `suspended` or `departed`. A departed account is kept rather than deleted so the memberships still to be revoked stay visible (`NG-S015`). | — |
+| `ssh_keys` | string, ≥ 1 character list, ≤ 32 entries | no | `[]` | Public keys the account authenticates with, `<algorithm> <base64> [comment]`. Normalised to single spaces; a private key is refused (`NG-S002`). | `/ietf-system:system/authentication/user/authorized-key` |
+
+* `login` is optional because `metadata.name` is usually the account name already. Absent means the two are the same; everything downstream reads the materialised value, so nothing has to re-apply the default.
+* A `departed` account is *kept*, not deleted: the group memberships still to be revoked are what `NG-S015` reports, and deleting the document would delete them too.
+* Only public keys. A pasted private key is refused with an explanation (`NG-S002`), which is the point of checking the shape at all.
+
+## `spec` of a `group` document
+
+A named set of identities. `members` may name a `user` or another `group`, which is what makes a hierarchy expressible.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `members` | element reference list, ≤ 4096 entries | no | `[]` | The users and nested groups in this group, as element references resolved outwards from the group's own namespace. Must resolve (`NG-S010`), must be an identity (`NG-S011`), and the nesting must not loop (`NG-S012`). | — |
+| `gid` | integer, 0–4294967294 | no | *unset* | POSIX group id, when the estate assigns one. 0 to 4294967294; two groups claiming one is `NG-S013`. | — |
+| `email` | string, 3–254 characters | no | *unset* | Where mail to the whole group goes, when the group is also a distribution list. | — |
+
+* Membership is written on the group and nowhere else. A `user` does not list its groups: two spellings of one fact are how an inventory starts disagreeing with itself.
+* A member is an ordinary element reference (§4.1), resolved outwards from the group's own namespace. It must resolve (`NG-S010`) and must be an identity (`NG-S011`).
+* A group naming itself is refused by the model; a longer loop needs the whole tree and is `NG-S012`.
+
 ## `spec` of a `layout` document
 
 Where things are drawn, per view. A sidecar: it carries no network facts, and the elements it places know nothing about it. `netgraph layout` writes it.
@@ -695,6 +729,26 @@ The authentication *method*. netgraph never stores key material (`NG-T010`).
 | `certificate` |
 | `public-key` |
 | `password` |
+
+### `user.type`
+
+Decides which identity rules apply: only a `person` can depart (`NG-S015`), and only a `person` is expected to be in a group (`NG-S016`).
+
+| Value |
+|---|
+| `person` |
+| `service` |
+| `shared` |
+
+### `user.status`
+
+`departed` is kept rather than deleted, so the memberships still to be revoked stay visible.
+
+| Value |
+|---|
+| `active` |
+| `suspended` |
+| `departed` |
 
 ## Scalar formats
 

@@ -18,7 +18,7 @@ this page paraphrases, and it is the one to read when two statements disagree.
 - [Folders are namespaces](#folders-are-namespaces)
 - [How a reference is resolved](#how-a-reference-is-resolved)
 - [Which files the loader reads](#which-files-the-loader-reads)
-- [The ten kinds](#the-ten-kinds)
+- [The thirteen kinds](#the-thirteen-kinds)
 - [A layout for a small network](#a-layout-for-a-small-network)
 - [A layout for an estate](#a-layout-for-an-estate)
 - [Declaring a 48-port switch without typing it 48 times](#declaring-a-48-port-switch-without-typing-it-48-times)
@@ -150,11 +150,11 @@ Discovery is one implementation, used by every command, so a file the inventory
 would not read is also a file `fmt` will not rewrite and `validate` will not
 complain about.
 
-## The ten kinds
+## The thirteen kinds
 
 Every document declares a `kind`, and the `kind` decides the shape of its `spec`.
-Nine kinds are **elements** — each becomes a node or an edge of the graph. The
-tenth, `template`, is not.
+Twelve kinds are **elements** — each becomes a node or an edge of the graph. The
+thirteenth, `template`, is not.
 
 | `kind` | What it is for | Specification |
 |---|---|---|
@@ -167,6 +167,9 @@ tenth, `template`, is not.
 | `adapter` | Interfaces presented over a non-network host port — a USB dock, a Thunderbolt bridge. | [§8](schema.md#8-adapters) |
 | `tunnel` | An undirected logical link between two or more `tunnel` interfaces; `over` nests one inside another. | [§14](schema.md#14-tunnels) |
 | `patchpanel` | A passive cross-connect. Its front and rear ports are derived from `ports`, and it is not a hop. | [§15](schema.md#15-patch-panels) |
+| `pdu` | A power distribution unit. Its numbered outlets are derived from `outlets`; a device names one in `power.inputs`. | [§17.1](schema.md#171-power-distribution-units) |
+| `user` | One identity: a person, a service account or a shared login. Owns no interfaces; drawn only in the `identity` view. | [§19.1](schema.md#191-user) |
+| `group` | A named set of identities. `members` may name a `user` or another `group`, so a hierarchy is expressible. | [§19.2](schema.md#192-group) |
 | `template` | A named partial device `spec`, merged into every device that names it in `spec.from`. Not an element. | [§6.6](schema.md#66-template--reusable-partial-device-specs) |
 
 [`docs/schema-reference.md`](schema-reference.md#element-kinds) is the generated

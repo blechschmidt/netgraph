@@ -28,9 +28,11 @@ from netgraph.errors import RenderError
 from netgraph.models import format_watts
 from netgraph.render.aggregate import AGGREGATE_KIND, AggregateView
 from netgraph.render.graph import (
+    GROUP_KIND,
     PATCHPANEL_KIND,
     SUBNET_KIND,
     TUNNEL_KIND,
+    USER_KIND,
     Edge,
     EdgeKind,
     Graph,
@@ -74,6 +76,13 @@ _NODE_SHAPE: Final[Mapping[str, tuple[str, str]]] = {
     # have taken theirs, and its widening base reads as "several things under
     # one heading", which is what a collapsed namespace is.
     AGGREGATE_KIND: ("[/", "\\]"),
+    # ``(( ))`` is Mermaid's circle: the organisation-chart shape, and the one
+    # frame no network kind above claimed.
+    USER_KIND: ("((", "))"),
+    # ``[\…/]`` is the inverted trapezoid, the last frame Mermaid has left and
+    # the mirror of the aggregate's: several things narrowing into one heading,
+    # which is what a group is.
+    GROUP_KIND: ("[\\", "/]"),
 }
 _DEFAULT_SHAPE: Final[tuple[str, str]] = ("[", "]")
 
@@ -89,6 +98,8 @@ _CLASS_STYLE: Final[Mapping[str, str]] = {
     SUBNET_KIND: "fill:#e0f2f1,stroke:#0f766e,stroke-width:1px",
     TUNNEL_KIND: "fill:#ede9fe,stroke:#6d28d9,stroke-width:1px,stroke-dasharray:4 3",
     AGGREGATE_KIND: "fill:#e2e8f0,stroke:#475569,stroke-width:2px",
+    USER_KIND: "fill:#fce7f3,stroke:#be185d,stroke-width:1px",
+    GROUP_KIND: "fill:#fbcfe8,stroke:#9d174d,stroke-width:2px",
 }
 
 #: Link syntax per edge style: solid, thick (fibre) and dotted (attachment).
@@ -289,6 +300,10 @@ def _node_text(node: Node, options: RenderOptions, layer: Layer) -> str:
         # What this box draws, distributes or hands out: the same content the DOT
         # record holds, and the whole reason the node is drawn at this layer.
         return "\n".join([node.name, f"[{node.kind}]", *node.power.describe()])
+
+    if node.identity is not None:
+        # Who this is, the same clauses the DOT record spells out (§19.3).
+        return "\n".join([node.name, f"[{node.kind}]", *node.identity.details()])
 
     parts = [node.name, f"[{node.kind}]"]
     # At layer 3 the addresses live on the edges, where they say which interface

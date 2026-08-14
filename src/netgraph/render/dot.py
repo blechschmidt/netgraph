@@ -110,11 +110,13 @@ from netgraph.render.details import (
     printable,
 )
 from netgraph.render.graph import (
+    GROUP_KIND,
     PATCHPANEL_KIND,
     PDU_KIND,
     RACK_KIND,
     SUBNET_KIND,
     TUNNEL_KIND,
+    USER_KIND,
     Edge,
     EdgeKind,
     Graph,
@@ -328,6 +330,15 @@ _NODE_STYLE: Final[Mapping[str, tuple[str, str, str]]] = {
     # the one no element kind here had taken, which is what keeps a power node
     # from being read as part of the data path.
     PDU_KIND: ("box", "#fef3c7", "#b45309"),
+    # An identity is a person, and Graphviz has no person. An ``oval`` is the
+    # shape every organisation chart draws one with, and rose is the last accent
+    # left — which matters more than the hue itself: the identity view must not
+    # be mistakable for a fragment of the network views at a glance.
+    USER_KIND: ("oval", "#fce7f3", "#be185d"),
+    # A group is a *container* of those, so it borrows the folder shape the
+    # collapsed namespace uses and the identity palette, saying both things at
+    # once: something is inside it, and what is inside it is people.
+    GROUP_KIND: ("folder", "#fbcfe8", "#9d174d"),
 }
 _DEFAULT_NODE_STYLE: Final[tuple[str, str, str]] = ("box", "#f5f5f5", "#6b7280")
 
@@ -360,6 +371,11 @@ _CLEARTEXT_TUNNEL_STYLE: Final[tuple[str, str]] = ("#be123c", "dashed")
 #: another. Dotted and violet: the vocabulary of the tunnel it belongs to,
 #: with a line weight that keeps it behind the tunnels themselves.
 _ENCAPSULATION_STYLE: Final[tuple[str, str]] = ("#8b5cf6", "dotted")
+
+#: A membership (§19.3) is the only edge the identity view has, so it needs no
+#: contrast with a sibling: solid, in the identity rose, and told apart from
+#: everything else by being the only line on the page.
+_MEMBERSHIP_STYLE: Final[tuple[str, str]] = ("#be185d", "solid")
 
 #: The two adjacencies of the routing view (§16.6). A BGP session is a
 #: configured, point-to-point relationship, so it is drawn *solid*; an OSPF
@@ -1407,6 +1423,11 @@ def _node_rows(node: Node, options: RenderOptions, layer: Layer) -> tuple[_Row, 
     if node.power is not None:
         return _power_rows(node.power)
 
+    if node.identity is not None:
+        # Spanning rows, for the same reason the power view uses them: not one
+        # of these facts is about a port, and an identity has no ports anyway.
+        return tuple(_Row(port=_inline(line), spans=True) for line in node.identity.details())
+
     # At layer 3 each address is printed on the edge that puts the element in a
     # subnet, which also says which interface holds it; repeating the list under
     # the node would double the label to say less.
@@ -1461,6 +1482,8 @@ def _edge_views(
             colour, style = _OUTLET_STYLE
         elif edge.kind is EdgeKind.POE:
             colour, style = _POE_STYLE
+        elif edge.kind is EdgeKind.MEMBERSHIP:
+            colour, style = _MEMBERSHIP_STYLE
         elif edge.kind is EdgeKind.TUNNEL:
             colour, style = (
                 _TUNNEL_STYLE

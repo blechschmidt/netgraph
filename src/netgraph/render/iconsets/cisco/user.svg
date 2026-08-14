@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="72" height="56" viewBox="0 0 72 56" role="img" aria-label="User">
+  <title>User</title>
+  <g stroke="#be185d" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <circle cx="36" cy="19" r="10" fill="#fce7f3"/>
+    <path d="M17 49 C17 37 25 32 36 32 C47 32 55 37 55 49 Z" fill="#fce7f3"/>
+  </g>
+</svg>

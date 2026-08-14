@@ -10,14 +10,16 @@
     "scope": "the whole inventory",
     "format": "json",
     "counts": {
-      "elements": 14,
+      "elements": 19,
       "sites": 1,
       "adapter": 1,
       "cable": 6,
       "computer": 3,
+      "group": 2,
       "router": 1,
       "server": 1,
-      "switch": 2
+      "switch": 2,
+      "user": 3
     }
   },
   "pages": [
@@ -25,7 +27,7 @@
       "path": "index",
       "kind": "overview",
       "title": "home-lab — as-built network documentation",
-      "summary": "14 element(s) across 1 site page(s), covering the whole inventory.",
+      "summary": "19 element(s) across 1 site page(s), covering the whole inventory.",
       "parent": "",
       "sections": [
         {
@@ -549,6 +551,150 @@
                 ]
               ],
               "note": "A row with no port is an element that reaches the VLAN over a link rather than by configuring it — a host behind an access port, or a hub."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "accounts",
+          "title": "Identity",
+          "blurb": "The accounts the network is for, and the groups that grant access.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "users",
+              "title": "Accounts",
+              "columns": [
+                {
+                  "header": "USER",
+                  "align": "left"
+                },
+                {
+                  "header": "LOGIN",
+                  "align": "left"
+                },
+                {
+                  "header": "FULL NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "EMAIL",
+                  "align": "left"
+                },
+                {
+                  "header": "UID",
+                  "align": "right"
+                },
+                {
+                  "header": "TYPE",
+                  "align": "left"
+                },
+                {
+                  "header": "STATUS",
+                  "align": "left"
+                },
+                {
+                  "header": "KEYS",
+                  "align": "right"
+                },
+                {
+                  "header": "GROUPS",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "ana",
+                  "ana",
+                  "Ana Brandt",
+                  "ana@example.invalid",
+                  "1000",
+                  "person",
+                  "active",
+                  "1",
+                  "admins"
+                ],
+                [
+                  "kit",
+                  "kit",
+                  "Kit Brandt",
+                  "kit@example.invalid",
+                  "1001",
+                  "person",
+                  "active",
+                  "0",
+                  "household"
+                ],
+                [
+                  "backup",
+                  "backup",
+                  "-",
+                  "-",
+                  "900",
+                  "service",
+                  "active",
+                  "0",
+                  "-"
+                ]
+              ],
+              "note": "GROUPS is the reverse of what the documents hold: no 'user' lists its groups, so this is the one fact about a person their own file cannot say."
+            },
+            {
+              "key": "groups",
+              "title": "Groups",
+              "columns": [
+                {
+                  "header": "GROUP",
+                  "align": "left"
+                },
+                {
+                  "header": "GID",
+                  "align": "right"
+                },
+                {
+                  "header": "EMAIL",
+                  "align": "left"
+                },
+                {
+                  "header": "MEMBERS",
+                  "align": "right"
+                },
+                {
+                  "header": "NESTED",
+                  "align": "right"
+                },
+                {
+                  "header": "PEOPLE",
+                  "align": "right"
+                },
+                {
+                  "header": "HOLDS",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "admins",
+                  "100",
+                  "-",
+                  "1",
+                  "0",
+                  "1",
+                  "ana"
+                ],
+                [
+                  "household",
+                  "101",
+                  "-",
+                  "2",
+                  "1",
+                  "2",
+                  "admins, kit"
+                ]
+              ],
+              "note": "HOLDS is what the document names; PEOPLE is how many accounts the group reaches once nested groups have been walked."
             }
           ],
           "links": [],
@@ -1323,6 +1469,150 @@
                 ]
               ],
               "note": "One row per SSID per radio: a dual-band AP serving three networks has six."
+            }
+          ],
+          "links": [],
+          "notes": []
+        },
+        {
+          "key": "accounts",
+          "title": "Identity",
+          "blurb": "The accounts the network is for, and the groups that grant access.",
+          "fields": [],
+          "diagrams": [],
+          "tables": [
+            {
+              "key": "users",
+              "title": "Accounts",
+              "columns": [
+                {
+                  "header": "USER",
+                  "align": "left"
+                },
+                {
+                  "header": "LOGIN",
+                  "align": "left"
+                },
+                {
+                  "header": "FULL NAME",
+                  "align": "left"
+                },
+                {
+                  "header": "EMAIL",
+                  "align": "left"
+                },
+                {
+                  "header": "UID",
+                  "align": "right"
+                },
+                {
+                  "header": "TYPE",
+                  "align": "left"
+                },
+                {
+                  "header": "STATUS",
+                  "align": "left"
+                },
+                {
+                  "header": "KEYS",
+                  "align": "right"
+                },
+                {
+                  "header": "GROUPS",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "ana",
+                  "ana",
+                  "Ana Brandt",
+                  "ana@example.invalid",
+                  "1000",
+                  "person",
+                  "active",
+                  "1",
+                  "admins"
+                ],
+                [
+                  "kit",
+                  "kit",
+                  "Kit Brandt",
+                  "kit@example.invalid",
+                  "1001",
+                  "person",
+                  "active",
+                  "0",
+                  "household"
+                ],
+                [
+                  "backup",
+                  "backup",
+                  "-",
+                  "-",
+                  "900",
+                  "service",
+                  "active",
+                  "0",
+                  "-"
+                ]
+              ],
+              "note": "GROUPS is the reverse of what the documents hold: no 'user' lists its groups, so this is the one fact about a person their own file cannot say."
+            },
+            {
+              "key": "groups",
+              "title": "Groups",
+              "columns": [
+                {
+                  "header": "GROUP",
+                  "align": "left"
+                },
+                {
+                  "header": "GID",
+                  "align": "right"
+                },
+                {
+                  "header": "EMAIL",
+                  "align": "left"
+                },
+                {
+                  "header": "MEMBERS",
+                  "align": "right"
+                },
+                {
+                  "header": "NESTED",
+                  "align": "right"
+                },
+                {
+                  "header": "PEOPLE",
+                  "align": "right"
+                },
+                {
+                  "header": "HOLDS",
+                  "align": "left"
+                }
+              ],
+              "rows": [
+                [
+                  "admins",
+                  "100",
+                  "-",
+                  "1",
+                  "0",
+                  "1",
+                  "ana"
+                ],
+                [
+                  "household",
+                  "101",
+                  "-",
+                  "2",
+                  "1",
+                  "2",
+                  "admins, kit"
+                ]
+              ],
+              "note": "HOLDS is what the document names; PEOPLE is how many accounts the group reaches once nested groups have been walked."
             }
           ],
           "links": [],

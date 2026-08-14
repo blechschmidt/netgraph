@@ -53,6 +53,8 @@ expands §9 with the reasoning and with what is deliberately left uncovered.
 15. [Patch panels](#15-patch-panels)
 16. [Routing](#16-routing)
 17. [Power](#17-power)
+18. [Layout: diagram geometry](#18-layout-diagram-geometry)
+19. [Identity: users and groups](#19-identity-users-and-groups)
 
 ---
 
@@ -207,13 +209,14 @@ spec:
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
 | `apiVersion` | string | M | — | MUST be `netgraph.dev/v1alpha1` for this revision. See §12. |
-| `kind` | enum | M | — | One of `switch`, `router`, `hub`, `computer`, `server`, `cable`, `adapter`, `tunnel`, `patchpanel`, `pdu`, `template`. Lower-case; other spellings are rejected. |
+| `kind` | enum | M | — | One of `switch`, `router`, `hub`, `computer`, `server`, `cable`, `adapter`, `tunnel`, `patchpanel`, `pdu`, `user`, `group`, `template`, `layout`. Lower-case; other spellings are rejected. |
 | `metadata` | mapping | M | — | §3.1 |
-| `spec` | mapping | M | — | Shape depends on `kind`: §6 (devices), §7 (cable), §8 (adapter), §14 (tunnel), §15 (patchpanel), §17.1 (pdu), §6.6 (template). |
+| `spec` | mapping | M | — | Shape depends on `kind`: §6 (devices), §7 (cable), §8 (adapter), §14 (tunnel), §15 (patchpanel), §17.1 (pdu), §19 (user, group), §6.6 (template), §18 (layout). |
 
-The first ten kinds are **elements**: each becomes a node or an edge of the
-graph. `template` is the eleventh kind and is not an element — it declares a
-reusable partial device `spec` and is merged away by the loader (§6.6).
+The first twelve kinds are **elements**: each becomes a node or an edge of the
+graph. `template` is not an element — it declares a reusable partial device
+`spec` and is merged away by the loader (§6.6) — and neither is `layout`, which
+carries diagram geometry for elements declared elsewhere (§18).
 
 ### 3.1 `metadata`
 
@@ -1150,7 +1153,7 @@ named. §10.10 maps them.
 |---|---|---|
 | `NG-D001` | error | The document is a mapping with the four envelope keys; `apiVersion`, `kind`, `metadata`, `spec` are all present. |
 | `NG-D002` | error | `apiVersion` is a recognised version string. |
-| `NG-D003` | error | `kind` is one of the ten element kinds or `template`, lower-case. |
+| `NG-D003` | error | `kind` is one of the twelve element kinds, `template` or `layout`, lower-case. |
 | `NG-D004` | error | `spec` matches the shape required by `kind`. |
 | `NG-D005` | error | No unknown keys anywhere in the document. |
 | `NG-N001` | error | `metadata.name` matches the name grammar (§4.1). |
@@ -3801,3 +3804,151 @@ Graphviz at all.
 | `NG-Y001` | warning | Every key names something the inventory declares. `netgraph layout --prune` drops the rest. |
 | `NG-Y002` | error | Two layout documents in one namespace do not share a name. |
 | `NG-Y003` | error | A view is one of the layers netgraph draws, a coordinate is a finite number, and a size is positive. |
+
+---
+
+## 19. Identity: users and groups
+
+Every other kind in this specification answers *what is there*. These two answer
+*whose is it, and who may touch it* — the question an audit asks first and the
+one an inventory of boxes and cables cannot answer at all. A wireless network
+with a per-user PSK, a jump host with a list of authorised keys, a VLAN that
+exists because one department needed it: all three are facts about people,
+written down today in a spreadsheet nobody diffs.
+
+So an identity is an element like any other. It has a document, a namespace, a
+name unique within it (`NG-N002`), labels, a description and a source location;
+it is planned, applied, formatted, listed, exported and drawn by exactly the
+machinery every other kind goes through. Nothing here is a special case, which is
+the point: the moment identity needs its own loader or its own diff, the single
+source of truth has stopped being single.
+
+Neither kind owns interfaces. A person is not a host, so a `user` and a `group`
+terminate no cable, appear in no data layer, and are excluded from every rule
+about ports — the same arrangement a `pdu` has (§17.1), and for the same reason.
+
+### 19.1 `user`
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: user
+metadata:
+  name: ana
+  description: Runs the lab. Holds the only account on the router.
+spec:
+  full_name: Ana Brandt
+  email: ana@example.invalid
+  uid: 1000
+  ssh_keys:
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyForTheDocsOnlyAAAAAAAAAAA ana@pc-desk
+```
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `login` | string | O | `metadata.name` | The account name, when it differs from the document's own. Letters, digits and `. _ - @`, starting with a letter, a digit or `_`; at most 64 characters (`NG-S001`). `@` is accepted because a user principal name (`ana@example.com`) *is* the login on a domain-joined estate. |
+| `full_name` | string | O | `null` | The person's name as they write it. Free text, ≤253 characters: a real name is not a grammar, and the ones that do not fit a first/last split are exactly the ones a schema must not mangle. |
+| `email` | string | O | `null` | `local@domain.tld`, ≤254 characters (RFC 5321). Checked for shape rather than against RFC 5322, which accepts things no mail system delivers to and rejects nothing anybody mistypes (`NG-S001`). |
+| `uid` | integer | O | `null` | POSIX user id, 0 to 4294967294 — `4294967295` is `(uid_t) -1` and is not assignable (`NG-S001`). Two users claiming one is `NG-S013`. |
+| `type` | enum | O | `person` | `person`, `service` or `shared`. See below. |
+| `status` | enum | O | `active` | `active`, `suspended` or `departed`. See below. |
+| `ssh_keys` | list[string] | O | `[]` | Public keys, `<algorithm> <base64> [comment]`, at most 32. Normalised to single spaces, so a key pasted wrapped compares equal to the same key pasted flat. Two entries with the same material are `NG-S002` however their comments differ, and a **private** key is refused outright with an explanation — which is the mistake this check exists for. |
+
+`type` is not cosmetic: it decides which rules have anything to say. A `service`
+account belongs to no group on a great many estates, so reporting that as an
+oversight would be noise (`NG-S016` is silent for one); a `shared` account has no
+single person to depart, so `NG-S015` is silent for one too.
+
+`status: departed` is the field the whole section turns on. The tempting response
+to somebody leaving is to delete their `user` document — which removes them from
+the inventory *and* from every group naming them, losing exactly the list somebody
+has to work through. The memberships are the access still to be revoked; they
+cannot be revoked from a record that no longer exists. Marking the account
+`departed` keeps the work visible until it has been done, and `NG-S015` is the
+worklist.
+
+### 19.2 `group`
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: group
+metadata:
+  name: household
+spec:
+  gid: 101
+  members:
+    - admins            # a nested group
+    - kit               # a user
+```
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `members` | list[element ref] | O | `[]` | The users and nested groups in this group, at most 4096. Each is an ordinary element reference (§4.1), resolved outwards from the group's own namespace (§2.2). Must resolve (`NG-S010`), must name a `user` or a `group` (`NG-S011`), and the nesting must not loop (`NG-S012`). One member named twice, or a group naming itself, is `NG-S003`. |
+| `gid` | integer | O | `null` | POSIX group id, 0 to 4294967294. Two groups claiming one is `NG-S013`. |
+| `email` | string | O | `null` | Where mail to the whole group goes, when the group is also a distribution list. Same grammar as a user's. |
+
+**Membership is written on the group and nowhere else.** A `user` does not list
+its groups. Both spellings are readable and only one can be authoritative, and
+writing the fact twice is how an inventory starts disagreeing with itself — the
+failure this tool exists to prevent. The group side is the one chosen because it
+is the side an access rule is written against ("the `vpn` group may dial in") and
+because the count that matters — how many people can do this? — is then a
+property of one document rather than a search across all of them.
+
+The reverse index is *derived*: `netgraph list users` prints a `GROUPS` column,
+and it is the one fact about a person their own file cannot state.
+
+**Nesting** is what makes a hierarchy expressible: `everyone` holds
+`engineering`, which holds `ana`, and `ana` is in `everyone` without being listed
+twice. `netgraph list groups` prints both numbers — `HOLDS` is what the document
+names, `PEOPLE` is how many accounts the group reaches once the nesting has been
+walked — because the second is what an access rule actually grants to and no
+single document holds it.
+
+### 19.3 The identity view
+
+`netgraph render --layer identity` draws the identities and nothing else.
+
+**Nodes** are the `user` and `group` documents. A user is drawn as an oval, the
+shape every organisation chart uses for a person; a group as a folder, because
+something is inside it. Both are in a rose palette no element kind had taken, so
+an identity diagram cannot be misread as a fragment of a network one, and both
+have an icon in the bundled themes.
+
+**Edges** are the memberships, one per entry of `spec.members`, drawn from the
+group to the member — the direction the fact is written in and the direction a
+reader follows to answer "who is in this?". A member that does not resolve is not
+drawn: `NG-S010` is the place that says so, and `--force` must still produce a
+picture.
+
+Everything else is discarded, exactly as the power view discards the cabling
+(§17.5). A cable between two servers says nothing about who may log into either,
+and drawing both graphs at once produces a picture in which neither is readable.
+
+### 19.4 Rules
+
+The group is lettered `S`, for *subject* — the term an access-control system uses
+for a principal it names. `NG-U` was spent on rack units (§10.13) and `NG-I` on
+interfaces, so neither initial was available. `NG-S001` to `NG-S003` are schema
+rules, reported while the document is parsed and not suppressible; `NG-S010`
+onwards are semantic and carry the short ids of §10.10.
+
+| ID | Sev. | Rule |
+|---|---|---|
+| `NG-S001` | error | A `user`'s `login` matches the account grammar and fits in 64 characters, its `email` is `local@domain.tld` within 254, and a `uid`/`gid` is an assignable POSIX id. |
+| `NG-S002` | error | Every `ssh_keys` entry is `<algorithm> <base64> [comment]`, no two entries share key material, and none of them is a private key. |
+| `NG-S003` | error | A `group`'s `members` names nothing twice and does not name the group itself. |
+| `NG-S010` | error | Every member resolves: the reference names one declared element, unambiguously, after the §2.2 lookups. |
+| `NG-S011` | error | Every member is a `user` or a `group`. Anything else is a name collision, not a statement about the switch it landed on. |
+| `NG-S012` | error | Group nesting is acyclic. A cyclic group has no membership: expanding it does not terminate. |
+| `NG-S013` | error | No two identities claim one `login`, one `uid` or one `gid`. Namespaces make no difference: the account namespace is the estate, not the folder. |
+| `NG-S014` | warning | A `group` has at least one member. Anything granted to an empty group is granted to nobody, and *looks* granted. |
+| `NG-S015` | warning | No group lists a `person` whose `status` is `departed`. The membership is access that has not been revoked. |
+| `NG-S016` | info | An active `person` is a member of at least one group. |
+
+`NG-S014` is a warning deliberately: a group created before the people who will
+be in it is a normal intermediate state, and so is one emptied on purpose to keep
+its name reserved. `NG-S016` is only info, and only about a `person`: granting a
+person access directly and putting them in nothing is a normal way to run an
+estate. It is printed because the opposite reading — "she is in no group,
+therefore she has no access" — is a claim an auditor wants confirmed rather than
+assumed.

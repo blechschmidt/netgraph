@@ -32,9 +32,10 @@ from typing import Any, Final
 
 from netgraph.console import Align
 from netgraph.errors import compact_ids
+from netgraph.identity import identity_plan
 from netgraph.ipam import Utilisation, format_capacity, format_utilisation
 from netgraph.loader.inventory import Inventory, short_name
-from netgraph.models import Adapter, Device, format_bitrate, format_watts
+from netgraph.models import GROUP_KIND, Adapter, Device, format_bitrate, format_watts
 from netgraph.power import format_utilisation_percent, power_plan
 from netgraph.render.graph import Layer, Node, build_graph, resolve_tunnels
 from netgraph.subnets import subnets_of
@@ -46,10 +47,12 @@ __all__ = [
     "bss",
     "cables",
     "devices",
+    "groups",
     "length_text",
     "power",
     "subnets",
     "tunnels",
+    "users",
     "utilisation",
     "vlans",
 ]
@@ -449,6 +452,108 @@ def power(inventory: Inventory) -> Listing:
     return Listing(headers, aligns, rows, records)
 
 
+def users(inventory: Inventory) -> Listing:
+    """One row per identity: the account, and what it is a member of (§19.1).
+
+    ``GROUPS`` is the reverse of what the documents hold — no ``user`` lists its
+    groups (see :mod:`netgraph.models.identity`) — which is exactly why it is
+    worth a column: it is the one fact about a person that cannot be read off
+    their own file.
+    """
+    plan = identity_plan(inventory)
+    rows: list[list[str]] = []
+    records: list[dict[str, Any]] = []
+    for fqn, user in inventory.users.items():
+        holders = plan.groups_of(fqn)
+        rows.append(
+            [
+                short_name(fqn),
+                user.login,
+                user.spec.full_name or "-",
+                user.spec.email or "-",
+                str(user.spec.uid) if user.spec.uid is not None else "-",
+                str(user.spec.type),
+                str(user.spec.status),
+                str(len(user.spec.ssh_keys)),
+                ", ".join(short_name(group) for group in holders) or "-",
+            ]
+        )
+        record: dict[str, Any] = {
+            "user": fqn,
+            "name": user.metadata.name,
+            "login": user.login,
+            "type": str(user.spec.type),
+            "status": str(user.spec.status),
+            "sshKeys": len(user.spec.ssh_keys),
+            "groups": list(holders),
+        }
+        if user.spec.full_name:
+            record["fullName"] = user.spec.full_name
+        if user.spec.email:
+            record["email"] = user.spec.email
+        if user.spec.uid is not None:
+            record["uid"] = user.spec.uid
+        records.append(record)
+    headers = ("USER", "LOGIN", "FULL NAME", "EMAIL", "UID", "TYPE", "STATUS", "KEYS", "GROUPS")
+    aligns: tuple[Align, ...] = (
+        "left",
+        "left",
+        "left",
+        "left",
+        "right",
+        "left",
+        "left",
+        "right",
+        "left",
+    )
+    return Listing(headers, aligns, rows, records)
+
+
+def groups(inventory: Inventory) -> Listing:
+    """One row per group: what it holds directly, and who it grants to (§19.2).
+
+    Two member columns rather than one, for the same reason the power table has
+    two load columns. ``MEMBERS`` is what the document says; ``PEOPLE`` is how
+    many users the group actually reaches once the nesting has been walked, which
+    is the number an access rule written against it grants to and the number no
+    single document holds.
+    """
+    plan = identity_plan(inventory)
+    rows: list[list[str]] = []
+    records: list[dict[str, Any]] = []
+    for fqn, group in inventory.groups.items():
+        direct = plan.members_of(fqn)
+        reached = plan.users_in(fqn)
+        nested = tuple(member for member in direct if plan.kinds.get(member) == GROUP_KIND)
+        rows.append(
+            [
+                short_name(fqn),
+                str(group.gid) if group.gid is not None else "-",
+                group.spec.email or "-",
+                str(len(group.spec.members)),
+                str(len(nested)),
+                str(len(reached)),
+                ", ".join(short_name(member) for member in direct) or "-",
+            ]
+        )
+        record: dict[str, Any] = {
+            "group": fqn,
+            "name": group.metadata.name,
+            "members": list(direct),
+            "declaredMembers": list(group.members),
+            "nestedGroups": list(nested),
+            "users": list(reached),
+        }
+        if group.gid is not None:
+            record["gid"] = group.gid
+        if group.spec.email:
+            record["email"] = group.spec.email
+        records.append(record)
+    headers = ("GROUP", "GID", "EMAIL", "MEMBERS", "NESTED", "PEOPLE", "HOLDS")
+    aligns: tuple[Align, ...] = ("left", "right", "left", "right", "right", "right", "left")
+    return Listing(headers, aligns, rows, records)
+
+
 def utilisation(rows: Iterable[Utilisation], *, aggregated: bool = False) -> Listing:
     """The ``netgraph ipam`` utilisation table: how full each prefix is.
 
@@ -503,6 +608,8 @@ LISTINGS: Final[Mapping[str, Callable[[Inventory], Listing]]] = {
     "bss": bss,
     "subnets": subnets,
     "power": power,
+    "users": users,
+    "groups": groups,
 }
 
 

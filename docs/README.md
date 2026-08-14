@@ -46,7 +46,7 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
   48-port switch without typing 48 interfaces.
 * **[importing.md](importing.md)** — bootstrap the first inventory from LLDP, `ip -j addr`
   or the cabling spreadsheet you already keep, then converge on it by hand.
-* **[rendering.md](rendering.md)** — the seven layers, the filters, namespace collapsing and
+* **[rendering.md](rendering.md)** — the nine layers, the filters, namespace collapsing and
   link bundling, icon themes, labelling, stored arrangements, interactivity, and what each
   output format is good for.
 * **[validation.md](validation.md)** — the three passes, severities, `--strict`, the four

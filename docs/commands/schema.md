@@ -109,7 +109,7 @@ ends of a link agree about a VLAN: all of that needs the whole tree and stays wi
 <!-- generated: options schema -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
-| `-k`, `--kind` | `[switch\|router\|hub\|computer\|server\|cable\|adapter\|tunnel\|patchpanel\|pdu\|template\|layout]` | — | Emit the schema for a single document kind instead of all of them. |
+| `-k`, `--kind` | `[switch\|router\|hub\|computer\|server\|cable\|adapter\|tunnel\|patchpanel\|pdu\|user\|group\|template\|layout]` | — | Emit the schema for a single document kind instead of all of them. |
 | `--all` | — | off | Emit one schema covering every kind, discriminated on 'kind'. The default. |
 | `-o`, `--output` | `FILE` | — | Write to this file instead of stdout. |
 <!-- /generated -->

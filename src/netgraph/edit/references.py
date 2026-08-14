@@ -5,7 +5,7 @@ the new one, and a delete is not safe until the tree is asked what would be left
 dangling. Both questions come down to the same table: the places one document
 can name another.
 
-There are five, and they are not guessable from the YAML — a string is a
+There are six, and they are not guessable from the YAML — a string is a
 reference because the *schema* says the field holds one, not because it has a
 colon in it:
 
@@ -14,6 +14,7 @@ colon in it:
 ``spec.over``                the tunnel a tunnel runs inside (§14.4)
 ``spec.upstream.attached_to``the host an adapter is plugged into (§8.1)
 ``spec.power.inputs[]``      the outlet feeding a supply, ``pdu:outlet`` (§17)
+``spec.members[]``           a user or nested group in a group (§19.2)
 ``spec.from``                the template a device inherits (§6.6)
 ============================ ================================================
 
@@ -42,7 +43,7 @@ from typing import Any, Final
 from netgraph.edit.errors import EditError
 from netgraph.edit.paths import FieldPath, format_field_path, get_field
 from netgraph.loader.inventory import namespace_of, qualify, short_name
-from netgraph.models import Adapter, Cable, Element, Tunnel
+from netgraph.models import Adapter, Cable, Element, Group, Tunnel
 
 __all__ = [
     "NameIndex",
@@ -68,6 +69,11 @@ class ReferenceRole(str, Enum):
     ATTACHED_TO = "attached_to"
     #: One entry of ``spec.power.inputs``. A list entry, so it can be dropped.
     POWER_INPUT = "power_input"
+    #: One entry of a group's ``spec.members`` (§19.2). A list entry, so a
+    #: cascading delete drops the membership rather than the group: a group that
+    #: loses a member is still a group, which is not true of a cable that loses
+    #: an end.
+    MEMBER = "member"
     #: ``spec.from`` — the template a device inherits. Not an element reference:
     #: templates are not elements, so nothing here ever deletes one. It is
     #: tracked because moving a document to another folder can change what a
@@ -145,6 +151,14 @@ def references_of(fqn: str, element: Element) -> Iterator[Reference]:
             path=("spec", "upstream", "attached_to"),
             target=element.spec.upstream.attached_to,
         )
+    if isinstance(element, Group):
+        for index, member in enumerate(element.spec.members):
+            yield Reference(
+                source=fqn,
+                role=ReferenceRole.MEMBER,
+                path=("spec", "members", index),
+                target=member,
+            )
     power = getattr(element.spec, "power", None)
     if power is not None:
         for index, entry in enumerate(power.inputs):
@@ -303,8 +317,8 @@ def drop_reference(document: Any, reference: Reference) -> None:
     """Remove the reference itself: a list entry, or an optional scalar field.
 
     Used by a cascading delete for the references that are not structural — an
-    adapter's ``attached_to`` and a power input — where the referring element
-    survives without them.
+    adapter's ``attached_to``, a power input, a group membership — where the
+    referring element survives without them.
 
     Raises:
         EditError: The document holds no such reference.

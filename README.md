@@ -284,7 +284,7 @@ over the whole set. The pages a new reader wants first:
 |---|---|
 | [`docs/getting-started.md`](docs/getting-started.md) | Install it, build a three-device inventory by hand, validate, render, interrogate. Ends with the editor wiring. |
 | [`docs/inventory-layout.md`](docs/inventory-layout.md) | How to organise the files: namespaces, references, templates, interface ranges, and a layout for a multi-site estate. |
-| [`docs/rendering.md`](docs/rendering.md) | The seven layers, the filters, namespace collapsing, link bundling, icon themes, stored arrangements, and what each output format is for. |
+| [`docs/rendering.md`](docs/rendering.md) | The nine layers, the filters, namespace collapsing, link bundling, icon themes, stored arrangements, and what each output format is for. |
 | [`docs/validation.md`](docs/validation.md) | What the checks are, what a finding means, and the four ways to say "not here". |
 | [`docs/schema-reference.md`](docs/schema-reference.md) | Every field of every kind, with its type, default and YANG counterpart. |
 | [`docs/schema.md`](docs/schema.md) | The normative specification, if you want the reasoning as well as the rules. |

@@ -58,6 +58,7 @@ from netgraph.models import (  # noqa: E402
     ElementBase,
     Forwarding,
     GroupGeometry,
+    GroupSpec,
     Interface,
     InterfaceRef,
     InterfaceType,
@@ -90,6 +91,9 @@ from netgraph.models import (  # noqa: E402
     TunnelType,
     UpstreamPort,
     UpstreamType,
+    UserSpec,
+    UserStatus,
+    UserType,
     ViewGeometry,
     VlanConfig,
     VlanDefinition,
@@ -464,6 +468,42 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "`NG-E013`.",
         ),
     ),
+    # Identity (§19). After the hardware and before the geometry: it is a fact
+    # about the network rather than about the drawing, but it is the only kind
+    # here that describes no equipment.
+    Section(
+        UserSpec,
+        "`spec` of a `user` document",
+        "One identity: a person, a service account or a shared login. Owns no interfaces and "
+        "terminates no cable — a person is not a host — so it appears only in the `identity` "
+        "view.",
+        notes=(
+            "`login` is optional because `metadata.name` is usually the account name already. "
+            "Absent means the two are the same; everything downstream reads the materialised "
+            "value, so nothing has to re-apply the default.",
+            "A `departed` account is *kept*, not deleted: the group memberships still to be "
+            "revoked are what `NG-S015` reports, and deleting the document would delete them "
+            "too.",
+            "Only public keys. A pasted private key is refused with an explanation "
+            "(`NG-S002`), which is the point of checking the shape at all.",
+        ),
+    ),
+    Section(
+        GroupSpec,
+        "`spec` of a `group` document",
+        "A named set of identities. `members` may name a `user` or another `group`, which is "
+        "what makes a hierarchy expressible.",
+        notes=(
+            "Membership is written on the group and nowhere else. A `user` does not list its "
+            "groups: two spellings of one fact are how an inventory starts disagreeing with "
+            "itself.",
+            "A member is an ordinary element reference (§4.1), resolved outwards from the "
+            "group's own namespace. It must resolve (`NG-S010`) and must be an identity "
+            "(`NG-S011`).",
+            "A group naming itself is refused by the model; a longer loop needs the whole tree "
+            "and is `NG-S012`.",
+        ),
+    ),
     # Diagram geometry (§18). Listed after the elements because it describes the
     # *drawing* rather than the network, and because a reader looking for a field
     # of a device should not have to walk past a table of coordinates to reach it.
@@ -575,6 +615,18 @@ ENUMS: Final[tuple[tuple[type[enum.Enum], str, str], ...]] = (
         TunnelAuth,
         "`tunnel.auth`",
         "The authentication *method*. netgraph never stores key material (`NG-T010`).",
+    ),
+    (
+        UserType,
+        "`user.type`",
+        "Decides which identity rules apply: only a `person` can depart (`NG-S015`), and only "
+        "a `person` is expected to be in a group (`NG-S016`).",
+    ),
+    (
+        UserStatus,
+        "`user.status`",
+        "`departed` is kept rather than deleted, so the memberships still to be revoked stay "
+        "visible.",
     ),
 )
 

@@ -12,7 +12,7 @@ than a shape.
 
 <!-- generated: synopsis list -->
 ```text
-netgraph [GLOBAL OPTIONS] list [OPTIONS] [devices|cables|tunnels|vlans|bss|subnets|power]
+netgraph [GLOBAL OPTIONS] list [OPTIONS] [devices|cables|tunnels|vlans|bss|subnets|power|users|groups]
 ```
 <!-- /generated -->
 
@@ -33,6 +33,8 @@ about one element:
 | `bss` | `SSID`, `RADIO`, `ROLE`, `CHANNEL`, `BSSID`, `VLAN`, `SECURITY` |
 | `subnets` | `SUBNET`, `IP`, `ADDRESSES`, `ELEMENTS`, `VLANS`, and `VRF` when anything is in one |
 | `power` | `PDU`, `FEED`, `OUTLETS`, `USED`, `FREE`, `CAPACITY`, `LOAD`, `FAILOVER`, `UTIL`, `LOADS` |
+| `users` | `USER`, `LOGIN`, `FULL NAME`, `EMAIL`, `UID`, `TYPE`, `STATUS`, `KEYS`, `GROUPS` |
+| `groups` | `GROUP`, `GID`, `EMAIL`, `MEMBERS`, `NESTED`, `PEOPLE`, `HOLDS` |
 
 The columns that are not self-evident:
 
@@ -60,6 +62,12 @@ The columns that are not self-evident:
 | `LOAD`, `FAILOVER` | `power` | The two load figures — see below. |
 | `UTIL` | `power` | `LOAD` as a percentage of `CAPACITY`, or `-` without one. |
 | `LOADS` | `power` | How many elements are plugged into the unit. |
+| `LOGIN` | `users` | The account name. Defaults to `metadata.name`, materialised here so the column always says what the account is ([schema §19.1](../schema.md#191-user)). |
+| `KEYS` | `users` | How many public keys the account authenticates with. |
+| `GROUPS` | `users` | The groups that name this account directly. Derived: no `user` document lists its groups, which is why the column is worth having. |
+| `MEMBERS`, `NESTED` | `groups` | How many members the document names, and how many of them are groups rather than people. |
+| `PEOPLE` | `groups` | How many `user` accounts the group reaches once nested groups have been walked — see below. |
+| `HOLDS` | `groups` | The direct members by name, in the order the document lists them. |
 
 `bss` is one row per SSID per radio, which is the unit an operator works with: a
 dual-band access point serving three networks has six of them, each with its own
@@ -113,10 +121,50 @@ buys. Where each of those watts comes from and goes to is
 [`--layer power`](../rendering.md#power-the-pdus-and-what-they-feed) and
 [`netgraph export power`](export.md).
 
+### `users` and `groups`: the accounts, and what each grants
+
+Identity is an element kind like any other
+([§19 of the schema](../schema.md#19-identity-users-and-groups)), so it is listed
+like one. Two subjects rather than one, because they answer different questions
+and a single table would have half its columns blank in every row.
+
+The pair of member columns on `groups` is the interesting part, for the same
+reason the pair of load columns on `power` is. **`MEMBERS`** is what the document
+says. **`PEOPLE`** is how many `user` accounts the group actually reaches once
+nested groups have been walked, which is the number an access rule written
+against it grants to — and no single document holds it.
+
+<!-- run: -->
+```console
+$ netgraph -q -i examples/home-lab list groups
+GROUP      GID  EMAIL  MEMBERS  NESTED  PEOPLE  HOLDS
+---------  ---  -----  -------  ------  ------  -----------
+admins     100  -            1       0       1  ana
+household  101  -            2       1       2  admins, kit
+```
+
+`household` names two members and holds two people: `kit` directly, and `ana`
+through `admins`. Writing `ana` into both groups would say the same thing and
+would be one more place to forget her.
+
+`GROUPS` on `users` is the same derivation read backwards. Membership is written
+on the group and nowhere else, so "which groups is this person in?" is a question
+$ netgraph -q -i examples/home-lab list users
+USER    LOGIN   FULL NAME   EMAIL                 UID  TYPE     STATUS  KEYS  GROUPS
+------  ------  ----------  -------------------  ----  -------  ------  ----  ---------
+ana     ana     Ana Brandt  ana@example.invalid  1000  person   active     1  admins
+kit     kit     Kit Brandt  kit@example.invalid  1001  person   active     0  household
+backup  backup  -           -                     900  service  active     0  -
+```
+
+`backup` is in nothing, and is a `service` account, so
+[`I004`](../validation-rules.md#i004--person-in-no-group) says nothing about it:
+an account nobody logs in as belonging to no group is the normal shape of one.
+
 ## Computed, not transcribed
 
-`vlans`, `subnets` and `power` are computed from the resolved graph, not from what
-each document literally says: a host on an untagged access port is listed as a
+`vlans`, `subnets`, `power` and `groups` are computed from the resolved graph or
+plan rather than from what each document literally says: a host on an untagged access port is listed as a
 member of that VLAN even though it declares none, and a PDU's row is built from the
 `spec.power.inputs` of everything plugged into it rather than from anything the PDU
 declares about itself — nothing on a strip names its own downstream devices
@@ -130,9 +178,10 @@ The point of computing them is that they cannot disagree with the pictures.
 `power` the same resolution
 [`--layer power`](../rendering.md#power-the-pdus-and-what-they-feed) and
 [`netgraph export power`](export.md) use,
-and `tunnels` the same resolution
+`tunnels` the same resolution
 [`--layer overlay`](../rendering.md#overlay-tunnels-and-what-runs-inside-what)
-draws. A tunnel whose endpoints do not resolve is still listed — you are most
+draws, and `groups` the same membership
+[`--layer identity`](../rendering.md#identity-who-is-in-what) draws. A tunnel whose endpoints do not resolve is still listed — you are most
 likely running the command *because* something is wrong — with its stack left at
 its own type.
 
@@ -214,7 +263,7 @@ answer to everything else, and is usually faster to act on:
 <!-- generated: arguments list -->
 | Argument | Required | Count | Default |
 |---|---|---|---|
-| `[devices\|cables\|tunnels\|vlans\|bss\|subnets\|power]` | no | 1 | `devices` |
+| `[devices\|cables\|tunnels\|vlans\|bss\|subnets\|power\|users\|groups]` | no | 1 | `devices` |
 <!-- /generated -->
 
 ---
@@ -250,7 +299,7 @@ own: validation is not run and findings do not change the code.
   name.
 * [`netgraph ipam`](ipam.md) and [`docs/ipam.md`](../ipam.md) — `list subnets`
   says which prefixes exist; `ipam` says whether the plan is healthy.
-* [`docs/rendering.md`](../rendering.md#layers-one-inventory-eight-questions) — the
+* [`docs/rendering.md`](../rendering.md#layers-one-inventory-nine-questions) — the
   layers whose groupings `subnets`, `tunnels` and `power` print as tables.
 * [`netgraph export power`](export.md) and [`docs/export.md`](../export.md#power) —
   `list power` says whether each strip has room; the load schedule says which outlet

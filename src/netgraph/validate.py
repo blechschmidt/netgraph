@@ -58,6 +58,7 @@ from typing import Final, TypeAlias
 
 from netgraph.config import ValidationConfig
 from netgraph.errors import count_text
+from netgraph.identity import IdentityPlan, identity_plan
 from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of
 from netgraph.loader.provenance import Site
 from netgraph.models import (
@@ -88,6 +89,8 @@ from netgraph.models import (
     StaticRoute,
     Switch,
     Tunnel,
+    UserStatus,
+    UserType,
     VlanConfig,
     VlanMode,
     VrfDefinition,
@@ -613,6 +616,10 @@ class _Context:
     #: resolve. The same plan the ``power`` layer draws and ``list power``
     #: prints, so a finding and a diagram of it can never disagree.
     power: PowerPlan = field(default_factory=PowerPlan)
+    #: Every group membership of the inventory (:mod:`netgraph.identity`),
+    #: resolved. The same plan the ``identity`` layer draws and ``list groups``
+    #: prints, so a finding and a diagram of it can never disagree.
+    identities: IdentityPlan = field(default_factory=IdentityPlan)
 
     def source_of(self, fqn: str | None) -> SourceLocation | None:
         if fqn is None:
@@ -803,6 +810,7 @@ def _build_context(inventory: Inventory) -> _Context:
         routing=routing.routing,
         address_owners=routing.address_owners,
         power=power_plan(inventory),
+        identities=identity_plan(inventory),
     )
 
 
@@ -4358,6 +4366,205 @@ def _check_missing_power_path(ctx: _Context) -> Iterator[_Draft]:
         )
 
 
+# --------------------------------------------------------------------------- #
+# Identity (§19)
+# --------------------------------------------------------------------------- #
+
+
+def _check_member_resolves(ctx: _Context) -> Iterator[_Draft]:
+    """E043 — a group names a member that does not exist (``NG-S010``).
+
+    The same two failures every reference in this schema can have, reported
+    apart because the fix differs: nothing of that name, or several things of
+    that name and no way to tell which was meant. An access rule written against
+    a group is only as true as the group's membership, so a name that resolves to
+    nothing is not a cosmetic problem — it is a person the list silently does not
+    include.
+    """
+    for entry in ctx.identities:
+        if entry.resolved:
+            continue
+        if entry.ambiguous:
+            yield _Draft(
+                f"group {_q(entry.group)} names member {_q(entry.ref)}, which is "
+                f"ambiguous: {_join(sorted(entry.ambiguous))}. Write the reference fully "
+                f"qualified.",
+                (entry.group, *entry.ambiguous),
+                entry.field_path,
+            )
+        else:
+            yield _Draft(
+                f"group {_q(entry.group)} names member {_q(entry.ref)}, but no element "
+                f"of that name exists",
+                (entry.group,),
+                entry.field_path,
+            )
+
+
+def _check_member_is_identity(ctx: _Context) -> Iterator[_Draft]:
+    """E044 — a group member is not a user or a group (``NG-S011``).
+
+    A group holds identities. A switch is not one, and a membership naming one is
+    almost always a name collision rather than a statement about the switch —
+    which is exactly why it is worth saying out loud instead of resolving to the
+    device and drawing an edge nobody meant.
+    """
+    for entry in ctx.identities:
+        if not entry.resolved or entry.is_identity:
+            continue
+        # The member resolved, so both are real elements worth naming.
+        assert entry.member is not None
+        yield _Draft(
+            f"group {_q(entry.group)} names member {_q(entry.ref)}, but {_q(entry.member)} "
+            f"is a {entry.kind}; a group holds 'user' and 'group' elements",
+            (entry.group, entry.member),
+            entry.field_path,
+        )
+
+
+def _check_membership_cycle(ctx: _Context) -> Iterator[_Draft]:
+    """E045 — group membership forms a cycle (``NG-S012``).
+
+    Nesting is the point of groups, so the loop it makes possible has to be
+    refused: ``everyone`` inside ``engineering`` inside ``everyone`` has no
+    membership list at all, because expanding it never terminates. A group naming
+    *itself* is refused earlier, by the model (``NG-S003``), which can see it
+    without an inventory and can therefore point at the line.
+    """
+    for cycle in ctx.identities.cycles():
+        chain = " -> ".join(_q(fqn) for fqn in (*cycle, cycle[0]))
+        yield _Draft(
+            f"group membership is cyclic: {chain}. "
+            f"{count_text(len(cycle), 'group')} would each have to contain the next, so "
+            f"none of them has a membership that can be listed.",
+            tuple(cycle),
+            ("spec", "members"),
+        )
+
+
+def _check_account_identifiers(ctx: _Context) -> Iterator[_Draft]:
+    """E046 — two identities claim one login, uid or gid (``NG-S013``).
+
+    All three are *the* key of an account in the system that consumes them: two
+    users with one login are one account with two owners, and two POSIX ids that
+    collide make a file owned by whichever document happened to be applied last.
+    Reported together because they are one mistake with three spellings, and
+    anchored at the first claimant so the finding lands where the id was assigned.
+
+    Namespaces do not make a difference here, deliberately. Two switches called
+    ``sw-1`` in two sites are two switches; two accounts called ``alice`` in two
+    directories are the same person's login twice, and the whole reason to record
+    a login rather than rely on ``metadata.name`` is that it is estate-wide.
+    """
+    logins: dict[str, list[str]] = {}
+    uids: dict[int, list[str]] = {}
+    for fqn, user in ctx.inventory.users.items():
+        logins.setdefault(user.login, []).append(fqn)
+        if user.spec.uid is not None:
+            uids.setdefault(user.spec.uid, []).append(fqn)
+
+    gids: dict[int, list[str]] = {}
+    for fqn, group in ctx.inventory.groups.items():
+        if group.gid is not None:
+            gids.setdefault(group.gid, []).append(fqn)
+
+    for login, holders in logins.items():
+        if len(holders) > 1:
+            yield _Draft(
+                f"login {_q(login)} is claimed by {count_text(len(holders), 'user')}: "
+                f"{_join(holders)}. One login is one account.",
+                tuple(holders),
+                ("spec", "login"),
+            )
+    for uid, holders in uids.items():
+        if len(holders) > 1:
+            yield _Draft(
+                f"uid {uid} is claimed by {count_text(len(holders), 'user')}: {_join(holders)}. "
+                f"Two users sharing a uid are one user to the filesystem.",
+                tuple(holders),
+                ("spec", "uid"),
+            )
+    for gid, holders in gids.items():
+        if len(holders) > 1:
+            yield _Draft(
+                f"gid {gid} is claimed by {count_text(len(holders), 'group')}: {_join(holders)}. "
+                f"Two groups sharing a gid are one group to the filesystem.",
+                tuple(holders),
+                ("spec", "gid"),
+            )
+
+
+def _check_empty_group(ctx: _Context) -> Iterator[_Draft]:
+    """W139 — a group has no members (``NG-S014``).
+
+    A warning, not an error: a group created before the people who will be in it
+    is a normal intermediate state, and so is one that has been emptied on purpose
+    and kept so its name stays reserved. It is still worth saying, because an
+    access rule written against an empty group grants nothing and *looks* like it
+    grants something — which is the failure that gets noticed on the day somebody
+    needed the access.
+    """
+    for fqn, group in ctx.inventory.groups.items():
+        if group.is_empty:
+            yield _Draft(
+                f"group {_q(fqn)} has no members: anything granted to it is granted to nobody",
+                (fqn,),
+                ("spec", "members"),
+            )
+
+
+def _check_departed_member(ctx: _Context) -> Iterator[_Draft]:
+    """W140 — a group still lists a user who has left (``NG-S015``).
+
+    This is the rule the ``status`` field exists for. Deleting the ``user``
+    document would make the person disappear from the inventory *and* from every
+    group naming them, which is exactly the wrong outcome: the memberships are
+    what somebody has to go and revoke, and they cannot revoke what the inventory
+    no longer records. Marking the account ``departed`` keeps the list of things
+    to undo visible until they have been undone.
+
+    Silent for a ``shared`` or ``service`` account, which has no person to depart.
+    """
+    for entry in ctx.identities:
+        member = ctx.inventory.users.get(entry.member or "")
+        if member is None or not member.has_departed or not member.is_person:
+            continue
+        assert entry.member is not None
+        yield _Draft(
+            f"group {_q(entry.group)} still lists {_q(entry.member)}, whose account is "
+            f"'departed': the membership is access that has not been revoked",
+            (entry.group, entry.member),
+            entry.field_path,
+        )
+
+
+def _check_ungrouped_user(ctx: _Context) -> Iterator[_Draft]:
+    """I004 — a person's account is a member of no group (``NG-S016``).
+
+    Info, because it is a fact rather than a fault: plenty of estates grant a
+    person access directly and never put them in anything. It is reported at all
+    because the opposite reading — "this person is in no group, so they have no
+    access" — is the one an auditor wants confirmed, and because an account that
+    was meant to be in a group and is not looks exactly like this.
+
+    Only ``person`` accounts (§19.1). A service account outside every group is the
+    normal shape of a service account, and saying so on each one would drown the
+    people this rule is about.
+    """
+    for fqn, user in ctx.inventory.users.items():
+        if user.spec.type is not UserType.PERSON or ctx.identities.groups_of(fqn):
+            continue
+        if user.spec.status is not UserStatus.ACTIVE:
+            # A suspended or departed account belonging to nothing is the state
+            # ``W140`` asks for, not a gap.
+            continue
+        yield _Draft(
+            f"user {_q(fqn)} is a member of no group",
+            (fqn,),
+            ("metadata", "name"),
+        )
+
+
 #: Every check, paired with the rule it reports, in report order.
 _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("E001", _check_endpoint_references),
@@ -4402,6 +4609,10 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("E040", _check_poe_budget),
     ("E041", _check_poe_uplink),
     ("E042", _check_power_redundancy),
+    ("E043", _check_member_resolves),
+    ("E044", _check_member_is_identity),
+    ("E045", _check_membership_cycle),
+    ("E046", _check_account_identifiers),
     ("W101", _check_unaddressed_interface),
     ("W102", _check_mtu_mismatch),
     ("W103", _check_orphan_device),
@@ -4440,9 +4651,12 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("W136", _check_empty_vrf),
     ("W137", _check_missing_power_path),
     ("W138", _check_stale_geometry),
+    ("W139", _check_empty_group),
+    ("W140", _check_departed_member),
     ("I001", _check_local_mac),
     ("I002", _check_uncabled_interface),
     ("I003", _check_nonstandard_port),
+    ("I004", _check_ungrouped_user),
 )
 
 

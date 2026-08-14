@@ -1,0 +1,21 @@
+# W140 (NG-S015) - a group still lists somebody who has left.
+#
+# Bob's account is marked 'departed' and he is still in 'engineering'. Deleting
+# the user document would have removed him from the group as well, which is
+# exactly the wrong outcome: the membership is the access somebody still has to
+# revoke, and it cannot be revoked from a record that is gone.
+apiVersion: netgraph.dev/v1alpha1
+kind: user
+metadata:
+  name: bob
+spec:
+  full_name: Bob Rao
+  status: departed
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: group
+metadata:
+  name: engineering
+spec:
+  members:
+    - bob

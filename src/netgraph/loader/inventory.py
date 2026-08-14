@@ -25,7 +25,18 @@ from pathlib import Path, PurePosixPath
 
 from netgraph.errors import SchemaIssue, format_path
 from netgraph.loader.provenance import Provenance, Site
-from netgraph.models import Adapter, Cable, Device, Element, Layout, PatchPanel, Pdu, Tunnel
+from netgraph.models import (
+    Adapter,
+    Cable,
+    Device,
+    Element,
+    Group,
+    Layout,
+    PatchPanel,
+    Pdu,
+    Tunnel,
+    User,
+)
 
 __all__ = [
     "Inventory",
@@ -189,7 +200,7 @@ class Resolution:
 class Inventory:
     """Every element of a loaded tree, indexed by fully-qualified name.
 
-    The six element maps preserve load order (``NG-L005``), so iterating an
+    The eight element maps preserve load order (``NG-L005``), so iterating an
     inventory is deterministic and renderers produce stable output.
     """
 
@@ -207,6 +218,10 @@ class Inventory:
     patchpanels: dict[str, PatchPanel] = field(default_factory=dict)
     #: The subset of :attr:`elements` that are power distribution units (§17).
     pdus: dict[str, Pdu] = field(default_factory=dict)
+    #: The subset of :attr:`elements` that are user identities (§19).
+    users: dict[str, User] = field(default_factory=dict)
+    #: The subset of :attr:`elements` that are groups of identities (§19).
+    groups: dict[str, Group] = field(default_factory=dict)
     #: Diagram geometry (§18), keyed by fully-qualified name. A layout is not an
     #: element — it declares no network fact and is never drawn as a node — so
     #: it is indexed apart from :attr:`elements` and cannot collide with one.
@@ -248,6 +263,10 @@ class Inventory:
             self.patchpanels[fqn] = element
         elif isinstance(element, Pdu):
             self.pdus[fqn] = element
+        elif isinstance(element, User):
+            self.users[fqn] = element
+        elif isinstance(element, Group):
+            self.groups[fqn] = element
         elif isinstance(element, Device):
             self.devices[fqn] = element
 
@@ -380,6 +399,7 @@ class Inventory:
             f"devices={len(self.devices)}, cables={len(self.cables)}, "
             f"adapters={len(self.adapters)}, tunnels={len(self.tunnels)}, "
             f"patchpanels={len(self.patchpanels)}, pdus={len(self.pdus)}, "
+            f"users={len(self.users)}, groups={len(self.groups)}, "
             f"errors={len(self.errors)})"
         )
 
@@ -408,7 +428,10 @@ def subset(inventory: Inventory, names: Container[str]) -> Inventory:
     An adapter's ``upstream`` is deliberately *not* treated as such a link. An
     adapter is a piece of hardware that sits in the selection or does not, and
     dropping the dongles of a site because the switch they hang off is in another
-    one would lose the elements the site actually holds.
+    one would lose the elements the site actually holds. A ``group``'s members
+    are not links either, and for the same reason: people are not scoped to a
+    site, and a group that lost its out-of-scope members would report a headcount
+    that is not the group's (§19.2).
 
     Load errors are dropped: they are facts about files rather than about
     elements, and a narrowed inventory cannot say which of them still apply.

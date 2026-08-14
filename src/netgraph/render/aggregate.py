@@ -86,7 +86,7 @@ from typing import Final
 
 from netgraph.errors import count_text
 from netgraph.loader.inventory import namespace_of
-from netgraph.models import InterfaceType, Pdu
+from netgraph.models import Adapter, Device, InterfaceType, PatchPanel
 from netgraph.render.graph import Edge, EdgeKind, Graph, Node, NodeType
 
 __all__ = [
@@ -554,13 +554,15 @@ def _aggregate_ports(graph: Graph) -> Mapping[str, Mapping[str, str]]:
     """
     mapping: dict[str, dict[str, str]] = {}
     for fqn, node in graph.nodes.items():
-        # A PDU is an element with no interfaces at all (§17.1), so there is
-        # nothing on it that could be aggregated.
-        if node.element is None or isinstance(node.element, Pdu):
+        # Everything else a node can stand for owns no interfaces at all — a
+        # PDU (§17.1), a user or a group (§19.1) — so there is nothing on it that
+        # could be aggregated, and no ``interfaces`` attribute to ask.
+        element = node.element
+        if not isinstance(element, (Device, Adapter, PatchPanel)):
             continue
         ports = {
             member: interface.name
-            for interface in node.element.interfaces
+            for interface in element.interfaces
             if interface.type is InterfaceType.LAG
             for member in interface.members or ()
         }

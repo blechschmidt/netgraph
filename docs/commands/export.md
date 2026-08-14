@@ -201,7 +201,7 @@ host variables are set are [Groups](../export.md#groups),
 | `--manifest` | `FILE` | — | Write the JSON record of what was skipped to this file. It goes to stderr when no file is named. |
 | `--namespace` | `NS` | — | Keep only elements in this namespace or below it. Repeatable. |
 | `--vlan` | `VID` | — | Keep only elements participating in this VLAN. Repeatable. |
-| `--kind` | `[switch\|router\|hub\|computer\|server\|adapter\|patchpanel\|pdu]` | — | Keep only elements of this kind. Repeatable. |
+| `--kind` | `[switch\|router\|hub\|computer\|server\|adapter\|patchpanel\|pdu\|user\|group]` | — | Keep only elements of this kind. Repeatable. |
 | `--name` | `GLOB` | — | Keep only elements whose name matches this glob. Repeatable. |
 | `--neighbors-of` | `NAME` | — | Keep only the neighbourhood of this element. |
 | `--depth` | `INTEGER, >= 0` | `1` | How many hops --neighbors-of reaches. |
