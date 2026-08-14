@@ -611,9 +611,33 @@ def _keep(editor: Editor, nodeid: str, index: int) -> None:
 
 
 def _centre(locator: Locator) -> tuple[float, float]:
-    box = locator.bounding_box()
-    assert box is not None, "the element is not on screen, so it cannot be dragged"
-    return box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+    """Where to put the mouse to hit ``locator``, once it is actually there.
+
+    ``bounding_box()`` answers ``None`` for an element that is not laid out at
+    that instant, and every locator here is positional — ``.ng-handle-bend >>
+    nth=0`` is *whichever* handle is first right now. The editor rebuilds the
+    whole viewport on each state change, so the element the call resolved a
+    moment ago is a different DOM node from the one it resolves next, and a
+    single measurement lands in the gap about one run in six. That is what took
+    ``browser (chromium)`` red on 2026-08-14, with a message describing the
+    instant rather than the problem.
+
+    So the *measurement* is retried, and only the measurement. Waiting for
+    ``visible`` first would be the obvious thing and is the wrong thing here:
+    Playwright calls an element with an empty bounding box invisible, and a hit
+    band is a transparent stroke — a cable drawn straight down has a box no wider
+    than its own line, which :func:`press_on` explains at length. Gating on
+    visibility turned four of these tests from "measured a stale node" into
+    "waited twenty seconds for a band that was never going to satisfy the check".
+    """
+    deadline = time.monotonic() + TIMEOUT_MS / 1000
+    while True:
+        box = locator.bounding_box(timeout=TIMEOUT_MS)
+        if box is not None:
+            return box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+        if time.monotonic() >= deadline:
+            raise AssertionError("the element is not on screen, so it cannot be dragged")
+        time.sleep(0.05)
 
 
 # --------------------------------------------------------------------------- #

@@ -87,7 +87,7 @@ def write_config(
             holds a file netgraph did not write, or a write failed.
     """
     if target.exists() and not target.is_dir():
-        raise ConfigWriteError(f"{target} exists and is not a directory")
+        raise ConfigWriteError(f"{_shown(target)} exists and is not a directory")
     if not force:
         _refuse_inside_inventory(target, inventory_root)
         _refuse_foreign(config, target)
@@ -102,7 +102,7 @@ def write_config(
             # running config of a device that is almost certainly not Windows.
             write_text(path, content)
         except OSError as exc:
-            raise ConfigWriteError(f"cannot write {path}: {exc.strerror or exc}") from exc
+            raise ConfigWriteError(f"cannot write {_shown(path)}: {exc.strerror or exc}") from exc
         written.append(path)
     return written
 
@@ -146,11 +146,22 @@ def _refuse_inside_inventory(target: Path, inventory_root: Path | None) -> None:
     # ``target`` as it was typed, not as it resolves: the message is read next to
     # the command that produced it, and an absolute path nobody wrote is noise.
     raise ConfigWriteError(
-        f"refusing to write a configuration tree into the inventory: {target} is under the "
-        f"inventory root, and the loader reads every YAML document there -- so the next "
+        f"refusing to write a configuration tree into the inventory: {_shown(target)} is under "
+        f"the inventory root, and the loader reads every YAML document there -- so the next "
         f"command would try to load the generated files as elements. Point --out outside "
         f"the inventory, or pass --force"
     )
+
+
+def _shown(path: Path) -> str:
+    """A path as netgraph prints one: forward slashes, whatever the platform.
+
+    The separator is the platform's and the diagnostic is a document — one that
+    changed shape on Windows would need a second copy of every transcript
+    quoting it, which is the reasoning ``netgraph fmt``, every finding and
+    :func:`netgraph.drift.report._root_text` already follow.
+    """
+    return path.as_posix()
 
 
 def _refuse_foreign(config: ConfigSet, target: Path) -> None:
@@ -166,7 +177,7 @@ def _refuse_foreign(config: ConfigSet, target: Path) -> None:
     if len(clashes) > MAX_LISTED_CLASHES:
         listed += f", and {len(clashes) - MAX_LISTED_CLASHES} more"
     raise ConfigWriteError(
-        f"refusing to overwrite {len(clashes)} file(s) under {target} that netgraph did not "
+        f"refusing to overwrite {len(clashes)} file(s) under {_shown(target)} that netgraph "
         f"generate: {listed}; pass --force to replace them, or point --out at a directory "
         f"this command owns"
     )

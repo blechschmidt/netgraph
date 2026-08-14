@@ -356,6 +356,14 @@ def test_a_real_edit_reaches_the_loop(inventory: Path) -> None:
     macOS and Windows. Rewriting the same file every 250ms makes the test wait
     for the watcher instead of guessing at it, and still fails within the guard
     if no event ever arrives.
+
+    Batches are consumed until one holds the target, for the same reason and on
+    the same side. FSEvents coalesces, so the *first* batch a macOS run yields
+    may be the tail of the fixture being written a moment earlier — the run on
+    2026-08-14 got one holding ``cables/links.yaml`` and nothing else. Asserting
+    on the first batch tests when the backend flushed; asserting on the first
+    batch that mentions the file tests what the watcher reports, which is the
+    thing this is about.
     """
     stop = threading.Event()
     changes = file_changes(
@@ -376,8 +384,12 @@ def test_a_real_edit_reaches_the_loop(inventory: Path) -> None:
     guard = threading.Timer(30, stop.set)  # Never hang the suite.
     writer.start()
     guard.start()
+    seen: list[frozenset[str]] = []
     try:
-        batch = next(changes, None)
+        for batch in changes:
+            seen.append(frozenset(batch))
+            if str(target) in batch:
+                break
     finally:
         done.set()
         writer.join(timeout=5)
@@ -385,8 +397,10 @@ def test_a_real_edit_reaches_the_loop(inventory: Path) -> None:
         stop.set()
         changes.close()
 
-    assert batch is not None, "the watcher did not report the edit"
-    assert str(target) in batch
+    assert seen, "the watcher reported nothing at all within the guard"
+    assert any(str(target) in batch for batch in seen), (
+        f"the watcher never reported {target}; it reported {sorted(set().union(*seen))}"
+    )
 
 
 def test_the_watcher_stops_when_asked(inventory: Path) -> None:
