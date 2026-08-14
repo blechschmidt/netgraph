@@ -233,6 +233,11 @@ Error: mermaid output has no way to say what changed — it can colour nothing a
 | `--show-config` | — | off | Print the settings this invocation resolves to, and where each one came from, then exit without doing any work. |
 <!-- /generated -->
 
+The filter and display options are `render`'s, and mean the same thing here —
+they decide what the drawing *contains*, and the diff then marks what is in it.
+`--layer` is the one exception to the shared help above: it may be given once,
+for the reason under [One layer at a time](#one-layer-at-a-time).
+
 ## Exit codes
 
 | Code | When |
