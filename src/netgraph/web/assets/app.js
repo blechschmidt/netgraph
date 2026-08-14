@@ -42,8 +42,23 @@
   /** Zoom bounds. Below the first the diagram is a smudge; above the second a pixel. */
   var MIN_SCALE = 0.1;
   var MAX_SCALE = 12;
+  /** How many screen pixels one unit of the drawing has to reach before the
+   *  zoom is allowed to stop.
+   *
+   *  The SVG is sized to the canvas, so the *drawing's* scale at 1x depends on
+   *  how big the drawing is: a five-device diagram starts near life size and a
+   *  thousand-device one starts at 1/400th of it. A fixed ceiling of 12x is
+   *  generous for the first and useless for the second -- twelve times nothing
+   *  is still nothing, and a label ten points tall was still a quarter of a
+   *  pixel. So the ceiling is measured per drawing, and this is what it has to
+   *  reach: enough that a 10pt label is fifteen pixels and readable. */
+  var READABLE_SCALE = 1.5;
   /** How long a toast stays up, in milliseconds. */
   var TOAST_MS = 4000;
+  /** How often a render that has not come back yet says so, in milliseconds.
+   *  Slow enough not to flicker on the ordinary sub-second redraw, often enough
+   *  that a multi-second layout visibly counts rather than appearing hung. */
+  var WAITING_MS = 1200;
 
   var el = {
     source: document.getElementById("source"),
@@ -117,6 +132,12 @@
    *  and each entry holds an SVG document. */
   var MAX_VIEWS = 6;
 
+  /** And how many bytes of SVG those may add up to. A drawing of a thousand
+   *  devices is two megabytes of it, so six of them is a tab holding
+   *  twenty-five megabytes of string for layers nobody has open. Four is enough
+   *  for the two or three layers somebody actually switches between. */
+  var MAX_VIEW_BYTES = 4000000;
+
   var details = {};
   /** The stored arrangement behind the drawing on screen, or null. What makes
    *  a cable routable: see links.js. */
@@ -126,9 +147,15 @@
   var queued = false;
   var pinned = null;
   var view = { x: 0, y: 0, k: 1, placed: false };
+  /** How far this drawing may be zoomed in. See READABLE_SCALE. */
+  var maxScale = MAX_SCALE;
   /** "stream" until /api/state says otherwise. */
   var mode = "stream";
   var toastTimer = null;
+  /** Ticks while a render is outstanding; see beginWaiting. */
+  var waitTimer = null;
+  /** The status line without the culling note, so a cull can re-say it. */
+  var lastStatus = [];
   /** What has been drawn, by request URL: the fingerprint the server gave it,
    *  the SVG and the records. This is what makes "the tree moved but this layer
    *  did not" cost a round trip instead of a Graphviz run -- and what makes
@@ -177,10 +204,37 @@
     return ids;
   }
 
+  /** Say that a render is taking a while, and keep saying so.
+   *
+   * A large inventory's first layout is seconds of Graphviz and there is
+   * nothing to be done about it -- the work is real and it is not ours. What
+   * *can* be done is not looking broken while it happens: a tab that has said
+   * "rendering" and then sat still for eight seconds is indistinguishable from
+   * one that has hung, and the honest thing is to keep counting.
+   */
+  function beginWaiting() {
+    var started = Date.now();
+    window.clearInterval(waitTimer);
+    waitTimer = window.setInterval(function () {
+      var seconds = Math.round((Date.now() - started) / 1000);
+      setStatus("rendering", "still laying out — " + seconds + "s");
+      if (!el.placeholder.hidden) {
+        el.placeholder.textContent = "laying the diagram out (" + seconds + "s). "
+          + "A large inventory is a real Graphviz layout, and the first one is the slow one.";
+      }
+    }, WAITING_MS);
+  }
+
+  function endWaiting() {
+    window.clearInterval(waitTimer);
+    waitTimer = null;
+  }
+
   function render() {
     if (inFlight) { queued = true; return; }
     inFlight = true;
     setStatus("rendering", "");
+    beginWaiting();
     // Which of the two the session wants -- the tree, or the tree as a diff
     // against a baseline -- is session.js's decision; this file only draws what
     // comes back, and a diff comes back in the same shape. The URL doubles as
@@ -192,7 +246,8 @@
         if (!response.ok) { throw new Error(body.message || response.statusText); }
         return body;
       });
-    }).then(function (body) { apply(body, key); }).catch(function (error) {
+    }).then(function (body) { endWaiting(); apply(body, key); }).catch(function (error) {
+      endWaiting();
       setStatus("failed", String(error.message || error));
       showProblems([]);
     }).then(function () {
@@ -262,8 +317,15 @@
     var svg = reuse ? held.svg : result.svg;
     if (svg) {
       if (!reuse || key !== currentView) {
+        netgraphCull.reset();
         el.viewport.innerHTML = svg;
         if (!view.placed) { view.placed = true; resetView(); }
+        // Measure before anything is culled: a box can only be read while the
+        // element still has one. Everything downstream -- the focus ring, the
+        // arrow keys, find-in-diagram -- asks the index rather than the DOM
+        // from here on, which is what keeps an off-screen element usable.
+        netgraphCull.index(el.viewport.firstElementChild, details);
+        measureZoomCeiling();
       }
       el.placeholder.hidden = true;
       if (key) { remember(key, result.graphHash || held.hash, svg, details, geometry); }
@@ -296,7 +358,23 @@
     views[key] = { hash: hash, svg: svg, details: records, geometry: arrangement };
     viewOrder = viewOrder.filter(function (other) { return other !== key; });
     viewOrder.unshift(key);
-    while (viewOrder.length > MAX_VIEWS) { delete views[viewOrder.pop()]; }
+    // Bounded by bytes as well as by count, because the two disagree by three
+    // orders of magnitude: six drawings of a home lab are 200 kB and six of a
+    // thousand-device inventory are twenty-five megabytes of string held for
+    // layers nobody is looking at. Whichever bound bites first; the drawing on
+    // screen is always kept, whatever it weighs.
+    var held = 0;
+    var kept = [];
+    viewOrder.forEach(function (other, index) {
+      var entry = views[other];
+      held += (entry && entry.svg ? entry.svg.length : 0);
+      if (index === 0 || (kept.length < MAX_VIEWS && held <= MAX_VIEW_BYTES)) {
+        kept.push(other);
+        return;
+      }
+      delete views[other];
+    });
+    viewOrder = kept;
   }
 
   /* ------------------------------------------------------ other people */
@@ -337,7 +415,26 @@
       parts.push(counts.errors + " errors, " + counts.warnings + " warnings");
     }
     if (typeof durationMs === "number") { parts.push(durationMs + " ms"); }
-    el.summary.textContent = parts.join("  ·  ");
+    lastStatus = parts;
+    el.summary.textContent = parts.concat(culling()).join("  ·  ");
+  }
+
+  /** What the status line says about a drawing that is not all being drawn.
+   *
+   * The alternative to saying it is a canvas that is quietly missing things,
+   * which is the sort of silence that makes somebody distrust a tool. It also
+   * answers the question the state raises -- "where is the rest of it" -- with
+   * the gesture that reveals it.
+   */
+  function culling() {
+    var stats = netgraphCull.stats();
+    if (!stats.active || stats.drawn >= stats.total) { return []; }
+    return ["drawing " + stats.drawn + " of " + stats.total + " in view (pan, or Ctrl-K to find)"];
+  }
+
+  /** Re-say the status line after a cull changed how much is on screen. */
+  function culled() {
+    el.summary.textContent = lastStatus.concat(culling()).join("  ·  ");
   }
 
   /** Redraw the problems list.
@@ -617,6 +714,10 @@
   function applyView() {
     el.viewport.style.transform =
       "translate(" + view.x + "px, " + view.y + "px) scale(" + view.k + ")";
+    // The transform is the whole of panning and zooming and stays at whatever
+    // frame rate the compositor manages. What is *drawn* catches up afterwards;
+    // see cull.js.
+    netgraphCull.schedule();
   }
 
   function resetView() {
@@ -626,11 +727,17 @@
     applyView();
   }
 
+  /** Work out how far *this* drawing may be zoomed in; see READABLE_SCALE. */
+  function measureZoomCeiling() {
+    var natural = netgraphCull.naturalScale(view.k);
+    maxScale = natural ? Math.max(MAX_SCALE, READABLE_SCALE / natural) : MAX_SCALE;
+  }
+
   function zoomAt(clientX, clientY, factor) {
     var box = el.canvas.getBoundingClientRect();
     var x = clientX - box.left;
     var y = clientY - box.top;
-    var next = Math.min(MAX_SCALE, Math.max(MIN_SCALE, view.k * factor));
+    var next = Math.min(maxScale, Math.max(MIN_SCALE, view.k * factor));
     // Keep the point under the cursor where it is: solve for the translation
     // that maps it to the same screen position at the new scale.
     view.x = x - (x - view.x) * (next / view.k);
@@ -1033,7 +1140,11 @@
     write: function (operation, said) { netgraphSession.ops([operation], said); }
   });
 
+  netgraphCull.attach({ el: el, culled: culled });
   netgraphA11y.attach({ el: el, bringIntoView: bringIntoView });
+  // A resized canvas is a different viewport, so a different part of the
+  // diagram has to be drawn.
+  window.addEventListener("resize", function () { netgraphCull.schedule(); });
   defineCommands();
   netgraphSession.defineCommands(bridge);
   netgraphKeys.attach(keyHost);

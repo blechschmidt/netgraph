@@ -69,7 +69,7 @@ from bench_pipeline import Shape, generate, yaml_files  # noqa: E402
 
 from netgraph.loader.cache import DocumentCache  # noqa: E402
 from netgraph.render import DETAIL_OPTIONS, build_details, build_graph, filter_graph  # noqa: E402
-from netgraph.render.dot import find_dot, to_image  # noqa: E402
+from netgraph.render.dot import find_dot, layout_plan, to_image  # noqa: E402
 from netgraph.validate import validate  # noqa: E402
 from netgraph.web.preview import ViewOptions, graph_digest  # noqa: E402
 from netgraph.web.server import WebServer  # noqa: E402
@@ -431,6 +431,65 @@ def move_selection(tab: Tab, addresses: Sequence[str], report: Report) -> None:
     row.note = "one operation, not fifty: see edit/operations.py SetGeometry"
 
 
+def viewport(tab: Tab, report: Report) -> None:
+    """Zoom in and pan, and see how much of the drawing the tab is holding up.
+
+    The cull is not measured as a duration — it runs after the gesture, on a
+    timer, precisely so that the gesture does not wait for it. What is measured
+    is the gesture itself (a wheel and a drag, timed to the frame the transform
+    lands on) and, either side of it, what the tab is carrying.
+    """
+    canvas = tab.page.eval_on_selector(
+        "#canvas",
+        "node => { const box = node.getBoundingClientRect();"
+        " return [box.x + box.width / 2, box.y + box.height / 2]; }",
+    )
+    x, y = float(canvas[0]), float(canvas[1])
+
+    def note() -> str:
+        stats = tab.page.evaluate("netgraphCull.stats()")
+        return (
+            f"{stats['drawn']} of {stats['total']} drawn, "
+            f"{tab.dom_nodes()} elements, coarse={str(stats['coarse']).lower()}"
+        )
+
+    report.fact("wholeDiagram", note())
+
+    zoom = report.add(Measurement("zoom in 30 notches"))
+    for _ in range(min(SAMPLES, 3)):
+        tab.page.evaluate("() => { window.__ngzoom = document.getElementById('viewport'); }")
+        started = time.time() * 1000
+        for _ in range(30):
+            tab.page.mouse.move(x, y)
+            tab.page.mouse.wheel(0, -200)
+        zoom.samples.append(time.time() * 1000 - started)
+        tab.page.wait_for_timeout(400)
+        # Back out again, so each round starts where the last one did.
+        for _ in range(30):
+            tab.page.mouse.move(x, y)
+            tab.page.mouse.wheel(0, 200)
+        tab.page.wait_for_timeout(400)
+    zoom.note = "a CSS transform per notch; the cull follows on a timer"
+
+    for _ in range(30):
+        tab.page.mouse.move(x, y)
+        tab.page.mouse.wheel(0, -200)
+    tab.page.wait_for_timeout(600)
+    report.fact("zoomedIn", note())
+
+    pan = report.add(Measurement("pan the canvas"))
+    for index in range(SAMPLES):
+        started = time.time() * 1000
+        tab.page.mouse.move(x, y)
+        tab.page.mouse.down()
+        for step in range(1, 9):
+            tab.page.mouse.move(x - step * 24, y - step * 12 + index)
+        tab.page.mouse.up()
+        pan.samples.append(time.time() * 1000 - started)
+        tab.page.wait_for_timeout(300)
+    pan.note = report.facts["zoomedIn"]
+
+
 def layer_cycle(tab: Tab, report: Report) -> None:
     """Switch layers and come back, which is what fills the client's view cache."""
     row = report.add(Measurement("switch layer and come back"))
@@ -471,6 +530,13 @@ def server_stages(session: EditingSession, report: Report) -> None:
         return outcome
 
     report.heading("what one repaint costs the server")
+    # Which of the three layout modes is being timed. The bench has moved fifty
+    # nodes by now, so this is normally the partial one — the expensive one, and
+    # the one the editor is in the moment somebody drags anything.
+    graph_now = filter_graph(build_graph(inventory, layer=options.layer), options.filter_spec)
+    mode = layout_plan(graph_now).mode
+    report.fact("layoutMode", str(mode))
+    print(f"{'':<34} arrangement: {mode} ({len(graph_now.geometry.nodes)} positions stored)")
     timed("load_tree (cache warm)", lambda: session.inventory())
     timed("validate", lambda: validate(inventory, session.settings()))
     graph = timed(
@@ -601,6 +667,7 @@ def run(args: argparse.Namespace) -> int:
         measure(lambda: one_field(tab, a_device(session), report))
         measure(lambda: stream_latency(tab, max(files, key=lambda p: p.stat().st_size), report))
         measure(lambda: move_selection(tab, a_selection(session, args.selection), report))
+        measure(lambda: viewport(tab, report))
         measure(lambda: layer_cycle(tab, report))
 
         print()
@@ -610,6 +677,8 @@ def run(args: argparse.Namespace) -> int:
             f"heap {report.facts.get('heapBytes', 0) / 1_000_000:.0f} MB "
             f"→ {report.facts.get('heapAfterCycleBytes', 0) / 1_000_000:.0f} MB after a layer cycle"
         )
+        print(f"  whole diagram on screen: {report.facts.get('wholeDiagram', '—')}")
+        print(f"  zoomed in:               {report.facts.get('zoomedIn', '—')}")
 
         server_stages(session, report)
 

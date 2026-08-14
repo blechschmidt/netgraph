@@ -1734,6 +1734,233 @@ def test_an_edit_that_does_not_move_the_picture_does_not_redraw_it(
 
 
 # --------------------------------------------------------------------------- #
+# A diagram too big to draw all of
+# --------------------------------------------------------------------------- #
+
+#: How many devices the culling tests add to the home lab.
+#:
+#: ``cull.js`` leaves a drawing alone below ``CULL_ABOVE`` *groups*, and a group
+#: is a node or a link, so this has to produce more than that between them: 320
+#: computers and the 160 cables joining them in pairs is 480, comfortably over
+#: the threshold of 400 — and still a layout Graphviz finishes in a fraction of
+#: a second, which a browser test can afford.
+CROWD: Final = 320
+
+
+def a_crowd(count: int = CROWD) -> str:
+    """A YAML stream of ``count`` computers, wired together in pairs.
+
+    Deliberately dull: one interface each, one cable per pair, no addresses. The
+    tests below are about how much of a drawing is *materialised*, and anything
+    interesting in the documents would only be interesting in the diagram.
+    """
+    documents = []
+    for index in range(count):
+        documents.append(
+            "apiVersion: netgraph.dev/v1alpha1\n"
+            "kind: computer\n"
+            f"metadata:\n  name: crowd-{index:03d}\n"
+            "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n"
+        )
+    for index in range(0, count - 1, 2):
+        documents.append(
+            "apiVersion: netgraph.dev/v1alpha1\n"
+            "kind: cable\n"
+            f"metadata:\n  name: cbl-{index:03d}\n"
+            f"spec:\n  endpoints: [crowd-{index:03d}:eth0, crowd-{index + 1:03d}:eth0]\n"
+            "  medium: copper\n"
+        )
+    return "---\n".join(documents)
+
+
+def crowded(open_editor: OpenEditor) -> Editor:
+    """A session over an inventory big enough that the canvas culls."""
+    editor = open_editor(extra={"crowd/hosts.yaml": a_crowd()})
+    editor.page.wait_for_function(
+        "() => window.netgraphCull && netgraphCull.stats().total > netgraphCull.CULL_ABOVE",
+        timeout=TIMEOUT_MS,
+    )
+    return editor
+
+
+def cull_stats(editor: Editor) -> dict[str, Any]:
+    stats = editor.page.evaluate("() => netgraphCull.stats()")
+    assert isinstance(stats, dict)
+    return stats
+
+
+def viewport_elements(editor: Editor) -> int:
+    """How much SVG the tab is actually holding up, under ``#viewport``."""
+    count = editor.page.evaluate(
+        "() => document.getElementById('viewport').querySelectorAll('*').length"
+    )
+    assert isinstance(count, int)
+    return count
+
+
+def zoom(editor: Editor, notches: int) -> None:
+    """Wheel over the middle of the canvas, and let the cull catch up."""
+    box = editor.page.locator("#canvas").bounding_box()
+    assert box is not None
+    x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+    for _ in range(abs(notches)):
+        editor.page.mouse.move(x, y)
+        editor.page.mouse.wheel(0, -200 if notches > 0 else 200)
+
+
+@requires_dot
+def test_a_small_diagram_is_drawn_whole(open_editor: OpenEditor) -> None:
+    """Culling is for drawings that need it, and the home lab does not.
+
+    The cost of culling is a pass over the index on every pan. Paying it to hide
+    nothing would be a regression for every inventory anybody actually has.
+    """
+    editor = open_editor()
+    stats = cull_stats(editor)
+    assert stats["active"] is False, stats
+    assert stats["coarse"] is False, stats
+
+
+@requires_dot
+def test_zooming_into_a_crowd_stops_drawing_what_is_off_screen(
+    open_editor: OpenEditor,
+) -> None:
+    editor = crowded(open_editor)
+    whole = cull_stats(editor)
+    assert whole["active"] is True, whole
+    held = viewport_elements(editor)
+
+    zoom(editor, 30)
+    editor.page.wait_for_function(
+        "total => netgraphCull.stats().drawn < total", arg=whole["total"], timeout=TIMEOUT_MS
+    )
+    culled = cull_stats(editor)
+    assert culled["drawn"] < whole["total"]
+    # The groups themselves stay — that is what keeps every id addressable —
+    # so the saving is in their contents, and it has to be a real one.
+    assert viewport_elements(editor) < held
+
+
+@requires_dot
+def test_an_element_off_screen_is_still_findable_and_selectable(
+    open_editor: OpenEditor,
+) -> None:
+    """The property culling is not allowed to break.
+
+    The command palette, the outline and find-in-diagram all name an element
+    that may be anywhere in the drawing. Landing on one has to work whether or
+    not it happens to be materialised — so the outline entry for a device is
+    clicked while zoomed into a corner it is nowhere near, and the ring has to
+    end up on it.
+    """
+    editor = crowded(open_editor)
+    page = editor.page
+    zoom(editor, 30)
+    page.wait_for_function(
+        "() => netgraphCull.stats().drawn < netgraphCull.stats().total", timeout=TIMEOUT_MS
+    )
+    parked = page.evaluate(
+        """() => {
+             const groups = document.querySelectorAll('#viewport svg g.node');
+             for (const group of groups) {
+               if (!group.childElementCount) { return group.id; }
+             }
+             return null;
+           }"""
+    )
+    assert parked, "nothing was culled, so this test would prove nothing"
+
+    page.evaluate("id => netgraphA11y.focus(id, { quiet: true })", parked)
+    # Materialised by being focused, and wearing the ring.
+    expect(page.locator(f'#viewport svg g[id="{parked}"].focused')).to_be_attached(
+        timeout=TIMEOUT_MS
+    )
+    assert page.evaluate(
+        "id => document.querySelector('#viewport svg [id=\"' + id + '\"]').childElementCount",
+        parked,
+    )
+    assert (
+        page.evaluate(
+            "() => document.getElementById('canvas').getAttribute('aria-activedescendant')"
+        )
+        == parked
+    )
+
+
+@requires_dot
+def test_the_keyboard_crosses_a_culled_diagram(open_editor: OpenEditor) -> None:
+    """Arrow navigation runs off the index, not off the DOM.
+
+    a11y.js reads a candidate's centre from cull.js's box index, so an element
+    whose contents are parked is still a place the keyboard can go. If it read
+    ``getBBox`` instead, every arrow press would stop at the edge of the screen.
+    """
+    editor = crowded(open_editor)
+    page = editor.page
+    zoom(editor, 30)
+    page.wait_for_function(
+        "() => netgraphCull.stats().drawn < netgraphCull.stats().total", timeout=TIMEOUT_MS
+    )
+    page.locator("#canvas").focus()
+    page.evaluate("() => netgraphA11y.first({ quiet: true })")
+    visited = set()
+    for _ in range(12):
+        page.keyboard.press("ArrowRight")
+        here = page.evaluate("() => { const f = netgraphA11y.focused(); return f && f.element; }")
+        if here:
+            visited.add(here)
+    assert len(visited) > 1, "the keyboard did not move"
+
+
+@requires_dot
+def test_zooming_out_drops_the_detail_and_frames_the_namespaces(
+    open_editor: OpenEditor,
+) -> None:
+    """The level-of-detail half: below the threshold, labels off, frames on."""
+    editor = crowded(open_editor)
+    page = editor.page
+    zoom(editor, -40)
+    page.wait_for_function("() => netgraphCull.stats().coarse", timeout=TIMEOUT_MS)
+    expect(page.locator("#canvas.coarse")).to_be_attached(timeout=TIMEOUT_MS)
+    # One frame per namespace with more than one member: the crowd, and the
+    # home lab's own folders.
+    assert page.locator("#viewport svg .ng-lod-frame").count() > 0
+    assert page.locator("#viewport svg .ng-lod-label").count() > 0
+    # A node's label is in the DOM and not rendered, which is the point: the
+    # text is what a repaint at this scale was spending itself on.
+    hidden = page.evaluate(
+        """() => {
+             const text = document.querySelector('#viewport svg g.node text');
+             return text ? window.getComputedStyle(text).display : 'missing';
+           }"""
+    )
+    assert hidden == "none", hidden
+
+    # And zooming in far enough brings it back, because at that scale it says
+    # something again. Sixty notches from the floor, not forty: the drawing
+    # starts at a thirtieth of life size, so the ceiling is a long way up.
+    zoom(editor, 60)
+    page.wait_for_function("() => !netgraphCull.stats().coarse", timeout=TIMEOUT_MS)
+    expect(page.locator("#viewport svg .ng-lod-frame")).to_have_count(0, timeout=TIMEOUT_MS)
+
+
+@requires_dot
+def test_a_crowd_can_be_zoomed_in_far_enough_to_read(open_editor: OpenEditor) -> None:
+    """The zoom ceiling is the drawing's, not a constant.
+
+    The SVG is sized to the canvas, so a big drawing starts tiny; a fixed 12x
+    ceiling left a thousand-device diagram permanently illegible. See
+    ``READABLE_SCALE`` in app.js.
+    """
+    editor = crowded(open_editor)
+    zoom(editor, -40)
+    editor.page.wait_for_function("() => netgraphCull.stats().coarse", timeout=TIMEOUT_MS)
+    zoom(editor, 90)
+    editor.page.wait_for_function("() => !netgraphCull.stats().coarse", timeout=TIMEOUT_MS)
+    assert cull_stats(editor)["coarse"] is False
+
+
+# --------------------------------------------------------------------------- #
 # Accessibility
 # --------------------------------------------------------------------------- #
 

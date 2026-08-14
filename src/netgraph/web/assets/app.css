@@ -585,6 +585,40 @@ main {
 }
 .viewport svg g.focused { filter: drop-shadow(0 0 4px var(--focus)); }
 
+/* --------------------------------------------------- level of detail */
+
+/* Zoomed far enough out that a node's label is a smudge. The words and the
+ * icons come off — at this scale they cost a repaint each and say nothing —
+ * and the namespace frames cull.js draws take over as the legend. The shapes
+ * stay: the point of being this far out is seeing where things are.
+ *
+ * The focus ring and both selection marks are deliberately *not* suppressed.
+ * "Where is the thing I selected" is exactly the question somebody zooms out
+ * to answer. */
+.canvas.coarse .viewport svg g.node text,
+.canvas.coarse .viewport svg g.edge text,
+.canvas.coarse .viewport svg g.node image {
+  display: none;
+}
+
+.viewport svg .ng-lod-frame {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+  opacity: .7;
+}
+
+/* The one thing that stays legible when the labels go: which namespace this
+ * block of shapes is. Sized in user units, so it grows as the diagram shrinks
+ * and stays about the same size on screen. */
+.viewport svg .ng-lod-label {
+  fill: var(--muted);
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 28px;
+  font-weight: 600;
+}
+
 /* ------------------------------------------------------- diagram outline */
 
 /* The drawing as a list. Off screen until focused; a real panel once it is,

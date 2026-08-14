@@ -697,24 +697,32 @@ class EditingSession:
             self._findings = (loaded, grading, answer)
         return answer
 
-    def diagnostics(self, inventory: Inventory | None = None) -> tuple[Problem, ...]:
-        """Every load error and finding of the tree, most severe group first.
+    def repairs(
+        self, inventory: Inventory | None = None, settings: ValidationConfig | None = None
+    ) -> dict[tuple[str, str], tuple[tuple[str, str], ...]]:
+        """The mechanical repairs on offer, keyed as ``flatten_problems`` keys them.
 
-        Each finding carries the mechanical repairs on offer for it, which is
-        what the problems list turns into a **Fix** button. Computing them costs
-        one pass over the findings and no file access — a producer is a pure
-        function of the finding and the tree (:mod:`netgraph.fixes`) — so they
-        are not worth making optional and then having to ask for.
+        Every answer that carries problems carries these with them — the file
+        list's diagnostics *and* the diagram's. The page draws one list from
+        both, and a **Fix** button that came and went depending on which answer
+        landed second would be a race the user could see.
+
+        Computing them costs one pass over the findings and no file access: a
+        producer is a pure function of the finding and the tree
+        (:mod:`netgraph.fixes`).
         """
         loaded = self.inventory() if inventory is None else inventory
-        findings = self.findings(loaded)
-        offers = {
+        return {
             (offer.finding.rule, offer.finding.message): tuple(
                 (fix.key, fix.title) for fix in offer.fixes
             )
-            for offer in offers_for(findings, loaded)
+            for offer in offers_for(self.findings(loaded, settings), loaded)
         }
-        return flatten_problems(loaded.errors, findings, fixes=offers)
+
+    def diagnostics(self, inventory: Inventory | None = None) -> tuple[Problem, ...]:
+        """Every load error and finding of the tree, most severe group first."""
+        loaded = self.inventory() if inventory is None else inventory
+        return flatten_problems(loaded.errors, self.findings(loaded), fixes=self.repairs(loaded))
 
     def graph(
         self, view: ViewOptions | None = None, *, known: str | None = None
@@ -750,6 +758,7 @@ class EditingSession:
                 settings=settings,
                 known=known,
                 findings=self.findings(inventory, settings),
+                fixes=self.repairs(inventory, settings),
             ),
             revision,
         )

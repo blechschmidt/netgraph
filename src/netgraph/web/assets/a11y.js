@@ -247,9 +247,19 @@ var netgraphA11y = (function () {
 
   /* --------------------------------------------------------------- focus */
 
+  /** The drawn group for an element id, drawn back in if it had been culled.
+   *
+   * cull.js empties the group of anything off screen but never removes it, so
+   * the lookup itself always succeeds; what would be missing is the shape the
+   * ring goes round. Asking for the group is asking to do something with it, so
+   * this is where the contents come back — which is what makes "select the
+   * thing find-in-diagram just landed on" work when it is half a screen away.
+   */
   function group(id) {
     var svg = el.viewport.firstElementChild;
-    return svg ? svg.querySelector('[id="' + cssEscape(id) + '"]') : null;
+    var found = svg ? svg.querySelector('[id="' + cssEscape(id) + '"]') : null;
+    if (found && window.netgraphCull) { window.netgraphCull.materialise(id); }
+    return found;
   }
 
   function cssEscape(value) {
@@ -376,7 +386,20 @@ var netgraphA11y = (function () {
     return value;
   }
 
+  /** The middle of an element, in the diagram's own coordinates.
+   *
+   * From cull.js's index rather than from `getBBox`, for two reasons. It is the
+   * only answer that exists for an element whose contents have been culled out
+   * of the render tree — and navigation has to work on those, or arrowing
+   * across a large diagram would stop at the edge of the screen. And it is
+   * arithmetic on numbers already in hand rather than a forced layout, which
+   * matters because `move` asks for the centre of every candidate on every
+   * keypress: on a two-thousand-element diagram that was two thousand layout
+   * flushes per arrow key.
+   */
   function centre(id) {
+    var known = window.netgraphCull ? window.netgraphCull.centreOf(id) : null;
+    if (known) { return known; }
     var target = group(id);
     if (!target) { return null; }
     var box = target.getBBox ? target.getBBox() : null;

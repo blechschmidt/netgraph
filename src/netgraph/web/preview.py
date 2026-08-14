@@ -277,6 +277,11 @@ class Preview:
                     "location": problem.location,
                     "rule": problem.rule,
                     "message": problem.message,
+                    **(
+                        {"fixes": [{"key": key, "title": title} for key, title in problem.fixes]}
+                        if problem.fixes
+                        else {}
+                    ),
                 }
                 for problem in shown
             ],
@@ -362,6 +367,7 @@ def render_inventory(
     started: float | None = None,
     known: str | None = None,
     findings: Sequence[Finding] | None = None,
+    fixes: Mapping[tuple[str, str], Sequence[tuple[str, str]]] | None = None,
 ) -> Preview:
     """Validate and draw an inventory somebody else has already loaded.
 
@@ -390,6 +396,12 @@ def render_inventory(
             and on a thousand-device tree each one is a tenth of a second, so the
             caller that already has the answer hands it over. ``None`` — every
             other caller — validates here.
+        fixes: The mechanical repairs on offer, keyed as
+            :func:`~netgraph.watch.pipeline.flatten_problems` keys them. Passed
+            for the same reason the problems are reported at all: the page draws
+            one list, fed from *both* this answer and the file list's, and a
+            **Fix** button that appeared or vanished depending on which of the
+            two landed second would be a race the user could see.
 
     Returns:
         The diagram, its info-box records, and every problem found on the way.
@@ -401,7 +413,7 @@ def render_inventory(
         findings = run_validation(
             inventory, settings if settings is not None else ValidationConfig(strict=options.strict)
         )
-    problems = flatten_problems(inventory.errors, findings)
+    problems = flatten_problems(inventory.errors, findings, fixes=fixes)
     rejected = bool(inventory.errors) or any(finding.severity.is_fatal for finding in findings)
 
     try:
