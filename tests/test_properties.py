@@ -666,25 +666,35 @@ def test_no_name_can_break_out_of_a_rendering(element: str, interface: str) -> N
     assert interface in _strings(document)
 
 
-@pytest.mark.parametrize("value", ["{", "}", "{}}", "<b>", "&", '"'])
+#: Values that land in an HTML-like label and mean something in some other
+#: syntax: a brace opens a block in DOT, an angle bracket opens a tag in the
+#: label's own markup, and an ampersand opens an entity in it.
+LABEL_PAYLOADS: Final = ("{", "}", "{}}", "<b>", "&", '"', "&amp;", "]>")
+
+
+@requires_dot
+@pytest.mark.parametrize("value", LABEL_PAYLOADS)
 def test_a_brace_in_a_label_is_text_and_not_structure(value: str) -> None:
     """A field's value reaches an HTML-like label, where a brace is a character.
 
     ``spec.full_name: '{'`` on a user is the case the generated inventories
-    found: the label is delimited by angle brackets, so Graphviz reads the brace
-    as text and the file is well formed. The rendering must not escape it into
-    something else, and the skeleton check must not mistake it for a block.
+    found. The label is delimited by angle brackets, so Graphviz reads the brace
+    as text — which is asserted by handing the file to Graphviz, not only by the
+    skeleton check that used to miscount it.
     """
-    documents = (
-        {
-            "apiVersion": "netgraph.dev/v1alpha1",
-            "kind": "user",
-            "metadata": {"name": "u1"},
-            "spec": {"full_name": value},
-        },
-    )
     plan = ng.InventoryPlan(
-        documents=(ng.PlannedDocument(namespace="", stem="u1", data=documents[0]),)
+        documents=(
+            ng.PlannedDocument(
+                namespace="",
+                stem="u1",
+                data={
+                    "apiVersion": "netgraph.dev/v1alpha1",
+                    "kind": "user",
+                    "metadata": {"name": "u1"},
+                    "spec": {"full_name": value},
+                },
+            ),
+        )
     )
     with written(plan) as (_, inventory):
         assert_loaded(inventory)
@@ -692,6 +702,7 @@ def test_a_brace_in_a_label_is_text_and_not_structure(value: str) -> None:
     dot = RENDERERS["dot"].text(graph, RenderOptions())
     skeleton = _dot_skeleton(dot)
     assert skeleton.count("{") == skeleton.count("}")
+    assert_graphviz_parses(dot)
 
 
 @requires_dot
