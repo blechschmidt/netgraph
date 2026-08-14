@@ -539,6 +539,14 @@ publish a version whose section is missing or empty — see
 
 ### Fixed
 
+- **netgraph could not be imported on Python 3.11, and the timeline crashed on 3.10.** Two
+  separate instances of the same shape of problem, both found by the CI matrix and neither
+  reachable from the version the work was done on. `netgraph lsp` declared a `mappingproxy`
+  as a plain dataclass default, which is refused before 3.12 and refused at *import* time,
+  so every LSP command raised `ValueError: mutable default` on 3.11. And `netgraph history`
+  parsed git's `%aI` with `datetime.fromisoformat`, which before 3.11 accepts `+00:00` and
+  not the `Z` some builds of git write, so a timeline over such a repository raised
+  `ValueError: Invalid isoformat string` on 3.10. Both are one line; both now have a test.
 - **Clicking a node in `netgraph web` did not open the document that declares it.** The
   page passed the SVG element id where the tree is keyed by element address, so the lookup
   matched nothing and the click silently did nothing at all — the one mapping the command

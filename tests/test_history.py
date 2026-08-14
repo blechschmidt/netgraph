@@ -22,11 +22,14 @@ from click.testing import CliRunner
 from netgraph.cli import cli
 from netgraph.config import DEFAULT_MAX_REVISIONS, parse_config
 from netgraph.errors import ConfigurationError
-from netgraph.history import (
+from netgraph.history import (  # the log format, under test below
+    _FIELD,
+    _RECORD,
     Commit,
     FrameCache,
     HistoryError,
     Timeline,
+    _parse_log,
     summarise,
 )
 from netgraph.loader import load_tree
@@ -139,6 +142,25 @@ def history(tmp_path: Path) -> Repo:
 # --------------------------------------------------------------------------- #
 # The plumbing
 # --------------------------------------------------------------------------- #
+
+
+def test_a_utc_stamp_is_read_whichever_way_git_spelled_it() -> None:
+    """``%aI`` is ``+00:00`` in most builds of git and ``Z`` in some.
+
+    Both are ISO 8601 and both are the same instant, and Python only accepts
+    both from 3.11: on 3.10 the ``Z`` form made every timeline command raise
+    ``ValueError: Invalid isoformat string``, which is exactly the kind of
+    difference a CI matrix exists to find and a test exists to keep found.
+    """
+
+    def one(stamp: str) -> Commit:
+        record = _FIELD.join(("a" * 40, "", "Tester", "t@example.invalid", stamp, "Subject"))
+        return next(iter(_parse_log(record + _RECORD)))
+
+    assert one("2026-08-14T15:47:25Z").when == one("2026-08-14T15:47:25+00:00").when
+    assert one("2026-08-14T15:47:25Z").when.utcoffset() is not None
+    # An offset that is not UTC is left exactly alone.
+    assert one("2026-08-14T15:47:25+02:00").when.hour == 15
 
 
 def test_a_timeline_lists_the_commits_that_touched_the_inventory(history: Repo) -> None:

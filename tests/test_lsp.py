@@ -27,7 +27,7 @@ from typing import Any, Final
 import pytest
 
 from netgraph.lsp import Connection, LanguageServer
-from netgraph.lsp.context import Slot, context_at, document_bounds
+from netgraph.lsp.context import CursorContext, Slot, context_at, document_bounds
 from netgraph.lsp.jsonrpc import (
     METHOD_NOT_FOUND,
     SERVER_NOT_INITIALIZED,
@@ -298,6 +298,17 @@ def _column_of(path: Path, needle: str, inside: str) -> int:
 # --------------------------------------------------------------------------- #
 # The wire
 # --------------------------------------------------------------------------- #
+
+
+def test_a_cursor_context_can_be_built_on_every_supported_python() -> None:
+    """The default of :attr:`CursorContext.written` is a factory, not a proxy.
+
+    A ``mappingproxy`` as a plain dataclass default is refused before Python
+    3.12, and refused at *import* time — so this module raised ``ValueError``
+    while pytest was collecting it, and every LSP test on 3.10 and 3.11 errored
+    at once. The assertion is trivial; the import above it is the test.
+    """
+    assert CursorContext(slot=Slot.KEY).written == {}
 
 
 class TestFraming:

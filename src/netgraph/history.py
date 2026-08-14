@@ -778,9 +778,21 @@ def _parse_log(output: str) -> Iterator[Commit]:
             parents=tuple(parents.split()),
             author=author,
             email=email,
-            when=datetime.fromisoformat(when),
+            when=_when(when),
             subject=subject,
         )
+
+
+def _when(stamp: str) -> datetime:
+    """One ``%aI`` field, whichever way this git spells a UTC offset.
+
+    Most builds write ``+00:00`` and some write ``Z``; both are ISO 8601 and
+    both mean the same instant. Before Python 3.11 ``fromisoformat`` accepts
+    only the first, so on 3.10 a repository whose git wrote the second made
+    every timeline command raise ``ValueError: Invalid isoformat string`` —
+    which is a thing to normalise here rather than a thing to hope about.
+    """
+    return datetime.fromisoformat(f"{stamp[:-1]}+00:00" if stamp.endswith("Z") else stamp)
 
 
 def _short(rev: str) -> str:

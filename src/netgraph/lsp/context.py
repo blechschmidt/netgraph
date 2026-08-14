@@ -67,6 +67,9 @@ _KIND_RE: Final = re.compile(r"^kind:[ \t]*(?P<kind>[A-Za-z][A-Za-z0-9_-]*)[ \t]
 #: Flow style before the caret means the layout scan cannot be trusted.
 _FLOW: Final = frozenset("[]{}")
 
+#: The empty ``written`` map, shared. See :attr:`CursorContext.written`.
+_EMPTY_WRITTEN: Final[Mapping[str, str]] = MappingProxyType({})
+
 
 class Slot(str, Enum):
     """What the caret is positioned to type."""
@@ -101,7 +104,13 @@ class CursorContext:
     #: (``""`` when it opened a block). Keeps a key from being offered twice,
     #: and lets the ``outlet:`` half of a reference be completed from the
     #: ``pdu:`` half written beside it.
-    written: Mapping[str, str] = MappingProxyType({})
+    #:
+    #: A factory for the same reason as
+    #: :attr:`netgraph.config.ValidationConfig.severity`: a ``mappingproxy`` is
+    #: not accepted as a plain dataclass default before Python 3.12, and as a
+    #: plain default this raised ``ValueError`` while *importing* the module on
+    #: 3.10 and 3.11 — so every one of them failed at collection.
+    written: Mapping[str, str] = field(default_factory=lambda: _EMPTY_WRITTEN)
     #: The key whose value is being written, for :attr:`Slot.VALUE`.
     key: str | None = None
     #: The key written on the caret's line, whole, wherever in it the caret is.

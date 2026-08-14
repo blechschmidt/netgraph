@@ -64,6 +64,12 @@ window.netgraphCull = (function () {
    * any. */
   var COARSE_SCALE = 0.45;
 
+  /** How tall a namespace frame's label is drawn, in *screen* pixels.
+   *  Converted into drawing units when the frames are painted, because the
+   *  drawing may be at a four-hundredth of life size and a label sized in its
+   *  units would be a fifteenth of a pixel. */
+  var LABEL_PX = 15;
+
   /** How long after a pan or a zoom the cull runs, in milliseconds. The gesture
    *  itself must not wait for it: panning is a transform on a wrapper and stays
    *  at whatever frame rate the compositor manages, and the cull catches up
@@ -80,6 +86,8 @@ window.netgraphCull = (function () {
   var parked = {};
   /** The <g> the namespace frames are drawn into, or null. */
   var frames = null;
+  /** The scale they were sized for, so a zoom re-sizes them. */
+  var framesScale = 0;
   /** namespace -> { x, y, w, h } in SVG user space, computed once per drawing. */
   var regions = {};
   /** The transform from SVG user space to client pixels, or null. */
@@ -131,6 +139,7 @@ window.netgraphCull = (function () {
     parked = {};
     regions = {};
     frames = null;
+    framesScale = 0;
     mapping = null;
     active = false;
     coarse = false;
@@ -195,7 +204,7 @@ window.netgraphCull = (function () {
     if (!svg) { return; }
     var window_ = visible(svg);
     if (!window_) { return; }
-    setCoarse(window_.scale < COARSE_SCALE, svg);
+    setCoarse(window_.scale < COARSE_SCALE, svg, window_.scale);
     var shown = 0;
     for (var id in boxes) {
       if (!Object.prototype.hasOwnProperty.call(boxes, id)) { continue; }
@@ -281,11 +290,21 @@ window.netgraphCull = (function () {
 
   /* ------------------------------------------------- level of detail */
 
-  function setCoarse(wanted, svg) {
-    if (wanted === coarse) { return; }
-    coarse = wanted;
-    el.canvas.classList.toggle("coarse", coarse);
-    if (coarse) { paintFrames(svg); } else if (frames) { frames.remove(); frames = null; }
+  function setCoarse(wanted, svg, scale) {
+    if (wanted !== coarse) {
+      coarse = wanted;
+      el.canvas.classList.toggle("coarse", coarse);
+      if (!coarse && frames) { frames.remove(); frames = null; }
+    }
+    if (!coarse) { return; }
+    // Repainted whenever the zoom has moved appreciably, because the frames are
+    // drawn in the diagram's units and have to come out a constant size on
+    // *screen*: a label sized in user units on a drawing at a four-hundredth of
+    // life size is a fifteenth of a pixel tall, which is the state this whole
+    // level of detail exists to rescue.
+    if (frames && framesScale && Math.abs(Math.log(scale / framesScale)) < 0.2) { return; }
+    framesScale = scale;
+    paintFrames(svg, scale);
   }
 
   /** The bounding box of each namespace, from the nodes that are in it.
@@ -316,39 +335,73 @@ window.netgraphCull = (function () {
       region.bottom = Math.max(region.bottom, box.y + box.h);
       region.members += 1;
     }
-    var regions_ = {};
-    for (var name in found) {
-      if (!Object.prototype.hasOwnProperty.call(found, name)) { continue; }
-      if (found[name].members < 2) { continue; }
-      regions_[name] = found[name];
-    }
-    return regions_;
+    return disjoint(found);
   }
 
-  /** Draw one frame per namespace, under everything else. */
-  function paintFrames(svg) {
+  /** Keep the namespaces a frame would actually say something about.
+   *
+   * A frame is a claim: everything in here is that namespace. That is only true
+   * when the layout put the namespace's members together — which a stored
+   * arrangement usually does and `--group-by-namespace` always does, and which a
+   * plain Graphviz hierarchy usually does not. On a drawing where the racks
+   * interleave, the bounding boxes lie on top of one another and forty-two
+   * overlapping rectangles tell a reader nothing except that there are
+   * forty-two of something.
+   *
+   * So a namespace is framed only when its box touches no other namespace's,
+   * and one with a single member is never framed at all — a box round one node
+   * says nothing the node did not.
+   */
+  function disjoint(found) {
+    var names = Object.keys(found).filter(function (name) { return found[name].members > 1; });
+    var kept = {};
+    names.forEach(function (name) {
+      var mine = found[name];
+      var clear = names.every(function (other) {
+        if (other === name) { return true; }
+        var theirs = found[other];
+        return mine.x > theirs.right || mine.right < theirs.x ||
+          mine.y > theirs.bottom || mine.bottom < theirs.y;
+      });
+      if (clear) { kept[name] = mine; }
+    });
+    return kept;
+  }
+
+  /** Draw one frame per namespace, under everything else.
+   *
+   * ``scale`` is screen pixels per drawing unit. Everything drawn here is
+   * divided by it, so the frame is a hairline and the label is legible text
+   * whatever the diagram has been shrunk to — which is the whole point, since
+   * this only runs when the diagram has been shrunk a long way.
+   */
+  function paintFrames(svg, scale) {
     if (frames) { frames.remove(); frames = null; }
     var root = svg.querySelector("g#graph0, g.graph") || svg.firstElementChild;
     if (!root) { return; }
     var names = Object.keys(regions).sort();
     if (!names.length) { return; }
+    var unit = 1 / (scale || 1);
+    var pad = LABEL_PX * unit;
     var layer = document.createElementNS("http://www.w3.org/2000/svg", "g");
     layer.setAttribute("class", "ng-lod");
     layer.setAttribute("aria-hidden", "true");
     names.forEach(function (name) {
       var region = regions[name];
-      var pad = 12;
       var rect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
       rect.setAttribute("x", region.x - pad);
       rect.setAttribute("y", region.y - pad);
       rect.setAttribute("width", (region.right - region.x) + 2 * pad);
       rect.setAttribute("height", (region.bottom - region.y) + 2 * pad);
       rect.setAttribute("class", "ng-lod-frame");
+      rect.setAttribute("stroke-width", 1.5 * unit);
+      rect.setAttribute("stroke-dasharray", (6 * unit) + " " + (4 * unit));
       layer.appendChild(rect);
       var label = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      label.setAttribute("x", region.x - pad + 6);
-      label.setAttribute("y", region.y - pad - 6);
+      label.setAttribute("x", region.x - pad);
+      label.setAttribute("y", region.y - pad - 4 * unit);
       label.setAttribute("class", "ng-lod-label");
+      label.setAttribute("font-size", LABEL_PX * unit);
       label.textContent = name + " (" + region.members + ")";
       layer.appendChild(label);
     });

@@ -601,21 +601,21 @@ main {
   display: none;
 }
 
+/* The stroke width, the dash and the font size are set per frame by cull.js,
+ * in drawing units worked back from the current zoom, so that they come out the
+ * same size on screen however far the diagram has been shrunk. Everything that
+ * does *not* depend on the zoom is here. */
 .viewport svg .ng-lod-frame {
   fill: none;
   stroke: var(--muted);
-  stroke-width: 1.5;
-  stroke-dasharray: 6 4;
   opacity: .7;
 }
 
 /* The one thing that stays legible when the labels go: which namespace this
- * block of shapes is. Sized in user units, so it grows as the diagram shrinks
- * and stays about the same size on screen. */
+ * block of shapes is, and how much is in it. */
 .viewport svg .ng-lod-label {
   fill: var(--muted);
   font-family: Helvetica, Arial, sans-serif;
-  font-size: 28px;
   font-weight: 600;
 }
 
