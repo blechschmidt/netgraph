@@ -387,10 +387,10 @@ def _assert_parses(format: str, text: str, graph: Graph) -> None:
         assert "flowchart" in text or "graph" in text
     elif format == "dot":
         assert text.lstrip().startswith(("digraph", "graph", "strict"))
-        # Balanced braces once every string literal is blanked: the cheap
-        # structural check, with ``dot -Tcanon`` doing the real one in
-        # ``test_dot_output_is_accepted_by_graphviz``.
-        skeleton = _DOT_STRING.sub('""', text)
+        # Balanced braces once every string literal and HTML-like label is
+        # blanked: the cheap structural check, with ``dot -Tcanon`` doing the
+        # real one in ``test_dot_output_is_accepted_by_graphviz``.
+        skeleton = _dot_skeleton(text)
         assert skeleton.count("{") == skeleton.count("}")
 
 
@@ -569,6 +569,43 @@ _DOT_STRING: Final = re.compile(r'"(?:[^"\\]|\\.)*"', re.S)
 _MERMAID_STRING: Final = re.compile(r'"[^"]*"')
 
 
+def _dot_skeleton(text: str) -> str:
+    """``text`` with every string literal and HTML-like label emptied out.
+
+    The braces that decide a DOT file's *structure* are the ones outside both.
+    A brace inside a quoted string is a character, and so is a brace inside an
+    HTML-like label: ``label=<…>`` is delimited by angle brackets, so Graphviz
+    reads ``{`` in it as text. A user whose ``full_name`` is ``{`` produces
+    exactly that, and it parses — ``dot -Tcanon`` says so.
+
+    Written as a scan rather than a regex because angle brackets nest: the
+    markup inside a label is tags, and a non-greedy ``<.*?>`` would stop at the
+    first one.
+    """
+    kept: list[str] = []
+    index, length, quoted, depth = 0, len(text), False, 0
+    while index < length:
+        char = text[index]
+        if quoted:
+            if char == "\\":
+                index += 2
+                continue
+            if char == '"':
+                quoted = False
+                kept.append(char)
+        elif depth:
+            depth += 1 if char == "<" else (-1 if char == ">" else 0)
+        elif char == '"':
+            quoted = True
+            kept.append(char)
+        elif char == "<":
+            depth = 1
+        else:
+            kept.append(char)
+        index += 1
+    return "".join(kept)
+
+
 def _named(element: str, interface: str) -> ng.InventoryPlan:
     """The payload inventory with one device renamed, and its port with it."""
     plan = _payload_documents(BENIGN)
@@ -611,7 +648,7 @@ def test_no_name_can_break_out_of_a_rendering(element: str, interface: str) -> N
     # label (``label=<…>``) is well-formed markup. That second one is the check
     # that matters here: a label is the one part of a DOT file where a name is
     # not inside quotes, so an unescaped ``<`` would open a tag.
-    skeleton = _DOT_STRING.sub('""', dot)
+    skeleton = _dot_skeleton(dot)
     assert skeleton.count("{") == skeleton.count("}")
     labels = re.findall(r"label=<(.*?)>\];", dot, re.S)
     assert labels, "no HTML-like label was emitted, so nothing was checked"
@@ -627,6 +664,34 @@ def test_no_name_can_break_out_of_a_rendering(element: str, interface: str) -> N
     assert len(document["edges"]) == len(graph.edges)
     assert element in {node["id"] for node in document["nodes"]}
     assert interface in _strings(document)
+
+
+@pytest.mark.parametrize("value", ["{", "}", "{}}", "<b>", "&", '"'])
+def test_a_brace_in_a_label_is_text_and_not_structure(value: str) -> None:
+    """A field's value reaches an HTML-like label, where a brace is a character.
+
+    ``spec.full_name: '{'`` on a user is the case the generated inventories
+    found: the label is delimited by angle brackets, so Graphviz reads the brace
+    as text and the file is well formed. The rendering must not escape it into
+    something else, and the skeleton check must not mistake it for a block.
+    """
+    documents = (
+        {
+            "apiVersion": "netgraph.dev/v1alpha1",
+            "kind": "user",
+            "metadata": {"name": "u1"},
+            "spec": {"full_name": value},
+        },
+    )
+    plan = ng.InventoryPlan(
+        documents=(ng.PlannedDocument(namespace="", stem="u1", data=documents[0]),)
+    )
+    with written(plan) as (_, inventory):
+        assert_loaded(inventory)
+        graph = build_graph(inventory, layer=Layer.IDENTITY)
+    dot = RENDERERS["dot"].text(graph, RenderOptions())
+    skeleton = _dot_skeleton(dot)
+    assert skeleton.count("{") == skeleton.count("}")
 
 
 @requires_dot
