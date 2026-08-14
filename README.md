@@ -201,6 +201,8 @@ report.txt` both do what they look like they do.
 | [`netgraph edit add-interface`](docs/commands/edit.md) | Add an interface to an element. | [edit.md](docs/commands/edit.md) |
 | [`netgraph edit remove-interface`](docs/commands/edit.md) | Remove an interface from an element. | [edit.md](docs/commands/edit.md) |
 | [`netgraph edit apply`](docs/commands/edit.md) | Apply operations given as JSON; the programmatic face. | [edit.md](docs/commands/edit.md) |
+| [`netgraph plan`](docs/commands/plan.md) | Diff two inventory states into a reviewable changeset. | [plan.md](docs/commands/plan.md) |
+| [`netgraph apply`](docs/commands/apply.md) | Execute a plan against the inventory files. | [apply.md](docs/commands/apply.md) |
 | [`netgraph render`](docs/commands/render.md) | Draw the graph as SVG, PNG, PDF, DOT, Mermaid, JSON or HTML. | [render.md](docs/commands/render.md) |
 | [`netgraph layout`](docs/commands/layout.md) | Store the diagram's arrangement, so a hand-placed node stays put. | [layout.md](docs/commands/layout.md) |
 | [`netgraph watch`](docs/commands/watch.md) | Re-render on every save, optionally serving the result. | [watch.md](docs/commands/watch.md) |

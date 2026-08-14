@@ -28,6 +28,8 @@ a flag that is documented exists. The prose around them is written by hand.
 | [`netgraph edit add-interface`](edit.md) | Add an interface to an element. | [edit.md](edit.md) |
 | [`netgraph edit remove-interface`](edit.md) | Remove an interface from an element. | [edit.md](edit.md) |
 | [`netgraph edit apply`](edit.md) | Apply operations given as JSON; the programmatic face. | [edit.md](edit.md) |
+| [`netgraph plan`](plan.md) | Diff two inventory states into a reviewable changeset. | [plan.md](plan.md) |
+| [`netgraph apply`](apply.md) | Execute a plan against the inventory files. | [apply.md](apply.md) |
 | [`netgraph render`](render.md) | Draw the graph as SVG, PNG, PDF, DOT, Mermaid, JSON or HTML. | [render.md](render.md) |
 | [`netgraph layout`](layout.md) | Store the diagram's arrangement, so a hand-placed node stays put. | [layout.md](layout.md) |
 | [`netgraph watch`](watch.md) | Re-render on every save, optionally serving the result. | [watch.md](watch.md) |

@@ -1,0 +1,28 @@
+netgraph plan: home-lab → home-lab (edited)
+
+  - cable.cables/cbl-sw-ap  [cable]
+      description: PoE run into the hallway ceiling
+      spec.endpoints: [ap-home:eth0, sw-home:port5]
+      spec.medium: copper
+      spec.speed: 1000000000
+      spec.duplex: full
+      spec.length_m: 6.0
+      spec.category: cat6
+      spec.connector: rj45
+      spec.label: H-005
+  → device.hosts/srv-nas → device.hosts/nas-01  [server]
+  + device.hosts/printer  [computer]
+      description: Laser printer in the study
+      spec.vendor: Brother
+      spec.interfaces: [eth0]
+      spec.forwarding: {ipv4: false, ipv6: false}
+  + cable.cbl-sw-printer  [cable]
+      spec.endpoints: [printer:eth0, sw-home:port6]
+      spec.medium: copper
+      spec.duplex: full
+  ~ device.switches/sw-home  [switch]
+      + spec.interfaces[name=port6]: {name: port6, type: ethernet, enabled: true}
+  ~ cable.cables/cbl-sw-nas  [cable]
+      ~ spec.endpoints: [srv-nas:eth0, sw-home:port3] -> [nas-01:eth0, sw-home:port3]
+
+Plan: + 2 to add, ~ 2 to change, - 1 to destroy, → 1 to rename.

@@ -10,6 +10,11 @@ needs one thing first: a way to change the files that is as safe and as lossless
 as the way it reads them. That way is `netgraph.edit`, and
 [`netgraph edit`](commands/edit.md) is its command-line face.
 
+[`netgraph apply`](commands/apply.md) is the first of those callers to arrive: it
+takes a changeset computed by [`netgraph plan`](commands/plan.md) and turns each
+entry into the operations described here, which is why a plan applied to a tree
+leaves every comment in it alone.
+
 ## Contents
 
 - [The problem](#the-problem)
@@ -314,4 +319,6 @@ job, and drawing it there is the renderer's.
 - [`docs/validation.md`](validation.md) — what the write gate runs.
 - [`netgraph layout`](commands/layout.md) — the first caller to write through it that is
   not a person: it stores a diagram's arrangement as `set-geometry` operations.
+- [`netgraph plan`](commands/plan.md) and [`netgraph apply`](commands/apply.md) — a
+  changeset between two inventory states, and its execution through these operations.
 - [`docs/architecture.md`](architecture.md) — where the write path sits in the pipeline.

@@ -79,6 +79,7 @@ import sys
 import threading
 import webbrowser
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, Final, TypeVar
@@ -159,6 +160,7 @@ from netgraph.fsio import write_text
 from netgraph.importer import (
     DIALECTS,
     Draft,
+    ImportSourceError,
     build_draft,
     build_files,
     read_inputs,
@@ -211,6 +213,25 @@ from netgraph.loader import (
     subset,
 )
 from netgraph.models import DOCUMENT_KINDS, KINDS, Element, Medium
+from netgraph.plan import (
+    PLAN_FORMATS,
+    Plan,
+    PlanExecutionError,
+    PlanFormatError,
+    PlanSourceError,
+    StateRef,
+    adopt,
+    git_ref,
+    plan_from_dict,
+    render_plan,
+    state_digest,
+    summary_line,
+    translate,
+    write_plan,
+)
+from netgraph.plan import (
+    diff as diff_states,
+)
 from netgraph.render import (
     DEFAULT_RANKDIR,
     FORMATS,
@@ -1674,6 +1695,30 @@ def _run_edit(
     session = EditSession(root=root, config=_edit_config(app), cache=app.cache())
     try:
         session.apply_all(operations)
+    except EditError as exc:
+        _report_edit_error(console, exc)
+        raise click.exceptions.Exit(EXIT_INVALID) from exc
+    _run_edit_session(app, session, dry_run=dry_run, as_json=as_json, force=force)
+
+
+def _run_edit_session(
+    app: AppContext,
+    session: EditSession,
+    *,
+    dry_run: bool,
+    as_json: bool,
+    force: bool,
+    note: str | None = None,
+) -> None:
+    """Check, write and report a session whose operations have all been applied.
+
+    Split out from :func:`_run_edit` so that ``apply`` — which builds its
+    operations one changeset entry at a time, against the tree the previous
+    entry left — reaches the disk through exactly the same two gates and prints
+    exactly the same report.
+    """
+    console = app.console()
+    try:
         if not session.changes:
             console.info("nothing to change")
             if as_json:
@@ -1702,6 +1747,8 @@ def _run_edit(
         console.warn(str(problem))
     for applied in summary.applied:
         console.info(applied.summary)
+    if note is not None:
+        console.info(note)
     verb = "would change" if dry_run else "changed"
     console.info(f"{verb} {len(summary.changes)} file(s): {', '.join(sorted(summary.changes))}")
 
@@ -1731,6 +1778,502 @@ def _report_edit_error(console: Console, error: EditError) -> None:
     elif isinstance(error, AddressError):
         for candidate in error.candidates:
             console.info(f"  {candidate}")
+
+
+# --------------------------------------------------------------------------- #
+# plan / apply
+# --------------------------------------------------------------------------- #
+
+
+@cli.command("plan")
+@click.argument("inputs", nargs=-1, metavar="[NAME=]INPUT...")
+@click.option(
+    "--from",
+    "source",
+    metavar="REF|DIR",
+    default=None,
+    help=(
+        "Take the current state from a git ref or another folder instead of from the "
+        "inventory. A directory that exists is a folder; anything else is a git ref, "
+        "exported read-only — the working tree is never touched."
+    ),
+)
+@click.option(
+    "--to",
+    "target",
+    metavar="REF|DIR",
+    default=None,
+    help="Take the desired state from a git ref or another folder. Defaults to the inventory.",
+)
+@click.option(
+    "--from-live",
+    "from_live",
+    is_flag=True,
+    default=False,
+    help=(
+        "Take the desired state from a live capture: the inventory as it would read if it "
+        "agreed with what the network reports. Reads the same inputs 'netgraph import' and "
+        "'netgraph drift' do."
+    ),
+)
+@click.option(
+    "--dialect",
+    type=click.Choice(DIALECTS),
+    default="auto",
+    show_default=True,
+    help="Input dialect for --from-live, as 'netgraph drift --from' takes it.",
+)
+@click.option(
+    "--host",
+    metavar="NAME",
+    default=None,
+    help="Device every --from-live input was captured on, when the input does not name it.",
+)
+@click.option(
+    "--only",
+    multiple=True,
+    metavar="GLOB",
+    shell_complete=complete_element,
+    help="Adopt only elements whose name matches this glob (--from-live only). Repeatable.",
+)
+@click.option(
+    "--exclude",
+    "excluded",
+    multiple=True,
+    metavar="GLOB",
+    shell_complete=complete_element,
+    help="Leave elements matching this glob out of the adoption (--from-live only). Repeatable.",
+)
+@click.option(
+    "--exclude-interface",
+    "excluded_interfaces",
+    multiple=True,
+    metavar="GLOB",
+    help="Leave interfaces matching this glob out of the adoption. Repeatable.",
+)
+@click.option(
+    "--target",
+    "targets",
+    multiple=True,
+    metavar="ADDRESS",
+    help=(
+        "Keep only changes to elements this glob selects, matched against the address "
+        "(device.core/sw-1), the qualified name or the short name. Repeatable."
+    ),
+)
+@click.option(
+    "--no-renames",
+    "no_renames",
+    is_flag=True,
+    default=False,
+    help="Report every rename as a delete and a create rather than detecting it.",
+)
+@click.option(
+    "-F",
+    "--output-format",
+    type=click.Choice(PLAN_FORMATS),
+    default="text",
+    show_default=True,
+    help="text is for reading; json is for CI and for a script.",
+)
+@click.option("--json", "as_json", is_flag=True, default=False, help="Shorthand for '-F json'.")
+@click.option(
+    "-out",
+    "--out",
+    "out_path",
+    metavar="FILE",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help=(
+        "Write the plan to FILE so 'netgraph apply FILE' executes exactly what was reviewed. "
+        "The file records a hash of the current state and apply refuses if the tree has moved on."
+    ),
+)
+@click.option(
+    "--fail-on",
+    "fail_on",
+    type=click.Choice(("never", "changes")),
+    default="never",
+    show_default=True,
+    help="Exit 1 when the plan is not empty, so CI can gate on 'nothing to do'.",
+)
+@click.pass_obj
+def plan_command(
+    app: AppContext,
+    inputs: tuple[str, ...],
+    source: str | None,
+    target: str | None,
+    from_live: bool,
+    dialect: str,
+    host: str | None,
+    only: tuple[str, ...],
+    excluded: tuple[str, ...],
+    excluded_interfaces: tuple[str, ...],
+    targets: tuple[str, ...],
+    no_renames: bool,
+    output_format: str,
+    as_json: bool,
+    out_path: Path | None,
+    fail_on: str,
+) -> None:
+    """Diff two inventory states and print an ordered changeset.
+
+    The two sides come from wherever they can: a git ref against the working
+    tree, two folders, or a live capture with --from-live. The result is a
+    terraform-style plan — what is added, changed, renamed and destroyed, field
+    by field — that 'netgraph apply' executes back onto the *files*.
+
+    Nothing is written unless -out is given, and nothing is ever sent to a
+    device: applying to the live network is out of scope.
+
+    \b
+    netgraph -i net plan --from HEAD
+    netgraph -i net plan --to ../proposed --json
+    netgraph -i net plan --from-live captures/*.json -out drift.plan
+    netgraph -i net plan --fail-on changes --from origin/main
+    """
+    console = app.console()
+    stream = console.to_stderr() if output_format != "text" or as_json else console
+    root = app.inventory if app.inventory.is_dir() else app.inventory.parent
+
+    if from_live and target is not None:
+        raise click.UsageError("--from-live and --to both name the desired state; pick one")
+    if not from_live and not inputs and source is None and target is None:
+        raise click.UsageError(
+            "nothing to compare against: give --from, --to, or --from-live with a capture"
+        )
+    if inputs and not from_live:
+        raise click.UsageError("capture inputs are only read with --from-live")
+
+    try:
+        plan = _build_plan(
+            app,
+            root=root,
+            source=source,
+            target=target,
+            from_live=from_live,
+            inputs=inputs,
+            dialect=dialect,
+            host=host,
+            spec=CompareSpec(only=only, exclude=excluded, ignore_interfaces=excluded_interfaces),
+            renames=not no_renames,
+            console=stream,
+        )
+    except (PlanSourceError, ImportSourceError, LoaderError) as exc:
+        stream.error(str(exc))
+        raise click.exceptions.Exit(EXIT_INVALID) from exc
+
+    plan = plan.select(targets)
+    if targets and plan.empty:
+        stream.warn(f"--target matched no change; {len(targets)} pattern(s) given")
+
+    # Written before anything is printed: a reader that closes the pipe early
+    # (``netgraph plan | head``) must not be able to lose the file that the
+    # subsequent ``netgraph apply`` is about to be given.
+    if out_path is not None:
+        write_text(out_path, render_plan(plan, "json") + "\n")
+
+    if output_format == "json" or as_json:
+        console.print(render_plan(plan, "json"))
+        stream.info(f"Plan: {summary_line(plan)}.")
+    else:
+        write_plan(console, plan, verbose=app.verbosity > 0)
+
+    if out_path is not None:
+        stream.info(f"plan written to {out_path}; apply it with 'netgraph apply {out_path}'")
+
+    if fail_on == "changes" and not plan.empty:
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+
+def _build_plan(
+    app: AppContext,
+    *,
+    root: Path,
+    source: str | None,
+    target: str | None,
+    from_live: bool,
+    inputs: Sequence[str],
+    dialect: str,
+    host: str | None,
+    spec: CompareSpec,
+    renames: bool,
+    console: Console,
+) -> Plan:
+    """Load both sides and diff them.
+
+    The working tree is one side of every comparison unless both --from and --to
+    name something else, which is what makes the common case — "what did I
+    change?" — a single flag.
+    """
+    with ExitStack() as stack:
+        current = _load_state(stack, app, root, source, fallback="the inventory")
+        if from_live:
+            return _live_plan(
+                current,
+                inputs=inputs,
+                dialect=dialect,
+                host=host,
+                spec=spec,
+                renames=renames,
+                console=console,
+                verbose=app.verbosity > 0,
+            )
+        desired = _load_state(stack, app, root, target, fallback="the inventory")
+        _refuse_broken(console, current.inventory, "the current state")
+        _refuse_broken(console, desired.inventory, "the desired state")
+        return diff_states(
+            current.inventory,
+            desired.inventory,
+            source=current.ref,
+            target=desired.ref,
+            renames=renames,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class _State:
+    """One side of a plan, loaded."""
+
+    inventory: Inventory
+    ref: StateRef
+
+
+def _load_state(
+    stack: ExitStack, app: AppContext, root: Path, spec: str | None, *, fallback: str
+) -> _State:
+    """Load the working tree, a folder, or a git ref, whichever ``spec`` names."""
+    if spec is None:
+        inventory = app.load()
+        return _State(
+            inventory=inventory,
+            ref=StateRef(kind="tree", description=fallback, digest=state_digest(inventory)),
+        )
+    folder = Path(spec)
+    if folder.is_dir():
+        inventory = load_tree(folder)
+        return _State(
+            inventory=inventory,
+            ref=StateRef(kind="folder", description=str(folder), digest=state_digest(inventory)),
+        )
+    exported = stack.enter_context(git_ref(root, spec))
+    inventory = load_tree(exported)
+    # The root the export was loaded from is a temporary directory nobody will
+    # ever open again, so the plan reports the ref instead.
+    return _State(
+        inventory=inventory,
+        ref=StateRef(kind="git", description=spec, digest=state_digest(inventory)),
+    )
+
+
+def _live_plan(
+    current: _State,
+    *,
+    inputs: Sequence[str],
+    dialect: str,
+    host: str | None,
+    spec: CompareSpec,
+    renames: bool,
+    console: Console,
+    verbose: bool,
+) -> Plan:
+    """The plan that adopts a capture into the declared inventory."""
+    _refuse_broken(console, current.inventory, "the inventory")
+    draft = build_draft(read_inputs(list(inputs), host=host, stdin=sys.stdin), dialect=dialect)
+    adoption = adopt(current.inventory, draft, spec=spec)
+    # What the capture was not entitled to change is the reason the plan is
+    # shorter than a drift report; it is commentary, so it is behind -v with a
+    # count in its place -- the same shape 'netgraph drift' reports it in.
+    if adoption.unobserved:
+        if verbose:
+            for note in adoption.unobserved:
+                console.info(f"  unobserved: {note}")
+        else:
+            console.info(
+                f"{count_text(len(adoption.unobserved), 'declared item')} the capture could "
+                f"not vouch for were left alone; -v lists them"
+            )
+    for problem in adoption.rejected:
+        console.warn(f"could not adopt: {problem}")
+    return diff_states(
+        current.inventory,
+        adoption.inventory,
+        source=current.ref,
+        target=StateRef(
+            kind="live",
+            description="the live network ("
+            + (", ".join(sorted(set(draft.dialects.values()))) or "no input")
+            + ")",
+        ),
+        renames=renames,
+    )
+
+
+def _refuse_broken(console: Console, inventory: Inventory, side: str) -> None:
+    """A state that does not load cannot be planned against.
+
+    A document that was rejected is absent from the inventory, so diffing
+    against it would read as a deletion — the same reasoning ``drift`` applies,
+    and with more at stake here because the answer is meant to be executed.
+    """
+    if not inventory.errors:
+        return
+    _report_problems(console, inventory.errors, ())
+    raise PlanSourceError(
+        f"refusing to plan: {side} does not load ({count_text(len(inventory.errors), 'error')})"
+    )
+
+
+@cli.command("apply")
+@click.argument(
+    "plan_file",
+    metavar="PLAN",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+)
+@click.option(
+    "--target",
+    "targets",
+    multiple=True,
+    metavar="ADDRESS",
+    help=(
+        "Apply only the changes this glob selects, matched against the address "
+        "(device.core/sw-1), the qualified name or the short name. Repeatable."
+    ),
+)
+@click.option(
+    "--auto-approve",
+    is_flag=True,
+    default=False,
+    help="Do not ask before writing. For automation; a person should read the plan first.",
+)
+@click.option(
+    "-n",
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Write nothing; print the unified diff the plan would produce.",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help=(
+        "Write even if the result would introduce new validation errors. The state check "
+        "is never skipped: a plan is only ever applied to the tree it was made from."
+    ),
+)
+@click.option("--json", "as_json", is_flag=True, default=False, help="Report as JSON.")
+@click.pass_obj
+def apply_command(
+    app: AppContext,
+    plan_file: Path,
+    targets: tuple[str, ...],
+    auto_approve: bool,
+    dry_run: bool,
+    force: bool,
+    as_json: bool,
+) -> None:
+    """Execute a plan against the inventory *files*.
+
+    Each entry becomes a 'netgraph edit' operation, so comments, key order and
+    formatting survive, and the same validation gate applies: an edit that would
+    introduce a new error is refused unless --force.
+
+    Applying to the live network is deliberately out of scope. This command
+    writes YAML and nothing else — it opens no session to a device, and there is
+    no flag that makes it. The loop it closes runs the other way: adopt what the
+    network reports into the declared inventory.
+
+    \b
+    netgraph -i net plan --from-live caps/*.json -out drift.plan
+    netgraph -i net apply drift.plan
+    netgraph -i net apply drift.plan --target 'device.core/*' --auto-approve
+    """
+    console = app.console()
+    root = app.inventory if app.inventory.is_dir() else app.inventory.parent
+
+    try:
+        plan = plan_from_dict(json.loads(plan_file.read_text(encoding="utf-8")))
+    except (OSError, UnicodeDecodeError) as exc:
+        console.error(f"cannot read {plan_file}: {exc}")
+        raise click.exceptions.Exit(EXIT_INVALID) from exc
+    except (json.JSONDecodeError, PlanFormatError) as exc:
+        console.error(f"{plan_file} is not a netgraph plan: {exc}")
+        raise click.exceptions.Exit(EXIT_INVALID) from exc
+
+    session = EditSession(root=root, config=_edit_config(app), cache=app.cache())
+    if not _state_matches(console, plan, session, plan_file=plan_file):
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+    selected = plan.select(targets)
+    if selected.empty:
+        console.info("nothing to apply" if not targets else "--target selected no change")
+        if as_json:
+            console.print(json.dumps(session.summary().to_dict(), indent=2))
+        return
+
+    console.info(f"Plan: {summary_line(selected)}.")
+    for change in selected:
+        console.info(f"  {change.sigil} {change.headline}  [{change.kind}]")
+
+    if not dry_run and not auto_approve and not _confirm(console, selected):
+        console.info("aborted; nothing has been written")
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+    try:
+        applied = [operations for _, operations in translate(selected, session)]
+    except (PlanExecutionError, EditError) as exc:
+        if isinstance(exc, EditError):
+            _report_edit_error(console, exc)
+        else:
+            console.error(str(exc))
+        console.info("nothing has been written")
+        raise click.exceptions.Exit(EXIT_INVALID) from exc
+
+    _run_edit_session(
+        app,
+        session,
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+        note=f"{sum(len(group) for group in applied)} operation(s) from {plan_file}",
+    )
+
+
+def _state_matches(console: Console, plan: Plan, session: EditSession, *, plan_file: Path) -> bool:
+    """Is the tree still the one the plan was made from?"""
+    expected = plan.source.digest
+    if expected is None:
+        console.error(
+            f"{plan_file} records no source state, so it cannot be applied safely; "
+            f"re-run 'netgraph plan' with -out"
+        )
+        return False
+    if session.baseline.errors:
+        _report_problems(console, session.baseline.errors, ())
+        console.error("refusing to apply to an inventory that does not load")
+        return False
+    actual = state_digest(session.baseline)
+    if actual == expected:
+        return True
+    console.error(
+        f"{plan_file} was made against a different state of {session.root}; the tree has "
+        f"changed since. Re-run 'netgraph plan' and review the new plan."
+    )
+    console.info(f"  plan expects {expected}")
+    console.info(f"  tree is      {actual}")
+    return False
+
+
+def _confirm(console: Console, plan: Plan) -> bool:
+    """Ask before writing. A closed stdin is a no, not a yes."""
+    console.info("")
+    try:
+        return click.confirm(
+            f"Apply these {len(plan)} change(s) to the inventory files?", default=False
+        )
+    except click.Abort:
+        return False
 
 
 # --------------------------------------------------------------------------- #

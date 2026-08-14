@@ -1,0 +1,6 @@
+netgraph plan: campus → campus (edited)
+
+  ~ device.sites/north/access/sw-north-acc-01  [switch]
+      ~ spec.vendor: Cisco -> Arista
+
+Plan: ~ 1 to change.

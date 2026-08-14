@@ -1,0 +1,3 @@
+netgraph plan: home-lab → home-lab
+
+No changes. The two states describe the same network.

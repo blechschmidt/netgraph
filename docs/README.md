@@ -20,6 +20,8 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
 | find out how two machines reach each other | [paths.md](paths.md) |
 | keep the YAML in one canonical form | [format.md](format.md) |
 | change the inventory safely, from a script or an editor | [editing.md](editing.md) |
+| diff two inventory states, review the change, and apply it | [commands/plan.md](commands/plan.md), [commands/apply.md](commands/apply.md) |
+| adopt what a live network reports into the declared inventory | [commands/drift.md](commands/drift.md), [commands/plan.md](commands/plan.md) |
 | gate a pull request on the inventory validating | [ci.md](ci.md) |
 | bootstrap an inventory from a network that already exists | [importing.md](importing.md) |
 | stop retyping the same flags | [configuration.md](configuration.md) |
@@ -55,7 +57,11 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
   decision in it is the way it is.
 * **[editing.md](editing.md)** — the write path: what an operation is, what its inverse
   is, how a rename finds every reference, and the two gates between an edit and the
-  disk. The web editor and `apply` will both be described in terms of it.
+  disk. `netgraph apply` and the web editor are both built on it.
+* **[commands/plan.md](commands/plan.md)** — the diff engine: stable addresses, structural
+  rename detection, the order a changeset has to run in, plan files and the state hash,
+  and how a capture becomes a proposal. [commands/apply.md](commands/apply.md) executes
+  the result against the files.
 * **[ipam.md](ipam.md)** — utilisation, free space, the next free block, aggregation and
   conflicts, with the arithmetic spelled out.
 * **[paths.md](paths.md)** — how the trace works, what counts as a hop, several paths and

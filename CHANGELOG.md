@@ -18,6 +18,49 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **`netgraph plan` and `netgraph apply`: a typed changeset between two inventory states.**
+  The inventory is meant to be a source of truth that can be *diffed and applied*, and until
+  now only the read half existed: `netgraph drift` compared a live network against the
+  declaration and reported. The general diff engine and the write half are now here.
+
+  Every element has a stable **address** — `device.core/sw-1`, `cable.core/uplink` — whose
+  type is a category rather than the document's `kind`, so `kind: switch` → `kind: router`
+  is an update of one element rather than the destruction of one and the creation of
+  another. `netgraph plan` diffs two loaded inventories into an ordered changeset of
+  `create`, `update`, `delete` and `rename` entries, each with the address and the
+  field-level before/after pairs, and prints it in the terraform shape
+  (`+ 3 to add, ~ 5 to change, - 1 to destroy`).
+
+  Three things make the output worth reading. **Renames are detected structurally** — by
+  serial, MAC, link ends, cable label, rack slot or a `netgraph.dev/id` annotation — so a
+  renamed switch is one entry rather than a delete plus a create, and only where the
+  evidence names exactly one element on each side. **The entries are in dependency order**:
+  a cable is destroyed before the device it terminates on and created after it. And **the
+  comparison is of meaning, not text** — templates merged, ranges expanded, defaults filled
+  in — so a tree somebody has just run `netgraph fmt` over produces an empty plan.
+
+  The two sides come from wherever they can: `--from <git-ref>` against the working tree
+  (read with `git archive`, so the working tree is never disturbed), two folders with
+  `--from`/`--to`, or `--from-live` reusing the `import` and `drift` collectors. The last
+  is the one that closes the loop: the desired state is *the declaration with the
+  observations written into it*, never the capture rendered as YAML, so a partial capture
+  proposes corrections and never a cull — a declared cable is only removed where a port
+  contradicts it, a re-patched lead keeps its document, and a trunk's VLAN set is merged
+  rather than substituted.
+
+  `netgraph apply` executes a plan against the **files**, translating each entry into the
+  `netgraph edit` operations from the previous release, so comments, key order and
+  formatting survive and the same validation gate applies. `netgraph plan -out drift.plan
+  && netgraph apply drift.plan` adopts what the network reports into the inventory. The
+  plan file records a hash of the state it was made from and apply refuses a tree that has
+  moved on; `--target` applies a subset, `--auto-approve` skips the confirmation, `-n`
+  prints the diff instead of writing it. `--json` and `--fail-on changes` are for CI.
+
+  **Applying to the live network is deliberately out of scope.** `netgraph apply` writes
+  YAML and nothing else: it opens no session to a device and there is no flag that makes
+  it. See [`docs/commands/plan.md`](docs/commands/plan.md) and
+  [`docs/commands/apply.md`](docs/commands/apply.md).
+
 - **`netgraph layout`, and a diagram that stays where you put it.** Until now the picture
   was derived: Graphviz laid the graph out afresh on every render, so a diagram could not
   be *arranged* — move a node and the next render moved it back. Geometry is now

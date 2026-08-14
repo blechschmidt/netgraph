@@ -1,0 +1,11 @@
+netgraph plan: home-lab → the live network (patch.csv)
+
+  ~ device.switches/sw-home  [switch]
+      + spec.interfaces[name=port6]: {name: port6, type: ethernet, enabled: true}
+  ~ cable.cables/cbl-sw-ap  [cable]
+      ~ spec.medium: copper -> fiber
+  ~ cable.cables/cbl-sw-nas  [cable]
+      ~ spec.endpoints: [srv-nas:eth0, sw-home:port3] -> [srv-nas:eth0, sw-home:port6]
+      ~ spec.medium: copper -> fiber
+
+Plan: ~ 3 to change.

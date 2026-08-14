@@ -1,0 +1,26 @@
+netgraph plan: patch-room → patch-room (edited)
+
+  - cable.cables/cbl-access-cam  [cable]
+      description: Patch lead, access switch straight to the lobby camera.
+      spec.endpoints: [cam-lobby-01:eth0, sw-access-01:GigabitEthernet1/0/2]
+      spec.medium: copper
+      spec.speed: 1000000000
+      spec.duplex: full
+      spec.length_m: 12.0
+      spec.category: cat6
+      spec.connector: rj45
+      spec.label: P-010
+  - device.hosts/cam-lobby-01  [computer]
+      description: Lobby camera, cabled straight to the access switch and powered over tha…
+      spec.vendor: Axis
+      spec.model: P3265-LV
+      spec.interfaces: [eth0]
+      spec.forwarding: {ipv4: false, ipv6: false}
+      spec.power: {draw_watts: {typical: 5.0}, redundant: false, powered_by: poe}
+  ~ device.network/rtr-edge-01  [router]
+      - spec.model: SRX345
+  ~ device.network/sw-core-01  [switch]
+      ~ spec.interfaces[name=GigabitEthernet1/0/1].mtu: 1500 -> 9000
+      ~ spec.interfaces[name=GigabitEthernet1/0/1].ipv4.mtu: 1500 -> 9000
+
+Plan: ~ 2 to change, - 2 to destroy.
