@@ -17,24 +17,30 @@ this is the harness that drives one::
 It starts the real :class:`~netgraph.web.server.WebServer` over a real
 :class:`~netgraph.web.session.EditingSession` — the same objects ``netgraph web
 --write`` builds, with the same parse cache — points the Playwright Chromium
-from ``tests/test_browser.py`` at it, and measures five things:
+from ``tests/test_browser.py`` at it, and measures what a person does with it:
 
 * **cold open** — navigation to first paint of the diagram. What somebody
   waits through before the tool exists.
-* **re-render after one field** — a ``set`` on one element's description,
-  driven from the page, timed to the moment the canvas has been repainted. The
-  inner loop of editing.
+* **one field, twice** — a ``set`` on a description, which does not move the
+  drawing, and a rename, which does. The two halves of editing cost very
+  different things and their average would describe neither.
 * **event-stream latency** — a file written *behind* the session's back, the
-  way ``$EDITOR`` writes one, timed from the write to the repaint. What a
-  second tab, a ``git checkout`` or a colleague costs.
-* **memory in the tab** — heap and DOM node count after the first paint, and
-  again after cycling layers, which is what fills the client-side view cache.
+  way ``$EDITOR`` writes one, timed from the write to the moment the page has
+  caught up. What a second tab, a ``git checkout`` or a colleague costs.
 * **a fifty-node move** — one ``set-geometry`` carrying fifty positions, which
   is what dragging a marquee selection writes.
+* **zoom, pan, and how much is drawn** — the gestures, and either side of them
+  what the tab is holding up: elements drawn out of elements there are, DOM
+  nodes, and whether the level of detail has dropped. See
+  ``netgraph/web/assets/cull.js``.
+* **memory** — heap after the first paint, and again after cycling layers,
+  which is what fills the client-side view cache.
 
 Each is reported with the server-side stages underneath it, because a number
 with no breakdown tells you an interaction is slow and nothing about which of
-the six things it does is to blame.
+the six things it does is to blame — and the arrangement is named there, because
+a drawing somebody has half arranged is laid out by a different route from one
+nobody has touched.
 
 Requires the ``browser`` extra and its Chromium::
 
