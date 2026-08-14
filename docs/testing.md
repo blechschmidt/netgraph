@@ -332,6 +332,52 @@ output, a third-party inventory, a generated tree — so the contract there is n
 diagnostics, bounds its memory*. The seed corpus is `tests/fuzz-corpus/`: one
 file per way of being wrong, mutated by the test into near misses.
 
+## The performance guards
+
+Two files stop an optimisation from being given back unnoticed, and both run in
+the ordinary `pytest` invocation — there is no separate job to forget to look at.
+
+`tests/test_performance.py` guards the two stages every command pays for,
+loading and validating, as **ratios** against a floor measured in the same
+process: `load_tree` against a raw parse of the same tree, `validate` against a
+plain walk over every address. A wall-clock ceiling would be worthless on a
+shared runner; a ratio cancels the machine out.
+
+`tests/test_editor_performance.py` guards the editor's own loop — the round trip
+between changing one field and the diagram agreeing again — and guards it mostly
+by **counting**, because most of what regressed there is countable:
+
+| Guarded | Catches |
+|---|---|
+| one edit parses one file | the parse cache dropped from the write path |
+| one edit validates three times | a request handler grading the tree for itself |
+| an answer carries at most 200 problems | a payload that grows with the inventory |
+| separating 4× the nodes costs ≤ 6× the comparisons | the overlap sweep going quadratic |
+| a half-arranged layout costs ≤ 6× an unarranged one | the layout probe routing edges it discards |
+
+An integer is the same integer on a laptop and on a runner having a bad minute,
+which is why the counts are preferred wherever counting will do.
+
+Every guard in both files prints what it measured whether or not it passed —
+
+```
+[perf] validate: 8.20x against a budget of 9.50x (14% headroom)
+[perf] partial layout: 2.12x the auto layout (399 ms against 188 ms) …
+```
+
+— and the CI job collects those lines into its step summary, so the next
+recalibration reads a spread off six green runners rather than off the one that
+failed. The numbers behind each threshold, and what reverting each optimisation
+does to them, are in [`follow-ups.md`](follow-ups.md).
+
+`tools/bench_editor.py` is the harness the editor's figures come from: it starts
+the real server over a generated tree of any size, drives it with the same
+Chromium the browser layer uses, and reports cold open, the re-render after one
+field, the write-to-canvas latency, the tab's heap and DOM, a fifty-node move
+and how much of the drawing is being materialised. It is not part of the suite —
+it takes a couple of minutes and needs a browser — but it is what a threshold
+here should be re-measured with before it is changed.
+
 ## Profiles
 
 How hard the search works is a profile, chosen with

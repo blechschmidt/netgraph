@@ -308,6 +308,34 @@ keyboard is — and **selection** is a long dash, with somebody else's selection
 short one. Three patterns, not three shades, so they are told apart without
 colour.
 
+### A thousand devices
+
+Above four hundred elements the canvas stops drawing all of them at once. Two
+things happen, and both are visible:
+
+**Only what is on screen is drawn.** Everything more than half a screen outside
+the viewport keeps its place in the document and loses its contents until you
+pan back to it. The status line says so — *drawing 140 of 2106 in view (pan, or
+Ctrl-K to find)* — because a canvas that is quietly missing things is worse than
+a slow one. Nothing about *reaching* an element changes: the arrow keys, the
+outline, the command palette and find-in-diagram all work from the records
+rather than from the drawing, so selecting something on the far side of the
+diagram brings it back and pans to it.
+
+**Zoomed out, the labels come off.** Below the scale at which a device name is
+a smudge, the names and the icons are dropped and each namespace grows a dashed
+frame with its name and how many elements are in it. Zoom back in and they
+return. The zoom range is the drawing's own, not a fixed multiple, so a label on
+a thousand-device diagram can always be reached.
+
+The first layout of an inventory that size is a real Graphviz run and takes a
+second or two; the status line counts while it happens rather than sitting
+still. If a redraw after dragging a node feels slow, it is: a diagram with
+*some* positions stored has to be laid out twice, and
+[`netgraph layout --write`](layout.md) places the rest and takes the redraw to a
+fraction of it. The measured ceilings are in
+[`docs/follow-ups.md`](../follow-ups.md) entry 20.
+
 ### Routing a cable
 
 A link is geometry as much as a node is

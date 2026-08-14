@@ -18,6 +18,45 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **The editor is usable on a thousand-device inventory.** Every feature so far had been
+  built against a five-device example. `tools/bench_editor.py` (new) opens the 1056-device,
+  2106-document tree `tools/bench_pipeline.py` generates in a real browser and reports what
+  a person actually waits through — cold open, the re-render after one field, the latency
+  from a write to the canvas, the tab's heap and DOM, and a fifty-node move.
+
+  The worst of what it found was not on anybody's list: **drag one node and every redraw
+  afterwards took 58 seconds.** A drawing with *some* positions stored is laid out twice,
+  and the first of those runs — which exists only to read coordinates back — was also being
+  asked to route the edges, whose answer it discards. `neato`'s spline router on nodes it
+  did not place is superlinear. The probe run no longer routes anything, the overlap repair
+  that follows it buckets nodes into a grid instead of comparing every pair, and the same
+  redraw is now 2.1 s for the identical drawing.
+
+  Three more, each half a second of every edit: the write path reparsed the whole tree three
+  times because the parse cache reached the read path and not the write one; the validator
+  ran four times over objects that had not moved; and every answer carried all 2101 findings
+  — 538 kB and that many DOM rows, for a list nobody reads past the first screen of.
+
+  In the browser, a drawing above four hundred elements is now **culled to the viewport**
+  plus a margin: 140 of 2106 elements drawn and 2 872 DOM nodes instead of 12 682. Zoomed
+  out past the point where a device name is a smudge, the labels and icons come off and each
+  namespace grows a frame with its name on it. Nothing about *reaching* an element changes —
+  the arrow keys, the outline, the palette and find-in-diagram work from the records rather
+  than from the drawing, and selecting something off screen brings it back.
+
+  And the page says what it cannot make fast: a layout that has not come back counts the
+  seconds rather than sitting still, and a culled canvas says how much it is drawing and how
+  to reach the rest. The measured ceilings are in
+  [`docs/follow-ups.md`](docs/follow-ups.md) entry 20; `tests/test_editor_performance.py`
+  stops any of it being given back.
+
+  | 1056 devices | Before | After |
+  |---|---|---|
+  | cold open | 1565 ms | 1345 ms |
+  | edit one field | 1736 ms | 635 ms |
+  | move a 50-node selection | 2056 ms | 950 ms |
+  | redraw after dragging a node | 58 152 ms | 2 119 ms |
+
 - **A round trip with draw.io: `netgraph export drawio` and `netgraph import drawio`.**
   netgraph's pitch is "draw.io for infrastructure, with the YAML as the source of truth".
   This is where it meets the actual tool: a diagram can be handed to a stakeholder who has

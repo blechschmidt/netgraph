@@ -1898,6 +1898,196 @@ somebody invokes rather than a behaviour that changes under them.
 
 ---
 
+## 20. ~~The editor had never been opened on a large inventory~~ — fixed, and where the ceilings are
+
+**Status:** closed 2026-08-14. `tools/bench_editor.py` is the harness,
+`tests/test_editor_performance.py` the guard.
+
+Every editor feature to date was built and tested against `examples/home-lab`:
+five devices. `tools/bench_pipeline.py` has generated a **1056-device,
+2106-document, 138-file** tree since entry 5, and nobody had ever pointed
+`netgraph web` at it.
+
+### The harness
+
+`tools/bench_editor.py` (new) starts the real `WebServer` over a real
+`EditingSession` — the same objects `netgraph web --write` builds, with the same
+parse cache — points the Playwright Chromium from `tests/test_browser.py` at it,
+and measures the interactions rather than the functions: navigation to first
+paint, a `set` on one field timed to the moment the page has caught up, a write
+made behind the session's back timed to the same, a fifty-node `set-geometry`,
+a wheel gesture, a pan, and what the tab is holding while all of that happens.
+
+A probe installed before the page's own scripts stamps every `fetch` and every
+mutation of the canvas, so the timings are the page's own clock rather than the
+round trip to it, and nothing about what the page does is changed by measuring it.
+
+### Measured
+
+| One thousand devices | Before | After | |
+|---|---|---|---|
+| cold open, to first paint | 1565 ms | 1345 ms | 4.77 MB → 3.80 MB over the wire |
+| edit one field, picture unmoved | 1736 ms | 635 ms | **2.7×**; 1.62 MB → 0.16 MB |
+| edit one field, picture moves | 2589 ms | 1751 ms | a rename; Graphviz is most of it |
+| a write from outside, to the canvas | 816 ms | 605 ms | |
+| move a 50-node selection | 2056 ms | 950 ms | **2.2×** |
+| **redraw after dragging a node** | **58 152 ms** | **2 119 ms** | **27×** |
+| DOM elements, zoomed in | 12 682 | 2 872 | culling |
+| problem rows rebuilt per answer | 2 101 | 200 | |
+
+### The four suspects, and what the profile said about each
+
+**Whole-SVG replacement on every change — refuted.** `app.js` already sends the
+fingerprint of the drawing it holds and, when the server agrees the picture has
+not moved, does not touch the DOM at all. That is the common edit. When the
+picture *has* moved the 2 MB SVG has to be replaced, and parsing it is about
+200 ms of a 1.8 s cycle — not where the time was. Nothing was changed here.
+
+**Re-running the pipeline per keystroke instead of the entry-14 cache — half
+confirmed, and in the half nobody had looked at.** `netgraph web` does pass the
+cache, and a reload after one edit is 25 ms. But `EditSession` — the *write*
+path — loads the tree three times per batch (the baseline, the tree between
+operations, the tree the validation gate compares against) and passed the cache
+to none of the overlaid loads. Its docstring explained why: "an overlaid file's
+bytes are not the bytes on disk". True of the overlaid file, which `load_tree`
+takes the overlay branch for anyway — and false of the other 137. That was 1.25 s
+of parsing per edit, for nothing.
+
+The validator was the same shape of mistake one level up: **one edit graded the
+tree four times** — twice in the write path (which is a comparison, so two is
+correct) and then once each for the file-list fetch and the diagram fetch, over
+objects that had not moved between them. `EditingSession.findings` memoises it,
+keyed by the *identity* of the inventory and of the settings rather than by a
+revision number, so a reload or a config change invalidates it and nothing has to
+remember to.
+
+**The whole state payload on every event — confirmed, though not where the entry
+predicted.** Events have carried deltas since entry 18. What did not was the
+*diagnostics*: this tree reports 2 101 findings, 2 100 of them from one
+informational rule, and every answer carried all of them — 538 kB on the ops
+response, on the one-file tree fetch and on the diagram fetch alike, and 2 101
+DOM rows rebuilt from each. Answers now carry the 200 most severe and say how
+many they kept back; the page says so too.
+
+**Every node in the DOM regardless of viewport — confirmed.** 12 682 SVG
+elements, 93 191 DOM nodes in the tab. See the culling section below.
+
+### The thing that was not on the list, and dominated everything
+
+**Drag one node and every subsequent redraw took 58 seconds.** Not on the
+suspect list because nobody had done it. A drawing with *some* positions stored
+is `LayoutMode.PARTIAL`, and partial mode is two Graphviz runs: one to place the
+nodes that have no position, and then `neato -n2` to draw the completed
+arrangement. Two separate causes, each worth about half:
+
+| Nodes | `dot`, nothing stored | 50 stored, before | after |
+|---:|---:|---:|---:|
+| 19 | 47 ms | 38 ms | 38 ms |
+| 68 | 59 ms | 558 ms | 136 ms |
+| 198 | 98 ms | 1 671 ms | 318 ms |
+| 412 | 187 ms | 8 158 ms | 682 ms |
+| 1056 | 675 ms | 58 152 ms | 2 119 ms |
+
+*The probe run was routing edges it then discards.* The first run exists to read
+node coordinates back; `complete_layout` uses `drawing.nodes` and nothing else.
+It was nonetheless asking `neato` to route the edges, and `neato`'s spline router
+on nodes it did not choose the positions of is superlinear: 52 seconds with
+routing on, 0.54 s with it off, for identical positions and therefore an
+identical final drawing. `to_dot` grew a `route_edges` flag and the two probe
+runs pass `False`. Nothing a reader sees depends on it — the drawing that is
+*shown* is the second run, which routes everything exactly as before.
+
+*The overlap repair was quadratic.* Undoing Graphviz's scale reintroduces the
+overlaps it removed, so `netgraph.layout.graphviz.separate` pushes boxes apart —
+and it compared every pair on every one of up to 24 passes. On this tree that is
+thirteen million comparisons and 4.7 s. Two boxes can only overlap if their
+centres are within one box of each other, so the nodes are now bucketed into a
+grid of that size and each is tried against the nine cells it can reach. The
+surviving pairs are tried **in the order they always were**, and the result is
+checked against the old implementation over 300 random cases: identical, node for
+node.
+
+### Viewport culling and level of detail
+
+`src/netgraph/web/assets/cull.js` (new). Above 400 groups, every node and link
+outside the viewport plus half a screen has its *contents* moved into a detached
+fragment; the `<g>` stays, empty. Zoomed in, that is 140 of 2106 elements drawn
+and 2 872 DOM nodes instead of 12 682.
+
+The `<g>` stays because everything else on the page addresses an element by the
+id of its group — the focus ring, remote selections, the info box, the link
+overlay, the outline — and removing it would break all of them for exactly the
+elements a person is most likely to be looking for. An empty group has no box, no
+paint and no hit test; its dozen children are what cost something.
+
+Culling needs to know where everything is, and `getBBox` cannot answer for an
+element whose contents are parked. So every box is measured once, when the
+drawing arrives, and **that index is then the answer for everybody** — including
+`a11y.js`'s arrow navigation, which used to call `getBBox` once per candidate per
+keypress, which on a 2106-element diagram was two thousand forced layouts per
+arrow key. Off-screen elements stay navigable, findable and selectable; five
+browser tests hold that.
+
+Below 0.45 screen pixels per drawing unit the labels and the icons come off — at
+that scale they cost a repaint each and say nothing — and each namespace grows a
+dashed frame with its name and member count on it. The shapes stay: seeing where
+things are is the reason to be zoomed out that far.
+
+Two smaller things fell out of the same measurements. The client's view cache is
+now bounded by bytes as well as by count — six drawings of a thousand devices was
+twenty-five megabytes held for layers nobody had open. And the **zoom ceiling was
+a constant and should not have been**: the SVG is sized to the canvas, so a
+five-device diagram starts near life size and a thousand-device one at a
+four-hundredth of it, and twelve times a four-hundredth is still illegible. It is
+measured per drawing now, so a label can always be reached.
+
+### The ceilings, said out loud
+
+Where an interaction cannot be made fast, the page says so rather than appearing
+to hang, and the number is here rather than only in somebody's memory.
+
+| Ceiling | Measured | What the page does about it |
+|---|---|---|
+| first layout of 1056 nodes | 675 ms of Graphviz, ~1.3 s to first paint | the status line counts the seconds and says a large inventory is a real layout |
+| a redraw that moves the picture | ~1.8 s | same |
+| a redraw after a drag (partial arrangement) | ~2.1 s, 3× an unarranged one | same; `netgraph layout --write` places the rest and takes it to 0.3 s |
+| the drawing at 1× | the whole 2106 elements, unculled | it *is* all on screen; the level of detail is what applies here |
+| the tab's heap | 8 MB at first paint, ~27 MB after switching layers | bounded by the byte cap on the view cache |
+| problems reported | 200 per answer | "and N more, not listed here. Run `netgraph validate` for all of them." |
+
+The first three are Graphviz, and Graphviz is not ours. What is ours is not
+pretending otherwise: a progress indicator that counts beats a frozen tab, and a
+canvas that is drawing 140 of 2106 elements says so and says how to reach the
+rest.
+
+### What is deliberately not done
+
+* **No server-side incremental SVG.** Patching the changed subtrees of a
+  Graphviz drawing would mean owning the layout, because moving one node moves
+  its neighbours. The fingerprint already makes the common edit cost no layout at
+  all, and the honest way to make a *changed* picture cheap is a stored
+  arrangement — which is `netgraph layout --write`, and which takes the same
+  redraw to 0.3 s.
+* **No virtualised list for the file tree.** 138 rows is not a problem, and
+  2106 documents are not rows: the tree lists files.
+* **No collapsing of namespaces into single nodes at low zoom.** The frames are
+  drawn over the shapes rather than instead of them. Hiding the shapes would cut
+  a repaint that culling does not reach — at 1× the whole diagram is on screen —
+  but it would also remove the only thing a zoomed-out diagram is *for*, which is
+  seeing the shape of the network.
+
+### The guard
+
+`tests/test_editor_performance.py`, in the ordinary `pytest` run, and mostly by
+counting rather than timing: files parsed per edit (1), validator runs per edit
+(3), problems per answer (≤ 200), growth of the separation pass when the drawing
+quadruples (≤ 6×), and one ratio — a partly-arranged layout against an
+unarranged one (≤ 6×, measured 0.8× to 3.6×, was 86×). Every one prints its
+figure whether or not it passed, and the CI job collects those lines into its
+step summary.
+
+---
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

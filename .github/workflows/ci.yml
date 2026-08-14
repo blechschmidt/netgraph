@@ -342,6 +342,35 @@ jobs:
               print(f"  {classname}::{name} -- {message}")
           PY
 
+      # The performance guards have already run inside the step above, and they
+      # have already failed the job if anything regressed. What they have *not*
+      # done is put their figures anywhere anybody looks: every threshold in
+      # tests/test_performance.py and tests/test_editor_performance.py has been
+      # recalibrated at least once, and each time the only numbers to hand came
+      # from the run that failed. So they are run once more with the capture off
+      # and their ``[perf]`` lines put in the job summary, where a spread across
+      # the whole matrix can be read off a green run rather than inferred from a
+      # red one.
+      #
+      # Seven seconds, and deliberately not gating: a failure here is already a
+      # failure above, and this step must never be the thing that turns a job
+      # red on its own.
+      - name: Report the performance figures
+        if: ${{ !cancelled() && steps.pytest.outcome != 'skipped' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          python -m pytest tests/test_performance.py tests/test_editor_performance.py \
+            --no-cov -p no:randomly -q -s > perf.log 2>&1 || true
+          {
+            echo "### Performance guards"
+            echo
+            echo '```'
+            grep '^\[perf\]' perf.log || echo "(no figures: the guards did not run)"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          grep '^\[perf\]' perf.log || true
+
       - name: Upload the coverage report
         # Runs whether pytest passed or failed -- the report of a failing run is
         # the interesting one -- but not when an earlier step never got there,

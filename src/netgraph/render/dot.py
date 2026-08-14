@@ -152,7 +152,6 @@ __all__ = [
     "DOT_EXECUTABLE",
     "EDGE_PALETTE",
     "IMAGE_FORMATS",
-    "MAX_ROUTED_PARTIAL_NODES",
     "NODE_PALETTE",
     "NOOP_ENGINE",
     "cluster_keys",
@@ -166,7 +165,6 @@ __all__ = [
     "run_graphviz",
     "to_dot",
     "to_image",
-    "unroutable",
 ]
 
 #: Formats :func:`to_image` can produce by running Graphviz.
@@ -196,33 +194,6 @@ DOT_ENV_VAR: Final = "NETGRAPH_DOT"
 #: on ``PATH``.
 NOOP_ENGINE: Final = "neato"
 
-#: Above this many nodes, a *partially* arranged drawing gets straight edges
-#: rather than engine-routed ones.
-#:
-#: The three layout modes cost wildly different things, and only one of them
-#: falls over. ``dot`` lays a thousand nodes out and routes them in 0.7 s;
-#: ``neato -n2`` reproduces a fully-stored arrangement in 0.3 s and routes
-#: nothing, because netgraph supplies every route. In between, a drawing with
-#: *some* positions stored runs ``neato`` with pins — and neato's spline router,
-#: on nodes it did not get to choose the positions of, is superlinear:
-#:
-#: =======  ======  =============  ==========
-#: Nodes    ``dot``  neato, 50 pinned  ``-n2``
-#: =======  ======  =============  ==========
-#: 19        47 ms      38 ms          37 ms
-#: 68        59 ms     558 ms          59 ms
-#: 198       98 ms   1 671 ms          89 ms
-#: 412      187 ms   8 158 ms         142 ms
-#: 1056     675 ms  58 152 ms         296 ms
-#: =======  ======  =============  ==========
-#:
-#: That last row is the whole of what made the editor unusable on a large
-#: inventory: drag one node, and every redraw afterwards takes a minute. It is
-#: the *routing* and not the placement — the same graph with ``splines=line``
-#: lays out in 0.57 s — so above this threshold the routing is what gives way,
-#: and :func:`routing_advisories` says so. The number is where the curve leaves
-#: interactive territory: 198 nodes is 1.7 s, 412 is eight.
-MAX_ROUTED_PARTIAL_NODES: Final = 200
 
 #: The cluster frame netgraph draws itself when the layout engine will not.
 #: The three colours match what ``graph.dot.j2`` sets on a ``subgraph cluster``,
@@ -817,16 +788,6 @@ _SPLINES_ATTRIBUTE: Final[dict[Routing, str]] = {
 }
 
 
-def unroutable(graph: Graph, plan: LayoutPlan) -> bool:
-    """Is this drawing too large for the engine to route a partial arrangement?
-
-    See :data:`MAX_ROUTED_PARTIAL_NODES`. Asked in two places — the DOT this
-    module emits and the advisory it reports — so that what is drawn and what is
-    said about it cannot disagree.
-    """
-    return plan.mode is LayoutMode.PARTIAL and len(graph.nodes) > MAX_ROUTED_PARTIAL_NODES
-
-
 def routing_advisories(graph: Graph, options: RenderOptions | None = None) -> tuple[str, ...]:
     """What this rendering could not honour about the routes it was given.
 
@@ -875,16 +836,6 @@ def routing_advisories(graph: Graph, options: RenderOptions | None = None) -> tu
                 "record the sizes"
             )
         return tuple(said)
-
-    if unroutable(graph, plan):
-        placed = len(graph.geometry.nodes)
-        said.append(
-            f"{count_text(len(graph.nodes), 'node')} with {count_text(placed, 'position')} "
-            "stored is more than Graphviz will route curved edges around in a usable time "
-            f"(it takes about a minute past {MAX_ROUTED_PARTIAL_NODES} nodes), so this "
-            "drawing gets straight edges. Run 'netgraph layout --write' to place the rest, "
-            "after which every link is routed exactly as it asks"
-        )
 
     default = default_routing(graph, opts)
     per_link = sorted(
@@ -1013,7 +964,13 @@ def _xdot_text(value: str) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def to_dot(graph: Graph, options: RenderOptions | None = None, *, target: str = "dot") -> str:
+def to_dot(
+    graph: Graph,
+    options: RenderOptions | None = None,
+    *,
+    target: str = "dot",
+    route_edges: bool = True,
+) -> str:
     """Render ``graph`` as Graphviz DOT source.
 
     The graph is undirected (a cable has no direction, §7.1), so the output is a
@@ -1029,6 +986,19 @@ def to_dot(graph: Graph, options: RenderOptions | None = None, *, target: str = 
         target: The output format this DOT is destined for. Only icon
             selection depends on it — see :func:`netgraph.render.icons.suffix_order`
             — and the default suits DOT written out for someone else to lay out.
+        route_edges: Whether the engine should be asked to *draw* the edges as
+            well as place the nodes. Off for the two documents netgraph lays out
+            only to read coordinates back off — :func:`complete_layout` and
+            :func:`measure_nodes`, which use the node positions and sizes and
+            discard everything else.
+
+            Not a cosmetic saving. ``neato``'s spline router, on nodes it did
+            not choose the positions of, is superlinear: the probe run for a
+            thousand-node graph with fifty nodes pinned took 52 seconds with
+            routing on and half a second with it off, for the same positions and
+            therefore the same final drawing. Nothing a reader sees depends on
+            it, because the drawing that is *shown* is the second run, and that
+            one routes everything.
     """
     opts = options or RenderOptions()
     icons = _icon_files(graph, opts.icons, target=target)
@@ -1049,14 +1019,10 @@ def to_dot(graph: Graph, options: RenderOptions | None = None, *, target: str = 
         # goes here and a link asking for something different is reported by
         # :func:`routing_advisories` rather than silently ignored.
         #
-        # Except on a large partially-arranged drawing, where asking neato to
-        # route around pins it did not choose costs a minute; see
-        # :data:`MAX_ROUTED_PARTIAL_NODES`.
-        splines=(
-            _SPLINES_ATTRIBUTE[Routing.STRAIGHT]
-            if unroutable(graph, plan)
-            else _SPLINES_ATTRIBUTE[default_routing(graph, opts)]
-        ),
+        # Unless this document is only being laid out to read positions off, in
+        # which case routing its edges is work whose answer is thrown away; see
+        # ``route_edges``.
+        splines=(_SPLINES_ATTRIBUTE[default_routing(graph, opts)] if route_edges else "false"),
         groups=_groups(graph, opts, icons, identity, details, plan),
         edges=tuple(_edge_views(graph, opts, identity, details, plan)),
         imagepath=str(opts.icons.directory) if icons and opts.icons is not None else None,
@@ -1220,7 +1186,9 @@ def complete_layout(graph: Graph, options: RenderOptions, *, target: str = "svg"
     if plan.mode is not LayoutMode.PARTIAL:
         return graph
     payload, _ = run_graphviz(
-        to_dot(graph, options, target=target),
+        # Positions only: the edges this run would draw are discarded, and
+        # asking for them is most of what a partial layout used to cost.
+        to_dot(graph, options, target=target, route_edges=False),
         format="json",
         plan=plan,
         subject="the diagram layout",
@@ -1266,7 +1234,7 @@ def measure_nodes(graph: Graph, options: RenderOptions, *, target: str = "svg") 
     if plan.mode is not LayoutMode.FIXED or not wanted:
         return graph
     payload, _ = run_graphviz(
-        to_dot(graph, options, target=target),
+        to_dot(graph, options, target=target, route_edges=False),
         format="json",
         plan=plan,
         subject="the node sizes",
