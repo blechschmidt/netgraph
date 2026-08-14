@@ -182,8 +182,9 @@ _CLUSTER_STROKE: Final = "#9ca3af"
 _CLUSTER_LABEL_COLOUR: Final = "#4b5563"
 _CLUSTER_FONT: Final = "Helvetica,Arial,sans-serif"
 _CLUSTER_FONT_SIZE: Final = 11
-#: Points from the left edge of a cluster box to its caption.
-_CLUSTER_LABEL_INSET: Final = 8
+#: Prefix of the node id a frame's caption is emitted under. A colon cannot
+#: appear in an element name, so it can never collide with one.
+_FRAME_ID_PREFIX: Final = "cluster-label:"
 
 #: Directories to look in when ``PATH`` does not have it, per :data:`os.name`.
 #: Nothing here is a guess at a version number or a wildcard: each entry is the
@@ -532,6 +533,26 @@ class _EdgeView:
 
 
 @dataclass(frozen=True, slots=True)
+class _FrameView:
+    """One namespace box drawn from stored geometry, and its caption.
+
+    Two halves because Graphviz will draw only one of them for us: the rectangle
+    goes into the graph's ``_background``, and the caption is a node — see
+    :func:`_background` for why the obvious "put the text in the background too"
+    is not available.
+    """
+
+    #: Node id of the caption. Colon-prefixed, so it cannot collide with an
+    #: element's fully-qualified name.
+    id: str
+    label: str
+    #: The rectangle, as one xdot polygon operation.
+    outline: str
+    #: ``pos`` of the caption node.
+    caption: str
+
+
+@dataclass(frozen=True, slots=True)
 class _GroupView:
     """A ``cluster_*`` subgraph, or — with :attr:`id` unset — loose nodes."""
 
@@ -643,8 +664,8 @@ def _spline(points: Sequence[tuple[float, float]]) -> str:
     return " ".join(_pos(x, y) for x, y in points)
 
 
-def _background(graph: Graph, options: RenderOptions, plan: LayoutPlan) -> str | None:
-    """The namespace boxes, as xdot draw operations for ``_background``.
+def _frames(graph: Graph, options: RenderOptions, plan: LayoutPlan) -> tuple[_FrameView, ...]:
+    """The namespace boxes this drawing has stored geometry for.
 
     ``neato`` does not draw clusters — only ``dot`` and ``fdp`` do — so a fixed
     arrangement would silently lose every namespace frame. Since the arrangement
@@ -652,47 +673,76 @@ def _background(graph: Graph, options: RenderOptions, plan: LayoutPlan) -> str |
     and more faithful than letting an engine guess: the box is where the user
     put it rather than wherever the layout happened to land.
 
-    Graphviz grows the canvas to fit a ``_background``, so a box drawn wider
-    than its contents is not clipped.
-
     Only the groups this render actually boxes are drawn, read off
     :func:`cluster_keys` rather than off the namespaces — a diagram rendered
     without ``--group-by-namespace`` has no frames, and stored boxes for frames
     nobody asked for must not appear.
 
-    Returns ``None`` when no group has stored geometry, which leaves the
-    document byte-identical to one without the feature.
+    Empty when no group has stored geometry, which leaves the document
+    byte-identical to one without the feature.
     """
-    boxes = [
-        (key, plan.geometry.groups[key])
+    return tuple(
+        _FrameView(
+            id=f"{_FRAME_ID_PREFIX}{key}",
+            label=key,
+            outline=_dot_points(plan.geometry.groups[key]),
+            caption=_caption_pos(plan.geometry.groups[key]),
+        )
         for key in cluster_keys(graph, options).values()
         if key in plan.geometry.groups
-    ]
-    if not boxes:
+    )
+
+
+def _background(frames: Sequence[_FrameView]) -> str | None:
+    """The frames as xdot draw operations for the ``_background`` attribute.
+
+    Graphviz grows the canvas to fit a ``_background``, so a box drawn wider
+    than its contents is not clipped.
+
+    **Rectangles only, and no text.** A ``T`` operation in a ``_background``
+    segfaults Graphviz 2.43 — the version Debian and Ubuntu ship — depending on
+    whether anything else in the document has established a font, which makes it
+    a landmine rather than a limitation. The caption is drawn as an ordinary
+    node instead (:class:`_FrameView`), which every engine handles and which
+    also puts the caption inside the drawing's bounding box for free.
+    """
+    if not frames:
         return None
-    return " ".join(op for key, box in boxes for op in _box_ops(key, box))
+    return " ".join(
+        op for frame in frames for op in (f"c {_xdot_text(_CLUSTER_STROKE)}", frame.outline)
+    )
 
 
-def _box_ops(label: str, box: Box) -> Iterator[str]:
-    """One cluster frame: a filled rectangle, its outline, and its caption."""
+def _dot_points(box: Box) -> str:
+    """One rectangle as an xdot unfilled-polygon operation."""
     left, bottom, right, top = box.bounds
     corners = " ".join(
         f"{_coordinate(x)} {_coordinate(y)}"
         for x, y in ((left, bottom), (left, top), (right, top), (right, bottom))
     )
-    yield f"c {_xdot_text(_CLUSTER_STROKE)}"
-    yield f"p 4 {corners}"
-    yield f"F {_CLUSTER_FONT_SIZE} {_xdot_text(_CLUSTER_FONT)}"
-    yield f"c {_xdot_text(_CLUSTER_LABEL_COLOUR)}"
-    # ``labeljust=l`` in the template puts the caption at the top left of the
-    # box; -1 is xdot's left alignment, and the width is a hint Graphviz only
-    # uses to centre or right-align, so an approximation is harmless.
-    caption_y = top - _CLUSTER_FONT_SIZE
-    width = len(label) * _CLUSTER_FONT_SIZE * 0.6
-    yield (
-        f"T {_coordinate(left + _CLUSTER_LABEL_INSET)} {_coordinate(caption_y)} "
-        f"-1 {_coordinate(width)} {_xdot_text(label)}"
-    )
+    return f"p 4 {corners}"
+
+
+def _caption_pos(box: Box) -> str:
+    """Where a frame's caption sits: centred, just *above* the top edge.
+
+    Two decisions, both forced by what the caption is — an ordinary node.
+
+    *Centred* rather than left-aligned the way ``labeljust=l`` puts a cluster's
+    own label, because netgraph does not measure text: an approximate left edge
+    would look like a mistake, while a centred caption is exactly where it says
+    it is.
+
+    *Above* rather than inside, because a node placed inside the frame touches
+    whatever the arrangement put near the top of it, and ``neato`` responds to
+    two touching nodes by abandoning spline routing for the **whole graph**.
+    A caption that cost every edge its curve would be a poor trade for eleven
+    points of vertical space, and a title above a box reads as its title
+    anyway. Graphviz grows the canvas to fit both the caption and the
+    ``_background``, so nothing is clipped.
+    """
+    _, _, _, top = box.bounds
+    return _pos(box.x, top + _CLUSTER_FONT_SIZE)
 
 
 def _xdot_text(value: str) -> str:
@@ -730,6 +780,7 @@ def to_dot(graph: Graph, options: RenderOptions | None = None, *, target: str = 
     identity = element_ids(graph) if opts.tooltips or opts.element_ids else ElementIds()
     details = build_details(graph, opts, ids=identity) if opts.tooltips else {}
     plan = layout_plan(graph)
+    frames = _frames(graph, opts, plan) if plan.mode is LayoutMode.FIXED else ()
     template = _environment().get_template(_TEMPLATE_NAME)
     return template.render(
         title=opts.title,
@@ -744,7 +795,10 @@ def to_dot(graph: Graph, options: RenderOptions | None = None, *, target: str = 
         # is emitted whenever anything is placed: it costs nothing, and it makes
         # ``-f dot`` output that somebody lays out themselves honour the pins.
         inputscale=POINTS_PER_INCH if plan.mode is not LayoutMode.AUTO else None,
-        background=_background(graph, opts, plan) if plan.mode is LayoutMode.FIXED else None,
+        frames=frames,
+        background=_background(frames),
+        frame_color=_CLUSTER_LABEL_COLOUR,
+        frame_font_size=_CLUSTER_FONT_SIZE,
     )
 
 

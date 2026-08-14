@@ -107,7 +107,9 @@ hand it straight back.
 Group boxes too, when the render groups by namespace: the no-op layout engine
 does not draw clusters, so netgraph draws them itself from the stored box, which
 means the frame is where you put it rather than wherever a layout happened to
-land.
+land. Its caption sits centred above the frame rather than inside it —
+[`docs/follow-ups.md` §17](../follow-ups.md) explains why that is not a matter
+of taste.
 
 Two things are deliberately *not* seeded, both recorded in
 [`docs/follow-ups.md` §16](../follow-ups.md):

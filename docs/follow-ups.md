@@ -1697,6 +1697,69 @@ decision, and that is what the flag is for.
 
 ---
 
+## 17. Graphviz 2.43 segfaults on text in a `_background`
+
+**Status:** worked around, and the workaround is why an arranged diagram's
+namespace captions sit where they do.
+
+A fixed arrangement is drawn by `neato -n2`, and `neato` does not draw clusters —
+only `dot` and `fdp` do. So the namespace frames a `--group-by-namespace` render
+would otherwise lose have to be drawn by netgraph, from the boxes the
+arrangement stores. The obvious mechanism is the `_background` graph attribute,
+which takes xdot draw operations and which Graphviz grows the canvas to fit.
+
+### What was measured
+
+Rectangles are fine. **Text is not.** A `T` operation inside a `_background`
+segfaults Graphviz 2.43.0 — the version Debian 12 and Ubuntu 22.04/24.04 ship —
+under both `dot` and `neato -n2`:
+
+```console
+$ printf 'graph g { graph [_background="c 7 -#000000 T 16 194 -1 33 5 -hosts"]; x -- y; }' | dot -Tsvg
+Segmentation fault (core dumped)
+```
+
+Worse than a plain failure, it is *conditional*: the same document with a node
+carrying an HTML-like label renders fine, because something else has established
+a font by the time the background is drawn. So it is a landmine rather than a
+limitation — a diagram would render for months and then crash when a device was
+deleted. It was found by the first golden that put a caption in a background,
+which is exactly what a golden is for.
+
+Every variant was tried: all three justifications, with and without a preceding
+colour operation, with and without an `F` font operation, integer and float
+coordinates. All segfault. Only the polygon operations survive.
+
+### What netgraph does instead
+
+`_background` carries the rectangles alone. Each caption is emitted as an
+ordinary `shape=plaintext` node with a `pos`, which every engine handles, which
+cannot crash, and which has the side benefit of being inside the drawing's
+bounding box without any special pleading.
+
+The caption is centred **above** its frame rather than inside it at the left,
+where `labeljust=l` puts a real cluster's label, and both halves of that are
+forced rather than chosen:
+
+* *Centred*, because netgraph does not measure text. An estimated left edge would
+  be visibly wrong for a short name or a long one; a centred caption is exactly
+  where it says it is.
+* *Above*, because a node placed inside the frame touches whatever the
+  arrangement put near the top of it — and `neato` responds to two touching nodes
+  by abandoning spline routing **for the whole graph**, which was measured on the
+  `arranged` fixture: every edge in the diagram went straight. Eleven points of
+  vertical space is a poor price for that.
+
+### If this is revisited
+
+Check whether the crash survives in Graphviz 9.x before reaching for `T` again;
+if it does not, the constraint is a packaging question rather than a design one,
+and the caption could move inside the frame *only* if the touching-nodes problem
+is solved too — a zero-sized caption node avoids the touch but earns a "size too
+small for label" warning per frame, which is not an improvement.
+
+---
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

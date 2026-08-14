@@ -44,7 +44,9 @@ publish a version whose section is missing or empty — see
   hand. `svg`, `png`, `pdf` and `html` are the same Graphviz run and `json` publishes the
   same coordinates in the same units, so a browser can draw the graph itself. Namespace
   frames in a fixed layout are drawn from the stored group boxes, since the no-op engine
-  draws no clusters. See [`docs/commands/layout.md`](docs/commands/layout.md),
+  draws no clusters; their captions sit above the frame rather than inside it, for the
+  reason in [`docs/follow-ups.md` §17](docs/follow-ups.md). See
+  [`docs/commands/layout.md`](docs/commands/layout.md),
   [`docs/schema.md` §18](docs/schema.md#18-layout-diagram-geometry) and
   [`docs/rendering.md`](docs/rendering.md#stored-arrangements).
 

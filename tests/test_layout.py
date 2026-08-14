@@ -14,6 +14,7 @@ including the arithmetic that makes the partial case exact.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -378,8 +379,34 @@ def test_stored_group_boxes_are_drawn_as_a_background(tmp_path: Path) -> None:
     source = to_dot(graph, RenderOptions(group_by_namespace=True))
     assert "_background=" in source
     assert "#9ca3af" in source, "the frame is drawn in the same grey a cluster is"
+    assert '"cluster-label:edge"' in source, "and the caption is a node, not a draw operation"
     # Without the grouping there is no frame to draw, and no background either.
     assert "_background=" not in to_dot(graph)
+
+
+def test_the_background_carries_no_text_operation(tmp_path: Path) -> None:
+    """A ``T`` in a ``_background`` segfaults Graphviz 2.43 — see follow-up 17.
+
+    Conditionally, on whether anything else in the document has established a
+    font, which is what makes it worth a test rather than a comment: a diagram
+    would render for months and then crash when a device was deleted.
+    """
+    write(tmp_path, "edge/net.yaml", PAIR)
+    write(
+        tmp_path,
+        "arrange.yaml",
+        layout_document(
+            "    l1:\n      nodes:\n"
+            "        edge/sw-a: {position: [54, 18]}\n"
+            "        edge/sw-b: {position: [54, 126]}\n"
+            "      groups:\n"
+            "        edge: {position: [54, 72], size: [120, 160]}\n"
+        ),
+    )
+    source = to_dot(build_graph(load_tree(tmp_path)), RenderOptions(group_by_namespace=True))
+    (background,) = re.findall(r'_background="([^"]*)"', source)
+    assert " T " not in f" {background} ", background
+    assert " F " not in f" {background} ", background
 
 
 def test_edge_waypoints_become_spline_control_points(pair: Path) -> None:
@@ -717,6 +744,22 @@ def test_a_derived_node_id_is_never_called_stale(pair: Path) -> None:
         pair,
         "arrange.yaml",
         layout_document("    l3:\n      nodes:\n        subnet:192.0.2.0/24: {position: [1, 2]}\n"),
+    )
+    assert [f for f in validate(load_tree(pair)) if f.rule == "W138"] == []
+
+
+def test_a_synthetic_edge_id_is_never_called_stale(pair: Path) -> None:
+    """An adapter attachment is a fact about a drawing; no element declares it."""
+    from netgraph.validate import validate
+
+    write(
+        pair,
+        "arrange.yaml",
+        layout_document(
+            "    l1:\n      edges:\n"
+            "        adp-usb#upstream: {waypoints: [[1, 2]]}\n"
+            "        sw-a:port1#10.0.0.0/24: {waypoints: [[3, 4]]}\n"
+        ),
     )
     assert [f for f in validate(load_tree(pair)) if f.rule == "W138"] == []
 

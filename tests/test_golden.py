@@ -300,6 +300,31 @@ CASES = (
         layer=Layer.POWER,
         options=RenderOptions(title="Patch room, power"),
     ),
+    Case(
+        # A stored arrangement (§18), fully placed: every node carries a ``pos``,
+        # every link its spline control points, and the document asks for the
+        # no-op layout engine. This golden is what makes the arrangement a
+        # *contract* — a change to how geometry is emitted shows up as a diff in
+        # coordinates a reader can check against ``layout.yaml`` by eye.
+        name="arranged-l1-fixed",
+        example="arranged",
+        layer=Layer.L1,
+        options=RenderOptions(),
+        formats=("dot", "json"),
+        fixture=True,
+    ),
+    Case(
+        # The same tree's other view, which carries group boxes instead of
+        # waypoints. ``neato`` draws no clusters, so the frames are emitted as a
+        # ``_background`` of xdot operations; nothing else in the matrix pins
+        # that down, and getting it wrong loses every namespace frame silently.
+        name="arranged-l2-grouped",
+        example="arranged",
+        layer=Layer.L2,
+        options=RenderOptions(group_by_namespace=True, title="Arranged, layer 2"),
+        formats=("dot", "json"),
+        fixture=True,
+    ),
 )
 
 #: The cases a Mermaid golden is kept for.

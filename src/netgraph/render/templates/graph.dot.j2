@@ -74,6 +74,12 @@ graph netgraph {
   ];
   node [fontname="Helvetica,Arial,sans-serif", fontsize=10, style=filled, penwidth=1.2];
   edge [fontname="Helvetica,Arial,sans-serif", fontsize=8];
+{% if frames %}
+
+{% for frame in frames %}
+  {{ frame.id | dot_string }} [shape=plaintext, style="", fillcolor="none", fontcolor="{{ frame_color }}", fontsize={{ frame_font_size }}, margin=0, pos={{ frame.caption | dot_string }}, label={{ frame.label | dot_string }}];
+{% endfor %}
+{% endif %}
 {% for group in groups %}
 
 {% if group.id %}

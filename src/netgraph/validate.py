@@ -4087,11 +4087,18 @@ def _check_stale_geometry(ctx: _Context) -> Iterator[_Draft]:
 def _geometry_key_exists(
     ctx: _Context, key: str, *, section: str, namespace: str, namespaces: set[str]
 ) -> bool:
-    """Does ``key`` still name something? ``True`` when it cannot be judged."""
+    """Does ``key`` still name something? ``True`` when it cannot be judged.
+
+    A derived id — ``subnet:10.0.0.0/24`` for a prefix node, ``adp#upstream``
+    for an adapter's attachment, ``sw:eth0#10.0.0.0/24`` for a membership — is a
+    fact about a *drawing*, and only a drawing can say whether it still exists.
+    Both punctuation marks are refused from an element name by ``NG-N001``, so
+    finding either is proof the key is not one.
+    """
     if section == "groups":
         return _qualified_namespace(key, namespace) in namespaces
-    if ":" in key:
-        return True  # a derived node id; only a drawing can settle it
+    if ":" in key or "#" in key:
+        return True
     return ctx.inventory.resolve_fqn(key, namespace=namespace) is not None
 
 

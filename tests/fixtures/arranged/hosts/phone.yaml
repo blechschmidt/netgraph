@@ -1,0 +1,34 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: phone
+  description: |
+    Wireless-only client. It reaches the network through its association to
+    ap-home, which is declared as a `medium: wireless` cable - the association
+    is the link.
+  labels:
+    site: home
+    role: mobile
+    owner: sam
+spec:
+  vendor: Apple
+  model: iPhone 15
+  interfaces:
+    - name: en0
+      type: wifi
+      description: Associated to the home SSID on 5 GHz
+      mac: 'f0:18:98:11:22:33'
+      mtu: 1500
+      ipv4:
+        addresses: [192.168.10.40/24]
+      ipv6:
+        addresses: [2001:db8:10::40/64]
+      wireless:
+        role: station
+        band: 5GHz
+        channel: 36
+        width_mhz: 80
+        bss:
+          - ssid: home
+            bssid: '78:8a:20:aa:00:11'
+            security: wpa3-psk

@@ -3787,7 +3787,8 @@ Per view, and decided from the drawing rather than from the document:
 In `fixed` mode netgraph also draws the namespace cluster frames itself, from the
 stored group boxes, because the no-op layout engine does not draw clusters. A
 frame is therefore where you put it rather than wherever a layout happened to
-land.
+land; its caption sits centred above it rather than inside it, for the reason in
+[`docs/follow-ups.md` §17](follow-ups.md).
 
 The `json` renderer publishes the coordinates — a `layout` object per node, per
 edge and at the top level — so a client can draw the graph without running

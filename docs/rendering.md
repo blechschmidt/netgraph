@@ -608,7 +608,12 @@ the graph itself without running Graphviz.
 **Namespace frames in a fixed layout are drawn by netgraph.** `neato` does not
 draw clusters, so when the whole view is arranged the frames come from the stored
 group boxes instead of from the engine — which is more faithful, not less: the
-frame is where you put it.
+frame is where you put it. The caption sits centred *above* its frame rather than
+inside it at the left, which is the one visible difference between an arranged
+diagram and an automatic one; [`docs/follow-ups.md` §17](follow-ups.md) records
+why (in short: a caption inside the box touches whatever is near the top of it,
+and `neato` answers two touching nodes by dropping spline routing for the whole
+graph).
 
 A `mermaid` render ignores an arrangement entirely. Mermaid does its own layout
 in the browser and has nowhere to put a coordinate.
