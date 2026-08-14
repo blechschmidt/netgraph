@@ -462,7 +462,7 @@ var netgraphSession = (function () {
       .then(function (next) {
         tree = next;
         paintTree();
-        if (host.diagnostics) { host.diagnostics(next.diagnostics || []); }
+        if (host.diagnostics) { host.diagnostics(next.diagnostics || [], next.diagnosticsOmitted || 0); }
       })
       .catch(function () {});
   }
@@ -490,7 +490,9 @@ var netgraphSession = (function () {
         tree.revision = next.revision;
         merge(next.files || [], next.missing || []);
         paintTree();
-        if (diagnostics && host.diagnostics) { host.diagnostics(next.diagnostics || []); }
+        if (diagnostics && host.diagnostics) {
+          host.diagnostics(next.diagnostics || [], next.diagnosticsOmitted || 0);
+        }
       })
       .catch(function () { return refreshTree(); });
   }
@@ -726,7 +728,9 @@ var netgraphSession = (function () {
     });
     host.render();
     refreshChanges();
-    if (result.diagnostics && host.diagnostics) { host.diagnostics(result.diagnostics); }
+    if (result.diagnostics && host.diagnostics) {
+      host.diagnostics(result.diagnostics, result.diagnosticsOmitted || 0);
+    }
   }
 
   /** A refusal is information, not a failure to hide: say which kind it was. */

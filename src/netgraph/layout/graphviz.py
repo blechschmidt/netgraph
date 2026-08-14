@@ -327,26 +327,110 @@ def separate(
     engine placed. Two fixed nodes that overlap each other are left overlapping,
     for the same reason.
 
+    Every pair used to be tried, which is a comparison per pair per pass: on a
+    thousand-device inventory that is half a million pairs, twenty-four times,
+    and it was 4.7 seconds of the 5.6 a partially-arranged redraw cost — the
+    single most expensive thing in the loop between dragging a node and seeing
+    the diagram again. Two boxes can only overlap if their centres are within
+    one box of each other, so the nodes are bucketed into a grid of that size
+    and each one is only tried against the nine cells it could reach. The pairs
+    that survive are tried **in the order they always were**, so the arrangement
+    this produces is the one it produced before; what is skipped is the pairs
+    that were never going to touch.
+
     Returns:
         Every node, with the free ones moved as little as the overlaps allow.
     """
     pinned = set(fixed)
     moved = dict(nodes)
     order = sorted(moved)
+    if not order:
+        return moved
+    rank = {name: index for index, name in enumerate(order)}
+    grid = _Grid(moved, padding=padding)
+
+    def reachable(name: str, after: int) -> list[str]:
+        """Everything ranked after ``after`` that ``name`` could touch, in rank order."""
+        return sorted(
+            (other for other in grid.near(moved[name]) if rank[other] > after),
+            key=rank.__getitem__,
+        )
+
     for _ in range(SEPARATION_PASSES):
         collisions = 0
         for index, first in enumerate(order):
-            for second in order[index + 1 :]:
+            candidates = reachable(first, index)
+            position = 0
+            while position < len(candidates):
+                second = candidates[position]
+                position += 1
                 if first in pinned and second in pinned:
                     continue
                 shift = _overlap(moved[first], moved[second], padding)
                 if shift is None:
                     continue
                 collisions += 1
+                before = (moved[first], moved[second])
                 _push(moved, first, second, shift, pinned)
+                # A node that moved may have left its cell, and the sweep is not
+                # finished with it: re-file it, or a later pair would be judged
+                # against a stale bucket.
+                for name, was in zip((first, second), before, strict=True):
+                    if moved[name] is not was:
+                        grid.moved(name, was, moved[name])
+                if moved[first] is not before[0]:
+                    # ``first`` moved, so what it can now reach is not what it
+                    # could reach when this list was built. The exhaustive sweep
+                    # this replaces re-read its position on every comparison;
+                    # rebuilding here is how that is preserved exactly.
+                    candidates = reachable(first, rank[second])
+                    position = 0
         if not collisions:
             break
     return moved
+
+
+class _Grid:
+    """Which nodes are near enough to a box to be worth testing against it.
+
+    The cell is as wide as the widest node and as tall as the tallest, plus the
+    padding, which is the most two centres can be apart and still overlap. So a
+    box can only touch something in its own cell or one of the eight around it,
+    and everything else in the drawing is skipped without being looked at.
+    """
+
+    __slots__ = ("_cells", "_height", "_width")
+
+    def __init__(self, nodes: Mapping[str, Placement], *, padding: float) -> None:
+        # ``or 1.0`` for the degenerate drawing of one node with no size: a cell
+        # of zero would put every node in cell (0, 0) and divide by nothing.
+        self._width = max((_extent(one.width) for one in nodes.values()), default=0.0) + padding
+        self._height = max((_extent(one.height) for one in nodes.values()), default=0.0) + padding
+        self._width = self._width or 1.0
+        self._height = self._height or 1.0
+        self._cells: dict[tuple[int, int], set[str]] = {}
+        for name, placement in nodes.items():
+            self._cells.setdefault(self._cell(placement), set()).add(name)
+
+    def _cell(self, placement: Placement) -> tuple[int, int]:
+        return (int(placement.x // self._width), int(placement.y // self._height))
+
+    def near(self, placement: Placement) -> set[str]:
+        """Every node in the nine cells around ``placement``, itself included."""
+        column, row = self._cell(placement)
+        found: set[str] = set()
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                found |= self._cells.get((column + dx, row + dy), frozenset())
+        return found
+
+    def moved(self, name: str, was: Placement, now: Placement) -> None:
+        """Re-file ``name`` after it was pushed."""
+        origin, target = self._cell(was), self._cell(now)
+        if origin == target:
+            return
+        self._cells[origin].discard(name)
+        self._cells.setdefault(target, set()).add(name)
 
 
 def _overlap(a: Placement, b: Placement, padding: float) -> tuple[float, float] | None:

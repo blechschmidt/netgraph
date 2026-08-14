@@ -158,15 +158,20 @@ class ValidationConfig:
     ) -> ValidationConfig:
         """A copy with command-line overrides applied on top of the file.
 
+        An override that overrides nothing answers with *this* object rather
+        than an equal copy. Callers that memoise a validation pass key it by the
+        identity of the settings it was made under (see
+        :meth:`netgraph.web.session.EditingSession.findings`), and a copy would
+        be a different key for the same grading.
+
         Raises:
             ConfigurationError: ``ignore`` names an unknown rule.
         """
         extra = frozenset(_resolve_ids(ignore, where="--disable"))
-        return replace(
-            self,
-            strict=self.strict if strict is None else strict,
-            ignore=self.ignore | extra,
-        )
+        graded = self.strict if strict is None else strict
+        if graded == self.strict and not extra:
+            return self
+        return replace(self, strict=graded, ignore=self.ignore | extra)
 
 
 @dataclass(frozen=True, slots=True)

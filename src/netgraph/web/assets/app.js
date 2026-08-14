@@ -257,7 +257,7 @@
     el.canvas.classList.toggle("diffing", !!result.diff);
     el.legend.hidden = !result.diff;
     setStatus(result.status, result.message, result.counts, result.durationMs);
-    showProblems(result.problems || [], result.dangling || []);
+    showProblems(result.problems || [], result.dangling || [], result.problemsOmitted || 0);
     hideInfo(true);
     var svg = reuse ? held.svg : result.svg;
     if (svg) {
@@ -340,7 +340,16 @@
     el.summary.textContent = parts.join("  ·  ");
   }
 
-  function showProblems(problems, dangling) {
+  /** Redraw the problems list.
+   *
+   * `omitted` is how many the server found and did not send. An inventory can
+   * have thousands of notes -- one rule about one missing field, once per
+   * device -- and shipping every one of them on every answer cost half a
+   * megabyte a keystroke and this many DOM rows to rebuild. So the server sends
+   * the most severe few hundred and says how many it kept back, and the list
+   * ends by saying so rather than by trailing off.
+   */
+  function showProblems(problems, dangling, omitted) {
     el.problems.replaceChildren();
     (dangling || []).forEach(function (text) {
       problems = problems.concat([
@@ -394,8 +403,16 @@
       entry.appendChild(repairs);
       el.problems.appendChild(entry);
     });
+    if (omitted > 0) {
+      var more = document.createElement("p");
+      more.className = "empty";
+      more.textContent = "and " + omitted + " more, not listed here. "
+        + "Run 'netgraph validate' for all of them.";
+      el.problems.appendChild(more);
+    }
     el.problemCounts.textContent =
-      counts.error + " errors, " + counts.warning + " warnings, " + counts.info + " notes";
+      counts.error + " errors, " + counts.warning + " warnings, " + counts.info + " notes"
+      + (omitted > 0 ? " (" + omitted + " more not shown)" : "");
   }
 
   /** The Fix control for a diagnostic, or null when nothing can repair it.
@@ -981,7 +998,7 @@
     render: render,
     toast: toast,
     goToLine: goToLine,
-    diagnostics: function (problems) { showProblems(problems || []); },
+    diagnostics: function (problems, omitted) { showProblems(problems || [], [], omitted); },
     remote: setRemote,
     layer: function () { return el.layer.value; },
     /** Put the focus ring back on an element after a change redrew the SVG. */

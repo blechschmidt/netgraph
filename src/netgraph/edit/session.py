@@ -91,8 +91,17 @@ class EditSession:
     #: ``netgraph.toml``'s ``[validation]``, so the gate grades findings the way
     #: ``netgraph validate`` would in this tree.
     config: Config | None = None
-    #: The parse cache, shared with the rest of the run. Only the *baseline*
-    #: load uses it: an overlaid file's bytes are not the bytes on disk.
+    #: The parse cache, shared with the rest of the run, and used on *every*
+    #: load this session makes — including the overlaid ones.
+    #:
+    #: An overlaid file never consults it: :func:`~netgraph.loader.load_tree`
+    #: takes the overlay branch before the cache branch, so a file whose bytes
+    #: are in memory is parsed from memory. Every *other* file in the tree is
+    #: exactly the bytes on disk, and re-parsing all of them to judge an edit to
+    #: one of them is what made editing a thousand-device inventory cost a
+    #: second per keystroke: a batch loads the tree three times (the baseline,
+    #: the tree between operations, and the tree the gate judges), and on the
+    #: benchmark tree that was 1.25 s of parsing per edit.
     cache: DocumentCache | None = None
     #: Files an editor is holding open with unsaved changes, keyed by POSIX path
     #: relative to :attr:`root`. They are the text the session reads, and the
@@ -129,11 +138,7 @@ class EditSession:
     def baseline(self) -> Inventory:
         """The inventory as it is on disk, loaded once and kept for comparison."""
         if self._baseline is None:
-            self._baseline = (
-                load_tree(self.root, cache=self.cache)
-                if self._overlay is None
-                else load_tree(self.root, overlay=self._overlay)
-            )
+            self._baseline = load_tree(self.root, cache=self.cache, overlay=self._overlay)
             self._inventory = self._baseline
         return self._baseline
 
@@ -144,7 +149,7 @@ class EditSession:
             self._inventory = (
                 self.baseline
                 if not self._tree.dirty
-                else load_tree(self.root, overlay=self._tree.overlay())
+                else load_tree(self.root, cache=self.cache, overlay=self._tree.overlay())
             )
         return self._inventory
 
@@ -221,7 +226,7 @@ class EditSession:
         """
         if not self._tree.dirty:
             return ()
-        after = load_tree(self.root, overlay=self._tree.overlay())
+        after = load_tree(self.root, cache=self.cache, overlay=self._tree.overlay())
         return _new_problems(self.baseline, after, config=self.config)
 
     def commit(self, *, force: bool = False) -> tuple[str, ...]:

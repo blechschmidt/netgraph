@@ -53,14 +53,17 @@ from netgraph.render import (
 from netgraph.render.dot import to_dot, to_image
 from netgraph.render.routes import anchors_of, default_routing, fans_of, route_table
 from netgraph.rules import Severity
+from netgraph.validate import Finding
 from netgraph.validate import validate as run_validation
 from netgraph.watch.pipeline import Problem, Status, flatten_problems
 from netgraph.web.svgdoc import prepare
 
 __all__ = [
+    "MAX_PROBLEMS",
     "MAX_VLAN",
     "Preview",
     "ViewOptions",
+    "clip_problems",
     "graph_digest",
     "render_diff",
     "render_inventory",
@@ -69,6 +72,22 @@ __all__ = [
 
 #: The highest VLAN id ``--vlan`` and the browser may ask for (§9.1).
 MAX_VLAN: Final = 4094
+
+#: How many problems one answer carries to the browser.
+#:
+#: Not a cap on what was *found* — every answer reports the true totals beside
+#: the list, and ``netgraph validate`` prints every one — but a cap on what is
+#: serialised, sent and turned into DOM rows on each of the four answers an edit
+#: produces. On the thousand-device benchmark tree the validator reports 2 101
+#: findings, almost all of them one informational rule; that was 538 kB on every
+#: answer and 2 101 rows rebuilt in the page each time, for a list nobody can
+#: read past the first screen of.
+#:
+#: The kept ones are the most severe, because :func:`~netgraph.watch.pipeline.
+#: flatten_problems` has already sorted them that way: an inventory with three
+#: errors and two thousand notes sends the three errors first, which is the
+#: order somebody reads them in anyway.
+MAX_PROBLEMS: Final = 200
 
 #: What the browser is allowed to ask for, mapped to the field it sets. Keeping
 #: this closed is what stops a request from reaching a rendering knob the web
@@ -246,6 +265,7 @@ class Preview:
 
     def to_dict(self) -> dict[str, Any]:
         """The JSON the page consumes. Keys are only ever added, never renamed."""
+        shown, omitted = clip_problems(self.problems)
         return {
             "status": str(self.status),
             "message": self.message,
@@ -258,8 +278,9 @@ class Preview:
                     "rule": problem.rule,
                     "message": problem.message,
                 }
-                for problem in self.problems
+                for problem in shown
             ],
+            "problemsOmitted": omitted,
             "dangling": list(self.dangling),
             "geometry": dict(self.geometry) if self.geometry is not None else None,
             "counts": {
@@ -273,6 +294,20 @@ class Preview:
             "graphHash": self.graph_hash,
             "unchanged": self.unchanged,
         }
+
+
+def clip_problems(
+    problems: Sequence[Problem], *, limit: int = MAX_PROBLEMS
+) -> tuple[Sequence[Problem], int]:
+    """The problems to send, and how many were left out. See :data:`MAX_PROBLEMS`.
+
+    The count is the honest half: an answer that quietly stopped at two hundred
+    would read as an inventory with two hundred problems, which is a worse lie
+    than a slow page.
+    """
+    if len(problems) <= limit:
+        return problems, 0
+    return problems[:limit], len(problems) - limit
 
 
 def graph_digest(graph: Graph, options: RenderOptions) -> str:
@@ -326,6 +361,7 @@ def render_inventory(
     settings: ValidationConfig | None = None,
     started: float | None = None,
     known: str | None = None,
+    findings: Sequence[Finding] | None = None,
 ) -> Preview:
     """Validate and draw an inventory somebody else has already loaded.
 
@@ -346,6 +382,14 @@ def render_inventory(
         known: A :func:`graph_digest` the caller already holds the drawing for.
             When this pass would produce the same one, it stops before Graphviz
             and answers with :attr:`Preview.unchanged`.
+        findings: What ``validate`` said about this inventory under these
+            settings, when the caller has already asked. An editing session has:
+            the write path validates the tree to decide whether to write it, and
+            the page then asks for the diagram of the tree that was written. Two
+            passes of the validator over the same objects answer the same thing,
+            and on a thousand-device tree each one is a tenth of a second, so the
+            caller that already has the answer hands it over. ``None`` — every
+            other caller — validates here.
 
     Returns:
         The diagram, its info-box records, and every problem found on the way.
@@ -353,9 +397,10 @@ def render_inventory(
     options = view or ViewOptions()
     started = time.monotonic() if started is None else started
 
-    findings = run_validation(
-        inventory, settings if settings is not None else ValidationConfig(strict=options.strict)
-    )
+    if findings is None:
+        findings = run_validation(
+            inventory, settings if settings is not None else ValidationConfig(strict=options.strict)
+        )
     problems = flatten_problems(inventory.errors, findings)
     rejected = bool(inventory.errors) or any(finding.severity.is_fatal for finding in findings)
 

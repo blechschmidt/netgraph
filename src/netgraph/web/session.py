@@ -107,11 +107,17 @@ from netgraph.plan import PlanSourceError
 from netgraph.plan import diff as diff_states
 from netgraph.plan.sources import git_ref
 from netgraph.render import IconTheme
-from netgraph.validate import validate
+from netgraph.validate import Finding, validate
 from netgraph.watch.pipeline import Problem, Status, flatten_problems
 from netgraph.web.events import EVENT_NAMES, EVENTS_PATH, HEARTBEAT_SECONDS, EventBus
 from netgraph.web.presence import Client, Presence
-from netgraph.web.preview import Preview, ViewOptions, render_diff, render_inventory
+from netgraph.web.preview import (
+    Preview,
+    ViewOptions,
+    clip_problems,
+    render_diff,
+    render_inventory,
+)
 
 __all__ = [
     "BASELINES",
@@ -306,7 +312,7 @@ class Change:
                 )
                 for path, value in sorted(self.files.items())
             },
-            "diagnostics": [_problem(problem) for problem in self.diagnostics],
+            **_diagnostics_payload(self.diagnostics),
             "undo": self.undo_depth,
             "redo": self.redo_depth,
         }
@@ -417,6 +423,19 @@ def _choose_fix(fixes: Sequence[Fix], *, rule: str, key: str | None) -> Fix:
     return chosen
 
 
+def _diagnostics_payload(problems: Sequence[Problem]) -> dict[str, Any]:
+    """The ``diagnostics`` half of an answer: the rows to draw and what was left out.
+
+    Every answer that carries diagnostics carries them the same way, capped the
+    same way and counted the same way; see :data:`~netgraph.web.preview.MAX_PROBLEMS`.
+    """
+    shown, omitted = clip_problems(problems)
+    return {
+        "diagnostics": [_problem(problem) for problem in shown],
+        "diagnosticsOmitted": omitted,
+    }
+
+
 def _problem(problem: Problem) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "severity": str(problem.severity),
@@ -468,6 +487,11 @@ class EditingSession:
     )
     _revision: int = field(default=1, init=False, repr=False)
     _inventory: Inventory | None = field(default=None, init=False, repr=False)
+    #: The last answer :meth:`findings` gave, with the two objects it was an
+    #: answer about. See that method for why identity is the whole key.
+    _findings: tuple[Inventory, ValidationConfig, tuple[Finding, ...]] | None = field(
+        default=None, init=False, repr=False
+    )
     _undo: list[_History] = field(default_factory=list, init=False, repr=False)
     _redo: list[_History] = field(default_factory=list, init=False, repr=False)
     #: Every gesture this session made, oldest first. Unlike the undo stack this
@@ -640,8 +664,38 @@ class EditingSession:
             payload["partial"] = True
             payload["missing"] = missing
         if diagnostics:
-            payload["diagnostics"] = [_problem(problem) for problem in self.diagnostics(inventory)]
+            payload.update(_diagnostics_payload(self.diagnostics(inventory)))
         return payload
+
+    def findings(
+        self, inventory: Inventory | None = None, settings: ValidationConfig | None = None
+    ) -> tuple[Finding, ...]:
+        """What ``validate`` says about the tree, computed once per revision.
+
+        One edit asks the validator the same question up to four times: the
+        write path judges the tree it is about to write, the commit reports the
+        diagnostics of the tree it wrote, the page fetches the file list with
+        its diagnostics, and then fetches the diagram. On the benchmark tree
+        that is four passes of a tenth of a second each, over objects that did
+        not move between them.
+
+        So the answer is remembered, and the memo is keyed by *identity* rather
+        than by a revision number: :meth:`inventory` hands out a new object
+        whenever the tree is reloaded and :meth:`settings` a new one whenever
+        the config is, so an answer that is still valid is exactly an answer
+        whose two inputs are still the same objects. Nothing has to remember to
+        invalidate this, which is the point.
+        """
+        loaded = self.inventory() if inventory is None else inventory
+        grading = self.settings() if settings is None else settings
+        with self._lock:
+            memo = self._findings
+            if memo is not None and memo[0] is loaded and memo[1] is grading:
+                return memo[2]
+        answer = tuple(validate(loaded, grading))
+        with self._lock:
+            self._findings = (loaded, grading, answer)
+        return answer
 
     def diagnostics(self, inventory: Inventory | None = None) -> tuple[Problem, ...]:
         """Every load error and finding of the tree, most severe group first.
@@ -653,7 +707,7 @@ class EditingSession:
         are not worth making optional and then having to ask for.
         """
         loaded = self.inventory() if inventory is None else inventory
-        findings = validate(loaded, self.settings())
+        findings = self.findings(loaded)
         offers = {
             (offer.finding.rule, offer.finding.message): tuple(
                 (fix.key, fix.title) for fix in offer.fixes
@@ -689,7 +743,16 @@ class EditingSession:
         if options.icons is None and self.icons is not None:
             options = replace(options, icons=self.icons)
         settings = self.settings().with_overrides(strict=True if options.strict else None)
-        return render_inventory(inventory, options, settings=settings, known=known), revision
+        return (
+            render_inventory(
+                inventory,
+                options,
+                settings=settings,
+                known=known,
+                findings=self.findings(inventory, settings),
+            ),
+            revision,
+        )
 
     def read_file(self, path: str) -> dict[str, Any]:
         """One file's text, with the hash a write of it has to quote back.
