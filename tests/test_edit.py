@@ -657,6 +657,53 @@ def test_the_inverse_of_a_move_within_a_namespace_is_a_move(home: Path) -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("newline", "preamble"),
+    [
+        pytest.param("\r\n", "", id="crlf"),
+        pytest.param("\n", "# the desk machines\n\n", id="preamble"),
+        pytest.param("\n", "", id="plain", marks=pytest.mark.xfail(raises=AssertionError)),
+    ],
+)
+def test_a_move_that_deletes_a_file_it_cannot_remake_is_inverted_by_bytes(
+    tmp_path: Path, newline: str, preamble: str
+) -> None:
+    """The inverse has to *make* the emptied file again, and cannot always.
+
+    A file netgraph makes is plain UTF-8, ``\n``-terminated, and starts at its
+    first document. A CRLF checkout and a licence header are neither, so moving
+    the last document out of such a file and moving it back would rewrite every
+    line of it — which is why those moves fall back to the primitive restore.
+    The ``plain`` case is expected to *fail* this assertion: it keeps the
+    semantic inverse, which is the point of asking the question at all.
+    """
+    document = (
+        "apiVersion: netgraph.dev/v1alpha1\n"
+        "kind: switch\n"
+        "metadata:\n"
+        "  name: sw-a\n"
+        "spec:\n"
+        "  interfaces:\n"
+        "    - name: p1\n"
+        "      type: ethernet\n"
+    )
+    source = tmp_path / "a.yaml"
+    source.write_bytes((preamble + document).replace("\n", newline).encode())
+    before = source.read_bytes()
+
+    session = EditSession(root=tmp_path)
+    applied = session.apply(MoveElement(address="sw-a", file="b.yaml"))
+    session.commit(force=True)
+    assert not source.exists(), "the move emptied it"
+
+    undo = EditSession(root=tmp_path)
+    undo.apply_all(applied.inverse)
+    undo.commit(force=True)
+    assert source.read_bytes() == before
+    assert not (tmp_path / "b.yaml").exists()
+    assert not any(isinstance(operation, MoveElement) for operation in applied.inverse)
+
+
 def test_moving_to_another_folder_changes_the_namespace_and_the_references(home: Path) -> None:
     apply_and_commit(home, MoveElement(address="pc-desk", file="office/pc-desk.yaml"))
     inventory = load_tree(home)

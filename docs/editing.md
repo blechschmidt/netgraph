@@ -145,12 +145,20 @@ not write:
 |---|---|
 | `create` | `delete` — the document did not exist, so removing it leaves the file as it was |
 | `connect` | `disconnect`, for the same reason |
-| `move` within a namespace | `move` back to the index it came from, the document travelling as text |
+| `move` within a namespace | `move` back to the index it came from, the document travelling as text — unless the move emptied its source file |
 | `set` of a field that was absent | `unset` — the key was not there, and had no comment |
 | `add-interface` | `remove-interface` |
 
-The last two carry a condition. They edit a document *in place*, so they may only
-claim a semantic inverse when re-emitting that document reproduces it exactly —
+`move` carries a condition of its own. A move that takes the last document out of
+a file deletes the file, so the inverse has to *make* it again — and a file
+netgraph makes is plain UTF-8 with `\n` line endings that starts at its first
+document. A CRLF checkout, a byte-order mark or a licence header above the first
+`---` is none of those, so a move that emptied such a file is inverted with the
+pre-images instead. (This is not hypothetical: it is what made the property tests
+fail on Windows and nowhere else.)
+
+The last two carry a condition too. They edit a document *in place*, so they may
+only claim a semantic inverse when re-emitting that document reproduces it exactly —
 the [indent probe](#a-note-on-indent-probing) succeeded and no scalar changed
 spelling. When it does not hold, applying the operation has already rewritten
 lines nobody touched, and the opposite operation would rewrite them again rather

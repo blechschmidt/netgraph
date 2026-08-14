@@ -24,7 +24,8 @@ create                   delete: the document did not exist, so removing it
                          leaves the file as it was
 connect                  disconnect, for the same reason
 move within a namespace  move back to the index it came from, the document
-                         being carried across verbatim
+                         being carried across verbatim -- unless the move
+                         emptied its source file; see :func:`_is_reproducible`
 set of an absent field   unset: the key was not there, and had no comment
 add-interface            remove-interface
 ======================== =====================================================
@@ -78,6 +79,7 @@ from netgraph.edit.references import (
     references_of,
     rewrite_reference,
 )
+from netgraph.edit.roundtrip import YamlFile
 from netgraph.edit.tree import EditableTree
 from netgraph.errors import SchemaError
 from netgraph.fmt.canonical import format_stream
@@ -404,18 +406,37 @@ def _move(context: _Context, operation: MoveElement) -> tuple[Operation, ...] | 
 
     # The document travels as text, so every comment, blank line and quoting
     # choice in it arrives unchanged -- a move is a move, not a reformat.
+    reproducible = _is_reproducible(context.tree.open(located.relative))
     text = context.tree.document(located.relative, located.index).render()
     context.tree.remove_document(located.relative, located.index)
+    survived = context.tree.exists(located.relative)
     target = operation.index if operation.index is not None else -1
     position = context.tree.insert_document(relative, target, text)
 
-    if namespace == located.namespace:
+    if namespace == located.namespace and (survived or reproducible):
         return (MoveElement(address=new_fqn, file=located.relative, index=located.index),)
     _repoint(context, old=located.fqn, new=new_fqn)
     _requalify(
         context, old=located.fqn, new=new_fqn, element=located.element, at=(relative, position)
     )
     return None
+
+
+def _is_reproducible(file: YamlFile) -> bool:
+    """Would re-creating this file from its documents alone put it back exactly?
+
+    Only asked when a move empties its source file, which deletes it: the
+    inverse then has to *make* the file again, and a file netgraph makes is
+    plain UTF-8 with ``\n`` line endings and nothing before its first document
+    (:mod:`netgraph.fsio`). A file that was any of those things differently —
+    a CRLF checkout, a byte-order mark, a licence header above the first
+    ``---`` — cannot be restored that way, so such a move is inverted with the
+    primitive file restore instead, which carries the bytes.
+
+    The common case is the cheap one: an LF file with no preamble round-trips,
+    and keeps the semantic inverse an undo stack is nicer to read.
+    """
+    return file.newline == "\n" and not file.bom and not file.preamble
 
 
 def _requalify(
