@@ -56,7 +56,6 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import Enum
-from types import MappingProxyType
 from typing import Any, Final
 
 from netgraph.layout.geometry import Geometry
@@ -91,10 +90,6 @@ class Mark(str, Enum):
 #: The order marks are counted and reported in: what the reader looks for first.
 MARK_ORDER: Final[tuple[Mark, ...]] = (Mark.ADDED, Mark.CHANGED, Mark.REMOVED, Mark.UNCHANGED)
 
-_EMPTY_MARKS: Final[Mapping[str, Mark]] = MappingProxyType({})
-_EMPTY_FIELDS: Final[Mapping[str, tuple[str, ...]]] = MappingProxyType({})
-_EMPTY_NAMES: Final[Mapping[str, str]] = MappingProxyType({})
-
 
 @dataclass(frozen=True, slots=True)
 class DiffOverlay:
@@ -113,15 +108,15 @@ class DiffOverlay:
     """
 
     #: Node fully-qualified name to what happened to it.
-    nodes: Mapping[str, Mark] = _EMPTY_MARKS
+    nodes: Mapping[str, Mark] = field(default_factory=dict)
     #: :attr:`Edge.id <netgraph.render.graph.Edge.id>` to what happened to it.
-    edges: Mapping[str, Mark] = _EMPTY_MARKS
+    edges: Mapping[str, Mark] = field(default_factory=dict)
     #: Node or edge id to the field paths that moved, as ``netgraph plan``
     #: spells them. Only ever set for :attr:`Mark.CHANGED`.
-    fields: Mapping[str, tuple[str, ...]] = _EMPTY_FIELDS
+    fields: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
     #: Node or edge id to the address it used to have. Only ever set for
     #: something the plan detected as a rename.
-    renamed_from: Mapping[str, str] = _EMPTY_NAMES
+    renamed_from: Mapping[str, str] = field(default_factory=dict)
     #: The changeset itself, as :meth:`Plan.to_dict <netgraph.plan.model.Plan>`
     #: renders it, for the JSON export to publish beside the graph. ``None``
     #: when the overlay was built without one. Held as plain data rather than as

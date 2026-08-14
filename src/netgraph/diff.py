@@ -17,14 +17,13 @@ the changeset side by side. Nothing here renders anything.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from netgraph.plan.address import LAYOUT_TYPE
 from netgraph.plan.model import Action, Plan
-from netgraph.render.diffview import DiffOverlay, Mark, diff_overlay, union_graph
+from netgraph.render.diffview import DiffOverlay, diff_overlay, union_graph
 from netgraph.render.graph import Graph
 
-__all__ = ["Drawing", "draw", "renamed_addresses", "summarise", "updated_fields"]
+__all__ = ["Drawing", "draw", "renamed_addresses", "updated_fields"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,18 +111,4 @@ def renamed_addresses(plan: Plan) -> dict[str, str]:
         if change.action is Action.RENAME
         and change.new_address is not None
         and change.address.type != LAYOUT_TYPE
-    }
-
-
-def summarise(drawing: Drawing) -> dict[str, Any]:
-    """The counts a caller reports after drawing, as plain data."""
-    return {
-        "nodes": {
-            mark.value: sum(1 for value in drawing.overlay.nodes.values() if value is mark)
-            for mark in (Mark.ADDED, Mark.CHANGED, Mark.REMOVED)
-        },
-        "edges": {
-            mark.value: sum(1 for value in drawing.overlay.edges.values() if value is mark)
-            for mark in (Mark.ADDED, Mark.CHANGED, Mark.REMOVED)
-        },
     }
