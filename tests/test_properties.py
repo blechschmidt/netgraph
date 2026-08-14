@@ -40,8 +40,10 @@ import subprocess
 import tempfile
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from dataclasses import replace
 from html.parser import HTMLParser
 from pathlib import Path
+from statistics import median
 from typing import Any, Final
 
 import pytest
@@ -49,10 +51,23 @@ import yaml
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
+from netgraph.edit import EditSession
 from netgraph.fmt import format_source
 from netgraph.fmt.verify import meaning, verify
+from netgraph.layout.geometry import (
+    Geometry,
+    LabelPlacement,
+    LayoutMode,
+    LinkGeometry,
+    Routing,
+)
+from netgraph.layout.graphviz import parse_drawing
+from netgraph.layout.resolve import resolve_geometry
+from netgraph.layout.seed import clear_operations, seed_geometry, write_operations
 from netgraph.loader import Inventory, load_tree, namespace_of
 from netgraph.render import RENDERERS, Graph, Layer, RenderOptions, build_graph
+from netgraph.render.dot import layout_plan, run_graphviz, to_dot
+from netgraph.render.ids import element_ids
 from netgraph.render.registry import draws_racks
 from netgraph.trace import TraceError, trace
 from netgraph.validate import validate
@@ -61,6 +76,14 @@ from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path,
 
 import strategies as ng  # isort: skip -- tests/ is on sys.path, not a package
 
+
+#: How far a rendered coordinate may sit from its stored one, once the drawing's
+#: single translation is taken off. Graphviz reports positions rounded to a
+#: hundredth of a point and netgraph stores them the same way, so the two can
+#: disagree in the last place they both print; a twentieth of a point is a
+#: five-hundredth of a millimetre on paper and several hundred times smaller than
+#: any drift a broken arrangement produces.
+RIGID: Final = 0.05
 
 #: Layers a topology can be drawn at. Every one of them has to survive every
 #: inventory, including the ones where the layer is empty.
@@ -1021,6 +1044,164 @@ def _chain(switches: int, medium: str) -> ng.InventoryPlan:
             },
         )
     return ng.InventoryPlan(tuple(documents))
+
+
+# --------------------------------------------------------------------------- #
+# 8. Diagram geometry
+# --------------------------------------------------------------------------- #
+
+
+@requires_dot
+@settings(deadline=None, max_examples=capped(10), suppress_health_check=[HealthCheck.too_slow])
+@given(st.data(), ng.inventory_plans(min_devices=2, max_devices=3, panels=False, pdus=False))
+def test_a_hand_edited_arrangement_survives_a_render_and_a_reload(
+    data: st.DataObject, plan: ng.InventoryPlan
+) -> None:
+    """The property the visual editor rests on, for every inventory.
+
+    Seed an arrangement, hand-edit it the way the canvas does — move a node,
+    bend a cable, route it orthogonally, nudge its label — then render it and
+    read back where Graphviz actually put everything.
+
+    What must hold is that the drawing is *the arrangement*, **rigidly**: every
+    node and every pinned bend comes out at its stored coordinate plus one
+    translation shared by the whole drawing. The translation is real and is not
+    a defect — the no-op engine normalises the canvas so its bounding box starts
+    at the origin, and a hand edit is exactly what moves that box — but it is
+    the only freedom the renderer has. Anything else drifting is a diagram
+    nobody can arrange, and a bend that landed somewhere else, or on another
+    link, is a cable that springs back the moment you look away.
+
+    Re-seeding then settles the translation away, so ``netgraph layout --write``
+    leaves an arrangement that reproduces itself point for point; and removing
+    the geometry leaves no residue at all, the diagram going back to the
+    automatic layout rather than to a half-pinned version of what was deleted.
+    """
+    with written(plan) as (root, inventory):
+        assume(not inventory.errors)
+        graph = build_graph(inventory)
+        assume(len(graph.nodes) >= 2 and graph.edges)
+        options = RenderOptions()
+
+        seeded = seed_geometry(graph, options, with_waypoints=True)
+        assert seeded.nodes, "an inventory with nodes has to seed positions for them"
+
+        # The hand edit: everything the canvas can do to a link, plus the one
+        # thing it can do to a node.
+        moved = data.draw(st.sampled_from(sorted(seeded.nodes)))
+        edge = graph.edges[data.draw(st.integers(0, len(graph.edges) - 1))]
+        placement = seeded.nodes[moved]
+        nodes = dict(seeded.nodes)
+        nodes[moved] = replace(placement, x=placement.x + 37.0, y=placement.y - 23.0)
+        # Somewhere no node is: a bend dropped *inside* a shape is clipped away
+        # by design (a route leaves the box it starts in), and the assertion
+        # below is about bends that survive.
+        bend = (
+            round(max(node.x for node in seeded.nodes.values()) + 240.0, 2),
+            round(max(node.y for node in seeded.nodes.values()) + 240.0, 2),
+        )
+        routed = LinkGeometry(
+            waypoints=(bend,),
+            routing=Routing.STRAIGHT,
+            label=LabelPlacement(at=0.25, dx=12.0, dy=-8.0),
+        )
+        edited = replace(seeded, nodes=nodes, edges={edge.id: routed})
+
+        arranged = replace(graph, geometry=edited)
+        assert layout_plan(arranged).mode is LayoutMode.FIXED
+
+        drawn = _drawn(arranged, options)
+        shift = _shift(drawn, edited)
+        for fqn, stored in edited.nodes.items():
+            placed = drawn.nodes.get(fqn)
+            assert placed is not None, fqn
+            assert (placed.x - shift[0], placed.y - shift[1]) == pytest.approx(
+                (stored.x, stored.y), abs=RIGID
+            ), f"{fqn}: drawn {(placed.x, placed.y)} shift {shift} stored {(stored.x, stored.y)}"
+
+        # The bend is on the line, and on the *right* line: a waypoint the
+        # renderer rounded away, or attached to the wrong link, would still be a
+        # valid spline and would draw a cable across the diagram.
+        drawn_id = element_ids(graph).edge(graph.edges.index(edge))
+        line = drawn.edges.get(drawn_id or "", ())
+        assert any(
+            abs(x - shift[0] - bend[0]) < 0.5 and abs(y - shift[1] - bend[1]) < 0.5 for x, y in line
+        ), f"the bend pinned on {edge.id} is not on the line that was drawn for it"
+
+        # Re-seeding settles the translation away, and what it settles on is
+        # what the next render draws, point for point. The bend travels with the
+        # nodes rather than staying put, which is the whole point of settling:
+        # what is stored is what will be drawn.
+        settled = seed_geometry(arranged, options, with_waypoints=True)
+        kept = settled.link(edge.id)
+        assert kept.routing is routed.routing
+        assert kept.label == routed.label
+        assert len(kept.waypoints) == 1
+        again = _drawn(replace(graph, geometry=settled), options)
+        for fqn, stored in settled.nodes.items():
+            placed = again.nodes[fqn]
+            assert (placed.x, placed.y) == pytest.approx((stored.x, stored.y), abs=0.01), fqn
+
+        # Reloading the *written* form must reproduce the same arrangement.
+        reloaded = _reloaded(root, edited)
+        assert {key: node.rounded() for key, node in reloaded.nodes.items()} == {
+            key: node.rounded() for key, node in edited.nodes.items()
+        }
+        assert reloaded.link(edge.id) == routed.rounded()
+
+        # And with the geometry gone, the diagram is back to the automatic
+        # layout with nothing left over.
+        _edit(root, clear_operations([edited.view], inventory=load_tree(root)))
+        bare = build_graph(load_tree(root))
+        assert bare.geometry.is_empty
+        assert layout_plan(bare).mode is LayoutMode.AUTO
+        assert "pos=" not in to_dot(bare)
+        assert not [
+            path
+            for path in root.rglob("*.yaml")
+            if "kind: layout" in path.read_text(encoding="utf-8")
+        ]
+
+
+def _drawn(graph: Graph, options: RenderOptions) -> Any:
+    """Where Graphviz actually put everything, read out of its own JSON."""
+    payload, _ = run_graphviz(
+        to_dot(graph, replace(options, element_ids=True)),
+        format="json",
+        plan=layout_plan(graph),
+    )
+    return parse_drawing(payload)
+
+
+def _shift(drawn: Any, stored: Geometry) -> tuple[float, float]:
+    """The one translation the no-op engine applied to the whole drawing.
+
+    The median of what each node moved by rather than any one node's, so that a
+    single coordinate Graphviz rounded differently cannot decide the answer for
+    the rest. Every node is then asserted against it, which is what makes "one
+    translation" a claim rather than an excuse.
+    """
+    moves = [
+        (placed.x - stored.nodes[fqn].x, placed.y - stored.nodes[fqn].y)
+        for fqn in sorted(stored.nodes)
+        if (placed := drawn.nodes.get(fqn)) is not None
+    ]
+    if not moves:  # pragma: no cover - the caller asserts there are nodes
+        return (0.0, 0.0)
+    return (median(move[0] for move in moves), median(move[1] for move in moves))
+
+
+def _reloaded(root: Path, geometry: Geometry) -> Geometry:
+    """``geometry`` written to ``root`` as a layout document and read back."""
+    _edit(root, write_operations(geometry, with_waypoints=True))
+    return resolve_geometry(load_tree(root), geometry.view)
+
+
+def _edit(root: Path, operations: Sequence[Any]) -> None:
+    """Apply operations through the real write path, comments and all."""
+    session = EditSession(root=root)
+    session.apply_all(operations)
+    session.commit(force=True)
 
 
 # --------------------------------------------------------------------------- #

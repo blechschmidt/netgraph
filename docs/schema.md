@@ -3674,6 +3674,7 @@ kind: layout
 metadata:
   name: default
 spec:
+  routing: orthogonal
   views:
     l1:
       nodes:
@@ -3681,7 +3682,10 @@ spec:
         core/rtr-edge: {position: [240, 540]}
         subnet:10.0.0.0/24: {position: {x: 480, y: 396}}
       edges:
-        core/cbl-uplink: {waypoints: [{x: 240, y: 470}]}
+        core/cbl-uplink:
+          waypoints: [{x: 240, y: 470}]
+          routing: straight
+          label: {at: 0.35, offset: {x: 0, y: 12}}
       groups:
         core: {position: {x: 240, y: 468}, size: {width: 220, height: 260}}
 ```
@@ -3762,20 +3766,50 @@ them.
 
 | Key | Required | Meaning |
 |---|---|---|
+| `routing` | no | the inventory-wide default routing style; `spline` when absent |
+| `views.<view>.routing` | no | that view's default, which overrides `spec.routing` |
 | `nodes.<address>.position` | yes | the centre of the node |
 | `nodes.<address>.size` | no | the box it occupies; the label decides when absent |
-| `edges.<address>.waypoints` | yes | spline control points, first endpoint to second |
+| `edges.<address>.waypoints` | no | the bends the link is routed through, source end first |
+| `edges.<address>.routing` | no | how *this* link is drawn; overrides both defaults |
+| `edges.<address>.label` | no | where the link's annotation sits, relative to the route |
 | `groups.<namespace>.position` | yes | the centre of the cluster box |
 | `groups.<namespace>.size` | yes | its extent; nothing else decides how big a cluster is |
 
-`size` on a node is optional *and is not written by `netgraph layout --write`*.
-Graphviz derives the same box from the same label on every run, so a stored size
-buys the renderer nothing and goes stale the moment a device grows an interface.
-It is honoured on read, for an editor that lets somebody resize a box on purpose.
+`size` on a node is optional, and is written by `netgraph layout --write` only
+for a node a stored route leaves from. Graphviz derives the same box from the
+same label on every run, so a stored size otherwise buys the renderer nothing
+and goes stale the moment a device grows an interface — but a route netgraph
+computes itself has to stop at the shape it runs into, and netgraph cannot
+measure a label, so for those nodes the size is a fact the drawing needs. It is
+honoured on read wherever it appears, for an editor that lets somebody resize a
+box on purpose.
 
-Edge waypoints are honoured but not seeded unless `--waypoints` is asked for: a
-computed spline is four control points per link that the render recomputes
+An `edges` entry is where a link's own geometry goes. None of its three fields
+is required, but an entry must carry **at least one** of them (`NG-Y003`): a key
+with nothing under it says nothing, and the way to say nothing is to leave the
+key out.
+
+`waypoints` are **interior** points. The two ends of a route are always the
+nodes themselves, so moving either device carries the bends along instead of
+stranding them — which is what makes a hand-routed trunk worth placing. An entry
+with no waypoints is a link running directly between its two nodes. They are
+honoured but not seeded unless `netgraph layout --write --waypoints` is asked
+for: a computed route is a handful of points per link that the render recomputes
 identically, while a hand-placed bend is a decision worth keeping.
+
+`routing` is one of `spline` (the curve Graphviz draws), `orthogonal` (right
+angles, the way a patch schedule is drawn) or `straight` (segment to segment).
+It is spelled the way a person would say it rather than the way Graphviz spells
+it, because this is inventory somebody writes by hand. Three levels are
+answered most specific first — the link, then the view, then the inventory —
+and `--routing` on `render` supplies a default the first of them still beats.
+
+`label` is `{at: 0.5, offset: {x: 0, y: 0}}`: `at` is how far along the route
+the annotation sits, from `0` at the source end to `1` at the target, and
+`offset` nudges it off the line in points. It is stored on the *link* rather
+than as a coordinate so that a label nudged clear of a crossing cable survives
+both endpoints being dragged somewhere else.
 
 ### 18.6 What a renderer does with it
 
@@ -3793,9 +3827,21 @@ frame is therefore where you put it rather than wherever a layout happened to
 land; its caption sits centred above it rather than inside it, for the reason in
 [`docs/follow-ups.md` §17](follow-ups.md).
 
+A link's geometry follows the same split. In `fixed` mode netgraph computes each
+route itself and hands Graphviz the finished line, which is the only way a
+*per-link* routing style can be expressed at all — Graphviz has a graph-wide
+`splines` attribute and nothing per edge — and it is also the only mode in which
+a pinned label position is honoured. Anywhere else the engine is routing, so the
+default style reaches the drawing as `splines` and the bends and label positions
+do not; the renderer says what it could not honour rather than emitting
+something broken. [`docs/rendering.md`](rendering.md#links-are-geometry-too) is
+that story in full, with a worked example.
+
 The `json` renderer publishes the coordinates — a `layout` object per node, per
 edge and at the top level — so a client can draw the graph without running
-Graphviz at all.
+Graphviz at all. An edge's object carries both what the document pinned
+(`waypoints`, `routing`, `label`) and, in `fixed` mode, the line netgraph drew
+(`route`, `controls`, `drawnAs`).
 
 ### 18.7 Rules
 

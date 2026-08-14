@@ -25,7 +25,16 @@ from netgraph.cli import cli
 from netgraph.edit import EditSession, SetGeometry
 from netgraph.edit.errors import OperationError
 from netgraph.layout.document import canonical_geometry, geometry_sections, inline_entry
-from netgraph.layout.geometry import Box, Geometry, LayoutMode, Placement, round_coordinate
+from netgraph.layout.geometry import (
+    Box,
+    Geometry,
+    LabelPlacement,
+    LayoutMode,
+    LinkGeometry,
+    Placement,
+    Routing,
+    round_coordinate,
+)
 from netgraph.layout.graphviz import (
     Drawing,
     Transform,
@@ -35,6 +44,7 @@ from netgraph.layout.graphviz import (
     separate,
 )
 from netgraph.layout.resolve import conflicts_in, resolve_geometry, resolve_key
+from netgraph.layout.routing import FAN_GAP, Anchor, fan_offsets, label_position, route
 from netgraph.layout.seed import (
     LAYOUT_ENGINES,
     live_keys,
@@ -49,6 +59,7 @@ from netgraph.render import Layer, RenderOptions, build_graph, filter_graph
 from netgraph.render.dot import complete_layout, layout_plan, run_graphviz, to_dot
 from netgraph.render.graph import FilterSpec
 from netgraph.render.jsonexport import to_json
+from netgraph.render.routes import fans_of
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path
 
@@ -169,7 +180,9 @@ def parse_layout_text(text: str) -> Any:
             "further than",
         ),
         ("    l1:\n      nodes:\n        a: {position: [0, 0], size: [0, 4]}\n", "greater than 0"),
-        ("    l1:\n      edges:\n        a: {waypoints: []}\n", "at least 1"),
+        ("    l1:\n      edges:\n        a: {}\n", "must say something about the link"),
+        ("    l1:\n      edges:\n        a: {routing: diagonal}\n", "routing"),
+        ("    l1:\n      edges:\n        a: {waypoints: [[0, 0]], label: {at: 2}}\n", "at"),
         ("    l1:\n      nodes: []\n", "must be a mapping"),
     ],
 )
@@ -409,20 +422,69 @@ def test_the_background_carries_no_text_operation(tmp_path: Path) -> None:
     assert " F " not in f" {background} ", background
 
 
-def test_edge_waypoints_become_spline_control_points(pair: Path) -> None:
+def test_edge_waypoints_become_a_route_through_them(pair: Path) -> None:
+    """The bends are interior: the two ends of the route are the nodes.
+
+    So the emitted ``pos`` passes through every waypoint and stops at each
+    shape's border rather than starting at the first bend — which is what lets
+    dragging a node carry its cables along instead of stranding them.
+    """
     write(
         pair,
         "arrange.yaml",
         layout_document(
             "    l1:\n      nodes:\n"
-            "        sw-a: {position: [54, 18]}\n"
-            "        sw-b: {position: [54, 126]}\n"
+            "        sw-a: {position: [54, 18], size: [60, 20]}\n"
+            "        sw-b: {position: [54, 126], size: [60, 20]}\n"
             "      edges:\n"
-            "        cbl-a-b: {waypoints: [[54, 50], [54, 94]]}\n"
+            "        cbl-a-b: {waypoints: [[90, 50], [90, 94]]}\n"
         ),
     )
     source = to_dot(build_graph(load_tree(pair)))
-    assert 'pos="54,50 54,94"' in source
+    (pos,) = re.findall(r'pos="([^"]+)"[^]]*label="port1', source)
+    points = [tuple(float(part) for part in point.split(",")) for point in pos.split()]
+    assert (90.0, 50.0) in points and (90.0, 94.0) in points
+    # Clipped: the route leaves sw-a's box (18 ± 10) rather than its centre.
+    assert points[0][1] >= 28.0 and points[-1][1] <= 116.0
+
+
+def test_a_per_link_routing_style_beats_the_view_default(pair: Path) -> None:
+    write(
+        pair,
+        "arrange.yaml",
+        layout_document(
+            "    l1:\n      routing: orthogonal\n      nodes:\n"
+            "        sw-a: {position: [54, 18], size: [60, 20]}\n"
+            "        sw-b: {position: [200, 126], size: [60, 20]}\n"
+            "      edges:\n"
+            "        cbl-a-b: {routing: straight}\n"
+        ),
+    )
+    geometry = build_graph(load_tree(pair)).geometry
+    assert geometry.routing is Routing.ORTHOGONAL
+    assert geometry.routing_for("cbl-a-b") is Routing.STRAIGHT
+    assert geometry.routing_for("anything-else") is Routing.ORTHOGONAL
+
+
+def test_a_nudged_label_is_pinned_with_lp(pair: Path) -> None:
+    """``lp`` is an output attribute everywhere but the no-op engine, which is
+    the one place a label position can be pinned at all."""
+    write(
+        pair,
+        "arrange.yaml",
+        layout_document(
+            "    l1:\n      nodes:\n"
+            "        sw-a: {position: [54, 18], size: [60, 20]}\n"
+            "        sw-b: {position: [54, 126], size: [60, 20]}\n"
+            "      edges:\n"
+            "        cbl-a-b: {label: {at: 0.25, offset: [30, 0]}}\n"
+        ),
+    )
+    source = to_dot(build_graph(load_tree(pair)))
+    (lp,) = re.findall(r'lp="([^"]+)"', source)
+    x, y = (float(part) for part in lp.split(","))
+    assert x == pytest.approx(84.0, abs=1.0)
+    assert 40.0 < y < 70.0
 
 
 # --------------------------------------------------------------------------- #
@@ -710,11 +772,26 @@ def test_an_empty_view_produces_no_operation() -> None:
 
 
 def test_write_operations_leave_waypoints_out_unless_asked() -> None:
-    geometry = Geometry(view="l1", nodes={"a": Placement(0, 0)}, edges={"c": ((1.0, 2.0),)})
+    geometry = Geometry(
+        view="l1",
+        nodes={"a": Placement(0, 0)},
+        edges={"c": LinkGeometry(waypoints=((1.0, 2.0),))},
+    )
     (without,) = write_operations(geometry)
     (with_them,) = write_operations(geometry, with_waypoints=True)
     assert without.edges is None
     assert with_them.edges == {"c": {"waypoints": [{"x": 1, "y": 2}]}}
+
+
+def test_a_routing_style_is_written_whether_or_not_waypoints_were_asked_for() -> None:
+    """A style is a decision, not a derived number: dropping it would undo it."""
+    geometry = Geometry(
+        view="l1",
+        nodes={"a": Placement(0, 0)},
+        edges={"c": LinkGeometry(routing=Routing.ORTHOGONAL)},
+    )
+    (operation,) = write_operations(geometry)
+    assert operation.edges == {"c": {"routing": "orthogonal"}}
 
 
 # --------------------------------------------------------------------------- #
@@ -801,7 +878,7 @@ def test_the_json_export_publishes_the_coordinates(pair: Path) -> None:
         ),
     )
     document = json.loads(to_json(build_graph(load_tree(pair))))
-    assert document["layout"] == {"units": "points", "mode": "fixed"}
+    assert document["layout"] == {"units": "points", "mode": "fixed", "routing": "spline"}
     placed = {node["id"]: node.get("layout") for node in document["nodes"]}
     assert placed["sw-a"] == {
         "position": {"x": 54.0, "y": 18.0},
@@ -809,13 +886,152 @@ def test_the_json_export_publishes_the_coordinates(pair: Path) -> None:
     }
     assert placed["sw-b"] == {"position": {"x": 54.0, "y": 126.0}}
     (edge,) = document["edges"]
-    assert edge["layout"] == {"waypoints": [{"x": 54.0, "y": 72.0}]}
+    assert edge["layout"]["waypoints"] == [{"x": 54.0, "y": 72.0}]
+    # The route netgraph draws is published beside what the inventory pinned, so
+    # a client can reproduce the picture without reimplementing the routing.
+    assert {"x": 54.0, "y": 72.0} in edge["layout"]["route"]
+    assert edge["layout"]["drawnAs"] == "spline"
+    assert len(edge["layout"]["controls"]) % 3 == 1
 
 
 def test_an_unarranged_export_carries_no_layout_key(pair: Path) -> None:
     document = json.loads(to_json(build_graph(load_tree(pair))))
     assert "layout" not in document
     assert all("layout" not in node for node in document["nodes"])
+
+
+# --------------------------------------------------------------------------- #
+# Routing
+# --------------------------------------------------------------------------- #
+
+
+def _anchor(x: float, y: float, width: float = 60.0, height: float = 40.0) -> Anchor:
+    return Anchor(x=x, y=y, width=width, height=height)
+
+
+def _within(anchor: Anchor, point: tuple[float, float]) -> bool:
+    """Is this point *strictly* inside the box, rather than on its border?
+
+    A clipped route ends exactly on the border, which
+    :meth:`~netgraph.layout.routing.Anchor.contains` counts as inside — rightly,
+    since that is the test for which points to drop. What a route must not do is
+    go *through* the shape, which is this.
+    """
+    return (
+        abs(point[0] - anchor.x) < anchor.width / 2 - 0.01
+        and abs(point[1] - anchor.y) < anchor.height / 2 - 0.01
+    )
+
+
+def test_a_route_leaves_both_shapes_rather_than_crossing_them() -> None:
+    """Edges are painted after nodes, so an unclipped route is plainly visible."""
+    source, target = _anchor(0, 0), _anchor(0, 300)
+    line = route(source, target)
+    assert not any(_within(source, point) or _within(target, point) for point in line.corners)
+    # And it starts *on* the border rather than somewhere out in the open. This
+    # is the case the crossing test's slack exists for: leaving a box squarely
+    # reaches the border exactly, and exactly is where floating point misses.
+    assert line.corners[0][1] == pytest.approx(source.height / 2 + 1.0)
+
+
+def test_an_orthogonal_route_between_two_nodes_turns_once_each_way() -> None:
+    """A Z: half way along the dominant axis, across, and on."""
+    line = route(_anchor(0, 0), _anchor(400, 200), style=Routing.ORTHOGONAL)
+    for before, after in zip(line.corners, line.corners[1:], strict=False):
+        assert before[0] == pytest.approx(after[0]) or before[1] == pytest.approx(after[1]), (
+            "an orthogonal leg runs along one axis or the other, never both"
+        )
+
+
+def test_a_route_passes_through_every_bend_it_is_given() -> None:
+    bends = ((120.0, 260.0), (300.0, 40.0))
+    for style in Routing:
+        line = route(_anchor(0, 0), _anchor(400, 300), waypoints=bends, style=style)
+        for bend in bends:
+            assert any(point == pytest.approx(bend, abs=0.01) for point in line.corners), (
+                f"{style} dropped {bend}"
+            )
+
+
+def test_control_points_are_the_form_a_graphviz_pos_is() -> None:
+    """``3n + 1``, or Graphviz draws something else entirely and never says so."""
+    for style in Routing:
+        for waypoints in ((), ((150.0, 150.0),), ((100.0, 40.0), (300.0, 260.0))):
+            line = route(_anchor(0, 0), _anchor(400, 300), waypoints=waypoints, style=style)
+            assert (len(line.controls) - 1) % 3 == 0 and len(line.controls) >= 4
+
+
+def test_a_label_is_placed_along_the_route_it_is_pinned_to() -> None:
+    line = route(_anchor(0, 0), _anchor(0, 400), style=Routing.STRAIGHT)
+    assert label_position(line, LabelPlacement(at=0.5)) is None, "the default pins nothing"
+    placed = label_position(line, LabelPlacement(at=0.25, dx=8.0, dy=0.0))
+    assert placed is not None
+    start, end = line.corners[0][1], line.corners[-1][1]
+    assert placed[0] == pytest.approx(8.0)
+    assert placed[1] == pytest.approx(start + (end - start) * 0.25, abs=0.5)
+
+
+def test_parallel_links_are_fanned_apart_and_a_lone_one_is_not_moved() -> None:
+    assert fan_offsets(1) == (0.0,)
+    assert fan_offsets(2) == (-FAN_GAP / 2, FAN_GAP / 2)
+    # An odd bundle keeps one cable on the direct line, which is the one a reader
+    # traces first.
+    assert 0.0 in fan_offsets(3)
+    assert fan_offsets(4)[0] == -fan_offsets(4)[-1]
+
+
+def test_a_fan_bows_a_link_off_the_line_without_changing_which_shapes_it_joins() -> None:
+    source, target = _anchor(0, 0), _anchor(0, 400)
+    bowed = route(source, target, fan=FAN_GAP)
+    # The bow is the full gap at the middle and nothing at all at the ends,
+    # which is what keeps every cable in a bundle the same length to the eye.
+    assert max(abs(x) for x, _ in bowed.corners) == pytest.approx(FAN_GAP)
+    # Both ends still stop at their own shape, aimed at the bow rather than
+    # straight up: a fanned cable is a different line, not a shifted one.
+    assert not any(_within(source, point) or _within(target, point) for point in bowed.corners)
+    assert bowed.corners[0][0] != 0.0, "the line leaves the box aimed at the bow"
+
+
+def test_a_fanned_link_with_bends_of_its_own_is_left_where_it_was_put() -> None:
+    """A bend says where the cable goes; nudging it off would make a drag lie."""
+    bends = ((90.0, 200.0),)
+    assert (
+        route(_anchor(0, 0), _anchor(0, 400), waypoints=bends).corners
+        == route(_anchor(0, 0), _anchor(0, 400), waypoints=bends, fan=FAN_GAP).corners
+    )
+
+
+def test_a_self_link_is_a_ring_that_stands_further_off_for_each_fan() -> None:
+    node = _anchor(0, 0)
+    first = route(node, node)
+    second = route(node, node, fan=FAN_GAP)
+    assert first.corners[0] != first.corners[-1], "a loop leaves and returns at two points"
+    # Further out *and* wider, so a stack of them nests visibly rather than
+    # drawing one ring on top of another.
+    assert max(y for _, y in second.corners) > max(y for _, y in first.corners)
+    assert max(x for x, _ in second.corners) > max(x for x, _ in first.corners)
+
+
+def test_self_links_on_one_node_are_spread_outwards_rather_than_centred(pair: Path) -> None:
+    """Centred offsets put the first two loops the same distance out, both ways."""
+    write(
+        pair,
+        "loops.yaml",
+        "apiVersion: netgraph.dev/v1alpha1\n"
+        "kind: cable\n"
+        "metadata: {name: lp1}\n"
+        "spec: {endpoints: [sw-a:port1, sw-a:port2], medium: copper}\n"
+        "---\n"
+        "apiVersion: netgraph.dev/v1alpha1\n"
+        "kind: cable\n"
+        "metadata: {name: lp2}\n"
+        "spec: {endpoints: [sw-a:port3, sw-a:port4], medium: copper}\n",
+    )
+    graph = build_graph(load_tree(pair))
+    loops = [index for index, edge in enumerate(graph.edges) if edge.source == edge.target]
+    assert len(loops) == 2
+    fans = fans_of(graph)
+    assert sorted(abs(fans[index]) for index in loops) == [0.0, FAN_GAP]
 
 
 # --------------------------------------------------------------------------- #
@@ -907,14 +1123,18 @@ def test_seeded_waypoints_belong_to_the_links_they_were_read_from(tmp_path: Path
 
     graph = build_graph(load_tree(root))
     placed = graph.geometry.nodes
-    assert graph.geometry.edges, "the seed stored the splines"
+    assert graph.geometry.edges, "the seed stored the routes"
     for edge in graph.edges:
-        waypoints = graph.geometry.edges.get(edge.id)
-        if waypoints is None:
+        link = graph.geometry.link(edge.id)
+        if not link.waypoints:
             continue
         ends = (placed[edge.source], placed[edge.target])
-        for point, end in zip((waypoints[0], waypoints[-1]), ends, strict=True):
-            assert abs(point[0] - end.x) < 200 and abs(point[1] - end.y) < 200, edge.id
+        for point, end in zip((link.waypoints[0], link.waypoints[-1]), ends, strict=True):
+            assert abs(point[0] - end.x) < 300 and abs(point[1] - end.y) < 300, edge.id
+        # And the size of every node a stored route leaves from is recorded with
+        # it, because the route has to stop at the shape and netgraph cannot
+        # measure a label.
+        assert all(end.width is not None for end in ends), edge.id
 
 
 @requires_dot

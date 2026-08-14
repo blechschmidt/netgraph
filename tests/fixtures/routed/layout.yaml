@@ -1,0 +1,45 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: layout
+metadata:
+  name: layout
+spec:
+  routing: orthogonal
+  views:
+    l1:
+      nodes:
+        hosts/adp-usb-eth:
+          position: {x: 1176, y: 271}
+          size: {width: 376.18, height: 66.47}
+        hosts/laptop:
+          position: {x: 1176, y: 439}
+          size: {width: 65, height: 36}
+        hosts/pc-desk:
+          position: {x: 847, y: 271}
+          size: {width: 209, height: 47}
+        hosts/phone:
+          position: {x: 1485, y: 56}
+          size: {width: 203, height: 47}
+        hosts/srv-nas:
+          position: {x: 103, y: 271}
+          size: {width: 206, height: 64.63}
+        routers/rtr-home:
+          position: {x: 474, y: 271}
+          size: {width: 464, height: 146}
+        switches/sw-home:
+          position: {x: 847, y: 56}
+          size: {width: 169, height: 112}
+        wireless/ap-home:
+          position: {x: 1485, y: 271}
+          size: {width: 169, height: 60}
+      edges:
+        # A trunk dragged clear of the router, then labelled off the line so the
+        # two cables running under it stay readable.
+        cables/cbl-rtr-sw:
+          waypoints:
+            - {x: 640, y: 380}
+            - {x: 900, y: 380}
+          label: {at: 0.3, offset: {x: 0, y: 14}}
+        # One link that disagrees with the view: a radio association is not a
+        # cable and reads better as the straight line it physically is.
+        cables/wl-ap-phone:
+          routing: straight

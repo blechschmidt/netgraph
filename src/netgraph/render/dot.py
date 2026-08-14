@@ -91,13 +91,21 @@ from jinja2 import Environment, PackageLoader, StrictUndefined
 from markupsafe import Markup
 
 from netgraph.errors import RenderError, clip_text, compact_ids, count_text
-from netgraph.layout.geometry import COORDINATE_PLACES, Box, Geometry, LayoutMode
+from netgraph.layout.geometry import (
+    COORDINATE_PLACES,
+    Box,
+    Geometry,
+    LabelPlacement,
+    LayoutMode,
+    Routing,
+)
 from netgraph.layout.graphviz import (
     POINTS_PER_INCH,
     DrawingError,
     parse_drawing,
     realign,
 )
+from netgraph.layout.routing import Route, label_position
 from netgraph.loader.inventory import namespace_of, short_name
 from netgraph.models import format_watts
 from netgraph.power import PowerNode
@@ -133,6 +141,7 @@ from netgraph.render.icons import IconTheme, suffix_order
 from netgraph.render.ids import ElementIds, element_ids
 from netgraph.render.links import Linker
 from netgraph.render.options import DEFAULT_RANKDIR, RenderOptions
+from netgraph.render.routes import anchors_of, default_routing, route_table
 
 __all__ = [
     "DOT_ENV_VAR",
@@ -142,9 +151,11 @@ __all__ = [
     "cluster_keys",
     "find_dot",
     "graphviz_install_hint",
+    "measure_nodes",
     "missing_dot_message",
     "render_dot",
     "render_image",
+    "routing_advisories",
     "run_graphviz",
     "to_dot",
     "to_image",
@@ -565,11 +576,21 @@ class _EdgeView:
     #: them together four times as hard as one, which is what keeps a LAG short
     #: and straight instead of routed around the diagram.
     weight: str | None = None
-    #: ``pos`` attribute: the stored spline control points. Only emitted for a
+    #: ``pos`` attribute: the route's Bézier control points. Only emitted for a
     #: fully-fixed drawing, where the no-op engine draws them as given; a
     #: partially-pinned one is re-routed around the nodes it just placed, and
-    #: stale bends would cross them.
+    #: stale bends would cross them. Computed by :mod:`netgraph.layout.routing`
+    #: from the node positions, the stored bends and the link's routing style —
+    #: which is what makes a *per-link* style expressible at all, Graphviz
+    #: having a graph-wide ``splines`` and nothing per edge.
     pos: str | None = None
+    #: ``lp`` attribute: where a nudged label is pinned. An output attribute
+    #: everywhere except the no-op engine, which reads it back in.
+    lp: str | None = None
+    #: ``xlabel`` attribute, carrying the label when :attr:`label` cannot.
+    #: Graphviz refuses to place a real edge label on an orthogonal route it
+    #: laid out itself; a floating one it will place.
+    xlabel: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -704,6 +725,106 @@ def _spline(points: Sequence[tuple[float, float]]) -> str:
     return " ".join(_pos(x, y) for x, y in points)
 
 
+# --------------------------------------------------------------------------- #
+# Routing
+# --------------------------------------------------------------------------- #
+
+#: How each routing style is spelled as a Graphviz ``splines`` graph attribute.
+#: Only consulted when the engine is doing the routing — a drawing whose nodes
+#: are all placed carries an explicit ``pos`` per link instead, which is the only
+#: way to express a *per-link* style, since Graphviz has no per-edge equivalent.
+_SPLINES_ATTRIBUTE: Final[dict[Routing, str]] = {
+    Routing.SPLINE: "true",
+    Routing.ORTHOGONAL: "ortho",
+    Routing.STRAIGHT: "line",
+}
+
+
+def routing_advisories(graph: Graph, options: RenderOptions | None = None) -> tuple[str, ...]:
+    """What this rendering could not honour about the routes it was given.
+
+    Graphviz will happily accept a document that asks for something it cannot
+    do — an orthogonal layout with edge labels draws the labels somewhere else
+    and says so on stderr; a pinned bend in a drawing it is still laying out is
+    simply overwritten — so the ways a route can be quietly lost are enumerated
+    here instead, in the vocabulary of the thing that fixes each one.
+
+    Advisory, never fatal: a diagram that is nearly right is worth drawing, and
+    a warning that stops a render is a warning nobody leaves turned on.
+    """
+    opts = options or RenderOptions()
+    plan = layout_plan(graph)
+    geometry = graph.geometry
+    said: list[str] = []
+
+    pinned = [edge for edge in graph.edges if geometry.link(edge.id).waypoints]
+    if pinned and plan.mode is not LayoutMode.FIXED:
+        loose = sorted(fqn for fqn in graph.nodes if fqn not in geometry.nodes)
+        said.append(
+            f"{count_text(len(pinned), 'link')} in this drawing "
+            f"{'has' if len(pinned) == 1 else 'have'} bends pinned, but "
+            f"{count_text(len(loose), 'node')} {'has' if len(loose) == 1 else 'have'} "
+            f"no stored position ({_names(loose)}), so Graphviz has to route the whole "
+            "diagram and the bends are lost. Run 'netgraph layout --write' to place the rest"
+        )
+
+    if plan.mode is LayoutMode.FIXED:
+        anchors = anchors_of(graph)
+        unmeasured = sorted(
+            {
+                node
+                for edge in graph.edges
+                if not geometry.link(edge.id).is_empty
+                for node in (edge.source, edge.target)
+                if (anchor := anchors.get(node)) is not None and not anchor.measured
+            }
+        )
+        if unmeasured:
+            said.append(
+                f"{count_text(len(unmeasured), 'node')} anchoring a routed link "
+                f"{'records' if len(unmeasured) == 1 else 'record'} no size "
+                f"({_names(unmeasured)}), so the route is clipped against a default box "
+                "and may stop short of the shape. Re-run 'netgraph layout --write' to "
+                "record the sizes"
+            )
+        return tuple(said)
+
+    default = default_routing(graph, opts)
+    per_link = sorted(
+        {
+            str(style)
+            for edge in graph.edges
+            if (style := geometry.link(edge.id).routing) is not None and style is not default
+        }
+    )
+    if per_link:
+        said.append(
+            "this drawing is laid out by Graphviz, which has one routing style for the "
+            f"whole graph, so the links asking for {', '.join(per_link)} are drawn "
+            f"{default} like everything else. Run 'netgraph layout --write' to pin the "
+            "arrangement, after which every link is routed as it asks"
+        )
+    if default is Routing.ORTHOGONAL and _has_edge_labels(graph, opts):
+        said.append(
+            "Graphviz cannot place an edge label on an orthogonal route, so the labels are "
+            "emitted as 'xlabel' and floated near their links instead. Pin the arrangement "
+            "with 'netgraph layout --write' to place them exactly"
+        )
+    return tuple(said)
+
+
+def _has_edge_labels(graph: Graph, options: RenderOptions) -> bool:
+    """Would this rendering annotate any link? Decided the way the render does."""
+    return any(_edge_label(edge, graph.layer, options) for edge in graph.edges)
+
+
+def _names(items: Sequence[str], *, most: int = 3) -> str:
+    """A handful of addresses for a message, with the tail counted rather than listed."""
+    if len(items) <= most:
+        return ", ".join(items)
+    return f"{', '.join(items[:most])} and {len(items) - most} more"
+
+
 def _frames(graph: Graph, options: RenderOptions, plan: LayoutPlan) -> tuple[_FrameView, ...]:
     """The namespace boxes this drawing has stored geometry for.
 
@@ -825,6 +946,12 @@ def to_dot(graph: Graph, options: RenderOptions | None = None, *, target: str = 
     return template.render(
         title=opts.title,
         rankdir=opts.rankdir or DEFAULT_RANKDIR,
+        # What the *engine* routes with. A fixed drawing carries an explicit
+        # ``pos`` per link and this is inert; anywhere else it is the only place
+        # a routing style can be expressed at all, so the inventory's default
+        # goes here and a link asking for something different is reported by
+        # :func:`routing_advisories` rather than silently ignored.
+        splines=_SPLINES_ATTRIBUTE[default_routing(graph, opts)],
         groups=_groups(graph, opts, icons, identity, details, plan),
         edges=tuple(_edge_views(graph, opts, identity, details, plan)),
         imagepath=str(opts.icons.directory) if icons and opts.icons is not None else None,
@@ -951,6 +1078,7 @@ def to_image(graph: Graph, options: RenderOptions | None = None, *, format: str)
     opts = options or RenderOptions()
     if layout_plan(graph).mode is LayoutMode.PARTIAL:
         graph = complete_layout(graph, opts, target=format)
+    graph = measure_nodes(graph, opts, target=format)
     plan = layout_plan(graph)
     source = to_dot(graph, opts, target=format)
     theme = opts.icons
@@ -1002,6 +1130,55 @@ def complete_layout(graph: Graph, options: RenderOptions, *, target: str = "svg"
         nodes={fqn: placed[fqn] for fqn in graph.nodes if fqn in placed},
     )
     return replace(graph, geometry=geometry)
+
+
+def measure_nodes(graph: Graph, options: RenderOptions, *, target: str = "svg") -> Graph:
+    """A fixed arrangement with the box of every routed link's anchors filled in.
+
+    A route computed by netgraph has to stop at the shape it runs into, and
+    nothing in a stored arrangement says how big a shape is — Graphviz derives
+    it from the label, which netgraph cannot measure. ``netgraph layout --write``
+    records the sizes of the nodes a routed link leaves from for exactly this
+    reason, so the common case costs nothing; this is the fallback for an
+    arrangement written before a link was routed, or by hand.
+
+    One extra Graphviz run, and only when a route would otherwise be clipped
+    against a guess. Node positions are pinned and edge routing does not feed
+    back into them, so what comes out is the same drawing measured.
+
+    Raises:
+        RenderError: Graphviz failed, or produced JSON that cannot be read.
+    """
+    plan = layout_plan(graph)
+    geometry = plan.geometry
+    wanted = {
+        node
+        for edge in graph.edges
+        if not geometry.link(edge.id).is_empty
+        for node in (edge.source, edge.target)
+        if (placement := geometry.nodes.get(node)) is not None and placement.width is None
+    }
+    if plan.mode is not LayoutMode.FIXED or not wanted:
+        return graph
+    payload, _ = run_graphviz(
+        to_dot(graph, options, target=target),
+        format="json",
+        plan=plan,
+        subject="the node sizes",
+    )
+    try:
+        drawing = parse_drawing(payload)
+    except DrawingError as exc:
+        raise RenderError(f"cannot read the layout Graphviz computed: {exc}") from exc
+    nodes = {
+        fqn: (
+            replace(placement, width=measured.width, height=measured.height)
+            if fqn in wanted and (measured := drawing.nodes.get(fqn)) is not None
+            else placement
+        )
+        for fqn, placement in geometry.nodes.items()
+    }
+    return replace(graph, geometry=replace(geometry, nodes=nodes))
 
 
 def _check_icons_loaded(stderr: str, *, format: str) -> None:
@@ -1571,6 +1748,14 @@ def _edge_views(
     details: Mapping[str, Mapping[str, object]],
     plan: LayoutPlan,
 ) -> Iterator[_EdgeView]:
+    routes = route_table(graph, options)
+    default_style = default_routing(graph, options)
+    # An orthogonal layout that Graphviz is doing itself cannot carry a real
+    # edge label — it says so on stderr and draws it somewhere arbitrary — so
+    # the label becomes an ``xlabel``, which Graphviz floats near the line
+    # instead. Nothing is lost but the exact position, and the alternative is a
+    # diagram whose annotations have silently moved.
+    floating = plan.mode is not LayoutMode.FIXED and default_style is Routing.ORTHOGONAL
     for index, edge in enumerate(graph.edges):
         colour, style = _MEDIUM_STYLE.get(edge.medium, _DEFAULT_MEDIUM_STYLE)
         if edge.kind is EdgeKind.ATTACHMENT:
@@ -1608,6 +1793,15 @@ def _edge_views(
             style = "dashed" if mark is Mark.REMOVED else style
         element = identity.edge(index)
         record = details.get(element) if element is not None else None
+        line = routes[index]
+        label = (
+            _diff_label(
+                _edge_label(edge, graph.layer, options),
+                mark,
+                None if options.diff is None else options.diff.badge(edge.id),
+            )
+            or None
+        )
         yield _EdgeView(
             source=edge.source,
             target=edge.target,
@@ -1619,27 +1813,31 @@ def _edge_views(
             # fast", because a reader looking at a traced route is asking the
             # first question; the rate is still on the label and in the tooltip.
             penwidth=emphasis.penwidth if emphasis is not None else _penwidth(edge.speed),
-            label=_diff_label(
-                _edge_label(edge, graph.layer, options),
-                mark,
-                None if options.diff is None else options.diff.badge(edge.id),
-            )
-            or None,
+            label=None if floating else label,
+            xlabel=label if floating else None,
             tooltip=detail_text(record) if record is not None else None,
             element_id=element if options.element_ids else None,
             url=_edge_url(graph, edge, options.link_template),
             fontcolor=emphasis.fontcolor if emphasis is not None else None,
             weight=str(edge.bundle.size) if edge.bundle is not None else None,
-            pos=_edge_pos(edge, plan),
+            pos=None if line is None else _spline(line.controls),
+            lp=_label_pos(line, plan.geometry.link(edge.id).label) if label else None,
         )
 
 
-def _edge_pos(edge: Edge, plan: LayoutPlan) -> str | None:
-    """The stored bends of one link, when the whole drawing is fixed."""
-    if plan.mode is not LayoutMode.FIXED:
+def _label_pos(line: Route | None, label: LabelPlacement | None) -> str | None:
+    """Where a link's annotation is pinned, as a Graphviz ``lp``.
+
+    ``lp`` is normally an *output* attribute — where Graphviz decided to put the
+    label — but the no-op engine honours it on input, which is the one place a
+    label position can be pinned at all. So a nudged label reproduces exactly in
+    a fixed drawing and is left to Graphviz everywhere else, which is the same
+    bargain the bends make.
+    """
+    if line is None or label is None:
         return None
-    waypoints = plan.geometry.edges.get(edge.id)
-    return _spline(waypoints) if waypoints else None
+    placed = label_position(line, label)
+    return None if placed is None else _pos(*placed)
 
 
 def _edge_url(graph: Graph, edge: Edge, template: Linker | None) -> str | None:

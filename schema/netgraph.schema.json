@@ -829,21 +829,46 @@
     },
     "EdgeGeometry": {
       "additionalProperties": false,
-      "description": "The bends one link is drawn through.\n\nThe points become Graphviz spline control points, in the order written, from\nthe ``source`` end to the ``target`` end of the edge as the graph orders\nthem. An empty list is refused: an edge with no waypoints is an edge with no\ngeometry, and the way to say that is to leave the entry out.",
+      "description": "How one link is drawn: its bends, its routing style and its label.\n\nThe waypoints are the **interior** points of the route, in the order\nwritten, from the ``source`` end to the ``target`` end of the edge as the\ngraph orders them; the two ends are the nodes, which is why moving a node\nmoves the route without invalidating the bends. An entry carrying none of\nthe three fields is refused (``NG-Y003``): it says nothing, and the way to\nsay nothing is to leave the key out.",
       "properties": {
         "waypoints": {
+          "default": [],
           "items": {
             "$ref": "#/$defs/Point"
           },
           "maxItems": 64,
-          "minItems": 1,
           "title": "Waypoints",
           "type": "array"
+        },
+        "routing": {
+          "anyOf": [
+            {
+              "enum": [
+                "spline",
+                "orthogonal",
+                "straight"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Routing"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LabelGeometry"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
-      "required": [
-        "waypoints"
-      ],
       "title": "EdgeGeometry",
       "type": "object"
     },
@@ -1348,6 +1373,32 @@
       "title": "InterfaceType",
       "type": "string"
     },
+    "LabelGeometry": {
+      "additionalProperties": false,
+      "description": "Where a link's annotation sits, relative to the link.\n\nStored *on the link* rather than as a coordinate, so that nudging a VLAN\nlabel clear of a crossing cable survives both endpoints being dragged\nsomewhere else. :attr:`at` slides it along the route and :attr:`offset`\nlifts it off, in points, in the same ``y``-upwards system as everything\nelse here.",
+      "properties": {
+        "at": {
+          "default": 0.5,
+          "ge": 0.0,
+          "le": 1.0,
+          "title": "At",
+          "type": "number"
+        },
+        "offset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Point"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "title": "LabelGeometry",
+      "type": "object"
+    },
     "Layout": {
       "additionalProperties": false,
       "description": "A ``kind: layout`` document: geometry for one or more views.",
@@ -1393,6 +1444,23 @@
           },
           "title": "Views",
           "type": "object"
+        },
+        "routing": {
+          "anyOf": [
+            {
+              "enum": [
+                "spline",
+                "orthogonal",
+                "straight"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Routing"
         }
       },
       "title": "LayoutSpec",
@@ -3287,6 +3355,23 @@
           },
           "title": "Groups",
           "type": "object"
+        },
+        "routing": {
+          "anyOf": [
+            {
+              "enum": [
+                "spline",
+                "orthogonal",
+                "straight"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Routing"
         }
       },
       "title": "ViewGeometry",

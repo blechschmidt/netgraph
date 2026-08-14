@@ -495,6 +495,60 @@ main {
 .viewport svg g.edge { pointer-events: visibleStroke; }
 .viewport svg g.node, .viewport svg g.edge { cursor: pointer; }
 
+/* Routing a cable: the overlay links.js appends inside the drawing.
+ *
+ * The band is a wide, invisible stroke over every routable link, so that a
+ * click near a one-point line lands on it -- the same trick a mapping library
+ * uses for a road. It must not swallow hover, though: the info box is looked up
+ * from Graphviz's own <g class="edge">, and a transparent band on top of that
+ * would silently blank it. Hence `stroke` and not `fill`, and pointer events
+ * only where the stroke is. */
+.viewport svg .ng-link-hit {
+  stroke: transparent;
+  fill: none;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+/* The route of the selected link, drawn over Graphviz's own line. Visible only
+ * while a bend is being dragged, when Graphviz's line is a frame behind. */
+.viewport svg .ng-link-route {
+  stroke: var(--selected);
+  stroke-width: 1.6;
+  stroke-dasharray: 6 3;
+  fill: none;
+  pointer-events: none;
+}
+
+/* A grab handle. Big enough to hit at a normal zoom, and cheap enough to draw
+ * one per bend on a link with sixty-four of them. */
+.viewport svg .ng-handle {
+  fill: var(--bg);
+  stroke: var(--selected);
+  stroke-width: 1.6;
+  cursor: grab;
+}
+
+.viewport svg .ng-handle:hover { fill: var(--selected); }
+.viewport svg .ng-handle:active { cursor: grabbing; }
+
+/* The midpoint handle is hollow and a size smaller: it is not a bend yet, it is
+ * where one would go. */
+.viewport svg .ng-handle-add {
+  fill: var(--bg);
+  stroke-dasharray: 3 2;
+  opacity: .75;
+}
+
+/* A nudged label's handle, in the colour a label is drawn in rather than the
+ * selection's, so "this moves the words" needs no explaining. */
+.viewport svg .ng-handle-label {
+  stroke: var(--info);
+  fill: var(--bg);
+}
+
+.canvas.panning svg .ng-handle { cursor: grabbing; }
+
 .viewport svg g.hot { filter: drop-shadow(0 0 3px currentColor); }
 .viewport svg g.hot > * { stroke-width: 2.4; }
 .viewport svg g.faded { opacity: .28; }

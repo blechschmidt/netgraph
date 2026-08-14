@@ -51,6 +51,7 @@ from netgraph.render import (
     filter_graph,
 )
 from netgraph.render.dot import to_dot, to_image
+from netgraph.render.routes import anchors_of, default_routing, fans_of, route_table
 from netgraph.rules import Severity
 from netgraph.validate import validate as run_validation
 from netgraph.watch.pipeline import Problem, Status, flatten_problems
@@ -394,7 +395,7 @@ def render_inventory(
         nodes=len(graph.nodes),
         edges=len(graph.edges),
         dangling=tuple(graph.dangling),
-        geometry=_geometry(graph),
+        geometry=_geometry(graph, options.render_options),
         duration=time.monotonic() - started,
         graph_hash=digest,
     )
@@ -491,7 +492,7 @@ def render_diff(
         nodes=len(graph.nodes),
         edges=len(graph.edges),
         dangling=tuple(graph.dangling),
-        geometry=_geometry(graph),
+        geometry=_geometry(graph, options.render_options),
         duration=time.monotonic() - started,
         diff=drawing.overlay.to_dict() | {"changeset": plan.to_dict()},
         graph_hash=digest,
@@ -506,13 +507,22 @@ def _diff_summary(drawing: Drawing, *, rejected: bool) -> str:
     return f"{counted} (drawn despite the problems below)" if rejected else counted
 
 
-def _geometry(graph: Graph) -> dict[str, Any] | None:
+def _geometry(graph: Graph, options: RenderOptions | None = None) -> dict[str, Any] | None:
     """The graph's stored arrangement, or ``None`` when it stores none.
 
     The same coordinate system, units and ``mode`` as
     ``netgraph render -f json`` — points, ``y`` upwards, a position being the
     centre of what it places — because the two describe the same arrangement and
     a client that learned one must not have to learn the other.
+
+    ``links`` is the half the canvas needs and the command line does not: per
+    link, what the inventory pins (the bends, the routing style, the label
+    position) *and* the line netgraph drew from it. The canvas puts a grab
+    handle on each bend and, while one is being dragged, redraws the line
+    itself from the same inputs — see ``web/assets/links.js``, which mirrors
+    :mod:`netgraph.layout.routing`. ``anchors`` is what it clips against, so
+    that the decision "how big is this box" is made once here rather than twice
+    in two languages.
     """
     geometry: Geometry = graph.geometry
     if geometry.is_empty:
@@ -520,6 +530,7 @@ def _geometry(graph: Graph) -> dict[str, Any] | None:
     payload: dict[str, Any] = {
         "units": "points",
         "mode": str(geometry.mode(graph.nodes)),
+        "routing": str(default_routing(graph, options)),
         "nodes": {
             key: {"x": placement.x, "y": placement.y}
             | (
@@ -535,7 +546,51 @@ def _geometry(graph: Graph) -> dict[str, Any] | None:
             key: {"x": box.x, "y": box.y, "width": box.width, "height": box.height}
             for key, box in sorted(geometry.groups.items())
         }
+    links = _links(graph, options)
+    if links:
+        payload["links"] = links
+        payload["anchors"] = {
+            fqn: {"x": anchor.x, "y": anchor.y, "width": anchor.width, "height": anchor.height}
+            for fqn, anchor in sorted(anchors_of(graph).items())
+        }
     return payload
+
+
+def _links(graph: Graph, options: RenderOptions | None) -> dict[str, Any]:
+    """Per link: what is pinned, what was drawn, and which nodes it joins.
+
+    Only for a drawing every node of which is placed. Anywhere else Graphviz is
+    routing, there is no line for the canvas to put handles on, and offering one
+    would let somebody drag a bend that the next render would throw away.
+    """
+    routes = route_table(graph, options)
+    links: dict[str, Any] = {}
+    for edge, line in zip(graph.edges, routes, strict=True):
+        if line is None:
+            continue
+        pinned = graph.geometry.link(edge.id)
+        links[edge.id] = {
+            "endpoints": [edge.source, edge.target],
+            "waypoints": [{"x": x, "y": y} for x, y in pinned.waypoints],
+            "routing": None if pinned.routing is None else str(pinned.routing),
+            "drawnAs": str(line.routing),
+            "route": [{"x": x, "y": y} for x, y in line.corners],
+            "label": (
+                None
+                if pinned.label is None
+                else {
+                    "at": pinned.label.at,
+                    "offset": {"x": pinned.label.dx, "y": pinned.label.dy},
+                }
+            ),
+            "fan": _fans(graph).get(edge.id, 0.0),
+        }
+    return links
+
+
+def _fans(graph: Graph) -> dict[str, float]:
+    """The sideways offset of each link, keyed by link id rather than by index."""
+    return {graph.edges[index].id: offset for index, offset in fans_of(graph).items()}
 
 
 # --------------------------------------------------------------------------- #

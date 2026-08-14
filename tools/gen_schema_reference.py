@@ -66,6 +66,7 @@ from netgraph.models import (  # noqa: E402
     IPv4Config,
     IPv6Address,
     IPv6Config,
+    LabelGeometry,
     LayoutSpec,
     Location,
     Medium,
@@ -543,9 +544,21 @@ SECTIONS: Final[tuple[Section, ...]] = (
     Section(
         EdgeGeometry,
         "`spec.views.<view>.edges.<address>`",
-        "The bends one link is drawn through. Not seeded unless `netgraph layout --write "
-        "--waypoints` is asked for: a computed spline is noise, a hand-placed bend is a "
-        "decision.",
+        "How one link is drawn: the bends it goes through, the style it is routed in and "
+        "where its label sits. Bends are not seeded unless `netgraph layout --write "
+        "--waypoints` is asked for — a computed spline is noise, a hand-placed bend is a "
+        "decision — but a `routing` or a `label` is always written, neither being derivable.",
+        notes=(
+            "The waypoints are **interior** points: the two ends of a route are the nodes "
+            "themselves, so dragging either endpoint carries the bends along instead of "
+            "invalidating them.",
+        ),
+    ),
+    Section(
+        LabelGeometry,
+        "`spec.views.<view>.edges.<address>.label`",
+        "Where a link's annotation sits, as a position on the link rather than a coordinate "
+        "— so nudging a VLAN label clear of a crossing cable survives both endpoints moving.",
     ),
     Section(
         GroupGeometry,

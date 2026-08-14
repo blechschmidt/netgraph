@@ -51,7 +51,7 @@
 graph netgraph {
   graph [
     rankdir={{ rankdir }},
-    splines=true,
+    splines={{ splines }},
     overlap=false,
     nodesep=0.5,
     ranksep=0.7,
@@ -110,7 +110,7 @@ graph netgraph {
 {% if edges %}
 
 {% for edge in edges %}
-  {{ edge.source | dot_string }} -- {{ edge.target | dot_string }} [{% if edge.element_id %}id={{ edge.element_id | dot_string }}, {% endif %}color="{{ edge.color }}", style={{ edge.style }}{% if edge.penwidth %}, penwidth={{ edge.penwidth }}{% endif %}{% if edge.weight %}, weight={{ edge.weight }}{% endif %}{% if edge.pos %}, pos={{ edge.pos | dot_string }}{% endif %}{% if edge.fontcolor %}, fontcolor="{{ edge.fontcolor }}"{% endif %}{% if edge.label %}, label={{ edge.label | dot_string }}{% endif %}{% if edge.tooltip %}, tooltip={{ edge.tooltip | dot_string }}{% endif %}{% if edge.url %}, URL={{ edge.url | dot_string }}{% endif %}];
+  {{ edge.source | dot_string }} -- {{ edge.target | dot_string }} [{% if edge.element_id %}id={{ edge.element_id | dot_string }}, {% endif %}color="{{ edge.color }}", style={{ edge.style }}{% if edge.penwidth %}, penwidth={{ edge.penwidth }}{% endif %}{% if edge.weight %}, weight={{ edge.weight }}{% endif %}{% if edge.pos %}, pos={{ edge.pos | dot_string }}{% endif %}{% if edge.lp %}, lp={{ edge.lp | dot_string }}{% endif %}{% if edge.fontcolor %}, fontcolor="{{ edge.fontcolor }}"{% endif %}{% if edge.label %}, label={{ edge.label | dot_string }}{% endif %}{% if edge.xlabel %}, xlabel={{ edge.xlabel | dot_string }}{% endif %}{% if edge.tooltip %}, tooltip={{ edge.tooltip | dot_string }}{% endif %}{% if edge.url %}, URL={{ edge.url | dot_string }}{% endif %}];
 {% endfor %}
 {% endif %}
 }

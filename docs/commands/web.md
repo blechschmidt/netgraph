@@ -308,6 +308,35 @@ keyboard is — and **selection** is a long dash, with somebody else's selection
 short one. Three patterns, not three shades, so they are told apart without
 colour.
 
+### Routing a cable
+
+A link is geometry as much as a node is
+([`docs/schema.md` §18](../schema.md#18-layout-diagram-geometry)), and once the
+view is arranged it can be routed here. Click a link to select it; **double-click**
+the line to drop a bend where you clicked; drag a bend to move it; drag the
+hollow **midpoint handle** to insert a bend and place it in one motion;
+**right-click** a bend to remove it. A label the inventory has already pinned
+gets a handle of its own, which slides it along the route and lifts it off.
+
+Each of those is also a command, because a bend that can only be placed with a
+mouse is a bend somebody working from the keyboard cannot place at all: `b` adds
+one half way along the selected link, `Shift-B` straightens it, `r` sets its
+routing style — spline, orthogonal or straight, on this link alone — and the
+palette puts a moved label back on the line. On a view that is not arranged they
+refuse with the fix, `netgraph layout --write`, rather than doing nothing: a
+diagram Graphviz is still routing has nowhere to keep a bend.
+
+Nothing here is a browser-side model of the arrangement. Letting go of a handle
+posts one `set-link-geometry` operation
+([`docs/editing.md`](../editing.md#the-operations)), the server rewrites the
+`kind: layout` document through the same comment-preserving path
+[`netgraph layout`](layout.md) uses, and the canvas repaints from the render
+that follows — so what you see here is what `netgraph render` draws, and the
+gesture is one entry in the changes drawer with a YAML hunk under it. The line
+*under the cursor* is drawn by a port of netgraph's own router, which
+`tests/test_browser.py` runs against the Python it mirrors on every CI run, so a
+drag cannot land somewhere the render would not.
+
 ### Without a screen
 
 The rendered SVG is inert by default: Graphviz emits shapes, not semantics. This
@@ -377,6 +406,10 @@ cable it, undo both — without dispatching a single mouse event.
 | *palette only* | Remove a field… | anywhere | `--write` | 'netgraph edit unset'. |
 | *palette only* | Move to another file… | anywhere | `--write` | Moves the element's document into a different file. 'netgraph edit move'. |
 | *palette only* | Disconnect a cable… | anywhere | `--write` | Removes a cable, leaving both devices. 'netgraph edit disconnect'. |
+| `b` | Add a bend to the focused link | the diagram | `--write` | Drops a waypoint half way along the link, which the route then passes through. Double-clicking the line does the same at the point clicked. |
+| `Shift-B` | Straighten the focused link | the diagram | `--write` | Clears every bend, leaving the link to run directly between its two devices. The routing style and the label position are kept. |
+| `r` | Change how the link is routed… | the diagram | `--write` | Spline, orthogonal or straight, on this link alone. Clearing it takes the view's default back. Honoured by 'netgraph render' as well as here. |
+| *palette only* | Put the link's label back on the line | anywhere | `--write` | Undoes a nudged label, leaving it half way along the route where the renderer puts one nobody has moved. |
 | `i` | Add an interface… | the diagram | `--write` | 'netgraph edit add-interface'. |
 | *palette only* | Remove an interface… | anywhere | `--write` | 'netgraph edit remove-interface'. |
 

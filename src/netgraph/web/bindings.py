@@ -336,6 +336,60 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         detail="Removes a cable, leaving both devices. 'netgraph edit disconnect'.",
         needs="write",
     ),
+    # -- Routing a link ----------------------------------------------------
+    #
+    # A cable's shape is inventory too (§18), so every one of these ends in a
+    # ``kind: layout`` document through the same write path a rename takes.
+    # Each is reachable two ways — a gesture on the canvas, and a command from
+    # anywhere — because a bend that can only be placed with a mouse is a bend
+    # somebody working from the keyboard cannot place at all.
+    Binding(
+        id="link.bend",
+        title="Add a bend to the focused link",
+        section="Editing the inventory",
+        keys=("b",),
+        detail=(
+            "Drops a waypoint half way along the link, which the route then passes "
+            "through. Double-clicking the line does the same at the point clicked."
+        ),
+        where="canvas",
+        needs="write",
+    ),
+    Binding(
+        id="link.straighten",
+        title="Straighten the focused link",
+        section="Editing the inventory",
+        keys=("Shift-B",),
+        detail=(
+            "Clears every bend, leaving the link to run directly between its two "
+            "devices. The routing style and the label position are kept."
+        ),
+        where="canvas",
+        needs="write",
+    ),
+    Binding(
+        id="link.route",
+        title="Change how the link is routed…",
+        section="Editing the inventory",
+        keys=("r",),
+        detail=(
+            "Spline, orthogonal or straight, on this link alone. Clearing it takes the "
+            "view's default back. Honoured by 'netgraph render' as well as here."
+        ),
+        where="canvas",
+        needs="write",
+    ),
+    Binding(
+        id="link.label.reset",
+        title="Put the link's label back on the line",
+        section="Editing the inventory",
+        keys=(),
+        detail=(
+            "Undoes a nudged label, leaving it half way along the route where the "
+            "renderer puts one nobody has moved."
+        ),
+        needs="write",
+    ),
     Binding(
         id="interface.add",
         title="Add an interface…",

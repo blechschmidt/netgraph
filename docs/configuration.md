@@ -271,6 +271,7 @@ title               Q3 review   flag --title
 | `element-ids` | boolean | `false` | `--element-ids` |
 | `max-addresses` | integer ≥ 0 | `4` | `--max-addresses` |
 | `rankdir` | `"TB"`, `"LR"`, `"BT"` or `"RL"` | `"TB"` | `--rankdir` |
+| `routing` | `"spline"`, `"orthogonal"` or `"straight"` | what the layout documents say, else `"spline"` | `--routing` |
 | `title` | string | unset | `--title` |
 
 Values are validated when the file is read, against the same registries the

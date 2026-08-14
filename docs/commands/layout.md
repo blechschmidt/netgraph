@@ -9,7 +9,8 @@ Graphviz decides where things go. That is the right default and it is what
 to where it belongs and the next render puts it back, because nothing in the
 tree remembers that you moved it. `netgraph layout` is what makes the
 arrangement part of the model: a `kind: layout` document holding a position per
-node, scoped by view, loaded, validated and edited like everything else.
+node — and, when asked, the route each link takes and the style it is drawn in —
+scoped by view, loaded, validated and edited like everything else.
 
 Once a view is arranged, `render` reproduces it exactly — the same coordinates in
 the SVG, the same coordinates in the HTML, the same coordinates in the JSON
@@ -111,16 +112,34 @@ land. Its caption sits centred above the frame rather than inside it —
 [`docs/follow-ups.md` §17](../follow-ups.md) explains why that is not a matter
 of taste.
 
-Two things are deliberately *not* seeded, both recorded in
-[`docs/follow-ups.md` §16](../follow-ups.md):
+**`--waypoints` also stores the routes**, as the *interior* bends of each link —
+the two ends of a route are always the nodes themselves, so a stored route
+survives either device being dragged. It is off by default because a seeded
+route is a handful of points per link that the render recomputes identically,
+and that is a lot of noise for no decision; a *hand-placed* bend is a decision,
+and the flag is how you get a starting point to drag one from. It brings the
+**sizes** of the nodes those routes leave from with it, which is the one case
+where a stored size is worth having: a route netgraph computes has to stop at
+the shape it runs into, and netgraph cannot measure a label. Every other node is
+left sized by its label, because Graphviz derives the same box from the same
+label on every run and a stored size would go stale the moment a device grew an
+interface ([`docs/follow-ups.md` §16](../follow-ups.md)).
 
-* **node sizes** — Graphviz derives the same box from the same label on every
-  run, so a stored size buys the renderer nothing and goes stale the moment a
-  device grows an interface. `size` stays in the schema for a canvas editor that
-  lets somebody resize a box on purpose.
-* **edge waypoints**, unless `--waypoints` is given — a seeded spline is four
-  control points per link that the render recomputes identically. A *hand-placed*
-  bend is a decision, and that is what the flag is for.
+**`--routing` records how this view's links are drawn** — `spline`,
+`orthogonal` or `straight` — as `views.<view>.routing`. The same flag every
+other command takes, doing both jobs at once here: the seeding run draws in that
+style, and `--write` then records it, so what is stored is what was on screen.
+It is a *default*: a link that pins a style of its own keeps it. To take the
+setting back out, delete the one line it wrote — a generated file that has to be
+hand-edited to be undone is a poor thing, but a `--routing ""` that meant
+"remove" would be one keystroke away from `--routing` meaning "leave alone", and
+that is worse.
+
+A style pinned on *one link*, and where a link's label sits, are decisions a
+person takes rather than ones a layout run can seed, so they are written by the
+canvas editor of [`netgraph web`](web.md) instead;
+[`docs/rendering.md`](../rendering.md#links-are-geometry-too) is what all three
+draw as.
 
 ## Writes go through the edit layer
 
@@ -152,7 +171,7 @@ a list of what moved.
 | `--clear` | — | off | Drop the stored arrangement, so the view is laid out from scratch again. |
 | `--replace` | — | off | With --write, lay every node out afresh instead of keeping what is already arranged and placing only the rest. |
 | `--prune` | — | off | Drop geometry for elements the inventory no longer declares. |
-| `--waypoints` | — | off | Also store the edge splines. Off by default: the render recomputes an identical one from the node positions, and four control points per link is a lot of noise. |
+| `--waypoints` | — | off | Also store the bends each link is routed through, and the sizes of the nodes they leave from. Off by default: the render recomputes an equivalent route from the node positions, and a handful of points per link is a lot of noise. Turn it on to get a starting point that can then be dragged. |
 | `--name` | `NAME` | `layout` | metadata.name of the layout document to write into or create. |
 | `--namespace` | `PATH` | — | Folder to declare the layout document in. The inventory root by default. |
 | `--file` | `PATH` | — | File to write a new layout document to, relative to the inventory root. Chosen by the layout conventions when absent. |
@@ -165,6 +184,7 @@ a list of what moved.
 | `--element-ids` | — | off | Give every node, edge and namespace a stable id derived from its name, so the diagram can be deep-linked and styled from outside. dot and svg only. |
 | `--max-addresses` | `N` | `4` | Longest address list spelled out under a node before it is abbreviated to 'and N more'. 0 prints the count alone. |
 | `--rankdir` | `[tb\|lr\|bt\|rl]` | TB, top to bottom | Layout direction. A wide network reads better left to right; a deep one top to bottom. Honoured by the Graphviz backends and by mermaid. |
+| `--routing` | `[spline\|orthogonal\|straight]` | whatever the inventory's layout documents say, else spline | How links are drawn between the bends they are pinned through: 'spline' is the curve Graphviz draws, 'orthogonal' right angles, 'straight' segment to segment. A default: a link that pins a style of its own keeps it. Honoured by the Graphviz backends, the JSON export and the editor. 'netgraph layout --write' records it in the view it arranges, so the choice is the inventory's rather than the command line's from then on. |
 | `--title` | `TEXT` | — | Caption for the diagram. |
 | `--profile` | `NAME` | — | Apply the [profile.NAME] block of netgraph.toml on top of its [render] table. Explicit flags still win over both. |
 | `--show-config` | — | off | Print the settings this invocation resolves to, and where each one came from, then exit without doing any work. |
@@ -188,7 +208,9 @@ a list of what moved.
 * [`docs/schema.md` §18](../schema.md#18-layout-diagram-geometry) — the
   `kind: layout` document, field by field.
 * [`docs/rendering.md`](../rendering.md#stored-arrangements) — how `svg`, `html`
-  and `json` honour an arrangement, and what each publishes.
+  and `json` honour an arrangement, and what each publishes;
+  [Links are geometry too](../rendering.md#links-are-geometry-too) is the same
+  for bends, routing styles and label positions.
 * [`netgraph edit`](edit.md) — the write path this command goes through, and its
   two gates.
 * [`docs/follow-ups.md` §16](../follow-ups.md) — why the geometry is a sidecar

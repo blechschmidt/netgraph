@@ -1854,6 +1854,50 @@ in `tests/test_web_events.py` are written against those, not against the badge.
 
 ---
 
+## 19. Orthogonal routes go through nodes, not around them
+
+`spec.routing: orthogonal` (§18, [`docs/rendering.md`](rendering.md#links-are-geometry-too))
+breaks each leg of a link into horizontal and vertical runs. It does **not**
+avoid obstacles: a Z route between two devices with a third sitting between them
+draws a line straight across the third one's box.
+
+That is a deliberate stopping point rather than an oversight, and the reasoning
+is worth recording because "add obstacle avoidance" looks like a small
+follow-up and is not.
+
+**What the rule is.** Two points with nothing pinned between them get a Z —
+half way along the dominant axis, across, and on — and a leg between two pinned
+points gets an L, turning along that leg's own dominant axis first. Both are
+*local*: they look at one leg and at nothing else in the diagram. That locality
+is what makes dragging a bend feel right. The line follows the cursor exactly,
+the leg on the far side of the route does not re-shape itself, and the browser
+can compute the same answer the renderer will
+(`web/assets/links.js` mirrors `netgraph.layout.routing`) without holding a
+model of the whole drawing.
+
+**What avoidance would cost.** A router that goes *around* obstacles is global:
+every node's box is an input, so moving one device can re-shape a cable on the
+other side of the diagram, and a bend the user placed becomes a hint rather than
+a decision. It is also expensive enough that the mirrored implementation would
+stop being a faithful port — and a canvas that drew one line under the cursor and
+a different one after the round trip is worse than one that draws a line through
+a box.
+
+**What to do instead, today.** Drop a bend. That is what the gesture is for, it
+takes one double-click, and the result is recorded as the decision it was.
+Graphviz's own `splines=ortho` does avoid nodes and is what an *unarranged*
+orthogonal diagram already gets — so the case where nobody has arranged anything
+is handled, and the case where somebody has is the case where they can say where
+the cable goes.
+
+If this is revisited, the shape to reach for is an A* over a visibility grid
+built from the node boxes, run **once per link at write time** and stored as
+waypoints, rather than at render time. That keeps the renderer local and the
+stored route a decision, and it makes "route this link around things" a command
+somebody invokes rather than a behaviour that changes under them.
+
+---
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

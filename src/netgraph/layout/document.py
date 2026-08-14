@@ -32,15 +32,22 @@ is the marker they share; :func:`as_yaml` is what turns it into ruamel's form.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from typing import Any, Final
 
 import yaml as pyyaml
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
-from netgraph.layout.geometry import Geometry
+from netgraph.layout.geometry import Geometry, LinkGeometry
 
-__all__ = ["Inline", "as_yaml", "canonical_geometry", "geometry_sections", "inline_entry"]
+__all__ = [
+    "Inline",
+    "as_yaml",
+    "canonical_geometry",
+    "geometry_sections",
+    "inline_entry",
+    "link_entry",
+]
 
 
 class Inline(dict[str, Any]):
@@ -148,11 +155,12 @@ def geometry_sections(geometry: Geometry, *, with_waypoints: bool = False) -> di
             key: inline_entry(placement.to_model().model_dump(exclude_none=True))
             for key, placement in sorted(geometry.nodes.items())
         }
-    if with_waypoints:
+    if with_waypoints or _pinned_beyond_waypoints(geometry):
         edges = {
-            key: inline_entry({"waypoints": _points(points)})
-            for key, points in sorted(geometry.edges.items())
-            if points
+            key: link_entry(link)
+            for key, link in sorted(geometry.edges.items())
+            if not link.is_empty
+            and (with_waypoints or link.waypoints or link.routing or link.label)
         }
         if edges:
             sections["edges"] = edges
@@ -164,5 +172,31 @@ def geometry_sections(geometry: Geometry, *, with_waypoints: bool = False) -> di
     return sections
 
 
-def _points(points: Iterable[tuple[float, float]]) -> list[dict[str, float]]:
-    return [{"x": x, "y": y} for x, y in points]
+def link_entry(link: LinkGeometry) -> Inline:
+    """One link's geometry as a document entry: bends, style and label.
+
+    Written the same way a node entry is — every mapping under the key inline,
+    the key itself expanded by ``netgraph fmt`` — so a bend is one line, and
+    dragging the third one changes the third line and nothing else.
+    """
+    entry = link.to_model().model_dump(exclude_none=True)
+    written: dict[str, Any] = {}
+    if entry.get("waypoints"):
+        written["waypoints"] = [inline_entry(point) for point in entry["waypoints"]]
+    if "routing" in entry:
+        written["routing"] = entry["routing"]
+    if "label" in entry:
+        written["label"] = inline_entry(entry["label"])
+    return Inline(written)
+
+
+def _pinned_beyond_waypoints(geometry: Geometry) -> bool:
+    """Does any link pin something a re-layout could not work out for itself?
+
+    A routing style and a nudged label are *decisions*, not derived numbers, so
+    they are written whether or not ``--waypoints`` was asked for — unlike a
+    spline, which the render recomputes identically from the node positions.
+    """
+    return any(
+        link.routing is not None or link.label is not None for link in geometry.edges.values()
+    )

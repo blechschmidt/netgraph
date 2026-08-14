@@ -18,6 +18,50 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **Links are first-class geometry: waypoints, routing styles and label positions.** A
+  `kind: layout` document already said where every node went; it now says how every cable
+  gets there. In a hand-arranged diagram that was the last thing that did not stay where
+  its author left it — an edge was whatever Graphviz decided, on every render.
+
+  **Waypoints.** `spec.views.<view>.edges.<address>.waypoints` is the list of bends a link
+  is routed through. They are *interior* points: the two ends of a route are the nodes
+  themselves, so dragging a device carries its cables along instead of stranding them. In
+  the editor, click a link to select it, double-click the line to drop a bend where you
+  clicked, drag a bend to move it, drag the hollow midpoint handle to insert and place one
+  in a single motion, and right-click a bend to remove it. From the keyboard, `b` adds a
+  bend, `Shift-B` straightens the link and `r` sets its routing style. Every one of them is
+  a `set-link-geometry` operation through the same comment-preserving write path as any
+  other edit, so a bend dropped in a browser is a hunk in a YAML file.
+
+  **Routing styles.** `spline` (the curve Graphviz draws, unchanged and still the default),
+  `orthogonal` (right angles) and `straight` (segment to segment) — settable per link, per
+  view (`views.<view>.routing`) and per inventory (`spec.routing`), most specific winning.
+  `--routing` on `render`, `watch`, `diff` and `path`, and `routing` in the `[render]` table
+  of `netgraph.toml`, set a *default* that a link pinning its own style still beats;
+  `netgraph layout --write --routing STYLE` records the view's. For a fully arranged view
+  netgraph computes each route itself and writes it into the Graphviz `pos`, which is the
+  only way a per-link style can be expressed at all — Graphviz has a graph-wide `splines`
+  and nothing per edge. For a view Graphviz is laying out, only that graph-wide attribute is
+  available, and netgraph now says out loud what it could not honour rather than emitting a
+  document Graphviz quietly draws differently.
+
+  **Label positions.** `edges.<address>.label` is `{at, offset}` — how far along the route
+  the annotation sits, and how far off the line. Stored on the link rather than as a
+  coordinate, so it survives both endpoints being dragged, which is the whole reason a label
+  gets nudged. Applied by the DOT, SVG, PNG, PDF and HTML renderers, and published by JSON.
+
+  **Parallel links and self-links.** Two cables between one pair of devices no longer land
+  on the same line in a fixed drawing: they are fanned 14 points apart, centred so a lone
+  link is not moved, and each gets a grab handle of its own. A bundle folded by
+  `--bundle-links` counts once. A self-link is drawn as a ring standing off its node, so
+  four VLANs terminating on one switch are four rings rather than one thick one.
+
+  `netgraph render -f json` publishes both halves per edge: what the inventory pinned
+  (`waypoints`, `routing`, `label`) and, for an arranged view, the line that was drawn
+  (`route`, `controls`, `drawnAs`). See
+  [`docs/rendering.md`](docs/rendering.md#links-are-geometry-too), which carries a worked
+  example checked against a committed golden.
+
 - **A history timeline: `netgraph log`, two revisions on `netgraph diff`, and a scrubber
   under the canvas.** The inventory is a folder of YAML in a repository, which means its
   whole history is renderable — and nothing else in this space can show you when a network

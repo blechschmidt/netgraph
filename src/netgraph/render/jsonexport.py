@@ -67,6 +67,7 @@ import json
 from typing import Any, Final
 
 from netgraph.layout.geometry import Geometry, Placement
+from netgraph.layout.routing import Route
 from netgraph.models import API_VERSION
 from netgraph.power import Feed, PowerNode
 from netgraph.render.aggregate import AggregateView, BundleView
@@ -86,6 +87,7 @@ from netgraph.render.graph import (
     WirelessView,
 )
 from netgraph.render.options import RenderOptions
+from netgraph.render.routes import default_routing, route_table
 
 __all__ = ["GRAPH_KIND", "graph_to_dict", "render_json", "to_json"]
 
@@ -141,7 +143,10 @@ def graph_to_dict(graph: Graph, options: RenderOptions | None = None) -> dict[st
         "kind": GRAPH_KIND,
         "layer": graph.layer.value,
         "nodes": [_node(node, opts, graph.geometry) for node in graph.nodes.values()],
-        "edges": [_edge(edge, graph.geometry, opts.diff) for edge in graph.edges],
+        "edges": [
+            _edge(edge, graph.geometry, opts.diff, line)
+            for edge, line in zip(graph.edges, route_table(graph, opts), strict=True)
+        ],
     }
     if opts.diff is not None:
         # The changeset travels *with* the graph rather than in a second file:
@@ -182,6 +187,11 @@ def _layout(graph: Graph) -> dict[str, Any] | None:
     payload: dict[str, Any] = {
         "units": "points",
         "mode": str(geometry.mode(graph.nodes)),
+        # What a link is drawn as when it does not say for itself. Published
+        # beside the coordinates because a client redrawing this graph needs it
+        # to reproduce the picture, and it is a property of the arrangement
+        # rather than of any one link.
+        "routing": str(default_routing(graph)),
     }
     if geometry.groups:
         payload["groups"] = {
@@ -498,8 +508,37 @@ def _port(port: PortView, options: RenderOptions) -> dict[str, Any]:
 _NO_GEOMETRY: Final[Geometry] = Geometry()
 
 
+def _link_layout(edge: Edge, geometry: Geometry, line: Route | None) -> dict[str, Any]:
+    """What this document says about how one link is drawn.
+
+    Two different things, and a consumer wants both. ``waypoints``, ``routing``
+    and ``label`` are what the *inventory pins* — the decisions somebody made,
+    which is what an editor round-trips. ``route`` is the line netgraph
+    actually draws, in the same coordinates as the node positions beside it, so
+    a client can reproduce the picture without reimplementing the routing. The
+    second is only present for a fully-arranged drawing, because anywhere else
+    Graphviz decides it and this document does not know the answer.
+    """
+    link = geometry.link(edge.id)
+    payload: dict[str, Any] = {}
+    if link.waypoints:
+        payload["waypoints"] = [{"x": x, "y": y} for x, y in link.waypoints]
+    if link.routing is not None:
+        payload["routing"] = str(link.routing)
+    if link.label is not None:
+        payload["label"] = {"at": link.label.at, "offset": {"x": link.label.dx, "y": link.label.dy}}
+    if line is not None:
+        payload["route"] = [{"x": x, "y": y} for x, y in line.corners]
+        payload["controls"] = [{"x": x, "y": y} for x, y in line.controls]
+        payload["drawnAs"] = str(line.routing)
+    return payload
+
+
 def _edge(
-    edge: Edge, geometry: Geometry = _NO_GEOMETRY, overlay: DiffOverlay | None = None
+    edge: Edge,
+    geometry: Geometry = _NO_GEOMETRY,
+    overlay: DiffOverlay | None = None,
+    route: Route | None = None,
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "id": edge.id,
@@ -538,9 +577,9 @@ def _edge(
     if edge.bundle is not None:
         payload["bundle"] = _bundle(edge.bundle)
     payload["vlans"] = sorted(edge.vlans)
-    waypoints = geometry.edges.get(edge.id)
-    if waypoints:
-        payload["layout"] = {"waypoints": [{"x": x, "y": y} for x, y in waypoints]}
+    layout = _link_layout(edge, geometry, route)
+    if layout:
+        payload["layout"] = layout
     diff = _diff_mark(overlay, edge.id)
     if diff is not None:
         payload["diff"] = diff

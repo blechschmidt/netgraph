@@ -1,0 +1,87 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-home
+  description: Eight-port desktop switch in the hallway cabinet
+  labels:
+    site: home
+    role: access
+spec:
+  vendor: TP-Link
+  model: TL-SG108E
+  location: Home / hallway cabinet
+  interfaces:
+    - name: br0
+      type: bridge
+      description: Switching instance
+      members:
+        - port1
+        - port2
+        - port3
+        - port4
+        - port5
+
+    - name: Vlan10
+      type: vlan
+      description: In-band management address of the switch
+      ipv4:
+        addresses: [192.168.10.2/24]
+      vlan:
+        mode: access
+        access_vlan: 10
+      parent: br0
+
+    - name: port1
+      type: ethernet
+      description: Uplink to rtr-home
+      mac: '00:22:07:aa:00:01'
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+
+    - name: port2
+      type: ethernet
+      description: Desk - pc-desk
+      mac: '00:22:07:aa:00:02'
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+
+    - name: port3
+      type: ethernet
+      description: NAS
+      mac: '00:22:07:aa:00:03'
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+
+    - name: port4
+      type: ethernet
+      description: Patch to the desk, used by the laptop dongle
+      mac: '00:22:07:aa:00:04'
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 10
+
+    - name: port5
+      type: ethernet
+      description: PoE injector for ap-home; trunks the guest VLAN up to it
+      mac: '00:22:07:aa:00:05'
+      mtu: 1500
+      vlan:
+        mode: trunk
+        trunk_vlans: 10,20
+        native_vlan: 10
+  bridge:
+    name: br0
+    type: customer-vlan-bridge
+    address: '00:22:07:aa:00:00'
+  vlans:
+    - id: 10
+      name: home
+    - id: 20
+      name: guest

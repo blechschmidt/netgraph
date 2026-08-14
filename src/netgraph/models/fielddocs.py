@@ -42,6 +42,7 @@ from netgraph.models.interface import (
 from netgraph.models.layout import (
     EdgeGeometry,
     GroupGeometry,
+    LabelGeometry,
     LayoutSpec,
     NodeGeometry,
     Point,
@@ -127,6 +128,7 @@ DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
     ViewGeometry,
     NodeGeometry,
     EdgeGeometry,
+    LabelGeometry,
     GroupGeometry,
     Point,
     Size,
@@ -889,13 +891,40 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "The box each namespace cluster is drawn as, keyed by namespace. Only drawn when the "
         "render groups by namespace."
     ),
+    ("ViewGeometry", "routing"): Doc(
+        "How links in this view are drawn when they do not say for themselves. Overrides "
+        "`spec.routing`; a link's own `routing` overrides both."
+    ),
+    ("LayoutSpec", "routing"): Doc(
+        "How links are drawn across the whole inventory unless a view or a link says "
+        "otherwise: `spline` (the curve Graphviz draws), `orthogonal` (right angles) or "
+        "`straight`."
+    ),
     ("NodeGeometry", "position"): Doc("Centre of the node, in points."),
     ("NodeGeometry", "size"): Doc(
         "Box the node occupies, in points. Omitted means the label decides, which is what keeps "
         "an arrangement valid when a device grows a port."
     ),
     ("EdgeGeometry", "waypoints"): Doc(
-        "Spline control points, in points, ordered from the link's first endpoint to its second."
+        "The bends the link is drawn through, in points, ordered from its first endpoint to "
+        "its second. Interior points only: the two ends are the nodes, so a route follows "
+        "them when they are dragged."
+    ),
+    ("EdgeGeometry", "routing"): Doc(
+        "How this link is drawn between its bends, overriding the view's and the inventory's "
+        "default: `spline`, `orthogonal` or `straight`."
+    ),
+    ("EdgeGeometry", "label"): Doc(
+        "Where the link's annotation sits. Omitted leaves it where the renderer puts it, "
+        "which is half way along and on the line."
+    ),
+    ("LabelGeometry", "at"): Doc(
+        "How far along the route the label sits, from `0` at the first endpoint to `1` at "
+        "the second."
+    ),
+    ("LabelGeometry", "offset"): Doc(
+        "How far off the line the label is nudged, in points. This is what makes a dense "
+        "VLAN diagram legible."
     ),
     ("GroupGeometry", "position"): Doc("Centre of the cluster box, in points."),
     ("GroupGeometry", "size"): Doc("Extent of the cluster box, in points."),

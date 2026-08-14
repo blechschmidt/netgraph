@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Mapping
 
-from netgraph.layout.geometry import Box, Geometry, Placement, points_of
+from netgraph.layout.geometry import Box, Geometry, LinkGeometry, Placement, Routing
 from netgraph.loader.inventory import Inventory, namespace_of
 
 __all__ = ["Conflict", "conflicts_in", "resolve_geometry", "resolve_key"]
@@ -63,29 +63,38 @@ def resolve_geometry(inventory: Inventory, view: str) -> Geometry:
         return Geometry(view=view)
 
     nodes: dict[str, Placement] = {}
-    edges: dict[str, tuple[tuple[float, float], ...]] = {}
+    edges: dict[str, LinkGeometry] = {}
     groups: dict[str, Box] = {}
+    routing: Routing | None = None
     for fqn, layout in inventory.layouts.items():
+        # The routing default follows the same first-wins rule as a coordinate,
+        # and a view's own default beats the document's: a document that says
+        # "orthogonal, except the L3 diagram" has to be able to say the second
+        # half.
+        if routing is None and layout.spec.routing is not None:
+            routing = Routing(layout.spec.routing)
         geometry = layout.view(view)
         if geometry is None:
             continue
+        if geometry.routing is not None:
+            routing = Routing(geometry.routing)
         namespace = namespace_of(fqn)
         for key, placement in geometry.nodes.items():
             nodes.setdefault(
                 resolve_key(key, inventory=inventory, namespace=namespace),
                 Placement.from_model(placement),
             )
-        for key, waypoints in geometry.edges.items():
+        for key, link in geometry.edges.items():
             edges.setdefault(
                 resolve_key(key, inventory=inventory, namespace=namespace),
-                points_of(waypoints),
+                LinkGeometry.from_model(link),
             )
         for key, box in geometry.groups.items():
             # A group key is a namespace, not an element, so it is qualified
             # rather than resolved: a layout in ``sites/`` naming ``hq`` means
             # ``sites/hq``, and nothing has to exist for that to be true.
             groups.setdefault(_qualify_group(key, namespace), Box.from_model(box))
-    return Geometry(view=view, nodes=nodes, edges=edges, groups=groups)
+    return Geometry(view=view, nodes=nodes, edges=edges, groups=groups, routing=routing)
 
 
 def _qualify_group(key: str, namespace: str) -> str:

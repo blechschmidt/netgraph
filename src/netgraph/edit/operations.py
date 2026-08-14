@@ -40,7 +40,7 @@ from typing import Any, ClassVar, Final
 
 from netgraph.edit.errors import OperationError
 from netgraph.edit.paths import format_field_path, parse_field_path
-from netgraph.models.layout import LAYOUT_VIEWS
+from netgraph.models.layout import LAYOUT_VIEWS, ROUTING_STYLES
 
 __all__ = [
     "OPERATIONS",
@@ -57,6 +57,7 @@ __all__ = [
     "RenameElement",
     "SetField",
     "SetGeometry",
+    "SetLinkGeometry",
     "UnsetField",
     "WriteFile",
     "operation_from_dict",
@@ -430,6 +431,11 @@ class SetGeometry(Operation):
     edges: Mapping[str, Any] | None = None
     #: Namespace to group geometry.
     groups: Mapping[str, Any] | None = None
+    #: The view's default routing style, one of
+    #: :data:`~netgraph.models.layout.ROUTING_STYLES`. ``None`` leaves whatever
+    #: the document says alone; the empty string removes it, so that "go back to
+    #: splines" is expressible and is not the same request as "do not touch".
+    routing: str | None = None
     #: ``metadata.name`` of the layout document to write into or create.
     layout: str = "layout"
     #: The namespace — the folder — the document lives in.
@@ -445,11 +451,21 @@ class SetGeometry(Operation):
             )
         if not self.layout:
             raise OperationError("a layout document must be named")
+        if self.routing is not None and self.routing != "" and self.routing not in ROUTING_STYLES:
+            raise OperationError(
+                f"unknown routing style {self.routing!r}; "
+                f"expected one of {', '.join(ROUTING_STYLES)}"
+            )
 
     @property
     def clears(self) -> bool:
         """Does this operation drop the view rather than write it?"""
-        return self.nodes is None and self.edges is None and self.groups is None
+        return (
+            self.nodes is None
+            and self.edges is None
+            and self.groups is None
+            and self.routing is None
+        )
 
     @property
     def address(self) -> str:
@@ -462,6 +478,8 @@ class SetGeometry(Operation):
             value = getattr(self, section)
             if value is not None:
                 payload[section] = dict(value)
+        if self.routing is not None:
+            payload["routing"] = self.routing
         payload["layout"] = self.layout
         if self.namespace:
             payload["namespace"] = self.namespace
@@ -472,7 +490,7 @@ class SetGeometry(Operation):
     def describe(self) -> str:
         if self.clears:
             return f"clear the {self.view} geometry of {self.address}"
-        counts = ", ".join(
+        said = [
             f"{len(value)} {section}"
             for section, value in (
                 ("nodes", self.nodes),
@@ -480,8 +498,115 @@ class SetGeometry(Operation):
                 ("groups", self.groups),
             )
             if value is not None
-        )
-        return f"set the {self.view} geometry of {self.address} ({counts})"
+        ]
+        if self.routing is not None:
+            said.append(f"routing {self.routing or 'by default'}")
+        return f"set the {self.view} geometry of {self.address} ({', '.join(said)})"
+
+
+@dataclass(frozen=True)
+class SetLinkGeometry(Operation):
+    """Write one *link's* geometry: its bends, its routing style, its label.
+
+    One link at a time, which is the opposite unit to :class:`SetGeometry` and
+    for the opposite reason. A whole view is what an *automatic layout* decides;
+    a route is what a *hand* decides, one cable at a time, and dragging a bend
+    must not have to send — and so must not be able to clobber — the coordinates
+    of every other thing in the diagram. Two people arranging one diagram is the
+    case that makes the difference load-bearing.
+
+    The entry is **replaced**, not merged: what is given is what the link ends
+    up saying. So straightening a cable is this operation with no waypoints, and
+    a link left with nothing pinned at all has its entry removed, which is what
+    keeps a layout document from filling up with keys that say ``{}``.
+    """
+
+    op: ClassVar[str] = "set-link-geometry"
+
+    #: The view, as ``docs/schema.md`` §18 lists them.
+    view: str
+    #: The link's address, spelled as a layout key: a cable's or tunnel's name,
+    #: or the synthetic id of a derived edge.
+    link: str
+    #: The bends, source end first — interior points only, ``[{x, y}, ...]``.
+    waypoints: Sequence[Any] = ()
+    #: One of :data:`~netgraph.models.layout.ROUTING_STYLES`, or ``None`` to
+    #: take the view's default.
+    routing: str | None = None
+    #: ``{"at": 0.5, "offset": {"x": 0, "y": 0}}``, or ``None`` to leave the
+    #: label where the renderer puts it.
+    label: Mapping[str, Any] | None = None
+    #: ``metadata.name`` of the layout document to write into or create.
+    layout: str = "layout"
+    #: The namespace — the folder — the document lives in.
+    namespace: str = ""
+    #: Where a document that has to be created should land.
+    file: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.view not in LAYOUT_VIEWS:
+            raise OperationError(
+                f"unknown view {self.view!r}; expected one of {', '.join(LAYOUT_VIEWS)}"
+            )
+        if not self.link:
+            raise OperationError("a link geometry must name the link it places")
+        if not self.layout:
+            raise OperationError("a layout document must be named")
+        if self.routing is not None and self.routing not in ROUTING_STYLES:
+            raise OperationError(
+                f"unknown routing style {self.routing!r}; "
+                f"expected one of {', '.join(ROUTING_STYLES)}"
+            )
+
+    @property
+    def clears(self) -> bool:
+        """Does this leave the link with nothing pinned, and so no entry?"""
+        return not self.waypoints and self.routing is None and self.label is None
+
+    @property
+    def address(self) -> str:
+        """The layout document's fully-qualified name."""
+        return f"{self.namespace}/{self.layout}" if self.namespace else self.layout
+
+    @property
+    def entry(self) -> dict[str, Any]:
+        """The document form of what this pins, ready to be merged in."""
+        payload: dict[str, Any] = {}
+        if self.waypoints:
+            payload["waypoints"] = [dict(point) for point in self.waypoints]
+        if self.routing is not None:
+            payload["routing"] = self.routing
+        if self.label is not None:
+            payload["label"] = dict(self.label)
+        return payload
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"op": self.op, "view": self.view, "link": self.link}
+        if self.waypoints:
+            payload["waypoints"] = [dict(point) for point in self.waypoints]
+        if self.routing is not None:
+            payload["routing"] = self.routing
+        if self.label is not None:
+            payload["label"] = dict(self.label)
+        payload["layout"] = self.layout
+        if self.namespace:
+            payload["namespace"] = self.namespace
+        if self.file is not None:
+            payload["file"] = self.file
+        return payload
+
+    def describe(self) -> str:
+        if self.clears:
+            return f"straighten {self.link} in the {self.view} view"
+        said = []
+        if self.waypoints:
+            count = len(self.waypoints)
+            said.append(f"{count} bend{'' if count == 1 else 's'}")
+        if self.routing is not None:
+            said.append(self.routing)
+        if self.label is not None:
+            said.append("label")
+        return f"route {self.link} in the {self.view} view ({', '.join(said)})"
 
 
 # --------------------------------------------------------------------------- #
@@ -542,6 +667,7 @@ OPERATIONS: Final[dict[str, type[Operation]]] = {
         Connect,
         Disconnect,
         SetGeometry,
+        SetLinkGeometry,
         WriteFile,
         RemoveFile,
     )
@@ -564,7 +690,14 @@ _FIELDS: Final[dict[str, tuple[tuple[str, ...], tuple[str, ...]]]] = {
     "remove-interface": (("address", "name"), ("cascade",)),
     "connect": (("a", "b"), ("spec", "name", "namespace", "file")),
     "disconnect": (("address",), ()),
-    "set-geometry": (("view",), ("nodes", "edges", "groups", "layout", "namespace", "file")),
+    "set-geometry": (
+        ("view",),
+        ("nodes", "edges", "groups", "routing", "layout", "namespace", "file"),
+    ),
+    "set-link-geometry": (
+        ("view", "link"),
+        ("waypoints", "routing", "label", "layout", "namespace", "file"),
+    ),
     "write-file": (("path", "text"), ()),
     "remove-file": (("path",), ()),
 }

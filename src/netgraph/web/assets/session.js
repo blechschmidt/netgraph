@@ -1680,6 +1680,10 @@ var netgraphSession = (function () {
   return {
     attach: attach,
     defineCommands: defineCommands,
+    /* The one way anything on this page changes a file. links.js posts its
+     * geometry through it, so a bend written from the canvas takes exactly
+     * the route a rename does. */
+    ops: ops,
     markDirty: markDirty,
     isWritable: function () { return !!state.writable; },
     reveal: reveal,

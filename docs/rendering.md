@@ -32,6 +32,8 @@ labelled links](images/home-lab.svg)
 - [Icons](#icons)
 - [Labelling and layout](#labelling-and-layout)
 - [Stored arrangements](#stored-arrangements)
+  - [Links are geometry too](#links-are-geometry-too)
+  - [A worked example: an orthogonal, waypointed diagram](#a-worked-example-an-orthogonal-waypointed-diagram)
 - [Interactive SVG: tooltips, links and ids](#interactive-svg-tooltips-links-and-ids)
 - [Output formats](#output-formats)
   - [The interactive HTML page](#the-interactive-html-page)
@@ -654,9 +656,9 @@ options, so no backend has to be told about it and none can be told something
 different.
 
 `json` adds a `layout` object per node (`position`, and `size` when one is
-stored), a `layout.waypoints` per edge that has bends, and a top-level `layout`
-carrying the mode, the units and the group boxes — enough for a browser to draw
-the graph itself without running Graphviz.
+stored), a `layout` object per edge (below), and a top-level `layout` carrying
+the mode, the units, the effective `routing` and the group boxes — enough for a
+browser to draw the graph itself without running Graphviz.
 
 **Namespace frames in a fixed layout are drawn by netgraph.** `neato` does not
 draw clusters, so when the whole view is arranged the frames come from the stored
@@ -670,6 +672,203 @@ graph).
 
 A `mermaid` render ignores an arrangement entirely. Mermaid does its own layout
 in the browser and has nowhere to put a coordinate.
+
+### Links are geometry too
+
+Where the nodes go is half of an arrangement. The other half is the cables:
+which way the trunk goes round the diagram rather than through it, whether it
+turns at right angles, and where its label sits. All three live in the same
+`kind: layout` document, under `spec.views.<view>.edges`, keyed by the link's
+address ([`docs/schema.md` §18](schema.md#18-layout-diagram-geometry)).
+
+**Waypoints are the bends, and only the bends.** `edges.<address>.waypoints` is
+the list of points a link is routed through, and they are **interior** points:
+the two ends of a route are always the nodes themselves. That is what makes a
+hand-routed cable worth placing — drag a device and it carries its cables along
+rather than stranding them, and the bends somebody chose stay where they were
+put.
+
+`netgraph layout --write --waypoints` seeds them, which gives a route to drag
+rather than a decision to keep, and it also records the `size` of every node a
+stored route leaves from. Those sizes are not decoration: a route netgraph
+computes has to stop at the shape it runs into, and netgraph cannot measure a
+label. Without them the route is clipped against a default box — Graphviz's own
+0.75 × 0.5 inch node — so it may stop short of the shape, and the render says
+so.
+
+In [`netgraph web`](commands/web.md) the same thing is a gesture. Click a link
+to select it; **double-click** the line to drop a bend where you clicked; drag a
+bend to move it; drag the hollow **midpoint handle** to insert a bend and place
+it in one motion; **right-click** a bend to remove it. From the keyboard, `b`
+adds a bend, `Shift-B` straightens the link — every bend cleared, the routing
+style and the label kept — and `r` sets the routing style. Each is one
+`set-link-geometry` operation through the same comment-preserving write path as
+every other edit ([`docs/editing.md`](editing.md#the-operations)), so a bend
+dropped in the browser is a hunk in a YAML file you can read.
+
+**Three routing styles, and the most specific one wins.** `spline` is the curve
+Graphviz draws — what every diagram looked like before this existed, and still
+the default; `orthogonal` is right angles, the way a patch schedule is drawn;
+`straight` is segment to segment. Each can be set at three levels:
+
+| Where | Applies to |
+|---|---|
+| `spec.views.<view>.edges.<address>.routing` | one link |
+| `spec.views.<view>.routing` | every link of one view |
+| `spec.routing` | every link of every view |
+
+A link that pins a style of its own beats the view, which beats the inventory.
+`--routing` on [`render`](commands/render.md), [`watch`](commands/watch.md) and
+[`diff`](commands/diff.md), and `routing` in the `[render]` table of
+[`netgraph.toml`](configuration.md#every-render-setting), set a *default* — so
+they change what unpinned links do and leave a link that has decided for itself
+alone. `netgraph layout --write --routing STYLE` records the view's default in
+the document.
+
+How much of that a render can deliver depends on how much of the view is
+arranged, because the two paths to Graphviz are not equally expressive:
+
+* For a **fully arranged** view netgraph computes each route itself — from the
+  node positions, the stored bends and the style — and writes it into the
+  Graphviz `pos` attribute. That is the only way a *per-link* style can be
+  expressed at all: Graphviz has a graph-wide `splines` and nothing per edge.
+* For a view Graphviz is laying out, only that graph-wide attribute is
+  available (`true`, `ortho`, `line`), so the default reaches the drawing and
+  nothing else can.
+
+Rather than emit something broken, netgraph says what it could not honour. Each
+advisory is phrased as the thing that fixes it, and each is advisory rather than
+fatal — a diagram that is nearly right is worth drawing, and a warning that
+stops a render is a warning nobody leaves turned on:
+
+| When | What it says |
+|---|---|
+| bends are pinned but the view is not fully placed | Graphviz has to route the whole diagram and the bends are lost; `netgraph layout --write` places the rest |
+| links pin a style the engine-laid-out drawing cannot give them | they are drawn in the graph-wide style like everything else, until the arrangement is pinned |
+| the drawing is orthogonal, Graphviz is laying it out, and the links are labelled | Graphviz will not put a real edge label on an orthogonal route it routed itself, so the labels become `xlabel`s floated near their links |
+
+**A label is pinned to the link, not to the canvas.**
+`edges.<address>.label` is `{at: 0.5, offset: {x: 0, y: 0}}`: `at` is how far
+along the route the annotation sits, from `0` at the source end to `1` at the
+target, and `offset` nudges it off the line in points. Storing it *on the link*
+rather than as a coordinate is what makes it survive both endpoints being
+dragged somewhere else, which is the whole reason a label gets nudged in the
+first place — to keep it clear of whatever crosses underneath.
+
+It reaches the DOT as an `lp` attribute. `lp` is normally something Graphviz
+*writes* — where it decided to put the label — but the no-op engine reads one
+back in, which is the one place a label position can be pinned at all. So it
+applies to `-f dot`, to `-f svg`, `png` and `pdf`, and to `-f html`, all of
+which go through Graphviz, and it is published by `-f json`. A label left half
+way along with no offset emits nothing: that is where a renderer puts one nobody
+has moved, and a number in a file that can only go stale is worse than no
+number.
+
+**Parallel links are fanned apart, and a self-link is a ring.** Two cables
+between the same pair of devices land on exactly the same line once both ends
+are pinned — Graphviz's own nudging is part of *its* routing, and a fixed
+drawing does none of it. So netgraph fans them itself, 14 points between
+neighbours, centred: a lone link is not moved at all, and an odd-numbered bundle
+keeps one cable on the direct line between the two devices, which is the one a
+reader traces first. Each member ends up with a line of its own to hover, to
+select and to drop a bend on.
+
+A bundle folded by [`--bundle-links`](#aggregation-one-node-per-site-one-line-per-bundle)
+counts once rather than once per member: folding four cables into one trunk is
+done so that the reader sees one line, and fanning the fold against itself would
+undo it. And a **self-link** — a cable whose two ends are on one device — is
+drawn as a loop standing off the node, with the fan deciding how far off, so
+four VLANs terminating on one switch are four rings rather than one thick one.
+
+`-f json` publishes both halves of this per edge, because a consumer wants both.
+Under `layout`, `waypoints`, `routing` and `label` are what the *inventory
+pinned* — the decisions somebody made, which is what an editor round-trips —
+while `route` (the polyline), `controls` (the same line as cubic Bézier control
+points) and `drawnAs` (the style it came out in) are the line netgraph actually
+drew. The second group appears only for a fully arranged drawing, because
+anywhere else Graphviz decides it and the export does not know the answer.
+
+### A worked example: an orthogonal, waypointed diagram
+
+[`tests/fixtures/routed`](../tests/fixtures/routed) is the `home-lab` example
+arranged **and** routed. Both the arrangement and the DOT it produces are
+committed, and `tests/test_golden.py` renders the one and compares it against
+the other on every CI run — so the example below cannot go stale without a test
+going red.
+
+The whole of its link geometry is eight lines, on top of a `spec.routing` that
+makes the diagram orthogonal
+([`tests/fixtures/routed/layout.yaml`](../tests/fixtures/routed/layout.yaml),
+with the node positions elided):
+
+```yaml
+spec:
+  routing: orthogonal
+  views:
+    l1:
+      nodes:
+        routers/rtr-home:
+          position: {x: 474, y: 271}
+          size: {width: 464, height: 146}
+        switches/sw-home:
+          position: {x: 847, y: 56}
+          size: {width: 169, height: 112}
+        # ... and the other six
+      edges:
+        # A trunk dragged clear of the router, then labelled off the line so the
+        # two cables running under it stay readable.
+        cables/cbl-rtr-sw:
+          waypoints:
+            - {x: 640, y: 380}
+            - {x: 900, y: 380}
+          label: {at: 0.3, offset: {x: 0, y: 14}}
+        # One link that disagrees with the view: a radio association is not a
+        # cable and reads better as the straight line it physically is.
+        cables/wl-ap-phone:
+          routing: straight
+```
+
+Every node is placed, so the view is `fixed`, so netgraph routes the links
+itself. `netgraph -i tests/fixtures/routed render -f dot` produces
+[`tests/fixtures/golden/routed-l1-orthogonal.dot`](../tests/fixtures/golden/routed-l1-orthogonal.dot),
+of which these are the two interesting edges, with the colours and the tooltips
+elided:
+
+<!-- norun: an excerpt of the golden DOT, with most of each attribute list elided -->
+```console
+$ netgraph -i tests/fixtures/routed render -f dot
+...
+  "routers/rtr-home" -- "switches/sw-home" [..., pos="640,345 640,356.67 640,368.33 640,380 726.67,380 813.33,380 900,380 900,291 900,202 900,113", lp="773.6,394", label="lan0 -- port1\nH-001\n1Gbps\nvlan 10", ...];
+...
+  "wireless/ap-home" -- "hosts/phone" [..., pos="1485,240 1485,186.83 1485,133.67 1485,80.5", label="wlan0 -- en0\nwireless", ...];
+```
+
+**The trunk.** Its spine is the router's centre, the two pinned bends, and the
+switch's centre. `orthogonal` breaks each leg into an L, turning along that
+leg's own dominant axis first — locally decided, so dragging one bend cannot
+re-shape the leg on the far side of the route. Then both ends are clipped
+against the boxes the arrangement recorded, a point clear of each: the router is
+146 points tall and centred at `y: 271`, so the route starts at `640,345` above
+it rather than inside it, and the switch is 112 tall and centred at `y: 56`, so
+it stops at `900,113`. What is left is the polyline `640,345 → 640,380 → 900,380 →
+900,113` — the four corners visible in the `pos`, each straight leg written as a
+cubic whose control points are its own thirds, which is the `3n + 1` form a
+Graphviz `pos` is.
+
+The `lp` is the label. The route is 562 points long; `at: 0.3` is 168.6 points
+along it, which lands on the horizontal leg at `773.6,380`, and `offset: {x: 0,
+y: 14}` lifts it to `773.6,394`. None of the other links carries an `lp`,
+because none of them has been moved.
+
+**The radio association.** `routing: straight` on that one link beats
+`spec.routing: orthogonal`, so it is drawn as a single clipped segment from
+`1485,240` to `1485,80.5` — one cubic, four control points. Left to the view it
+would have been the orthogonal Z every link with no bends of its own gets here,
+which for two vertically aligned nodes puts a corner half way down and makes the
+same visible line out of *two* cubics. That is the difference a per-link style
+makes, and
+expressing it is exactly why a fully arranged drawing carries a computed `pos`
+instead of a graph-wide `splines`.
 
 ## Interactive SVG: tooltips, links and ids
 

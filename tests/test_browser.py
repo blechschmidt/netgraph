@@ -61,7 +61,7 @@ import subprocess
 import sys
 import time
 import urllib.request
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import ExitStack, suppress
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -69,6 +69,8 @@ from typing import TYPE_CHECKING, Any, Final
 
 import pytest
 
+from netgraph.layout.geometry import Routing
+from netgraph.layout.routing import Anchor, route
 from netgraph.web.server import WebServer
 from netgraph.web.session import EditingSession, TreeWatcher
 
@@ -917,6 +919,231 @@ def test_drawing_a_link_produces_a_cable(open_editor: OpenEditor) -> None:
         for entry in endpoints["files"]
         for document in entry["documents"]
     )
+
+
+# --------------------------------------------------------------------------- #
+# Routing a link
+# --------------------------------------------------------------------------- #
+#
+# A cable's *shape* is inventory too (§18), and it is the one part of the
+# diagram that can only be edited with a pointer: a bend has no name to type.
+# So these are the tests that cannot be written anywhere but here, and the
+# reason this file starts a browser at all.
+
+
+#: The arranged home-lab, as a file to drop beside it. A route needs somewhere
+#: to be routed *from*, so every test below runs against a fully placed diagram
+#: -- which is also the only kind netgraph offers handles on, for the good
+#: reason that a bend pinned on a drawing Graphviz is still laying out is a bend
+#: the next render throws away.
+ARRANGED_LAYOUT: Final = (REPO_ROOT / "tests" / "fixtures" / "arranged" / "layout.yaml").read_text(
+    encoding="utf-8"
+)
+
+#: The view those coordinates belong to. The page opens on ``physical``, which
+#: the fixture does not arrange.
+ARRANGED_LAYER: Final = "l1"
+
+#: A cable long enough to grab, in a straight line nothing else crosses.
+A_CABLE: Final = "cables/cbl-sw-desk"
+
+
+def arranged(open_editor: OpenEditor, *, writable: bool = True) -> Editor:
+    """A writable session over an arranged diagram, showing the arranged view."""
+    editor = open_editor(writable=writable, extra={"layout.yaml": ARRANGED_LAYOUT})
+    editor.page.select_option("#layer", ARRANGED_LAYER)
+    expect(editor.page.locator(".ng-link-hit").first).to_be_attached(timeout=TIMEOUT_MS)
+    return editor
+
+
+def band(editor: Editor, link: str = A_CABLE) -> Locator:
+    """The invisible band along one link, which is what a click on it hits."""
+    return editor.page.locator(f'.ng-link-hit[data-link="{link}"]').first
+
+
+def press_on(editor: Editor, locator: Locator, *, button: str = "left") -> None:
+    """Click with the real mouse, at the centre of what is on screen.
+
+    Rather than ``locator.click()``, which first asks whether the element is
+    *visible*: a hit band is a transparent stroke with no fill, and a run of
+    cable drawn straight down has a bounding box no wider than its own line.
+    Playwright is right to be suspicious of that in general and wrong about it
+    here, and the gesture being tested is a press at a point anyway.
+    """
+    editor.page.mouse.click(*_centre(locator), button=button)
+
+
+def bends(editor: Editor, link: str = A_CABLE) -> list[dict[str, float]]:
+    """What the *server* says the link is pinned through, not what is on screen."""
+    geometry = editor.api(f"/api/graph?view={ARRANGED_LAYER}")["geometry"] or {}
+    return list((geometry.get("links", {}).get(link) or {}).get("waypoints") or [])
+
+
+def test_selecting_a_link_reveals_its_handles(open_editor: OpenEditor) -> None:
+    """Nothing is grabbable until a link is picked, or the canvas is a field of dots."""
+    editor = arranged(open_editor)
+    assert editor.page.locator(".ng-handle").count() == 0
+
+    press_on(editor, band(editor))
+    expect(editor.page.locator(".ng-handle-add")).to_have_count(1)
+    # Two bends are stored for this cable, and each gets a handle of its own.
+    assert editor.page.locator(".ng-handle-bend").count() == len(bends(editor))
+
+
+def test_dragging_a_bend_writes_the_new_route_to_disk(open_editor: OpenEditor) -> None:
+    """The gesture the whole feature exists for: a cable dragged into place stays there."""
+    editor = arranged(open_editor)
+    assert editor.session is not None
+    before = editor.session.revision
+    original = bends(editor)
+    assert original, "this cable is routed, so it has bends to drag"
+
+    press_on(editor, band(editor))
+    handle = editor.page.locator(".ng-handle-bend").first
+    start = _centre(handle)
+    mouse = editor.page.mouse
+    mouse.move(*start)
+    mouse.down()
+    mouse.move(start[0] + 60, start[1] + 20)
+    mouse.move(start[0] + 110, start[1] + 35)
+    mouse.up()
+
+    assert editor.settles(
+        lambda: editor.session is not None and editor.session.revision != before,
+        timeout=TIMEOUT_MS / 1000,
+    ), "dragging a bend has to reach a file"
+
+    # On disk, in the layout document, as a waypoint -- and the *other* bend is
+    # untouched, which is what says a drag moved one point rather than rewriting
+    # the route.
+    text = editor.read("layout.yaml")
+    assert "waypoints:" in text
+    after = bends(editor)
+    assert len(after) == len(original)
+    assert after[0] != original[0], "the dragged bend did not move"
+    assert after[1:] == original[1:], "dragging one bend moved another"
+
+
+def test_double_clicking_a_link_drops_a_bend_and_right_clicking_takes_it_away(
+    open_editor: OpenEditor,
+) -> None:
+    """The two gestures every diagram editor has, and neither has a keyboard shape."""
+    editor = arranged(open_editor)
+    original = len(bends(editor))
+
+    # A quarter of the way along rather than half: the midpoint carries the
+    # "add a bend here" handle, and a double-click on *that* is a press on a
+    # handle rather than on the line.
+    box = band(editor).bounding_box()
+    assert box is not None
+    editor.page.mouse.dblclick(box["x"] + box["width"] / 2, box["y"] + box["height"] / 4)
+    assert editor.settles(lambda: len(bends(editor)) == original + 1, timeout=TIMEOUT_MS / 1000), (
+        "double-clicking a link has to drop a bend"
+    )
+
+    press_on(editor, editor.page.locator(".ng-handle-bend").first, button="right")
+    assert editor.settles(lambda: len(bends(editor)) == original, timeout=TIMEOUT_MS / 1000), (
+        "right-clicking a bend has to remove it"
+    )
+
+
+def test_straightening_a_link_clears_every_bend_from_the_keyboard(
+    open_editor: OpenEditor,
+) -> None:
+    """A diagram has to be arrangeable without a mouse, this one included."""
+    editor = arranged(open_editor)
+    assert bends(editor), "this cable is routed, so there is something to clear"
+
+    press_on(editor, band(editor))
+    editor.page.locator("#canvas").focus()
+    editor.press("Shift+B")
+
+    assert editor.settles(lambda: bends(editor) == [], timeout=TIMEOUT_MS / 1000), (
+        "link.straighten has to clear the bends"
+    )
+    # And the geometry that was not asked about survives: straightening is not
+    # "forget everything about this cable".
+    geometry = editor.api(f"/api/graph?view={ARRANGED_LAYER}")["geometry"]
+    assert A_CABLE in geometry["links"]
+
+
+def test_a_read_only_session_shows_a_route_and_offers_no_handle(
+    open_editor: OpenEditor,
+) -> None:
+    """Looking at an arrangement must never be able to become changing one."""
+    editor = arranged(open_editor, writable=False)
+    press_on(editor, band(editor))
+    editor.page.wait_for_timeout(300)
+    assert editor.page.locator(".ng-handle").count() == 0
+
+
+def test_the_canvas_and_the_renderer_route_a_link_identically(
+    open_editor: OpenEditor,
+) -> None:
+    """The one duplicated algorithm in the codebase, checked against itself.
+
+    ``web/assets/links.js`` mirrors :mod:`netgraph.layout.routing` because a
+    line that only moved when the server answered would lag the cursor. A mirror
+    is a liability exactly as long as nothing compares the two, so this runs a
+    table of cases through both and asserts they agree to the last decimal
+    place -- every routing style, with bends and without, a fan, and a
+    self-link.
+    """
+    editor = arranged(open_editor, writable=False)
+
+    source = Anchor(x=100.0, y=100.0, width=120.0, height=60.0)
+    target = Anchor(x=500.0, y=400.0, width=80.0, height=40.0)
+    cases: list[dict[str, Any]] = []
+    for style in Routing:
+        for waypoints in ((), ((300.0, 120.0),), ((250.0, 380.0), (420.0, 150.0))):
+            for fan in (0.0, 14.0, -21.0):
+                cases.append({"style": style.value, "waypoints": waypoints, "fan": fan})
+    # And a self-link, whose loop is a different code path in both languages.
+    self_cases = [
+        {"style": style.value, "waypoints": (), "fan": fan}
+        for style in Routing
+        for fan in (0.0, 28.0)
+    ]
+
+    def expected(case: Mapping[str, Any], ends: tuple[Anchor, Anchor]) -> list[list[float]]:
+        line = route(
+            ends[0],
+            ends[1],
+            waypoints=case["waypoints"],
+            style=Routing(case["style"]),
+            fan=case["fan"],
+        )
+        return [[round(x, 6), round(y, 6)] for x, y in line.corners]
+
+    def drawn(payload: Sequence[Mapping[str, Any]], ends: tuple[Anchor, Anchor]) -> Any:
+        return editor.page.evaluate(
+            """([cases, source, target]) => cases.map(function (one) {
+                 return window.netgraphLinks.routeOf(
+                   source, target,
+                   one.waypoints.map(function (p) { return { x: p[0], y: p[1] }; }),
+                   one.style, one.fan
+                 ).map(function (point) {
+                   return [Math.round(point[0] * 1e6) / 1e6, Math.round(point[1] * 1e6) / 1e6];
+                 });
+               })""",
+            [
+                [
+                    dict(one, waypoints=[list(point) for point in one["waypoints"]])
+                    for one in payload
+                ],
+                _anchor(ends[0]),
+                _anchor(ends[1]),
+            ],
+        )
+
+    for group, ends in ((cases, (source, target)), (self_cases, (source, source))):
+        got = drawn(group, ends)
+        for case, actual in zip(group, got, strict=True):
+            assert actual == expected(case, ends), case
+
+
+def _anchor(anchor: Anchor) -> dict[str, float]:
+    return {"x": anchor.x, "y": anchor.y, "width": anchor.width, "height": anchor.height}
 
 
 # --------------------------------------------------------------------------- #

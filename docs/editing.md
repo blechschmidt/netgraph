@@ -56,7 +56,7 @@ are the whole design:
 
 ## The operations
 
-There are fourteen. Twelve are **semantic** — the vocabulary a person or a
+There are fifteen. Thirteen are **semantic** — the vocabulary a person or a
 diagram uses:
 
 | Operation | JSON `op` | What it does |
@@ -72,7 +72,8 @@ diagram uses:
 | `RemoveInterface(address, name, cascade)` | `remove-interface` | Removes a port, and what terminated on it. |
 | `Connect(a, b, spec, name, namespace, file)` | `connect` | Creates a cable between two interfaces. |
 | `Disconnect(address)` | `disconnect` | Removes a cable. |
-| `SetGeometry(view, nodes, edges, groups, layout, namespace, file)` | `set-geometry` | Writes one view of a [`kind: layout`](schema.md#18-layout-diagram-geometry) document. |
+| `SetGeometry(view, nodes, edges, groups, routing, layout, namespace, file)` | `set-geometry` | Writes one view of a [`kind: layout`](schema.md#18-layout-diagram-geometry) document. |
+| `SetLinkGeometry(view, link, waypoints, routing, label, layout, namespace, file)` | `set-link-geometry` | Writes one *link's* geometry into that document: its bends, its routing style and where its label sits. |
 
 Two are **primitive**, and file-level:
 
@@ -95,6 +96,19 @@ survives keeps the comment somebody wrote above it. It is the operation
 [`netgraph layout`](commands/layout.md) writes through, and the one a canvas will
 write through when a node is dragged.
 
+`SetLinkGeometry` is the opposite unit for the opposite reason. A whole view is
+what an *automatic layout* decides; a route is what a *hand* decides, one cable
+at a time, and dragging a bend must not have to send — and so must not be able
+to clobber — the coordinates of everything else in the diagram. Two people
+arranging one diagram is the case that makes that load-bearing. The entry is
+**replaced** rather than merged, so straightening a cable is this operation with
+no waypoints, and a link left with nothing pinned at all has its entry removed
+rather than left saying `{}`. It is what every link-routing gesture in
+[`netgraph web`](commands/web.md#the-keyboard) ends in — dropping a bend,
+dragging one, setting a routing style, putting a nudged label back on the line —
+and [`docs/rendering.md`](rendering.md#links-are-geometry-too) is what the
+stored result draws as.
+
 `AppendItem` is the general form of the gap `AddInterface` names: a sequence
 entry cannot be written at a path that does not exist yet, so `set` cannot add
 one, and replacing the whole list to add an entry would rewrite the comments
@@ -103,7 +117,7 @@ it has to extend a device's VLAN database, and `AddInterface` stays as it is
 because a port also has to be *placed*, and a duplicate name has to mean
 something.
 
-The set is deliberately closed. A fifteenth kind of change is a fifteenth
+The set is deliberately closed. A sixteenth kind of change is a sixteenth
 operation, defined here, and not a caller reaching for the file system.
 
 ## What an operation guarantees
@@ -385,10 +399,11 @@ the template.
 **It does not resolve conflicts.** It detects them and stops. Merging is a job
 for the tool that already does it well, and the files are text.
 
-**It does not lay diagrams out.** It *stores* where a node sits — `SetGeometry`
-is a first-class operation and geometry is inventory data like anything else —
-but deciding where a node should sit is [`netgraph layout`](commands/layout.md)'s
-job, and drawing it there is the renderer's.
+**It does not lay diagrams out.** It *stores* where a node sits and which bends
+a cable goes through — `SetGeometry` and `SetLinkGeometry` are first-class
+operations and geometry is inventory data like anything else — but deciding
+where a node should sit is [`netgraph layout`](commands/layout.md)'s job, and
+turning a bend into a line is the renderer's.
 
 ## See also
 

@@ -65,6 +65,7 @@ from netgraph.edit.operations import (
     RenameElement,
     SetField,
     SetGeometry,
+    SetLinkGeometry,
     UnsetField,
     WriteFile,
 )
@@ -856,6 +857,13 @@ def _set_geometry(context: _Context, operation: SetGeometry) -> tuple[Operation,
         if wanted is None:
             continue
         _merge_section(view, section, wanted)
+    if operation.routing is not None:
+        # The empty string is "go back to the default", which is a different
+        # request from "leave it alone" and has to be able to remove the key.
+        if operation.routing:
+            view["routing"] = operation.routing
+        else:
+            view.pop("routing", None)
     if not view:
         # Reachable from a prune whose view had nothing left in it: every key it
         # held named something the inventory no longer has.
@@ -863,6 +871,79 @@ def _set_geometry(context: _Context, operation: SetGeometry) -> tuple[Operation,
     _drop_if_empty(context, data, spec, views, relative=relative, index=index)
     _check_layout(data, operation)
     return None
+
+
+def _set_link_geometry(
+    context: _Context, operation: SetLinkGeometry
+) -> tuple[Operation, ...] | None:
+    """Write, replace or drop the geometry of one link (§18).
+
+    The same three cases as :func:`_set_geometry` and the same write path — the
+    document's round-trip tree is edited in place, so a comment above the cable
+    somebody routed last week survives this week's drag. What differs is the
+    unit: one entry in the ``edges`` section rather than three whole sections,
+    so two people dragging two different cables do not overwrite each other.
+
+    Clearing the last entry tidies up after itself: the ``edges`` section goes,
+    then the view if that was all it held, then the document, then the file.
+    """
+    located = _find_layout(context, operation)
+    entry = operation.entry
+    if located is None:
+        if operation.clears:
+            return ()
+        return _create_link_layout(context, operation)
+
+    relative, index = located
+    data = context.tree.document(relative, index).touch()
+    spec = _mapping_at(data, "spec")
+    views = _mapping_at(spec, "views")
+    view = _mapping_at(views, operation.view)
+    edges = _mapping_at(view, "edges")
+    if entry:
+        current = edges.get(operation.link, MISSING)
+        if current is not MISSING and _equivalent(current, entry):
+            return None
+        if isinstance(current, MutableMapping):
+            _merge_entry(current, entry)
+        else:
+            edges[operation.link] = as_yaml(entry)
+    else:
+        edges.pop(operation.link, None)
+    if not edges:
+        view.pop("edges", None)
+    if not view:
+        views.pop(operation.view, None)
+    _drop_if_empty(context, data, spec, views, relative=relative, index=index)
+    _check_layout(data, operation)
+    return None
+
+
+def _create_link_layout(context: _Context, operation: SetLinkGeometry) -> tuple[Operation, ...]:
+    """Write a new layout document holding just this one routed link."""
+    document = {
+        "apiVersion": API_VERSION,
+        "kind": LAYOUT_KIND,
+        "metadata": {"name": operation.layout},
+        "spec": {"views": {operation.view: {"edges": {operation.link: operation.entry}}}},
+    }
+    _check_layout(document, operation)
+    relative = choose_file(
+        kind=LAYOUT_KIND,
+        namespace=operation.namespace,
+        name=operation.layout,
+        files=context.tree.facts(context.inventory),
+        requested=operation.file,
+    )
+    context.tree.insert_document(relative, -1, _emit(document))
+    return (
+        SetLinkGeometry(
+            view=operation.view,
+            link=operation.link,
+            layout=operation.layout,
+            namespace=operation.namespace,
+        ),
+    )
 
 
 def _drop_if_empty(
@@ -883,7 +964,9 @@ def _drop_if_empty(
         context.tree.remove_document(relative, index)
 
 
-def _find_layout(context: _Context, operation: SetGeometry) -> tuple[str, int] | None:
+def _find_layout(
+    context: _Context, operation: SetGeometry | SetLinkGeometry
+) -> tuple[str, int] | None:
     """Where the named layout document lives, or ``None`` if there is none."""
     source = context.inventory.layout_sources.get(operation.address)
     if source is None or source.relative is None:
@@ -893,11 +976,13 @@ def _find_layout(context: _Context, operation: SetGeometry) -> tuple[str, int] |
 
 def _create_layout(context: _Context, operation: SetGeometry) -> tuple[Operation, ...]:
     """Write a new layout document holding just this view."""
-    view = {
+    view: dict[str, Any] = {
         section: dict(value)
         for section in ("nodes", "edges", "groups")
         if (value := getattr(operation, section))
     }
+    if operation.routing:
+        view["routing"] = operation.routing
     document = {
         "apiVersion": API_VERSION,
         "kind": LAYOUT_KIND,
@@ -986,7 +1071,7 @@ def _has_geometry(data: Any) -> bool:
     return bool(views)
 
 
-def _check_layout(data: Any, operation: SetGeometry) -> None:
+def _check_layout(data: Any, operation: SetGeometry | SetLinkGeometry) -> None:
     """Refuse geometry that is not a layout document, naming what is wrong.
 
     Raises:
@@ -1043,6 +1128,7 @@ _HANDLERS: Final[dict[type[Operation], _Handler]] = {
     Connect: _connect,
     Disconnect: _disconnect,
     SetGeometry: _set_geometry,
+    SetLinkGeometry: _set_link_geometry,
     WriteFile: _write_file,
     RemoveFile: _remove_file,
 }

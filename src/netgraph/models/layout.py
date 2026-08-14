@@ -8,6 +8,7 @@ network facts at all — no interface, no address, no link — only coordinates:
     metadata:
       name: default
     spec:
+      routing: orthogonal
       views:
         l1:
           nodes:
@@ -18,6 +19,8 @@ network facts at all — no interface, no address, no link — only coordinates:
           edges:
             core/cbl-uplink:
               waypoints: [{x: 240, y: 470}]
+              routing: straight
+              label: {at: 0.35, offset: {x: 0, y: 12}}
           groups:
             core:
               position: {x: 240, y: 468}
@@ -59,6 +62,33 @@ address, or the synthetic id of a derived edge. A group key is a namespace.
 A key naming something the inventory no longer has is a **warning**, not an
 error (``NG-Y001``): deleting a switch must not break ``netgraph validate``,
 and ``netgraph layout --prune`` is the one-line fix.
+
+Links
+-----
+
+A link is geometry too, and an edge entry says three separable things about
+one:
+
+``waypoints``
+    The bends the cable is dragged through, **interior points only**. The two
+    ends are always the nodes themselves, so a route survives either of them
+    being moved: drag the switch and the bends stay put, which is what makes a
+    hand-routed trunk worth placing. An entry with no waypoints is a straight
+    run between the two nodes.
+``routing``
+    ``spline`` (the curve Graphviz draws), ``orthogonal`` (right angles, the
+    way a patch schedule is drawn) or ``straight`` (segment to segment). Set on
+    the link it applies to; :attr:`ViewGeometry.routing` is the default for one
+    view and :attr:`LayoutSpec.routing` the default for the whole inventory,
+    and the most specific one wins.
+``label``
+    Where the link's annotation sits: ``at`` is how far along the route, from
+    ``0`` at the source end to ``1`` at the target end, and ``offset`` nudges
+    it off the line in points. This is what makes a dense VLAN diagram legible.
+
+None of the three is required, but an entry must carry at least one of them:
+an edge key with nothing under it says nothing, and the way to say nothing is
+to leave the key out.
 """
 
 from __future__ import annotations
@@ -81,8 +111,10 @@ __all__ = [
     "MAX_COORDINATE",
     "MAX_GEOMETRY_ENTRIES",
     "MAX_WAYPOINTS",
+    "ROUTING_STYLES",
     "EdgeGeometry",
     "GroupGeometry",
+    "LabelGeometry",
     "Layout",
     "LayoutSpec",
     "NodeGeometry",
@@ -119,6 +151,12 @@ MAX_WAYPOINTS: Final = 64
 #: Most entries one section of one view may hold. An arrangement of a hundred
 #: thousand nodes is a generated file, not a hand-arranged diagram.
 MAX_GEOMETRY_ENTRIES: Final = 100_000
+
+#: How a link is drawn between its bends. Spelled the way a person would say it
+#: rather than the way Graphviz spells it (``true``/``ortho``/``line``), because
+#: this is inventory somebody writes by hand; :mod:`netgraph.layout.routing`
+#: owns the translation.
+ROUTING_STYLES: Final[tuple[str, ...]] = ("spline", "orthogonal", "straight")
 
 
 def _coordinate(value: Any) -> Any:
@@ -200,16 +238,48 @@ class NodeGeometry(NetgraphModel):
     size: Size | None = None
 
 
-class EdgeGeometry(NetgraphModel):
-    """The bends one link is drawn through.
+class LabelGeometry(NetgraphModel):
+    """Where a link's annotation sits, relative to the link.
 
-    The points become Graphviz spline control points, in the order written, from
-    the ``source`` end to the ``target`` end of the edge as the graph orders
-    them. An empty list is refused: an edge with no waypoints is an edge with no
-    geometry, and the way to say that is to leave the entry out.
+    Stored *on the link* rather than as a coordinate, so that nudging a VLAN
+    label clear of a crossing cable survives both endpoints being dragged
+    somewhere else. :attr:`at` slides it along the route and :attr:`offset`
+    lifts it off, in points, in the same ``y``-upwards system as everything
+    else here.
     """
 
-    waypoints: Annotated[tuple[Point, ...], Field(min_length=1, max_length=MAX_WAYPOINTS)]
+    #: How far along the route, from ``0`` at the source end to ``1`` at the
+    #: target end. Half way is where a renderer puts a label left alone.
+    at: Annotated[float, BeforeValidator(_coordinate), Field(ge=0.0, le=1.0)] = 0.5
+    #: How far off the line, in points. Omitted means "on it".
+    offset: Point | None = None
+
+
+class EdgeGeometry(NetgraphModel):
+    """How one link is drawn: its bends, its routing style and its label.
+
+    The waypoints are the **interior** points of the route, in the order
+    written, from the ``source`` end to the ``target`` end of the edge as the
+    graph orders them; the two ends are the nodes, which is why moving a node
+    moves the route without invalidating the bends. An entry carrying none of
+    the three fields is refused (``NG-Y003``): it says nothing, and the way to
+    say nothing is to leave the key out.
+    """
+
+    waypoints: Annotated[tuple[Point, ...], Field(max_length=MAX_WAYPOINTS)] = ()
+    #: One of :data:`ROUTING_STYLES`, or ``None`` to take the view's default.
+    routing: Literal["spline", "orthogonal", "straight"] | None = None
+    label: LabelGeometry | None = None
+
+    @model_validator(mode="after")
+    def _says_something(self) -> EdgeGeometry:
+        if not self.waypoints and self.routing is None and self.label is None:
+            raise field_error(
+                "an edge entry must say something about the link — waypoints, "
+                "routing or label; drop the key to say nothing",
+                rule="NG-Y003",
+            )
+        return self
 
 
 class GroupGeometry(NetgraphModel):
@@ -255,6 +325,9 @@ class ViewGeometry(NetgraphModel):
     nodes: dict[str, NodeGeometry] = Field(default_factory=dict)
     edges: dict[str, EdgeGeometry] = Field(default_factory=dict)
     groups: dict[str, GroupGeometry] = Field(default_factory=dict)
+    #: How links in this view are drawn when they do not say for themselves.
+    #: ``None`` takes :attr:`LayoutSpec.routing`.
+    routing: Literal["spline", "orthogonal", "straight"] | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -268,13 +341,16 @@ class ViewGeometry(NetgraphModel):
     @property
     def is_empty(self) -> bool:
         """Does this view place nothing at all?"""
-        return not (self.nodes or self.edges or self.groups)
+        return not (self.nodes or self.edges or self.groups or self.routing)
 
 
 class LayoutSpec(NetgraphModel):
     """The arrangements one layout document carries, one per view."""
 
     views: dict[str, ViewGeometry] = Field(default_factory=dict)
+    #: The inventory-wide default routing style, overridden per view and per
+    #: link. ``None`` means ``spline`` — the curve Graphviz has always drawn.
+    routing: Literal["spline", "orthogonal", "straight"] | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -321,6 +397,8 @@ class Layout(NetgraphModel):
     @property
     def is_empty(self) -> bool:
         """Does this document place nothing at all?"""
+        if self.spec.routing is not None:
+            return False
         return all(view.is_empty for view in self.spec.views.values())
 
     def __str__(self) -> str:

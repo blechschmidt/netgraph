@@ -8,69 +8,63 @@ spec:
       nodes:
         hosts/adp-usb-eth:
           position: {x: 1176, y: 271}
+          size: {width: 376.18, height: 66.47}
         hosts/laptop:
           position: {x: 1176, y: 439}
+          size: {width: 65, height: 36}
         hosts/pc-desk:
           position: {x: 847, y: 271}
+          size: {width: 209, height: 47}
         hosts/phone:
           position: {x: 1485, y: 56}
+          size: {width: 203, height: 47}
         hosts/srv-nas:
           position: {x: 103, y: 271}
+          size: {width: 206, height: 64.63}
         routers/rtr-home:
           position: {x: 474, y: 271}
+          size: {width: 464, height: 146}
         switches/sw-home:
           position: {x: 847, y: 56}
+          size: {width: 169, height: 112}
         wireless/ap-home:
           position: {x: 1485, y: 271}
+          size: {width: 169, height: 60}
       edges:
         cables/cbl-rtr-sw:
           waypoints:
-            - {x: 555.4, y: 223.52}
             - {x: 616.59, y: 188.57}
             - {x: 700.21, y: 140.82}
-            - {x: 762.22, y: 105.41}
         cables/cbl-sw-ap:
           waypoints:
-            - {x: 1449.7, y: 240.67}
             - {x: 1430.7, y: 226.07}
             - {x: 1406.2, y: 209.19}
             - {x: 1382, y: 198}
             - {x: 1231.2, y: 128.14}
             - {x: 1039.9, y: 88.31}
-            - {x: 931.7, y: 69.82}
         cables/cbl-sw-desk:
           waypoints:
-            - {x: 847, y: 247.21}
             - {x: 847, y: 215.22}
             - {x: 847, y: 156.04}
-            - {x: 847, y: 112.15}
         cables/cbl-sw-dongle:
           waypoints:
-            - {x: 1127.8, y: 238.8}
             - {x: 1076.4, y: 205.52}
             - {x: 993.98, y: 152.16}
-            - {x: 931.7, y: 111.84}
         cables/cbl-sw-nas:
           waypoints:
-            - {x: 147.79, y: 238.75}
             - {x: 169.88, y: 224.55}
             - {x: 197.44, y: 208.6}
             - {x: 224, y: 198}
             - {x: 408.62, y: 124.33}
             - {x: 640.14, y: 84.7}
-            - {x: 762.37, y: 67.56}
         cables/wl-ap-phone:
           waypoints:
-            - {x: 1485, y: 240.83}
             - {x: 1485, y: 197.88}
             - {x: 1485, y: 118.51}
-            - {x: 1485, y: 79.64}
         hosts/adp-usb-eth#upstream:
           waypoints:
-            - {x: 1176, y: 420.86}
             - {x: 1176, y: 393.44}
             - {x: 1176, y: 339.26}
-            - {x: 1176, y: 304.38}
     l2:
       nodes:
         hosts/adp-usb-eth:

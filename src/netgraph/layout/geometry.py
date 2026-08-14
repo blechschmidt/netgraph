@@ -32,16 +32,26 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Final
+from typing import Any, Final
 
-from netgraph.models.layout import EdgeGeometry, GroupGeometry, NodeGeometry, Point
+from netgraph.models.layout import (
+    EdgeGeometry,
+    GroupGeometry,
+    LabelGeometry,
+    NodeGeometry,
+    Point,
+)
 
 __all__ = [
     "COORDINATE_PLACES",
+    "DEFAULT_ROUTING",
     "Box",
     "Geometry",
+    "LabelPlacement",
     "LayoutMode",
+    "LinkGeometry",
     "Placement",
+    "Routing",
     "round_coordinate",
 ]
 
@@ -158,6 +168,113 @@ class Box:
         )
 
 
+class Routing(str, Enum):
+    """How a link is drawn between the points it is pinned through."""
+
+    #: The curve Graphviz draws, and what every diagram looked like before this
+    #: existed.
+    SPLINE = "spline"
+    #: Right angles: each leg runs horizontally then vertically, which is how a
+    #: patch schedule and a rack diagram are drawn.
+    ORTHOGONAL = "orthogonal"
+    #: Straight from point to point, corners left sharp.
+    STRAIGHT = "straight"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+#: What a link is drawn as when neither it, its view nor the inventory says.
+DEFAULT_ROUTING: Final = Routing.SPLINE
+
+
+@dataclass(frozen=True, slots=True)
+class LabelPlacement:
+    """Where a link's annotation sits, as a position *on the link*."""
+
+    #: How far along the route, ``0`` at the source end and ``1`` at the target.
+    at: float = 0.5
+    #: How far off the line, in points.
+    dx: float = 0.0
+    dy: float = 0.0
+
+    @property
+    def offset(self) -> tuple[float, float]:
+        return (self.dx, self.dy)
+
+    def to_model(self) -> LabelGeometry:
+        payload: dict[str, Any] = {"at": round_coordinate(self.at)}
+        if self.dx or self.dy:
+            payload["offset"] = {"x": round_coordinate(self.dx), "y": round_coordinate(self.dy)}
+        return LabelGeometry.model_validate(payload)
+
+    @classmethod
+    def from_model(cls, geometry: LabelGeometry) -> LabelPlacement:
+        offset = geometry.offset
+        return cls(
+            at=geometry.at,
+            dx=0.0 if offset is None else offset.x,
+            dy=0.0 if offset is None else offset.y,
+        )
+
+    def rounded(self) -> LabelPlacement:
+        return LabelPlacement(
+            at=round_coordinate(self.at),
+            dx=round_coordinate(self.dx),
+            dy=round_coordinate(self.dy),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class LinkGeometry:
+    """Everything one link's entry says: its bends, its style and its label.
+
+    Every field is optional and the empty instance means "nothing is pinned",
+    which is what :meth:`Geometry.link` hands back for a link nobody has
+    touched — so a caller never has to test for ``None`` before asking what a
+    link's routing is.
+    """
+
+    #: The **interior** points of the route, source end first. The two ends are
+    #: the nodes themselves and are never stored: that is what lets a bend
+    #: survive its endpoints being dragged.
+    waypoints: tuple[tuple[float, float], ...] = ()
+    #: The style this link is drawn in, or ``None`` to take the view's default.
+    routing: Routing | None = None
+    label: LabelPlacement | None = None
+
+    @property
+    def is_empty(self) -> bool:
+        return not self.waypoints and self.routing is None and self.label is None
+
+    def to_model(self) -> EdgeGeometry:
+        payload: dict[str, Any] = {}
+        if self.waypoints:
+            payload["waypoints"] = [
+                {"x": round_coordinate(x), "y": round_coordinate(y)} for x, y in self.waypoints
+            ]
+        if self.routing is not None:
+            payload["routing"] = self.routing.value
+        if self.label is not None:
+            payload["label"] = self.label.to_model().model_dump(exclude_none=True)
+        return EdgeGeometry.model_validate(payload)
+
+    @classmethod
+    def from_model(cls, geometry: EdgeGeometry) -> LinkGeometry:
+        return cls(
+            waypoints=tuple((point.x, point.y) for point in geometry.waypoints),
+            routing=None if geometry.routing is None else Routing(geometry.routing),
+            label=None if geometry.label is None else LabelPlacement.from_model(geometry.label),
+        )
+
+    def rounded(self) -> LinkGeometry:
+        return LinkGeometry(
+            waypoints=tuple((round_coordinate(x), round_coordinate(y)) for x, y in self.waypoints),
+            routing=self.routing,
+            label=None if self.label is None else self.label.rounded(),
+        )
+
+
 class LayoutMode(str, Enum):
     """How much of a drawing the stored arrangement decides."""
 
@@ -180,14 +297,33 @@ class Geometry:
     view: str = ""
     #: Node id to placement.
     nodes: Mapping[str, Placement] = field(default_factory=dict)
-    #: Edge id to spline control points, in the graph's endpoint order.
-    edges: Mapping[str, tuple[tuple[float, float], ...]] = field(default_factory=dict)
+    #: Edge id to what its entry pins, in the graph's endpoint order.
+    edges: Mapping[str, LinkGeometry] = field(default_factory=dict)
     #: Namespace to cluster box.
     groups: Mapping[str, Box] = field(default_factory=dict)
+    #: The routing style links in this view take when they do not say for
+    #: themselves — the view's own, or failing that the inventory's.
+    routing: Routing | None = None
 
     @property
     def is_empty(self) -> bool:
-        return not (self.nodes or self.edges or self.groups)
+        return not (self.nodes or self.edges or self.groups or self.routing)
+
+    def link(self, edge_id: str) -> LinkGeometry:
+        """What is pinned for one link, which may be nothing at all."""
+        return self.edges.get(edge_id, _NOTHING_PINNED)
+
+    def routing_for(self, edge_id: str, *, default: Routing | None = None) -> Routing:
+        """The style one link is drawn in, most specific answer first.
+
+        The link's own entry beats everything, because it is a decision
+        somebody made about *that cable*; then the caller's override (which is
+        where ``--routing`` arrives), then the view's, then the inventory's.
+        """
+        pinned = self.link(edge_id).routing
+        if pinned is not None:
+            return pinned
+        return default or self.routing or DEFAULT_ROUTING
 
     def mode(self, node_ids: Iterable[str]) -> LayoutMode:
         """How much of a drawing over ``node_ids`` this arrangement decides.
@@ -219,7 +355,13 @@ class Geometry:
             nodes={k: v for k, v in self.nodes.items() if k in keep_nodes},
             edges={k: v for k, v in self.edges.items() if k in keep_edges},
             groups=dict(self.groups),
+            routing=self.routing,
         )
+
+
+#: What :meth:`Geometry.link` answers for a link nothing is pinned for. One
+#: shared instance because it is immutable and asked for constantly.
+_NOTHING_PINNED: Final = LinkGeometry()
 
 
 def points_of(geometry: EdgeGeometry) -> tuple[tuple[float, float], ...]:

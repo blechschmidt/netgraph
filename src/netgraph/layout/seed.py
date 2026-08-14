@@ -31,14 +31,21 @@ prompted it.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Final
 
 from netgraph.edit.operations import Operation, SetGeometry
 from netgraph.errors import RenderError
 from netgraph.layout.document import geometry_sections, inline_entry
-from netgraph.layout.geometry import Box, Geometry, LayoutMode, Placement, round_coordinate
+from netgraph.layout.geometry import (
+    Box,
+    Geometry,
+    LayoutMode,
+    LinkGeometry,
+    Placement,
+    round_coordinate,
+)
 from netgraph.layout.graphviz import Drawing, DrawingError, parse_drawing
 from netgraph.layout.resolve import conflicts_in, resolve_key
 from netgraph.loader.inventory import Inventory, namespace_of
@@ -91,7 +98,12 @@ SEED_PASSES: Final = 3
 
 
 def seed_geometry(
-    graph: Graph, options: RenderOptions, *, engine: str = "dot", replace_all: bool = False
+    graph: Graph,
+    options: RenderOptions,
+    *,
+    engine: str = "dot",
+    replace_all: bool = False,
+    with_waypoints: bool = False,
 ) -> Geometry:
     """Lay ``graph`` out and return the arrangement that reproduces the result.
 
@@ -122,6 +134,12 @@ def seed_geometry(
             sizes decide the layout.
         engine: One of :data:`LAYOUT_ENGINES`.
         replace_all: Lay every node out afresh, discarding what is stored.
+        with_waypoints: Is the caller going to *store* the routes this produces?
+            It decides which node sizes are recorded: a route has to stop at the
+            shape it runs into, and netgraph cannot measure a label, so the box
+            of every node a stored route leaves from is recorded with it. Nodes
+            no route touches are left sized by their labels, which is what keeps
+            an arrangement valid when a device grows a port.
 
     Returns:
         The arrangement, rounded to the precision it is stored at: a position
@@ -137,11 +155,28 @@ def seed_geometry(
 
     view = graph.layer.value
     mode = graph.geometry.mode(graph.nodes)
+    # A route somebody dragged into place is a decision, not a derived number,
+    # so it is carried across every pass untouched rather than being replaced by
+    # whatever the engine drew. ``--replace`` is the one thing that discards it,
+    # which is what "lay every node out afresh" has to mean.
+    routed = (
+        {} if replace_all else {k: v for k, v in graph.geometry.edges.items() if not v.is_empty}
+    )
+    # Which nodes have to record how big they are: the ends of every link whose
+    # route will be in the file when this is done.
+    sized = _anchor_nodes(
+        graph, {edge.id for edge in graph.edges} if with_waypoints else set(routed)
+    )
+    adopt = True
     if replace_all or mode is LayoutMode.AUTO:
         bare = replace(graph, geometry=Geometry(view=view))
         geometry = _geometry_of(
-            _draw(bare, options, LayoutPlan(engine=engine)), bare, options, view=view
+            _draw(bare, options, LayoutPlan(engine=engine)), bare, options, view=view, sized=sized
         )
+        # The engine has just routed every link from scratch, which is as good
+        # an answer as this will ever get: pin it now rather than re-reading the
+        # settling pass's echo of it.
+        routed, adopt = dict(geometry.edges), False
     elif mode is LayoutMode.PARTIAL:
         geometry = complete_layout(graph, options).geometry
     else:
@@ -149,21 +184,48 @@ def seed_geometry(
 
     # Settle on the coordinates the *render* path produces, not the ones the
     # seeding engine produced, so that what is written is what will be drawn.
+    #
+    # A route is read back out of Graphviz **once**, on the first settling pass,
+    # and is a pinned decision from then on. It has to be: the pass after that
+    # one is drawing the route this one just produced, so re-reading it would be
+    # reading our own output — and since a polyline of *n* bends goes to
+    # Graphviz as 3n+1 control points and would come back as 3n-1 bends, the
+    # answer would grow every time instead of settling.
     for _ in range(SEED_PASSES):
         candidate = replace(graph, geometry=geometry)
         plan = LayoutPlan(mode=LayoutMode.FIXED, geometry=geometry)
-        drawn = _geometry_of(_draw(candidate, options, plan), candidate, options, view=view)
+        drawn = _geometry_of(
+            _draw(candidate, options, plan), candidate, options, view=view, sized=sized
+        )
+        shift = _translation(geometry.nodes, drawn.nodes)
         # The no-op engine draws no clusters, so a settling pass never reports a
         # group box; the boxes from the engine pass are carried across and moved
         # by exactly the translation the nodes moved by, which keeps a frame
-        # around the nodes it was drawn around.
-        settled = replace_geometry_groups(
-            drawn, geometry, _translation(geometry.nodes, drawn.nodes)
-        )
+        # around the nodes it was drawn around. A pinned route moves with them,
+        # for the same reason: the bends are in the coordinate system the nodes
+        # are in, and a pass that shifts one has to shift the other.
+        edges = dict(drawn.edges) if adopt else {}
+        edges.update({key: _shifted(link, shift) for key, link in routed.items()})
+        settled = replace(replace_geometry_groups(drawn, geometry, shift), edges=edges)
         if settled.nodes == geometry.nodes:
             return settled
+        routed, adopt = edges, False
         geometry = settled
     return geometry
+
+
+def _shifted(link: LinkGeometry, shift: tuple[float, float]) -> LinkGeometry:
+    """One link's geometry moved by ``shift``. A label position is normalised
+    along the route and so moves with it for free."""
+    dx, dy = shift
+    if not dx and not dy:
+        return link
+    return replace(
+        link,
+        waypoints=tuple(
+            (round_coordinate(x + dx), round_coordinate(y + dy)) for x, y in link.waypoints
+        ),
+    )
 
 
 def replace_geometry_groups(
@@ -224,16 +286,29 @@ def _draw(graph: Graph, options: RenderOptions, plan: LayoutPlan) -> Drawing:
         raise RenderError(f"cannot read the layout Graphviz computed: {exc}") from exc
 
 
-def _geometry_of(drawing: Drawing, graph: Graph, options: RenderOptions, *, view: str) -> Geometry:
+def _geometry_of(
+    drawing: Drawing,
+    graph: Graph,
+    options: RenderOptions,
+    *,
+    view: str,
+    sized: Collection[str] = (),
+) -> Geometry:
     """One Graphviz drawing as a stored arrangement, rounded."""
-    # Sizes are read from Graphviz and then dropped. Graphviz derives the same
-    # box from the same label on every run, so storing it would buy nothing and
-    # cost correctness: a device that grows an interface grows its label, and a
-    # stored size would then be a stale number that only a client drawing from
-    # the JSON export would ever see. ``size`` stays in the schema for a canvas
-    # editor that lets somebody resize a box on purpose.
+    stored = graph.geometry
+    anchors = frozenset(sized)
+    # Sizes are read from Graphviz and then dropped for every node that does not
+    # anchor a hand-routed link. Graphviz derives the same box from the same
+    # label on every run, so storing one would normally buy nothing and cost
+    # correctness: a device that grows an interface grows its label, and a
+    # stored size would then be a stale number.
+    #
+    # A node a *route* leaves from is the exception. The renderer has to know
+    # where the border is to stop the line at it, and it has no label metrics to
+    # work that out — so for those nodes the size is recorded, and a re-seed
+    # refreshes it. See :mod:`netgraph.layout.routing`.
     nodes = {
-        fqn: Placement(x=round_coordinate(placed.x), y=round_coordinate(placed.y))
+        fqn: _placement(placed, sized=fqn in anchors)
         for fqn in graph.nodes
         if (placed := drawing.nodes.get(fqn)) is not None
     }
@@ -247,13 +322,47 @@ def _geometry_of(drawing: Drawing, graph: Graph, options: RenderOptions, *, view
     # Graphviz walks edges per node rather than in declaration order, so an
     # index-for-index pairing attaches a spline to the wrong link — which draws
     # a line across the diagram and parses perfectly.
+    #
+    # What a *hand-routed* link says is not read back here at all: the bends, the
+    # style and the label position are decisions, and :func:`seed_geometry` puts
+    # them back over the top of this so that re-seeding an arrangement cannot
+    # quietly replace one with whatever the engine drew.
     identity = element_ids(graph)
-    edges = {
-        edge.id: tuple((round_coordinate(x), round_coordinate(y)) for x, y in spline)
-        for index, edge in enumerate(graph.edges)
-        if (drawn := identity.edge(index)) is not None and (spline := drawing.edges.get(drawn))
-    }
-    return Geometry(view=view, nodes=nodes, edges=edges, groups=groups)
+    edges: dict[str, LinkGeometry] = {}
+    for index, edge in enumerate(graph.edges):
+        drawn = identity.edge(index)
+        spline = drawing.edges.get(drawn) if drawn is not None else None
+        if spline:
+            edges[edge.id] = LinkGeometry(waypoints=_interior(spline))
+    return Geometry(view=view, nodes=nodes, edges=edges, groups=groups, routing=stored.routing)
+
+
+def _placement(placed: Placement, *, sized: bool) -> Placement:
+    return Placement(
+        x=round_coordinate(placed.x),
+        y=round_coordinate(placed.y),
+        width=round_coordinate(placed.width) if sized and placed.width is not None else None,
+        height=round_coordinate(placed.height) if sized and placed.height is not None else None,
+    )
+
+
+def _anchor_nodes(graph: Graph, links: Collection[str]) -> frozenset[str]:
+    """The nodes ``links`` leave from, whose size a stored route needs."""
+    return frozenset(
+        node for edge in graph.edges if edge.id in links for node in (edge.source, edge.target)
+    )
+
+
+def _interior(spline: Sequence[tuple[float, float]]) -> tuple[tuple[float, float], ...]:
+    """A Graphviz spline as the bends it goes through.
+
+    Graphviz reports a route that already starts and ends on the two shapes'
+    borders; a stored one says only where it *bends*, because the ends are the
+    nodes and have to follow them when they are dragged. So the two boundary
+    points come off, and the renderer puts equivalents back — see
+    :func:`netgraph.layout.routing.route`.
+    """
+    return tuple((round_coordinate(x), round_coordinate(y)) for x, y in spline[1:-1])
 
 
 def _rounded_box(box: Box) -> Box:
@@ -277,28 +386,36 @@ def write_operations(
     namespace: str = "",
     file: str | None = None,
     with_waypoints: bool = False,
+    routing: str | None = None,
 ) -> tuple[Operation, ...]:
     """The operations that persist ``geometry`` as one view of a layout document.
 
-    Edge waypoints are left out unless asked for. A seeded spline is four
-    control points per link of numbers nobody will ever read, and the render
-    recomputes an identical one from the node positions; a *hand-placed* bend is
-    a different thing, and that is what the flag is for.
+    Seeded edge waypoints are left out unless asked for. A seeded spline is a
+    handful of control points per link of numbers nobody will ever read, and the
+    render recomputes an identical one from the node positions; a *hand-placed*
+    bend is a different thing, and that is what the flag is for. A link that
+    pins a routing style or a label position is written either way, because
+    neither is derivable and dropping one would undo a decision.
 
     An arrangement of nothing produces no operation. A view whose drawing is
     empty — ``--layer rack`` on an inventory that records no racks — has nothing
     to store, and writing ``rack: {}`` into a layout document would be a line
     that says so at the top of every file.
+
+    Args:
+        routing: The view's default routing style to write, or ``None`` to
+            leave whatever the document says alone.
     """
-    if geometry.is_empty:
+    if geometry.is_empty and routing is None:
         return ()
     sections = geometry_sections(geometry, with_waypoints=with_waypoints)
     return (
         SetGeometry(
             view=geometry.view,
             nodes=sections.get("nodes", {}),
-            edges=sections.get("edges", {}) if with_waypoints else None,
+            edges=sections.get("edges", {}) if with_waypoints or "edges" in sections else None,
             groups=sections.get("groups", {}),
+            routing=routing,
             layout=layout,
             namespace=namespace,
             file=file,

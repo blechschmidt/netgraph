@@ -118,6 +118,9 @@
   var MAX_VIEWS = 6;
 
   var details = {};
+  /** The stored arrangement behind the drawing on screen, or null. What makes
+   *  a cable routable: see links.js. */
+  var geometry = null;
   var pending = null;
   var inFlight = false;
   var queued = false;
@@ -248,6 +251,7 @@
       return;
     }
     details = reuse ? held.details : (result.details || {});
+    geometry = reuse ? held.geometry : (result.geometry || null);
     // A diff is drawn by the same renderer into the same canvas; what marks the
     // page as showing one is the legend, which is furniture without it.
     el.canvas.classList.toggle("diffing", !!result.diff);
@@ -262,7 +266,7 @@
         if (!view.placed) { view.placed = true; resetView(); }
       }
       el.placeholder.hidden = true;
-      if (key) { remember(key, result.graphHash || held.hash, svg, details); }
+      if (key) { remember(key, result.graphHash || held.hash, svg, details, geometry); }
       currentView = key;
       paintRemote();
     } else {
@@ -276,6 +280,10 @@
     // the ones that reuse a cached SVG -- a view switched back to has to be as
     // legible as one drawn fresh.
     netgraphA11y.annotate(details, { view: el.layer.value });
+    // The handles that route a cable live *inside* the drawing, so they are
+    // rebuilt whenever the drawing is -- a view switched back to out of the
+    // cache has to be as editable as one drawn fresh.
+    netgraphLinks.annotate(el.viewport.firstElementChild, geometry, details);
     // A frame of the history carries facts the canvas has nowhere to put: which
     // commit it is, and what that commit did. The scrubber puts them beside
     // itself; app.js only has to say that a drawing arrived.
@@ -283,9 +291,9 @@
   }
 
   /** Keep this view's drawing, dropping the least recently drawn if need be. */
-  function remember(key, hash, svg, records) {
+  function remember(key, hash, svg, records, arrangement) {
     if (!hash) { return; }
-    views[key] = { hash: hash, svg: svg, details: records };
+    views[key] = { hash: hash, svg: svg, details: records, geometry: arrangement };
     viewOrder = viewOrder.filter(function (other) { return other !== key; });
     viewOrder.unshift(key);
     while (viewOrder.length > MAX_VIEWS) { delete views[viewOrder.pop()]; }
@@ -677,7 +685,22 @@
 
   el.canvas.addEventListener("mouseleave", function () { hideInfo(); });
 
+  el.canvas.addEventListener("dblclick", function (event) {
+    // Double-clicking a link drops a bend where it was clicked -- the gesture
+    // every diagram editor has, and the one that needs no chrome at all.
+    if (netgraphLinks.insert(event)) { event.preventDefault(); }
+  });
+
+  el.canvas.addEventListener("contextmenu", function (event) {
+    // Right-clicking a bend removes it. The browser menu is only suppressed
+    // when a bend was actually under the cursor.
+    if (netgraphLinks.remove(event)) { event.preventDefault(); }
+  });
+
   el.canvas.addEventListener("click", function (event) {
+    // Selecting a link is what reveals its handles, so it happens whether or
+    // not the click also landed on something with a detail record.
+    netgraphLinks.select(netgraphLinks.linkAt(event.target));
     var hit = recordAt(event.target);
     if (!hit) { hideInfo(true); return; }
     // In a session, clicking a shape reveals the document that declares it:
@@ -701,20 +724,27 @@
     zoomAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.12 : 1 / 1.12);
   }, { passive: false });
 
+  /* One mouse, two things it can be doing: moving the whole canvas, or moving
+   * one grab handle inside it. The handle wins -- a drag that started on a
+   * bend is never a pan -- which is why links.js is asked first and the pan is
+   * not armed at all when it says yes. */
   (function draggable() {
     var origin = null;
     el.canvas.addEventListener("mousedown", function (event) {
       if (event.button !== 0) { return; }
+      if (netgraphLinks.grab(event)) { event.preventDefault(); return; }
       origin = { x: event.clientX - view.x, y: event.clientY - view.y };
       el.canvas.classList.add("panning");
     });
     window.addEventListener("mousemove", function (event) {
+      if (netgraphLinks.dragging()) { netgraphLinks.move(event); return; }
       if (!origin) { return; }
       view.x = event.clientX - origin.x;
       view.y = event.clientY - origin.y;
       applyView();
     });
     window.addEventListener("mouseup", function () {
+      netgraphLinks.release();
       origin = null;
       el.canvas.classList.remove("panning");
     });
@@ -812,6 +842,31 @@
     });
     K.define("element.goto", { run: function () { K.palette("elements", ""); } });
 
+    /* Routing a cable. Each is the keyboard's way in to a gesture the pointer
+     * also has, so a diagram can be arranged without a mouse; links.js owns
+     * both, and both end in the same set-link-geometry operation. */
+    K.define("link.bend", { run: function () { pickLink(); return netgraphLinks.bend(); } });
+    K.define("link.straighten", {
+      run: function () { pickLink(); return netgraphLinks.straighten(); }
+    });
+    K.define("link.route", {
+      run: function () {
+        pickLink();
+        if (!netgraphLinks.hasLink()) { return netgraphLinks.route(null); }
+        K.prompt({
+          title: "How is this link routed?",
+          detail: "spline, orthogonal or straight. Empty takes the view's default back.",
+          fields: [{ name: "style", label: "Routing", list: ROUTING_STYLES, value: "" }],
+          confirm: "Route",
+          onSubmit: function (values) { netgraphLinks.route((values.style || "").trim()); }
+        });
+        return true;
+      }
+    });
+    K.define("link.label.reset", {
+      run: function () { pickLink(); return netgraphLinks.resetLabel(); }
+    });
+
     K.define("view.layer", { run: function () { K.palette("layers", ""); } });
     K.define("view.layer.next", { run: function () { stepLayer(1); } });
     K.define("view.layer.previous", { run: function () { stepLayer(-1); } });
@@ -879,6 +934,22 @@
    * A pane is a container, not a control, so it is focused with `tabindex="-1"`
    * and the first thing inside it that *is* a control takes over from there.
    */
+  /** The routing styles a link may be given; mirrors ROUTING_STYLES in Python. */
+  var ROUTING_STYLES = ["spline", "orthogonal", "straight"];
+
+  /** Point the link commands at whatever the keyboard has focused.
+   *
+   * Clicking a link selects it; focusing one with the arrow keys has to do the
+   * same, or every one of these commands would be mouse-only in practice while
+   * appearing in the palette as though it were not.
+   */
+  function pickLink() {
+    var here = netgraphA11y.focused();
+    if (here && here.record && here.record.type === "edge") {
+      netgraphLinks.select(String(here.record.id || ""));
+    }
+  }
+
   function focusPane(pane) {
     if (!pane) { return; }
     var first = pane.querySelector("button, [href], input, select, textarea");
@@ -935,6 +1006,15 @@
     },
     refuse: function (why) { toast(why, "error"); }
   };
+
+  /* What links.js is given: whether this page may write, which view it is
+   * drawing, and the one way anything on this page changes a file. */
+  netgraphLinks.attach({
+    writable: function () { return mode === "session" && netgraphSession.isWritable(); },
+    view: function () { return el.layer.value; },
+    refuse: function (why) { toast(why, "error"); },
+    write: function (operation, said) { netgraphSession.ops([operation], said); }
+  });
 
   netgraphA11y.attach({ el: el, bringIntoView: bringIntoView });
   defineCommands();

@@ -1,0 +1,1010 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkGraph",
+  "layer": "l1",
+  "nodes": [
+    {
+      "id": "hosts/adp-usb-eth",
+      "type": "element",
+      "name": "adp-usb-eth",
+      "kind": "adapter",
+      "namespace": "hosts",
+      "description": "USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the\nlaptop - there is deliberately no cable between the two (NG-X005).\n",
+      "labels": {
+        "asset": "A-0001",
+        "site": "home"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "enx001122334455",
+          "type": "ethernet",
+          "description": "Dongle Ethernet port",
+          "mac": "00:11:22:33:44:55",
+          "mtu": 1500,
+          "addresses": [
+            "192.168.10.30/24",
+            "2001:db8:10::30/64"
+          ]
+        }
+      ],
+      "layout": {
+        "position": {
+          "x": 1176.0,
+          "y": 271.0
+        },
+        "size": {
+          "width": 376.18,
+          "height": 66.47
+        }
+      }
+    },
+    {
+      "id": "hosts/laptop",
+      "type": "element",
+      "name": "laptop",
+      "kind": "computer",
+      "namespace": "hosts",
+      "description": "Ultrabook without a built-in Ethernet port. It reaches the wired network\nthrough the USB dongle declared in hosts/adp-usb-eth.yaml, so it owns no\ncabled interface of its own.\n",
+      "labels": {
+        "owner": "sam",
+        "role": "laptop",
+        "site": "home"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback",
+          "addresses": [
+            "127.0.0.1/8",
+            "::1/128"
+          ]
+        },
+        {
+          "name": "wlp0s20f3",
+          "type": "wifi",
+          "enabled": false,
+          "description": "Disabled while docked",
+          "mac": "8c:8c:aa:30:01:01"
+        }
+      ],
+      "layout": {
+        "position": {
+          "x": 1176.0,
+          "y": 439.0
+        },
+        "size": {
+          "width": 65.0,
+          "height": 36.0
+        }
+      }
+    },
+    {
+      "id": "hosts/pc-desk",
+      "type": "element",
+      "name": "pc-desk",
+      "kind": "computer",
+      "namespace": "hosts",
+      "description": "Desktop workstation in the study",
+      "labels": {
+        "owner": "sam",
+        "role": "workstation",
+        "site": "home"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback",
+          "addresses": [
+            "127.0.0.1/8",
+            "::1/128"
+          ]
+        },
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "description": "Onboard gigabit port",
+          "mac": "3c:97:0e:20:01:01",
+          "mtu": 1500,
+          "addresses": [
+            "192.168.10.20/24",
+            "2001:db8:10::20/64"
+          ]
+        },
+        {
+          "name": "wlp1s0",
+          "type": "wifi",
+          "enabled": false,
+          "description": "Disabled - the desk is wired",
+          "mac": "3c:97:0e:20:01:02"
+        }
+      ],
+      "layout": {
+        "position": {
+          "x": 847.0,
+          "y": 271.0
+        },
+        "size": {
+          "width": 209.0,
+          "height": 47.0
+        }
+      }
+    },
+    {
+      "id": "hosts/phone",
+      "type": "element",
+      "name": "phone",
+      "kind": "computer",
+      "namespace": "hosts",
+      "description": "Wireless-only client. It reaches the network through its association to\nap-home, which is declared as a `medium: wireless` cable - the association\nis the link.\n",
+      "labels": {
+        "owner": "sam",
+        "role": "mobile",
+        "site": "home"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "en0",
+          "type": "wifi",
+          "description": "Associated to the home SSID on 5 GHz",
+          "mac": "f0:18:98:11:22:33",
+          "mtu": 1500,
+          "addresses": [
+            "192.168.10.40/24",
+            "2001:db8:10::40/64"
+          ]
+        }
+      ],
+      "layout": {
+        "position": {
+          "x": 1485.0,
+          "y": 56.0
+        },
+        "size": {
+          "width": 203.0,
+          "height": 47.0
+        }
+      }
+    },
+    {
+      "id": "hosts/srv-nas",
+      "type": "element",
+      "name": "srv-nas",
+      "kind": "server",
+      "namespace": "hosts",
+      "description": "Backup and media server",
+      "labels": {
+        "env": "prod",
+        "role": "storage",
+        "site": "home"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "lo",
+          "type": "loopback",
+          "addresses": [
+            "127.0.0.1/8",
+            "::1/128"
+          ]
+        },
+        {
+          "name": "eth0",
+          "type": "ethernet",
+          "mac": "00:11:32:40:01:01",
+          "mtu": 1500,
+          "addresses": [
+            "192.168.10.10/24",
+            "2001:db8:10::10/64"
+          ]
+        }
+      ],
+      "layout": {
+        "position": {
+          "x": 103.0,
+          "y": 271.0
+        },
+        "size": {
+          "width": 206.0,
+          "height": 64.63
+        }
+      }
+    },
+    {
+      "id": "routers/rtr-home",
+      "type": "element",
+      "name": "rtr-home",
+      "kind": "router",
+      "namespace": "routers",
+      "description": "Home edge router. Terminates the ISP hand-off on wan0 and is the default\ngateway for the single home VLAN (10).\n",
+      "labels": {
+        "env": "prod",
+        "role": "edge",
+        "site": "home"
+      },
+      "vlans": [
+        10
+      ],
+      "interfaces": [
+        {
+          "name": "lo0",
+          "type": "loopback",
+          "description": "Router ID and management target",
+          "addresses": [
+            "192.0.2.1/32",
+            "2001:db8::1/128"
+          ]
+        },
+        {
+          "name": "wan0",
+          "type": "ethernet",
+          "description": "ISP hand-off",
+          "mac": "00:1e:8c:00:10:01",
+          "mtu": 1500,
+          "addresses": [
+            "203.0.113.2/30"
+          ]
+        },
+        {
+          "name": "lan0",
+          "type": "ethernet",
+          "description": "Downlink to sw-home",
+          "mac": "00:1e:8c:00:10:02",
+          "mtu": 1500,
+          "addresses": [
+            "192.168.10.1/24",
+            "2001:db8:10::1/64"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        }
+      ],
+      "layout": {
+        "position": {
+          "x": 474.0,
+          "y": 271.0
+        },
+        "size": {
+          "width": 464.0,
+          "height": 146.0
+        }
+      }
+    },
+    {
+      "id": "switches/sw-home",
+      "type": "element",
+      "name": "sw-home",
+      "kind": "switch",
+      "namespace": "switches",
+      "description": "Eight-port desktop switch in the hallway cabinet",
+      "labels": {
+        "role": "access",
+        "site": "home"
+      },
+      "vlans": [
+        10,
+        20
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Switching instance"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "In-band management address of the switch",
+          "addresses": [
+            "192.168.10.2/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "port1",
+          "type": "ethernet",
+          "description": "Uplink to rtr-home",
+          "mac": "00:22:07:aa:00:01",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "port2",
+          "type": "ethernet",
+          "description": "Desk - pc-desk",
+          "mac": "00:22:07:aa:00:02",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "port3",
+          "type": "ethernet",
+          "description": "NAS",
+          "mac": "00:22:07:aa:00:03",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "port4",
+          "type": "ethernet",
+          "description": "Patch to the desk, used by the laptop dongle",
+          "mac": "00:22:07:aa:00:04",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "port5",
+          "type": "ethernet",
+          "description": "PoE injector for ap-home; trunks the guest VLAN up to it",
+          "mac": "00:22:07:aa:00:05",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              10,
+              20
+            ]
+          }
+        }
+      ],
+      "layout": {
+        "position": {
+          "x": 847.0,
+          "y": 56.0
+        },
+        "size": {
+          "width": 169.0,
+          "height": 112.0
+        }
+      }
+    },
+    {
+      "id": "wireless/ap-home",
+      "type": "element",
+      "name": "ap-home",
+      "kind": "switch",
+      "namespace": "wireless",
+      "description": "Ceiling access point in the hallway, powered over the uplink. It is a\nswitch: the radio is a bridge port like any other, and the two SSIDs are\nwhat it bridges the air into.\n",
+      "labels": {
+        "role": "wireless",
+        "site": "home"
+      },
+      "vlans": [
+        10,
+        20
+      ],
+      "interfaces": [
+        {
+          "name": "br0",
+          "type": "bridge",
+          "description": "Bridges the radio onto the wired uplink"
+        },
+        {
+          "name": "Vlan10",
+          "type": "vlan",
+          "description": "In-band management address of the access point",
+          "addresses": [
+            "192.168.10.3/24"
+          ],
+          "vlan": {
+            "mode": "access",
+            "vlans": [
+              10
+            ]
+          }
+        },
+        {
+          "name": "eth0",
+          "type": "ethernet",
+          "description": "PoE uplink to sw-home",
+          "mac": "78:8a:20:aa:00:01",
+          "mtu": 1500,
+          "vlan": {
+            "mode": "trunk",
+            "vlans": [
+              10,
+              20
+            ]
+          }
+        },
+        {
+          "name": "wlan0",
+          "type": "wifi",
+          "description": "5 GHz radio, two SSIDs",
+          "mac": "78:8a:20:aa:00:10",
+          "mtu": 1500
+        }
+      ],
+      "layout": {
+        "position": {
+          "x": 1485.0,
+          "y": 271.0
+        },
+        "size": {
+          "width": 169.0,
+          "height": 60.0
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "cables/cbl-rtr-sw",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "routers/rtr-home",
+          "interface": "lan0"
+        },
+        {
+          "node": "switches/sw-home",
+          "interface": "port1"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "H-001",
+      "lengthM": 0.5,
+      "vlans": [
+        10
+      ],
+      "layout": {
+        "waypoints": [
+          {
+            "x": 640.0,
+            "y": 380.0
+          },
+          {
+            "x": 900.0,
+            "y": 380.0
+          }
+        ],
+        "label": {
+          "at": 0.3,
+          "offset": {
+            "x": 0.0,
+            "y": 14.0
+          }
+        },
+        "route": [
+          {
+            "x": 640.0,
+            "y": 345.0
+          },
+          {
+            "x": 640.0,
+            "y": 380.0
+          },
+          {
+            "x": 900.0,
+            "y": 380.0
+          },
+          {
+            "x": 900.0,
+            "y": 113.0
+          }
+        ],
+        "controls": [
+          {
+            "x": 640.0,
+            "y": 345.0
+          },
+          {
+            "x": 640.0,
+            "y": 356.6666666666667
+          },
+          {
+            "x": 640.0,
+            "y": 368.3333333333333
+          },
+          {
+            "x": 640.0,
+            "y": 380.0
+          },
+          {
+            "x": 726.6666666666666,
+            "y": 380.0
+          },
+          {
+            "x": 813.3333333333334,
+            "y": 380.0
+          },
+          {
+            "x": 900.0,
+            "y": 380.0
+          },
+          {
+            "x": 900.0,
+            "y": 291.0
+          },
+          {
+            "x": 900.0,
+            "y": 202.0
+          },
+          {
+            "x": 900.0,
+            "y": 113.0
+          }
+        ],
+        "drawnAs": "orthogonal"
+      }
+    },
+    {
+      "id": "cables/cbl-sw-desk",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "hosts/pc-desk",
+          "interface": "eno1"
+        },
+        {
+          "node": "switches/sw-home",
+          "interface": "port2"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "H-002",
+      "lengthM": 8.0,
+      "vlans": [
+        10
+      ],
+      "layout": {
+        "route": [
+          {
+            "x": 847.0,
+            "y": 246.5
+          },
+          {
+            "x": 847.0,
+            "y": 163.5
+          },
+          {
+            "x": 847.0,
+            "y": 113.0
+          }
+        ],
+        "controls": [
+          {
+            "x": 847.0,
+            "y": 246.5
+          },
+          {
+            "x": 847.0,
+            "y": 218.83333333333334
+          },
+          {
+            "x": 847.0,
+            "y": 191.16666666666666
+          },
+          {
+            "x": 847.0,
+            "y": 163.5
+          },
+          {
+            "x": 847.0,
+            "y": 146.66666666666666
+          },
+          {
+            "x": 847.0,
+            "y": 129.83333333333334
+          },
+          {
+            "x": 847.0,
+            "y": 113.0
+          }
+        ],
+        "drawnAs": "orthogonal"
+      }
+    },
+    {
+      "id": "cables/cbl-sw-nas",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "hosts/srv-nas",
+          "interface": "eth0"
+        },
+        {
+          "node": "switches/sw-home",
+          "interface": "port3"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "H-003",
+      "lengthM": 0.5,
+      "vlans": [
+        10
+      ],
+      "layout": {
+        "route": [
+          {
+            "x": 207.0,
+            "y": 271.0
+          },
+          {
+            "x": 475.0,
+            "y": 271.0
+          },
+          {
+            "x": 475.0,
+            "y": 56.0
+          },
+          {
+            "x": 761.5,
+            "y": 56.0
+          }
+        ],
+        "controls": [
+          {
+            "x": 207.0,
+            "y": 271.0
+          },
+          {
+            "x": 296.3333333333333,
+            "y": 271.0
+          },
+          {
+            "x": 385.66666666666663,
+            "y": 271.0
+          },
+          {
+            "x": 475.0,
+            "y": 271.0
+          },
+          {
+            "x": 475.0,
+            "y": 199.33333333333331
+          },
+          {
+            "x": 475.0,
+            "y": 127.66666666666666
+          },
+          {
+            "x": 475.0,
+            "y": 56.0
+          },
+          {
+            "x": 570.5,
+            "y": 56.0
+          },
+          {
+            "x": 666.0,
+            "y": 56.0
+          },
+          {
+            "x": 761.5,
+            "y": 56.0
+          }
+        ],
+        "drawnAs": "orthogonal"
+      }
+    },
+    {
+      "id": "cables/cbl-sw-dongle",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "hosts/adp-usb-eth",
+          "interface": "enx001122334455"
+        },
+        {
+          "node": "switches/sw-home",
+          "interface": "port4"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "H-004",
+      "lengthM": 10.0,
+      "vlans": [
+        10
+      ],
+      "layout": {
+        "route": [
+          {
+            "x": 1011.5,
+            "y": 236.765
+          },
+          {
+            "x": 1011.5,
+            "y": 56.0
+          },
+          {
+            "x": 932.5,
+            "y": 56.0
+          }
+        ],
+        "controls": [
+          {
+            "x": 1011.5,
+            "y": 236.765
+          },
+          {
+            "x": 1011.5,
+            "y": 176.51
+          },
+          {
+            "x": 1011.5,
+            "y": 116.255
+          },
+          {
+            "x": 1011.5,
+            "y": 56.0
+          },
+          {
+            "x": 985.1666666666666,
+            "y": 56.0
+          },
+          {
+            "x": 958.8333333333334,
+            "y": 56.0
+          },
+          {
+            "x": 932.5,
+            "y": 56.0
+          }
+        ],
+        "drawnAs": "orthogonal"
+      }
+    },
+    {
+      "id": "cables/cbl-sw-ap",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "wireless/ap-home",
+          "interface": "eth0"
+        },
+        {
+          "node": "switches/sw-home",
+          "interface": "port5"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "label": "H-005",
+      "lengthM": 6.0,
+      "vlans": [
+        10,
+        20
+      ],
+      "layout": {
+        "route": [
+          {
+            "x": 1399.5,
+            "y": 271.0
+          },
+          {
+            "x": 1166.0,
+            "y": 271.0
+          },
+          {
+            "x": 1166.0,
+            "y": 56.0
+          },
+          {
+            "x": 932.5,
+            "y": 56.0
+          }
+        ],
+        "controls": [
+          {
+            "x": 1399.5,
+            "y": 271.0
+          },
+          {
+            "x": 1321.6666666666667,
+            "y": 271.0
+          },
+          {
+            "x": 1243.8333333333333,
+            "y": 271.0
+          },
+          {
+            "x": 1166.0,
+            "y": 271.0
+          },
+          {
+            "x": 1166.0,
+            "y": 199.33333333333331
+          },
+          {
+            "x": 1166.0,
+            "y": 127.66666666666666
+          },
+          {
+            "x": 1166.0,
+            "y": 56.0
+          },
+          {
+            "x": 1088.1666666666667,
+            "y": 56.0
+          },
+          {
+            "x": 1010.3333333333334,
+            "y": 56.0
+          },
+          {
+            "x": 932.5,
+            "y": 56.0
+          }
+        ],
+        "drawnAs": "orthogonal"
+      }
+    },
+    {
+      "id": "cables/wl-ap-phone",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "wireless/ap-home",
+          "interface": "wlan0"
+        },
+        {
+          "node": "hosts/phone",
+          "interface": "en0"
+        }
+      ],
+      "medium": "wireless",
+      "wireless": {
+        "ssids": [
+          "home"
+        ],
+        "band": "5GHz",
+        "channel": 36,
+        "widthMhz": 80,
+        "accessPoint": "wireless/ap-home:wlan0"
+      },
+      "vlans": [],
+      "layout": {
+        "routing": "straight",
+        "route": [
+          {
+            "x": 1485.0,
+            "y": 240.0
+          },
+          {
+            "x": 1485.0,
+            "y": 80.5
+          }
+        ],
+        "controls": [
+          {
+            "x": 1485.0,
+            "y": 240.0
+          },
+          {
+            "x": 1485.0,
+            "y": 186.83333333333334
+          },
+          {
+            "x": 1485.0,
+            "y": 133.66666666666669
+          },
+          {
+            "x": 1485.0,
+            "y": 80.5
+          }
+        ],
+        "drawnAs": "straight"
+      }
+    },
+    {
+      "id": "hosts/adp-usb-eth#upstream",
+      "kind": "attachment",
+      "endpoints": [
+        {
+          "node": "hosts/laptop"
+        },
+        {
+          "node": "hosts/adp-usb-eth",
+          "interface": "usb0"
+        }
+      ],
+      "medium": "copper",
+      "speed": 5000000000,
+      "speedText": "5Gbps",
+      "label": "usb",
+      "vlans": [],
+      "layout": {
+        "route": [
+          {
+            "x": 1176.0,
+            "y": 420.0
+          },
+          {
+            "x": 1176.0,
+            "y": 355.0
+          },
+          {
+            "x": 1176.0,
+            "y": 305.235
+          }
+        ],
+        "controls": [
+          {
+            "x": 1176.0,
+            "y": 420.0
+          },
+          {
+            "x": 1176.0,
+            "y": 398.3333333333333
+          },
+          {
+            "x": 1176.0,
+            "y": 376.6666666666667
+          },
+          {
+            "x": 1176.0,
+            "y": 355.0
+          },
+          {
+            "x": 1176.0,
+            "y": 338.4116666666667
+          },
+          {
+            "x": 1176.0,
+            "y": 321.8233333333333
+          },
+          {
+            "x": 1176.0,
+            "y": 305.235
+          }
+        ],
+        "drawnAs": "orthogonal"
+      }
+    }
+  ],
+  "layout": {
+    "units": "points",
+    "mode": "fixed",
+    "routing": "orthogonal"
+  }
+}

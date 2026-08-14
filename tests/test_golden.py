@@ -325,6 +325,21 @@ CASES = (
         formats=("dot", "json"),
         fixture=True,
     ),
+    Case(
+        # An orthogonal, waypointed diagram (§18): right angles everywhere
+        # except one link that asks for a straight line, a trunk dragged through
+        # two hand-placed bends, and a label nudged off it. Between them these
+        # cover every part of a link's geometry that reaches the DOT — the
+        # computed ``pos``, the per-link override, and the ``lp`` that pins a
+        # label — and they are *typed* numbers rather than seeded ones, so this
+        # golden moves only when the emission changes.
+        name="routed-l1-orthogonal",
+        example="routed",
+        layer=Layer.L1,
+        options=RenderOptions(),
+        formats=("dot", "json"),
+        fixture=True,
+    ),
 )
 
 #: The cases a Mermaid golden is kept for.

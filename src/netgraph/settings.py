@@ -260,6 +260,12 @@ def _rankdirs() -> Sequence[str]:
     return RANKDIRS
 
 
+def _routing_styles() -> Sequence[str]:
+    from netgraph.models.layout import ROUTING_STYLES
+
+    return ROUTING_STYLES
+
+
 # --------------------------------------------------------------------------- #
 # The registry
 # --------------------------------------------------------------------------- #
@@ -371,6 +377,12 @@ SETTINGS: Final[tuple[Setting, ...]] = (
         "rankdir",
         _choice(_rankdirs, fold_case=True),
         "Layout direction: TB, LR, BT or RL.",
+    ),
+    _setting(
+        "routing",
+        "routing",
+        _choice(_routing_styles, fold_case=True),
+        "How links are drawn: spline, orthogonal or straight.",
     ),
     _setting("title", "title", _text, "Caption for the diagram."),
 )

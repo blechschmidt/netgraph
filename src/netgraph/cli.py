@@ -185,6 +185,7 @@ from netgraph.ipam import (
 )
 from netgraph.ipam import Report as IpamReport
 from netgraph.ipam import build_report as build_ipam_report
+from netgraph.layout.geometry import Routing
 from netgraph.layout.resolve import resolve_geometry
 from netgraph.layout.seed import (
     DEFAULT_LAYOUT_NAME,
@@ -218,6 +219,7 @@ from netgraph.loader import (
     subset,
 )
 from netgraph.models import DOCUMENT_KINDS, KINDS, Element, Medium
+from netgraph.models.layout import ROUTING_STYLES
 from netgraph.plan import (
     PLAN_FORMATS,
     Plan,
@@ -276,8 +278,10 @@ from netgraph.render import (
 from netgraph.render.dot import (
     DOT_ENV_VAR,
     DOT_EXECUTABLE,
+    IMAGE_FORMATS,
     find_dot,
     graphviz_install_hint,
+    routing_advisories,
 )
 from netgraph.report import EPOCH_ENV_VAR, Bundle, git_revision, resolve_timestamp
 from netgraph.report import FORMATS as REPORT_FORMATS
@@ -2698,6 +2702,20 @@ _DISPLAY_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
             "top to bottom. Honoured by the Graphviz backends and by mermaid."
         ),
     ),
+    click.option(
+        "--routing",
+        type=click.Choice(ROUTING_STYLES, case_sensitive=False),
+        default=None,
+        show_default="whatever the inventory's layout documents say, else spline",
+        help=(
+            "How links are drawn between the bends they are pinned through: 'spline' is "
+            "the curve Graphviz draws, 'orthogonal' right angles, 'straight' segment to "
+            "segment. A default: a link that pins a style of its own keeps it. Honoured "
+            "by the Graphviz backends, the JSON export and the editor. 'netgraph layout "
+            "--write' records it in the view it arranges, so the choice is the "
+            "inventory's rather than the command line's from then on."
+        ),
+    ),
     click.option("--title", default=None, metavar="TEXT", help="Caption for the diagram."),
 )
 
@@ -2908,6 +2926,7 @@ def _render_options(
         link_template=params["link_template"],
         element_ids=params["element_ids"],
         rankdir=params["rankdir"],
+        routing=None if params.get("routing") is None else Routing(params["routing"].lower()),
         highlight=highlight,
     )
 
@@ -3092,6 +3111,8 @@ def render_command(
     options = _render_options(params)
     _report_icon_support(console, output_format, options)
     _report_interaction_support(ctx, console, output_format, options)
+    for graph in graphs:
+        _report_routing(console, graph, options, output_format)
     payload = render_layers(graphs, output_format, options)
     _write_output(
         payload, output=output, binary=is_binary_format(output_format), what=output_format
@@ -3290,6 +3311,7 @@ def diff_command(
     _report_advisories(
         console, output_format, nodes=len(drawing.graph.nodes), edges=len(drawing.graph.edges)
     )
+    _report_routing(console, drawing.graph, options, output_format)
     payload = render(drawing.graph, output_format, options)
     _write_output(
         payload, output=output, binary=is_binary_format(output_format), what=output_format
@@ -3471,6 +3493,28 @@ def _report_advisories(console: Console, output_format: str, *, nodes: int, edge
     reported is that a *consumer* will refuse it.
     """
     for advisory in advisories_for(output_format, nodes=nodes, edges=edges):
+        console.warn(advisory)
+
+
+#: The formats a route reaches through Graphviz, and so the ones a route that
+#: cannot be honoured is worth warning about. Mermaid has one edge shape and
+#: JSON publishes the arrangement verbatim, so neither can lose anything.
+_ROUTED_FORMATS: Final[frozenset[str]] = frozenset({"dot", "html", *IMAGE_FORMATS})
+
+
+def _report_routing(
+    console: Console, graph: Graph, options: RenderOptions, output_format: str
+) -> None:
+    """Say what this rendering could not honour about the routes it was given.
+
+    A pinned bend in a half-arranged diagram, or an orthogonal layout carrying
+    edge labels, are both cases Graphviz accepts and then quietly does something
+    else with. Each one names the command that fixes it — see
+    :func:`~netgraph.render.dot.routing_advisories`.
+    """
+    if output_format not in _ROUTED_FORMATS:
+        return
+    for advisory in routing_advisories(graph, options):
         console.warn(advisory)
 
 
@@ -3901,8 +3945,10 @@ def _write_log(console: Console, commits: Sequence[Commit], frames: Sequence[Fra
     is_flag=True,
     default=False,
     help=(
-        "Also store the edge splines. Off by default: the render recomputes an identical "
-        "one from the node positions, and four control points per link is a lot of noise."
+        "Also store the bends each link is routed through, and the sizes of the nodes "
+        "they leave from. Off by default: the render recomputes an equivalent route from "
+        "the node positions, and a handful of points per link is a lot of noise. Turn it "
+        "on to get a starting point that can then be dragged."
     ),
 )
 @click.option(
@@ -3942,6 +3988,7 @@ def layout_command(
     replace_all: bool,
     prune: bool,
     waypoints: bool,
+    routing: str | None,
     layout_name: str,
     layout_namespace: str,
     target: str | None,
@@ -4006,11 +4053,18 @@ def layout_command(
             operation
             for view, graph in drawings
             for operation in write_operations(
-                seed_geometry(graph, options, engine=engine, replace_all=replace_all),
+                seed_geometry(
+                    graph,
+                    options,
+                    engine=engine,
+                    replace_all=replace_all,
+                    with_waypoints=waypoints,
+                ),
                 layout=layout_name,
                 namespace=layout_namespace,
                 file=target,
                 with_waypoints=waypoints,
+                routing=routing,
             )
         ]
         _run_layout_edit(app, operations, dry_run=dry_run, force=force)

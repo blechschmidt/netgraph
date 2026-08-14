@@ -526,6 +526,7 @@ Where things are drawn, per view. A sidecar: it carries no network facts, and th
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
 | `views` | map string → ViewGeometry | no | `{}` | Geometry per view, keyed by layer name (`l1`, `l2`, `l3`, `routing`, ...). The same element sits differently in each, so each gets its own arrangement. | — |
+| `routing` | `spline` \| `orthogonal` \| `straight` | no | *unset* | How links are drawn across the whole inventory unless a view or a link says otherwise: `spline` (the curve Graphviz draws), `orthogonal` (right angles) or `straight`. | — |
 
 * Coordinates are **points** (1/72 inch), `y` upwards, origin at the bottom left, and a `position` is the **centre** of what it places — Graphviz's system, so a stored arrangement can be handed straight back to it.
 * A key is an address, resolved like any other reference. A node the inventory does not declare is keyed by its graph id instead: `subnet:10.0.0.0/24`, `tunnel:site/wg0`, `rack:hq/comms/r1`.
@@ -540,6 +541,7 @@ One view's arrangement. The view name is a layer netgraph draws — `physical`, 
 | `nodes` | map string → NodeGeometry | no | `{}` | Where each node is drawn, keyed by its address. A derived node the inventory does not declare is keyed by its graph id, such as `subnet:10.0.0.0/24`. | — |
 | `edges` | map string → EdgeGeometry | no | `{}` | Bends each link is drawn through, keyed by the link's address. | — |
 | `groups` | map string → GroupGeometry | no | `{}` | The box each namespace cluster is drawn as, keyed by namespace. Only drawn when the render groups by namespace. | — |
+| `routing` | `spline` \| `orthogonal` \| `straight` | no | *unset* | How links in this view are drawn when they do not say for themselves. Overrides `spec.routing`; a link's own `routing` overrides both. | — |
 
 ## `spec.views.<view>.nodes.<address>`
 
@@ -554,11 +556,24 @@ Where one node is drawn.
 
 ## `spec.views.<view>.edges.<address>`
 
-The bends one link is drawn through. Not seeded unless `netgraph layout --write --waypoints` is asked for: a computed spline is noise, a hand-placed bend is a decision.
+How one link is drawn: the bends it goes through, the style it is routed in and where its label sits. Bends are not seeded unless `netgraph layout --write --waypoints` is asked for — a computed spline is noise, a hand-placed bend is a decision — but a `routing` or a `label` is always written, neither being derivable.
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `waypoints` | [Point](#a-point) list, 1–64 entries | **yes** | — | Spline control points, in points, ordered from the link's first endpoint to its second. | — |
+| `waypoints` | [Point](#a-point) list, ≤ 64 entries | no | `()` | The bends the link is drawn through, in points, ordered from its first endpoint to its second. Interior points only: the two ends are the nodes, so a route follows them when they are dragged. | — |
+| `routing` | `spline` \| `orthogonal` \| `straight` | no | *unset* | How this link is drawn between its bends, overriding the view's and the inventory's default: `spline`, `orthogonal` or `straight`. | — |
+| `label` | [LabelGeometry](#specviewsviewedgesaddresslabel) | no | *unset* | Where the link's annotation sits. Omitted leaves it where the renderer puts it, which is half way along and on the line. | — |
+
+* The waypoints are **interior** points: the two ends of a route are the nodes themselves, so dragging either endpoint carries the bends along instead of invalidating them.
+
+## `spec.views.<view>.edges.<address>.label`
+
+Where a link's annotation sits, as a position on the link rather than a coordinate — so nudging a VLAN label clear of a crossing cable survives both endpoints moving.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `at` | number, 0.0–1.0 | no | `0.5` | How far along the route the label sits, from `0` at the first endpoint to `1` at the second. | — |
+| `offset` | [Point](#a-point) | no | *unset* | How far off the line the label is nudged, in points. This is what makes a dense VLAN diagram legible. | — |
 
 ## `spec.views.<view>.groups.<namespace>`
 

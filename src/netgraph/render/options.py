@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
+from netgraph.layout.geometry import Routing
 from netgraph.render.diffview import DiffOverlay
 from netgraph.render.highlight import Highlight
 from netgraph.render.icons import IconTheme
@@ -47,6 +48,16 @@ class RenderOptions:
     #: this option existed. Honoured by the Graphviz backends and by Mermaid
     #: (which spells the same four tokens the same way); JSON carries no layout.
     rankdir: str | None = None
+    #: How links are drawn when neither they nor the layout document say:
+    #: ``spline``, ``orthogonal`` or ``straight``. ``None`` — the default —
+    #: leaves the decision to the inventory (``spec.routing`` on a ``kind:
+    #: layout`` document, or a view's own), and to Graphviz's curve when the
+    #: inventory says nothing either. A link that pins its own style keeps it:
+    #: this is a default, not an override, because a route somebody dragged
+    #: into place is a decision about *that cable* and a command-line flag is
+    #: not. Honoured by the Graphviz backends, by the JSON export and by the
+    #: editor canvas; Mermaid has one edge shape and ignores it.
+    routing: Routing | None = None
     #: Draw each node as its kind's icon instead of a plain Graphviz shape.
     #: ``None`` keeps the shapes. Honoured by the Graphviz backends; Mermaid and
     #: JSON have no picture to put an icon in, and ignore it.
