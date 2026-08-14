@@ -1,18 +1,25 @@
-"""One ``parse → validate → render`` pass over a YAML document stream.
+"""One ``parse → validate → render`` pass, over a stream or over a loaded tree.
 
 This is the whole of what ``netgraph web`` does per keystroke-burst, and it is
 the same pipeline the command line runs, in the same order, with two
 differences that follow from being interactive:
 
-* **The input is a stream, not a tree.** :func:`~netgraph.loader.load_stream`
-  reads what the browser sent, under the same strict parser and the same schema
-  validation as a folder of files. No file is opened and nothing is written.
 * **A rejected inventory is still drawn.** ``netgraph render`` refuses one
   without ``--force``, because a diagram that disagrees with the files
   misinforms whoever it is shown to. Here the diagram *is* the feedback: text
   being edited is wrong most of the time, and blanking the picture on every
   half-typed line would make the tool useless. So every problem is reported —
   prominently, with its line — and whatever resolved is drawn anyway.
+* **The picture comes back as a fragment, not a file.**
+  :func:`~netgraph.web.svgdoc.prepare` strips everything that could execute or
+  navigate, so the diagram can be put straight into the live page.
+
+Two entry points, one body. :func:`render_source` takes the document stream the
+scratchpad edits; :func:`render_inventory` takes a tree
+:class:`~netgraph.web.session.EditingSession` has already loaded, so an editing
+session draws its files without parsing them a second time. Everything after
+the load is identical, which is what keeps the two faces of the command showing
+the same diagram.
 
 The result carries a :class:`~netgraph.watch.pipeline.Status`, and a status
 that is not ``ok`` is the front end's cue to say so, not to hide the diagram.
@@ -21,12 +28,13 @@ that is not ``ok`` is the front end's cue to say so, not to hide the diagram.
 from __future__ import annotations
 
 import time
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Final
 
 from netgraph.config import ValidationConfig
 from netgraph.errors import NetgraphError
+from netgraph.layout.geometry import Geometry
 from netgraph.loader import Inventory, load_stream
 from netgraph.render import (
     DETAIL_OPTIONS,
@@ -45,7 +53,7 @@ from netgraph.validate import validate as run_validation
 from netgraph.watch.pipeline import Problem, Status, flatten_problems
 from netgraph.web.svgdoc import prepare
 
-__all__ = ["MAX_VLAN", "Preview", "ViewOptions", "render_source"]
+__all__ = ["MAX_VLAN", "Preview", "ViewOptions", "render_inventory", "render_source"]
 
 #: The highest VLAN id ``--vlan`` and the browser may ask for (§9.1).
 MAX_VLAN: Final = 4094
@@ -115,6 +123,42 @@ class ViewOptions:
             values["title"] = _text(payload["title"], "title")
         return cls(**values)
 
+    @classmethod
+    def from_query(
+        cls, query: Mapping[str, Sequence[str]], *, icons: IconTheme | None = None
+    ) -> ViewOptions:
+        """Build options from a parsed query string.
+
+        ``GET /api/graph?view=l2&vlans=10,20`` is the shape a browser can put in
+        an address bar and a reader can type by hand, so the editing session
+        takes its view that way rather than by posting a body. Every value goes
+        through the same checks :meth:`from_request` applies — a query string is
+        no more trustworthy for coming from a URL.
+
+        Raises:
+            RequestError: A parameter is malformed or out of range.
+        """
+        payload: dict[str, Any] = {}
+        for name, key in (
+            ("view", "layer"),
+            ("layer", "layer"),
+            ("title", "title"),
+        ):
+            if query.get(name):
+                payload[key] = query[name][-1]
+        for name in _BOOLEAN_FIELDS:
+            # ``show_ips`` on the wire, ``show-ips`` for a person typing it.
+            for spelling in (name, name.replace("_", "-")):
+                if query.get(spelling):
+                    payload[name] = _flag(query[spelling][-1], name)
+        if query.get("vlans"):
+            payload["vlans"] = _split_ids(query["vlans"][-1])
+        if query.get("kinds"):
+            payload["kinds"] = [
+                item for value in query["kinds"] for item in value.split(",") if item
+            ]
+        return cls.from_request(payload, icons=icons)
+
     @property
     def filter_spec(self) -> FilterSpec:
         return FilterSpec(vlans=self.vlans, kinds=self.kinds)
@@ -157,6 +201,12 @@ class Preview:
     edges: int = 0
     #: Cables the graph builder had to drop, with the reason.
     dangling: tuple[str, ...] = ()
+    #: The stored arrangement this pass drew from, in the form
+    #: ``netgraph render -f json`` exports it, or ``None`` when the inventory
+    #: stores none. A canvas that lets somebody drag a node needs to know where
+    #: netgraph thinks that node is, and whether the position is stored or was
+    #: invented by the engine; see :mod:`netgraph.layout.geometry`.
+    geometry: Mapping[str, Any] | None = None
     #: Wall-clock duration of the pass, in seconds.
     duration: float = 0.0
 
@@ -185,6 +235,7 @@ class Preview:
                 for problem in self.problems
             ],
             "dangling": list(self.dangling),
+            "geometry": dict(self.geometry) if self.geometry is not None else None,
             "counts": {
                 "nodes": self.nodes,
                 "edges": self.edges,
@@ -212,11 +263,43 @@ def render_source(source: str, view: ViewOptions | None = None) -> Preview:
     Returns:
         The diagram, its info-box records, and every problem found on the way.
     """
-    options = view or ViewOptions()
     started = time.monotonic()
+    return render_inventory(load_stream(source), view, started=started)
 
-    inventory = load_stream(source)
-    findings = run_validation(inventory, ValidationConfig(strict=options.strict))
+
+def render_inventory(
+    inventory: Inventory,
+    view: ViewOptions | None = None,
+    *,
+    settings: ValidationConfig | None = None,
+    started: float | None = None,
+) -> Preview:
+    """Validate and draw an inventory somebody else has already loaded.
+
+    The half of :func:`render_source` that does not care where the documents
+    came from, so an editing session over a folder
+    (:mod:`netgraph.web.session`) draws its tree without re-parsing it and
+    without either face of ``netgraph web`` growing its own renderer.
+
+    Args:
+        inventory: A loaded tree or stream, errors and all.
+        view: Which graph to build and how to draw it.
+        settings: Validation settings, normally the tree's own ``netgraph.toml``
+            with the page's ``strict`` toggle folded in. Defaults to netgraph's
+            built-ins under that toggle, which is what a stream — having no
+            folder to look in — has to use.
+        started: When the pass began, for the duration this reports. Supplied by
+            a caller that did work before calling.
+
+    Returns:
+        The diagram, its info-box records, and every problem found on the way.
+    """
+    options = view or ViewOptions()
+    started = time.monotonic() if started is None else started
+
+    findings = run_validation(
+        inventory, settings if settings is not None else ValidationConfig(strict=options.strict)
+    )
     problems = flatten_problems(inventory.errors, findings)
     rejected = bool(inventory.errors) or any(finding.severity.is_fatal for finding in findings)
 
@@ -241,8 +324,41 @@ def render_source(source: str, view: ViewOptions | None = None) -> Preview:
         nodes=len(graph.nodes),
         edges=len(graph.edges),
         dangling=tuple(graph.dangling),
+        geometry=_geometry(graph),
         duration=time.monotonic() - started,
     )
+
+
+def _geometry(graph: Graph) -> dict[str, Any] | None:
+    """The graph's stored arrangement, or ``None`` when it stores none.
+
+    The same coordinate system, units and ``mode`` as
+    ``netgraph render -f json`` — points, ``y`` upwards, a position being the
+    centre of what it places — because the two describe the same arrangement and
+    a client that learned one must not have to learn the other.
+    """
+    geometry: Geometry = graph.geometry
+    if geometry.is_empty:
+        return None
+    payload: dict[str, Any] = {
+        "units": "points",
+        "mode": str(geometry.mode(graph.nodes)),
+        "nodes": {
+            key: {"x": placement.x, "y": placement.y}
+            | (
+                {"width": placement.width, "height": placement.height}
+                if placement.width is not None and placement.height is not None
+                else {}
+            )
+            for key, placement in sorted(geometry.nodes.items())
+        },
+    }
+    if geometry.groups:
+        payload["groups"] = {
+            key: {"x": box.x, "y": box.y, "width": box.width, "height": box.height}
+            for key, box in sorted(geometry.groups.items())
+        }
+    return payload
 
 
 # --------------------------------------------------------------------------- #
@@ -254,6 +370,29 @@ def _boolean(value: Any, field_name: str) -> bool:
     if not isinstance(value, bool):
         raise RequestError(f"{field_name!r} must be true or false")
     return value
+
+
+def _flag(value: str, field_name: str) -> bool:
+    """A boolean written the way a query string writes one."""
+    lowered = value.strip().lower()
+    if lowered in ("1", "true", "yes", "on"):
+        return True
+    if lowered in ("0", "false", "no", "off"):
+        return False
+    raise RequestError(f"{field_name!r} must be true or false, not {value!r}")
+
+
+def _split_ids(value: str) -> list[int]:
+    """``10,20`` as VLAN ids, refusing anything that is not one."""
+    ids: list[int] = []
+    for part in value.replace(" ", ",").split(","):
+        if not part:
+            continue
+        try:
+            ids.append(int(part))
+        except ValueError:
+            raise RequestError(f"{part!r} is not a VLAN id between 1 and {MAX_VLAN}") from None
+    return ids
 
 
 def _layer(value: Any) -> Layer:

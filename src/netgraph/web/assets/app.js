@@ -4,10 +4,23 @@
  * that has no build step, and a bundler would put a toolchain between a user
  * and the diagram they asked for.
  *
+ * This file is the shell -- the canvas, the info box, the problems list, the
+ * status line and the editor -- and it works the same either way the command
+ * was started. What is *behind* the editor differs, and the page asks the
+ * server which it is at boot:
+ *
+ *   stream    `netgraph web` on a file, a pipe or nothing. The text lives in
+ *             the browser and is posted to /api/render whenever it settles.
+ *             Nothing is on disk; nothing is written.
+ *   session   `netgraph web DIR`. The server holds the inventory tree, and
+ *             session.js takes over the file list, saving, undo and the
+ *             reconciliation with whatever else is editing the same files.
+ *
  * Three things happen here and nothing else:
  *
- *   1. The editor's text is posted to /api/render whenever it settles, and the
- *      SVG that comes back replaces the one on screen.
+ *   1. The diagram is fetched -- posted as text in stream mode, requested by
+ *      view in session mode -- and the SVG that comes back replaces the one on
+ *      screen.
  *   2. The pointer's position over that SVG is turned into an info box, by
  *      looking up the id of the <g> under it in the records the same response
  *      carried. No request is made on hover; the details are already here.
@@ -29,6 +42,8 @@
   /** Zoom bounds. Below the first the diagram is a smudge; above the second a pixel. */
   var MIN_SCALE = 0.1;
   var MAX_SCALE = 12;
+  /** How long a toast stays up, in milliseconds. */
+  var TOAST_MS = 4000;
 
   var el = {
     source: document.getElementById("source"),
@@ -40,6 +55,7 @@
     canvas: document.getElementById("canvas"),
     placeholder: document.getElementById("placeholder"),
     info: document.getElementById("info"),
+    toast: document.getElementById("toast"),
     layer: document.getElementById("layer"),
     vlans: document.getElementById("vlans"),
     showIps: document.getElementById("show-ips"),
@@ -48,7 +64,18 @@
     strict: document.getElementById("strict"),
     render: document.getElementById("render"),
     fit: document.getElementById("fit"),
-    splitter: document.getElementById("splitter")
+    splitter: document.getElementById("splitter"),
+    files: document.getElementById("files"),
+    fileList: document.getElementById("file-list"),
+    filesRoot: document.getElementById("files-root"),
+    filesMode: document.getElementById("files-mode"),
+    actions: document.getElementById("session-actions"),
+    save: document.getElementById("save"),
+    undo: document.getElementById("undo"),
+    redo: document.getElementById("redo"),
+    editorTitle: document.getElementById("editor-title"),
+    editorHint: document.getElementById("editor-hint"),
+    editorState: document.getElementById("editor-state")
   };
 
   var details = {};
@@ -57,6 +84,9 @@
   var queued = false;
   var pinned = null;
   var view = { x: 0, y: 0, k: 1, placed: false };
+  /** "stream" until /api/state says otherwise. */
+  var mode = "stream";
+  var toastTimer = null;
 
   /* ------------------------------------------------------------ requests */
 
@@ -70,6 +100,20 @@
       group_by_namespace: el.group.checked,
       strict: el.strict.checked
     };
+  }
+
+  /** The same view options as a query string, for the session's GET. */
+  function query() {
+    var parts = [
+      "view=" + encodeURIComponent(el.layer.value),
+      "show_ips=" + (el.showIps.checked ? "1" : "0"),
+      "show_vlans=" + (el.showVlans.checked ? "1" : "0"),
+      "group_by_namespace=" + (el.group.checked ? "1" : "0"),
+      "strict=" + (el.strict.checked ? "1" : "0")
+    ];
+    var vlans = parseVlans(el.vlans.value);
+    if (vlans.length) { parts.push("vlans=" + vlans.join(",")); }
+    return parts.join("&");
   }
 
   function parseVlans(text) {
@@ -86,12 +130,7 @@
     if (inFlight) { queued = true; return; }
     inFlight = true;
     setStatus("rendering", "");
-    fetch("/api/render", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      cache: "no-store",
-      body: JSON.stringify(options())
-    }).then(function (response) {
+    request().then(function (response) {
       return response.json().then(function (body) {
         if (!response.ok) { throw new Error(body.message || response.statusText); }
         return body;
@@ -102,6 +141,18 @@
     }).then(function () {
       inFlight = false;
       if (queued) { queued = false; render(); }
+    });
+  }
+
+  function request() {
+    if (mode === "session") {
+      return fetch("/api/graph?" + query(), { cache: "no-store" });
+    }
+    return fetch("/api/render", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify(options())
     });
   }
 
@@ -161,11 +212,11 @@
       counts[problem.severity] = (counts[problem.severity] || 0) + 1;
       var row = document.createElement("div");
       row.className = "problem " + problem.severity;
-      var line = lineOf(problem.location);
-      if (line) {
+      var target = navigation(problem.location);
+      if (target) {
         row.classList.add("locatable");
-        row.title = "go to line " + line;
-        row.addEventListener("click", function () { jumpTo(line); });
+        row.title = target.title;
+        row.addEventListener("click", target.go);
       }
       [
         ["severity", problem.severity],
@@ -184,20 +235,35 @@
       counts.error + " errors, " + counts.warning + " warnings, " + counts.info + " notes";
   }
 
-  /** The 1-based line a location names, or 0 when it names none.
+  /** What clicking a problem should do, or null when it points nowhere.
    *
-   * A location reads ``stream.yaml#3:17`` -- file, document index, line -- and the line is what the editor can act on. See
-   * netgraph.loader.LoadError.location for where the shape comes from.
+   * A location reads `switches/sw.yaml#3:17` -- file, document index, line. In
+   * a session both halves are actionable, so the file is opened and the cursor
+   * put on the line; in the scratchpad there is only one document and only the
+   * line means anything. See netgraph.loader.LoadError.location for the shape.
    */
+  function navigation(location) {
+    if (mode === "session") {
+      return {
+        title: "open " + location,
+        go: function () {
+          if (!netgraphSession.locate(location)) { toast("no file at " + location, "error"); }
+        }
+      };
+    }
+    var line = lineOf(location);
+    return line ? { title: "go to line " + line, go: function () { goToLine(line); } } : null;
+  }
+
   function lineOf(location) {
     var match = /#\d+:(\d+)/.exec(location || "");
     return match ? parseInt(match[1], 10) : 0;
   }
 
-  /** Put the cursor on ``line`` of the editor and select it. */
-  function jumpTo(line) {
+  /** Put the cursor on `line` of the editor and select it. */
+  function goToLine(line) {
     var lines = el.source.value.split("\n");
-    if (line > lines.length) { return; }
+    if (!line || line > lines.length) { return; }
     var start = 0;
     for (var i = 0; i < line - 1; i++) { start += lines[i].length + 1; }
     el.source.focus();
@@ -206,6 +272,17 @@
     // line height and centre the selection in the visible part.
     var height = parseFloat(window.getComputedStyle(el.source).lineHeight) || 18;
     el.source.scrollTop = Math.max(0, (line - 1) * height - el.source.clientHeight / 2);
+  }
+
+  /* --------------------------------------------------------------- toast */
+
+  /** Say something for a moment: what was saved, what was refused, why. */
+  function toast(text, kind) {
+    window.clearTimeout(toastTimer);
+    el.toast.textContent = text;
+    el.toast.className = "toast " + (kind || "");
+    el.toast.hidden = false;
+    toastTimer = window.setTimeout(function () { el.toast.hidden = true; }, TOAST_MS);
   }
 
   /* ------------------------------------------------------------ info box */
@@ -310,7 +387,16 @@
 
   /* ---------------------------------------------------------- listeners */
 
-  el.source.addEventListener("input", schedule);
+  el.source.addEventListener("input", function () {
+    if (mode === "session") {
+      // A session writes files, so nothing is written until Save. The diagram
+      // keeps showing what is on disk, which is what it is a diagram of.
+      netgraphSession.markDirty();
+      return;
+    }
+    schedule();
+  });
+
   el.source.addEventListener("keydown", function (event) {
     if (event.key !== "Tab") { return; }
     // A YAML editor that loses focus on Tab is not an editor.
@@ -318,7 +404,7 @@
     var start = el.source.selectionStart;
     var end = el.source.selectionEnd;
     el.source.setRangeText("  ", start, end, "end");
-    schedule();
+    if (mode === "session") { netgraphSession.markDirty(); } else { schedule(); }
   });
 
   [el.layer, el.showIps, el.showVlans, el.group, el.strict].forEach(function (control) {
@@ -339,6 +425,9 @@
   el.canvas.addEventListener("click", function (event) {
     var hit = recordAt(event.target);
     if (!hit) { hideInfo(true); return; }
+    // In a session, clicking a shape reveals the document that declares it:
+    // that mapping is the whole point of the command.
+    if (mode === "session") { netgraphSession.reveal(hit.record.element); }
     if (pinned === hit.record.element) { hideInfo(true); return; }
     pinned = hit.record.element;
     showInfo(hit, event);
@@ -386,9 +475,33 @@
 
   /* --------------------------------------------------------------- boot */
 
-  fetch("/api/source", { cache: "no-store" })
+  /* What session.js is given: the elements it shares with this file, and the
+   * four things it needs this file to do. Everything else -- the file list,
+   * the hashes, the undo depth -- is its own. */
+  var bridge = {
+    el: el,
+    render: render,
+    toast: toast,
+    goToLine: goToLine,
+    diagnostics: function (problems) { showProblems(problems || []); }
+  };
+
+  fetch("/api/state", { cache: "no-store" })
     .then(function (response) { return response.json(); })
-    .then(function (body) { el.source.value = body.source || ""; })
-    .catch(function () {})
-    .then(render);
+    .then(function (state) {
+      if (state.mode !== "session") { return bootStream(); }
+      mode = "session";
+      netgraphSession.attach(bridge, state);
+      render();
+    })
+    .catch(bootStream);
+
+  function bootStream() {
+    mode = "stream";
+    return fetch("/api/source", { cache: "no-store" })
+      .then(function (response) { return response.json(); })
+      .then(function (body) { el.source.value = body.source || ""; })
+      .catch(function () {})
+      .then(render);
+  }
 })();

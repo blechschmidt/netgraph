@@ -1,16 +1,42 @@
-"""The HTTP face of ``netgraph web``: five routes, none of them a file name.
+"""The HTTP face of ``netgraph web``: a fixed set of routes over one session.
 
-    GET  /            the page
-    GET  /app.css     its style sheet
-    GET  /app.js      its client
-    GET  /api/source  the text the editor opens with
-    POST /api/render  a document stream in, a diagram and its records out
+The command has two faces and this module serves both from one handler, because
+they are the same page with a different thing behind it.
 
-The only route that accepts input is the last one, and what it accepts is a
-JSON object holding the YAML the user typed plus the view options the page
-offers. Nothing in that body ever becomes a path, a command-line argument or a
-file: it is parsed in memory by :func:`~netgraph.web.preview.render_source` and
-the answer is built from what it produced.
+**The scratchpad** — ``netgraph web`` on a file, a pipe or nothing — holds a
+document stream in the browser and renders what it is sent::
+
+    GET  /api/source     the text the editor opens with
+    POST /api/render     a document stream in, a diagram and its records out
+
+**The editing session** — ``netgraph web DIR`` — holds a real inventory tree
+(:mod:`netgraph.web.session`) and exposes it::
+
+    GET  /api/state           revision, and what this session allows
+    GET  /api/tree            files, documents, element addresses, source lines
+    GET  /api/graph?view=l2   the resolved graph, its records and its geometry
+    GET  /api/file/<path>     one file's text, with the hash a write must quote
+    PUT  /api/file/<path>     that file back, refusing a stale one
+    POST /api/ops             a batch of netgraph.edit operations, applied
+    POST /api/undo, /api/redo the server-side history
+
+Plus the page itself and its three assets, which are the same either way.
+
+Three properties hold across all of it:
+
+**No request ever becomes a path.** The static routes are a fixed table. The
+file routes go through :func:`~netgraph.web.session.relative_path`, which
+accepts a relative POSIX path below the root with a YAML suffix and no component
+the loader would skip, and refuses everything else by name.
+
+**Nothing is written unless the session says so.** Every mutating route asks the
+session, which refuses unless it was opened writable — which the command line
+only does for an explicit flag on a loopback bind. A read-only session answers
+the same reads and 403s the rest.
+
+**The write path is not here.** This module decodes a request and encodes an
+answer; :mod:`netgraph.web.session` decides, and :mod:`netgraph.edit` writes. No
+YAML is constructed anywhere in this package.
 
 The rest of being a local server — loopback by default, the ``Host`` header
 check that defeats DNS rebinding, the response headers — is
@@ -32,7 +58,9 @@ from functools import cache
 from http import HTTPStatus
 from importlib import resources
 from typing import Any, Final
+from urllib.parse import parse_qs, unquote, urlsplit
 
+from netgraph.edit import ConflictError, EditError, ValidationRefused
 from netgraph.httpserve import (
     DEFAULT_HOST,
     BackgroundServer,
@@ -42,13 +70,21 @@ from netgraph.httpserve import (
 )
 from netgraph.render import IconTheme
 from netgraph.web.preview import Preview, RequestError, ViewOptions, render_source
+from netgraph.web.session import Conflict, EditingSession, ReadOnly, SessionError
 
 __all__ = [
     "ASSETS",
     "DEFAULT_PORT",
+    "FILE_PREFIX",
+    "GRAPH_PATH",
     "MAX_SOURCE_BYTES",
+    "OPS_PATH",
+    "REDO_PATH",
     "RENDER_PATH",
     "SOURCE_PATH",
+    "STATE_PATH",
+    "TREE_PATH",
+    "UNDO_PATH",
     "WebServer",
     "asset",
 ]
@@ -59,11 +95,19 @@ DEFAULT_PORT: Final = 8081
 
 SOURCE_PATH: Final = "/api/source"
 RENDER_PATH: Final = "/api/render"
+STATE_PATH: Final = "/api/state"
+TREE_PATH: Final = "/api/tree"
+GRAPH_PATH: Final = "/api/graph"
+OPS_PATH: Final = "/api/ops"
+UNDO_PATH: Final = "/api/undo"
+REDO_PATH: Final = "/api/redo"
+#: Everything after this is a path inside the inventory, and is checked as one.
+FILE_PREFIX: Final = "/api/file/"
 
-#: Largest document stream the editor may post, in bytes. An inventory this
-#: size is one to keep in files and open with ``netgraph watch``; a browser
-#: textarea is not the tool for it, and rendering it on every keystroke would
-#: not be interactive anyway.
+#: Largest body the editor may post or put, in bytes. An inventory this size is
+#: one to keep in files and open with ``netgraph watch``; a browser textarea is
+#: not the tool for it, and rendering it on every keystroke would not be
+#: interactive anyway.
 MAX_SOURCE_BYTES: Final = 1_000_000
 
 #: The static files, by request path: ``(package resource, content type)``.
@@ -72,6 +116,7 @@ ASSETS: Final[dict[str, tuple[str, str]]] = {
     "/app.css": ("app.css", "text/css; charset=utf-8"),
     "/detail.js": ("detail.js", "text/javascript; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/session.js": ("session.js", "text/javascript; charset=utf-8"),
 }
 
 #: Where an asset is looked for, in order. ``detail.js`` — how one detail record
@@ -82,6 +127,19 @@ ASSETS: Final[dict[str, tuple[str, str]]] = {
 _ASSET_ROOTS: Final[tuple[tuple[str, str], ...]] = (
     ("netgraph.web", "assets"),
     ("netgraph.render", "assets"),
+)
+
+#: How a refusal is reported. Every one of these is the *caller's* mistake or a
+#: race with another editor, never a fault in the inventory — a broken document
+#: is something to draw and list, not something to answer 500 with.
+_STATUS: Final[tuple[tuple[type[Exception], HTTPStatus], ...]] = (
+    (ReadOnly, HTTPStatus.FORBIDDEN),
+    (Conflict, HTTPStatus.CONFLICT),
+    (ConflictError, HTTPStatus.CONFLICT),
+    (ValidationRefused, HTTPStatus.UNPROCESSABLE_ENTITY),
+    (SessionError, HTTPStatus.BAD_REQUEST),
+    (RequestError, HTTPStatus.BAD_REQUEST),
+    (EditError, HTTPStatus.BAD_REQUEST),
 )
 
 
@@ -101,26 +159,29 @@ def asset(name: str) -> bytes:
 
 
 class _Handler(LocalHandler):
-    """The five routes. Everything they answer with is built in memory."""
+    """The routes. Everything they answer with is built in memory."""
 
     server_version = "netgraph-web"
 
     # Bound onto a subclass by :meth:`WebServer.create`.
     source: str
     icons: IconTheme | None
+    session: EditingSession | None
     on_render: Callable[[Preview], None]
 
     def handle_request(self, method: str, *, body: bool) -> None:
-        path = self.path.split("?", 1)[0]
+        path = urlsplit(self.path).path
         if method in ("GET", "HEAD"):
             self._get(path, body=body)
         elif method == "POST":
             self._post(path)
+        elif method == "PUT":
+            self._put(path)
         else:  # pragma: no cover - the base class routes nothing else here
             self.send_text(
                 HTTPStatus.METHOD_NOT_ALLOWED,
-                "expected GET, HEAD or POST",
-                allow="GET, HEAD, POST",
+                "expected GET, HEAD, POST or PUT",
+                allow="GET, HEAD, POST, PUT",
             )
 
     # -- GET -------------------------------------------------------------
@@ -129,9 +190,21 @@ class _Handler(LocalHandler):
         if path in ASSETS:
             name, content_type = ASSETS[path]
             self.send_payload(HTTPStatus.OK, asset(name), content_type, body=body)
-        elif path == SOURCE_PATH:
-            payload = json.dumps({"source": self.source}).encode()
-            self.send_payload(HTTPStatus.OK, payload, "application/json", body=body)
+            return
+        if path == STATE_PATH:
+            self._json(HTTPStatus.OK, self._state(), body=body)
+            return
+        if self.session is None:
+            self._get_stream(path, body=body)
+            return
+        try:
+            self._get_session(self.session, path, body=body)
+        except (SessionError, EditError) as exc:
+            self._refuse(exc, body=body)
+
+    def _get_stream(self, path: str, *, body: bool) -> None:
+        if path == SOURCE_PATH:
+            self._json(HTTPStatus.OK, {"source": self.source}, body=body)
         elif path == RENDER_PATH:
             self.send_text(
                 HTTPStatus.METHOD_NOT_ALLOWED,
@@ -142,9 +215,28 @@ class _Handler(LocalHandler):
         else:
             self.send_text(HTTPStatus.NOT_FOUND, "not found; the editor is at /", body=body)
 
+    def _get_session(self, session: EditingSession, path: str, *, body: bool) -> None:
+        if path == TREE_PATH:
+            self._json(HTTPStatus.OK, session.tree(), body=body)
+        elif path == GRAPH_PATH:
+            view = ViewOptions.from_query(parse_qs(urlsplit(self.path).query), icons=self.icons)
+            preview, revision = session.graph(view)
+            self.on_render(preview)
+            self._json(HTTPStatus.OK, {"revision": revision} | preview.to_dict(), body=body)
+        elif path.startswith(FILE_PREFIX):
+            self._json(HTTPStatus.OK, session.read_file(_requested_path(path)), body=body)
+        else:
+            self.send_text(HTTPStatus.NOT_FOUND, "not found; the editor is at /", body=body)
+
     # -- POST ------------------------------------------------------------
 
     def _post(self, path: str) -> None:
+        if self.session is None:
+            self._post_stream(path)
+        else:
+            self._post_session(self.session, path)
+
+    def _post_stream(self, path: str) -> None:
         if path != RENDER_PATH:
             self.send_text(HTTPStatus.NOT_FOUND, f"nothing to post to at {path}")
             return
@@ -155,16 +247,82 @@ class _Handler(LocalHandler):
                 raise RequestError("'source' must be the YAML document stream, as a string")
             view = ViewOptions.from_request(payload, icons=self.icons)
         except RequestError as exc:
-            self._send_error(HTTPStatus.BAD_REQUEST, str(exc))
+            self._refuse(exc)
             return
-
         preview = render_source(source, view)
         self.on_render(preview)
-        self.send_payload(
-            HTTPStatus.OK,
-            json.dumps(preview.to_dict()).encode(),
-            "application/json",
-        )
+        self._json(HTTPStatus.OK, preview.to_dict())
+
+    def _post_session(self, session: EditingSession, path: str) -> None:
+        if path not in (OPS_PATH, UNDO_PATH, REDO_PATH):
+            self.send_text(HTTPStatus.NOT_FOUND, f"nothing to post to at {path}")
+            return
+        try:
+            if path == UNDO_PATH:
+                change = session.undo()
+            elif path == REDO_PATH:
+                change = session.redo()
+            else:
+                payload = self._read_json()
+                change = session.apply(
+                    payload.get("ops", []),
+                    revision=_revision(payload),
+                    force=bool(payload.get("force", False)),
+                )
+        except Exception as exc:  # narrowed by ``_refuse``, which re-raises the rest
+            self._refuse(exc)
+            return
+        self._json(HTTPStatus.OK, change.to_dict())
+
+    # -- PUT -------------------------------------------------------------
+
+    def _put(self, path: str) -> None:
+        session = self.session
+        if session is None or not path.startswith(FILE_PREFIX):
+            self.send_text(
+                HTTPStatus.METHOD_NOT_ALLOWED,
+                "nothing here takes a PUT"
+                if session is not None
+                else "this is a document-stream scratchpad, not a tree; "
+                "open a folder with 'netgraph web DIR --write' to edit files",
+                allow="GET, HEAD, POST",
+            )
+            return
+        try:
+            payload = self._read_json()
+            text = payload.get("text")
+            if not isinstance(text, str):
+                raise RequestError("'text' must be the file's new contents, as a string")
+            base = payload.get("hash")
+            if base is not None and not isinstance(base, str):
+                raise RequestError("'hash' must be the content hash the file was read at")
+            change = session.write_file(
+                _requested_path(path),
+                text,
+                base_hash=base,
+                force=bool(payload.get("force", False)),
+            )
+        except Exception as exc:
+            self._refuse(exc)
+            return
+        self._json(HTTPStatus.OK, change.to_dict())
+
+    # -- shared ----------------------------------------------------------
+
+    def _state(self) -> dict[str, Any]:
+        if self.session is None:
+            return {
+                "mode": "stream",
+                "revision": 0,
+                "writable": False,
+                "undo": 0,
+                "redo": 0,
+                "maxFileBytes": MAX_SOURCE_BYTES,
+            }
+        return self.session.state()
+
+    def _json(self, status: HTTPStatus, payload: Any, *, body: bool = True) -> None:
+        self.send_payload(status, json.dumps(payload).encode(), "application/json", body=body)
 
     def _read_json(self) -> dict[str, Any]:
         """The request body as a JSON object.
@@ -185,9 +343,8 @@ class _Handler(LocalHandler):
             raise RequestError("Content-Length must not be negative")
         if length > MAX_SOURCE_BYTES:
             raise RequestError(
-                f"the document stream is {length} bytes; this editor renders up to "
-                f"{MAX_SOURCE_BYTES}. Keep an inventory this size in files and open it "
-                "with 'netgraph watch --serve'"
+                f"the request body is {length} bytes; this editor accepts up to "
+                f"{MAX_SOURCE_BYTES}. Keep a document this size out of the browser"
             )
         raw = self.rfile.read(length)
         try:
@@ -198,13 +355,58 @@ class _Handler(LocalHandler):
             raise RequestError("the request body must be a JSON object")
         return payload
 
-    def _send_error(self, status: HTTPStatus, message: str) -> None:
-        """Refuse in the shape the page expects, so it can show the reason."""
-        self.send_payload(
-            status,
-            json.dumps({"status": "failed", "message": message}).encode(),
-            "application/json",
-        )
+    def _refuse(self, exc: BaseException, *, body: bool = True) -> None:
+        """Answer in the shape the page expects, so it can show the reason.
+
+        Only the refusals :data:`_STATUS` names are answered; anything else is a
+        bug in netgraph and is re-raised, which the base server turns into a 500
+        and a traceback in the log. Swallowing those would leave an editor
+        quietly not saving.
+        """
+        for kind, status in _STATUS:
+            if isinstance(exc, kind):
+                self._json(status, _problem_body(exc, status), body=body)
+                return
+        raise exc
+
+
+def _problem_body(exc: BaseException, status: HTTPStatus) -> dict[str, Any]:
+    """The JSON a refusal carries: why, and whatever the page can act on."""
+    payload: dict[str, Any] = {
+        "status": "failed",
+        "message": str(exc),
+        "code": status.value,
+    }
+    if isinstance(exc, Conflict):
+        payload["conflict"] = {"path": exc.path, "hash": exc.hash}
+    elif isinstance(exc, ConflictError):
+        payload["conflict"] = {"path": exc.path, "hash": exc.actual}
+    elif isinstance(exc, ValidationRefused):
+        payload["problems"] = [
+            {"rule": problem.rule, "location": problem.location, "message": problem.message}
+            for problem in exc.problems
+        ]
+    return payload
+
+
+def _requested_path(path: str) -> str:
+    """The inventory-relative path a ``/api/file/…`` route names.
+
+    Percent-decoded here and checked in
+    :func:`~netgraph.web.session.relative_path`, which is the only thing that
+    ever turns one of these into a file name.
+    """
+    return unquote(path[len(FILE_PREFIX) :])
+
+
+def _revision(payload: dict[str, Any]) -> int | None:
+    """The tree revision a batch was decided against, if it named one."""
+    value = payload.get("revision")
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise RequestError("'revision' must be the tree revision this batch was built from")
+    return value
 
 
 class WebServer(BackgroundServer):
@@ -223,6 +425,7 @@ class WebServer(BackgroundServer):
         cls,
         *,
         source: str = "",
+        session: EditingSession | None = None,
         icons: IconTheme | None = None,
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
@@ -232,7 +435,10 @@ class WebServer(BackgroundServer):
         """Bind the interface without answering requests yet.
 
         Args:
-            source: What the editor opens with.
+            source: What the scratchpad opens with. Ignored when ``session`` is
+                given, because then the files are the source.
+            session: The inventory this interface edits. ``None`` serves the
+                document-stream scratchpad instead.
             icons: Icon theme for the diagram. Chosen here rather than by the
                 browser, because it names a directory on this machine.
             host: Address to bind. Loopback unless the caller says otherwise.
@@ -249,6 +455,7 @@ class WebServer(BackgroundServer):
             (_Handler,),
             {
                 "source": source,
+                "session": session,
                 "icons": icons,
                 "on_render": staticmethod(on_render),
                 "loopback_only": is_loopback(host),

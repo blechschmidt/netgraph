@@ -1,8 +1,10 @@
 /* netgraph web interface.
  *
- * Two panes and a floating info box. The palette follows the diagram's own
- * encoding -- green for what is fine, red for an error, amber for a warning --
- * so the status pill and a finding in the list mean the same thing as the
+ * Three panes -- the inventory, the editor, the diagram -- and a floating info
+ * box. The first is hidden in the document-stream scratchpad, which has no
+ * files to list. The palette follows the diagram's own encoding -- green for
+ * what is fine, red for an error, amber for a warning -- so the status pill, a
+ * finding in the list and a file marked unsaved mean the same thing as the
  * colours in the picture next to them.
  */
 
@@ -15,6 +17,7 @@
   --info: #0969da;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --pane: 40%;
+  --files: 15rem;
 }
 
 * { box-sizing: border-box; }
@@ -107,6 +110,8 @@ main {
 
 .pane.editor { flex: 0 0 var(--pane); border-right: 1px solid var(--edge); }
 .pane.diagram { flex: 1 1 auto; }
+.pane.files { flex: 0 0 var(--files); border-right: 1px solid var(--edge); }
+.pane.files[hidden] { display: none; }
 
 .pane-head {
   display: flex;
@@ -178,6 +183,84 @@ main {
 .problem .where { opacity: .7; overflow-wrap: anywhere; }
 
 .empty { opacity: .55; padding: .6rem .7rem; margin: 0; }
+
+/* ------------------------------------------------------------ file list */
+
+.file-list {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: .2rem 0 .8rem;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.file-list .ns {
+  padding: .5rem .7rem .1rem;
+  font: 600 10px/1.6 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  opacity: .5;
+}
+
+.file-list .file, .file-list .doc {
+  display: flex;
+  gap: .4rem;
+  align-items: baseline;
+  padding: .12rem .7rem;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.file-list .file { font-weight: 600; }
+.file-list .doc { padding-left: 1.5rem; opacity: .8; }
+.file-list .file:hover, .file-list .doc:hover {
+  background: color-mix(in srgb, CanvasText 8%, transparent);
+}
+.file-list .file.current { background: color-mix(in srgb, var(--info) 18%, transparent); }
+.file-list .file.broken .name { color: var(--error); }
+.file-list .doc .kind { opacity: .55; font-size: 11px; }
+.file-list .name { overflow: hidden; text-overflow: ellipsis; }
+
+/* The honest per-file state. Two different things, two different colours:
+ * "unsaved" is the browser's doing and "conflict" is somebody else's. */
+.badge {
+  font: 600 10px/1.5 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding: 0 .3rem;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+}
+
+.badge.dirty { color: var(--warning); }
+.badge.conflict, .badge.gone { color: var(--error); }
+.hint.ro { color: var(--info); }
+.hint.rw { color: var(--ok); }
+
+.actions { display: inline-flex; gap: .3rem; }
+.actions[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- toast */
+
+.toast {
+  position: fixed;
+  z-index: 20;
+  left: 50%;
+  bottom: 1.2rem;
+  transform: translateX(-50%);
+  max-width: 60vw;
+  padding: .4rem .8rem;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: Canvas;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, .3);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.toast.ok { border-color: var(--ok); color: var(--ok); }
+.toast.error { border-color: var(--error); color: var(--error); }
 
 /* -------------------------------------------------------------- diagram */
 
@@ -298,5 +381,6 @@ main {
 @media (max-width: 720px) {
   main { flex-direction: column; }
   .pane.editor { flex: 0 0 45%; border-right: 0; border-bottom: 1px solid var(--edge); }
+  .pane.files { flex: 0 0 20%; border-right: 0; border-bottom: 1px solid var(--edge); }
   .splitter { display: none; }
 }

@@ -12,6 +12,10 @@ user who has decided one of them is safe to run has decided it about both:
 * **No path ever becomes a file name.** Each front end answers a fixed set of
   routes out of memory, so no request can reach a document the user did not
   offer it.
+* **Nothing is written unless the command line asked for it.** ``PUT`` and the
+  mutating ``POST`` routes exist in one front end only — the editing session of
+  ``netgraph web`` — and only when it was opened with the flag that enables
+  them, on a loopback bind. Every other server here answers them with 405.
 * **A ``Host`` header check on a loopback bind.** Without it any web page could
   point a name it controls at 127.0.0.1 and read the diagram — and with it the
   topology — out of the user's browser (DNS rebinding).
@@ -176,6 +180,13 @@ class LocalHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         self._dispatch("POST", body=True)
+
+    def do_PUT(self) -> None:
+        # Only the editing session answers this, and only when it was opened for
+        # writing; every other front end falls through to its own 405. The
+        # method is dispatched here rather than in that one application so the
+        # host check and the security headers apply to it too.
+        self._dispatch("PUT", body=True)
 
     def _dispatch(self, method: str, *, body: bool) -> None:
         if not self._host_is_allowed():

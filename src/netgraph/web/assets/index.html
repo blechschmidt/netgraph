@@ -14,6 +14,11 @@
   <span id="status" class="pill pending">waiting</span>
   <span id="summary" class="summary"></span>
   <span class="spacer"></span>
+  <span id="session-actions" class="actions" hidden>
+    <button id="save" type="button" disabled title="Write the open file back (Ctrl-S)">Save</button>
+    <button id="undo" type="button" class="ghost" disabled title="Undo the last change">Undo</button>
+    <button id="redo" type="button" class="ghost" disabled title="Redo the last undone change">Redo</button>
+  </span>
   <label class="field">
     layer
     <select id="layer">
@@ -39,10 +44,22 @@
 </header>
 
 <main>
-  <section class="pane editor">
+  <section id="files" class="pane files" hidden>
     <div class="pane-head">
-      <span>YAML document stream</span>
-      <span class="hint">one or more documents, separated by <code>---</code></span>
+      <span>inventory</span>
+      <span id="files-root" class="hint"></span>
+      <span class="spacer"></span>
+      <span id="files-mode" class="hint"></span>
+    </div>
+    <div id="file-list" class="file-list"><p class="empty">loading</p></div>
+  </section>
+
+  <section class="pane editor">
+    <div class="pane-head" id="editor-head">
+      <span id="editor-title">YAML document stream</span>
+      <span id="editor-hint" class="hint">one or more documents, separated by <code>---</code></span>
+      <span class="spacer"></span>
+      <span id="editor-state" class="badge" hidden></span>
     </div>
     <textarea id="source" spellcheck="false" autocomplete="off" autocapitalize="off"
       aria-label="YAML document stream"></textarea>
@@ -50,7 +67,7 @@
       <span>problems</span>
       <span id="problem-counts" class="hint"></span>
       <span class="spacer"></span>
-      <span class="hint">click one to jump to its line</span>
+      <span class="hint">click one to jump to its file and line</span>
     </div>
     <div id="problems" class="problems"><p class="empty">nothing to report</p></div>
   </section>
@@ -73,7 +90,9 @@
 </main>
 
 <aside id="info" class="info" hidden aria-live="polite"></aside>
+<div id="toast" class="toast" hidden role="status"></div>
 <script src="/detail.js"></script>
+<script src="/session.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

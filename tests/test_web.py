@@ -660,13 +660,24 @@ def test_the_command_is_documented() -> None:
     assert "--no-open" in result.output
 
 
-def test_a_seed_folder_becomes_one_stream(monkeypatch: Any) -> None:
+def test_a_seed_folder_opens_a_session_rather_than_a_stream(monkeypatch: Any) -> None:
+    """A folder is a tree, and a tree is what the editing session is for.
+
+    It used to be flattened into one stream, which lost the folders and with
+    them the namespaces; see ``tests/test_web_session.py`` for what it does now.
+    """
     seeds: list[str] = []
-    monkeypatch.setattr("netgraph.cli.WebServer.create", _capture(seeds, port_error=SystemExit(0)))
+    sessions: list[Any] = []
+    monkeypatch.setattr(
+        "netgraph.cli.WebServer.create",
+        _capture(seeds, sessions=sessions, port_error=SystemExit(0)),
+    )
     result = run("web", str(HOME_LAB), "--no-open")
     assert result.exit_code == 0
-    assert "# routers/rtr-home.yaml" in seeds[0]
-    assert load_stream(seeds[0]).elements
+    assert seeds[0] == ""
+    assert sessions[0] is not None
+    assert sessions[0].root == HOME_LAB
+    assert not sessions[0].writable
 
 
 def test_a_seed_file_is_used_as_it_is(monkeypatch: Any) -> None:
@@ -693,11 +704,15 @@ def test_with_nothing_to_seed_from_the_editor_opens_on_the_example(monkeypatch: 
     assert inventory.devices
 
 
-def _capture(seeds: list[str], *, port_error: BaseException) -> Any:
-    """A ``WebServer.create`` that records the seed and then stops the command."""
+def _capture(
+    seeds: list[str], *, port_error: BaseException, sessions: list[Any] | None = None
+) -> Any:
+    """A ``WebServer.create`` that records what it was given and stops the command."""
 
     def create(**kwargs: Any) -> Any:
         seeds.append(kwargs["source"])
+        if sessions is not None:
+            sessions.append(kwargs.get("session"))
         raise port_error
 
     return create

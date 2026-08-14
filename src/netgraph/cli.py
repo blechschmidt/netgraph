@@ -204,7 +204,6 @@ from netgraph.loader import (
     clear_cache,
     disabled_by_environment,
     inspect_cache,
-    iter_inventory_files,
     load_stream,
     load_tree,
     open_cache,
@@ -286,10 +285,12 @@ from netgraph.watch import (
     Status,
     describe_exposure,
     file_changes,
+    is_loopback,
     run_watch,
 )
 from netgraph.web import DEFAULT_PORT as WEB_PORT
 from netgraph.web import WebServer
+from netgraph.web.session import EditingSession, TreeWatcher
 
 if TYPE_CHECKING:
     # ``netgraph.fmt`` pulls in ruamel.yaml, which costs roughly 30 ms of import
@@ -1236,6 +1237,9 @@ def edit_command(ctx: click.Context) -> None:
 
     With no subcommand, operations are read as JSON from stdin -- see
     'netgraph edit apply'.
+
+    For the same operations from a browser, with a file tree, a live diagram and
+    an undo stack, run 'netgraph web ./inventory --write'.
     """
     if ctx.invoked_subcommand is None:
         ctx.invoke(edit_apply_command)
@@ -3401,6 +3405,16 @@ _STATUS_COLOUR: Final[dict[Status, str]] = {
         "because it names a directory on this machine."
     ),
 )
+@click.option(
+    "--write/--read-only",
+    "write",
+    default=False,
+    show_default="--read-only",
+    help=(
+        "Let the browser change the inventory. Only for a SOURCE folder, only on a "
+        "loopback bind, and never by default: an editor that can write is a decision."
+    ),
+)
 @_config_options
 @click.pass_context
 def web_command(
@@ -3411,29 +3425,37 @@ def web_command(
     port: int,
     open_browser: bool,
     icons: IconTheme | None,
+    write: bool,
     profile: str | None,
     show_config: bool,
 ) -> None:
-    """Edit a YAML document stream in a browser and see it drawn as you type.
+    """Edit an inventory in a browser and see it drawn as you go.
 
-    The page holds the stream in a text area and the diagram beside it. Every
-    edit is parsed, validated and rendered exactly as `netgraph render` would,
-    and hovering a node or a link opens an info box with the detail the picture
-    has no room for: every interface, its addresses and VLANs, and what it is
-    cabled to.
+    A SOURCE *folder* opens an editing session: the server holds the tree, the
+    page lists its files and the documents in them, selecting a node in the
+    diagram reveals the document that declares it, and a problem in the list
+    navigates to its file and line. Add --write and the browser can save, undo
+    and redo -- every change through the same layer `netgraph edit` writes with,
+    so comments, quoting and formatting survive it. Edits made in $EDITOR or by
+    `git checkout` are noticed and reach the open page.
 
-    SOURCE seeds the editor. It may be a file or a folder, whose documents are
-    concatenated into one stream; `-` reads the stream from standard input, as
-    does a pipe. With no SOURCE the editor opens on the same example topology
-    `netgraph init` writes.
+    Anything else -- a file, a pipe, or no SOURCE at all -- opens the scratchpad
+    instead: one YAML document stream, held in the browser, rendered as you
+    type, written nowhere. It is the command for a snippet or a paste. With no
+    SOURCE it opens on the example topology `netgraph init` writes. Note that a
+    stream has no folders and therefore no namespaces.
 
-    Note that a stream has no folders and therefore no namespaces: every element
-    seeded from a tree lands in the root namespace.
+    Either way the diagram is the same one `netgraph render` draws, and hovering
+    a node or a link opens an info box with the detail the picture has no room
+    for: every interface, its addresses and VLANs, and what it is cabled to.
+
+    --write is refused unless the server is bound to loopback: publishing a
+    write endpoint with --host is not something a flag should let you do by
+    accident.
 
     Render defaults and --profile are read from the netgraph.toml of the
-    inventory named by -i, the current directory by default. The stream being
-    edited has no folder of its own to look in, so that file decides how this
-    machine draws rather than what this text means.
+    inventory named by -i, the current directory by default; a session also
+    reads the [validate] table of the folder it has open.
 
     Press Ctrl-C to stop.
     """
@@ -3446,7 +3468,8 @@ def web_command(
         return
     icons = ctx.params["icons"]
 
-    text = _web_source(console, source)
+    session = _web_session(app, source, write=write, host=host, icons=icons)
+    text = "" if session is not None else _web_source(console, source)
     exposure = describe_exposure(host, subject="the web interface")
     if exposure is not None:
         console.warn(exposure)
@@ -3459,6 +3482,7 @@ def web_command(
 
     server = WebServer.create(
         source=text,
+        session=session,
         icons=icons,
         host=host,
         port=port,
@@ -3467,7 +3491,14 @@ def web_command(
             f"{preview.status}: {preview.message} ({preview.duration * 1000:.0f} ms)", level=1
         ),
     ).start()
-    console.info(f"editing at {server.url}; press Ctrl-C to stop")
+    watcher = _web_watcher(app, session)
+    if session is None:
+        console.info(f"editing at {server.url}; press Ctrl-C to stop")
+    else:
+        console.info(
+            f"{'editing' if write else 'browsing'} {session.root} at {server.url} "
+            f"({'read-write' if write else 'read-only'}); press Ctrl-C to stop"
+        )
     if open_browser:
         _open_browser(app, server.url)
 
@@ -3477,41 +3508,92 @@ def web_command(
         # Ctrl-C is how this command is meant to end, not a failure.
         pass
     finally:
+        if watcher is not None:
+            watcher.stop()
         server.stop()
     console.info("web interface stopped")
 
 
-def _web_source(console: Console, source: Path | None) -> str:
-    """The document stream the editor opens with.
+def _web_session(
+    app: AppContext,
+    source: Path | None,
+    *,
+    write: bool,
+    host: str,
+    icons: IconTheme | None,
+) -> EditingSession | None:
+    """The tree this run edits, or ``None`` for the document-stream scratchpad.
 
-    A pipe wins over everything: ``netgraph render -f dot | ...`` taught users
-    that netgraph reads stdin when it is not a terminal, and a stream is what
-    this command edits.
+    A folder is a tree and everything else is a stream. That is the whole of the
+    decision, and it is made here rather than in the server so that ``--write``
+    can be refused with the reason before anything binds a port.
 
     Raises:
-        LoaderError: A seed folder cannot be walked.
+        click.BadParameter: ``--write`` was asked for where it cannot be given —
+            over a stream, which has no files, or on a bind that is not loopback.
     """
+    if source is None or not source.is_dir():
+        if write:
+            raise click.BadParameter(
+                "--write edits files, and a document stream has none. Give a folder: "
+                "'netgraph web ./inventory --write'.",
+                param_hint="'--write'",
+            )
+        return None
+    if write and not is_loopback(host):
+        raise click.BadParameter(
+            f"--write on {host} would publish an endpoint that changes this inventory to "
+            f"anyone who can reach this machine. Bind loopback (the default) to edit, or "
+            f"drop --write to publish a read-only session.",
+            param_hint="'--write'",
+        )
+    app.log(f"opening {source} as an editing session ({'read-write' if write else 'read-only'})")
+    return EditingSession(
+        root=source,
+        writable=write,
+        icons=icons,
+        cache=app.cache(),
+    )
+
+
+def _web_watcher(app: AppContext, session: EditingSession | None) -> TreeWatcher | None:
+    """Watch the session's folder, so an edit made elsewhere reaches the page.
+
+    The scratchpad has no folder to watch. A watch that cannot start — no
+    ``watchfiles`` wheel, a filesystem that delivers no events — is reported and
+    then lived with: the editor still works, it just stops noticing changes it
+    did not make itself, and saying so is better than a page that is quietly
+    stale.
+    """
+    if session is None:
+        return None
+    console = app.console(err=True)
+    return TreeWatcher(
+        session,
+        on_change=lambda batch: app.log(f"changed on disk: {', '.join(sorted(batch))}", level=1),
+        on_error=lambda message: console.warn(
+            f"the inventory is no longer being watched ({message}); changes made outside "
+            f"this editor will not reach the page until it is reloaded"
+        ),
+    ).start()
+
+
+def _web_source(console: Console, source: Path | None) -> str:
+    """The document stream the scratchpad opens with.
+
+    Only reached when there is no folder to open as a session: a file, a pipe,
+    or nothing. A pipe wins over the rest, because ``netgraph render -f dot |
+    ...`` taught users that netgraph reads stdin when it is not a terminal, and
+    a stream is what the scratchpad edits.
+    """
+    del console  # kept for symmetry with the session opener, which does warn
     if source is None and not _is_a_terminal(sys.stdin):
         return sys.stdin.read()
     if source is None:
         return _example_stream()
     if str(source) == "-":  # pragma: no cover - click resolves '-' to a path first
         return sys.stdin.read()
-    if source.is_file():
-        return source.read_text(encoding="utf-8-sig")
-
-    files = iter_inventory_files(source)
-    if any(entry.namespace for entry in files):
-        console.warn(
-            "a document stream has no folders: every element from a nested one is seeded "
-            "into the root namespace, and two elements that shared a name in different "
-            "folders now collide"
-        )
-    documents = [
-        f"# {entry.relative.as_posix()}\n{entry.path.read_text(encoding='utf-8-sig').lstrip()}"
-        for entry in files
-    ]
-    return "\n---\n".join(documents) if documents else _example_stream()
+    return source.read_text(encoding="utf-8-sig")
 
 
 def _example_stream() -> str:
