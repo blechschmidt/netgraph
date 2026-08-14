@@ -626,6 +626,39 @@ def test_a_loopback_server_answers_only_to_localhost(server: WebServer) -> None:
     assert request(server, "/", headers={"Host": "evil.example"})[0] == 421
 
 
+def test_a_refused_request_leaves_the_connection_usable(server: WebServer) -> None:
+    """A body nobody read is the next request, as far as HTTP/1.1 is concerned.
+
+    Every refusal that answers without looking at the body — a 404 for an
+    unknown route, a 403 from a read-only session, the 421 from the host check —
+    used to strand it in the socket, and the request *after* it on the same
+    connection was then parsed out of those leftover bytes. The symptom was a
+    ``501 Unsupported method`` that named a fragment of JSON, on a request that
+    was perfectly well formed. A browser keeps the connection alive, so this is
+    the ordinary case and not an exotic one.
+    """
+    connection = http.client.HTTPConnection("127.0.0.1", server.port, timeout=30)
+    try:
+        for _ in range(3):
+            connection.request(
+                "POST",
+                "/api/nothing-here",
+                body=json.dumps({"source": TWO_HOSTS}),
+                headers={"Content-Type": "application/json"},
+            )
+            refusal = connection.getresponse()
+            assert refusal.status == 404
+            refusal.read()
+
+            # The one that would have been parsed out of the leftover body.
+            connection.request("GET", "/api/state")
+            answer = connection.getresponse()
+            assert answer.status == 200
+            assert json.loads(answer.read())["mode"] == "stream"
+    finally:
+        connection.close()
+
+
 def test_the_url_is_one_a_browser_can_open(server: WebServer) -> None:
     assert server.url == f"http://127.0.0.1:{server.port}/"
 

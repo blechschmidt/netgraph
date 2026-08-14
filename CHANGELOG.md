@@ -211,6 +211,25 @@ publish a version whose section is missing or empty — see
 
 ### Fixed
 
+- **Clicking a node in `netgraph web` did not open the document that declares it.** The
+  page passed the SVG element id where the tree is keyed by element address, so the lookup
+  matched nothing and the click silently did nothing at all — the one mapping the command
+  exists for.
+- **`Ctrl-Z` in `netgraph web` left the editor showing text that was nowhere on disk.** The
+  undo restored the file correctly and the pane kept the version it had just replaced,
+  under a badge that said there was nothing unsaved. The pane is now reloaded from the file
+  the undo produced.
+- **A change made outside `netgraph web` was noticed and then ignored.** The open file was
+  compared against the *previous* file list rather than the one the change had just been
+  fetched into, so the hashes always matched and the one file that had moved on disk was
+  the one thing left stale. Editing an inventory in `$EDITOR` with the browser open now
+  reloads it there, or marks it conflicted when the pane has unsaved edits.
+- **A refused request left the connection unusable in both local servers.** Every refusal
+  that answers without reading the request body — a 404 for an unknown route, a 403 from a
+  read-only session, the host check's 421 — stranded that body in the socket, where HTTP/1.1
+  keep-alive made the *next* request on the same connection parse out of it. The symptom
+  was a `501 Unsupported method` naming a fragment of JSON, on a request that was perfectly
+  well formed.
 - **netgraph could not start on Python 3.11.** Every command raised `ValueError: mutable
   default <class 'mappingproxy'>` while importing the configuration layer. 3.10 and 3.12
   were unaffected, which is why it survived a full test matrix — the interpreter in the

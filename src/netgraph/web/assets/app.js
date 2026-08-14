@@ -426,8 +426,10 @@
     var hit = recordAt(event.target);
     if (!hit) { hideInfo(true); return; }
     // In a session, clicking a shape reveals the document that declares it:
-    // that mapping is the whole point of the command.
-    if (mode === "session") { netgraphSession.reveal(hit.record.element); }
+    // that mapping is the whole point of the command. `record.id` is the
+    // element's address, which is what the tree keys documents by --
+    // `record.element` is the SVG id, and matched nothing.
+    if (mode === "session") { netgraphSession.reveal(hit.record.id); }
     if (pinned === hit.record.element) { hideInfo(true); return; }
     pinned = hit.record.element;
     showInfo(hit, event);

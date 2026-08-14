@@ -229,3 +229,5 @@ Text that does not parse is reported in the page, not by the process.
 * [`docs/inventory-layout.md`](../inventory-layout.md) — why a folder tree means
   namespaces and a stream does not.
 * [`docs/validation.md`](../validation.md) — the problems the middle pane lists.
+* [`docs/testing.md`](../testing.md#the-browser-layer) — the headless-browser
+  suite that drives this page, and how to run it.

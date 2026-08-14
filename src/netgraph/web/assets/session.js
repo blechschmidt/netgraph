@@ -103,26 +103,32 @@ var netgraphSession = (function () {
       .then(function () { timer = window.setTimeout(poll, POLL_MS); });
   }
 
-  /** The tree moved: refetch everything that was derived from it. */
+  /** The tree moved: refetch everything that was derived from it.
+   *
+   * The decision about the open file waits for the refetch rather than racing
+   * it. Made against the tree still in hand, it is made against the hashes from
+   * *before* the change -- which always compare equal, so the file that just
+   * moved on disk was the one thing the reconciliation left alone. */
   function reconcile() {
-    refreshTree();
     host.render();
-    if (!open.path) { return; }
-    var entry = fileEntry(open.path);
-    if (!entry) {
-      // Deleted under us. The text stays on screen -- it may be the only copy
-      // left -- but it is no longer a file, so saving it would be a create.
-      mark("gone", "deleted on disk");
-      return;
-    }
-    if (entry.hash === open.hash) { return; }
-    if (open.dirty) {
-      open.conflicted = true;
-      mark("conflict", "changed on disk since you opened it");
-      host.toast(open.path + " changed on disk and has unsaved edits here", "error");
-      return;
-    }
-    openFile(open.path);
+    return refreshTree().then(function () {
+      if (!open.path) { return; }
+      var entry = fileEntry(open.path);
+      if (!entry) {
+        // Deleted under us. The text stays on screen -- it may be the only copy
+        // left -- but it is no longer a file, so saving it would be a create.
+        mark("gone", "deleted on disk");
+        return;
+      }
+      if (entry.hash === open.hash) { return; }
+      if (open.dirty) {
+        open.conflicted = true;
+        mark("conflict", "changed on disk since you opened it");
+        host.toast(open.path + " changed on disk and has unsaved edits here", "error");
+        return;
+      }
+      openFile(open.path);
+    });
   }
 
   /* -------------------------------------------------------------- the tree */
@@ -280,13 +286,18 @@ var netgraphSession = (function () {
     if (verb === "redo" && !state.redo) { return; }
     fetch("/api/" + verb, { method: "POST", cache: "no-store" })
       .then(readBody)
-      .then(function (result) { applied(result, verb + "ne"); })
+      .then(function (result) { applied(result, verb + "ne", true); })
       .catch(function (error) { host.toast(String(error.message || error), "error"); })
       .then(paintHistory);
   }
 
-  /** What every successful write does: adopt the new revision and redraw. */
-  function applied(result, what) {
+  /** What every successful write does: adopt the new revision and redraw.
+   *
+   * `rewrote` says the text on screen is not what was just written -- true of an
+   * undo, which puts back a file the pane is showing the *new* version of, and
+   * false of a save, where the pane is already the file. Without it an undo left
+   * the editor showing text that was nowhere on disk, under a clean badge. */
+  function applied(result, what, rewrote) {
     state.revision = result.revision;
     state.undo = result.undo;
     state.redo = result.redo;
@@ -296,6 +307,7 @@ var netgraphSession = (function () {
       open.dirty = false;
       open.conflicted = false;
       mark(null, "");
+      if (rewrote) { openFile(open.path); }
     }
     host.toast(what, "ok");
     refreshTree().then(function () {

@@ -1,8 +1,8 @@
 # Testing netgraph
 
-The suite is in two halves, and they answer different questions.
+The suite is in three halves, and they answer different questions.
 
-**Example tests** — everything in `tests/` except the three files below — say what
+**Example tests** — everything in `tests/` except the four files below — say what
 a feature *does*. Each one names an inventory somebody wrote, calls one thing,
 and asserts one outcome. When they fail, the failure is a sentence.
 
@@ -15,7 +15,12 @@ accepts: unicode-bearing free text, near-boundary names, interfaces with
 consistent types and members, cables whose endpoints resolve, nested tunnel
 stacks, adapters, patch panels, templates and interface ranges.
 
-Both run under a plain `pytest`.
+**The browser layer** — `tests/test_browser.py` — says what `netgraph web` *does
+in a browser*. It is the only thing in the repository that executes the page's
+CSS and JavaScript; see [The browser layer](#the-browser-layer) below.
+
+The first two run under a plain `pytest`. The third skips unless a browser is
+installed, so a plain `pytest` never fails for the want of one.
 
 ```console
 $ pip install --editable ".[dev]"
@@ -49,12 +54,17 @@ property of the operating system rather than of the interpreter, so a second
 version would double the cost and check the same thing twice. The interpreter
 range is covered on Linux, where it is cheapest.
 
+Two more jobs run outside that matrix, on Linux only, because what they check is
+not a property of the platform: `browser` opens `netgraph web` in a real
+Chromium ([below](#the-browser-layer)), and `docker` builds and drives the image.
+
 Three things are **not** covered anywhere, and are worth knowing:
 
 * **Python 3.13.** Claimed in the PyPI classifiers, not in the matrix.
 * **Docker.** The `docker` job is Linux-only; the image is a Linux image.
-* **The `netgraph web` and `netgraph watch` browser front ends** are asserted
-  through HTTP and through the DOM they emit, never through a real browser.
+* **A browser that is not Chromium**, and `netgraph watch`'s served page, which
+  is still asserted through HTTP and through the DOM it emits rather than by
+  something that renders it.
 
 ### What is skipped on Windows, and why
 
@@ -112,6 +122,85 @@ so the generated script is parsed by PowerShell's own parser, registered with
 That last test completes an element name out of an inventory whose path contains a
 space, which is the case that would break if the words travelled to Python
 whitespace-separated instead of newline-separated.
+
+## The browser layer
+
+`netgraph web` is about fourteen hundred lines of CSS and JavaScript, and until
+`tests/test_browser.py` existed nothing executed any of it: `tests/test_web.py`
+and `tests/test_web_session.py` stop at the HTTP boundary, so a regression in
+`app.js` shipped green. That file starts the real server over a temporary copy
+of `examples/home-lab` on an ephemeral loopback port, opens it in a headless
+Chromium through [Playwright][playwright], and asserts what a person would see.
+
+```console
+$ pip install --editable ".[dev,browser]"
+$ playwright install chromium
+$ pytest -m browser --no-cov
+```
+
+`--no-cov` because this layer is deliberately outside the coverage gate: it
+imports very little Python and would only dilute a number that is about the
+package. `-m browser` selects it; `-m 'not browser'` leaves it out of a run that
+wants everything else.
+
+Playwright is in the **`browser` extra rather than in `dev`**, so `pip install
+'.[dev]'` stays what it was. Without it — or with it but without the browser it
+drives — the whole module skips and says which command to run. It is never a hard
+failure for a contributor who has neither, and `NETGRAPH_INSTALL_BROWSER=1` turns
+the second command above into something the suite does for itself, which is how
+the CI job is wired.
+
+### What it asserts
+
+| Test | The behaviour |
+|---|---|
+| the page boots and draws the inventory | every asset loads, `/api/state` is fetched, and there are as many shapes on screen as the server has records |
+| typing in the text pane re-renders the diagram | the scratchpad's whole contract: text in, diagram out, nothing on disk |
+| hovering a node opens the info box | field by field against the record `/api/graph` carries, so the picture and the JSON export cannot drift |
+| clicking a node reveals its declaring document | a shape carries an address, an address has a file and a line, and the editor goes there — the 1:1 mapping the command exists for |
+| a diagnostic row jumps to its location | `cables/broken.yaml#0:4` opens that file with line 4 selected |
+| saving writes the file and `Ctrl-Z` puts it back | on disk *and* in the pane, with the diagram redrawn both times |
+| dragging a node writes geometry to disk | **skips today** — see below |
+| drawing a link produces a cable | **skips today** — see below |
+| a read-only session disables every mutating control | no control that would write, *and* a 403 from every route that could, asked from the page's own origin |
+| the poll notices a change made outside the session | `$EDITOR` writes the file; a clean pane adopts it, a dirty one is marked conflicted and left alone |
+| a stale save is refused rather than clobbering | the content hash the save quotes is what refuses it, whether or not anything noticed first |
+
+The two direct-manipulation tests **perform their gesture for real** and skip only
+when the tree did not move — which it does not, because a drag on the current
+canvas pans the diagram and writes nothing. They are not `xfail` and not
+commented out: the day the canvas grows the gesture, they start asserting its
+outcome without being touched. The skip reason says so in the run's own output.
+
+### Two properties every test here has
+
+**The console is an assertion.** Every message the page logs is collected, and a
+test fails if any of them was an error — an uncaught exception, a 404 for an
+asset, a fetch that came back wrong. That one check catches most asset
+regressions without anybody having to predict them, and it is why the tests read
+as short as they do. A test that drives a refusal *on purpose* allows it by
+status (`editor.console.allow("403")`), so the allowance is visible where it is
+needed rather than global.
+
+**A failure leaves evidence.** A screenshot, the page's HTML and the whole console
+log are written under `.browser-artifacts/` for any test that fails —
+`NETGRAPH_BROWSER_ARTIFACTS` moves that, and the `browser` job in
+`.github/workflows/ci.yml` points it at a directory it uploads. A browser failure
+nobody can reproduce is a browser failure nobody fixes.
+
+### Debugging one
+
+```console
+$ pytest -m browser --no-cov -k reveals -x
+$ PWDEBUG=1 pytest -m browser --no-cov -k reveals -x   # opens the inspector
+```
+
+`PWDEBUG=1` is Playwright's own switch: it runs headed, pauses on every action
+and lets you step through the test against the live page. The temporary
+inventory each test copies is a real directory under pytest's `tmp_path`, so
+whatever the test wrote is still there to look at afterwards.
+
+[playwright]: https://playwright.dev/python/
 
 ## The properties
 

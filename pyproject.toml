@@ -67,6 +67,12 @@ dev = [
     # installing this extra wires them into git.
     "pre-commit>=3.5",
 ]
+# The headless browser layer, ``tests/test_browser.py``. Deliberately *not* part
+# of ``dev``: it pulls a driver and then downloads a browser, which is a hundred
+# megabytes a contributor typing ``pytest`` did not ask for. The module skips
+# itself — with the command to run — when either half is missing, and
+# ``.github/workflows/ci.yml`` has a job that installs both. See docs/testing.md.
+browser = ["playwright>=1.44"]
 
 [project.urls]
 # The canonical URLs. ``netgraph.rules.RULES_DOC_URL`` and the SARIF
@@ -170,9 +176,23 @@ ignore_missing_imports = true
 module = ["tomli"]
 ignore_missing_imports = true
 
+# tests/test_browser.py imports it, and it is in the ``browser`` extra rather
+# than in ``dev`` -- so the type-checking job that lints every other test module
+# does not have it installed. The module ships type hints, so wherever it *is*
+# installed this override changes nothing.
+[[tool.mypy.overrides]]
+module = ["playwright.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
+markers = [
+    # tests/test_browser.py. Its own mark so the CI job that installs a browser
+    # can select it (``-m browser``) and every other run can leave it out
+    # (``-m 'not browser'``) rather than relying on it skipping itself.
+    "browser: drives the web interface in a real headless browser (see docs/testing.md)",
+]
 # Coverage is on by default so that the threshold cannot be forgotten in CI.
 # When running a subset of the suite the gate will trip on the untouched
 # modules -- pass ``--no-cov`` for those runs, e.g. ``pytest tests/test_dot.py

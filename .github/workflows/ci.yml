@@ -303,8 +303,15 @@ jobs:
         #
         # The floor is 85 unless the matrix entry says otherwise; see the
         # ``coverage-floor`` note on the Windows entry for why it is lower there.
+        #
+        # ``-m 'not browser'`` because the ``browser`` job below owns that
+        # module: it is not installable here (Playwright is in its own extra), so
+        # every one of its tests would skip, and eleven skips that mean "another
+        # job runs these" would drown the capability skips the step after this
+        # one exists to surface.
         run: |
           pytest \
+            -m 'not browser' \
             --cov \
             --cov-fail-under=${{ matrix.coverage-floor || 85 }} \
             --cov-report=xml:coverage.xml \
@@ -352,6 +359,110 @@ jobs:
             htmlcov/
             junit.xml
           if-no-files-found: error
+          retention-days: 14
+
+  # ``netgraph web`` is fourteen hundred lines of CSS and JavaScript that no
+  # other job executes: the ``test`` matrix asserts the HTTP boundary and stops
+  # there, so a regression in app.js would ship green. This job is the only place
+  # a real browser opens the page.
+  #
+  # Its own job rather than a step in the matrix, for three reasons: it needs a
+  # browser download the other jobs have no use for, it is Linux-only (what it
+  # checks is our assets, not the platform), and its coverage must not touch the
+  # Python gate -- hence ``--no-cov``. It runs the whole editor for real, so it
+  # also needs Graphviz.
+  browser:
+    name: browser (chromium)
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Install Graphviz
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes graphviz
+          dot -V
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install netgraph, its dev extras and Playwright
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install --editable ".[dev,browser]"
+
+      # ``--with-deps`` installs the shared libraries the headless browser needs,
+      # which the runner image does not carry in full. Chromium only: this layer
+      # is here to catch a regression in our assets, not to survey engines.
+      - name: Install the browser
+        run: python -m playwright install --with-deps chromium
+
+      # A skip here would be the whole job passing having opened nothing, which
+      # is exactly the failure mode this job exists to prevent -- so the browser
+      # being absent is checked before pytest gets a chance to be lenient about it.
+      - name: Confirm the browser starts
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from playwright.sync_api import sync_playwright
+
+          with sync_playwright() as playwright:
+              browser = playwright.chromium.launch()
+              print(f"chromium {browser.version}")
+              browser.close()
+          PY
+
+      - name: pytest -m browser
+        id: pytest
+        env:
+          # Where a failing test leaves its screenshot, page source and console
+          # log; the upload below is what makes them worth writing.
+          NETGRAPH_BROWSER_ARTIFACTS: ${{ github.workspace }}/browser-artifacts
+        # ``--no-cov`` on purpose: this job must not contribute to -- or be
+        # measured against -- the coverage gate the ``test`` matrix enforces.
+        # ``-m browser`` selects the module; ``-p no:randomly`` is not needed
+        # because nothing here shares state between tests.
+        run: |
+          pytest -m browser --no-cov -ra --junitxml=browser-junit.xml
+
+      # A module that skipped itself would be a green job that opened no browser.
+      - name: Fail if nothing was actually driven
+        if: ${{ !cancelled() && steps.pytest.outcome != 'skipped' }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          suite = ET.parse("browser-junit.xml").getroot()
+          cases = list(suite.iter("testcase"))
+          skipped = [case for case in cases if case.findall("skipped")]
+          print(f"{len(cases)} browser tests, {len(skipped)} skipped")
+          for case in skipped:
+              print(f"  {case.get('name')} -- {case.findall('skipped')[0].get('message', '')}")
+          # The two direct-manipulation tests skip until the canvas grows the
+          # gestures they perform; anything beyond that means the browser was
+          # never there and the job proved nothing.
+          if len(cases) - len(skipped) < 5:
+              raise SystemExit("::error::the browser suite ran almost nothing; was chromium missing?")
+          PY
+
+      - name: Upload the failure evidence
+        if: ${{ failure() && steps.pytest.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-failure-evidence
+          path: |
+            browser-artifacts/
+            browser-junit.xml
+          if-no-files-found: warn
           retention-days: 14
 
   # The example inventories are the only trees this repository ships that a user

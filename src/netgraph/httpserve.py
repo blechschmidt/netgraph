@@ -43,6 +43,7 @@ from netgraph.errors import NetgraphError
 __all__ = [
     "DEFAULT_CSP",
     "DEFAULT_HOST",
+    "MAX_DISCARD",
     "BackgroundServer",
     "LocalHandler",
     "LocalServer",
@@ -61,6 +62,11 @@ DEFAULT_HOST: Final = "127.0.0.1"
 #: Bind addresses that mean "every interface", and the address on this machine
 #: that actually reaches them. Used only to print a URL a browser can open.
 _WILDCARDS: Final[dict[str, str]] = {"0.0.0.0": "127.0.0.1", "::": "::1", "[::]": "::1"}
+
+#: Most of a request body that :meth:`LocalHandler._discard_body` will read and
+#: throw away to keep a connection usable. Anything larger is not worth the read;
+#: the connection is closed instead, which is equally correct and cheaper.
+MAX_DISCARD: Final = 4 * 1024 * 1024
 
 #: What every response is allowed to load: whatever this server itself sent,
 #: and nothing else. Both front ends inline their own diagram, so ``data:``
@@ -150,6 +156,11 @@ class LocalHandler(BaseHTTPRequestHandler):
     sys_version = ""
     protocol_version = "HTTP/1.1"
 
+    #: Set by an application that has read the request body, so that
+    #: :meth:`_discard_body` does not try to read it a second time. Reset before
+    #: every request.
+    body_consumed: bool = False
+
     # Bound onto a subclass when the server is created; see :func:`bind`.
     loopback_only: bool = True
     log: Callable[[str], None] = staticmethod(lambda message: None)
@@ -189,15 +200,56 @@ class LocalHandler(BaseHTTPRequestHandler):
         self._dispatch("PUT", body=True)
 
     def _dispatch(self, method: str, *, body: bool) -> None:
-        if not self._host_is_allowed():
-            self.send_payload(
-                HTTPStatus.MISDIRECTED_REQUEST,
-                b"this server is bound to loopback and only answers to localhost\n",
-                "text/plain; charset=utf-8",
-                body=body,
-            )
+        self.body_consumed = False
+        try:
+            if not self._host_is_allowed():
+                self.send_payload(
+                    HTTPStatus.MISDIRECTED_REQUEST,
+                    b"this server is bound to loopback and only answers to localhost\n",
+                    "text/plain; charset=utf-8",
+                    body=body,
+                )
+                return
+            self.handle_request(method, body=body)
+        finally:
+            self._discard_body()
+
+    def _discard_body(self) -> None:
+        """Read whatever of the request body the application did not.
+
+        ``protocol_version`` is HTTP/1.1, so connections are kept alive — and on
+        a kept-alive connection an unread body *is* the next request as far as
+        the parser is concerned. Every refusal that answers without looking at
+        the body is therefore a trap for the request after it: a 403 from a
+        read-only session, a 404 for an unknown route, a 421 from the host check.
+        The symptom is a nonsense ``501 Unsupported method`` on a later request,
+        which reads like a bug in the client.
+
+        Bounded rather than unbounded, and a body that says something the parser
+        cannot use at all closes the connection instead of being guessed at.
+        """
+        if self.body_consumed:
             return
-        self.handle_request(method, body=body)
+        if self.headers.get("Transfer-Encoding"):
+            # Chunked, so the length is not in a header and the framing is not
+            # worth re-implementing to throw the bytes away.
+            self.close_connection = True
+            return
+        header = self.headers.get("Content-Length")
+        if header is None:
+            return
+        try:
+            length = int(header)
+        except ValueError:
+            self.close_connection = True
+            return
+        if length <= 0:
+            return
+        if length > MAX_DISCARD:
+            self.close_connection = True
+            return
+        with suppress(OSError):
+            self.rfile.read(length)
 
     def handle_request(self, method: str, *, body: bool) -> None:
         """Answer one request. Implemented by the application."""

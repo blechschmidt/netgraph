@@ -15,6 +15,12 @@ Two project-wide switches live here.
 deliberately opt-in and never implicit: a snapshot that silently rewrites itself
 when the renderer changes asserts nothing at all.
 
+:data:`PHASE_REPORTS` lets a fixture find out how the test it is tearing down
+ended, which is what ``tests/test_browser.py`` needs to capture a screenshot and
+the browser console log *only* for a failure. pytest does not otherwise tell a
+fixture anything about the outcome, and a suite that saved an artefact for every
+passing test would bury the one that matters.
+
 ``NETGRAPH_HYPOTHESIS_PROFILE`` picks how hard the property tests in
 ``tests/test_properties.py`` and ``tests/test_fuzz_loader.py`` search. The
 profiles are registered here rather than per module so that every property in
@@ -25,7 +31,7 @@ one is for and ``docs/testing.md`` for how to run them.
 from __future__ import annotations
 
 import os
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from pathlib import Path
 from typing import Final
 
@@ -95,6 +101,32 @@ if _REQUESTED not in PROFILES:
         f"expected one of {', '.join(PROFILES)}"
     )
 settings.load_profile(_REQUESTED)
+
+
+#: Every phase's report, by ``"setup"``/``"call"``/``"teardown"``, stashed on the
+#: item as soon as it exists. A fixture reads it during teardown to find out
+#: whether the test it is finishing failed; see :func:`pytest_runtest_makereport`.
+PHASE_REPORTS: Final[pytest.StashKey[dict[str, pytest.TestReport]]] = pytest.StashKey()
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport(
+    item: pytest.Item,
+) -> Generator[None, pytest.TestReport, pytest.TestReport]:
+    """Record each phase's report on the item, for fixtures to consult.
+
+    The standard recipe, and the only way a teardown can know what happened in
+    the call phase. Nothing here changes the report; it is stashed and handed
+    straight back.
+    """
+    report = yield
+    item.stash.setdefault(PHASE_REPORTS, {})[report.when] = report
+    return report
+
+
+def failed(item: pytest.Item) -> bool:
+    """Did any phase of ``item`` fail? Answerable from inside a fixture teardown."""
+    return any(report.failed for report in item.stash.get(PHASE_REPORTS, {}).values())
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:

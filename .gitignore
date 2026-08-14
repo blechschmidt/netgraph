@@ -61,3 +61,7 @@ junit.xml
 /index.json
 /published.svg
 /topology.svg
+
+# Screenshots, page source and console logs left behind by a failing browser
+# test (tests/test_browser.py). Uploaded as an artefact in CI; scratch locally.
+/.browser-artifacts/

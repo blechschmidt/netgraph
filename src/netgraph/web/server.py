@@ -347,6 +347,9 @@ class _Handler(LocalHandler):
                 f"{MAX_SOURCE_BYTES}. Keep a document this size out of the browser"
             )
         raw = self.rfile.read(length)
+        # Whatever happens below, the body is off the connection; see
+        # ``LocalHandler._discard_body`` for what the flag is for.
+        self.body_consumed = True
         try:
             payload = json.loads(raw.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
