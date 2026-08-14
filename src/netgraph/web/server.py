@@ -12,15 +12,25 @@ document stream in the browser and renders what it is sent::
 **The editing session** — ``netgraph web DIR`` — holds a real inventory tree
 (:mod:`netgraph.web.session`) and exposes it::
 
-    GET  /api/state           revision, and what this session allows
+    GET  /api/state           revision, what this session allows, who else is here
     GET  /api/tree            files, documents, element addresses, source lines
     GET  /api/graph?view=l2   the resolved graph, its records and its geometry
     GET  /api/file/<path>     one file's text, with the hash a write must quote
     PUT  /api/file/<path>     that file back, refusing a stale one
     POST /api/ops             a batch of netgraph.edit operations, applied
     POST /api/undo, /api/redo the server-side history
+    GET  /api/events          server-sent events: what changed, as it changes
+    POST /api/presence        what this client has selected and is editing
 
 Plus the page itself and its three assets, which are the same either way.
+
+**The stream is an optimisation, not a channel of authority.** ``/api/events``
+says what moved so that a client can refetch one file instead of a tree and skip
+a Graphviz run for a picture that did not change. Every fact it carries is also
+answerable by a plain ``GET``: ``/api/state`` still holds the revision, and
+``?since=`` on it replays the same events out of the same ring buffer for a
+client that cannot hold a connection open — a buffering proxy, ``curl``, a test.
+Nothing is writable through the stream, and no write is gated on having read it.
 
 Three properties hold across all of it:
 
@@ -53,7 +63,7 @@ editor produces a refusal rather than a stall.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from functools import cache
 from http import HTTPStatus
 from importlib import resources
@@ -69,6 +79,15 @@ from netgraph.httpserve import (
     is_loopback,
 )
 from netgraph.render import IconTheme
+from netgraph.web.events import (
+    EVENTS_PATH,
+    HEARTBEAT_SECONDS,
+    PRESENCE_PATH,
+    Event,
+    Subscription,
+    TooManyStreams,
+    heartbeat_frame,
+)
 from netgraph.web.preview import Preview, RequestError, ViewOptions, render_source
 from netgraph.web.session import (
     SESSION_BASELINE,
@@ -83,10 +102,12 @@ __all__ = [
     "CHANGES_PATH",
     "DEFAULT_PORT",
     "DIFF_PATH",
+    "EVENTS_PATH",
     "FILE_PREFIX",
     "GRAPH_PATH",
     "MAX_SOURCE_BYTES",
     "OPS_PATH",
+    "PRESENCE_PATH",
     "REDO_PATH",
     "RENDER_PATH",
     "REVERT_PATH",
@@ -217,6 +238,10 @@ class _Handler(LocalHandler):
         except (SessionError, EditError) as exc:
             self._refuse(exc, body=body)
 
+    @property
+    def _query(self) -> dict[str, list[str]]:
+        return parse_qs(urlsplit(self.path).query)
+
     def _get_stream(self, path: str, *, body: bool) -> None:
         if path == SOURCE_PATH:
             self._json(HTTPStatus.OK, {"source": self.source}, body=body)
@@ -231,18 +256,27 @@ class _Handler(LocalHandler):
             self.send_text(HTTPStatus.NOT_FOUND, "not found; the editor is at /", body=body)
 
     def _get_session(self, session: EditingSession, path: str, *, body: bool) -> None:
+        query = self._query
         if path == TREE_PATH:
-            self._json(HTTPStatus.OK, session.tree(), body=body)
+            # ``?path=`` names the files to answer for, so a client that was told
+            # exactly what moved does not pay for a walk of the whole tree.
+            wanted = _paths(query)
+            self._json(
+                HTTPStatus.OK,
+                session.tree(wanted, diagnostics=_flag(query, "diagnostics", default=True)),
+                body=body,
+            )
+        elif path == EVENTS_PATH:
+            self._events(session, body=body)
         elif path == GRAPH_PATH:
-            view = ViewOptions.from_query(parse_qs(urlsplit(self.path).query), icons=self.icons)
-            preview, revision = session.graph(view)
+            view = ViewOptions.from_query(query, icons=self.icons)
+            preview, revision = session.graph(view, known=_known(query))
             self.on_render(preview)
             self._json(HTTPStatus.OK, {"revision": revision} | preview.to_dict(), body=body)
         elif path == DIFF_PATH:
-            query = parse_qs(urlsplit(self.path).query)
             view = ViewOptions.from_query(query, icons=self.icons)
             against = query.get("against", [SESSION_BASELINE])[-1]
-            preview, revision = session.diff(view, against=against)
+            preview, revision = session.diff(view, against=against, known=_known(query))
             self.on_render(preview)
             self._json(
                 HTTPStatus.OK,
@@ -259,6 +293,130 @@ class _Handler(LocalHandler):
             self._json(HTTPStatus.OK, session.read_file(_requested_path(path)), body=body)
         else:
             self.send_text(HTTPStatus.NOT_FOUND, "not found; the editor is at /", body=body)
+
+    # -- the event stream ------------------------------------------------
+
+    def _events(self, session: EditingSession, *, body: bool) -> None:
+        """Hold one ``text/event-stream`` open until the client goes away.
+
+        The whole of the push channel's HTTP side. What it must get right:
+
+        * **Resume, or say it cannot.** ``Last-Event-ID`` — the header a browser
+          resends by itself, or ``?lastEventId=`` for a client written by hand —
+          is replayed out of the ring buffer. A resume point that has fallen out
+          of it opens with ``resync`` instead of a plausible-looking partial
+          replay, because a client that applies a patch to a state it does not
+          have is worse off than one that refetches.
+        * **Say hello first.** The opening frame carries the client id and the
+          revision, so a page knows who it is and what it is looking at before
+          any incremental event arrives.
+        * **Beat.** An idle stream writes a comment every
+          :data:`~netgraph.web.events.HEARTBEAT_SECONDS`, which keeps a proxy
+          from timing the connection out, keeps this client's presence entry
+          alive, and — because a write to a dead socket raises — is how the
+          server notices a tab that was closed without a FIN.
+        * **Leave nothing behind.** The subscription and the presence entry are
+          released in ``finally``: this thread is the only owner of both.
+
+        A ``HEAD`` is answered with the headers and no stream. There is nothing
+        to say in one, and holding a connection open for a client that has told
+        us it will read no body is a thread spent on nothing.
+        """
+        try:
+            subscription = session.events.subscribe(self._last_event_id())
+        except TooManyStreams as exc:
+            self.send_text(HTTPStatus.SERVICE_UNAVAILABLE, str(exc), body=body)
+            return
+        # Read before anyone joins: this is the id the client resumes from, and
+        # an event published while the stream is being set up must land *after*
+        # it rather than be skipped by it.
+        resume_from = session.events.last_id
+        self.begin_stream("text/event-stream; charset=utf-8")
+        if not body:  # a HEAD: the headers are the whole answer
+            subscription.close()
+            return
+        client = session.join(streaming=True, client_id=_client_id(self._query))
+        try:
+            self._write_frame(
+                Event(
+                    id=resume_from,
+                    name="hello",
+                    revision=session.revision,
+                    data={
+                        "client": client.id,
+                        "label": client.label,
+                        # The resume point had fallen out of the ring: this
+                        # stream cannot be a continuation, so say so in the first
+                        # frame rather than let a patch land on a state that is
+                        # not there.
+                        "resync": subscription.gap,
+                        "heartbeatMs": round(HEARTBEAT_SECONDS * 1000),
+                        "clients": session.presence.payload(me=client.id),
+                    },
+                ).frame()
+            )
+            self._pump(session, subscription, client.id)
+        except (BrokenPipeError, ConnectionResetError, OSError):
+            # The tab was closed, the machine slept, the socket died. Every one
+            # of them is the ordinary end of a stream, not a fault to log.
+            pass
+        finally:
+            subscription.close()
+            # Not a *leave*: a browser reconnects a dropped stream within
+            # seconds and should get its identity back, so the entry is marked
+            # as no longer streaming and left to expire. A tab that is really
+            # closing says so with a POST to /api/presence.
+            session.stream_ended(client.id)
+
+    def _pump(self, session: EditingSession, subscription: Subscription, client_id: str) -> None:
+        """Write events as they arrive, and a heartbeat when they do not."""
+        while True:
+            # ``wait`` returns nothing both when the interval elapsed and when
+            # the subscription was closed under us — by the client hanging up or
+            # by the server stopping — so the flag is what ends the loop.
+            events = subscription.wait(HEARTBEAT_SECONDS)
+            if subscription.closed:
+                return
+            if not events:
+                self._write_frame(heartbeat_frame())
+                # The beat is also this client's keepalive: a stream that is
+                # open is a client that is present, and no separate request
+                # should be needed to say so.
+                session.presence.touch(client_id)
+                continue
+            for event in events:
+                self._write_frame(event.frame())
+            if subscription.gap:
+                # This stream fell behind and lost events. Anything sent now
+                # would be applied to a state the client cannot have, so it is
+                # told to start again and the connection is ended; its reconnect
+                # opens with a fresh subscription.
+                self._write_frame(
+                    Event(
+                        id=events[-1].id,
+                        name="resync",
+                        revision=session.revision,
+                        data={"reason": "this stream fell behind"},
+                    ).frame()
+                )
+                return
+
+    def _write_frame(self, frame: bytes) -> None:
+        self.wfile.write(frame)
+        self.wfile.flush()
+
+    def _last_event_id(self) -> int | None:
+        """Where a reconnecting client left off, or ``None`` for a fresh stream.
+
+        A value that is not a number is treated as no value at all: the client is
+        then sent the state it would have fetched anyway, which is right, rather
+        than a 400 that leaves a page with no channel over a malformed header.
+        """
+        raw = self.headers.get("Last-Event-ID") or (self._query.get("lastEventId") or [""])[-1]
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return None
 
     # -- POST ------------------------------------------------------------
 
@@ -286,28 +444,84 @@ class _Handler(LocalHandler):
         self._json(HTTPStatus.OK, preview.to_dict())
 
     def _post_session(self, session: EditingSession, path: str) -> None:
+        if path == PRESENCE_PATH:
+            self._presence(session)
+            return
         if path not in (OPS_PATH, UNDO_PATH, REDO_PATH, REVERT_PATH):
             self.send_text(HTTPStatus.NOT_FOUND, f"nothing to post to at {path}")
             return
         try:
             if path == UNDO_PATH:
-                change = session.undo()
+                change = session.undo(client=_client_id(self._query))
             elif path == REDO_PATH:
-                change = session.redo()
+                change = session.redo(client=_client_id(self._query))
             elif path == REVERT_PATH:
                 payload = self._read_json()
-                change = session.revert(_entry_id(payload), revision=_revision(payload))
+                change = session.revert(
+                    _entry_id(payload),
+                    revision=_revision(payload),
+                    client=_client(payload),
+                )
             else:
                 payload = self._read_json()
                 change = session.apply(
                     payload.get("ops", []),
                     revision=_revision(payload),
                     force=bool(payload.get("force", False)),
+                    client=_client(payload),
                 )
         except Exception as exc:  # narrowed by ``_refuse``, which re-raises the rest
             self._refuse(exc)
             return
         self._json(HTTPStatus.OK, change.to_dict())
+
+    def _presence(self, session: EditingSession) -> None:
+        """Say who you are and what you are doing; hear who else is here.
+
+        Three jobs in one route, because they are one round trip for a client on
+        the polling fallback: it is the keepalive that stops the entry expiring,
+        the way a selection and a set of unsaved files are published, and the way
+        the list comes back.
+
+        It writes nothing to disk and is therefore *not* gated on ``--write``: a
+        read-only session is still a session two people can have open, and
+        knowing where the other one is looking is exactly as useful there. What
+        gates it is the same thing that gates every other route here — the
+        loopback bind and the ``Host`` check in :class:`~netgraph.httpserve.LocalHandler`.
+        """
+        try:
+            payload = self._read_json()
+        except RequestError as exc:
+            self._refuse(exc)
+            return
+        identity = _client(payload)
+        if payload.get("leaving"):
+            # The tab is closing and said so, which is the difference between a
+            # list that is right now and one that is right in 45 seconds.
+            if identity is not None:
+                session.leave(identity)
+            self._json(HTTPStatus.OK, {"clients": session.presence.payload(), "left": True})
+            return
+        client = (
+            session.join(client_id=None)
+            if identity is None
+            else session.report(
+                identity,
+                selection=_strings(payload.get("selection")),
+                editing=_strings(payload.get("editing")),
+                view=_text(payload.get("view")),
+            )
+        )
+        self._json(
+            HTTPStatus.OK,
+            {
+                "client": client.id,
+                "label": client.label,
+                "clients": session.presence.payload(me=client.id),
+                "revision": session.revision,
+                "lastEventId": session.events.last_id,
+            },
+        )
 
     # -- PUT -------------------------------------------------------------
 
@@ -336,6 +550,7 @@ class _Handler(LocalHandler):
                 text,
                 base_hash=base,
                 force=bool(payload.get("force", False)),
+                client=_client(payload),
             )
         except Exception as exc:
             self._refuse(exc)
@@ -345,6 +560,15 @@ class _Handler(LocalHandler):
     # -- shared ----------------------------------------------------------
 
     def _state(self) -> dict[str, Any]:
+        """What the page fetches at boot, and what a polling client re-fetches.
+
+        ``?client=`` keeps that client's presence alive and marks it in the list,
+        so a page that could not open a stream stays visible to the others by
+        doing the thing it was doing anyway. ``?since=`` replays the events after
+        an id out of the same ring buffer the stream reads, so a polling client
+        gets the same incremental instructions — refetch *these* files, this
+        picture did not move — rather than only "the revision is different".
+        """
         if self.session is None:
             return {
                 "mode": "stream",
@@ -354,7 +578,18 @@ class _Handler(LocalHandler):
                 "redo": 0,
                 "maxFileBytes": MAX_SOURCE_BYTES,
             }
-        return self.session.state()
+        query = self._query
+        identity = _client_id(query)
+        if identity is not None:
+            self.session.presence.touch(identity)
+        state = self.session.state(me=identity)
+        since = _integer(query, "since")
+        if since is not None:
+            state["events"] = dict(state["events"]) | {
+                "since": since,
+                "replay": [event.to_dict() for event in self.session.events.history(since)],
+            }
+        return state
 
     def _json(self, status: HTTPStatus, payload: Any, *, body: bool = True) -> None:
         self.send_payload(status, json.dumps(payload).encode(), "application/json", body=body)
@@ -427,6 +662,82 @@ def _problem_body(exc: BaseException, status: HTTPStatus) -> dict[str, Any]:
     return payload
 
 
+def _paths(query: Mapping[str, Sequence[str]]) -> list[str] | None:
+    """Which files ``/api/tree`` was asked about, or ``None`` for all of them.
+
+    ``?path=a.yaml&path=b.yaml`` and ``?path=a.yaml,b.yaml`` both work: the first
+    is what a program builds, the second is what a person types. Each one is
+    checked by :func:`~netgraph.web.session.relative_path` before it becomes a
+    file name, exactly like the ``/api/file/`` routes — this is a second door
+    into the same room and it gets the same lock.
+    """
+    given = [item for value in query.get("path", ()) for item in value.split(",") if item]
+    return given or None
+
+
+def _known(query: Mapping[str, Sequence[str]]) -> str | None:
+    """The graph fingerprint the caller says it already holds a drawing for.
+
+    Only ever compared for equality with one this server computed, so a value
+    that is nonsense costs a full render and nothing else.
+    """
+    values = query.get("known") or ()
+    return values[-1] or None if values else None
+
+
+def _flag(query: Mapping[str, Sequence[str]], name: str, *, default: bool) -> bool:
+    """A ``0``/``1`` query flag, defaulting when it is absent or unreadable."""
+    values = query.get(name) or ()
+    if not values:
+        return default
+    return values[-1] not in ("0", "false", "no", "")
+
+
+def _integer(query: Mapping[str, Sequence[str]], name: str) -> int | None:
+    """A numeric query parameter, or ``None`` when absent or not a number."""
+    values = query.get(name) or ()
+    if not values:
+        return None
+    try:
+        return int(values[-1])
+    except ValueError:
+        return None
+
+
+def _client_id(query: Mapping[str, Sequence[str]]) -> str | None:
+    """The client id a request carries in its query string.
+
+    Never a permission: it names an entry in the presence list, which decides
+    nothing about what a request may do. See
+    :meth:`~netgraph.web.session.EditingSession.write_file`.
+    """
+    values = query.get("client") or ()
+    return values[-1] or None if values else None
+
+
+def _client(payload: Mapping[str, Any]) -> str | None:
+    """The same, out of a JSON body."""
+    value = payload.get("client")
+    return value if isinstance(value, str) and value else None
+
+
+def _strings(value: Any) -> list[str] | None:
+    """A list of strings from a request body, or ``None`` when it named none.
+
+    Anything that is not a list of strings is *dropped* rather than refused: this
+    is presence, it decides nothing, and a page whose selection cannot be
+    reported is better off than one whose save is rejected for it.
+    """
+    if not isinstance(value, list):
+        return None
+    return [item for item in value if isinstance(item, str) and item]
+
+
+def _text(value: Any) -> str | None:
+    """One short string from a request body, bounded so a list stays a list."""
+    return value[:64] if isinstance(value, str) and value else None
+
+
 def _requested_path(path: str) -> str:
     """The inventory-relative path a ``/api/file/…`` route names.
 
@@ -470,6 +781,18 @@ class WebServer(BackgroundServer):
 
     thread_name = "netgraph-web"
 
+    #: The session this interface serves, or ``None`` for the scratchpad. Held so
+    #: that stopping the server can also close the event streams it is holding
+    #: open — each one is a request thread parked in a wait, and shutting the
+    #: socket does not wake it.
+    session: EditingSession | None = None
+
+    def stop(self) -> None:
+        """Stop answering, close every open event stream, and release the port."""
+        if self.session is not None:
+            self.session.close()
+        super().stop()
+
     @classmethod
     def create(
         cls,
@@ -512,4 +835,6 @@ class WebServer(BackgroundServer):
                 "log": staticmethod(log),
             },
         )
-        return cls(bind(handler, host=host, port=port, subject="the web interface"), host=host)
+        web = cls(bind(handler, host=host, port=port, subject="the web interface"), host=host)
+        web.session = session
+        return web

@@ -27,6 +27,7 @@ that is not ``ok`` is the front end's cue to say so, not to hide the diagram.
 
 from __future__ import annotations
 
+import hashlib
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -49,7 +50,7 @@ from netgraph.render import (
     build_graph,
     filter_graph,
 )
-from netgraph.render.dot import to_image
+from netgraph.render.dot import to_dot, to_image
 from netgraph.rules import Severity
 from netgraph.validate import validate as run_validation
 from netgraph.watch.pipeline import Problem, Status, flatten_problems
@@ -59,6 +60,7 @@ __all__ = [
     "MAX_VLAN",
     "Preview",
     "ViewOptions",
+    "graph_digest",
     "render_diff",
     "render_inventory",
     "render_source",
@@ -223,6 +225,15 @@ class Preview:
     #: them, with the changeset under ``changeset``. ``None`` for the ordinary
     #: single-state rendering, which is every pass but the changes drawer's.
     diff: Mapping[str, Any] | None = None
+    #: Fingerprint of the picture this pass would draw; see :func:`graph_digest`.
+    #: ``None`` when the pass never got as far as building a graph.
+    graph_hash: str | None = None
+    #: Set when the caller said it already held :attr:`graph_hash` and this pass
+    #: therefore stopped before Graphviz. There is no :attr:`svg` and no
+    #: :attr:`details` in that case — the client has them — but the problems and
+    #: the counts are this revision's, because those can move while the drawing
+    #: does not.
+    unchanged: bool = False
 
     @property
     def error_count(self) -> int:
@@ -258,7 +269,32 @@ class Preview:
             },
             "durationMs": round(self.duration * 1000, 1),
             "diff": dict(self.diff) if self.diff is not None else None,
+            "graphHash": self.graph_hash,
+            "unchanged": self.unchanged,
         }
+
+
+def graph_digest(graph: Graph, options: RenderOptions) -> str:
+    """A fingerprint of the picture ``graph`` and ``options`` would produce.
+
+    The DOT document, hashed. It is the exact input Graphviz is given, so two
+    passes that agree here cannot disagree on the drawing — which is what lets a
+    client that already holds the SVG be told "nothing moved" instead of being
+    sent a re-render of the same picture.
+
+    Structural rather than incidental: the tree can move for a change that alters
+    no drawn layer at all — a description edited, a device added to a namespace
+    the current view filters out, a comment reflowed — and on a large inventory
+    the Graphviz run that produces the identical SVG is the single most expensive
+    thing an edit triggers.
+
+    Computing it costs one DOT serialisation, which :func:`render_inventory` then
+    repeats inside :func:`~netgraph.render.dot.to_image` when the picture *has*
+    moved. That is a few milliseconds against Graphviz's hundreds, and buying it
+    back would mean threading the source through a layer whose job is to lay
+    out a graph, not to cache one.
+    """
+    return hashlib.sha256(to_dot(graph, options, target="svg").encode("utf-8")).hexdigest()
 
 
 def render_source(source: str, view: ViewOptions | None = None) -> Preview:
@@ -288,6 +324,7 @@ def render_inventory(
     *,
     settings: ValidationConfig | None = None,
     started: float | None = None,
+    known: str | None = None,
 ) -> Preview:
     """Validate and draw an inventory somebody else has already loaded.
 
@@ -305,6 +342,9 @@ def render_inventory(
             folder to look in — has to use.
         started: When the pass began, for the duration this reports. Supplied by
             a caller that did work before calling.
+        known: A :func:`graph_digest` the caller already holds the drawing for.
+            When this pass would produce the same one, it stops before Graphviz
+            and answers with :attr:`Preview.unchanged`.
 
     Returns:
         The diagram, its info-box records, and every problem found on the way.
@@ -320,6 +360,21 @@ def render_inventory(
 
     try:
         graph = filter_graph(build_graph(inventory, layer=options.layer), options.filter_spec)
+        digest = graph_digest(graph, options.render_options)
+        status = Status.INVALID if rejected else Status.OK
+        message = _summary(inventory, graph, rejected=rejected)
+        if known is not None and known == digest:
+            return Preview(
+                status=status,
+                message=message,
+                problems=problems,
+                nodes=len(graph.nodes),
+                edges=len(graph.edges),
+                dangling=tuple(graph.dangling),
+                duration=time.monotonic() - started,
+                graph_hash=digest,
+                unchanged=True,
+            )
         payload = to_image(graph, options.render_options, format="svg")
         svg = prepare(payload)
     except (NetgraphError, OSError) as exc:
@@ -331,8 +386,8 @@ def render_inventory(
         )
 
     return Preview(
-        status=Status.INVALID if rejected else Status.OK,
-        message=_summary(inventory, graph, rejected=rejected),
+        status=status,
+        message=message,
         svg=svg,
         details=build_details(graph, DETAIL_OPTIONS),
         problems=problems,
@@ -341,6 +396,7 @@ def render_inventory(
         dangling=tuple(graph.dangling),
         geometry=_geometry(graph),
         duration=time.monotonic() - started,
+        graph_hash=digest,
     )
 
 
@@ -352,6 +408,7 @@ def render_diff(
     *,
     settings: ValidationConfig | None = None,
     started: float | None = None,
+    known: str | None = None,
 ) -> Preview:
     """Draw ``after`` with what ``plan`` says changed since ``before`` painted on.
 
@@ -373,6 +430,10 @@ def render_diff(
         view: Which graph to build and how to draw it.
         settings: Validation settings for ``after``.
         started: When the pass began, for the duration this reports.
+        known: A :func:`graph_digest` the caller already holds the overlay for,
+            as :func:`render_inventory` takes it. The fingerprint covers the
+            overlay as well as the graph, so a diff whose *marks* moved is
+            redrawn even when both states are otherwise unchanged.
 
     Returns:
         The diagram, its info-box records, every problem in ``after``, and the
@@ -394,9 +455,24 @@ def render_diff(
             filter_graph(build_graph(after, layer=options.layer), options.filter_spec),
         )
         graph = drawing.graph
-        payload = to_image(
-            graph, replace(options.render_options, diff=drawing.overlay), format="svg"
-        )
+        marked = replace(options.render_options, diff=drawing.overlay)
+        digest = graph_digest(graph, marked)
+        status = Status.INVALID if rejected else Status.OK
+        message = _diff_summary(drawing, rejected=rejected)
+        if known is not None and known == digest:
+            return Preview(
+                status=status,
+                message=message,
+                problems=problems,
+                nodes=len(graph.nodes),
+                edges=len(graph.edges),
+                dangling=tuple(graph.dangling),
+                duration=time.monotonic() - started,
+                graph_hash=digest,
+                unchanged=True,
+                diff=drawing.overlay.to_dict() | {"changeset": plan.to_dict()},
+            )
+        payload = to_image(graph, marked, format="svg")
         svg = prepare(payload)
     except (NetgraphError, OSError) as exc:
         return Preview(
@@ -407,8 +483,8 @@ def render_diff(
         )
 
     return Preview(
-        status=Status.INVALID if rejected else Status.OK,
-        message=_diff_summary(drawing, rejected=rejected),
+        status=status,
+        message=message,
         svg=svg,
         details=build_details(graph, DETAIL_OPTIONS),
         problems=problems,
@@ -418,6 +494,7 @@ def render_diff(
         geometry=_geometry(graph),
         duration=time.monotonic() - started,
         diff=drawing.overlay.to_dict() | {"changeset": plan.to_dict()},
+        graph_hash=digest,
     )
 
 

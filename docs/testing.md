@@ -126,11 +126,18 @@ whitespace-separated instead of newline-separated.
 ## The browser layer
 
 `netgraph web` is about fourteen hundred lines of CSS and JavaScript, and until
-`tests/test_browser.py` existed nothing executed any of it: `tests/test_web.py`
-and `tests/test_web_session.py` stop at the HTTP boundary, so a regression in
-`app.js` shipped green. That file starts the real server over a temporary copy
-of `examples/home-lab` on an ephemeral loopback port, opens it in a headless
-Chromium through [Playwright][playwright], and asserts what a person would see.
+`tests/test_browser.py` existed nothing executed any of it: `tests/test_web.py`,
+`tests/test_web_session.py` and `tests/test_web_events.py` stop at the HTTP
+boundary, so a regression in `app.js` shipped green. That file starts the real
+server over a temporary copy of `examples/home-lab` on an ephemeral loopback
+port, opens it in a headless Chromium through [Playwright][playwright], and
+asserts what a person would see.
+
+Some of it opens **two** pages against one server — `open_editor(beside=…)` —
+because a shared session is a thing two browsers do to each other: a badge
+appearing in one tab because somebody started typing in the other, an undo
+issued here landing there, a save crossing without either page refetching the
+whole tree.
 
 ```console
 $ pip install --editable ".[dev,browser]"

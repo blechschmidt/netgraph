@@ -83,8 +83,15 @@
     changesCopy: document.getElementById("changes-copy"),
     changesCount: document.getElementById("changes-count"),
     changesAgainst: document.getElementById("changes-against"),
-    legend: document.getElementById("legend")
+    legend: document.getElementById("legend"),
+    clients: document.getElementById("clients"),
+    linkState: document.getElementById("link-state")
   };
+
+  /** How many rendered views are kept in memory, most recently drawn first.
+   *  A handful: the layer menu has nine entries and nobody cycles all of them,
+   *  and each entry holds an SVG document. */
+  var MAX_VIEWS = 6;
 
   var details = {};
   var pending = null;
@@ -95,6 +102,15 @@
   /** "stream" until /api/state says otherwise. */
   var mode = "stream";
   var toastTimer = null;
+  /** What has been drawn, by request URL: the fingerprint the server gave it,
+   *  the SVG and the records. This is what makes "the tree moved but this layer
+   *  did not" cost a round trip instead of a Graphviz run -- and what makes
+   *  switching back to a layer nothing touched instant. */
+  var views = {};
+  var viewOrder = [];
+  var currentView = null;
+  /** Element addresses somebody else has selected, drawn faintly. */
+  var remote = {};
 
   /* ------------------------------------------------------------ requests */
 
@@ -138,12 +154,18 @@
     if (inFlight) { queued = true; return; }
     inFlight = true;
     setStatus("rendering", "");
-    request().then(function (response) {
+    // Which of the two the session wants -- the tree, or the tree as a diff
+    // against a baseline -- is session.js's decision; this file only draws what
+    // comes back, and a diff comes back in the same shape. The URL doubles as
+    // the cache key: two requests that differ in any way that could change the
+    // picture differ here too.
+    var key = mode === "session" ? netgraphSession.graphPath(query()) : null;
+    request(key).then(function (response) {
       return response.json().then(function (body) {
         if (!response.ok) { throw new Error(body.message || response.statusText); }
         return body;
       });
-    }).then(apply).catch(function (error) {
+    }).then(function (body) { apply(body, key); }).catch(function (error) {
       setStatus("failed", String(error.message || error));
       showProblems([]);
     }).then(function () {
@@ -152,12 +174,15 @@
     });
   }
 
-  function request() {
-    if (mode === "session") {
-      // Which of the two the session wants -- the tree, or the tree as a diff
-      // against a baseline -- is session.js's decision; this file only draws
-      // what comes back, and a diff comes back in the same shape.
-      return fetch(netgraphSession.graphPath(query()), { cache: "no-store" });
+  function request(key) {
+    if (key !== null) {
+      // Send the fingerprint of the picture already in hand. When the server
+      // works out that this revision would draw the same one, it says so and
+      // runs no layout -- which on a large inventory is the whole cost of an
+      // edit that did not touch the drawn layer.
+      var held = views[key];
+      return fetch(key + (held ? "&known=" + encodeURIComponent(held.hash) : ""),
+        { cache: "no-store" });
     }
     return fetch("/api/render", {
       method: "POST",
@@ -172,8 +197,33 @@
     pending = window.setTimeout(render, DEBOUNCE_MS);
   }
 
-  function apply(result) {
-    details = result.details || {};
+  /** Put one rendering on screen.
+   *
+   * `result.unchanged` says the server recognised the fingerprint we sent and
+   * stopped before Graphviz: there is no SVG in the response because we already
+   * have it. Two cases follow, and the difference between them matters:
+   *
+   *   * it is the view already on screen -- the DOM is not touched at all, so
+   *     the pan, the zoom and the scroll position survive an edit elsewhere in
+   *     the tree;
+   *   * it is a view we drew earlier -- the SVG comes back out of the cache,
+   *     with no round trip to Graphviz on either side.
+   *
+   * Everything that is *not* the picture -- the status line, the problems, the
+   * counts -- comes from the response either way, because those move when the
+   * drawing does not. That is the whole reason `unchanged` is a flag on a real
+   * answer rather than a 304.
+   */
+  function apply(result, key) {
+    var held = key ? views[key] : null;
+    var reuse = !!(result.unchanged && held);
+    if (result.unchanged && !held) {
+      // We claimed to hold a drawing we do not: only possible if the cache was
+      // evicted between the request and the answer. Ask again without the claim.
+      queued = true;
+      return;
+    }
+    details = reuse ? held.details : (result.details || {});
     // A diff is drawn by the same renderer into the same canvas; what marks the
     // page as showing one is the legend, which is furniture without it.
     el.canvas.classList.toggle("diffing", !!result.diff);
@@ -181,15 +231,57 @@
     setStatus(result.status, result.message, result.counts, result.durationMs);
     showProblems(result.problems || [], result.dangling || []);
     hideInfo(true);
-    if (result.svg) {
-      el.viewport.innerHTML = result.svg;
+    var svg = reuse ? held.svg : result.svg;
+    if (svg) {
+      if (!reuse || key !== currentView) {
+        el.viewport.innerHTML = svg;
+        if (!view.placed) { view.placed = true; resetView(); }
+      }
       el.placeholder.hidden = true;
-      if (!view.placed) { view.placed = true; resetView(); }
+      if (key) { remember(key, result.graphHash || held.hash, svg, details); }
+      currentView = key;
+      paintRemote();
     } else {
       el.viewport.replaceChildren();
       el.placeholder.hidden = false;
       el.placeholder.textContent = result.message || "nothing rendered";
+      currentView = null;
     }
+  }
+
+  /** Keep this view's drawing, dropping the least recently drawn if need be. */
+  function remember(key, hash, svg, records) {
+    if (!hash) { return; }
+    views[key] = { hash: hash, svg: svg, details: records };
+    viewOrder = viewOrder.filter(function (other) { return other !== key; });
+    viewOrder.unshift(key);
+    while (viewOrder.length > MAX_VIEWS) { delete views[viewOrder.pop()]; }
+  }
+
+  /* ------------------------------------------------------ other people */
+
+  /** Draw what somebody else has selected, faintly.
+   *
+   * Their selection, not ours: it is drawn as an outline rather than the
+   * highlight a hover gives, so that the two are never mistaken for each other.
+   * Advisory, like everything else about presence -- nothing here stops a click.
+   */
+  function setRemote(addresses) {
+    remote = {};
+    (addresses || []).forEach(function (address) { remote[address] = true; });
+    paintRemote();
+  }
+
+  function paintRemote() {
+    var svg = el.viewport.firstElementChild;
+    if (!svg) { return; }
+    svg.querySelectorAll("g.remote").forEach(function (group) {
+      group.classList.remove("remote");
+    });
+    svg.querySelectorAll("g.node, g.edge").forEach(function (group) {
+      var record = details[group.id];
+      if (record && remote[record.id]) { group.classList.add("remote"); }
+    });
   }
 
   /* -------------------------------------------------------------- status */
@@ -444,7 +536,11 @@
     // that mapping is the whole point of the command. `record.id` is the
     // element's address, which is what the tree keys documents by --
     // `record.element` is the SVG id, and matched nothing.
-    if (mode === "session") { netgraphSession.reveal(hit.record.id); }
+    if (mode === "session") {
+      netgraphSession.reveal(hit.record.id);
+      // What this page is looking at, so the other tabs can draw it faintly.
+      netgraphSession.select(hit.record.id);
+    }
     if (pinned === hit.record.element) { hideInfo(true); return; }
     pinned = hit.record.element;
     showInfo(hit, event);
@@ -500,7 +596,9 @@
     render: render,
     toast: toast,
     goToLine: goToLine,
-    diagnostics: function (problems) { showProblems(problems || []); }
+    diagnostics: function (problems) { showProblems(problems || []); },
+    remote: setRemote,
+    layer: function () { return el.layer.value; }
   };
 
   fetch("/api/state", { cache: "no-store" })

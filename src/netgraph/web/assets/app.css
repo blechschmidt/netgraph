@@ -235,8 +235,38 @@ main {
 
 .badge.dirty { color: var(--warning); }
 .badge.conflict, .badge.gone { color: var(--error); }
+/* Somebody else has unsaved edits here. Deliberately quieter than the two
+ * above: it is advisory, it blocks nothing, and a badge that shouts would
+ * suggest otherwise. */
+.badge.elsewhere { color: var(--info); opacity: .8; border-style: dashed; }
 .hint.ro { color: var(--info); }
 .hint.rw { color: var(--ok); }
+
+/* Which channel this page is on. Only worth reading when it is not "live",
+ * which is why "live" is the faintest of the three. */
+.hint.link { text-transform: lowercase; letter-spacing: 0; }
+.hint.link.live { color: var(--ok); opacity: .55; }
+.hint.link.polling { color: var(--warning); }
+.hint.link.reconnecting { color: var(--warning); opacity: .8; }
+
+/* Who else has this inventory open. */
+.clients {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem;
+  padding: .35rem .7rem;
+  border-bottom: 1px solid var(--line);
+}
+.clients[hidden] { display: none; }
+.clients .client {
+  font: 600 10px/1.6 var(--mono);
+  padding: 0 .35rem;
+  border: 1px solid color-mix(in srgb, var(--info) 60%, transparent);
+  border-radius: 999px;
+  color: var(--info);
+  cursor: default;
+}
+.clients .client.lagging { opacity: .55; border-style: dashed; }
 
 .actions { display: inline-flex; gap: .3rem; }
 .actions[hidden] { display: none; }
@@ -296,6 +326,17 @@ main {
 .viewport svg g.hot { filter: drop-shadow(0 0 3px currentColor); }
 .viewport svg g.hot > * { stroke-width: 2.4; }
 .viewport svg g.faded { opacity: .28; }
+
+/* What somebody else has selected. A dashed halo rather than the hover
+ * highlight, because "where the other person is looking" and "what is under my
+ * pointer" must not be able to be mistaken for one another -- and faint,
+ * because it is their attention, not mine. */
+.viewport svg g.remote > * {
+  stroke: var(--info);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+  opacity: .85;
+}
 
 /* ------------------------------------------------------------- info box */
 

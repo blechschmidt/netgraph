@@ -5,7 +5,7 @@ rendering on the other. Editing re-renders; hovering a node or a link opens an
 info box holding everything the diagram had no room for — every interface, its
 addresses, its VLANs, and the links that terminate on it.
 
-Four pieces, each usable on its own:
+Six pieces, each usable on its own:
 
 :mod:`~netgraph.web.preview`
     :func:`~netgraph.web.preview.render_source`, the ``parse → validate →
@@ -21,8 +21,17 @@ Four pieces, each usable on its own:
     Turning the Graphviz SVG into a fragment that can be embedded in a live
     page, with everything that could execute or navigate removed.
 :mod:`~netgraph.web.server`
-    :class:`~netgraph.web.server.WebServer`, the five routes over all of it,
+    :class:`~netgraph.web.server.WebServer`, the routes over all of it,
     loopback-bound like every local server netgraph starts.
+:mod:`~netgraph.web.events`
+    :class:`~netgraph.web.events.EventBus`, the push channel an editing session
+    announces itself on: numbered, revision-stamped, replayable from a bounded
+    ring. It is an optimisation over the polled revision and never an authority,
+    so a client that cannot hold a stream open loses latency and nothing else.
+:mod:`~netgraph.web.presence`
+    Who else has the same session open, what they have selected, and which files
+    they have unsaved edits in. Advisory throughout — the revision and the
+    content hash remain the only gates on a write.
 
 The split is what makes the interesting half testable without a browser:
 :func:`~netgraph.web.preview.render_source` takes a string and returns the
@@ -32,17 +41,21 @@ diagram, the records and the problems, and no HTTP is involved.
 from __future__ import annotations
 
 from netgraph.render.details import DETAIL_OPTIONS, build_details
+from netgraph.web.events import EVENT_NAMES, EVENTS_PATH, Event, EventBus
+from netgraph.web.presence import Client, Presence
 from netgraph.web.preview import (
     MAX_VLAN,
     Preview,
     RequestError,
     ViewOptions,
+    graph_digest,
     render_source,
 )
 from netgraph.web.server import (
     ASSETS,
     DEFAULT_PORT,
     MAX_SOURCE_BYTES,
+    PRESENCE_PATH,
     RENDER_PATH,
     SOURCE_PATH,
     WebServer,
@@ -54,16 +67,24 @@ __all__ = [
     "ASSETS",
     "DEFAULT_PORT",
     "DETAIL_OPTIONS",
+    "EVENTS_PATH",
+    "EVENT_NAMES",
     "MAX_SOURCE_BYTES",
     "MAX_VLAN",
+    "PRESENCE_PATH",
     "RENDER_PATH",
     "SOURCE_PATH",
+    "Client",
+    "Event",
+    "EventBus",
+    "Presence",
     "Preview",
     "RequestError",
     "ViewOptions",
     "WebServer",
     "asset",
     "build_details",
+    "graph_digest",
     "prepare",
     "render_source",
 ]

@@ -36,8 +36,12 @@ tool cannot touch is not a source of truth. So:
 
 * **Disk to browser.** :class:`TreeWatcher` runs the same ``watchfiles`` watch
   ``netgraph watch`` runs, over the same :class:`~netgraph.watch.loop.InventoryFilter`,
-  and bumps :attr:`EditingSession.revision`. The page polls that number and
-  refetches when it moves, so an edit made anywhere reaches the open browser.
+  and bumps :attr:`EditingSession.revision`. Every bump — from the watcher or
+  from a write of this session's own — is announced on
+  :attr:`EditingSession.events` (:mod:`netgraph.web.events`), naming the files
+  that moved, so an open page refetches those and nothing else. The revision is
+  still there to be polled, because a client that cannot hold a stream open must
+  still be correct, only slower.
 * **Browser to disk.** Every write carries a precondition — a content hash for
   a whole-file write, the tree revision for a batch of operations. A write
   whose precondition has moved is refused as a :class:`Conflict` and the page
@@ -51,6 +55,18 @@ command line only turns it on for an explicit flag *and* a loopback bind. A
 session that is not writable answers the same reads and refuses every write
 with :class:`ReadOnly`, so the preview use of the command survives intact and
 "I only wanted to look at it" cannot become a write.
+
+More than one client
+--------------------
+
+A session is shared: two tabs, or two people on the same machine. Each connected
+client is issued an id (:mod:`netgraph.web.presence`), and the state payload
+lists them with what each has selected and which files it has unsaved edits in.
+The page draws remote selections faintly and badges a file somebody else is in.
+
+All of that is *advisory*. Presence expires on a timer and blocks nothing; the
+revision precondition and the content hash above remain the only gates on a
+write, because they are the only two facts about the tree the server can check.
 """
 
 from __future__ import annotations
@@ -84,13 +100,15 @@ from netgraph.loader import (
     LoadError,
     load_tree,
 )
-from netgraph.loader.tree import iter_inventory_files
+from netgraph.loader.tree import InventoryFile, iter_inventory_files
 from netgraph.plan import PlanSourceError
 from netgraph.plan import diff as diff_states
 from netgraph.plan.sources import git_ref
 from netgraph.render import IconTheme
 from netgraph.validate import validate
 from netgraph.watch.pipeline import Problem, flatten_problems
+from netgraph.web.events import EVENT_NAMES, EVENTS_PATH, HEARTBEAT_SECONDS, EventBus
+from netgraph.web.presence import Client, Presence
 from netgraph.web.preview import Preview, ViewOptions, render_diff, render_inventory
 
 __all__ = [
@@ -343,6 +361,32 @@ class Gesture:
         }
 
 
+def _file_entry(file: InventoryFile, documents: Mapping[str, Sequence[DocumentEntry]]) -> FileEntry:
+    """One row of the file list: its bytes' hash, its size and its documents.
+
+    A file that cannot be read is still a row. It is the one the user most needs
+    to see, and leaving it out would make the list disagree with the folder.
+    """
+    relative = file.relative.as_posix()
+    try:
+        payload = file.path.read_bytes()
+    except OSError as exc:  # pragma: no cover - vanished or unreadable
+        return FileEntry(
+            path=relative,
+            namespace=file.namespace,
+            hash="",
+            size=0,
+            error=exc.strerror or str(exc),
+        )
+    return FileEntry(
+        path=relative,
+        namespace=file.namespace,
+        hash=digest_of(payload),
+        size=len(payload),
+        documents=tuple(documents.get(relative, ())),
+    )
+
+
 def _problem(problem: Problem) -> dict[str, Any]:
     return {
         "severity": str(problem.severity),
@@ -375,6 +419,13 @@ class EditingSession:
     #: reload incremental: only the files whose bytes changed are parsed again.
     #: ``None`` parses the whole tree on every revision.
     cache: DocumentCache | None = None
+    #: The push channel. Every revision bump, every committed gesture and every
+    #: presence change is announced here; ``GET /api/events`` is a reader of it.
+    #: A session with no reader publishes into a ring buffer and costs nothing.
+    events: EventBus = field(default_factory=EventBus)
+    #: Who else has this session open. Advisory throughout; see
+    #: :mod:`netgraph.web.presence`.
+    presence: Presence = field(default_factory=Presence)
 
     #: The server is threaded and a browser opens several connections, so every
     #: read of the tree and every write to it is serialised. Re-entrant because
@@ -449,10 +500,17 @@ class EditingSession:
         self.inventory()  # ensures ``config`` matches the loaded revision
         return self.config.validation if self.config is not None else ValidationConfig()
 
-    def state(self) -> dict[str, Any]:
-        """The small answer the page polls: has anything moved, and may I write?"""
+    def state(self, *, me: str | None = None) -> dict[str, Any]:
+        """The small answer: has anything moved, may I write, and who else is here?
+
+        Still polled by a client that could not open a stream, and still the
+        first thing every client fetches — the stream tells you what *changed*,
+        and this says what *is*. ``events`` names the push endpoint and the id of
+        the last event published, so a client can subscribe from exactly the
+        point this snapshot was taken and miss nothing in between.
+        """
         with self._lock:
-            return {
+            state = {
                 "mode": "session",
                 "root": str(self.root),
                 "revision": self._revision,
@@ -463,62 +521,103 @@ class EditingSession:
                 "redoLabel": self._redo[-1].label if self._redo else None,
                 "maxFileBytes": MAX_FILE_BYTES,
             }
+        state["events"] = {
+            "path": EVENTS_PATH,
+            "lastEventId": self.events.last_id,
+            "heartbeatMs": round(HEARTBEAT_SECONDS * 1000),
+            "names": list(EVENT_NAMES),
+            "streams": self.events.streams,
+        }
+        state["clients"] = self.presence.payload(me=me)
+        state["editing"] = self.presence.editing()
+        return state
 
-    def tree(self) -> dict[str, Any]:
+    def tree(
+        self, paths: Sequence[str] | None = None, *, diagnostics: bool = True
+    ) -> dict[str, Any]:
         """Every file, its documents, and where each element was declared.
 
         This is the 1:1 mapping the project is built around, in one payload: a
         diagram node carries an address, an address appears here against a file
         and a line, and that is how "reveal the document that declares this" is
         answered without the page guessing at file names.
+
+        Args:
+            paths: Answer for these files only, rather than walking the tree.
+                What an event-driven client asks for after a single-file save: a
+                ``tree-changed`` event names the files that moved, and refetching
+                a 1000-file listing to learn what one of them now hashes to is
+                the cost this whole channel exists to remove. The answer carries
+                ``partial: true`` and a ``missing`` list for anything named that
+                is no longer there, so a client can patch its own list without
+                guessing.
+            diagnostics: Include the tree's findings. On by default, because a
+                client that asked for the tree usually needs them; passed off by
+                one that already has this revision's — an applied change comes
+                back with them — since computing them means validating every
+                element of the tree, partial fetch or not.
+
+        Raises:
+            SessionError: One of ``paths`` is not a path inside the inventory.
         """
         with self._lock:
             inventory = self.inventory()
             revision = self._revision
         documents = _documents_by_file(inventory)
-        files: list[FileEntry] = []
         errors: list[LoadError] = []
-        for entry in iter_inventory_files(self.root, errors=errors):
-            relative = entry.relative.as_posix()
-            try:
-                payload = entry.path.read_bytes()
-            except OSError as exc:  # pragma: no cover - vanished or unreadable
-                files.append(
-                    FileEntry(
-                        path=relative,
-                        namespace=entry.namespace,
-                        hash="",
-                        size=0,
-                        error=exc.strerror or str(exc),
-                    )
-                )
-                continue
-            files.append(
-                FileEntry(
-                    path=relative,
-                    namespace=entry.namespace,
-                    hash=digest_of(payload),
-                    size=len(payload),
-                    documents=tuple(documents.get(relative, ())),
-                )
-            )
-        return {
+        if paths is None:
+            entries = [
+                _file_entry(entry, documents)
+                for entry in iter_inventory_files(self.root, errors=errors)
+            ]
+            missing: list[str] = []
+        else:
+            entries = []
+            missing = []
+            for relative in [relative_path(path) for path in paths]:
+                pure = PurePosixPath(relative)
+                target = self.root / pure
+                if not target.is_file():
+                    missing.append(relative)
+                    continue
+                # Through ``InventoryFile`` rather than by splitting the path
+                # here, so a partial listing derives the namespace of a file by
+                # exactly the rule the loader used to put it in one.
+                entries.append(_file_entry(InventoryFile(path=target, relative=pure), documents))
+        payload: dict[str, Any] = {
             "revision": revision,
             "root": str(self.root),
-            "files": [entry.to_dict() for entry in files],
-            "diagnostics": [_problem(problem) for problem in self.diagnostics(inventory)],
+            "files": [entry.to_dict() for entry in entries],
             "discovery": [
                 {"location": error.location, "message": error.message} for error in errors
             ],
         }
+        if paths is not None:
+            payload["partial"] = True
+            payload["missing"] = missing
+        if diagnostics:
+            payload["diagnostics"] = [_problem(problem) for problem in self.diagnostics(inventory)]
+        return payload
 
     def diagnostics(self, inventory: Inventory | None = None) -> tuple[Problem, ...]:
         """Every load error and finding of the tree, most severe group first."""
         loaded = self.inventory() if inventory is None else inventory
         return flatten_problems(loaded.errors, validate(loaded, self.settings()))
 
-    def graph(self, view: ViewOptions | None = None) -> tuple[Preview, int]:
+    def graph(
+        self, view: ViewOptions | None = None, *, known: str | None = None
+    ) -> tuple[Preview, int]:
         """Draw the tree, and say which revision was drawn.
+
+        Args:
+            view: Which graph to build and how to draw it.
+            known: The :func:`~netgraph.web.preview.graph_digest` the caller
+                already holds the drawing for. A tree can move — a description
+                edited, a device added to a namespace this view filters out —
+                without the picture moving at all, and on a large inventory the
+                Graphviz run that would produce the identical SVG is the most
+                expensive thing an edit triggers. When the fingerprints agree the
+                answer says so and carries no picture.
 
         Returns:
             The rendering and the revision it was made from, so a page that
@@ -532,7 +631,7 @@ class EditingSession:
         if options.icons is None and self.icons is not None:
             options = replace(options, icons=self.icons)
         settings = self.settings().with_overrides(strict=True if options.strict else None)
-        return render_inventory(inventory, options, settings=settings), revision
+        return render_inventory(inventory, options, settings=settings, known=known), revision
 
     def read_file(self, path: str) -> dict[str, Any]:
         """One file's text, with the hash a write of it has to quote back.
@@ -569,7 +668,13 @@ class EditingSession:
     # -- writing ---------------------------------------------------------
 
     def write_file(
-        self, path: str, text: str, *, base_hash: str | None = None, force: bool = False
+        self,
+        path: str,
+        text: str,
+        *,
+        base_hash: str | None = None,
+        force: bool = False,
+        client: str | None = None,
     ) -> Change:
         """Replace one file wholesale, if it is still what the caller last read.
 
@@ -578,6 +683,11 @@ class EditingSession:
         with it that write is refused and the page can show what is there now.
         ``base_hash`` of ``None`` means "I am creating this", and is refused if
         something is already there.
+
+        ``client`` names who asked, and travels no further than the events this
+        publishes: it lets a page recognise its own write and skip the reload the
+        others do. It is not a permission and it is not checked — a request that
+        claims somebody else's id can do nothing this one could not.
 
         Raises:
             ReadOnly: This session does not write.
@@ -608,10 +718,13 @@ class EditingSession:
                     path=relative,
                     hash=actual,
                 )
-            return self._commit(
-                [WriteFile(path=relative, text=text)],
-                label=f"edit {relative}",
-                force=force,
+            return self._committed(
+                self._commit(
+                    [WriteFile(path=relative, text=text)],
+                    label=f"edit {relative}",
+                    force=force,
+                    client=client,
+                )
             )
 
     def apply(
@@ -620,6 +733,7 @@ class EditingSession:
         *,
         revision: int | None = None,
         force: bool = False,
+        client: str | None = None,
     ) -> Change:
         """Apply a batch of :mod:`netgraph.edit` operations, atomically.
 
@@ -648,22 +762,37 @@ class EditingSession:
             label = operations[0].describe()
             if len(operations) > 1:
                 label += f" (+{len(operations) - 1} more)"
-            return self._commit(operations, label=label, force=force)
+            return self._committed(
+                self._commit(operations, label=label, force=force, client=client)
+            )
 
-    def undo(self) -> Change:
+    def undo(self, *, client: str | None = None) -> Change:
         """Put the last change back.
+
+        The stack is the session's, not the page's, so an undo issued in one tab
+        rewrites the files every other tab is showing. That is announced —
+        ``file-changed`` for what moved, ``history-changed`` for the depths — so
+        the other tab reloads rather than sitting on text that is nowhere on
+        disk under a clean badge.
 
         Raises:
             ReadOnly: This session does not write.
             SessionError: There is nothing to undo.
         """
-        return self._step(self._undo, self._redo, "undo")
+        return self._step(self._undo, self._redo, "undo", client=client)
 
-    def redo(self) -> Change:
+    def redo(self, *, client: str | None = None) -> Change:
         """Apply the last undone change again."""
-        return self._step(self._redo, self._undo, "redo")
+        return self._step(self._redo, self._undo, "redo", client=client)
 
-    def _step(self, source: list[_History], target: list[_History], verb: str) -> Change:
+    def _step(
+        self,
+        source: list[_History],
+        target: list[_History],
+        verb: str,
+        *,
+        client: str | None = None,
+    ) -> Change:
         self._require_writable()
         with self._lock:
             if not source:
@@ -671,12 +800,28 @@ class EditingSession:
             entry = source[-1]
             # ``force``: this is a state the tree was already in, so refusing it
             # for the problems it has would leave no way back to it.
-            change = self._commit(entry.backward, label=entry.label, force=True, history=False)
+            change = self._commit(
+                entry.backward, label=entry.label, force=True, history=False, client=client
+            )
             source.pop()
             target.append(
                 _History(label=entry.label, forward=entry.backward, backward=self._last_inverse)
             )
-            return self._restated(change)
+            restated = self._restated(change)
+        # Outside the lock and unconditional: a step always moves the depths,
+        # even when the batch it replayed wrote nothing.
+        self.announce_history()
+        return restated
+
+    def _committed(self, change: Change) -> Change:
+        """Announce the history depths after a write that moved them.
+
+        A batch that wrote nothing moved nothing, and an event for it would wake
+        every other tab to re-read two integers that did not change.
+        """
+        if change.files:
+            self.announce_history()
+        return change
 
     # -- the machinery ---------------------------------------------------
 
@@ -688,6 +833,7 @@ class EditingSession:
         force: bool,
         history: bool = True,
         reverts: int | None = None,
+        client: str | None = None,
     ) -> Change:
         """Apply and write one batch through the mutation layer.
 
@@ -729,7 +875,7 @@ class EditingSession:
                 )
                 del self._undo[:-MAX_HISTORY]
                 self._redo.clear()
-            self.invalidate()
+            self.invalidate(changes, origin="session", client=client)
             self._record(
                 label=label,
                 operations=tuple(operations),
@@ -827,7 +973,9 @@ class EditingSession:
             "commands": [command for entry in entries for command in entry.commands],
         }
 
-    def revert(self, entry_id: int, *, revision: int | None = None) -> Change:
+    def revert(
+        self, entry_id: int, *, revision: int | None = None, client: str | None = None
+    ) -> Change:
         """Put one gesture back, whatever has happened since.
 
         A revert is an ordinary edit, not a rewind: it applies the gesture's own
@@ -858,14 +1006,24 @@ class EditingSession:
                 raise SessionError(f"change {entry_id} ({entry.label}) records nothing to put back")
             # ``force``: this restores a state the tree was already in, so
             # refusing it for problems it already had would leave no way back.
-            return self._commit(
-                entry.inverse, label=f"revert {entry.label}", force=True, reverts=entry.id
+            return self._committed(
+                self._commit(
+                    entry.inverse,
+                    label=f"revert {entry.label}",
+                    force=True,
+                    reverts=entry.id,
+                    client=client,
+                )
             )
 
     # -- the diff overlay ------------------------------------------------
 
     def diff(
-        self, view: ViewOptions | None = None, *, against: str = SESSION_BASELINE
+        self,
+        view: ViewOptions | None = None,
+        *,
+        against: str = SESSION_BASELINE,
+        known: str | None = None,
     ) -> tuple[Preview, int]:
         """Draw the tree with what has changed since ``against`` painted on.
 
@@ -875,6 +1033,8 @@ class EditingSession:
             against: :data:`SESSION_BASELINE` — the tree as this session first
                 saw it — or :data:`GIT_BASELINE`, which is ``HEAD`` as the
                 inventory root looks in it.
+            known: A fingerprint the caller already holds the overlay for, as
+                :meth:`graph` takes it.
 
         Returns:
             The rendering and the revision it was made from, like :meth:`graph`.
@@ -896,7 +1056,8 @@ class EditingSession:
             options = replace(options, icons=self.icons)
         settings = self.settings().with_overrides(strict=True if options.strict else None)
         plan = diff_states(before, inventory)
-        return render_diff(before, inventory, plan, options, settings=settings), revision
+        preview = render_diff(before, inventory, plan, options, settings=settings, known=known)
+        return preview, revision
 
     def baselines(self) -> tuple[str, ...]:
         """Which baselines this session can draw against, in menu order.
@@ -957,20 +1118,172 @@ class EditingSession:
         except OSError as exc:  # pragma: no cover - unreadable but existing
             raise SessionError(f"cannot read {relative}: {exc.strerror or exc}") from exc
 
-    def invalidate(self, paths: Iterable[str] = ()) -> int:
-        """Note that the tree has changed and drop what was derived from it.
+    def invalidate(
+        self, paths: Iterable[str] = (), *, origin: str = "disk", client: str | None = None
+    ) -> int:
+        """Note that the tree has changed, drop what was derived from it, and say so.
 
         Called by :class:`TreeWatcher` for a change made outside this session,
-        and by the session itself after a write. The two are deliberately not
-        distinguished: the page's answer to either is to refetch, and pretending
-        to know which of several writers made a change is how an editor comes to
-        show a tree that is not there.
+        and by the session itself after a write. The *authority* of the two is
+        deliberately not distinguished — the revision moves either way, and
+        pretending to know which of several writers is the real one is how an
+        editor comes to show a tree that is not there — but their *provenance*
+        is, because a client that made a change already knows what it did, and
+        one that did not has to reload the file it has open.
+
+        ``paths`` is what moved. A watcher hands over absolute paths and a commit
+        hands over inventory-relative ones; both are normalised here, and
+        anything outside the tree (``netgraph.toml``, a file the loader skips)
+        still bumps the revision but names no file, which is the honest way to
+        say "something changed and it was not one of your documents".
         """
-        del paths  # accepted so a watcher can pass its batch; only the fact counts
         with self._lock:
             self._revision += 1
             self._inventory = None
-            return self._revision
+            revision = self._revision
+        moved, outside = self._relative(paths)
+        for path in moved:
+            self.events.publish(
+                "file-changed",
+                revision=revision,
+                path=path,
+                hash=self._digest_on_disk(path),
+                origin=origin,
+                client=client,
+            )
+        if origin == "disk":
+            self.events.publish(
+                "disk-changed", revision=revision, files=list(moved), outside=outside
+            )
+        self.events.publish(
+            "tree-changed",
+            revision=revision,
+            files=list(moved),
+            outside=outside,
+            origin=origin,
+            client=client,
+        )
+        return revision
+
+    def _relative(self, paths: Iterable[str]) -> tuple[tuple[str, ...], bool]:
+        """``paths`` as inventory-relative POSIX paths, and "was there anything else".
+
+        Anything that is not a YAML document below the root — the config file,
+        an editor's swap file that slipped past the filter — is reported only as
+        the flag: naming it would invite a client to fetch it, and
+        :func:`relative_path` would refuse to.
+        """
+        found: dict[str, None] = {}
+        outside = False
+        root = self.root.resolve()
+        for given in paths:
+            candidate = Path(given)
+            if candidate.is_absolute():
+                try:
+                    candidate = candidate.resolve().relative_to(root)
+                except (OSError, ValueError):
+                    outside = True
+                    continue
+            try:
+                found.setdefault(relative_path(candidate.as_posix()), None)
+            except SessionError:
+                outside = True
+        return tuple(found), outside
+
+    def announce_history(self) -> None:
+        """Publish where the undo and redo stacks now stand.
+
+        Its own event because the stacks move without the tree moving — a client
+        that cannot undo any more needs its buttons greyed whether or not it made
+        the change that emptied the stack. This is the mechanism behind "an undo
+        issued from one tab lands in the other".
+        """
+        with self._lock:
+            revision = self._revision
+            undo, redo = len(self._undo), len(self._redo)
+            undo_label = self._undo[-1].label if self._undo else None
+            redo_label = self._redo[-1].label if self._redo else None
+        self.events.publish(
+            "history-changed",
+            revision=revision,
+            undo=undo,
+            redo=redo,
+            undoLabel=undo_label,
+            redoLabel=redo_label,
+        )
+
+    # -- who else is here ------------------------------------------------
+
+    def join(self, *, streaming: bool = False, client_id: str | None = None) -> Client:
+        """Issue (or hand back) a client id, and tell everyone the list moved."""
+        client = self.presence.join(streaming=streaming, client_id=client_id)
+        self.announce_presence()
+        return client
+
+    def leave(self, client_id: str) -> None:
+        """Drop a client, if it was there, and tell everyone."""
+        if self.presence.leave(client_id):
+            self.announce_presence()
+
+    def report(
+        self,
+        client_id: str,
+        *,
+        selection: Sequence[str] | None = None,
+        editing: Sequence[str] | None = None,
+        view: str | None = None,
+    ) -> Client:
+        """Record what a client has selected and is editing, and tell the others.
+
+        An unknown id — an expired entry, a restarted server — is given a new
+        identity rather than refused: a page whose presence lapsed while its user
+        was at lunch should rejoin, not lose the ability to say what it is doing.
+
+        Only a change anybody else can see is announced. A keepalive that moved
+        nothing wakes nobody, which is what lets this double as the polling
+        client's heartbeat.
+        """
+        client, changed = self.presence.update(
+            client_id, selection=selection, editing=editing, view=view
+        )
+        if client is None:
+            fresh = self.presence.join(client_id=None)
+            client, _ = self.presence.update(
+                fresh.id, selection=selection, editing=editing, view=view
+            )
+            assert client is not None  # just created, under no lock in between
+            self.announce_presence()
+            return client
+        if changed:
+            self.announce_presence()
+        return client
+
+    def stream_ended(self, client_id: str) -> None:
+        """Note that a client's event stream closed, without dropping the client.
+
+        A browser reconnects a dropped stream within seconds and expects its
+        identity back, so the entry stays and merely stops claiming to be
+        streaming; :data:`~netgraph.web.presence.PRESENCE_TTL` removes it if the
+        reconnect never comes.
+        """
+        _, changed = self.presence.update(client_id, streaming=False)
+        if changed:
+            self.announce_presence()
+
+    def announce_presence(self) -> None:
+        """Publish the client list. Cheap, and never carries anything from disk."""
+        self.events.publish("presence", revision=self.revision, clients=self.presence.payload())
+
+    def close(self) -> None:
+        """Wake and drop every open stream, so the process can exit.
+
+        A stream is a request thread parked in a wait. The socket server's
+        shutdown does not touch it — the threads are daemons, so the process
+        would still exit — but a test that stops a server and then asserts on
+        what a reader saw needs the readers to have finished, and a user pressing
+        Ctrl-C should not wait for a heartbeat to come round.
+        """
+        self.events.close()
 
 
 def _unified_diff(before: Mapping[str, str | None], after: Mapping[str, str | None]) -> str:

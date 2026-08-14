@@ -19,10 +19,33 @@
  *   2. **A write states what it is replacing.** Saving sends the content hash
  *      the file was opened at. The server refuses a stale one, and the refusal
  *      is shown as a conflict rather than resolved by guessing.
- *   3. **A moved revision is never papered over.** The poll notices, and the
- *      file list, the diagram and the open file are refetched. A file that is
- *      dirty and has also changed underneath is marked conflicted and left
- *      alone -- the user's unsaved text is not something to throw away quietly.
+ *   3. **A moved revision is never papered over.** The stream says so, and the
+ *      files that moved, the diagram and the open file are brought up to date. A
+ *      file that is dirty and has also changed underneath is marked conflicted
+ *      and left alone -- the user's unsaved text is not something to throw away
+ *      quietly.
+ *
+ * How it hears about a change
+ * ---------------------------
+ *
+ * /api/events, a server-sent-events stream, says what moved the moment it
+ * moves: which files, which way the history went, who else is connected. Two
+ * things follow, and they are the point of it:
+ *
+ *   * **A single-file save refetches a single file.** The event names the paths,
+ *     so `/api/tree?path=...` answers for those and the other thousand rows stay
+ *     as they are.
+ *   * **A tree that moved is not a diagram that moved.** Every render sends the
+ *     fingerprint of the picture it is already showing; the server compares it
+ *     with the one this revision would produce and answers `unchanged` instead
+ *     of running Graphviz. app.js keeps the SVG it has, per view, so switching
+ *     back to a layer nothing touched costs a round trip and no render.
+ *
+ * **The stream is an optimisation, and the page works without it.** A proxy that
+ * buffers, a browser without EventSource, a stream that will not open: any of
+ * them drops this file back to polling /api/state, which replays the very same
+ * events out of the server's ring buffer into the very same handlers. Nothing
+ * below is reachable only from one of the two paths.
  *
  * Dependency-free, like the rest of this page: a local Python process serves it
  * and there is no build step to put a bundler in.
@@ -31,8 +54,14 @@
 var netgraphSession = (function () {
   "use strict";
 
-  /** How often the tree revision is checked, in milliseconds. */
+  /** How often the tree revision is checked when there is no stream, in ms. */
   var POLL_MS = 1000;
+  /** How long the stream has to say hello before we give up on it. */
+  var STREAM_TIMEOUT_MS = 4000;
+  /** How many times a stream may drop and reconnect before we stop trusting it.
+   *  EventSource retries by itself, so a couple of failures is a hiccup and a
+   *  steady trickle of them is a proxy that will not carry this. */
+  var STREAM_FAILURES = 3;
 
   var host = null;
   var el = null;
@@ -45,6 +74,14 @@ var netgraphSession = (function () {
   /** The changes drawer: is it showing, what has it been told, and what is the
    *  diagram being drawn against while it is. */
   var changes = { open: false, against: "session", entries: [], commands: [], baselines: [] };
+  /** The push channel: the connection, where we are in its numbering, and
+   *  whether we have given up on it and fallen back to polling. */
+  var link = { source: null, id: 0, live: false, failures: 0, timer: null, why: "" };
+  /** Who this page is to the server, and what it last told it. */
+  var me = { id: null, label: null, selection: [], reported: "" };
+  /** Everyone else, and the soft locks derived from them: path -> [label]. */
+  var peers = [];
+  var locks = {};
 
   /* ------------------------------------------------------------- attaching */
 
@@ -67,10 +104,12 @@ var netgraphSession = (function () {
     el.editorTitle.textContent = "no file open";
     el.editorHint.textContent = "choose a document on the left";
     el.source.readOnly = true;
+    link.id = (initial.events && initial.events.lastEventId) || 0;
+    setPeers(initial.clients || []);
     bindControls();
     refreshTree();
     refreshChanges();
-    poll();
+    connect();
     return true;
   }
 
@@ -95,33 +134,195 @@ var netgraphSession = (function () {
     });
   }
 
+  /* ------------------------------------------------------ the push channel */
+
+  /** Open the event stream, or fall back to polling if it will not open.
+   *
+   * Everything the stream can tell us, /api/state can also tell us; the stream
+   * only tells us sooner and in smaller pieces. So a failure here is a
+   * degradation, never a breakage, and it is deliberately easy to reach: no
+   * EventSource, a construction that throws, four seconds without a hello, or a
+   * connection that keeps dropping.
+   */
+  function connect() {
+    if (!window.EventSource) { fallback("this browser has no EventSource"); return; }
+    var url = "/api/events" + (me.id ? "?client=" + encodeURIComponent(me.id) : "");
+    try {
+      link.source = new EventSource(url);
+    } catch (error) {
+      fallback("the event stream could not be opened");
+      return;
+    }
+    window.clearTimeout(link.timer);
+    link.timer = window.setTimeout(function () {
+      // Opened the socket and said nothing: a proxy holding the response until
+      // it ends, which for a stream is never. Polling is the honest answer.
+      if (!link.live) { drop(); fallback("the event stream did not deliver"); }
+    }, STREAM_TIMEOUT_MS);
+    ["hello", "tree-changed", "file-changed", "history-changed", "disk-changed",
+     "presence", "resync"].forEach(function (name) {
+      link.source.addEventListener(name, receive);
+    });
+    link.source.onerror = function () {
+      link.failures += 1;
+      if (link.live && link.failures <= STREAM_FAILURES) {
+        // EventSource reconnects on its own, resending Last-Event-ID; the
+        // server replays what we missed. Nothing to do but say so.
+        paintLink("reconnecting");
+        return;
+      }
+      drop();
+      fallback("the event stream keeps dropping");
+    };
+  }
+
+  function receive(event) {
+    var data;
+    try { data = JSON.parse(event.data); } catch (error) { return; }
+    dispatch(data);
+  }
+
+  /** One event, whether it arrived on the stream or in a poll's replay. */
+  function dispatch(data) {
+    if (data.id) { link.id = Math.max(link.id, data.id); }
+    var handler = handlers[data.event];
+    if (handler) { handler(data); }
+  }
+
+  var handlers = {
+    "hello": function (data) {
+      window.clearTimeout(link.timer);
+      link.live = true;
+      link.failures = 0;
+      me.id = data.client;
+      me.label = data.label;
+      setPeers(data.clients || []);
+      paintLink("live");
+      // Whatever this page had selected or half-typed before the stream came up
+      // is news to everybody else.
+      announce(true);
+      if (data.resync) { fullRefresh(); }
+    },
+
+    /* The tree moved. `files` names what moved, so only those rows are
+     * refetched; `outside` says something changed that is not a document of
+     * this inventory -- netgraph.toml, most likely -- and there is no row for
+     * that, so the list is refetched whole. */
+    "tree-changed": function (data) {
+      if (data.client && data.client === me.id) { return; }   // we did this one
+      if (data.revision <= state.revision) { return; }        // already caught up
+      state.revision = data.revision;
+      var moved = data.files || [];
+      (moved.length && !data.outside ? patchTree(moved, true) : refreshTree());
+      host.render();
+      refreshChanges();
+    },
+
+    /* One file's bytes are different. The only thing this page has to decide is
+     * what to do with the *open* file, which the file list cannot answer: the
+     * text on screen may be the only copy of something. */
+    "file-changed": function (data) {
+      if (!open.path || data.path !== open.path) { return; }
+      if (data.hash === null) { mark("gone", "deleted on disk"); return; }
+      if (data.hash === open.hash) { return; }
+      if (open.dirty) {
+        open.conflicted = true;
+        mark("conflict", "changed on disk since you opened it");
+        paintTree();
+        host.toast(open.path + " changed on disk and has unsaved edits here", "error");
+        return;
+      }
+      openFile(open.path);
+    },
+
+    /* The undo stack is the server's, so a Ctrl-Z in another tab moves this
+     * one's buttons. No fetch: the event carries the depths. */
+    "history-changed": function (data) {
+      state.undo = data.undo;
+      state.redo = data.redo;
+      state.undoLabel = data.undoLabel;
+      state.redoLabel = data.redoLabel;
+      paintHistory();
+    },
+
+    /* Something outside this editor wrote to the tree. Worth saying, except
+     * about the file in the pane: `file-changed` has already said something
+     * more specific about that one, and a second toast would replace it. */
+    "disk-changed": function (data) {
+      var names = (data.files || []).filter(function (path) { return path !== open.path; });
+      if (names.length) {
+        host.toast(names.join(", ") + " changed on disk", "ok");
+      } else if (!data.files.length && data.outside) {
+        host.toast("something changed in the folder outside the inventory", "ok");
+      }
+    },
+
+    "presence": function (data) { setPeers(data.clients || []); },
+
+    /* The server could not tell us what we missed -- a reconnect after too long
+     * away, or this stream falling behind. Everything we hold may be stale, so
+     * nothing we hold is patched: it is all fetched again. */
+    "resync": function () { fullRefresh(); }
+  };
+
+  function drop() {
+    window.clearTimeout(link.timer);
+    if (link.source) { link.source.close(); link.source = null; }
+    link.live = false;
+  }
+
   /* ---------------------------------------------------------------- polling */
 
-  /* A poll rather than server-sent events: it is a dozen lines, it recovers
-   * from a server restart by itself, and one integer a second over loopback is
-   * not a cost worth engineering away. The number it watches is bumped by every
-   * change to the tree, whoever made it. */
+  /** Give up on the stream and watch /api/state instead.
+   *
+   * Not a lesser code path: `?since=` replays the same events, with the same
+   * ids, into the same handlers, so a polling page behaves exactly like a
+   * streaming one a fraction of a second later. What it loses is the fraction of
+   * a second -- and it says so, because "why is this tab behind" deserves an
+   * answer on screen. */
+  function fallback(why) {
+    if (link.why) { return; }   // already fell back; do not restart the timer
+    link.why = why;
+    paintLink("polling");
+    poll();
+  }
+
   function poll() {
     window.clearTimeout(timer);
-    fetch("/api/state", { cache: "no-store" })
+    var url = "/api/state?since=" + link.id + (me.id ? "&client=" + encodeURIComponent(me.id) : "");
+    fetch(url, { cache: "no-store" })
       .then(function (response) { return response.json(); })
       .then(function (next) {
         var moved = next.revision !== state.revision;
-        state = next;
+        var replay = (next.events && next.events.replay) || [];
+        state.writable = next.writable;
+        state.undo = next.undo;
+        state.redo = next.redo;
+        state.undoLabel = next.undoLabel;
+        state.redoLabel = next.redoLabel;
+        setPeers(next.clients || []);
         paintHistory();
-        if (moved) { reconcile(); }
+        if (replay.length) {
+          replay.forEach(dispatch);
+        } else if (moved) {
+          // Nothing to replay and yet the revision moved: the ring wrapped, or
+          // the server restarted under us. Fetch everything.
+          state.revision = next.revision;
+          fullRefresh();
+        }
+        if (!me.id) { announce(true); }
       })
       .catch(function () {})
       .then(function () { timer = window.setTimeout(poll, POLL_MS); });
   }
 
-  /** The tree moved: refetch everything that was derived from it.
+  /** Everything we hold may be wrong: fetch all of it again.
    *
    * The decision about the open file waits for the refetch rather than racing
    * it. Made against the tree still in hand, it is made against the hashes from
    * *before* the change -- which always compare equal, so the file that just
    * moved on disk was the one thing the reconciliation left alone. */
-  function reconcile() {
+  function fullRefresh() {
     host.render();
     // The drawer is a view of the session's own log, but the *diff* it paints
     // is against the tree -- which anything may have moved. Refetch both.
@@ -146,6 +347,89 @@ var netgraphSession = (function () {
     });
   }
 
+  /* --------------------------------------------------------------- presence */
+
+  /** Tell the server what this page has selected and is editing.
+   *
+   * Sent only when it has actually changed, because every one of these wakes
+   * every other page. Advisory throughout: nothing here is a lock, and a save is
+   * refused by the content hash or not at all. */
+  function announce(force) {
+    var payload = {
+      client: me.id,
+      selection: me.selection,
+      editing: open.dirty && open.path ? [open.path] : [],
+      view: host.layer ? host.layer() : null
+    };
+    var fingerprint = JSON.stringify([payload.selection, payload.editing, payload.view]);
+    if (!force && fingerprint === me.reported) { return; }
+    me.reported = fingerprint;
+    fetch("/api/presence", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify(payload)
+    })
+      .then(readBody)
+      .then(function (body) {
+        me.id = body.client;
+        me.label = body.label;
+        setPeers(body.clients || []);
+      })
+      .catch(function () { me.reported = ""; });   // try again next time
+  }
+
+  /** Note what this page has selected, and let the others draw it. */
+  function select(address) {
+    me.selection = address ? [address] : [];
+    announce(false);
+  }
+
+  /** Take everyone else's word for where they are and what they are in. */
+  function setPeers(clients) {
+    peers = (clients || []).filter(function (entry) { return entry.id !== me.id; });
+    locks = {};
+    var selected = [];
+    peers.forEach(function (entry) {
+      (entry.editing || []).forEach(function (path) {
+        (locks[path] = locks[path] || []).push(entry.label);
+      });
+      (entry.selection || []).forEach(function (address) {
+        if (selected.indexOf(address) === -1) { selected.push(address); }
+      });
+    });
+    if (host.remote) { host.remote(selected); }
+    paintPeers();
+    paintTree();
+  }
+
+  function paintPeers() {
+    el.clients.replaceChildren();
+    el.clients.hidden = !peers.length;
+    peers.forEach(function (entry) {
+      var chip = document.createElement("span");
+      chip.className = "client" + (entry.streaming ? "" : " lagging");
+      chip.textContent = entry.label;
+      var what = (entry.editing || []).length
+        ? "editing " + entry.editing.join(", ")
+        : ((entry.selection || []).length ? "looking at " + entry.selection.join(", ") : "connected");
+      chip.title = what + (entry.streaming ? "" : " (polling; may be a moment behind)");
+      el.clients.appendChild(chip);
+    });
+  }
+
+  /** Say which channel this page is on. A tab that is behind should look it. */
+  function paintLink(kind) {
+    el.linkState.hidden = false;
+    el.linkState.className = "hint link " + kind;
+    el.linkState.textContent = kind;
+    el.linkState.title = kind === "live"
+      ? "changes arrive as they happen"
+      : (kind === "polling"
+        ? "the event stream could not be used (" + link.why + "); checking once a second"
+        : "the event stream dropped; reconnecting");
+  }
+
   /* -------------------------------------------------------------- the tree */
 
   function refreshTree() {
@@ -157,6 +441,54 @@ var netgraphSession = (function () {
         if (host.diagnostics) { host.diagnostics(next.diagnostics || []); }
       })
       .catch(function () {});
+  }
+
+  /** Bring just these files up to date, leaving the rest of the list alone.
+   *
+   * The whole point of the push channel on a large inventory: a save moves one
+   * file, and walking a thousand of them to learn what that one now hashes to is
+   * the cost this replaces. `diagnostics` is asked for only when we do not
+   * already have this revision's -- an applied change comes back with them --
+   * because computing them means validating the whole tree either way.
+   *
+   * Anything unexpected falls back to the full fetch. A partial update that
+   * silently failed would leave a stale hash in the list, and a stale hash is a
+   * save refused for no visible reason. */
+  function patchTree(paths, diagnostics) {
+    if (!paths || !paths.length) { return refreshTree(); }
+    var query = paths.map(function (path) {
+      return "path=" + encodeURIComponent(path);
+    }).join("&");
+    return fetch("/api/tree?" + query + "&diagnostics=" + (diagnostics ? "1" : "0"),
+      { cache: "no-store" })
+      .then(readBody)
+      .then(function (next) {
+        tree.revision = next.revision;
+        merge(next.files || [], next.missing || []);
+        paintTree();
+        if (diagnostics && host.diagnostics) { host.diagnostics(next.diagnostics || []); }
+      })
+      .catch(function () { return refreshTree(); });
+  }
+
+  /** Put fresh rows in place of the old ones, and drop the ones that are gone.
+   *
+   * Insertion keeps the list in path order, which is the order the server walks
+   * the tree in, so a file created elsewhere lands where a full refetch would
+   * have put it rather than at the end. */
+  function merge(files, missing) {
+    (missing || []).forEach(function (path) {
+      tree.files = tree.files.filter(function (file) { return file.path !== path; });
+    });
+    (files || []).forEach(function (file) {
+      var at = -1;
+      for (var i = 0; i < tree.files.length; i++) {
+        if (tree.files[i].path === file.path) { at = i; break; }
+      }
+      if (at >= 0) { tree.files[at] = file; return; }
+      var before = tree.files.findIndex(function (other) { return other.path > file.path; });
+      tree.files.splice(before === -1 ? tree.files.length : before, 0, file);
+    });
   }
 
   function fileEntry(path) {
@@ -209,6 +541,8 @@ var netgraphSession = (function () {
     row.appendChild(name);
     var badge = stateBadge(file);
     if (badge) { row.appendChild(badge); }
+    var lock = lockBadge(file);
+    if (lock) { row.appendChild(lock); }
     row.title = file.error ? file.path + " — " + file.error : file.path;
     row.addEventListener("click", function () { openFile(file.path); });
     return row;
@@ -223,6 +557,21 @@ var netgraphSession = (function () {
     var badge = document.createElement("span");
     badge.className = "badge " + (open.conflicted ? "conflict" : "dirty");
     badge.textContent = text;
+    return badge;
+  }
+
+  /** Somebody else has unsaved edits in this file.
+   *
+   * A courtesy, not a lock: the row still opens, the file still saves, and the
+   * only thing that can refuse the save is the content hash. Saying so is worth
+   * doing because the alternative is finding out by being refused. */
+  function lockBadge(file) {
+    var who = locks[file.path];
+    if (!who || !who.length) { return null; }
+    var badge = document.createElement("span");
+    badge.className = "badge elsewhere";
+    badge.textContent = "in use";
+    badge.title = who.join(", ") + " has unsaved edits here";
     return badge;
   }
 
@@ -253,7 +602,9 @@ var netgraphSession = (function () {
     return fetch("/api/file/" + encodePath(path), { cache: "no-store" })
       .then(readBody)
       .then(function (body) {
+        var wasDirty = open.dirty;
         open = { path: body.path, hash: body.hash, dirty: false, conflicted: false };
+        if (wasDirty) { announce(false); }   // the file we were in is free again
         el.source.value = body.text;
         el.source.readOnly = !state.writable;
         el.editorTitle.textContent = body.path;
@@ -274,11 +625,14 @@ var netgraphSession = (function () {
     mark("dirty", "unsaved changes");
     paintTree();
     paintHistory();
+    // The first keystroke is what puts the "in use" badge on this file in
+    // everybody else's list; the ones after it change nothing and send nothing.
+    announce(false);
   }
 
   function save(force) {
     if (!open.path || !state.writable) { return; }
-    var body = { text: el.source.value, force: !!force };
+    var body = { text: el.source.value, force: !!force, client: me.id };
     // A conflicted file is being saved deliberately over somebody else's work,
     // so it goes without the precondition -- but only after the user was told.
     if (!open.conflicted) { body.hash = open.hash; }
@@ -299,7 +653,8 @@ var netgraphSession = (function () {
     if (!state.writable) { return; }
     if (verb === "undo" && !state.undo) { return; }
     if (verb === "redo" && !state.redo) { return; }
-    fetch("/api/" + verb, { method: "POST", cache: "no-store" })
+    var query = me.id ? "?client=" + encodeURIComponent(me.id) : "";
+    fetch("/api/" + verb + query, { method: "POST", cache: "no-store" })
       .then(readBody)
       .then(function (result) { applied(result, verb + "ne", true); })
       .catch(function (error) { host.toast(String(error.message || error), "error"); })
@@ -322,10 +677,14 @@ var netgraphSession = (function () {
       open.dirty = false;
       open.conflicted = false;
       mark(null, "");
+      announce(false);   // this file is no longer "in use" by us
       if (rewrote) { openFile(open.path); }
     }
     host.toast(what, "ok");
-    refreshTree().then(function () {
+    // Only the files the change touched, and no diagnostics: the response
+    // already carries this revision's, and recomputing them would mean
+    // validating the whole tree a second time for the same answer.
+    patchTree(Object.keys(result.files), false).then(function () {
       // An undo can rewrite the file that is open; reload it unless the user is
       // in the middle of typing something else into it.
       if (open.path && !open.dirty) {
@@ -569,7 +928,7 @@ var netgraphSession = (function () {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
-      body: JSON.stringify({ id: id, revision: state.revision })
+      body: JSON.stringify({ id: id, revision: state.revision, client: me.id })
     })
       .then(readBody)
       .then(function (result) { applied(result, "put change #" + id + " back", true); })
@@ -647,16 +1006,29 @@ var netgraphSession = (function () {
     return path.split("/").map(encodeURIComponent).join("/");
   }
 
+  /* A closing tab is worth one more request: without it the others keep this
+   * page's selection and its "in use" badge on screen until the presence entry
+   * expires. sendBeacon because a fetch started in pagehide is not guaranteed to
+   * leave. The expiry is still there as the backstop, for the tab that crashes
+   * or the laptop that closes. */
+  window.addEventListener("pagehide", function () {
+    if (!me.id || !navigator.sendBeacon) { return; }
+    var payload = JSON.stringify({ client: me.id, leaving: true });
+    navigator.sendBeacon("/api/presence", new Blob([payload], { type: "application/json" }));
+  });
+
   return {
     attach: attach,
     markDirty: markDirty,
     reveal: reveal,
     locate: locate,
+    select: select,
     isOpen: function () { return !!open.path; },
     save: save,
     graphPath: graphPath,
     showChanges: showChanges,
     refreshChanges: refreshChanges,
-    isDiffing: function () { return changes.open; }
+    isDiffing: function () { return changes.open; },
+    isLive: function () { return link.live; }
   };
 })();

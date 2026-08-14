@@ -1760,6 +1760,100 @@ small for label" warning per frame, which is not an improvement.
 
 ---
 
+## 18. ~~The editor polls, and a second tab is a race~~ — fixed, 9.3× an edit
+
+**Status:** closed 2026-08-14. `netgraph.web.events` is the push channel,
+`GET /api/events` serves it, `netgraph.web.presence` is who else is connected.
+
+`session.js` polled `/api/state` once a second and, whenever the revision moved,
+refetched the whole file list and re-rendered the diagram from scratch. Three
+costs, and the third is the one that hurt on a real inventory:
+
+* half a second of latency, on average, before an edit made anywhere showed up;
+* a walk of every file in the tree — read, hash, serialise — to learn what *one*
+  of them now hashes to;
+* a full Graphviz run on every revision, including the many that do not change
+  the drawing at all. A description, an owner label, a comment, a device added to
+  a namespace the current view filters out: the picture is byte-for-byte what it
+  was, and it was laid out again anyway.
+
+And with two tabs open, none of it was announced: each found out about the
+other's writes a second late and only as "the number moved".
+
+### The harness
+
+`tools/bench_events.py` (new), on `tools/bench_pipeline.py`'s default tree —
+**1056 devices in 2106 documents across 138 files, 1.2 MB of YAML** — median of
+five rounds, Graphviz 2.43. It measures the round trip an edit sits inside rather
+than the reload inside it, which is `tools/bench_incremental.py`'s job.
+
+### Measured
+
+| One edit | Polling | Push | |
+|---|---|---|---|
+| notice the change | 500 ms | 0.4 ms | mean wait; the interval's arithmetic against a queue hand-off |
+| fetch the file list | 107 ms | 95 ms | 138 rows → 1 |
+| … and not re-grade the tree | 107 ms | 3.3 ms | the applied change already carried the diagnostics |
+| draw it, picture moved | 1121 ms | 1121 ms | nothing to skip; this is the floor |
+| draw it, picture unmoved | 1121 ms | 182 ms | **6.2×** — the layout is skipped, everything before it is not |
+| **total, drawn layer untouched** | **1728 ms** | **185 ms** | **9.3×** |
+| **total, drawn layer changed** | **1728 ms** | **1125 ms** | **1.5×** |
+
+Two of those rows are worth reading twice.
+
+**The file list's win is almost entirely the diagnostics.** Answering for one
+file instead of 138 saves 12 ms; *not* re-validating the tree to grade it saves
+92 more. So `/api/tree?path=` carries `diagnostics=0`, and the client passes it
+exactly when it already has this revision's findings — which, after its own
+write, it does, because the change response carries them. A partial fetch that
+re-graded the tree would have been a rounding error.
+
+**The skipped layout still costs 182 ms.** The fingerprint is the DOT document,
+so producing it means loading, validating and building the graph; only Graphviz
+is skipped. That is 84 % of the render and it is the part that grows worst with
+the graph, but the remaining 182 ms is the same "nothing after the load is
+incremental" wall entry 14 left standing, and this entry does not move it.
+
+### The design, and what it refuses to do
+
+**The stream is an optimisation, never a channel of authority.** Every fact it
+carries is answerable by a plain `GET`; `?since=` on `/api/state` replays the
+same events, with the same ids, out of the same ring buffer, into the same
+client-side handlers. So the fallback is not a lesser code path — a page that
+lost the stream behaves identically a fraction of a second later, and the
+`curl`-and-plain-`GET` clients (every test that predates this) never learn the
+stream exists. Nothing is writable through it and no write is gated on it.
+
+**A client that fell behind is told, not patched.** Ids are monotonic and
+replayed from a bounded ring; a `Last-Event-ID` that has fallen out of it opens
+with `resync` rather than a plausible-looking partial replay, and a subscriber
+whose own queue overflows is resynchronised rather than buffered. A patch applied
+to a state the client cannot have is worse than a refetch, every time.
+
+**Presence blocks nothing.** It expires on a timer, and a timer is a bad thing to
+hold a lock on: an inventory that can be locked by closing a laptop lid is worse
+than one where two people can collide. The revision precondition in `apply` and
+the content hash in `write_file` remain the only gates, and the concurrency tests
+in `tests/test_web_events.py` are written against those, not against the badge.
+
+### What is deliberately not done
+
+* **No WebSocket.** SSE is one direction, which is the direction the data goes;
+  it reconnects and resumes by itself in every browser that matters; and it is
+  ~120 lines on `http.server` against a framing implementation and a handshake.
+  The client's writes are ordinary requests and are better for it — they get
+  status codes.
+* **No server-side SVG cache.** The fingerprint says "you already have this", not
+  "here it is again": the client keeps the drawing, per view, and the server
+  keeps nothing. Caching SVGs for a hundred (view, revision) pairs to save a
+  round trip on a loopback socket is memory spent on the wrong problem.
+* **No operational transform, no merge.** Two clients editing one file still
+  produces a `409` for the second, with what is really on disk attached. Merging
+  YAML that two people edited is a research project; telling them the truth is
+  not.
+
+---
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

@@ -407,6 +407,7 @@ def open_editor(
             watch: bool = False,
             source: str | None = None,
             extra: Mapping[str, str] | None = None,
+            beside: Editor | None = None,
         ) -> Editor:
             root = tmp_path / "inventory"
             if not root.exists():
@@ -418,13 +419,19 @@ def open_editor(
                     handle.write(text)
 
             session: EditingSession | None = None
-            if source is None:
-                session = EditingSession(root=root, writable=writable)
-                if watch:
-                    stack.enter_context(TreeWatcher(session, debounce_ms=50))
-            server = stack.enter_context(
-                WebServer.create(source=source or "", session=session, host="127.0.0.1", port=0)
-            )
+            if beside is not None:
+                # A second tab on the *same* session: one server, one tree, two
+                # browsers. The whole of what "shared" means here, and the only
+                # way to test what one tab does to the other.
+                session, server = beside.session, beside.server
+            else:
+                if source is None:
+                    session = EditingSession(root=root, writable=writable)
+                    if watch:
+                        stack.enter_context(TreeWatcher(session, debounce_ms=50))
+                server = stack.enter_context(
+                    WebServer.create(source=source or "", session=session, host="127.0.0.1", port=0)
+                )
 
             console = Console()
             context = stack.enter_context(
@@ -986,3 +993,152 @@ def test_a_read_only_session_offers_the_drawer_but_no_revert(
     payload = editor.api("/api/changes")
     assert payload["entries"] == []
     assert payload["baselines"] == ["session"]
+
+
+# --------------------------------------------------------------------------- #
+# Two tabs, one session
+# --------------------------------------------------------------------------- #
+
+
+def test_the_page_says_it_is_on_the_event_stream(open_editor: OpenEditor) -> None:
+    """The indicator is the honest answer to "why is this tab behind"."""
+    editor = open_editor(writable=True)
+    expect(editor.page.locator("#link-state")).to_have_text("live", timeout=TIMEOUT_MS)
+
+
+def test_a_second_tab_appears_in_the_first(open_editor: OpenEditor) -> None:
+    editor = open_editor(writable=True)
+    other = open_editor(beside=editor)
+    # Each page lists the *other* one, and neither lists itself.
+    expect(editor.page.locator("#clients .client")).to_have_count(1, timeout=TIMEOUT_MS)
+    expect(other.page.locator("#clients .client")).to_have_count(1, timeout=TIMEOUT_MS)
+
+
+def test_a_file_another_tab_is_typing_in_is_badged_but_not_locked(
+    open_editor: OpenEditor,
+) -> None:
+    """A soft lock: shown, and then deliberately ignored.
+
+    The badge is a courtesy between two people who can see each other. What
+    refuses a write is the content hash, so the second tab saving the file it was
+    warned about must simply work.
+    """
+    editor = open_editor(writable=True)
+    other = open_editor(beside=editor)
+    relative = "hosts/pc-desk.yaml"
+
+    other.page.locator(f'#file-list .file[data-path="{relative}"]').click()
+    other.page.locator("#source").fill(other.read(relative) + "\n# typed elsewhere\n")
+    expect(other.page.locator("#editor-state")).to_have_text("unsaved changes")
+
+    row = editor.page.locator(f'#file-list .file[data-path="{relative}"]')
+    expect(row.locator(".badge.elsewhere")).to_have_text("in use", timeout=TIMEOUT_MS)
+
+    # And it blocks nothing: this tab opens the same file and saves it.
+    row.click()
+    editor.page.locator("#source").fill(editor.read(relative) + "\n# and here\n")
+    editor.page.locator("#save").click()
+    expect(editor.page.locator("#toast")).to_contain_text("saved " + relative)
+    assert editor.read(relative).endswith("# and here\n")
+
+
+def test_what_another_tab_selected_is_drawn_faintly(open_editor: OpenEditor) -> None:
+    editor = open_editor(writable=True)
+    other = open_editor(beside=editor)
+    address = "switches/sw-home"
+
+    other.shape(address).click()
+    # The other tab's shape is marked; this tab's own pick is not, so the two
+    # cannot be mistaken for one another.
+    expect(
+        editor.page.locator(f'#viewport g.remote[id="{editor.element_id(address)}"]')
+    ).to_be_attached(timeout=TIMEOUT_MS)
+    expect(other.page.locator("#viewport g.remote")).to_have_count(0)
+
+
+def test_a_save_in_one_tab_reaches_the_other_without_a_full_refetch(
+    open_editor: OpenEditor,
+) -> None:
+    """The push channel, end to end, and the incremental path underneath it.
+
+    The second tab has the file open and clean, so it adopts what was written —
+    and it does so from a partial fetch of that one row, which is what the
+    request log shows.
+    """
+    editor = open_editor(writable=True)
+    other = open_editor(beside=editor)
+    relative = "hosts/pc-desk.yaml"
+
+    other.page.locator(f'#file-list .file[data-path="{relative}"]').click()
+    expect(other.page.locator("#source")).to_have_value(other.read(relative))
+
+    requested: list[str] = []
+    other.page.on("request", lambda request: requested.append(request.url))
+
+    editor.page.locator(f'#file-list .file[data-path="{relative}"]').click()
+    editor.page.locator("#source").fill(editor.read(relative) + "\n# pushed across\n")
+    editor.page.locator("#save").click()
+    expect(editor.page.locator("#toast")).to_contain_text("saved " + relative)
+
+    expect(other.page.locator("#source")).to_have_value(editor.read(relative), timeout=TIMEOUT_MS)
+    trees = [url for url in requested if "/api/tree" in url]
+    assert trees, "the other tab did not refresh its file list at all"
+    assert all("path=" in url for url in trees), (
+        f"a single-file save refetched the whole tree: {trees}"
+    )
+
+
+def test_an_undo_in_one_tab_lands_in_the_other(open_editor: OpenEditor) -> None:
+    """The history is the server's, so both tabs' buttons move together."""
+    editor = open_editor(writable=True)
+    other = open_editor(beside=editor)
+    relative = "hosts/pc-desk.yaml"
+    original = editor.read(relative)
+
+    editor.page.locator(f'#file-list .file[data-path="{relative}"]').click()
+    editor.page.locator("#source").fill(original + "\n# undo me\n")
+    editor.page.locator("#save").click()
+    expect(editor.page.locator("#toast")).to_contain_text("saved " + relative)
+
+    # The other tab's Undo comes alive without it having done anything.
+    expect(other.page.locator("#undo")).to_be_enabled(timeout=TIMEOUT_MS)
+    other.page.locator("#undo").click()
+
+    expect(other.page.locator("#toast")).to_contain_text("undone")
+    assert editor.read(relative) == original, "an undo restores the bytes"
+    # And the tab that made the change is told: its Undo is spent, its Redo is not.
+    expect(editor.page.locator("#undo")).to_be_disabled(timeout=TIMEOUT_MS)
+    expect(editor.page.locator("#redo")).to_be_enabled(timeout=TIMEOUT_MS)
+
+
+def test_an_edit_that_does_not_move_the_picture_does_not_redraw_it(
+    open_editor: OpenEditor,
+) -> None:
+    """The fingerprint, from the browser's side.
+
+    A description is not on the diagram. The page still asks — the problems and
+    the counts can move — but it sends the hash of what it is showing and the
+    server answers `unchanged`, so no layout runs and the SVG on screen is
+    literally the same node it was.
+    """
+    editor = open_editor(writable=True)
+    page = editor.page
+    relative = "hosts/pc-desk.yaml"
+
+    page.locator(f'#file-list .file[data-path="{relative}"]').click()
+    before = page.evaluate("() => document.querySelector('#viewport svg').id || 'anonymous'")
+    page.evaluate("() => { document.querySelector('#viewport svg').dataset.witness = 'original'; }")
+
+    text = editor.read(relative)
+    assert "description:" in text
+    page.locator("#source").fill(text.replace("description:", "description: edited —", 1))
+    page.locator("#save").click()
+    expect(page.locator("#toast")).to_contain_text("saved " + relative)
+
+    # The witness survives, which it could not if the SVG had been replaced.
+    expect(page.locator("#viewport svg[data-witness='original']")).to_be_attached(
+        timeout=TIMEOUT_MS
+    )
+    assert (
+        page.evaluate("() => document.querySelector('#viewport svg').id || 'anonymous'") == before
+    )

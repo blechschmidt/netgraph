@@ -11,7 +11,9 @@ user who has decided one of them is safe to run has decided it about both:
   put it on the network, and ``--host`` is the explicit act of publishing it.
 * **No path ever becomes a file name.** Each front end answers a fixed set of
   routes out of memory, so no request can reach a document the user did not
-  offer it.
+  offer it. One of those routes — the editing session's event stream — answers
+  over time rather than at once (:meth:`LocalHandler.begin_stream`); it is the
+  same promise, held open.
 * **Nothing is written unless the command line asked for it.** ``PUT`` and the
   mutating ``POST`` routes exist in one front end only — the editing session of
   ``netgraph web`` — and only when it was opened with the flag that enables
@@ -306,6 +308,46 @@ class LocalHandler(BaseHTTPRequestHandler):
         if body:
             with suppress(BrokenPipeError, ConnectionResetError):
                 self.wfile.write(payload)
+
+    def begin_stream(self, content_type: str, *, headers: dict[str, str] | None = None) -> None:
+        """Open a response whose length is not known yet, and keep it open.
+
+        One route needs this — the editing session's event stream — and it is
+        here rather than there so that a long-lived response cannot end up with a
+        different set of security headers from every other one.
+
+        Two things differ from :meth:`send_payload`, and both follow from there
+        being no ``Content-Length`` to send:
+
+        * The connection is marked for closing. ``protocol_version`` is HTTP/1.1,
+          so without a length the only framing left is end-of-connection —
+          chunked encoding would work too and would buy nothing, since a client
+          that hangs up mid-stream is the *normal* end of an event stream.
+        * The request body, if any, is taken as read. A stream can outlive any
+          notion of "the next request on this connection", so the base class must
+          not try to drain one afterwards.
+
+        The caller writes frames to ``self.wfile`` and flushes; a
+        :class:`BrokenPipeError` or :class:`ConnectionResetError` from a write is
+        the client having closed the tab, and is the loop's cue to stop.
+        """
+        self.close_connection = True
+        self.body_consumed = True
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Cache-Control", "no-store, max-age=0")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.send_header("Content-Security-Policy", self.content_security_policy)
+        self.send_header("Connection", "close")
+        # Nginx and friends buffer a proxied response by default, which turns an
+        # event stream into a response that arrives all at once when it ends.
+        # The header is theirs; a client behind a proxy that ignores it is why
+        # the polling fallback exists.
+        self.send_header("X-Accel-Buffering", "no")
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
+        self.end_headers()
 
     def send_text(
         self, status: HTTPStatus, message: str, *, body: bool = True, allow: str | None = None

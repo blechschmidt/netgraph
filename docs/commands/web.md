@@ -123,10 +123,51 @@ lossy; see [`docs/editing.md`](../editing.md#as-a-script).
 
 The session does not own the files. `watchfiles` watches the folder exactly as
 [`netgraph watch`](watch.md) does, so an edit made in `$EDITOR`, a `git
-checkout`, or a second netgraph process bumps the tree revision; the page polls
-that number once a second and refetches the file list, the diagram and — if it
-is not dirty — the file it has open. If the watch cannot start, the command says
-so rather than leaving a page that is quietly stale.
+checkout`, or a second netgraph process bumps the tree revision — and the page is
+**told**, over a server-sent-events stream, the moment it happens. If the watch
+cannot start, the command says so rather than leaving a page that is quietly
+stale.
+
+The event says *what* moved, which is what makes the page's response
+proportionate to the change:
+
+* a save of one file refetches **that file's row**, not the file list;
+* a revision that does not change the drawing of the layer on screen **does not
+  redraw it** — the page sends the fingerprint of the picture it is showing and
+  the server answers "unchanged" rather than running Graphviz. Editing a
+  description on a 1056-device tree went from 1.7 s to 185 ms; see
+  [`docs/follow-ups.md`](../follow-ups.md) entry 18 for the harness and the
+  numbers.
+
+**The stream is an optimisation, and the page works without it.** A proxy that
+buffers responses, a browser without `EventSource`, a stream that will not open:
+any of them drops the page back to polling `/api/state` once a second, which
+replays the very same events out of the server's ring buffer. The indicator above
+the file list says which of the two you are on. Nothing is writable through the
+stream and no write depends on having read one.
+
+### More than one client
+
+A session is shared — two tabs, or two people on the same machine — and it says
+so rather than leaving them to collide:
+
+* every connected page is listed above the file list, with what it is looking at
+  and what it is editing in the tooltip;
+* what somebody else has **selected** is drawn on the canvas as a faint dashed
+  halo, distinct from the highlight your own hover gives;
+* a file somebody else has **unsaved edits in** is badged `in use`.
+
+**All of that is advisory.** It blocks nothing: the row still opens, the file
+still saves, and presence expires by itself if a tab goes away without saying so.
+The only things that can refuse a write are the ones that are checks on the tree
+itself — the content hash of a whole-file save and the tree revision of an
+operation batch. A soft lock built on a heartbeat would be a way to lock an
+inventory by closing a laptop lid.
+
+So the conflict story is unchanged by having company: two clients saving the same
+file gives the second a `409` carrying what is really on disk; a save racing an
+`$EDITOR` write gives the same; and an undo issued in one tab rewrites the files
+and moves the buttons in the other, which is what a server-side history means.
 
 ### The API
 
@@ -135,9 +176,11 @@ is on loopback and none of the write routes exist unless `--write` was given.
 
 | Route | What it answers |
 |---|---|
-| `GET /api/state` | The tree revision, whether this session writes, and the undo/redo depth. |
-| `GET /api/tree` | Every file, its content hash, its documents, and each document's kind, name, address and line. |
-| `GET /api/graph?view=l2` | The resolved graph as an embeddable SVG, its info-box records, its problems and its stored [geometry](../editing.md). |
+| `GET /api/state` | The tree revision, whether this session writes, the undo/redo depth, and who else is connected. `?since=<id>` adds the events published after that id — the polling client's half of the push channel. `?client=<id>` keeps that client's presence alive. |
+| `GET /api/events` | A `text/event-stream` of `tree-changed`, `file-changed`, `history-changed`, `disk-changed`, `presence`, opening with `hello` and beating every 15 s. Resumes from `Last-Event-ID`; a resume point older than the ring buffer opens with `resync`, meaning refetch. |
+| `POST /api/presence` | `{"client": …, "selection": [ … ], "editing": [ … ]}` — what this client is looking at and has unsaved edits in; answers with everybody. `{"leaving": true}` drops it at once. Advisory, and the one route here that a read-only session still accepts, because it writes nothing. |
+| `GET /api/tree` | Every file, its content hash, its documents, and each document's kind, name, address and line. `?path=a.yaml&path=b.yaml` answers for those files only, with `partial: true` and a `missing` list; `?diagnostics=0` leaves out the findings, which cost a validation of the whole tree either way. |
+| `GET /api/graph?view=l2` | The resolved graph as an embeddable SVG, its info-box records, its problems and its stored [geometry](../editing.md). `graphHash` fingerprints the drawing; passing it back as `?known=` answers `unchanged: true` with no SVG when this revision would draw the same picture, having skipped the layout. |
 | `GET /api/file/<path>` | One file's text and the hash a write of it must quote. |
 | `PUT /api/file/<path>` | That file back: `{"text": …, "hash": …}`. A stale `hash` is `409`; a new error is `422`, listing them; `"force": true` overrides the second, never the first. |
 | `POST /api/ops` | `{"revision": …, "ops": [ … ]}` — a batch of [edit operations](../editing.md), applied atomically. Answers with the applied operations, their inverses, the files changed and the tree's diagnostics. |
@@ -215,6 +258,45 @@ rebound DNS name — plus three of its own: a request body is capped at 1 MB, th
 SVG is parsed and stripped of anything that could execute or navigate before it is
 put into the page, and no write route exists at all without `--write` on a
 loopback bind. It is a development server: do not put it on a hostile network.
+
+### The event stream and presence, against the same threat model
+
+Both are new surface, and both are held to the rules above rather than excused
+from them.
+
+* **Same bind, same `Host` check.** `/api/events` and `/api/presence` are
+  ordinary routes on the same handler, so a request that reached a loopback bind
+  under another name is refused with `421` before either is entered. A page on a
+  hostile origin therefore cannot open the stream and read your topology out of
+  it — which matters more here than elsewhere, because a stream keeps delivering.
+  `connect-src 'self'` in the [Content-Security-Policy](../architecture.md) says
+  the same thing from the other side.
+* **The stream is read-only, and so is presence.** Nothing about the inventory
+  can be changed through either. `/api/presence` writes to an in-memory list and
+  is the one route a read-only session still accepts, because "who else is
+  looking" is useful to two people browsing and touches no file. On a bind you
+  published with `--host`, anyone who can reach it can read the stream and add
+  themselves to that list — which is a nuisance rather than a compromise, and
+  one more reason publishing is an explicit act.
+* **A client id is a name, never a permission.** Ids are issued by the server and
+  a request that invents one gets a fresh identity rather than somebody else's
+  entry. The id travels with a write only so the page can recognise its own
+  change in the events and skip a reload; nothing is authorised by it, and a
+  request that claims another client's id can do nothing this one could not.
+* **Neither is unbounded.** At most 32 streams and 64 clients per session, at
+  most 64 selected addresses and dirty paths per client, a 256-event ring buffer,
+  and a subscription that falls 64 events behind is resynchronised rather than
+  buffered. A page in a reload loop cannot make the process grow, and a stalled
+  tab cannot make it grow on that tab's behalf.
+* **Presence expires.** Entries go after 45 s of silence. It is deliberately not
+  a lock: a lock that a heartbeat can hold is a way to lock an inventory by
+  closing a laptop lid, and everything that can actually refuse a write — the
+  content hash, the tree revision — is a check on the tree rather than on a
+  claim.
+* **Nothing new becomes a file name.** `?path=` on `/api/tree` goes through the
+  same check as `/api/file/<path>`: relative, below the root, no component the
+  loader skips, YAML suffix. It is a second door into the same room and it has
+  the same lock.
 
 The default port is 8081, one above the `watch` preview's, so a watch run and an
 editing session can be open at the same time. `--port 0` lets the operating system

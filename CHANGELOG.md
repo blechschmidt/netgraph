@@ -18,6 +18,36 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **The editor pushes instead of polling, and a second tab is a feature rather than a
+  race.** `netgraph web DIR` used to check a revision number once a second and, whenever it
+  moved, refetch the whole file list and re-lay-out the whole diagram. It now opens a
+  server-sent-events stream, `GET /api/events`, that says *what* moved the moment it does:
+  `tree-changed`, `file-changed`, `history-changed`, `disk-changed`, `presence`.
+
+  Two consequences, both measurable. A save of one file refetches **that file's row**
+  (`GET /api/tree?path=…`), not the tree. And a revision that does not change the picture on
+  screen **does not redraw it**: the page sends the fingerprint of the drawing it is
+  showing, and the server compares it with the DOT this revision would produce and answers
+  `unchanged` rather than running Graphviz. On a 1056-device tree, editing a description
+  went from 1.7 s to 185 ms; `tools/bench_events.py` is the harness and
+  [`docs/follow-ups.md`](docs/follow-ups.md) entry 18 has the table.
+
+  **It falls back.** A buffering proxy, a browser without `EventSource`, a stream that will
+  not open — any of them drops the page back to polling `/api/state`, which replays the same
+  events with the same ids out of the same ring buffer into the same handlers. A client that
+  makes plain `GET`s, `curl` included, never has to know the stream exists, and no write is
+  gated on having read one. An indicator above the file list says which path you are on.
+
+- **Presence and soft locking in the editor.** Every connected page is listed, what somebody
+  else has selected is drawn on the canvas as a faint dashed halo, and a file another client
+  has unsaved edits in is badged `in use`.
+
+  Advisory throughout: it blocks nothing, it expires by itself if a tab goes away without
+  saying so, and the only things that can refuse a write remain the content hash of a
+  whole-file save and the tree revision of an operation batch. A lock a heartbeat can hold is
+  a way to lock an inventory by closing a laptop lid. Two new routes carry it:
+  `POST /api/presence` and the `clients` list on `GET /api/state`.
+
 - **`netgraph diff`, and a changes drawer in the editor: a changeset, drawn.** `netgraph
   plan` already answered *what changed* and every renderer already answered *what the
   network looks like*; nothing put the two together. `netgraph diff` renders one diagram
