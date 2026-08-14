@@ -43,6 +43,12 @@ netgraph edit remove-interface sw-new Gi1/0/2 --cascade # and what terminated on
 Each subcommand applies exactly one operation. `netgraph edit apply` takes any
 number of them as JSON, which is how a script or an editor drives it.
 
+One operation has no subcommand of its own: `set-geometry`, which writes one
+view of a [`kind: layout`](../schema.md#18-layout-diagram-geometry) document.
+Coordinates are not something anybody types, so it is reached through
+[`netgraph layout`](layout.md) — or through `apply`, which is how a canvas will
+reach it when a node is dragged.
+
 ## Addresses and field paths
 
 An **address** is anything that names one element: a fully-qualified name

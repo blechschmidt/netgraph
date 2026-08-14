@@ -194,6 +194,14 @@ def render_layers(
 **May assume** a `Graph` and a `RenderOptions`, and nothing else: a backend never sees the
 `Inventory`, never reads `netgraph.toml`, and never decides what exists.
 
+The stored arrangement (§18) reaches a backend on the **`Graph`**, not in the options, and
+that placement is the point: geometry is a fact about the inventory rather than a
+preference about the drawing, so `svg`, `html` and `json` agree on coordinates without any
+of them being told to and none of them can be told something different. `build_graph`
+resolves it, `filter_graph` narrows it to what survived, and `render/dot.py` turns it into
+`pos` attributes and a Graphviz command line — see `layout/geometry.py` for the three
+cases.
+
 **Guarantees.** `render` always returns `bytes` — text formats UTF-8 encoded, image formats
 as Graphviz produced them — so a caller writing to a file or stdout needs no per-format
 branching; `render_text` is for callers that want a string and have already excluded the
@@ -334,6 +342,7 @@ Verified against the tree: every path below exists.
 | `src/netgraph/listing.py` | the tables of `netgraph list`, in a form a report can show: headers, alignment, formatted cells and the same rows as records |
 | `src/netgraph/report/` | `netgraph report`: the as-built document. `collect.py` works out the scopes and the shared derivations, `pages.py` says what each page carries, `model.py` is the format-independent document, `layout.py` the file names and cross-references, `diagrams.py` the drawings and the links inside them, `write.py` the templates and the escaping, `bundle.py` the files and how they are written, `stamp.py` the timestamp and the git revision; `templates/` and `assets/` are the editable layout (`--template DIR`) |
 | `src/netgraph/fmt/` | the canonical form of an inventory file (`netgraph fmt`): `canonical.py` shapes it, `order.py` holds the key order, `verify.py` re-reads it strictly, `runner.py` walks the paths |
+| `src/netgraph/layout/` | stored diagram geometry (`netgraph layout`): `geometry.py` is the runtime arrangement and the three-way decision a renderer makes from it, `resolve.py` merges every `kind: layout` document into one table per view and resolves its keys, `graphviz.py` reads coordinates back out of a Graphviz run and puts a partially-pinned one back on the stored coordinate system, `document.py` writes geometry as YAML somebody can still read, `seed.py` is the command's engine room |
 | `src/netgraph/edit/` | the write path (`netgraph edit`, and the web editor to come): `operations.py` is the closed set of typed changes and their JSON form, `apply.py` turns each into a change and its inverse, `roundtrip.py` holds a file as documents that can be edited without touching the others, `references.py` reads the references off the models and re-spells them, `placement.py` decides where a new document goes, `tree.py` journals and hashes what may be written, `session.py` runs the validation and conflict gates |
 | `src/netgraph/importer/` | `netgraph import`: a first inventory from live-network output. `run.py` reads the inputs, sniffs each dialect and writes the tree; `lldp.py` turns `lldpctl`/`lldpcli` neighbour records into cables, both ends at once; `iproute.py` turns `ip -j link`/`addr` into one host's interfaces, bridges, bonds and VLANs; `csvlinks.py` reads `device,port,device,port` rows (and says why not NetJSON); `draft.py` is the neutral inventory every reader appends to, and the dedup; `emit.py` writes it as commented YAML in `docs/schema.md` field order |
 | `src/netgraph/watch/` | live re-rendering (`netgraph watch`): `pipeline.py` is one load → validate → render cycle and its published state, `loop.py` decides what counts as a change, `server.py` is the loopback preview and its self-reloading page |

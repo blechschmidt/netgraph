@@ -25,7 +25,7 @@ from pathlib import Path, PurePosixPath
 
 from netgraph.errors import SchemaIssue, format_path
 from netgraph.loader.provenance import Provenance, Site
-from netgraph.models import Adapter, Cable, Device, Element, PatchPanel, Pdu, Tunnel
+from netgraph.models import Adapter, Cable, Device, Element, Layout, PatchPanel, Pdu, Tunnel
 
 __all__ = [
     "Inventory",
@@ -207,8 +207,14 @@ class Inventory:
     patchpanels: dict[str, PatchPanel] = field(default_factory=dict)
     #: The subset of :attr:`elements` that are power distribution units (§17).
     pdus: dict[str, Pdu] = field(default_factory=dict)
+    #: Diagram geometry (§18), keyed by fully-qualified name. A layout is not an
+    #: element — it declares no network fact and is never drawn as a node — so
+    #: it is indexed apart from :attr:`elements` and cannot collide with one.
+    layouts: dict[str, Layout] = field(default_factory=dict)
     #: Provenance of each element, keyed by fully-qualified name.
     sources: dict[str, SourceLocation] = field(default_factory=dict)
+    #: Provenance of each layout document, keyed the same way.
+    layout_sources: dict[str, SourceLocation] = field(default_factory=dict)
     #: Problems found while loading, in the order they were encountered.
     errors: list[LoadError] = field(default_factory=list)
 
@@ -248,6 +254,25 @@ class Inventory:
         self.sources[fqn] = source
         self._by_namespace.setdefault(namespace, {})[element.metadata.name] = fqn
         self._by_short_name.setdefault(element.metadata.name, []).append(fqn)
+        return fqn
+
+    def add_layout(self, layout: Layout, *, namespace: str, source: SourceLocation) -> str | None:
+        """Index a geometry document under ``namespace``.
+
+        Layouts have their own name space, deliberately: an arrangement called
+        ``default`` next to a switch called ``default`` is not a clash, because
+        nothing ever resolves one where the other is meant.
+
+        Returns:
+            The fully-qualified name, or ``None`` when a layout of that name is
+            already indexed. The caller reports the clash (``NG-Y002``) and the
+            first declaration wins, which keeps loading deterministic.
+        """
+        fqn = qualify(namespace, layout.metadata.name)
+        if fqn in self.layouts:
+            return None
+        self.layouts[fqn] = layout
+        self.layout_sources[fqn] = source
         return fqn
 
     def record(self, error: LoadError) -> None:

@@ -46,6 +46,13 @@ from pydantic.fields import FieldInfo  # noqa: E402
 from netgraph.models import (  # noqa: E402
     AcceptableFrames,
     AdapterSpec,
+    EdgeGeometry,
+    GroupGeometry,
+    LayoutSpec,
+    NodeGeometry,
+    Point,
+    Size,
+    ViewGeometry,
     BgpConfig,
     BgpNeighbor,
     BridgeConfig,
@@ -92,7 +99,7 @@ from netgraph.models import (  # noqa: E402
     WirelessConfig,
 )
 from netgraph.models.document import ELEMENT_MODELS  # noqa: E402
-from netgraph.models.element import TEMPLATE_KIND  # noqa: E402
+from netgraph.models.element import LAYOUT_KIND, TEMPLATE_KIND  # noqa: E402
 from netgraph.models.fielddocs import (  # noqa: E402
     DOCUMENTED_MODELS,
     FIELD_DOCS,
@@ -457,6 +464,67 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "`NG-E013`.",
         ),
     ),
+
+    # Diagram geometry (§18). Listed after the elements because it describes the
+    # *drawing* rather than the network, and because a reader looking for a field
+    # of a device should not have to walk past a table of coordinates to reach it.
+    Section(
+        LayoutSpec,
+        "`spec` of a `layout` document",
+        "Where things are drawn, per view. A sidecar: it carries no network facts, and the "
+        "elements it places know nothing about it. `netgraph layout` writes it.",
+        notes=(
+            "Coordinates are **points** (1/72 inch), `y` upwards, origin at the bottom left, "
+            "and a `position` is the **centre** of what it places — Graphviz's system, so a "
+            "stored arrangement can be handed straight back to it.",
+            "A key is an address, resolved like any other reference. A node the inventory does "
+            "not declare is keyed by its graph id instead: `subnet:10.0.0.0/24`, "
+            "`tunnel:site/wg0`, `rack:hq/comms/r1`.",
+            "A key naming something the inventory no longer has is `NG-Y001`, a warning; "
+            "`netgraph layout --prune` drops it.",
+        ),
+    ),
+    Section(
+        ViewGeometry,
+        "`spec.views.<view>`",
+        "One view's arrangement. The view name is a layer netgraph draws — `physical`, `l1`, "
+        "`l2`, `l3`, `overlay`, `routing`, `rack`, `power` — because the same device sits "
+        "somewhere different in each.",
+    ),
+    Section(
+        NodeGeometry,
+        "`spec.views.<view>.nodes.<address>`",
+        "Where one node is drawn.",
+        notes=(
+            "`size` is optional and is not seeded by `netgraph layout --write`: Graphviz "
+            "derives the same box from the same label on every run. It is honoured on read, "
+            "for an editor that lets somebody resize a box on purpose.",
+        ),
+    ),
+    Section(
+        EdgeGeometry,
+        "`spec.views.<view>.edges.<address>`",
+        "The bends one link is drawn through. Not seeded unless `netgraph layout --write "
+        "--waypoints` is asked for: a computed spline is noise, a hand-placed bend is a "
+        "decision.",
+    ),
+    Section(
+        GroupGeometry,
+        "`spec.views.<view>.groups.<namespace>`",
+        "The box one namespace cluster is drawn as. Unlike a node it carries a required "
+        "`size`: nothing else decides how big a cluster is.",
+    ),
+    Section(
+        Point,
+        "A point",
+        "Two numbers, in points. `{x: 240, y: 396}` or the shorthand `[240, 396]`; both mean "
+        "the same thing and both are read.",
+    ),
+    Section(
+        Size,
+        "A size",
+        "Two positive numbers, in points. `{width: 220, height: 90}` or `[220, 90]`.",
+    ),
 )
 
 #: Enumerations rendered as value tables, with the note that explains them.
@@ -772,6 +840,10 @@ def _kind_table() -> Iterator[str]:
     yield (
         f"| `{TEMPLATE_KIND}` | partial "
         f"[DeviceSpec]({_MODEL_ANCHORS[DeviceSpec]}) | {KIND_NOTES[TEMPLATE_KIND]} |"
+    )
+    yield (
+        f"| `{LAYOUT_KIND}` | [LayoutSpec]({_MODEL_ANCHORS[LayoutSpec]}) | "
+        f"{KIND_NOTES[LAYOUT_KIND]} |"
     )
 
 

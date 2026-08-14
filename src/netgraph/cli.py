@@ -141,6 +141,7 @@ from netgraph.errors import (
     LoaderError,
     NetgraphError,
     RenderError,
+    count_text,
     format_path,
 )
 from netgraph.export import (
@@ -177,6 +178,19 @@ from netgraph.ipam import (
 )
 from netgraph.ipam import Report as IpamReport
 from netgraph.ipam import build_report as build_ipam_report
+from netgraph.layout.resolve import resolve_geometry
+from netgraph.layout.seed import (
+    DEFAULT_LAYOUT_NAME,
+    LAYOUT_ENGINES,
+    LayoutReport,
+    clear_operations,
+    inspect_layout,
+    live_keys,
+    prune_operations,
+    seed_geometry,
+    views_for,
+    write_operations,
+)
 from netgraph.listing import LISTINGS
 from netgraph.listing import SUBJECTS as LISTING_SUBJECTS
 from netgraph.listing import utilisation as utilisation_listing
@@ -2041,6 +2055,22 @@ def _report_flags(command: _Command) -> _Command:
     return _apply((*_FILTER_OPTIONS, *_VALIDATION_OPTIONS), command)
 
 
+def _layout_flags(command: _Command) -> _Command:
+    """Apply the options ``layout`` takes beyond its own.
+
+    The display options are here because they are *inputs to the layout*: a
+    label decides how big a node is, and node sizes decide where a layout puts
+    them. The configuration options are here so ``netgraph.toml``'s ``[render]``
+    reaches the seed as well as the render — seeding with one set of options and
+    drawing with another is how an arrangement stops matching its diagram.
+
+    The filter options are deliberately *not* here. An arrangement covers a
+    view, and one seeded from three of a hundred devices would leave the other
+    ninety-seven unplaced and the diagram permanently half-arranged.
+    """
+    return _apply((*_DISPLAY_OPTIONS, *_CONFIG_OPTIONS, *_EDIT_OPTIONS), command)
+
+
 def _filter_spec(params: Mapping[str, Any]) -> FilterSpec:
     """Build the element filter from the parsed :data:`_GRAPH_OPTIONS`."""
     return FilterSpec(
@@ -2576,6 +2606,274 @@ def _is_a_terminal(stream: Any) -> bool:
 
 # --------------------------------------------------------------------------- #
 # path
+
+
+# --------------------------------------------------------------------------- #
+# netgraph layout
+# --------------------------------------------------------------------------- #
+
+
+@cli.command("layout")
+@click.option(
+    "--layer",
+    "layers",
+    multiple=True,
+    type=click.Choice([layer.value for layer in Layer]),
+    default=(Layer.L1.value,),
+    show_default=True,
+    shell_complete=complete_layer,
+    help="Which view to arrange. Repeatable; each view is arranged separately.",
+)
+@click.option(
+    "--engine",
+    type=click.Choice(LAYOUT_ENGINES),
+    default="dot",
+    show_default=True,
+    help=(
+        "Graphviz engine to lay the diagram out with when seeding. dot is the hierarchical "
+        "layout netgraph draws with; circo suits a ring, fdp and neato a flat mesh."
+    ),
+)
+@click.option(
+    "--write",
+    is_flag=True,
+    default=False,
+    help="Run the layout once and store the result, making the arrangement editable.",
+)
+@click.option(
+    "--clear",
+    is_flag=True,
+    default=False,
+    help="Drop the stored arrangement, so the view is laid out from scratch again.",
+)
+@click.option(
+    "--replace",
+    "replace_all",
+    is_flag=True,
+    default=False,
+    help=(
+        "With --write, lay every node out afresh instead of keeping what is already "
+        "arranged and placing only the rest."
+    ),
+)
+@click.option(
+    "--prune",
+    is_flag=True,
+    default=False,
+    help="Drop geometry for elements the inventory no longer declares.",
+)
+@click.option(
+    "--waypoints",
+    is_flag=True,
+    default=False,
+    help=(
+        "Also store the edge splines. Off by default: the render recomputes an identical "
+        "one from the node positions, and four control points per link is a lot of noise."
+    ),
+)
+@click.option(
+    "--name",
+    "layout_name",
+    default=DEFAULT_LAYOUT_NAME,
+    show_default=True,
+    metavar="NAME",
+    help="metadata.name of the layout document to write into or create.",
+)
+@click.option(
+    "--namespace",
+    "layout_namespace",
+    default="",
+    metavar="PATH",
+    help="Folder to declare the layout document in. The inventory root by default.",
+)
+@click.option(
+    "--file",
+    "target",
+    default=None,
+    metavar="PATH",
+    help=(
+        "File to write a new layout document to, relative to the inventory root. Chosen by "
+        "the layout conventions when absent."
+    ),
+)
+@_layout_flags
+@click.pass_context
+def layout_command(
+    ctx: click.Context,
+    /,
+    layers: tuple[str, ...],
+    engine: str,
+    write: bool,
+    clear: bool,
+    replace_all: bool,
+    prune: bool,
+    waypoints: bool,
+    layout_name: str,
+    layout_namespace: str,
+    target: str | None,
+    dry_run: bool,
+    as_json: bool,
+    force: bool,
+    **_options: Any,
+) -> None:
+    """Seed and maintain the stored arrangement of a diagram.
+
+    A diagram that Graphviz lays out afresh on every render cannot be arranged:
+    drag a switch and the next keystroke puts it back. This command turns the
+    automatic layout into *data* -- a 'kind: layout' document holding a position
+    per node, scoped by view -- after which the arrangement is the source of
+    truth and a render reproduces it exactly.
+
+    \b
+        netgraph layout                     what is arranged, and what is stale
+        netgraph layout --write             place what is not placed yet
+        netgraph layout --write --replace   lay every node out afresh
+        netgraph layout --write --engine circo   ... with a different engine
+        netgraph layout --prune             drop geometry for deleted elements
+        netgraph layout --clear             go back to laying it out from scratch
+
+    Writes go through the same path as 'netgraph edit', so comments and
+    formatting in a hand-arranged file survive, --dry-run shows the exact hunk,
+    and the tree is validated before anything is written.
+
+    The display options matter when seeding: a label decides how big a node is,
+    and how big the nodes are decides where the layout puts them. Seed with the
+    options you render with -- or put them in netgraph.toml, which this command
+    reads too.
+    """
+    app: AppContext = ctx.obj
+    params = ctx.params
+    console = app.console(err=True)
+
+    chosen = [flag for flag, given in (("--write", write), ("--clear", clear)) if given]
+    if len(chosen) > 1:
+        raise click.UsageError(f"{' and '.join(chosen)} ask for opposite things; pick one")
+    if clear and prune:
+        raise click.UsageError("--clear already removes everything --prune would")
+    if replace_all and not write:
+        raise click.UsageError("--replace says how to --write; it does nothing on its own")
+
+    _apply_settings(ctx)
+    options = _render_options(params)
+    views = views_for(layers)
+
+    inventory = app.load()
+    _report_load_errors(console, inventory, force=force)
+
+    if clear:
+        _run_layout_edit(
+            app, clear_operations(views, inventory=inventory), dry_run=dry_run, force=force
+        )
+        return
+
+    drawings = [(view, build_graph(inventory, layer=Layer(view))) for view in views]
+    if write:
+        operations = [
+            operation
+            for view, graph in drawings
+            for operation in write_operations(
+                seed_geometry(graph, options, engine=engine, replace_all=replace_all),
+                layout=layout_name,
+                namespace=layout_namespace,
+                file=target,
+                with_waypoints=waypoints,
+            )
+        ]
+        _run_layout_edit(app, operations, dry_run=dry_run, force=force)
+        return
+
+    if prune:
+        live = {view: live_keys(graph, options) for view, graph in drawings}
+        _run_layout_edit(app, prune_operations(inventory, live=live), dry_run=dry_run, force=force)
+        return
+
+    report = inspect_layout(
+        inventory,
+        # Against the *unnarrowed* arrangement: ``build_graph`` drops geometry
+        # for nodes the drawing does not have, which is exactly the geometry
+        # this report exists to point at.
+        [
+            (view, live_keys(graph, options), resolve_geometry(inventory, view))
+            for view, graph in drawings
+        ],
+    )
+    if as_json:
+        app.console().print(json.dumps(report.to_dict(), indent=2))
+    else:
+        _print_layout_report(app.console(), report)
+
+
+def _report_load_errors(console: Console, inventory: Inventory, *, force: bool) -> None:
+    """Refuse to arrange a tree that does not load, unless told to anyway.
+
+    An arrangement of a broken inventory is an arrangement of whatever survived
+    the errors, and writing one would quietly bake a half-loaded diagram into
+    the tree.
+
+    Raises:
+        click.exceptions.Exit: The inventory has load errors and ``force`` is off.
+    """
+    if not inventory.errors:
+        return
+    _report_problems(console, inventory.errors, (), commentary=True)
+    if not force:
+        console.error(
+            "refusing to arrange an inventory that does not load; fix the errors, or pass "
+            "--force to arrange what did load"
+        )
+        raise click.exceptions.Exit(EXIT_INVALID)
+    console.warn("arranging despite errors (--force): the geometry may not match the network")
+
+
+def _run_layout_edit(
+    app: AppContext, operations: Sequence[Operation], *, dry_run: bool, force: bool
+) -> None:
+    """Apply geometry operations, or say there were none to apply."""
+    if not operations:
+        app.console().info("nothing to change")
+        return
+    _run_edit(app, operations, dry_run=dry_run, as_json=False, force=force)
+
+
+#: How many stale geometry keys a warning names before it says "and N more".
+_STALE_SHOWN: Final = 8
+
+
+def _print_layout_report(console: Console, report: LayoutReport) -> None:
+    """What is arranged, per view, and what the arrangement has left behind."""
+    if not report.documents:
+        console.info("no layout document in this inventory; 'netgraph layout --write' seeds one")
+    else:
+        console.info(f"layout documents: {', '.join(report.documents)}")
+    console.table(
+        ("VIEW", "MODE", "NODES", "EDGES", "GROUPS", "STALE"),
+        [
+            [
+                view.view,
+                str(view.mode),
+                f"{view.placed}/{view.nodes}",
+                f"{view.routed}/{view.edges}",
+                f"{view.boxed}/{view.groups}",
+                str(len(view.stale)) if view.stale else "-",
+            ]
+            for view in report.views
+        ],
+    )
+    for view, section, key, layout in report.conflicts:
+        console.warn(
+            f"{layout} also places {key!r} in the {view} view's {section}; "
+            f"the first document to declare it wins"
+        )
+    if report.stale:
+        shown = ", ".join(report.stale[:_STALE_SHOWN])
+        rest = len(report.stale) - _STALE_SHOWN
+        console.warn(
+            f"{count_text(len(report.stale), 'stale entry', 'stale entries')} name nothing "
+            f"this inventory draws: {shown}{f' and {rest} more' if rest > 0 else ''}. "
+            "Run 'netgraph layout --prune' to drop them."
+        )
+
+
 # --------------------------------------------------------------------------- #
 
 #: Formats ``--highlight`` can draw. Emphasis is a *visual* weight — a bold

@@ -202,6 +202,7 @@ report.txt` both do what they look like they do.
 | [`netgraph edit remove-interface`](docs/commands/edit.md) | Remove an interface from an element. | [edit.md](docs/commands/edit.md) |
 | [`netgraph edit apply`](docs/commands/edit.md) | Apply operations given as JSON; the programmatic face. | [edit.md](docs/commands/edit.md) |
 | [`netgraph render`](docs/commands/render.md) | Draw the graph as SVG, PNG, PDF, DOT, Mermaid, JSON or HTML. | [render.md](docs/commands/render.md) |
+| [`netgraph layout`](docs/commands/layout.md) | Store the diagram's arrangement, so a hand-placed node stays put. | [layout.md](docs/commands/layout.md) |
 | [`netgraph watch`](docs/commands/watch.md) | Re-render on every save, optionally serving the result. | [watch.md](docs/commands/watch.md) |
 | [`netgraph web`](docs/commands/web.md) | Edit the YAML and see the diagram side by side in a browser. | [web.md](docs/commands/web.md) |
 | [`netgraph path`](docs/commands/path.md) | Trace how two elements reach each other, hop by hop. | [path.md](docs/commands/path.md) |
@@ -235,6 +236,7 @@ The files describe the network once; each command asks something different of th
 | which SSID is on which channel, in which VLAN? | [`netgraph list bss`](docs/commands/list.md) |
 | what is in rack 3, and at which units? | [`netgraph render --layer rack`](docs/rendering.md#rack-a-front-elevation-per-cabinet) |
 | how does this host reach that one, hop by hop? | [`netgraph path`](docs/paths.md) |
+| how do I move a switch on the diagram and have it stay there? | [`netgraph layout`](docs/commands/layout.md) |
 | how full is that /24, and where is the next free /28? | [`netgraph ipam`](docs/ipam.md) |
 | what should `/etc/hosts`, the DNS zone, the Ansible inventory, the pull list or the routing script say? | [`netgraph export`](docs/export.md) |
 | what do I hand over as the as-built documentation? | [`netgraph report`](docs/commands/report.md), and [an example of what it writes](docs/example-report/) |
@@ -280,7 +282,7 @@ over the whole set. The pages a new reader wants first:
 |---|---|
 | [`docs/getting-started.md`](docs/getting-started.md) | Install it, build a three-device inventory by hand, validate, render, interrogate. Ends with the editor wiring. |
 | [`docs/inventory-layout.md`](docs/inventory-layout.md) | How to organise the files: namespaces, references, templates, interface ranges, and a layout for a multi-site estate. |
-| [`docs/rendering.md`](docs/rendering.md) | The seven layers, the filters, namespace collapsing, link bundling, icon themes, and what each output format is for. |
+| [`docs/rendering.md`](docs/rendering.md) | The seven layers, the filters, namespace collapsing, link bundling, icon themes, stored arrangements, and what each output format is for. |
 | [`docs/validation.md`](docs/validation.md) | What the checks are, what a finding means, and the four ways to say "not here". |
 | [`docs/schema-reference.md`](docs/schema-reference.md) | Every field of every kind, with its type, default and YANG counterpart. |
 | [`docs/schema.md`](docs/schema.md) | The normative specification, if you want the reasoning as well as the rules. |

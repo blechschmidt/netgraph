@@ -18,6 +18,40 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **`netgraph layout`, and a diagram that stays where you put it.** Until now the picture
+  was derived: Graphviz laid the graph out afresh on every render, so a diagram could not
+  be *arranged* — move a node and the next render moved it back. Geometry is now
+  first-class, optional inventory data. A `kind: layout` document holds a position per
+  node, keyed by element address and scoped by view (`l1`, `l3`, `routing`, …), because the
+  same switch sits somewhere different in each. It is a **sidecar** rather than a field on
+  each device, so model files stay free of pixels and an arrangement can be dropped,
+  regenerated or versioned on its own — the reasoning is recorded in
+  [`docs/follow-ups.md` §16](docs/follow-ups.md).
+
+  `netgraph layout --write` runs the automatic layout once and persists the result, which
+  is what makes the diagram editable from then on; running it again places what is *not*
+  yet placed rather than discarding an afternoon of arranging (`--replace` asks for the
+  whole view afresh, `--engine` picks a different Graphviz engine). `--clear` goes back to
+  automatic, `--prune` drops geometry for elements that no longer exist. With no flags it
+  reports what is arranged and what has gone stale. Writes go through the `netgraph edit`
+  path, so comments and formatting survive and `--dry-run` shows the exact hunk.
+
+  The renderers honour it with no flag of their own. When every node in a view is placed,
+  Graphviz runs in **no-op layout mode** and the output reproduces the arrangement point
+  for point — verified by a test that renders a seeded diagram and reads the coordinates
+  back out. When only some are, those are pinned, the engine places the rest around them,
+  and anything still overlapping is separated without moving a node somebody placed by
+  hand. `svg`, `png`, `pdf` and `html` are the same Graphviz run and `json` publishes the
+  same coordinates in the same units, so a browser can draw the graph itself. Namespace
+  frames in a fixed layout are drawn from the stored group boxes, since the no-op engine
+  draws no clusters. See [`docs/commands/layout.md`](docs/commands/layout.md),
+  [`docs/schema.md` §18](docs/schema.md#18-layout-diagram-geometry) and
+  [`docs/rendering.md`](docs/rendering.md#stored-arrangements).
+
+- **`W138` / `NG-Y001`, stale diagram geometry.** A warning — never an error, because
+  deleting a switch must not make `netgraph validate` fail — naming each layout key that
+  no longer resolves. `netgraph layout --prune` is the fix.
+
 - **`netgraph edit`, the write path.** The first way to *change* an inventory that is as
   careful as the way netgraph reads one. Eleven typed operations — create, delete, rename,
   move, set, unset, add-interface, remove-interface, connect, disconnect, and any of them as

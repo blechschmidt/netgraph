@@ -43,7 +43,7 @@ comment that sat above the key, and no semantic operation carries either.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final
 
@@ -62,6 +62,7 @@ from netgraph.edit.operations import (
     RemoveInterface,
     RenameElement,
     SetField,
+    SetGeometry,
     UnsetField,
     WriteFile,
 )
@@ -81,8 +82,16 @@ from netgraph.edit.tree import EditableTree
 from netgraph.errors import SchemaError
 from netgraph.fmt.canonical import format_stream
 from netgraph.importer.names import element_name
+from netgraph.layout.document import as_yaml, canonical_geometry
 from netgraph.loader.inventory import Inventory, namespace_of, qualify, short_name
-from netgraph.models import API_VERSION, Cable, Element, parse_document
+from netgraph.models import (
+    API_VERSION,
+    LAYOUT_KIND,
+    Cable,
+    Element,
+    parse_document,
+    parse_layout,
+)
 
 __all__ = ["AppliedOperation", "apply_operation"]
 
@@ -744,6 +753,219 @@ def _remove_file(context: _Context, operation: RemoveFile) -> tuple[Operation, .
     return None
 
 
+# --------------------------------------------------------------------------- #
+# Diagram geometry
+# --------------------------------------------------------------------------- #
+
+
+def _set_geometry(context: _Context, operation: SetGeometry) -> tuple[Operation, ...] | None:
+    """Write, merge or drop one view of one layout document (§18).
+
+    Three cases, in the order they are reached:
+
+    * the document exists — its round-trip tree is edited in place, so the
+      comments and the quoting of a hand-arranged file survive being re-seeded;
+    * it does not, and the operation writes something — it is created, placed
+      the way any new document is;
+    * it does not, and the operation clears — nothing happens, because there is
+      nothing to clear.
+
+    The inverse is always the primitive file restore. A semantic one would have
+    to carry the geometry that was there before, which for a four-hundred-node
+    arrangement is the whole file twice over — and the file restore is exactly
+    that, once, with the comments included.
+    """
+    located = _find_layout(context, operation)
+    if located is None:
+        if operation.clears:
+            return ()
+        return _create_layout(context, operation)
+
+    relative, index = located
+    data = context.tree.document(relative, index).touch()
+    spec = _mapping_at(data, "spec")
+    views = _mapping_at(spec, "views")
+
+    if operation.clears:
+        views.pop(operation.view, None)
+        _drop_if_empty(context, data, spec, views, relative=relative, index=index)
+        return None
+
+    view = _mapping_at(views, operation.view)
+    for section in ("nodes", "edges", "groups"):
+        wanted = getattr(operation, section)
+        if wanted is None:
+            continue
+        _merge_section(view, section, wanted)
+    if not view:
+        # Reachable from a prune whose view had nothing left in it: every key it
+        # held named something the inventory no longer has.
+        views.pop(operation.view, None)
+    _drop_if_empty(context, data, spec, views, relative=relative, index=index)
+    _check_layout(data, operation)
+    return None
+
+
+def _drop_if_empty(
+    context: _Context, data: Any, spec: Any, views: Any, *, relative: str, index: int
+) -> None:
+    """Tidy a layout document that no longer places anything, and remove it.
+
+    A document holding ``spec: {views: {}}`` says nothing at all, and a file
+    holding only that is a file somebody has to work out is dead. The tree
+    removes the file too when this was its last document.
+    """
+    if views:
+        return
+    spec.pop("views", None)
+    if not spec:
+        data.pop("spec", None)
+    if not _has_geometry(data):
+        context.tree.remove_document(relative, index)
+
+
+def _find_layout(context: _Context, operation: SetGeometry) -> tuple[str, int] | None:
+    """Where the named layout document lives, or ``None`` if there is none."""
+    source = context.inventory.layout_sources.get(operation.address)
+    if source is None or source.relative is None:
+        return None
+    return source.relative, source.index
+
+
+def _create_layout(context: _Context, operation: SetGeometry) -> tuple[Operation, ...]:
+    """Write a new layout document holding just this view."""
+    view = {
+        section: dict(value)
+        for section in ("nodes", "edges", "groups")
+        if (value := getattr(operation, section))
+    }
+    document = {
+        "apiVersion": API_VERSION,
+        "kind": LAYOUT_KIND,
+        "metadata": {"name": operation.layout},
+        "spec": {"views": {operation.view: view}},
+    }
+    _check_layout(document, operation)
+    relative = choose_file(
+        kind=LAYOUT_KIND,
+        namespace=operation.namespace,
+        name=operation.layout,
+        files=context.tree.facts(context.inventory),
+        requested=operation.file,
+    )
+    context.tree.insert_document(relative, -1, _emit(document))
+    return (
+        SetGeometry(
+            view=operation.view,
+            layout=operation.layout,
+            namespace=operation.namespace,
+        ),
+    )
+
+
+def _merge_section(view: Any, section: str, wanted: Mapping[str, Any]) -> None:
+    """Make ``view[section]`` say ``wanted``, keeping what it already said.
+
+    A keyed merge rather than an assignment: an entry that is still wanted is
+    updated where it sits, so the comment above it and the order it was written
+    in are both kept, and only the entries that are gone are removed.
+    """
+    if not wanted:
+        view.pop(section, None)
+        return
+    entries = _mapping_at(view, section)
+    for key in [key for key in entries if key not in wanted]:
+        del entries[key]
+    for key, value in wanted.items():
+        current = entries.get(key, MISSING)
+        if current is not MISSING and _equivalent(current, value):
+            continue
+        if isinstance(current, MutableMapping):
+            _merge_entry(current, value)
+        else:
+            entries[key] = as_yaml(value)
+
+
+def _merge_entry(entry: MutableMapping[str, Any], value: Any) -> None:
+    """One geometry entry, updated in place so its comments stay put."""
+    if not isinstance(value, Mapping):  # pragma: no cover - callers pass mappings
+        return
+    for key in [key for key in entry if key not in value]:
+        del entry[key]
+    for key, item in value.items():
+        if key in entry and _equivalent(entry[key], item):
+            continue
+        if key in entry and isinstance(entry[key], MutableMapping) and isinstance(item, Mapping):
+            _merge_entry(entry[key], item)
+        else:
+            entry[key] = as_yaml(item)
+
+
+def _equivalent(existing: Any, wanted: Any) -> bool:
+    """Do these two say the same geometry, however each is spelled?
+
+    What keeps a re-seed of an unchanged diagram from rewriting the file — and
+    what keeps a hand-written ``position: [240, 396]`` from being expanded into
+    a mapping the moment anything else in the view moves.
+    """
+    return bool(canonical_geometry(existing) == canonical_geometry(wanted))
+
+
+def _mapping_at(data: Any, key: str) -> Any:
+    """``data[key]``, made an empty mapping if it is absent or not one."""
+    current = data.get(key)
+    if not isinstance(current, MutableMapping):
+        current = {}
+        data[key] = current
+    return current
+
+
+def _has_geometry(data: Any) -> bool:
+    """Does this layout document still place anything?"""
+    spec = data.get("spec")
+    views = spec.get("views") if isinstance(spec, Mapping) else None
+    return bool(views)
+
+
+def _check_layout(data: Any, operation: SetGeometry) -> None:
+    """Refuse geometry that is not a layout document, naming what is wrong.
+
+    Raises:
+        EditError: The result does not match the layout schema.
+    """
+    try:
+        parse_layout(_plain(data))
+    except SchemaError as exc:
+        problems = "; ".join(str(issue) for issue in exc.issues)
+        raise EditError(
+            f"the {operation.view} geometry of {operation.address} is not valid: {problems}"
+        ) from exc
+
+
+def _plain(data: Any) -> Any:
+    """A round-trip tree as plain Python, for the schema check.
+
+    ``ruamel`` subclasses of ``dict`` and ``list`` validate fine, but its
+    scalars do not always: a folded string or a quoted integer is its own type,
+    and pydantic is right to refuse what it cannot recognise. Rebuilding the
+    branch as builtins is cheap — a layout document is coordinates — and it
+    means the check tests the *document*, not the parser that read it.
+    """
+    if isinstance(data, Mapping):
+        return {str(key): _plain(value) for key, value in data.items()}
+    if isinstance(data, (list, tuple)):
+        return [_plain(item) for item in data]
+    if isinstance(data, bool):
+        return bool(data)
+    if isinstance(data, int):
+        return int(data)
+    if isinstance(data, float):
+        return float(data)
+    if isinstance(data, str):
+        return str(data)
+    return data
+
+
 _Handler = Callable[[_Context, Any], "tuple[Operation, ...] | None"]
 
 
@@ -760,6 +982,7 @@ _HANDLERS: Final[dict[type[Operation], _Handler]] = {
     RemoveInterface: _remove_interface,
     Connect: _connect,
     Disconnect: _disconnect,
+    SetGeometry: _set_geometry,
     WriteFile: _write_file,
     RemoveFile: _remove_file,
 }

@@ -220,7 +220,9 @@ def test_an_invalid_fixture_names_the_elements_it_blames(rule_id: str) -> None:
     inventory = load_tree(INVALID_FILES[rule_id])
     (finding,) = validate(inventory)
     assert finding.elements, "a finding must name something suppressible"
-    assert all(fqn in inventory for fqn in finding.elements)
+    # A layout document (§18) is not an element, but ``W138`` is reported
+    # against one and its annotations do suppress the finding, so it counts.
+    assert all(fqn in inventory or fqn in inventory.layouts for fqn in finding.elements)
     assert finding.source is not None
 
 

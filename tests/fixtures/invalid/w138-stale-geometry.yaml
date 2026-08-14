@@ -1,0 +1,56 @@
+# W138 (NG-Y001) - a layout document places something the inventory has not got.
+#
+# The arrangement still holds a position for 'sw-gone', a switch that was
+# deleted. It draws nothing -- geometry for a node that is not in the diagram
+# places nothing -- but it is three lines a reader has to work out are dead, and
+# an arrangement that is half history is one nobody trusts.
+#
+# A warning rather than an error, and not a close call: deleting a switch must
+# not make 'netgraph validate' fail. The whole point of keeping geometry in a
+# sidecar is that the model can change without asking the diagram's permission.
+# 'netgraph layout --prune' drops exactly these entries.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        - 10.0.0.1/24
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-b
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        - 10.0.0.2/24
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - sw-a:port1
+    - sw-b:port1
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: layout
+metadata:
+  name: default
+spec:
+  views:
+    l1:
+      nodes:
+        sw-a: {position: [54, 18]}
+        sw-b: {position: [54, 126]}
+        sw-gone: {position: [54, 234]}

@@ -52,7 +52,15 @@ from netgraph.loader.ignore import IGNORE_FILE_NAME, IgnoreStack, parse_ignore_f
 from netgraph.loader.inventory import Inventory, LoadError, SourceLocation, qualify
 from netgraph.loader.provenance import FieldPath, Provenance, Site
 from netgraph.loader.templates import INHERIT_KEY, TemplateRegistry, resolved_spec
-from netgraph.models import DEVICE_KINDS, TEMPLATE_KIND, Element, parse_document, parse_template
+from netgraph.models import (
+    DEVICE_KINDS,
+    LAYOUT_KIND,
+    TEMPLATE_KIND,
+    Element,
+    parse_document,
+    parse_layout,
+    parse_template,
+)
 
 __all__ = [
     "STREAM_NAME",
@@ -640,6 +648,7 @@ class _Mark:
     slots: int
     errors: int
     templates: int
+    layouts: int
 
 
 @dataclass(eq=False)
@@ -670,6 +679,8 @@ class _Builder:
     #: How many ``kind: template`` documents have been read. Only used to answer
     #: "did this file declare one?" in :meth:`harvest`.
     _templates_seen: int = 0
+    #: The same count for ``kind: layout``; see :meth:`harvest`.
+    _layouts_seen: int = 0
 
     # -- phase one: the walk ---------------------------------------------
 
@@ -677,14 +688,18 @@ class _Builder:
         """Take one parsed document."""
         if document.data is None:  # NG-L004: an empty document is not an error.
             return
-        if _kind_of(document.data) == TEMPLATE_KIND:
+        kind = _kind_of(document.data)
+        if kind == TEMPLATE_KIND:
             self._add_template(document, entry)
+            return
+        if kind == LAYOUT_KIND:
+            self._add_layout(document, entry)
             return
 
         reference = _inherit_reference(document.data)
         if reference is None:
             self._slots.append(self._build(document, entry))
-        elif _kind_of(document.data) in DEVICE_KINDS:
+        elif kind in DEVICE_KINDS:
             self._slots.append(_Deferred(document=document, entry=entry, reference=reference))
         else:
             self._slots.append(
@@ -727,12 +742,51 @@ class _Builder:
 
     # -- the cache ---------------------------------------------------------
 
+    def _add_layout(self, document: RawDocument, entry: InventoryFile) -> None:
+        """Register a ``kind: layout`` document, or record why it is unusable.
+
+        Indexed as it is read rather than deferred like an element, because a
+        layout inherits nothing and refers to nothing that has to exist yet: a
+        key naming an element declared in a file that sorts later is normal, and
+        whether it names anything at all is the validator's question
+        (``NG-Y001``), not the loader's.
+        """
+        self._layouts_seen += 1
+        try:
+            layout = parse_layout(document.data, source=document.source)
+        except SchemaError as exc:
+            for error in _schema_errors(exc, document):
+                self.inventory.record(error)
+            return
+        source = SourceLocation(
+            path=entry.path,
+            relative=entry.relative.as_posix(),
+            index=document.index,
+            line=document.line,
+        )
+        if self.inventory.add_layout(layout, namespace=entry.namespace, source=source) is None:
+            fqn = qualify(entry.namespace, layout.metadata.name)
+            first = self.inventory.layout_sources.get(fqn)
+            where = f" (first declared at {first})" if first is not None else ""
+            self.inventory.record(
+                LoadError(
+                    message=f"duplicate layout name {fqn!r}{where}; this document is ignored",
+                    path=source.path,
+                    relative=source.relative,
+                    line=source.line,
+                    index=source.index,
+                    field_path=("metadata", "name"),
+                    rule="NG-Y002",
+                )
+            )
+
     def mark(self) -> _Mark:
         """Where the builder stands before a file is fed to it."""
         return _Mark(
             slots=len(self._slots),
             errors=len(self.inventory.errors),
             templates=self._templates_seen,
+            layouts=self._layouts_seen,
         )
 
     def harvest(self, mark: _Mark) -> CachedFile | None:
@@ -748,12 +802,15 @@ class _Builder:
         * A device carrying ``spec.from``. Its element is the merge of this
           file's document with a template that may be declared anywhere, so a
           key over this file alone cannot notice the template changing.
+        * A file declaring a ``kind: layout``. Geometry is indexed apart from
+          the elements and a replayed slot list would not carry it, so a cached
+          file would silently lose the arrangement it declares.
 
         Both stay on the slow path forever, which is the honest cost of a
         per-file cache. They are counted, so ``netgraph cache info`` can say how
         much of the tree is not being cached and why.
         """
-        if self._templates_seen != mark.templates:
+        if self._templates_seen != mark.templates or self._layouts_seen != mark.layouts:
             return None
         slots: list[CachedSlot] = []
         for slot in self._slots[mark.slots :]:

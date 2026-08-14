@@ -3650,3 +3650,153 @@ on no PDU appears on no schedule either, so the rack looks emptier than it is.
 `NG-E015` accepts two PDUs that record no `input_feed` at all. Silence is not a
 claim, and a rule that treated a missing fact as evidence would punish the
 inventory for being incomplete rather than for being wrong.
+
+---
+
+## 18. Layout: diagram geometry
+
+Everything above describes the network. This section describes the *drawing* of
+it, and it is the one part of the schema that carries no network fact at all.
+
+A diagram netgraph lays out from scratch on every render cannot be arranged: drag
+a switch to where it belongs and the next render puts it back, because nothing in
+the tree remembers that you moved it. A `kind: layout` document is what remembers.
+Once every node in a view has a position, the renderers reproduce the arrangement
+exactly — the same coordinates in the SVG, in the HTML and in the JSON export —
+and the layout engine is asked to place nothing.
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: layout
+metadata:
+  name: default
+spec:
+  views:
+    l1:
+      nodes:
+        core/sw-core:  {position: {x: 240, y: 396}}
+        core/rtr-edge: {position: [240, 540]}
+        subnet:10.0.0.0/24: {position: {x: 480, y: 396}}
+      edges:
+        core/cbl-uplink: {waypoints: [{x: 240, y: 470}]}
+      groups:
+        core: {position: {x: 240, y: 468}, size: {width: 220, height: 260}}
+```
+
+### 18.1 It is a sidecar, and not an element
+
+A layout is a document kind, like `template` (§6.6), and not an element. It is
+never indexed among the elements, never drawn as a node, never listed by
+`netgraph list`, never cabled and never counted. It names elements; it does not
+join them.
+
+The alternative — `spec.position` on each device — was considered and rejected;
+[`docs/follow-ups.md` §16](follow-ups.md) records the four reasons in full. The
+short version:
+
+* the same device sits somewhere different in `l1`, `l3` and `routing`, so one
+  field on the device cannot hold the answer;
+* a subnet node, a rack elevation and a collapsed namespace are drawn but not
+  declared, so they have no `spec` to put a position in;
+* a device document is a description of hardware, reviewed as one, and four
+  numbers per view interleaved with that is noise in every diff forever;
+* an arrangement is dropped, regenerated, `.gitignore`d and reviewed as a unit,
+  none of which is expressible once it is spread across a hundred files.
+
+Several layout documents may coexist — one per site, one per audience. They are
+merged per view; where two place the same node, the first in load order wins and
+`netgraph layout` reports the conflict.
+
+### 18.2 Coordinates
+
+Points (1/72 inch). `x` grows rightwards, `y` grows **upwards**, the origin is
+the bottom left of the drawing, and a `position` is the **centre** of what it
+places.
+
+That is Graphviz's coordinate system, deliberately and exactly. The whole
+mechanism rests on being able to hand a stored arrangement straight back to the
+layout engine, and a system that needed converting would be a system that could
+be converted wrongly.
+
+A point is written `{x: 240, y: 396}` or, as shorthand, `[240, 396]`. A size is
+`{width: 220, height: 90}` or `[220, 90]`. Both spellings mean the same thing,
+both are read, and `netgraph layout` leaves whichever one it finds alone when the
+value has not changed.
+
+### 18.3 Views
+
+`spec.views` is keyed by the layer being drawn — `physical`, `l1`, `l2`, `l3`,
+`overlay`, `routing`, `rack`, `power` — because the same device sits somewhere
+different in each. The l3 diagram is a different graph with different neighbours,
+not the same diagram recoloured.
+
+An unknown view name is `NG-Y003`.
+
+### 18.4 Keys
+
+A node key is an address, spelled the way references are spelled everywhere else
+(§2.2): a short name resolved against the layout document's own namespace, or a
+fully-qualified one.
+
+A node the inventory does not declare is keyed by the id the graph gives it:
+
+| Key | What it places |
+|---|---|
+| `subnet:10.0.0.0/24` | a layer-3 prefix node |
+| `tunnel:site/wg0` | a tunnel drawn as a node in the overlay view |
+| `rack:hq/comms/r1` | a rack elevation |
+| `aggregate:sites/north` | a collapsed namespace |
+
+An edge key is a cable's or a tunnel's address, or the synthetic id of a derived
+edge. A group key is a namespace.
+
+A key naming nothing the inventory declares is `NG-Y001` — a **warning**, not an
+error. Deleting a switch must not make `netgraph validate` fail, and geometry for
+a node that is not in the diagram places nothing. `netgraph layout --prune` drops
+them.
+
+### 18.5 What is stored
+
+| Key | Required | Meaning |
+|---|---|---|
+| `nodes.<address>.position` | yes | the centre of the node |
+| `nodes.<address>.size` | no | the box it occupies; the label decides when absent |
+| `edges.<address>.waypoints` | yes | spline control points, first endpoint to second |
+| `groups.<namespace>.position` | yes | the centre of the cluster box |
+| `groups.<namespace>.size` | yes | its extent; nothing else decides how big a cluster is |
+
+`size` on a node is optional *and is not written by `netgraph layout --write`*.
+Graphviz derives the same box from the same label on every run, so a stored size
+buys the renderer nothing and goes stale the moment a device grows an interface.
+It is honoured on read, for an editor that lets somebody resize a box on purpose.
+
+Edge waypoints are honoured but not seeded unless `--waypoints` is asked for: a
+computed spline is four control points per link that the render recomputes
+identically, while a hand-placed bend is a decision worth keeping.
+
+### 18.6 What a renderer does with it
+
+Per view, and decided from the drawing rather than from the document:
+
+| Stored | Mode | What happens |
+|---|---|---|
+| nothing | `auto` | the graph is laid out from scratch, exactly as it always was |
+| some nodes | `partial` | those are pinned and the engine places the rest around them |
+| every node | `fixed` | the engine places nothing; the drawing *is* the arrangement |
+
+In `fixed` mode netgraph also draws the namespace cluster frames itself, from the
+stored group boxes, because the no-op layout engine does not draw clusters. A
+frame is therefore where you put it rather than wherever a layout happened to
+land.
+
+The `json` renderer publishes the coordinates — a `layout` object per node, per
+edge and at the top level — so a client can draw the graph without running
+Graphviz at all.
+
+### 18.7 Rules
+
+| Rule | Severity | Statement |
+|---|---|---|
+| `NG-Y001` | warning | Every key names something the inventory declares. `netgraph layout --prune` drops the rest. |
+| `NG-Y002` | error | Two layout documents in one namespace do not share a name. |
+| `NG-Y003` | error | A view is one of the layers netgraph draws, a coordinate is a finite number, and a size is positive. |

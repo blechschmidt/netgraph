@@ -30,6 +30,7 @@ labelled links](images/home-lab.svg)
 - [Aggregation: one node per site, one line per bundle](#aggregation-one-node-per-site-one-line-per-bundle)
 - [Icons](#icons)
 - [Labelling and layout](#labelling-and-layout)
+- [Stored arrangements](#stored-arrangements)
 - [Interactive SVG: tooltips, links and ids](#interactive-svg-tooltips-links-and-ids)
 - [Output formats](#output-formats)
   - [The interactive HTML page](#the-interactive-html-page)
@@ -557,6 +558,60 @@ the hover text of an SVG, the per-interface detail of
 [`-f json`](#the-json-export), and what an
 [HTML page](#the-interactive-html-page) is even allowed to hold. "Do not print
 the addresses" has to mean all of the printing.
+
+<a id="stored-arrangements"></a>
+
+## Stored arrangements
+
+By default the layout is Graphviz's decision, taken afresh on every render. That
+is the right default — a diagram nobody has arranged should still be readable —
+but it means the diagram cannot be *arranged*: move a node and the next render
+moves it back.
+
+[`netgraph layout`](commands/layout.md) turns the arrangement into data. It runs
+the automatic layout once and stores the coordinates as a `kind: layout`
+document ([`docs/schema.md` §18](schema.md#18-layout-diagram-geometry)); from
+then on the arrangement is the source of truth, and `render` honours it with no
+flag of its own — it is a fact about the inventory, not an option of the drawing.
+
+<!-- norun: the first command writes to the inventory -->
+```bash
+netgraph layout --write          # store the arrangement of the l1 view
+netgraph render -f svg           # ... and it comes back exactly
+```
+
+What "honours it" means depends on how much is stored, per view:
+
+| Stored | What the renderer does |
+|---|---|
+| nothing | lays the graph out from scratch, exactly as before |
+| some of the nodes | pins those and lets the engine place the rest around them, then separates whatever still overlaps |
+| every node | runs the layout engine in **no-op mode** (`neato -n2`), so the drawing *is* the arrangement, point for point |
+
+A partial arrangement costs **two** Graphviz runs per render — one to place what is
+unplaced, one to draw the completed result — because a single pinned run returns the whole
+drawing scaled onto Graphviz's own canvas, which would move the nodes you placed by hand.
+That is the transient state while an arrangement is being built; a `fixed` view is one run,
+and so is an `auto` one. `netgraph layout --write` closes the gap.
+
+**All four backends agree, by construction.** `svg`, `png` and `pdf` are the same
+Graphviz run; `html` embeds that SVG; and `json` publishes the same coordinates
+in the same units. The arrangement lives on the graph rather than in the render
+options, so no backend has to be told about it and none can be told something
+different.
+
+`json` adds a `layout` object per node (`position`, and `size` when one is
+stored), a `layout.waypoints` per edge that has bends, and a top-level `layout`
+carrying the mode, the units and the group boxes — enough for a browser to draw
+the graph itself without running Graphviz.
+
+**Namespace frames in a fixed layout are drawn by netgraph.** `neato` does not
+draw clusters, so when the whole view is arranged the frames come from the stored
+group boxes instead of from the engine — which is more faithful, not less: the
+frame is where you put it.
+
+A `mermaid` render ignores an arrangement entirely. Mermaid does its own layout
+in the browser and has nowhere to put a coordinate.
 
 ## Interactive SVG: tooltips, links and ids
 

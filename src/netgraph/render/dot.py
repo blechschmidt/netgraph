@@ -82,7 +82,7 @@ import re
 import shutil
 import subprocess
 from collections.abc import Iterable, Iterator, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from pathlib import Path
 from typing import Final
@@ -91,6 +91,13 @@ from jinja2 import Environment, PackageLoader, StrictUndefined
 from markupsafe import Markup
 
 from netgraph.errors import RenderError, clip_text, compact_ids, count_text
+from netgraph.layout.geometry import COORDINATE_PLACES, Box, Geometry, LayoutMode
+from netgraph.layout.graphviz import (
+    POINTS_PER_INCH,
+    DrawingError,
+    parse_drawing,
+    realign,
+)
 from netgraph.loader.inventory import namespace_of, short_name
 from netgraph.models import format_watts
 from netgraph.power import PowerNode
@@ -128,11 +135,14 @@ __all__ = [
     "DOT_ENV_VAR",
     "DOT_EXECUTABLE",
     "IMAGE_FORMATS",
+    "NOOP_ENGINE",
+    "cluster_keys",
     "find_dot",
     "graphviz_install_hint",
     "missing_dot_message",
     "render_dot",
     "render_image",
+    "run_graphviz",
     "to_dot",
     "to_image",
 ]
@@ -157,6 +167,23 @@ DOT_EXECUTABLE: Final = "dot"
 #: configuration is worth having on exactly the two platforms this repository
 #: has least visibility into.
 DOT_ENV_VAR: Final = "NETGRAPH_DOT"
+
+#: The Graphviz layout engine that reads a ``pos`` attribute. ``dot`` ignores
+#: one outright, so an arrangement can only be reproduced through this one —
+#: selected with ``-K`` on the same executable, so nothing extra has to be found
+#: on ``PATH``.
+NOOP_ENGINE: Final = "neato"
+
+#: The cluster frame netgraph draws itself when the layout engine will not.
+#: The three colours match what ``graph.dot.j2`` sets on a ``subgraph cluster``,
+#: because the two are alternative ways of drawing the same frame and a diagram
+#: must not change appearance when it becomes fixed.
+_CLUSTER_STROKE: Final = "#9ca3af"
+_CLUSTER_LABEL_COLOUR: Final = "#4b5563"
+_CLUSTER_FONT: Final = "Helvetica,Arial,sans-serif"
+_CLUSTER_FONT_SIZE: Final = 11
+#: Points from the left edge of a cluster box to its caption.
+_CLUSTER_LABEL_INSET: Final = 8
 
 #: Directories to look in when ``PATH`` does not have it, per :data:`os.name`.
 #: Nothing here is a guess at a version number or a wildcard: each entry is the
@@ -470,6 +497,10 @@ class _NodeView:
     #: rendering without one is byte-identical to what it always was.
     penwidth: str | None = None
     fontcolor: str | None = None
+    #: ``pos`` attribute: the stored centre of the node, in points, with a
+    #: trailing ``!`` when the node is pinned inside an otherwise free layout.
+    #: ``None`` when the arrangement does not place this node.
+    pos: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -493,6 +524,11 @@ class _EdgeView:
     #: them together four times as hard as one, which is what keeps a LAG short
     #: and straight instead of routed around the diagram.
     weight: str | None = None
+    #: ``pos`` attribute: the stored spline control points. Only emitted for a
+    #: fully-fixed drawing, where the no-op engine draws them as given; a
+    #: partially-pinned one is re-routed around the nodes it just placed, and
+    #: stale bends would cross them.
+    pos: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -510,6 +546,161 @@ class _GroupView:
 
 
 # --------------------------------------------------------------------------- #
+# Stored geometry
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True, slots=True)
+class LayoutPlan:
+    """How a graph with stored geometry has to be laid out.
+
+    ``dot`` ignores ``pos`` entirely, so an arrangement can only be honoured by
+    an engine that reads it: ``neato``, either pinning part of the drawing or —
+    with ``-n2`` — placing nothing at all and simply drawing what it was given.
+    Which of the three applies is decided once, here, and both the DOT emission
+    and the Graphviz invocation read the answer off it, so the document and the
+    command line cannot disagree about what is being asked for.
+    """
+
+    mode: LayoutMode = LayoutMode.AUTO
+    geometry: Geometry = field(default_factory=Geometry)
+    #: The engine to run, overriding what :attr:`mode` implies. Only
+    #: ``netgraph layout --engine`` sets it: seeding an arrangement is the one
+    #: time somebody chooses ``circo`` or ``fdp`` for a graph that has no
+    #: geometry yet, and the choice is theirs rather than this module's.
+    engine: str = ""
+
+    @property
+    def layout_engine(self) -> str:
+        """The Graphviz layout engine, for ``-K``."""
+        if self.engine:
+            return self.engine
+        return DOT_EXECUTABLE if self.mode is LayoutMode.AUTO else NOOP_ENGINE
+
+    @property
+    def noop(self) -> bool:
+        """Is the engine to place nothing at all and draw what it is given?"""
+        return self.mode is LayoutMode.FIXED and not self.engine
+
+    def argv(self, executable: str, *, format: str) -> list[str]:
+        """The Graphviz command line this plan means.
+
+        ``-K`` is only added when a non-default engine is wanted, so an
+        inventory with no arrangement produces exactly the command line it
+        always did.
+        """
+        argv = [executable]
+        if self.layout_engine != DOT_EXECUTABLE:
+            argv.append(f"-K{self.layout_engine}")
+        if self.noop:
+            argv.append("-n2")
+        argv.append(f"-T{format}")
+        return argv
+
+
+def layout_plan(graph: Graph) -> LayoutPlan:
+    """What the arrangement stored for ``graph``, if any, asks the renderer to do."""
+    geometry = graph.geometry
+    mode = geometry.mode(graph.nodes)
+    return LayoutPlan(mode=mode, geometry=geometry)
+
+
+def cluster_keys(graph: Graph, options: RenderOptions) -> dict[str, str]:
+    """Subgraph name to the thing it boxes, for the groups this render draws.
+
+    The DOT subgraph names are positional (``cluster_0``) because a DOT id may
+    hold neither the ``/`` of a namespace nor a ``-``; this is the one table
+    that maps them back, and both the ``_background`` boxes and
+    ``netgraph layout --write`` read it, so a box cannot be stored under one key
+    and drawn under another.
+    """
+    if graph.clusters:
+        return {f"cluster_vrf_{index}": name for index, name in enumerate(graph.clusters)}
+    if not options.group_by_namespace:
+        return {}
+    return {
+        f"cluster_{index}": namespace
+        for index, namespace in enumerate(graph.namespaces)
+        if namespace
+    }
+
+
+def _coordinate(value: float) -> str:
+    """One coordinate, as short as it can be written without losing a hundredth."""
+    text = f"{value:.{COORDINATE_PLACES}f}"
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return "0" if text in ("", "-0") else text
+
+
+def _pos(x: float, y: float, *, pin: bool = False) -> str:
+    """A Graphviz ``pos`` value, optionally pinned."""
+    return f"{_coordinate(x)},{_coordinate(y)}{'!' if pin else ''}"
+
+
+def _spline(points: Sequence[tuple[float, float]]) -> str:
+    """An edge ``pos``: the control points, in order."""
+    return " ".join(_pos(x, y) for x, y in points)
+
+
+def _background(graph: Graph, options: RenderOptions, plan: LayoutPlan) -> str | None:
+    """The namespace boxes, as xdot draw operations for ``_background``.
+
+    ``neato`` does not draw clusters — only ``dot`` and ``fdp`` do — so a fixed
+    arrangement would silently lose every namespace frame. Since the arrangement
+    already stores where each frame goes, drawing it ourselves is both possible
+    and more faithful than letting an engine guess: the box is where the user
+    put it rather than wherever the layout happened to land.
+
+    Graphviz grows the canvas to fit a ``_background``, so a box drawn wider
+    than its contents is not clipped.
+
+    Only the groups this render actually boxes are drawn, read off
+    :func:`cluster_keys` rather than off the namespaces — a diagram rendered
+    without ``--group-by-namespace`` has no frames, and stored boxes for frames
+    nobody asked for must not appear.
+
+    Returns ``None`` when no group has stored geometry, which leaves the
+    document byte-identical to one without the feature.
+    """
+    boxes = [
+        (key, plan.geometry.groups[key])
+        for key in cluster_keys(graph, options).values()
+        if key in plan.geometry.groups
+    ]
+    if not boxes:
+        return None
+    return " ".join(op for key, box in boxes for op in _box_ops(key, box))
+
+
+def _box_ops(label: str, box: Box) -> Iterator[str]:
+    """One cluster frame: a filled rectangle, its outline, and its caption."""
+    left, bottom, right, top = box.bounds
+    corners = " ".join(
+        f"{_coordinate(x)} {_coordinate(y)}"
+        for x, y in ((left, bottom), (left, top), (right, top), (right, bottom))
+    )
+    yield f"c {_xdot_text(_CLUSTER_STROKE)}"
+    yield f"p 4 {corners}"
+    yield f"F {_CLUSTER_FONT_SIZE} {_xdot_text(_CLUSTER_FONT)}"
+    yield f"c {_xdot_text(_CLUSTER_LABEL_COLOUR)}"
+    # ``labeljust=l`` in the template puts the caption at the top left of the
+    # box; -1 is xdot's left alignment, and the width is a hint Graphviz only
+    # uses to centre or right-align, so an approximation is harmless.
+    caption_y = top - _CLUSTER_FONT_SIZE
+    width = len(label) * _CLUSTER_FONT_SIZE * 0.6
+    yield (
+        f"T {_coordinate(left + _CLUSTER_LABEL_INSET)} {_coordinate(caption_y)} "
+        f"-1 {_coordinate(width)} {_xdot_text(label)}"
+    )
+
+
+def _xdot_text(value: str) -> str:
+    """An xdot counted string: the byte length, a dash, then the bytes."""
+    return f"{len(value.encode('utf-8'))} -{value}"
+
+
+# --------------------------------------------------------------------------- #
 # Entry points
 # --------------------------------------------------------------------------- #
 
@@ -519,6 +710,12 @@ def to_dot(graph: Graph, options: RenderOptions | None = None, *, target: str = 
 
     The graph is undirected (a cable has no direction, §7.1), so the output is a
     ``graph``, not a ``digraph``, and edges use ``--``.
+
+    A graph carrying a stored arrangement (§18) emits it: every placed node gets
+    a ``pos``, every placed link its spline control points, and — when the whole
+    drawing is placed — the namespace boxes are drawn as a ``_background``,
+    because the no-op layout engine that reproduces the arrangement does not
+    draw clusters. See :func:`layout_plan` for how the document is then run.
 
     Args:
         target: The output format this DOT is destined for. Only icon
@@ -532,15 +729,22 @@ def to_dot(graph: Graph, options: RenderOptions | None = None, *, target: str = 
     # itself stays anonymous. A rendering that wants neither pays for neither.
     identity = element_ids(graph) if opts.tooltips or opts.element_ids else ElementIds()
     details = build_details(graph, opts, ids=identity) if opts.tooltips else {}
+    plan = layout_plan(graph)
     template = _environment().get_template(_TEMPLATE_NAME)
     return template.render(
         title=opts.title,
         rankdir=opts.rankdir or DEFAULT_RANKDIR,
-        groups=_groups(graph, opts, icons, identity, details),
-        edges=tuple(_edge_views(graph, opts, identity, details)),
+        groups=_groups(graph, opts, icons, identity, details, plan),
+        edges=tuple(_edge_views(graph, opts, identity, details, plan)),
         imagepath=str(opts.icons.directory) if icons and opts.icons is not None else None,
         icon_width=_ICON_BOX[0],
         icon_height=_ICON_BOX[1],
+        # ``inputscale`` tells neato that a pinned ``pos`` is in points rather
+        # than inches. It is inert under ``-n2`` and inert under ``dot``, so it
+        # is emitted whenever anything is placed: it costs nothing, and it makes
+        # ``-f dot`` output that somebody lays out themselves honour the pins.
+        inputscale=POINTS_PER_INCH if plan.mode is not LayoutMode.AUTO else None,
+        background=_background(graph, opts, plan) if plan.mode is LayoutMode.FIXED else None,
     )
 
 
@@ -557,33 +761,37 @@ def _icon_files(graph: Graph, theme: IconTheme | None, *, target: str) -> Mappin
     return theme.files(kinds, prefer=suffix_order(target))
 
 
-def to_image(graph: Graph, options: RenderOptions | None = None, *, format: str) -> bytes:
-    """Lay ``graph`` out by running Graphviz, and return the encoded image.
+def run_graphviz(
+    source: str, *, format: str, plan: LayoutPlan | None = None, subject: str | None = None
+) -> tuple[bytes, str]:
+    """Run Graphviz over ``source`` and return ``(stdout, stderr)``.
+
+    The single place a subprocess is started, so that every caller — the image
+    renderers, and ``netgraph layout`` reading coordinates back out — reports a
+    missing binary, a timeout and a non-zero exit the same way.
 
     Args:
-        format: One of :data:`IMAGE_FORMATS`.
+        source: The DOT document, handed over stdin.
+        format: The ``-T`` value. Any Graphviz output format, not only the
+            image ones: ``netgraph layout`` asks for ``json``.
+        plan: Which engine to run and whether to run it in no-op mode. ``None``
+            means the plain hierarchical layout, as before.
+        subject: What to call the output in a diagnostic; defaults to ``format``.
 
     Raises:
-        RenderError: ``format`` is not an image format, the Graphviz ``dot``
-            executable is not installed, or the layout failed or timed out.
+        RenderError: Graphviz is not installed, would not start, timed out,
+            exited non-zero, or produced nothing.
     """
-    if format not in IMAGE_FORMATS:
-        supported = ", ".join(IMAGE_FORMATS)
-        raise RenderError(f"{format!r} is not a Graphviz image format; expected one of {supported}")
-
+    what = subject or format
     executable = find_dot()
     if executable is None:
-        raise RenderError(missing_dot_message(subject=format))
-
-    opts = options or RenderOptions()
-    source = to_dot(graph, opts, target=format)
-    theme = opts.icons
-    icons = _icon_files(graph, theme, target=format)
+        raise RenderError(missing_dot_message(subject=what))
+    argv = (plan or LayoutPlan()).argv(executable, format=format)
     try:
         # Fixed argv, no shell, and the DOT source goes over stdin: nothing from
         # an inventory ever becomes a command-line argument or a shell word.
         completed = subprocess.run(
-            [executable, f"-T{format}"],
+            argv,
             input=source.encode("utf-8"),
             capture_output=True,
             timeout=_DOT_TIMEOUT_SECONDS,
@@ -605,20 +813,60 @@ def to_image(graph: Graph, options: RenderOptions | None = None, *, format: str)
         detail = f"could not run {executable!r}: {exc.strerror or exc}"
         if isinstance(exc, FileNotFoundError) and os.environ.get(DOT_ENV_VAR, "").strip():
             detail += f" ({DOT_ENV_VAR} names it; unset it to search PATH instead)"
-        raise RenderError(f"cannot render {format}: {detail}") from exc
+        raise RenderError(f"cannot render {what}: {detail}") from exc
 
+    stderr = _decode(completed.stderr)
     if completed.returncode != 0:
-        detail = _decode(completed.stderr) or f"{DOT_EXECUTABLE} exited with {completed.returncode}"
-        raise RenderError(f"Graphviz failed to render {format}: {detail}")
+        detail = stderr or f"{DOT_EXECUTABLE} exited with {completed.returncode}"
+        raise RenderError(f"Graphviz failed to render {what}: {detail}")
     if not completed.stdout:
-        detail = _decode(completed.stderr) or "no diagnostic was reported"
-        raise RenderError(f"Graphviz produced no {format} output: {detail}")
-    payload = completed.stdout
+        detail = stderr or "no diagnostic was reported"
+        raise RenderError(f"Graphviz produced no {what} output: {detail}")
+    return completed.stdout, stderr
+
+
+def to_image(graph: Graph, options: RenderOptions | None = None, *, format: str) -> bytes:
+    """Lay ``graph`` out by running Graphviz, and return the encoded image.
+
+    Three shapes of run, decided by :func:`layout_plan` from the arrangement the
+    inventory stores (§18):
+
+    * nothing stored — the hierarchical layout, exactly as before;
+    * everything stored — ``neato -n2``, which places nothing and draws what it
+      is given, so the output reproduces the arrangement point for point;
+    * some of it stored — two runs. The first pins what is placed and lets
+      ``neato`` position the rest; its answer is brought back onto the stored
+      coordinate system (:func:`~netgraph.layout.graphviz.realign`) and the
+      second run draws the completed arrangement in no-op mode. Two runs rather
+      than one because a single pinned run returns the *whole* drawing scaled
+      and translated onto Graphviz's canvas — which would move the nodes the
+      user placed by hand, and moving those is the one thing an arrangement
+      exists to prevent.
+
+    Args:
+        format: One of :data:`IMAGE_FORMATS`.
+
+    Raises:
+        RenderError: ``format`` is not an image format, the Graphviz ``dot``
+            executable is not installed, or the layout failed or timed out.
+    """
+    if format not in IMAGE_FORMATS:
+        supported = ", ".join(IMAGE_FORMATS)
+        raise RenderError(f"{format!r} is not a Graphviz image format; expected one of {supported}")
+
+    opts = options or RenderOptions()
+    if layout_plan(graph).mode is LayoutMode.PARTIAL:
+        graph = complete_layout(graph, opts, target=format)
+    plan = layout_plan(graph)
+    source = to_dot(graph, opts, target=format)
+    theme = opts.icons
+    icons = _icon_files(graph, theme, target=format)
+    payload, stderr = run_graphviz(source, format=format, plan=plan)
     if icons:
         # An unreadable icon is the one warning worth escalating: Graphviz
         # succeeds and simply leaves the picture out, so the user would get a
         # diagram of empty labels and no explanation.
-        _check_icons_loaded(_decode(completed.stderr), format=format)
+        _check_icons_loaded(stderr, format=format)
         if format == "svg" and theme is not None:
             payload = _embed_icons(payload, theme, icons)
     if format == "svg" and opts.tooltips:
@@ -626,6 +874,40 @@ def to_image(graph: Graph, options: RenderOptions | None = None, *, format: str)
     # dot reports non-fatal layout warnings on stderr with a zero exit status;
     # those are not this renderer's to escalate.
     return payload
+
+
+def complete_layout(graph: Graph, options: RenderOptions, *, target: str = "svg") -> Graph:
+    """A partially-arranged graph with every remaining node placed.
+
+    Runs the pinned layout, reads the coordinates back and expresses them on the
+    stored coordinate system, so the result is a graph whose arrangement is
+    :attr:`~netgraph.layout.geometry.LayoutMode.FIXED` and whose stored nodes
+    are still exactly where they were stored. ``netgraph layout --write`` and
+    :func:`to_image` both go through it, which is what makes what is written the
+    same as what is drawn.
+
+    Raises:
+        RenderError: Graphviz failed, or produced JSON that cannot be read.
+    """
+    plan = layout_plan(graph)
+    if plan.mode is not LayoutMode.PARTIAL:
+        return graph
+    payload, _ = run_graphviz(
+        to_dot(graph, options, target=target),
+        format="json",
+        plan=plan,
+        subject="the diagram layout",
+    )
+    try:
+        drawing = parse_drawing(payload)
+    except DrawingError as exc:
+        raise RenderError(f"cannot read the layout Graphviz computed: {exc}") from exc
+    placed = realign(drawing, plan.geometry.nodes, plan.geometry.nodes)
+    geometry = replace(
+        plan.geometry,
+        nodes={fqn: placed[fqn] for fqn in graph.nodes if fqn in placed},
+    )
+    return replace(graph, geometry=geometry)
 
 
 def _check_icons_loaded(stderr: str, *, format: str) -> None:
@@ -781,6 +1063,7 @@ def _groups(
     icons: Mapping[str, str],
     identity: ElementIds,
     details: Mapping[str, Mapping[str, object]],
+    plan: LayoutPlan,
 ) -> tuple[_GroupView, ...]:
     """The node groups to draw: one per namespace, or a single loose group.
 
@@ -794,16 +1077,16 @@ def _groups(
     for by choosing the layer.
     """
     if graph.clusters:
-        return _cluster_groups(graph, options, icons, identity, details)
+        return _cluster_groups(graph, options, icons, identity, details, plan)
 
     if not options.group_by_namespace:
-        nodes = _node_views(graph, graph.nodes.values(), options, icons, identity, details)
+        nodes = _node_views(graph, graph.nodes.values(), options, icons, identity, details, plan)
         return (_GroupView(nodes=tuple(nodes)),)
 
     groups: list[_GroupView] = []
     for index, namespace in enumerate(graph.namespaces):
         members = graph.nodes_in(namespace)
-        views = tuple(_node_views(graph, members, options, icons, identity, details))
+        views = tuple(_node_views(graph, members, options, icons, identity, details, plan))
         if not namespace:
             groups.append(_GroupView(nodes=views))
             continue
@@ -829,6 +1112,7 @@ def _cluster_groups(
     icons: Mapping[str, str],
     identity: ElementIds,
     details: Mapping[str, Mapping[str, object]],
+    plan: LayoutPlan,
 ) -> tuple[_GroupView, ...]:
     """One box per cluster the *layer* asked for, unboxed nodes first.
 
@@ -844,6 +1128,7 @@ def _cluster_groups(
             icons,
             identity,
             details,
+            plan,
         )
     )
     groups: list[_GroupView] = [_GroupView(nodes=loose)] if loose else []
@@ -851,7 +1136,7 @@ def _cluster_groups(
         members = graph.nodes_in_cluster(cluster)
         groups.append(
             _GroupView(
-                nodes=tuple(_node_views(graph, members, options, icons, identity, details)),
+                nodes=tuple(_node_views(graph, members, options, icons, identity, details, plan)),
                 # Offset past the namespace clusters' numbering space so the two
                 # groupings can never mint the same subgraph name.
                 id=f"cluster_vrf_{index}",
@@ -891,8 +1176,10 @@ def _node_views(
     icons: Mapping[str, str],
     identity: ElementIds,
     details: Mapping[str, Mapping[str, object]],
+    plan: LayoutPlan,
 ) -> Iterator[_NodeView]:
     for node in nodes:
+        placement = plan.geometry.nodes.get(node.fqn)
         shape, fill, stroke = _NODE_STYLE.get(node.kind, _DEFAULT_NODE_STYLE)
         emphasis = _node_emphasis(node, options.highlight)
         if emphasis is not None:
@@ -921,6 +1208,16 @@ def _node_views(
             url=_node_url(graph, node, options.link_template),
             penwidth=emphasis.penwidth if emphasis is not None else None,
             fontcolor=emphasis.fontcolor if emphasis is not None else None,
+            # A stored *size* is deliberately not emitted. Graphviz derives the
+            # same box from the same label, so pinning it would buy nothing and
+            # a rounded value would clip a label by a hundredth of a point. The
+            # size is published in the JSON export instead, where a client that
+            # draws the graph itself has no label metrics to derive it from.
+            pos=(
+                None
+                if placement is None
+                else _pos(placement.x, placement.y, pin=plan.mode is LayoutMode.PARTIAL)
+            ),
         )
 
 
@@ -1092,6 +1389,7 @@ def _edge_views(
     options: RenderOptions,
     identity: ElementIds,
     details: Mapping[str, Mapping[str, object]],
+    plan: LayoutPlan,
 ) -> Iterator[_EdgeView]:
     for index, edge in enumerate(graph.edges):
         colour, style = _MEDIUM_STYLE.get(edge.medium, _DEFAULT_MEDIUM_STYLE)
@@ -1137,7 +1435,16 @@ def _edge_views(
             url=_edge_url(graph, edge, options.link_template),
             fontcolor=emphasis.fontcolor if emphasis is not None else None,
             weight=str(edge.bundle.size) if edge.bundle is not None else None,
+            pos=_edge_pos(edge, plan),
         )
+
+
+def _edge_pos(edge: Edge, plan: LayoutPlan) -> str | None:
+    """The stored bends of one link, when the whole drawing is fixed."""
+    if plan.mode is not LayoutMode.FIXED:
+        return None
+    waypoints = plan.geometry.edges.get(edge.id)
+    return _spline(waypoints) if waypoints else None
 
 
 def _edge_url(graph: Graph, edge: Edge, template: Linker | None) -> str | None:

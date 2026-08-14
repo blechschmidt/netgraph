@@ -41,7 +41,12 @@ from pydantic import TypeAdapter
 
 from netgraph.models.device import Switch
 from netgraph.models.document import ELEMENT_MODELS, Element, element_model_for
-from netgraph.models.element import DOCUMENT_KINDS, TEMPLATE_KIND, ElementBase
+from netgraph.models.element import (
+    DOCUMENT_KINDS,
+    LAYOUT_KIND,
+    TEMPLATE_KIND,
+    ElementBase,
+)
 from netgraph.models.fielddocs import (
     DOCUMENTED_MODELS,
     FIELD_DOCS,
@@ -49,6 +54,7 @@ from netgraph.models.fielddocs import (
     NONE,
     check_coverage,
 )
+from netgraph.models.layout import Layout
 from netgraph.models.patchpanel import PORT_RANGE_PATTERN
 from netgraph.models.pdu import OUTLET_RANGE_PATTERN
 from netgraph.models.scalars import (
@@ -96,6 +102,9 @@ def schema_id(kind: str | None = None) -> str:
 #: Name of the ``$defs`` entry for a ``kind: template`` document, and for the
 #: partial device spec it carries.
 _TEMPLATE_DEF: Final = "Template"
+
+#: Name of the ``$defs`` entry holding the ``kind: layout`` envelope (§18).
+_LAYOUT_DEF: Final = "Layout"
 _TEMPLATE_SPEC_DEF: Final = "TemplateSpec"
 
 
@@ -633,6 +642,8 @@ def build_schema(kind: str | None = None) -> dict[str, Any]:
         definitions = _reachable(root, definitions)
     elif kind is None:
         _register_template_branch(root)
+        _register_layout_branch(root, definitions)
+    _document_layout(definitions)
 
     return _envelope(root, definitions, kind)
 
@@ -651,6 +662,15 @@ def _generate(kind: str | None) -> tuple[dict[str, Any], dict[str, Any], bool]:
     # A template has no model of its own to generate from: it is a device spec
     # with nothing required. Any device kind pulls in the same ``$defs``, so one
     # stands in as the carrier and is dropped again once they are collected.
+    if kind == LAYOUT_KIND:
+        # A layout has a model of its own, and it is nothing like an element:
+        # no interfaces, no spec shorthands, no loader sugar. It generates
+        # directly, and every pass below finds nothing of its own to change.
+        root = Layout.model_json_schema(mode="validation", by_alias=True)
+        definitions = dict(root.pop("$defs", {}))
+        definitions[Layout.__name__] = root
+        return root, definitions, False
+
     model = Switch if kind == TEMPLATE_KIND else element_model_for(kind)
     if model is None:
         raise UnknownKindError(
@@ -692,6 +712,65 @@ def _register_template_branch(root: dict[str, Any]) -> None:
         return
     mapping: dict[str, str] = discriminator["mapping"]
     mapping[TEMPLATE_KIND] = f"#/$defs/{_TEMPLATE_DEF}"
+    discriminator["mapping"] = dict(sorted(mapping.items()))
+
+
+def _document_layout(definitions: dict[str, Any]) -> None:
+    """Describe the ``kind: layout`` envelope, borrowing the element's wording.
+
+    ``apiVersion``, ``kind`` and ``metadata`` mean exactly what they mean on an
+    element, so they take :class:`~netgraph.models.element.ElementBase`'s
+    documentation rather than a second copy of it that could drift. Only ``kind``
+    and ``spec`` are per-kind, which is the same split
+    :func:`_document_element_bodies` makes.
+    """
+    definition = definitions.get(_LAYOUT_DEF)
+    if definition is None:
+        return
+    properties = definition.get("properties", {})
+    for name, field in Layout.model_fields.items():
+        target = properties.get(field.alias or name)
+        if target is None:  # pragma: no cover - every field is a property
+            continue
+        target["title"] = field.alias or name
+        doc = FIELD_DOCS.get(("ElementBase", name))
+        if doc is not None:
+            target["description"] = _describe(doc.description, doc.yang)
+    if (kind_property := properties.get("kind")) is not None:
+        kind_property["description"] = f"Selects the shape of `spec`. {KIND_NOTES[LAYOUT_KIND]}"
+        # As for every element: a document's ``kind`` is never optional, and a
+        # default would let a branch of the union match a document without one.
+        kind_property.pop("default", None)
+    required = definition.setdefault("required", [])
+    if "kind" not in required:
+        required.insert(min(1, len(required)), "kind")
+    if (spec := properties.get("spec")) is not None:
+        spec["description"] = _markdown(
+            "The body of a `layout` document: one arrangement per view."
+        )
+
+
+def _register_layout_branch(root: dict[str, Any], definitions: dict[str, Any]) -> None:
+    """Add ``layout`` to the union the all-kinds schema discriminates on (§18).
+
+    Generated separately and merged rather than being part of the element union,
+    because it is not an element: pydantic never sees it in ``Element``, and the
+    element passes above have nothing to say about a coordinate. The shared
+    definitions it pulls in — ``Metadata``, ``Location`` — are the same models
+    the elements use, so the versions already decorated with field docs win.
+    """
+    schema = Layout.model_json_schema(mode="validation", by_alias=True)
+    for name, definition in schema.pop("$defs", {}).items():
+        definitions.setdefault(name, definition)
+    definitions[_LAYOUT_DEF] = schema
+
+    branches: list[dict[str, Any]] = root.setdefault("oneOf", [])
+    branches.append({"$ref": f"#/$defs/{_LAYOUT_DEF}"})
+    discriminator = root.get("discriminator")
+    if discriminator is None:  # pragma: no cover - pydantic always emits one
+        return
+    mapping: dict[str, str] = discriminator["mapping"]
+    mapping[LAYOUT_KIND] = f"#/$defs/{_LAYOUT_DEF}"
     discriminator["mapping"] = dict(sorted(mapping.items()))
 
 

@@ -700,6 +700,13 @@ RULES: Final[tuple[Rule, ...]] = (
         title="declared draw with no power path",
     ),
     Rule(
+        "W138",
+        Severity.WARNING,
+        "Diagram geometry names an element the inventory does not declare.",
+        ("NG-Y001",),
+        title="stale diagram geometry",
+    ),
+    Rule(
         "I001",
         Severity.INFO,
         "A MAC address is locally administered rather than vendor-assigned.",

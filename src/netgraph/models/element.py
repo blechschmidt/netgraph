@@ -14,6 +14,7 @@ __all__ = [
     "DEFAULT_API_VERSION",
     "DOCUMENT_KINDS",
     "KINDS",
+    "LAYOUT_KIND",
     "TEMPLATE_KIND",
     "ElementBase",
 ]
@@ -41,8 +42,14 @@ KINDS: tuple[str, ...] = (
 #: ``spec.from``, and it is gone by the time anything downstream sees the tree.
 TEMPLATE_KIND: str = "template"
 
-#: Every ``kind`` a document may declare, elements and templates alike.
-DOCUMENT_KINDS: tuple[str, ...] = (*KINDS, TEMPLATE_KIND)
+#: The twelfth kind (§18). A layout declares no element either: it is diagram
+#: geometry for elements declared elsewhere, kept in its own document so that a
+#: model file stays free of pixels and an arrangement can be dropped, diffed or
+#: versioned on its own. See :mod:`netgraph.models.layout`.
+LAYOUT_KIND: str = "layout"
+
+#: Every ``kind`` a document may declare: elements, templates and layouts.
+DOCUMENT_KINDS: tuple[str, ...] = (*KINDS, TEMPLATE_KIND, LAYOUT_KIND)
 
 
 class ElementBase(NetgraphModel):

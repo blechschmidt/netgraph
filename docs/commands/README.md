@@ -29,6 +29,7 @@ a flag that is documented exists. The prose around them is written by hand.
 | [`netgraph edit remove-interface`](edit.md) | Remove an interface from an element. | [edit.md](edit.md) |
 | [`netgraph edit apply`](edit.md) | Apply operations given as JSON; the programmatic face. | [edit.md](edit.md) |
 | [`netgraph render`](render.md) | Draw the graph as SVG, PNG, PDF, DOT, Mermaid, JSON or HTML. | [render.md](render.md) |
+| [`netgraph layout`](layout.md) | Store the diagram's arrangement, so a hand-placed node stays put. | [layout.md](layout.md) |
 | [`netgraph watch`](watch.md) | Re-render on every save, optionally serving the result. | [watch.md](watch.md) |
 | [`netgraph web`](web.md) | Edit the YAML and see the diagram side by side in a browser. | [web.md](web.md) |
 | [`netgraph path`](path.md) | Trace how two elements reach each other, hop by hop. | [path.md](path.md) |

@@ -66,6 +66,7 @@ from __future__ import annotations
 import json
 from typing import Any, Final
 
+from netgraph.layout.geometry import Geometry, Placement
 from netgraph.models import API_VERSION
 from netgraph.power import Feed, PowerNode
 from netgraph.render.aggregate import AggregateView, BundleView
@@ -138,9 +139,12 @@ def graph_to_dict(graph: Graph, options: RenderOptions | None = None) -> dict[st
         "apiVersion": API_VERSION,
         "kind": GRAPH_KIND,
         "layer": graph.layer.value,
-        "nodes": [_node(node, opts) for node in graph.nodes.values()],
-        "edges": [_edge(edge) for edge in graph.edges],
+        "nodes": [_node(node, opts, graph.geometry) for node in graph.nodes.values()],
+        "edges": [_edge(edge, graph.geometry) for edge in graph.edges],
     }
+    layout = _layout(graph)
+    if layout is not None:
+        document["layout"] = layout
     if opts.title:
         document["title"] = opts.title
     if graph.dangling:
@@ -150,7 +154,46 @@ def graph_to_dict(graph: Graph, options: RenderOptions | None = None) -> dict[st
     return document
 
 
-def _node(node: Node, options: RenderOptions) -> dict[str, Any]:
+def _layout(graph: Graph) -> dict[str, Any] | None:
+    """The stored arrangement, for a client that draws the graph itself.
+
+    ``mode`` is what the SVG renderer decided (§18): ``fixed`` means every
+    coordinate in this document is exactly where netgraph would draw it, and a
+    client can lay nothing out at all. ``partial`` means some are, and the rest
+    are the client's problem — the same problem netgraph hands to Graphviz.
+    ``auto``, and the key is left out entirely, so an inventory with no
+    arrangement exports byte-identically to what it always did.
+
+    Coordinates are points, ``y`` upwards, a position being the centre of what
+    it places — Graphviz's system, which is also the SVG the ``svg`` and ``html``
+    renderers emit, so the three agree by construction rather than by promise.
+    """
+    geometry = graph.geometry
+    if geometry.is_empty:
+        return None
+    payload: dict[str, Any] = {
+        "units": "points",
+        "mode": str(geometry.mode(graph.nodes)),
+    }
+    if geometry.groups:
+        payload["groups"] = {
+            key: {
+                "position": {"x": box.x, "y": box.y},
+                "size": {"width": box.width, "height": box.height},
+            }
+            for key, box in sorted(geometry.groups.items())
+        }
+    return payload
+
+
+def _placement(placement: Placement) -> dict[str, Any]:
+    payload: dict[str, Any] = {"position": {"x": placement.x, "y": placement.y}}
+    if placement.width is not None and placement.height is not None:
+        payload["size"] = {"width": placement.width, "height": placement.height}
+    return payload
+
+
+def _node(node: Node, options: RenderOptions, geometry: Geometry) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "id": node.fqn,
         "type": node.type.value,
@@ -178,6 +221,9 @@ def _node(node: Node, options: RenderOptions) -> dict[str, Any]:
         payload["cluster"] = node.cluster
     payload["vlans"] = sorted(node.vlans)
     payload["interfaces"] = [_port(port, options) for port in node.ports]
+    placement = geometry.nodes.get(node.fqn)
+    if placement is not None:
+        payload["layout"] = _placement(placement)
     return payload
 
 
@@ -436,7 +482,12 @@ def _port(port: PortView, options: RenderOptions) -> dict[str, Any]:
     return payload
 
 
-def _edge(edge: Edge) -> dict[str, Any]:
+#: The arrangement a member of a bundle is exported against: none. A bundle is
+#: drawn as one edge, so the links folded into it have no geometry of their own.
+_NO_GEOMETRY: Final[Geometry] = Geometry()
+
+
+def _edge(edge: Edge, geometry: Geometry = _NO_GEOMETRY) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "id": edge.id,
         "kind": edge.kind.value,
@@ -474,6 +525,9 @@ def _edge(edge: Edge) -> dict[str, Any]:
     if edge.bundle is not None:
         payload["bundle"] = _bundle(edge.bundle)
     payload["vlans"] = sorted(edge.vlans)
+    waypoints = geometry.edges.get(edge.id)
+    if waypoints:
+        payload["layout"] = {"waypoints": [{"x": x, "y": y} for x, y in waypoints]}
     return payload
 
 

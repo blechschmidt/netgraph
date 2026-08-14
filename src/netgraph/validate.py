@@ -615,7 +615,11 @@ class _Context:
     power: PowerPlan = field(default_factory=PowerPlan)
 
     def source_of(self, fqn: str | None) -> SourceLocation | None:
-        return self.inventory.source_of(fqn) if fqn is not None else None
+        if fqn is None:
+            return None
+        # A layout document (§18) is not an element, so it is not in
+        # ``sources``; a finding about one still has to point at its file.
+        return self.inventory.source_of(fqn) or self.inventory.layout_sources.get(fqn)
 
     def effective(self, endpoint: _Endpoint) -> Interface | None:
         """The interface whose configuration governs a link end (§10.6).
@@ -1114,9 +1118,14 @@ def _stacking_groups(owner: InterfaceOwner) -> dict[str, str]:
 
 
 def _collect_suppressions(inventory: Inventory) -> dict[str, frozenset[str]]:
-    """Read the ``netgraph/ignore`` annotation of every element."""
+    """Read the ``netgraph/ignore`` annotation of every element and layout.
+
+    A layout document (§18) is not an element, but ``W138`` is reported against
+    one, and a finding nobody can annotate away is a finding people learn to
+    ignore wholesale.
+    """
     suppressions: dict[str, frozenset[str]] = {}
-    for fqn, element in inventory.elements.items():
+    for fqn, element in (*inventory.elements.items(), *inventory.layouts.items()):
         tokens: list[str] = []
         for key in IGNORE_ANNOTATIONS:
             raw = element.metadata.annotations.get(key)
@@ -4039,6 +4048,59 @@ def _span_text(placement: _Placement) -> str:
 
 # --------------------------------------------------------------------------- #
 # Power (§17)
+def _check_stale_geometry(ctx: _Context) -> Iterator[_Draft]:
+    """W138 — a layout document places something the inventory no longer has.
+
+    Only *element addresses* are checked. A derived node — a layer-3 prefix, a
+    tunnel drawn as a box, a rack elevation — has an id no document declares,
+    and whether one still exists is a question about a particular drawing rather
+    than about the inventory; ``netgraph layout --prune`` builds the drawing and
+    answers it, and removes more than this reports. A namespace is checked,
+    because the inventory knows every namespace it has.
+
+    A warning rather than an error, deliberately. Deleting a switch must not
+    make ``netgraph validate`` fail, and stale coordinates draw nothing: they
+    place a node that is not in the diagram.
+    """
+    namespaces = set(ctx.inventory.namespaces)
+    for fqn, layout in ctx.inventory.layouts.items():
+        namespace = namespace_of(fqn)
+        for view, geometry in sorted(layout.spec.views.items()):
+            for section, keys in (
+                ("nodes", geometry.nodes),
+                ("edges", geometry.edges),
+                ("groups", geometry.groups),
+            ):
+                for key in keys:
+                    if _geometry_key_exists(
+                        ctx, key, section=section, namespace=namespace, namespaces=namespaces
+                    ):
+                        continue
+                    yield _Draft(
+                        f"layout {_q(fqn)} places {_q(key)} in its {view} view, which this "
+                        f"inventory does not declare; run 'netgraph layout --prune' to drop it",
+                        (fqn,),
+                        ("spec", "views", view, section, key),
+                    )
+
+
+def _geometry_key_exists(
+    ctx: _Context, key: str, *, section: str, namespace: str, namespaces: set[str]
+) -> bool:
+    """Does ``key`` still name something? ``True`` when it cannot be judged."""
+    if section == "groups":
+        return _qualified_namespace(key, namespace) in namespaces
+    if ":" in key:
+        return True  # a derived node id; only a drawing can settle it
+    return ctx.inventory.resolve_fqn(key, namespace=namespace) is not None
+
+
+def _qualified_namespace(key: str, namespace: str) -> str:
+    if not namespace or key.startswith(f"{namespace}/") or key == namespace:
+        return key
+    return f"{namespace}/{key}"
+
+
 # --------------------------------------------------------------------------- #
 
 
@@ -4370,6 +4432,7 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("W135", _check_bgp_neighbour_resolves),
     ("W136", _check_empty_vrf),
     ("W137", _check_missing_power_path),
+    ("W138", _check_stale_geometry),
     ("I001", _check_local_mac),
     ("I002", _check_uncabled_interface),
     ("I003", _check_nonstandard_port),

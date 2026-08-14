@@ -13,6 +13,7 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
 | know exactly what a field means or what values it accepts | [schema-reference.md](schema-reference.md) |
 | know why the schema is shaped the way it is, normatively | [schema.md](schema.md) |
 | control what a diagram shows — layers, filters, icons, formats | [rendering.md](rendering.md) |
+| arrange the diagram by hand and have it stay arranged | [commands/layout.md](commands/layout.md) |
 | understand a finding, or silence one | [validation.md](validation.md) |
 | look up one validation rule by its id | [validation-rules.md](validation-rules.md) |
 | check subnet utilisation, find free space, hunt overlaps | [ipam.md](ipam.md) |
@@ -44,8 +45,8 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
 * **[importing.md](importing.md)** — bootstrap the first inventory from LLDP, `ip -j addr`
   or the cabling spreadsheet you already keep, then converge on it by hand.
 * **[rendering.md](rendering.md)** — the seven layers, the filters, namespace collapsing and
-  link bundling, icon themes, labelling, interactivity, and what each output format is
-  good for.
+  link bundling, icon themes, labelling, stored arrangements, interactivity, and what each
+  output format is good for.
 * **[validation.md](validation.md)** — the three passes, severities, `--strict`, the four
   ways to suppress a rule, and how to read a finding.
 * **[ci.md](ci.md)** — `netgraph validate` as a gate: the JSON envelope, SARIF and code

@@ -38,6 +38,15 @@ from netgraph.models.interface import (
     VlanConfig,
     WirelessConfig,
 )
+from netgraph.models.layout import (
+    EdgeGeometry,
+    GroupGeometry,
+    LayoutSpec,
+    NodeGeometry,
+    Point,
+    Size,
+    ViewGeometry,
+)
 from netgraph.models.metadata import Location, Metadata
 from netgraph.models.patchpanel import PatchPanelSpec
 from netgraph.models.pdu import PduSpec
@@ -111,6 +120,13 @@ DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
     PowerInput,
     PoeConfig,
     PduSpec,
+    LayoutSpec,
+    ViewGeometry,
+    NodeGeometry,
+    EdgeGeometry,
+    GroupGeometry,
+    Point,
+    Size,
 )
 
 #: What distinguishes one ``kind`` from the next, one sentence each.
@@ -132,6 +148,8 @@ KIND_NOTES: Final[dict[str, str]] = {
     "it. Placed on a rack elevation like any other hardware.",
     "template": "A named partial device spec, merged into every device that names it in "
     "`spec.from`. Not an element: never drawn, never listed, never validated on its own.",
+    "layout": "Diagram geometry for elements declared elsewhere, scoped by view. Not an "
+    "element: it carries no network facts and is never drawn as a node. See `netgraph layout`.",
 }
 
 #: One entry per ``(model name, field name)``. Checked for exact coverage.
@@ -805,6 +823,36 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "nothing and powers nothing, which is what `NG-E014` reports it for.",
         "…/pethPsePortEntry/pethPsePortAdminEnable",
     ),
+    # -- layout geometry (§18) --------------------------------------------
+    ("LayoutSpec", "views"): Doc(
+        "Geometry per view, keyed by layer name (`l1`, `l2`, `l3`, `routing`, ...). The same "
+        "element sits differently in each, so each gets its own arrangement."
+    ),
+    ("ViewGeometry", "nodes"): Doc(
+        "Where each node is drawn, keyed by its address. A derived node the inventory does not "
+        "declare is keyed by its graph id, such as `subnet:10.0.0.0/24`."
+    ),
+    ("ViewGeometry", "edges"): Doc(
+        "Bends each link is drawn through, keyed by the link's address."
+    ),
+    ("ViewGeometry", "groups"): Doc(
+        "The box each namespace cluster is drawn as, keyed by namespace. Only drawn when the "
+        "render groups by namespace."
+    ),
+    ("NodeGeometry", "position"): Doc("Centre of the node, in points."),
+    ("NodeGeometry", "size"): Doc(
+        "Box the node occupies, in points. Omitted means the label decides, which is what keeps "
+        "an arrangement valid when a device grows a port."
+    ),
+    ("EdgeGeometry", "waypoints"): Doc(
+        "Spline control points, in points, ordered from the link's first endpoint to its second."
+    ),
+    ("GroupGeometry", "position"): Doc("Centre of the cluster box, in points."),
+    ("GroupGeometry", "size"): Doc("Extent of the cluster box, in points."),
+    ("Point", "x"): Doc("Points from the left edge of the drawing, growing rightwards."),
+    ("Point", "y"): Doc("Points from the bottom edge of the drawing, growing upwards."),
+    ("Size", "width"): Doc("Width in points; strictly positive."),
+    ("Size", "height"): Doc("Height in points; strictly positive."),
 }
 
 

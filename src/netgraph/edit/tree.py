@@ -32,8 +32,9 @@ from netgraph.edit.errors import ConflictError, EditError
 from netgraph.edit.placement import FileFacts
 from netgraph.edit.roundtrip import YamlDocument, YamlFile
 from netgraph.fsio import write_text_atomically
-from netgraph.loader.inventory import Inventory
+from netgraph.loader.inventory import Inventory, SourceLocation
 from netgraph.loader.tree import Overlay, iter_inventory_files
+from netgraph.models import LAYOUT_KIND
 
 __all__ = ["EditableTree", "digest_of"]
 
@@ -386,17 +387,28 @@ class EditableTree:
         kinds and names it needs are exactly what loading already worked out.
         Files that declare no element — a file of templates — are listed with no
         documents, so placement never invents a path that is already taken.
+
+        Layout documents (§18) are listed alongside the elements even though
+        they declare none, because placing a *second* one has to find the first:
+        a tree whose geometry lives in ``layouts.yaml`` should keep it there.
         """
         found: dict[str, tuple[list[str], list[str]]] = {}
         for relative in _discovered(self.root):
             found.setdefault(relative, ([], []))
-        for fqn, element in inventory.elements.items():
-            source = inventory.sources.get(fqn)
+        declared: list[tuple[SourceLocation | None, str, str]] = [
+            (inventory.sources.get(fqn), element.kind, element.metadata.name)
+            for fqn, element in inventory.elements.items()
+        ]
+        declared += [
+            (inventory.layout_sources.get(fqn), LAYOUT_KIND, layout.metadata.name)
+            for fqn, layout in inventory.layouts.items()
+        ]
+        for source, kind, name in declared:
             if source is None or source.relative is None:  # pragma: no cover - always set
                 continue
             kinds, names = found.setdefault(source.relative, ([], []))
-            kinds.append(element.kind)
-            names.append(element.metadata.name)
+            kinds.append(kind)
+            names.append(name)
         for relative, tracked in self._files.items():
             if tracked.removed:
                 found.pop(relative, None)

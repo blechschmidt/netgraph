@@ -21,6 +21,7 @@ from netgraph.models.cable import Cable
 from netgraph.models.device import Computer, Hub, Router, Server, Switch
 from netgraph.models.diagnostics import decode_field_error
 from netgraph.models.element import DOCUMENT_KINDS, KINDS, ElementBase
+from netgraph.models.layout import Layout
 from netgraph.models.patchpanel import PatchPanel
 from netgraph.models.pdu import Pdu
 from netgraph.models.template import Template
@@ -31,6 +32,7 @@ __all__ = [
     "Element",
     "element_model_for",
     "parse_document",
+    "parse_layout",
     "parse_template",
 ]
 
@@ -56,6 +58,7 @@ Element = Annotated[
 
 _ELEMENT_ADAPTER: Final[TypeAdapter[Element]] = TypeAdapter(Element)
 _TEMPLATE_ADAPTER: Final[TypeAdapter[Template]] = TypeAdapter(Template)
+_LAYOUT_ADAPTER: Final[TypeAdapter[Layout]] = TypeAdapter(Layout)
 
 #: pydantic error types that map onto a schema rule of §10.
 _RULE_BY_ERROR_TYPE: Final[dict[str, str]] = {
@@ -94,18 +97,7 @@ def parse_document(document: Any, *, source: str | None = None) -> Element:
             field path of the offending value.
     """
     if not isinstance(document, Mapping):
-        raise SchemaError(
-            issues=[
-                SchemaIssue(
-                    message=(
-                        "a document must be a mapping with the keys apiVersion, kind, "
-                        f"metadata and spec, got {type(document).__name__}"
-                    ),
-                    rule="NG-D001",
-                )
-            ],
-            source=source,
-        )
+        raise SchemaError(issues=[_not_a_mapping(document)], source=source)
 
     _reject_unknown_kind(document, source=source)
 
@@ -128,22 +120,43 @@ def parse_template(document: Any, *, source: str | None = None) -> Template:
             template envelope.
     """
     if not isinstance(document, Mapping):
-        raise SchemaError(
-            issues=[
-                SchemaIssue(
-                    message=(
-                        "a document must be a mapping with the keys apiVersion, kind, "
-                        f"metadata and spec, got {type(document).__name__}"
-                    ),
-                    rule="NG-D001",
-                )
-            ],
-            source=source,
-        )
+        raise SchemaError(issues=[_not_a_mapping(document)], source=source)
     try:
         return _TEMPLATE_ADAPTER.validate_python(dict(document))
     except PydanticValidationError as exc:
         raise SchemaError(issues=_issues_from(exc), source=source) from exc
+
+
+def parse_layout(document: Any, *, source: str | None = None) -> Layout:
+    """Parse one ``kind: layout`` document (§18).
+
+    Geometry is checked for *shape* only — a view netgraph draws, coordinates
+    that are finite numbers, a positive size. Whether a key names something the
+    inventory still holds is not knowable from one document, so it is left to
+    the validator (``NG-Y001``), which can see the whole tree and reports it as
+    a warning that ``netgraph layout --prune`` clears.
+
+    Raises:
+        SchemaError: The document is not a mapping, or does not match the
+            layout envelope.
+    """
+    if not isinstance(document, Mapping):
+        raise SchemaError(issues=[_not_a_mapping(document)], source=source)
+    try:
+        return _LAYOUT_ADAPTER.validate_python(dict(document))
+    except PydanticValidationError as exc:
+        raise SchemaError(issues=_issues_from(exc), source=source) from exc
+
+
+def _not_a_mapping(document: Any) -> SchemaIssue:
+    """``NG-D001`` — the document is a scalar or a sequence, not an envelope."""
+    return SchemaIssue(
+        message=(
+            "a document must be a mapping with the keys apiVersion, kind, "
+            f"metadata and spec, got {type(document).__name__}"
+        ),
+        rule="NG-D001",
+    )
 
 
 def _reject_unknown_kind(document: Mapping[str, Any], *, source: str | None) -> None:

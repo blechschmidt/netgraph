@@ -261,7 +261,7 @@ to nothing, and the message lists what you could have meant:
 <!-- run: rc=2 -->
 ```console
 $ netgraph -i examples/quickstart validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 An unknown id in an *annotation* is ignored rather than fatal — inventory data
@@ -393,6 +393,7 @@ says why the rule exists, what it deliberately exempts, and how to suppress it.
 | [`W135`](validation-rules.md#w135--bgp-neighbour-is-not-in-the-inventory) | `NG-F013` | warning | BGP neighbour is not in the inventory |
 | [`W136`](validation-rules.md#w136--vrf-with-no-interface-bound-to-it) | `NG-F014` | warning | VRF with no interface bound to it |
 | [`W137`](validation-rules.md#w137--declared-draw-with-no-power-path) | `NG-E016` | warning | declared draw with no power path |
+| [`W138`](validation-rules.md#w138--stale-diagram-geometry) | `NG-Y001` | warning | stale diagram geometry |
 | [`I001`](validation-rules.md#i001--locally-administered-mac-address) | `NG-I010` | info | locally administered MAC address |
 | [`I002`](validation-rules.md#i002--enabled-interface-terminates-no-cable) | `NG-C015` | info | enabled interface terminates no cable |
 | [`I003`](validation-rules.md#i003--tunnel-on-a-non-standard-port) | `NG-T015` | info | tunnel on a non-standard port |

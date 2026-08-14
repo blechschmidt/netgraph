@@ -1786,6 +1786,39 @@ legitimate case is a device fed from something the inventory does not model as a
 `pdu` — a wall socket, a bench supply, a UPS nothing has a document for — where
 the draw is worth recording and there is no outlet to name.
 
+#### `W138` — stale diagram geometry
+
+*Alias: `NG-Y001`. Severity: warning.*
+
+A `kind: layout` document (§18) places something the inventory does not declare
+— usually a device that has since been deleted, sometimes a name that was
+mistyped. The finding names the layout, the view and the key, and points at the
+line inside the layout document that holds it.
+
+Only *element addresses* are judged. A derived node has an id no document
+declares — `subnet:10.0.0.0/24`, `tunnel:site/wg0`, `rack:hq/comms/r1` — and
+whether one still exists is a question about a particular drawing rather than
+about the inventory, so those are left alone here. `netgraph layout --prune`
+builds the drawing and answers it, which is why a prune removes a little more
+than this reports. A group key is a namespace, and the inventory does know every
+namespace it has, so those are checked.
+
+**Why it matters.** Not because it draws anything wrong: geometry for a node
+that is not in the diagram places nothing. It matters because an arrangement is
+supposed to be reviewable. Coordinates for three devices that were
+decommissioned last year are three entries a reader has to work out are dead,
+and they accumulate — a layout file that is half history is one nobody trusts to
+say where anything is.
+
+A warning rather than an error, deliberately, and this one is not a close call:
+deleting a switch must not make `netgraph validate` fail. The whole point of
+keeping geometry in a sidecar is that the model can be changed without asking
+the diagram's permission.
+
+**Suppress with** `W138` / `NG-Y001`, or an annotation on the layout document.
+The fix is normally `netgraph layout --prune`, which drops exactly these
+entries and writes nothing else.
+
 ### Info
 
 #### `I001` — locally administered MAC address
@@ -1860,7 +1893,7 @@ schema rule is a usage error:
 <!-- run: rc=2 -->
 ```console
 $ netgraph validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, I001, I002, I003, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 Every mechanism accepts both spellings of an id — `W102` and `NG-C010` select

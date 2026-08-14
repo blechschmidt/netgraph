@@ -34,6 +34,7 @@ the field maps to, with `…` standing for
 | `patchpanel` | [PatchPanelSpec](#spec--patchpanel) | A passive cross-connect. Its `front/<n>` and `rear/<n>` ports are derived from `ports`, and a coupler joins each front port to one rear port; it is not a hop. |
 | `pdu` | [PduSpec](#spec--pdu) | A power distribution unit. Its numbered outlets are derived from `outlets`; they are not interfaces, and a device names one in `power.inputs` rather than being cabled to it. Placed on a rack elevation like any other hardware. |
 | `template` | partial [DeviceSpec](#spec--switch-router-hub-computer-server) | A named partial device spec, merged into every device that names it in `spec.from`. Not an element: never drawn, never listed, never validated on its own. |
+| `layout` | [LayoutSpec](#spec-of-a-layout-document) | Diagram geometry for elements declared elsewhere, scoped by view. Not an element: it carries no network facts and is never drawn as a node. See `netgraph layout`. |
 
 ## Document envelope
 
@@ -483,6 +484,74 @@ This port is power sourcing equipment: it hands power down the cable. Only on a 
 
 * How much the port reserves is said once: a `class`, or a `budget_watts`, never both (`NG-E004`). With neither, the port reserves its standard's maximum, which is what a switch with no per-port configuration does.
 * A `poe` block on a port with nothing on it is a *capability* and takes no budget. A port that feeds something, or one with an explicit `budget_watts`, does — see `NG-E013`.
+
+## `spec` of a `layout` document
+
+Where things are drawn, per view. A sidecar: it carries no network facts, and the elements it places know nothing about it. `netgraph layout` writes it.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `views` | map string → ViewGeometry | no | `{}` | Geometry per view, keyed by layer name (`l1`, `l2`, `l3`, `routing`, ...). The same element sits differently in each, so each gets its own arrangement. | — |
+
+* Coordinates are **points** (1/72 inch), `y` upwards, origin at the bottom left, and a `position` is the **centre** of what it places — Graphviz's system, so a stored arrangement can be handed straight back to it.
+* A key is an address, resolved like any other reference. A node the inventory does not declare is keyed by its graph id instead: `subnet:10.0.0.0/24`, `tunnel:site/wg0`, `rack:hq/comms/r1`.
+* A key naming something the inventory no longer has is `NG-Y001`, a warning; `netgraph layout --prune` drops it.
+
+## `spec.views.<view>`
+
+One view's arrangement. The view name is a layer netgraph draws — `physical`, `l1`, `l2`, `l3`, `overlay`, `routing`, `rack`, `power` — because the same device sits somewhere different in each.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `nodes` | map string → NodeGeometry | no | `{}` | Where each node is drawn, keyed by its address. A derived node the inventory does not declare is keyed by its graph id, such as `subnet:10.0.0.0/24`. | — |
+| `edges` | map string → EdgeGeometry | no | `{}` | Bends each link is drawn through, keyed by the link's address. | — |
+| `groups` | map string → GroupGeometry | no | `{}` | The box each namespace cluster is drawn as, keyed by namespace. Only drawn when the render groups by namespace. | — |
+
+## `spec.views.<view>.nodes.<address>`
+
+Where one node is drawn.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `position` | [Point](#a-point) | **yes** | — | Centre of the node, in points. | — |
+| `size` | [Size](#a-size) | no | *unset* | Box the node occupies, in points. Omitted means the label decides, which is what keeps an arrangement valid when a device grows a port. | — |
+
+* `size` is optional and is not seeded by `netgraph layout --write`: Graphviz derives the same box from the same label on every run. It is honoured on read, for an editor that lets somebody resize a box on purpose.
+
+## `spec.views.<view>.edges.<address>`
+
+The bends one link is drawn through. Not seeded unless `netgraph layout --write --waypoints` is asked for: a computed spline is noise, a hand-placed bend is a decision.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `waypoints` | [Point](#a-point) list, 1–64 entries | **yes** | — | Spline control points, in points, ordered from the link's first endpoint to its second. | — |
+
+## `spec.views.<view>.groups.<namespace>`
+
+The box one namespace cluster is drawn as. Unlike a node it carries a required `size`: nothing else decides how big a cluster is.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `position` | [Point](#a-point) | **yes** | — | Centre of the cluster box, in points. | — |
+| `size` | [Size](#a-size) | **yes** | — | Extent of the cluster box, in points. | — |
+
+## A point
+
+Two numbers, in points. `{x: 240, y: 396}` or the shorthand `[240, 396]`; both mean the same thing and both are read.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `x` | number | **yes** | — | Points from the left edge of the drawing, growing rightwards. | — |
+| `y` | number | **yes** | — | Points from the bottom edge of the drawing, growing upwards. | — |
+
+## A size
+
+Two positive numbers, in points. `{width: 220, height: 90}` or `[220, 90]`.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `width` | number, > 0.0 | **yes** | — | Width in points; strictly positive. | — |
+| `height` | number, > 0.0 | **yes** | — | Height in points; strictly positive. | — |
 
 ## Enumerations
 

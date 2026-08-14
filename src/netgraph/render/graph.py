@@ -98,6 +98,8 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import TYPE_CHECKING, Final, TypeAlias
 
+from netgraph.layout.geometry import Geometry
+from netgraph.layout.resolve import resolve_geometry
 from netgraph.loader.inventory import Inventory, SourceLocation, namespace_of, short_name
 from netgraph.models import (
     PATCHPANEL_KIND,
@@ -1033,6 +1035,16 @@ class Graph:
     #: ``--link-template`` expands (:mod:`netgraph.render.links`); it is
     #: deliberately not part of what a renderer *draws*.
     sources: Mapping[str, SourceLocation] = field(default_factory=dict)
+    #: The stored arrangement for this layer (§18), merged from every
+    #: ``kind: layout`` document in the tree and narrowed to what survived the
+    #: filter. Empty when nothing was arranged, which is the normal case: a
+    #: renderer that finds it empty lays the graph out exactly as it always did.
+    #:
+    #: It lives on the graph rather than in ``RenderOptions`` because it is a
+    #: fact about the inventory, not a preference about the drawing — which is
+    #: what makes the SVG, HTML and JSON renderers agree on coordinates without
+    #: any of them being told to.
+    geometry: Geometry = field(default_factory=Geometry)
 
     def source_of(self, fqn: str) -> SourceLocation | None:
         """Where the element called ``fqn`` was declared, if it was declared."""
@@ -1157,6 +1169,13 @@ class Graph:
 # --------------------------------------------------------------------------- #
 
 
+def _narrowed(geometry: Geometry, nodes: Mapping[str, Node], edges: Sequence[Edge]) -> Geometry:
+    """The arrangement, restricted to what this drawing actually contains."""
+    if geometry.is_empty:
+        return geometry
+    return geometry.narrowed(nodes, (edge.id for edge in edges))
+
+
 def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
     """Resolve an inventory into a renderable graph.
 
@@ -1240,6 +1259,7 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         nodes, edges = _rack_view(inventory)
     elif layer is Layer.POWER:
         nodes, edges = _power_view(inventory, nodes)
+    geometry = resolve_geometry(inventory, layer.value)
     return Graph(
         root=inventory.root,
         nodes=nodes,
@@ -1247,6 +1267,7 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         layer=layer,
         dangling=dangling,
         sources=dict(inventory.sources),
+        geometry=_narrowed(geometry, nodes, edges),
     )
 
 
@@ -2468,6 +2489,7 @@ def filter_graph(graph: Graph, spec: FilterSpec) -> Graph:
         layer=graph.layer,
         dangling=graph.dangling,
         sources=graph.sources,
+        geometry=_narrowed(graph.geometry, nodes, edges),
     )
 
 

@@ -16,6 +16,7 @@
       "cable": "#/$defs/Cable",
       "computer": "#/$defs/Computer",
       "hub": "#/$defs/Hub",
+      "layout": "#/$defs/Layout",
       "patchpanel": "#/$defs/PatchPanel",
       "pdu": "#/$defs/Pdu",
       "router": "#/$defs/Router",
@@ -59,6 +60,9 @@
     },
     {
       "$ref": "#/$defs/Template"
+    },
+    {
+      "$ref": "#/$defs/Layout"
     }
   ],
   "$defs": {
@@ -815,6 +819,26 @@
       "title": "Duplex",
       "type": "string"
     },
+    "EdgeGeometry": {
+      "additionalProperties": false,
+      "description": "The bends one link is drawn through.\n\nThe points become Graphviz spline control points, in the order written, from\nthe ``source`` end to the ``target`` end of the edge as the graph orders\nthem. An empty list is refused: an edge with no waypoints is an edge with no\ngeometry, and the way to say that is to leave the entry out.",
+      "properties": {
+        "waypoints": {
+          "items": {
+            "$ref": "#/$defs/Point"
+          },
+          "maxItems": 64,
+          "minItems": 1,
+          "title": "Waypoints",
+          "type": "array"
+        }
+      },
+      "required": [
+        "waypoints"
+      ],
+      "title": "EdgeGeometry",
+      "type": "object"
+    },
     "Forwarding": {
       "additionalProperties": false,
       "description": "`spec.forwarding` — the device-wide default for `ip:*/forwarding`.",
@@ -835,6 +859,24 @@
         "ipv6"
       ],
       "title": "Forwarding",
+      "type": "object"
+    },
+    "GroupGeometry": {
+      "additionalProperties": false,
+      "description": "The box one namespace cluster is drawn as.\n\nUnlike a node, a group carries a required :attr:`size`: nothing else decides\nhow big it is, because a cluster is drawn around whatever the arrangement\nput inside it rather than around whatever Graphviz packed into it.",
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/Point"
+        },
+        "size": {
+          "$ref": "#/$defs/Size"
+        }
+      },
+      "required": [
+        "position",
+        "size"
+      ],
+      "title": "GroupGeometry",
       "type": "object"
     },
     "Hub": {
@@ -1213,6 +1255,56 @@
       "title": "InterfaceType",
       "type": "string"
     },
+    "Layout": {
+      "additionalProperties": false,
+      "description": "A ``kind: layout`` document: geometry for one or more views.",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "layout",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. Diagram geometry for elements declared elsewhere, scoped by view. Not an element: it carries no network facts and is never drawn as a node. See `netgraph layout`."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/LayoutSpec",
+          "title": "spec",
+          "description": "The body of a `layout` document: one arrangement per view."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata"
+      ],
+      "title": "Layout",
+      "type": "object"
+    },
+    "LayoutSpec": {
+      "additionalProperties": false,
+      "description": "The arrangements one layout document carries, one per view.",
+      "properties": {
+        "views": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ViewGeometry"
+          },
+          "title": "Views",
+          "type": "object"
+        }
+      },
+      "title": "LayoutSpec",
+      "type": "object"
+    },
     "Location": {
       "additionalProperties": false,
       "description": "`metadata.location` — where the hardware physically is (§3.2).\n\nFree-text `spec.location` says it in prose, which is enough for a label\nand useless for anything else: no tool can tell from `\"MDF, third rack,\nnear the top\"` whether two things collide. This block is the structured\nform, and it is on `metadata` rather than on a `spec` because it is true\nof every kind — a patch panel is racked exactly as a server is.\n\n`position` is the *lowest* rack unit the element occupies and `height`\nhow many it takes, so a 2U server at `position: 10` fills U10 and U11.\nUnits count from 1 at the bottom, which is how a cabinet is labelled.",
@@ -1367,6 +1459,31 @@
         "name"
       ],
       "title": "Metadata",
+      "type": "object"
+    },
+    "NodeGeometry": {
+      "additionalProperties": false,
+      "description": "Where one node is drawn, and optionally how big it is.",
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/Point"
+        },
+        "size": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Size"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "position"
+      ],
+      "title": "NodeGeometry",
       "type": "object"
     },
     "OspfConfig": {
@@ -1970,6 +2087,26 @@
       "title": "PoeStandard",
       "type": "string"
     },
+    "Point": {
+      "additionalProperties": false,
+      "description": "A position in points, ``y`` upwards, origin at the bottom left.",
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "number"
+        },
+        "y": {
+          "title": "Y",
+          "type": "number"
+        }
+      },
+      "required": [
+        "x",
+        "y"
+      ],
+      "title": "Point",
+      "type": "object"
+    },
     "PowerConfig": {
       "additionalProperties": false,
       "description": "`spec.power` — a device's power, both directions (§17.2).\n\n\"Both directions\" is the whole shape of it. A switch *takes* power through\n`inputs` and *gives* it through `poe_budget_watts` and the `poe` blocks\non its ports; an access point takes power over its uplink and gives none. One\nblock covers all three because they are one question — where does the power\nin this box come from and go to — and splitting it would put two halves of\none answer in two places.",
@@ -2243,6 +2380,28 @@
         "spec"
       ],
       "title": "Server",
+      "type": "object"
+    },
+    "Size": {
+      "additionalProperties": false,
+      "description": "An extent in points. Both dimensions are strictly positive.",
+      "properties": {
+        "width": {
+          "gt": 0.0,
+          "title": "Width",
+          "type": "number"
+        },
+        "height": {
+          "gt": 0.0,
+          "title": "Height",
+          "type": "number"
+        }
+      },
+      "required": [
+        "width",
+        "height"
+      ],
+      "title": "Size",
       "type": "object"
     },
     "StaticRoute": {
@@ -2866,6 +3025,35 @@
       ],
       "title": "UpstreamType",
       "type": "string"
+    },
+    "ViewGeometry": {
+      "additionalProperties": false,
+      "description": "Everything one layer's drawing places, keyed by address.",
+      "properties": {
+        "nodes": {
+          "additionalProperties": {
+            "$ref": "#/$defs/NodeGeometry"
+          },
+          "title": "Nodes",
+          "type": "object"
+        },
+        "edges": {
+          "additionalProperties": {
+            "$ref": "#/$defs/EdgeGeometry"
+          },
+          "title": "Edges",
+          "type": "object"
+        },
+        "groups": {
+          "additionalProperties": {
+            "$ref": "#/$defs/GroupGeometry"
+          },
+          "title": "Groups",
+          "type": "object"
+        }
+      },
+      "title": "ViewGeometry",
+      "type": "object"
     },
     "VlanConfig": {
       "additionalProperties": false,

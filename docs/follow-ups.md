@@ -1619,6 +1619,84 @@ being smuggled in beside an unrelated feature.
 
 ---
 
+## 16. Diagram geometry is a sidecar, not a field on each element
+
+**Status:** decided and implemented; recorded here because the alternative is
+the obvious one and somebody will propose it again.
+
+`netgraph layout` had to put a node's position *somewhere*, and there were two
+plausible places:
+
+**(a) On the element.** `spec.position: {x: 240, y: 396}` on each device, next
+to its interfaces.
+
+**(b) In its own document.** `kind: layout`, keyed by element address, scoped by
+view — which is what was built (§18 of `docs/schema.md`,
+`netgraph.models.layout`).
+
+(b) won on four counts, and the fourth is the one that settles it.
+
+**One element, several positions.** The same switch is drawn in `l1`, `l2`,
+`l3`, `overlay`, `routing` and `power`, and it sits somewhere different in each
+— the l3 diagram is a different graph with different neighbours, not the same
+diagram recoloured. A single field on the device cannot hold six answers, so (a)
+becomes `spec.positions.l1`, `spec.positions.l3`, … on every device: the sidecar
+schema, inlined into a hundred files.
+
+**Not everything drawn is declared.** A layer-3 prefix node, a tunnel drawn as a
+box, a rack elevation, a collapsed namespace — none of these is an element, and
+none has a `spec` to put a position in. (b) keys by *node id* and takes them in
+its stride (`subnet:10.0.0.0/24`, `rack:hq/comms/r1`); (a) would need a second,
+sidecar mechanism for exactly those, which is (b) with extra steps.
+
+**A model file should be readable.** A device document is a description of
+hardware — ports, addresses, VLANs — and it is reviewed as one. Four numbers per
+view interleaved with that is noise in every diff of every device forever, and
+the numbers change on a drag rather than on a change to the network. Keeping
+them apart means `git log -- switches/` still answers "what changed about the
+switches".
+
+**An arrangement is a unit.** It is dropped as a unit (`--clear`), regenerated
+as a unit (`--write`), and reviewed as a unit. It can be `.gitignore`d by a team
+that does not want one, or committed by a team that does; a second arrangement
+for a different audience is a second document rather than a second field on
+ninety-seven devices. None of that is expressible if the geometry is spread
+across the model.
+
+### What the choice costs
+
+Two things, both accepted.
+
+*A layout key can go stale.* Deleting a switch leaves its coordinates behind,
+where a field on the element would have gone with it. That is `W138`, a warning
+rather than an error — a diagram must not stop validating because a device was
+retired — and `netgraph layout --prune` is the fix. The rule only checks keys
+that name *elements*; a `subnet:` key can only be judged against a drawing, and
+`--prune` builds one, so a prune removes a little more than the rule reports.
+
+*A layout file is uncacheable.* The parse cache stores elements, and a layout is
+not one, so a file declaring one stays on the slow path — the same treatment
+`kind: template` gets, for the same reason (`netgraph.loader.tree._Builder.harvest`).
+An arrangement is one small file, so this is measured in microseconds; it would
+stop being acceptable if geometry were ever moved *into* the element files,
+which is one more reason not to.
+
+### What was deliberately not stored
+
+**Node sizes.** `NodeGeometry.size` exists in the schema and is honoured on read,
+but `--write` does not seed it. Graphviz derives a node's box from its label on
+every run, so a stored size buys the renderer nothing — and it goes stale the
+moment a device grows an interface, in a way that only a client drawing from the
+JSON export would ever notice. It stays in the schema for a canvas editor that
+lets somebody resize a box on purpose.
+
+**Edge waypoints.** Stored and honoured, but not seeded unless `--waypoints` is
+given. A seeded spline is four control points per link that the render
+recomputes identically from the node positions; a *hand-placed* bend is a
+decision, and that is what the flag is for.
+
+---
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

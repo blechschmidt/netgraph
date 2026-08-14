@@ -50,8 +50,8 @@ are the whole design:
 
 ## The operations
 
-There are twelve. Ten are **semantic** — the vocabulary a person or a diagram
-uses:
+There are thirteen. Eleven are **semantic** — the vocabulary a person or a
+diagram uses:
 
 | Operation | JSON `op` | What it does |
 |---|---|---|
@@ -65,6 +65,7 @@ uses:
 | `RemoveInterface(address, name, cascade)` | `remove-interface` | Removes a port, and what terminated on it. |
 | `Connect(a, b, spec, name, namespace, file)` | `connect` | Creates a cable between two interfaces. |
 | `Disconnect(address)` | `disconnect` | Removes a cable. |
+| `SetGeometry(view, nodes, edges, groups, layout, namespace, file)` | `set-geometry` | Writes one view of a [`kind: layout`](schema.md#18-layout-diagram-geometry) document. |
 
 Two are **primitive**, and file-level:
 
@@ -77,7 +78,17 @@ The primitives exist for one reason, [inverses](#inverses), and are not somethin
 to reach for by hand: a log of them is a log of diffs rather than of intentions.
 They go through the same gates as everything else.
 
-The set is deliberately closed. A thirteenth kind of change is a thirteenth
+`SetGeometry` is the odd one out, and deliberately so. It takes a whole view at
+a time rather than a coordinate at a time, because that is the unit an
+arrangement is decided in: an auto-layout produces every position at once, and a
+hundred `set` operations would be a hundred trips through the round-trip parser
+for one user gesture. Each section it names is *replaced* and each section it
+leaves out is *left alone*, and the replacement is a keyed merge — an entry that
+survives keeps the comment somebody wrote above it. It is the operation
+[`netgraph layout`](commands/layout.md) writes through, and the one a canvas will
+write through when a node is dragged.
+
+The set is deliberately closed. A fourteenth kind of change is a fourteenth
 operation, defined here, and not a caller reaching for the file system.
 
 ## What an operation guarantees
@@ -282,8 +293,10 @@ the template.
 **It does not resolve conflicts.** It detects them and stops. Merging is a job
 for the tool that already does it well, and the files are text.
 
-**It does not know about diagram geometry.** Where a node sits on a canvas is not
-an inventory fact yet; that is the next piece of work.
+**It does not lay diagrams out.** It *stores* where a node sits — `SetGeometry`
+is a first-class operation and geometry is inventory data like anything else —
+but deciding where a node should sit is [`netgraph layout`](commands/layout.md)'s
+job, and drawing it there is the renderer's.
 
 ## See also
 
@@ -291,4 +304,6 @@ an inventory fact yet; that is the next piece of work.
 - [`docs/inventory-layout.md`](inventory-layout.md) — the conventions placement follows.
 - [`docs/format.md`](format.md) — the canonical form an edited canonical file keeps.
 - [`docs/validation.md`](validation.md) — what the write gate runs.
+- [`netgraph layout`](commands/layout.md) — the first caller to write through it that is
+  not a person: it stores a diagram's arrangement as `set-geometry` operations.
 - [`docs/architecture.md`](architecture.md) — where the write path sits in the pipeline.

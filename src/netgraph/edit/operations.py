@@ -40,6 +40,7 @@ from typing import Any, ClassVar, Final
 
 from netgraph.edit.errors import OperationError
 from netgraph.edit.paths import format_field_path, parse_field_path
+from netgraph.models.layout import LAYOUT_VIEWS
 
 __all__ = [
     "OPERATIONS",
@@ -54,6 +55,7 @@ __all__ = [
     "RemoveInterface",
     "RenameElement",
     "SetField",
+    "SetGeometry",
     "UnsetField",
     "WriteFile",
     "operation_from_dict",
@@ -349,6 +351,96 @@ class Disconnect(Operation):
 
 
 # --------------------------------------------------------------------------- #
+# Diagram geometry
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class SetGeometry(Operation):
+    """Write one view's geometry into a ``kind: layout`` document (§18).
+
+    A whole view at a time rather than a coordinate at a time, because that is
+    the unit an arrangement is decided in: an auto-layout produces every
+    position at once, and a prune removes several. A hundred ``set`` operations
+    would also be a hundred trips through the round-trip parser for one user
+    gesture.
+
+    Each section is *replaced* when given and *left alone* when ``None``, and
+    the replacement is a keyed merge: an entry that survives keeps the comment
+    somebody wrote above it, an entry that is gone is removed, a new one is
+    appended. All three ``None`` clears the view; a document left holding no
+    views at all is removed, and so is its file if it held nothing else.
+
+    The layout document is named by :attr:`layout` and :attr:`namespace` rather
+    than by an address, because it is not an element: it has its own name space,
+    and one may have to be *created*, which no address can name.
+    """
+
+    op: ClassVar[str] = "set-geometry"
+
+    #: The view, as ``docs/schema.md`` §18 lists them: ``l1``, ``l3``, ...
+    view: str
+    #: Address to node geometry. ``None`` leaves the section as it is.
+    nodes: Mapping[str, Any] | None = None
+    #: Address to edge geometry.
+    edges: Mapping[str, Any] | None = None
+    #: Namespace to group geometry.
+    groups: Mapping[str, Any] | None = None
+    #: ``metadata.name`` of the layout document to write into or create.
+    layout: str = "layout"
+    #: The namespace — the folder — the document lives in.
+    namespace: str = ""
+    #: Where a document that has to be created should land. ``None`` leaves
+    #: that to :mod:`netgraph.edit.placement`.
+    file: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.view not in LAYOUT_VIEWS:
+            raise OperationError(
+                f"unknown view {self.view!r}; expected one of {', '.join(LAYOUT_VIEWS)}"
+            )
+        if not self.layout:
+            raise OperationError("a layout document must be named")
+
+    @property
+    def clears(self) -> bool:
+        """Does this operation drop the view rather than write it?"""
+        return self.nodes is None and self.edges is None and self.groups is None
+
+    @property
+    def address(self) -> str:
+        """The layout document's fully-qualified name."""
+        return f"{self.namespace}/{self.layout}" if self.namespace else self.layout
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"op": self.op, "view": self.view}
+        for section in ("nodes", "edges", "groups"):
+            value = getattr(self, section)
+            if value is not None:
+                payload[section] = dict(value)
+        payload["layout"] = self.layout
+        if self.namespace:
+            payload["namespace"] = self.namespace
+        if self.file is not None:
+            payload["file"] = self.file
+        return payload
+
+    def describe(self) -> str:
+        if self.clears:
+            return f"clear the {self.view} geometry of {self.address}"
+        counts = ", ".join(
+            f"{len(value)} {section}"
+            for section, value in (
+                ("nodes", self.nodes),
+                ("edges", self.edges),
+                ("groups", self.groups),
+            )
+            if value is not None
+        )
+        return f"set the {self.view} geometry of {self.address} ({counts})"
+
+
+# --------------------------------------------------------------------------- #
 # Primitives
 # --------------------------------------------------------------------------- #
 
@@ -404,6 +496,7 @@ OPERATIONS: Final[dict[str, type[Operation]]] = {
         RemoveInterface,
         Connect,
         Disconnect,
+        SetGeometry,
         WriteFile,
         RemoveFile,
     )
@@ -425,6 +518,7 @@ _FIELDS: Final[dict[str, tuple[tuple[str, ...], tuple[str, ...]]]] = {
     "remove-interface": (("address", "name"), ("cascade",)),
     "connect": (("a", "b"), ("spec", "name", "namespace", "file")),
     "disconnect": (("address",), ()),
+    "set-geometry": (("view",), ("nodes", "edges", "groups", "layout", "namespace", "file")),
     "write-file": (("path", "text"), ()),
     "remove-file": (("path",), ()),
 }
