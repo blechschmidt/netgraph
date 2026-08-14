@@ -80,7 +80,7 @@ import threading
 import webbrowser
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import ExitStack
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Any, Final, TypeVar
 
@@ -115,6 +115,7 @@ from netgraph.diagnostics import FORMATS as DIAGNOSTIC_FORMATS
 from netgraph.diagnostics import Diagnostic
 from netgraph.diagnostics import build_report as build_diagnostics
 from netgraph.diagnostics import render_report as render_diagnostics
+from netgraph.diff import draw
 from netgraph.drift import FORMATS as DRIFT_FORMATS
 from netgraph.drift import CompareSpec, DriftReport, check_drift, render_drift
 from netgraph.drift import write_text as write_drift
@@ -253,6 +254,7 @@ from netgraph.render import (
     aggregate_graph,
     build_graph,
     collapse_targets,
+    diff_formats,
     draws_racks,
     filter_graph,
     icon_theme,
@@ -260,6 +262,7 @@ from netgraph.render import (
     rack_formats,
     render,
     render_layers,
+    supports_diff,
     supports_highlight,
     supports_icons,
     supports_interaction,
@@ -2895,6 +2898,321 @@ def render_command(
         f"{sum(len(graph.edges) for graph in graphs)} edge(s) as {output_format} "
         f"at layer {drawn}" + (f" to {output}" if output is not None else "")
     )
+
+
+# --------------------------------------------------------------------------- #
+# diff
+# --------------------------------------------------------------------------- #
+
+
+@cli.command("diff")
+@click.option(
+    "-f",
+    "--format",
+    "output_format",
+    type=click.Choice(FORMATS),
+    default="dot",
+    show_default=True,
+    shell_complete=complete_format,
+    help=f"Output format. {_describe_formats()}",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
+    default=None,
+    help="Write to this file instead of stdout.",
+)
+@click.option(
+    "--against",
+    metavar="REF|DIR",
+    default=None,
+    help=(
+        "Draw the inventory against this git ref or folder: '--against HEAD' is "
+        "'what have I changed since the last commit'. The same side as --from, spelled the "
+        "way a diff reads."
+    ),
+)
+@click.option(
+    "--from",
+    "source",
+    metavar="REF|DIR",
+    default=None,
+    help=(
+        "Take the state on the left of the diff from a git ref or another folder. A "
+        "directory that exists is a folder; anything else is a git ref, exported read-only."
+    ),
+)
+@click.option(
+    "--to",
+    "target",
+    metavar="REF|DIR",
+    default=None,
+    help="Take the state on the right of the diff from a git ref or folder. Defaults to the "
+    "inventory.",
+)
+@click.option(
+    "--plan",
+    "plan_file",
+    metavar="FILE",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help=(
+        "Draw the inventory against the state a saved plan would leave it in, without "
+        "writing anything. The plan is checked against the tree exactly as 'netgraph apply' "
+        "checks it."
+    ),
+)
+@click.option(
+    "--target",
+    "targets",
+    multiple=True,
+    metavar="ADDRESS",
+    help=(
+        "Mark only changes to elements this glob selects; the rest of the diagram is drawn "
+        "untouched. Repeatable."
+    ),
+)
+@click.option(
+    "--no-renames",
+    "no_renames",
+    is_flag=True,
+    default=False,
+    help="Draw every rename as a deletion beside a creation rather than as one moved element.",
+)
+@_graph_options
+@click.pass_context
+def diff_command(
+    ctx: click.Context,
+    /,
+    output_format: str,
+    output: Path | None,
+    against: str | None,
+    source: str | None,
+    target: str | None,
+    plan_file: Path | None,
+    targets: tuple[str, ...],
+    no_renames: bool,
+    **_options: Any,
+) -> None:
+    """Draw the difference between two inventory states as one diagram.
+
+    Added elements and links are green, removed ones red and dashed but still
+    in place, changed ones amber with a badge naming the fields that moved, and
+    everything untouched is faded. It is 'netgraph plan' as a picture: the same
+    changeset, drawn by the same renderers, so there is one notion of what
+    changed and one of what the network looks like.
+
+    A removed node keeps the position the layout document gave it, so a deletion
+    does not reshuffle the diagram and hide itself in the churn.
+
+    \b
+    netgraph -i net diff --against HEAD -f svg -o change.svg
+    netgraph -i net diff --from ../live --to . -f html -o review.html
+    netgraph -i net diff --plan drift.plan -f json | jq .changeset
+    """
+    app: AppContext = ctx.obj
+    params = ctx.params
+
+    # stdout may be the diagram itself, so every diagnostic goes to stderr.
+    console = app.console(err=True)
+    resolutions = _apply_settings(ctx)
+    if params["show_config"]:
+        _print_settings(app.console(), resolutions, config=app.config(), command="diff")
+        return
+    output_format = params["output_format"]
+    if not supports_diff(output_format):
+        raise click.UsageError(
+            f"{output_format} output has no way to say what changed — it can colour nothing "
+            f"and hold no changeset beside the graph; render the diff as "
+            f"{', '.join(diff_formats())}"
+        )
+
+    if against is not None:
+        if source is not None:
+            raise click.UsageError("--against and --from name the same side of the diff; pick one")
+        source = against
+    if plan_file is not None and (source is not None or target is not None):
+        raise click.UsageError(
+            "--plan already says what the desired state is; --from and --to name another"
+        )
+    if plan_file is None and source is None and target is None:
+        raise click.UsageError(
+            "nothing to compare against: give --against, --from, --to, or --plan"
+        )
+
+    root = app.inventory if app.inventory.is_dir() else app.inventory.parent
+    force = bool(params["force"])
+    with ExitStack() as stack:
+        try:
+            plan, before, after = _diff_states(
+                stack,
+                app,
+                root=root,
+                source=source,
+                target=target,
+                plan_file=plan_file,
+                renames=not no_renames,
+                console=console,
+                force=force,
+            )
+        except (PlanSourceError, LoaderError) as exc:
+            console.error(str(exc))
+            raise click.exceptions.Exit(EXIT_INVALID) from exc
+
+        if targets:
+            plan = plan.select(targets)
+            if plan.empty:
+                console.warn(f"--target matched no change; {len(targets)} pattern(s) given")
+
+        layer = _single_layer(params, output_format)
+        spec, aggregate = _filter_spec(params), _aggregate_spec(params)
+        drawing = draw(
+            plan,
+            _build_graph(app, before, layer=layer, spec=spec, aggregate=aggregate),
+            _build_graph(app, after, layer=layer, spec=spec, aggregate=aggregate, console=console),
+        )
+
+    if targets:
+        # ``--target`` narrows the *marks*, not the graph. Presence in the two
+        # drawings is what says "added" and "removed", and it knows nothing
+        # about the patterns — so the overlay is narrowed to the addresses the
+        # selected changeset covers, and everything else is drawn untouched.
+        drawing = replace(drawing, overlay=drawing.overlay.narrowed(_addresses_in(plan)))
+
+    options = replace(_render_options(params), diff=drawing.overlay)
+    _report_icon_support(console, output_format, options)
+    _report_interaction_support(ctx, console, output_format, options)
+    _report_advisories(
+        console, output_format, nodes=len(drawing.graph.nodes), edges=len(drawing.graph.edges)
+    )
+    payload = render(drawing.graph, output_format, options)
+    _write_output(
+        payload, output=output, binary=is_binary_format(output_format), what=output_format
+    )
+
+    if plan.empty:
+        console.info("nothing changed; the whole diagram is drawn untouched")
+    elif drawing.is_empty:
+        console.warn(
+            f"{count_text(len(plan), 'change')} to draw, but none of them is visible at layer "
+            f"{layer}; try another --layer, or read 'netgraph plan'"
+        )
+    else:
+        console.info(f"diff at layer {layer}: {drawing.overlay.summary()}")
+
+
+def _addresses_in(plan: Plan) -> set[str]:
+    """Every fully-qualified name a changeset touches, both sides of a rename."""
+    names = {change.address.fqn for change in plan}
+    names |= {change.new_address.fqn for change in plan if change.new_address is not None}
+    return names
+
+
+def _single_layer(params: Mapping[str, Any], output_format: str) -> Layer:
+    """The one layer a diff draws.
+
+    A diff is a comparison of one view. Two views would need two overlays, and
+    one output holding both would have to say which of them each mark belonged
+    to — so this refuses rather than merging marks that were computed against
+    different drawings.
+
+    Raises:
+        click.UsageError: More than one ``--layer`` was given.
+    """
+    # Counted before ``_layers`` runs, so that the answer does not depend on the
+    # format: ``-f html`` holds several layers and would otherwise be told it
+    # could have them.
+    chosen = tuple(dict.fromkeys(params["layers"]))
+    if len(chosen) > 1:
+        raise click.UsageError(
+            f"--layer was given {len(chosen)} times; a diff compares one view of the network, "
+            f"so draw each layer as its own diff"
+        )
+    return _layers(params, output_format)[0]
+
+
+def _diff_states(
+    stack: ExitStack,
+    app: AppContext,
+    *,
+    root: Path,
+    source: str | None,
+    target: str | None,
+    plan_file: Path | None,
+    renames: bool,
+    console: Console,
+    force: bool,
+) -> tuple[Plan, Inventory, Inventory]:
+    """The changeset and the two inventories behind it.
+
+    Raises:
+        PlanSourceError: A side cannot be read, or does not load and --force was
+            not given.
+        click.exceptions.Exit: ``--plan`` names something that is not a plan, or
+            one the tree has moved on from.
+    """
+    if plan_file is not None:
+        return _planned_states(app, root=root, plan_file=plan_file, console=console)
+    current = _load_state(stack, app, root, source, fallback="the inventory")
+    desired = _load_state(stack, app, root, target, fallback="the inventory")
+    for side, what in ((current, "the state on the left"), (desired, "the state on the right")):
+        if force:
+            # ``render --force`` draws an inventory with errors on the grounds
+            # that a broken picture beats no picture; a diff of two broken
+            # states is the same bargain, and says so once per side.
+            if side.inventory.errors:
+                console.warn(f"{what} does not load; drawing it anyway (--force)")
+        else:
+            _refuse_broken(console, side.inventory, what)
+    return (
+        diff_states(
+            current.inventory,
+            desired.inventory,
+            source=current.ref,
+            target=desired.ref,
+            renames=renames,
+        ),
+        current.inventory,
+        desired.inventory,
+    )
+
+
+def _planned_states(
+    app: AppContext, *, root: Path, plan_file: Path, console: Console
+) -> tuple[Plan, Inventory, Inventory]:
+    """The tree, and the tree as ``plan_file`` would leave it — without writing.
+
+    The plan is executed into an :class:`~netgraph.edit.EditSession` that is
+    never committed, so what is drawn on the right is the *same* text
+    ``netgraph apply`` would write, produced by the same operations. Drawing a
+    reconstruction instead would be a second answer to a question the mutation
+    layer already answers.
+    """
+    try:
+        plan = plan_from_dict(json.loads(plan_file.read_text(encoding="utf-8")))
+    except (OSError, UnicodeDecodeError) as exc:
+        console.error(f"cannot read {plan_file}: {exc}")
+        raise click.exceptions.Exit(EXIT_INVALID) from exc
+    except (json.JSONDecodeError, PlanFormatError) as exc:
+        console.error(f"{plan_file} is not a netgraph plan: {exc}")
+        raise click.exceptions.Exit(EXIT_INVALID) from exc
+
+    session = EditSession(root=root, config=_edit_config(app), cache=app.cache())
+    if not _state_matches(console, plan, session, plan_file=plan_file):
+        raise click.exceptions.Exit(EXIT_INVALID)
+    before = session.baseline
+    try:
+        for _ in translate(plan, session):
+            pass
+    except (PlanExecutionError, EditError) as exc:
+        if isinstance(exc, EditError):
+            _report_edit_error(console, exc)
+        else:
+            console.error(str(exc))
+        console.info("nothing has been written")
+        raise click.exceptions.Exit(EXIT_INVALID) from exc
+    return plan, before, session.inventory
 
 
 def _empty_graph_reason(layer: Layer, spec: FilterSpec) -> str:

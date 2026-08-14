@@ -109,6 +109,7 @@ from netgraph.render.details import (
     plain_text,
     printable,
 )
+from netgraph.render.diffview import Mark
 from netgraph.render.graph import (
     GROUP_KIND,
     PATCHPANEL_KIND,
@@ -416,6 +417,29 @@ _DIM_TEXT: Final = "#a1a1aa"
 #: Pen width of a dimmed link — the thinnest step, below every rate threshold,
 #: so the rate encoding never makes an off-path link louder than an on-path one.
 _DIM_PENWIDTH: Final = "0.7"
+
+#: How a :class:`~netgraph.render.diffview.DiffOverlay` paints each mark:
+#: outline, pen width, fill, text. Green for what arrives, red for what leaves,
+#: amber for what moved — the three colours a reader of a code review already
+#: knows — and the dimmed palette for everything untouched, shared with the
+#: highlight above so a diff and a trace fade the background the same way.
+#:
+#: Hue is not the only carrier: a removed node and a removed link are also
+#: **dashed** (see :func:`_diff_style`), so the picture survives a greyscale
+#: print and a red-green reader.
+_DIFF_ADDED_STROKE: Final = "#15803d"
+_DIFF_ADDED_FILL: Final = "#dcfce7"
+_DIFF_REMOVED_STROKE: Final = "#dc2626"
+_DIFF_REMOVED_FILL: Final = "#fee2e2"
+_DIFF_CHANGED_STROKE: Final = "#b45309"
+_DIFF_CHANGED_FILL: Final = "#fef3c7"
+#: Pen width of anything the diff marks. One step below the highlight's, because
+#: a diff marks many things at once and a page of 3.0pt outlines is a page with
+#: no emphasis in it.
+_DIFF_PENWIDTH: Final = "2.5"
+#: What a badge is prefixed with, per mark: the sigils ``netgraph plan`` already
+#: prints, so the diagram and the changeset read the same way.
+_DIFF_SIGILS: Final[dict[str, str]] = {"added": "+", "removed": "-", "changed": "~"}
 
 #: Pen width per link rate, widest threshold first. A reader should be able to
 #: rank two links by rate without reading either label, which needs the steps to
@@ -1254,6 +1278,13 @@ def _node_views(
         emphasis = _node_emphasis(node, options.highlight)
         if emphasis is not None:
             fill, stroke = emphasis.fill or fill, emphasis.stroke
+        # A diff is applied *after* a highlight and overrides it: the two are
+        # not normally combined, and when they are, "this is being deleted" is
+        # the louder fact.
+        mark = Mark.UNCHANGED if options.diff is None else options.diff.node(node.fqn)
+        if options.diff is not None:
+            emphasis = _diff_emphasis(mark)
+            fill, stroke = emphasis.fill or fill, emphasis.stroke
         image = icons.get(node.kind)
         element = identity.node(node.fqn)
         record = details.get(element) if element is not None else None
@@ -1268,11 +1299,15 @@ def _node_views(
             shape="none" if image else shape,
             fill=fill,
             stroke=stroke,
-            style="" if image else _node_style(node),
+            style="" if image else _diff_style(_node_style(node), mark),
             # A tooltip is a DOT string, not HTML, so its line breaks are
             # meaningful and are kept.
             tooltip=detail_text(record) if record is not None else None,
-            rows=_node_rows(node, options, layer=graph.layer),
+            rows=_with_badge(
+                _node_rows(node, options, layer=graph.layer),
+                mark,
+                None if options.diff is None else options.diff.badge(node.fqn),
+            ),
             image=image,
             element_id=element if options.element_ids else None,
             url=_node_url(graph, node, options.link_template),
@@ -1324,6 +1359,76 @@ def _edge_emphasis(edge: Edge, highlight: Highlight | None) -> _Emphasis | None:
     if highlight is None:
         return None
     return _EMPHASISED if highlight.has_edge(edge.id) else _DIMMED
+
+
+#: How each :class:`~netgraph.render.diffview.Mark` is drawn. An untouched thing
+#: reuses the highlight's dimmed palette rather than a second grey of its own.
+_DIFF_EMPHASIS: Final[dict[Mark, _Emphasis]] = {
+    Mark.ADDED: _Emphasis(
+        stroke=_DIFF_ADDED_STROKE, penwidth=_DIFF_PENWIDTH, fill=_DIFF_ADDED_FILL
+    ),
+    Mark.REMOVED: _Emphasis(
+        stroke=_DIFF_REMOVED_STROKE, penwidth=_DIFF_PENWIDTH, fill=_DIFF_REMOVED_FILL
+    ),
+    Mark.CHANGED: _Emphasis(
+        stroke=_DIFF_CHANGED_STROKE, penwidth=_DIFF_PENWIDTH, fill=_DIFF_CHANGED_FILL
+    ),
+    Mark.UNCHANGED: _DIMMED,
+}
+
+
+def _diff_emphasis(mark: Mark) -> _Emphasis:
+    """How loudly a diff draws something, given what the changeset says of it."""
+    return _DIFF_EMPHASIS[mark]
+
+
+def _diff_badge(mark: Mark, detail: str | None) -> _Row | None:
+    """The caption a diff adds under a node, or ``None`` for an untouched one.
+
+    Every marked node gets one, not only the amber ones: the sigil is what
+    survives a greyscale print, and a reader who cannot tell the green from the
+    amber can still read ``+`` and ``~``.
+    """
+    if mark is Mark.UNCHANGED:
+        return None
+    sigil = _DIFF_SIGILS.get(mark.value, "")
+    text = f"{sigil} {mark.value}" if detail is None else f"{sigil} {detail}"
+    return _Row(port=_inline(text), spans=True)
+
+
+def _diff_label(label: str, mark: Mark, detail: str | None) -> str:
+    """``label`` with the diff's sigil and detail added, on its own line.
+
+    A link has no table to hang a badge row off, so the caption grows instead —
+    which is also where the medium and the rate already are, so the two read
+    together.
+    """
+    if mark is Mark.UNCHANGED:
+        return label
+    sigil = _DIFF_SIGILS.get(mark.value, "")
+    caption = f"{sigil} {mark.value}" if detail is None else f"{sigil} {detail}"
+    return f"{label}\n{caption}" if label else caption
+
+
+def _with_badge(rows: tuple[_Row, ...], mark: Mark, detail: str | None) -> tuple[_Row, ...]:
+    """``rows`` with the diff's caption appended, when there is one to append."""
+    badge = _diff_badge(mark, detail)
+    return rows if badge is None else (*rows, badge)
+
+
+def _diff_style(style: str | None, mark: Mark) -> str | None:
+    """``style`` with the dashed outline a removed node is drawn with.
+
+    A deletion has to be legible without colour — this is the picture someone
+    prints and takes into a change meeting — so the one mark that means "this
+    will not be here" carries a line style as well as a hue.
+    """
+    if mark is not Mark.REMOVED:
+        return style
+    parts = [part for part in (style or "filled").split(",") if part]
+    if "dashed" not in parts:
+        parts.append("dashed")
+    return ",".join(parts)
 
 
 def _node_url(graph: Graph, node: Node, template: Linker | None) -> str | None:
@@ -1493,6 +1598,14 @@ def _edge_views(
         emphasis = _edge_emphasis(edge, options.highlight)
         if emphasis is not None:
             colour = emphasis.stroke
+        mark = Mark.UNCHANGED if options.diff is None else options.diff.edge(edge.id)
+        if options.diff is not None:
+            emphasis = _diff_emphasis(mark)
+            colour = emphasis.stroke
+            # A removed link is dashed whatever it is made of: at this point the
+            # question a reader has is not "copper or fibre" but "will it be
+            # there". The medium is still on the label and in the tooltip.
+            style = "dashed" if mark is Mark.REMOVED else style
         element = identity.edge(index)
         record = details.get(element) if element is not None else None
         yield _EdgeView(
@@ -1506,7 +1619,12 @@ def _edge_views(
             # fast", because a reader looking at a traced route is asking the
             # first question; the rate is still on the label and in the tooltip.
             penwidth=emphasis.penwidth if emphasis is not None else _penwidth(edge.speed),
-            label=_edge_label(edge, graph.layer, options) or None,
+            label=_diff_label(
+                _edge_label(edge, graph.layer, options),
+                mark,
+                None if options.diff is None else options.diff.badge(edge.id),
+            )
+            or None,
             tooltip=detail_text(record) if record is not None else None,
             element_id=element if options.element_ids else None,
             url=_edge_url(graph, edge, options.link_template),

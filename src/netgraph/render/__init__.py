@@ -42,6 +42,7 @@ from netgraph.render.details import (
     detail_text,
     namespace_text,
 )
+from netgraph.render.diffview import DiffOverlay, Mark, diff_overlay, union_graph
 from netgraph.render.dot import IMAGE_FORMATS, render_dot, render_image, to_dot, to_image
 from netgraph.render.graph import (
     NODE_KINDS,
@@ -106,10 +107,12 @@ from netgraph.render.registry import (
     RENDERERS,
     Renderer,
     content_security_policy_for,
+    diff_formats,
     draws_racks,
     media_type_for,
     rack_formats,
     renderer_for,
+    supports_diff,
     supports_highlight,
     supports_icons,
     supports_interaction,
@@ -145,6 +148,7 @@ __all__ = [
     "AggregateView",
     "BundleMode",
     "BundleView",
+    "DiffOverlay",
     "Edge",
     "EdgeKind",
     "ElementIds",
@@ -156,6 +160,7 @@ __all__ = [
     "LinkMap",
     "LinkTemplate",
     "Linker",
+    "Mark",
     "Node",
     "NodeType",
     "PatchHop",
@@ -180,6 +185,8 @@ __all__ = [
     "common_prefix",
     "content_security_policy_for",
     "detail_text",
+    "diff_formats",
+    "diff_overlay",
     "draws_racks",
     "element_ids",
     "filter_graph",
@@ -206,6 +213,7 @@ __all__ = [
     "resolve_tunnels",
     "splice_patch_panels",
     "suffix_for",
+    "supports_diff",
     "supports_highlight",
     "supports_icons",
     "supports_interaction",
@@ -216,6 +224,7 @@ __all__ = [
     "to_image",
     "to_json",
     "to_mermaid",
+    "union_graph",
 ]
 
 #: Every format ``netgraph render -f`` accepts, in help-text order.

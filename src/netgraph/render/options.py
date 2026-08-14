@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Final
 
+from netgraph.render.diffview import DiffOverlay
 from netgraph.render.highlight import Highlight
 from netgraph.render.icons import IconTheme
 from netgraph.render.links import Linker
@@ -74,3 +75,17 @@ class RenderOptions:
     #: renderer runs, and a highlight only decides how loudly. Honoured by the
     #: Graphviz backends; Mermaid and JSON have no visual weight to vary.
     highlight: Highlight | None = None
+    #: Draw the graph as a *diff*: added things green, removed things red and
+    #: dashed, changed things amber with a badge naming the fields that moved,
+    #: and everything untouched faded
+    #: (:mod:`netgraph.render.diffview`). ``None`` — the default — draws one
+    #: state of the network, as every rendering did before ``netgraph diff``
+    #: existed.
+    #:
+    #: Like a highlight this changes no topology. Unlike one it is normally
+    #: paired with a graph that holds *both* states — see
+    #: :func:`netgraph.render.diffview.union_graph` — because a removed device
+    #: has to be somewhere to be drawn in red. Honoured by the Graphviz backends
+    #: and by JSON, which publishes the marks and the changeset beside the
+    #: graph; Mermaid has no vocabulary for either and ignores it.
+    diff: DiffOverlay | None = None

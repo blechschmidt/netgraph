@@ -1,0 +1,57 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-home
+  description: |
+    Home edge router. Terminates the ISP hand-off on wan0 and is the default
+    gateway for the single home VLAN (10).
+  labels:
+    site: home
+    role: edge
+    env: prod
+  annotations:
+    # wan0 faces the ISP, which is not an element of this inventory, so it
+    # terminates no cable on purpose (NG-C015 / I002).
+    netgraph/ignore: NG-C015
+spec:
+  vendor: MikroTik
+  model: hEX S
+  location: Home / hallway cabinet
+  interfaces:
+    - name: lo0
+      type: loopback
+      description: Router ID and management target
+      ipv4:
+        addresses: [192.0.2.1/32]
+      ipv6:
+        addresses: [2001:db8::1/128]
+
+    - name: wan0
+      type: ethernet
+      description: ISP hand-off
+      mac: '00:1e:8c:00:10:01'
+      mtu: 1500
+      ipv4:
+        addresses:
+          - ip: 203.0.113.2
+            prefix_length: 30
+
+    - name: lan0
+      type: ethernet
+      description: Downlink to sw-home
+      mac: '00:1e:8c:00:10:02'
+      mtu: 1500
+      ipv4:
+        addresses: [192.168.10.1/24]
+      ipv6:
+        addresses: [2001:db8:10::1/64]
+      vlan:
+        mode: access
+        access_vlan: 10
+  vlans:
+    - id: 10
+      name: home
+      description: The one and only user VLAN
+  forwarding:
+    ipv4: true
+    ipv6: true

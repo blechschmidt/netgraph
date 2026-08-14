@@ -38,10 +38,12 @@ __all__ = [
     "RENDERERS",
     "Renderer",
     "content_security_policy_for",
+    "diff_formats",
     "draws_racks",
     "media_type_for",
     "rack_formats",
     "renderer_for",
+    "supports_diff",
     "supports_highlight",
     "supports_icons",
     "supports_interaction",
@@ -143,6 +145,14 @@ class Renderer:
     #: look. Mermaid and JSON have no such vocabulary, so ``netgraph path
     #: --highlight`` does not offer them rather than silently ignoring the flag.
     supports_highlight: bool = False
+    #: Can this backend draw a :class:`~netgraph.render.diffview.DiffOverlay`?
+    #: Wider than :attr:`supports_highlight`, because a diff is not only visual
+    #: weight: ``json`` cannot colour anything and still carries the whole
+    #: changeset beside the graph, which is the form another tool consumes. Only
+    #: Mermaid is left out — it can neither colour a node nor hold a document
+    #: beside one, so ``netgraph diff -f mermaid`` says so rather than emitting
+    #: a flowchart in which nothing distinguishes the deleted switch.
+    supports_diff: bool = False
 
     @property
     def is_text(self) -> bool:
@@ -195,6 +205,7 @@ def _text_renderer(
     supports_icons: bool = False,
     interactive: bool = False,
     supports_highlight: bool = False,
+    supports_diff: bool = False,
     to_document: DocumentBackend | None = None,
     csp: str | None = None,
     draws_racks: bool = True,
@@ -216,6 +227,7 @@ def _text_renderer(
         supports_icons=supports_icons,
         interactive=interactive,
         supports_highlight=supports_highlight,
+        supports_diff=supports_diff,
         to_document=to_document,
         csp=csp,
         draws_racks=draws_racks,
@@ -240,6 +252,7 @@ def _image_renderer(
         supports_icons=True,
         interactive=interactive,
         supports_highlight=True,
+        supports_diff=True,
     )
 
 
@@ -257,6 +270,7 @@ RENDERERS: Final[Mapping[str, Renderer]] = MappingProxyType(
                 supports_icons=True,
                 interactive=True,
                 supports_highlight=True,
+                supports_diff=True,
             ),
             _image_renderer(
                 "svg",
@@ -274,6 +288,7 @@ RENDERERS: Final[Mapping[str, Renderer]] = MappingProxyType(
                 supports_icons=True,
                 interactive=True,
                 supports_highlight=True,
+                supports_diff=True,
                 to_document=html_document,
                 csp=PAGE_CSP,
             ),
@@ -294,6 +309,7 @@ RENDERERS: Final[Mapping[str, Renderer]] = MappingProxyType(
                 ".json",
                 "application/json",
                 to_json,
+                supports_diff=True,
             ),
         )
     }
@@ -318,6 +334,21 @@ def supports_highlight(format: str) -> bool:
     """
     renderer = RENDERERS.get(format)
     return renderer is not None and renderer.supports_highlight
+
+
+def supports_diff(format: str) -> bool:
+    """Would ``format`` draw a :class:`~netgraph.render.diffview.DiffOverlay`?
+
+    An unknown format answers ``False``; the render call that follows is where
+    a bad format name is reported.
+    """
+    renderer = RENDERERS.get(format)
+    return renderer is not None and renderer.supports_diff
+
+
+def diff_formats() -> tuple[str, ...]:
+    """The formats that can, in help-text order, for a diagnostic."""
+    return tuple(name for name, renderer in RENDERERS.items() if renderer.supports_diff)
 
 
 def supports_layers(format: str) -> bool:

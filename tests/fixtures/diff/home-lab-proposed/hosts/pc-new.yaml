@@ -1,0 +1,18 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-new
+  description: The workstation this change adds
+  labels:
+    site: home
+    role: workstation
+spec:
+  vendor: Dell
+  model: OptiPlex 7020
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mac: '3c:97:0e:20:03:01'
+      mtu: 1500
+      ipv4:
+        addresses: [192.168.10.31/24]

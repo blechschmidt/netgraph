@@ -70,6 +70,7 @@ from netgraph.layout.geometry import Geometry, Placement
 from netgraph.models import API_VERSION
 from netgraph.power import Feed, PowerNode
 from netgraph.render.aggregate import AggregateView, BundleView
+from netgraph.render.diffview import DiffOverlay, Mark
 from netgraph.render.graph import (
     AdjacencyView,
     Edge,
@@ -140,8 +141,15 @@ def graph_to_dict(graph: Graph, options: RenderOptions | None = None) -> dict[st
         "kind": GRAPH_KIND,
         "layer": graph.layer.value,
         "nodes": [_node(node, opts, graph.geometry) for node in graph.nodes.values()],
-        "edges": [_edge(edge, graph.geometry) for edge in graph.edges],
+        "edges": [_edge(edge, graph.geometry, opts.diff) for edge in graph.edges],
     }
+    if opts.diff is not None:
+        # The changeset travels *with* the graph rather than in a second file:
+        # a consumer of a diff needs both, and two documents that could be
+        # paired wrongly is the failure this avoids.
+        document["diff"] = opts.diff.to_dict()
+        if opts.diff.changeset is not None:
+            document["changeset"] = dict(opts.diff.changeset)
     layout = _layout(graph)
     if layout is not None:
         document["layout"] = layout
@@ -224,6 +232,9 @@ def _node(node: Node, options: RenderOptions, geometry: Geometry) -> dict[str, A
     placement = geometry.nodes.get(node.fqn)
     if placement is not None:
         payload["layout"] = _placement(placement)
+    diff = _diff_mark(options.diff, node.fqn)
+    if diff is not None:
+        payload["diff"] = diff
     return payload
 
 
@@ -487,7 +498,9 @@ def _port(port: PortView, options: RenderOptions) -> dict[str, Any]:
 _NO_GEOMETRY: Final[Geometry] = Geometry()
 
 
-def _edge(edge: Edge, geometry: Geometry = _NO_GEOMETRY) -> dict[str, Any]:
+def _edge(
+    edge: Edge, geometry: Geometry = _NO_GEOMETRY, overlay: DiffOverlay | None = None
+) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "id": edge.id,
         "kind": edge.kind.value,
@@ -528,6 +541,30 @@ def _edge(edge: Edge, geometry: Geometry = _NO_GEOMETRY) -> dict[str, Any]:
     waypoints = geometry.edges.get(edge.id)
     if waypoints:
         payload["layout"] = {"waypoints": [{"x": x, "y": y} for x, y in waypoints]}
+    diff = _diff_mark(overlay, edge.id)
+    if diff is not None:
+        payload["diff"] = diff
+    return payload
+
+
+def _diff_mark(overlay: DiffOverlay | None, ident: str) -> dict[str, Any] | None:
+    """What ``netgraph diff`` says about one node or link, or ``None``.
+
+    Present on *every* node and edge of a diff document, untouched ones
+    included: a consumer filtering for what moved must be able to tell "this
+    export carries no diff" from "this element did not change", and an absent
+    key would say both.
+    """
+    if overlay is None:
+        return None
+    mark = overlay.nodes.get(ident) or overlay.edges.get(ident) or Mark.UNCHANGED
+    payload: dict[str, Any] = {"mark": mark.value}
+    fields = overlay.fields.get(ident, ())
+    if fields:
+        payload["fields"] = list(fields)
+    previous = overlay.renamed_from.get(ident)
+    if previous is not None:
+        payload["renamedFrom"] = previous
     return payload
 
 
