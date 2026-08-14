@@ -82,6 +82,43 @@ comment-preserving operations [`netgraph edit`](edit.md) applies from the comman
 line. The server constructs no YAML of its own, so untouched lines are not
 rewritten and a diff of an edit shows the edit.
 
+### Reviewing what you changed
+
+The **Changes** button opens a drawer listing every gesture the session made,
+newest first. One entry per gesture rather than per operation: deleting a switch
+is one line, not the five operations it became. Each carries
+
+* **the YAML hunk it wrote**, as a unified diff with `a/`–`b/` prefixes, so it
+  pastes into a patch file without editing;
+* **its label**, which reveals the document it changed at its line — the same
+  mapping a click on the diagram uses, run from the log instead;
+* **Revert**, which puts that one change back.
+
+**A revert is a new change, not a rewind.** It applies the gesture's own inverse
+as a fresh edit, which is itself logged and itself undoable, so reverting the
+third of ten gestures leaves the other nine alone. When one of those nine
+depended on what the third one did, the revert is refused with the reason and
+nothing is written — which is the honest outcome, and the one an undo stack
+cannot give you.
+
+Opening the drawer also **repaints the canvas as a diff**: added elements green,
+removed ones red and dashed but still in place, changed ones amber with a badge
+naming the fields that moved, everything untouched faded. The `since` menu
+chooses what it is drawn against —
+
+| | |
+|---|---|
+| `this session started` | the tree as this page first saw it. The default: "what have I done this afternoon" is the question, and neither git nor the undo stack answers it. |
+| `git HEAD` | `HEAD` as the inventory root looks in it. Offered only when the root is in a repository, because an option that always fails is not an option. |
+
+It is the same overlay [`netgraph diff`](diff.md) draws, from the same
+changeset — the drawer and the diagram are two views of one answer.
+
+**Copy commands** hands the whole session over as a list of
+[`netgraph edit`](edit.md) invocations, in the order they happened, for a
+pull-request description or somebody else's terminal. The rendering is never
+lossy; see [`docs/editing.md`](../editing.md#as-a-script).
+
 ### Reconciliation
 
 The session does not own the files. `watchfiles` watches the folder exactly as
@@ -105,6 +142,9 @@ is on loopback and none of the write routes exist unless `--write` was given.
 | `PUT /api/file/<path>` | That file back: `{"text": …, "hash": …}`. A stale `hash` is `409`; a new error is `422`, listing them; `"force": true` overrides the second, never the first. |
 | `POST /api/ops` | `{"revision": …, "ops": [ … ]}` — a batch of [edit operations](../editing.md), applied atomically. Answers with the applied operations, their inverses, the files changed and the tree's diagnostics. |
 | `POST /api/undo`, `POST /api/redo` | Move the server-side history one step. |
+| `GET /api/changes` | The session's log — one entry per gesture, with its hunk, the files and addresses it touched, and the `netgraph edit` lines that replay it — plus the whole session as one command list and the baselines this tree can be diffed against. |
+| `GET /api/diff?against=session` | The same payload `/api/graph` answers, drawn as a diff, with `diff` holding the marks per node and edge and `diff.changeset` the whole [plan](plan.md). `against=git` compares with `HEAD`. |
+| `POST /api/revert` | `{"id": 3, "revision": …}` — put one logged gesture back. |
 
 `<path>` is relative to the inventory root and is checked, not normalised: an
 absolute path, a `..`, a component the loader skips and a suffix that is not
@@ -220,6 +260,8 @@ Text that does not parse is reported in the page, not by the process.
 
 * [`netgraph edit`](edit.md) — the same operations from the command line, and the
   layer every write in the browser goes through.
+* [`netgraph diff`](diff.md) — the same overlay from the command line, over two
+  folders, a git ref or a saved plan.
 * [`netgraph watch`](watch.md) — the same live diagram without an editor, for a
   second screen.
 * [`docs/editing.md`](../editing.md) — what an operation is, what an inverse

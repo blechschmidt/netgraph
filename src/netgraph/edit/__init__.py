@@ -39,6 +39,12 @@ before writing any of it.
 from __future__ import annotations
 
 from netgraph.edit.apply import AppliedOperation, apply_operation
+from netgraph.edit.commands import (
+    INVENTORY_PLACEHOLDER,
+    command_for,
+    command_list,
+    commands_text,
+)
 from netgraph.edit.errors import (
     AddressError,
     CascadeRequired,
@@ -79,6 +85,7 @@ from netgraph.edit.tree import EditableTree, digest_of
 
 __all__ = [
     "COLLECTION_STEMS",
+    "INVENTORY_PLACEHOLDER",
     "OPERATIONS",
     "AddInterface",
     "AddressError",
@@ -115,6 +122,9 @@ __all__ = [
     "YamlFile",
     "apply_operation",
     "choose_file",
+    "command_for",
+    "command_list",
+    "commands_text",
     "digest_of",
     "format_field_path",
     "operation_from_dict",

@@ -172,9 +172,13 @@ class DiffOverlay:
         the honest reading of "only these elements": nobody selected the subnet
         an unselected host happens to sit in.
         """
-        keep = set(addresses)
-        nodes = {key: value for key, value in self.nodes.items() if _node_owner(key, keep) in keep}
-        edges = {key: value for key, value in self.edges.items() if _edge_owner(key, keep) in keep}
+        keep: dict[str, None] = dict.fromkeys(addresses)
+        nodes = {
+            key: value for key, value in self.nodes.items() if _node_owner(key, keep) is not None
+        }
+        edges = {
+            key: value for key, value in self.edges.items() if _edge_owner(key, keep) is not None
+        }
         marked = set(nodes) | set(edges)
         return replace(
             self,

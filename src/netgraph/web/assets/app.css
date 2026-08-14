@@ -378,7 +378,120 @@ main {
 }
 .info .note { opacity: .65; }
 
+/* -------------------------------------------------------- changes drawer */
+
+/* Over the diagram rather than beside it: the drawer is opened to *read* the
+ * change and closed to carry on editing, and a fourth column would take a
+ * quarter of the canvas away permanently for something wanted occasionally.
+ * The pane it sits in is the positioning context; see `.pane.diagram`. */
+.pane.diagram { position: relative; }
+
+.drawer {
+  position: absolute;
+  z-index: 8;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(30rem, 55%);
+  display: flex;
+  flex-direction: column;
+  background: Canvas;
+  border-left: 1px solid var(--edge);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, .22);
+}
+
+.drawer[hidden] { display: none; }
+.drawer .pane-head { align-items: center; flex-wrap: wrap; row-gap: .3rem; }
+.drawer .pane-head .field { text-transform: none; letter-spacing: 0; }
+
+.changes-list {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: .2rem 0 1rem;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.change {
+  border-bottom: 1px solid var(--edge);
+  padding: .45rem .7rem .55rem;
+}
+
+.change.reverted { opacity: .5; }
+
+.change-head {
+  display: flex;
+  gap: .45rem;
+  align-items: baseline;
+}
+
+.change .n { opacity: .5; }
+.change .label { flex: 1 1 auto; overflow-wrap: anywhere; }
+.change .label.revealable { cursor: pointer; text-decoration: underline dotted; }
+.change .where { opacity: .6; font-size: 11px; overflow-wrap: anywhere; }
+
+/* The hunk is the point of the entry: it is what was written, in the form a
+ * reviewer already reads. Coloured by the same three hues the diagram uses, so
+ * a green line here and a green box there mean the same thing. */
+.change pre {
+  margin: .35rem 0 0;
+  padding: .35rem .5rem;
+  max-height: 18rem;
+  overflow: auto;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  font: 11px/1.45 var(--mono);
+  white-space: pre;
+  background: color-mix(in srgb, CanvasText 4%, transparent);
+}
+
+.change pre .add { color: var(--ok); }
+.change pre .del { color: var(--error); }
+.change pre .at { color: var(--info); opacity: .8; }
+.change pre .file { font-weight: 600; opacity: .75; }
+
+.change .commands { opacity: .7; }
+
+/* --------------------------------------------------------------- legend */
+
+/* Only shown while a diff is on the canvas. A permanent key would be four
+ * words of furniture explaining a colour scheme that is not in use. */
+.legend {
+  position: absolute;
+  left: .7rem;
+  bottom: .7rem;
+  display: flex;
+  gap: .5rem;
+  padding: .3rem .5rem;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  background: Canvas;
+  font: 11px/1.4 var(--mono);
+}
+
+.legend[hidden] { display: none; }
+.legend .key::before {
+  content: "";
+  display: inline-block;
+  width: .6rem;
+  height: .6rem;
+  margin-right: .3rem;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+
+.legend .added { color: #15803d; }
+.legend .changed { color: #b45309; }
+.legend .removed { color: #dc2626; }
+.legend .removed::before { border-style: dashed; }
+.legend .untouched { color: #a1a1aa; }
+
+.count { opacity: .7; }
+
 @media (max-width: 720px) {
+  .drawer { width: 100%; }
+
   main { flex-direction: column; }
   .pane.editor { flex: 0 0 45%; border-right: 0; border-bottom: 1px solid var(--edge); }
   .pane.files { flex: 0 0 20%; border-right: 0; border-bottom: 1px solid var(--edge); }

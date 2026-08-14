@@ -70,17 +70,26 @@ from netgraph.httpserve import (
 )
 from netgraph.render import IconTheme
 from netgraph.web.preview import Preview, RequestError, ViewOptions, render_source
-from netgraph.web.session import Conflict, EditingSession, ReadOnly, SessionError
+from netgraph.web.session import (
+    SESSION_BASELINE,
+    Conflict,
+    EditingSession,
+    ReadOnly,
+    SessionError,
+)
 
 __all__ = [
     "ASSETS",
+    "CHANGES_PATH",
     "DEFAULT_PORT",
+    "DIFF_PATH",
     "FILE_PREFIX",
     "GRAPH_PATH",
     "MAX_SOURCE_BYTES",
     "OPS_PATH",
     "REDO_PATH",
     "RENDER_PATH",
+    "REVERT_PATH",
     "SOURCE_PATH",
     "STATE_PATH",
     "TREE_PATH",
@@ -99,6 +108,12 @@ STATE_PATH: Final = "/api/state"
 TREE_PATH: Final = "/api/tree"
 GRAPH_PATH: Final = "/api/graph"
 OPS_PATH: Final = "/api/ops"
+#: The changes drawer: the session's own log, and the handover command list.
+CHANGES_PATH: Final = "/api/changes"
+#: The same tree, drawn as a diff against a baseline (``?against=session|git``).
+DIFF_PATH: Final = "/api/diff"
+#: Put one logged gesture back.
+REVERT_PATH: Final = "/api/revert"
 UNDO_PATH: Final = "/api/undo"
 REDO_PATH: Final = "/api/redo"
 #: Everything after this is a path inside the inventory, and is checked as one.
@@ -223,6 +238,23 @@ class _Handler(LocalHandler):
             preview, revision = session.graph(view)
             self.on_render(preview)
             self._json(HTTPStatus.OK, {"revision": revision} | preview.to_dict(), body=body)
+        elif path == DIFF_PATH:
+            query = parse_qs(urlsplit(self.path).query)
+            view = ViewOptions.from_query(query, icons=self.icons)
+            against = query.get("against", [SESSION_BASELINE])[-1]
+            preview, revision = session.diff(view, against=against)
+            self.on_render(preview)
+            self._json(
+                HTTPStatus.OK,
+                {"revision": revision, "against": against} | preview.to_dict(),
+                body=body,
+            )
+        elif path == CHANGES_PATH:
+            self._json(
+                HTTPStatus.OK,
+                session.changes() | {"baselines": list(session.baselines())},
+                body=body,
+            )
         elif path.startswith(FILE_PREFIX):
             self._json(HTTPStatus.OK, session.read_file(_requested_path(path)), body=body)
         else:
@@ -254,7 +286,7 @@ class _Handler(LocalHandler):
         self._json(HTTPStatus.OK, preview.to_dict())
 
     def _post_session(self, session: EditingSession, path: str) -> None:
-        if path not in (OPS_PATH, UNDO_PATH, REDO_PATH):
+        if path not in (OPS_PATH, UNDO_PATH, REDO_PATH, REVERT_PATH):
             self.send_text(HTTPStatus.NOT_FOUND, f"nothing to post to at {path}")
             return
         try:
@@ -262,6 +294,9 @@ class _Handler(LocalHandler):
                 change = session.undo()
             elif path == REDO_PATH:
                 change = session.redo()
+            elif path == REVERT_PATH:
+                payload = self._read_json()
+                change = session.revert(_entry_id(payload), revision=_revision(payload))
             else:
                 payload = self._read_json()
                 change = session.apply(
@@ -400,6 +435,18 @@ def _requested_path(path: str) -> str:
     ever turns one of these into a file name.
     """
     return unquote(path[len(FILE_PREFIX) :])
+
+
+def _entry_id(payload: dict[str, Any]) -> int:
+    """Which logged gesture a revert names.
+
+    Raises:
+        RequestError: The body names none, or names something that is not one.
+    """
+    value = payload.get("id")
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise RequestError("'id' must be the number of the change to put back")
+    return value
 
 
 def _revision(payload: dict[str, Any]) -> int | None:

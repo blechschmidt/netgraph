@@ -18,14 +18,19 @@ pins the behaviours and the refusals.
 from __future__ import annotations
 
 import json
+import os
 import shutil
+import subprocess
+import sys
 from pathlib import Path
+from typing import Final
 
 import pytest
 from click.testing import CliRunner
 
 from netgraph.cli import cli
 from netgraph.edit import (
+    INVENTORY_PLACEHOLDER,
     AddInterface,
     AddressError,
     CascadeRequired,
@@ -39,6 +44,7 @@ from netgraph.edit import (
     FileFacts,
     MoveElement,
     NameIndex,
+    Operation,
     OperationError,
     PlacementError,
     Problem,
@@ -47,12 +53,14 @@ from netgraph.edit import (
     RenameElement,
     RoundTripError,
     SetField,
+    SetGeometry,
     UnsetField,
     ValidationRefused,
     WriteFile,
     YamlDocument,
     YamlFile,
     choose_file,
+    command_for,
     format_field_path,
     operation_from_dict,
     operations_from_json,
@@ -70,7 +78,8 @@ from netgraph.edit.references import (
 )
 from netgraph.loader import load_tree
 
-EXAMPLES = Path(__file__).resolve().parent.parent / "examples"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+EXAMPLES = REPO_ROOT / "examples"
 
 
 # --------------------------------------------------------------------------- #
@@ -1567,3 +1576,109 @@ def test_the_command_moves_and_unsets(home: Path) -> None:
     assert run(home, "unset", "sw-home", "spec.location").exit_code == 0
     assert run(home, "move", "sw-home", "network/sw-home.yaml").exit_code == 0
     assert "network/sw-home" in load_tree(home).devices
+
+
+# --------------------------------------------------------------------------- #
+# The handover: an operation as a command line
+# --------------------------------------------------------------------------- #
+
+
+#: The console script's directory, so a rendered command line finds ``netgraph``
+#: whether or not the test run's shell has the virtualenv activated.
+_SCRIPTS: Final = str(Path(sys.executable).parent)
+
+
+def _replay(root: Path, command: str) -> subprocess.CompletedProcess[str]:
+    """Run one rendered command line against ``root``, as a shell would."""
+    environment = {**os.environ, "PATH": _SCRIPTS + os.pathsep + os.environ.get("PATH", "")}
+    return subprocess.run(
+        command, cwd=root.parent, shell=True, capture_output=True, text=True, env=environment
+    )
+
+
+@pytest.mark.parametrize(
+    ("operation", "expected"),
+    [
+        (SetField(address="sw1", path="spec.model", value="X 2"), "edit set sw1 spec.model 'X 2'"),
+        (SetField(address="sw1", path="spec.mtu", value=9000), "edit set sw1 spec.mtu 9000"),
+        (UnsetField(address="sw1", path="spec.model"), "edit unset sw1 spec.model"),
+        (DeleteElement(address="a/b", cascade=True), "edit delete a/b --cascade"),
+        (RenameElement(address="a/b", new_name="c"), "edit rename a/b c"),
+        (Disconnect(address="cables/c1"), "edit disconnect cables/c1"),
+        (MoveElement(address="a/b", file="c.yaml"), "edit move a/b c.yaml"),
+        (
+            RemoveInterface(address="sw1", name="eth0", cascade=True),
+            "edit remove-interface sw1 eth0 --cascade",
+        ),
+        (
+            AddInterface(address="sw1", interface={"name": "e9", "type": "ethernet", "mtu": 9000}),
+            "edit add-interface sw1 e9 --type ethernet --field mtu=9000",
+        ),
+        (
+            Connect(a="x:e0", b="y:e1", spec={"medium": "fiber", "speed": 10_000_000_000}),
+            "edit connect x:e0 y:e1 --medium fiber --speed 10Gbps",
+        ),
+    ],
+)
+def test_an_operation_renders_as_the_command_that_makes_it(
+    operation: Operation, expected: str
+) -> None:
+    assert command_for(operation, inventory="net") == f"netgraph -i net {expected}"
+
+
+@pytest.mark.parametrize(
+    "operation",
+    [
+        WriteFile(path="a.yaml", text="hi\n"),
+        RemoveFile(path="a.yaml"),
+        SetGeometry(view="l1", nodes={"a": {"position": {"x": 1.0, "y": 2.0}}}),
+        # Two things ``connect`` has no flag for, so half a cable is not offered.
+        Connect(a="x:e0", b="y:e1", spec={"length_m": 2.0}),
+        # An interface field ``--field`` cannot carry.
+        AddInterface(
+            address="sw1", interface={"name": "e0", "ipv4": {"addresses": ["10.0.0.1/8"]}}
+        ),
+    ],
+)
+def test_an_operation_with_no_exact_spelling_hands_over_as_json(operation: Operation) -> None:
+    """Never lossy: the JSON form is the same write path by a different door."""
+    rendered = command_for(operation, inventory="net")
+    assert "netgraph -i net edit apply -f -" in rendered
+    payload = json.loads(rendered[len("echo ") : rendered.index(" | ")].strip("'"))
+    assert payload == [operation.to_dict()]
+
+
+def test_the_placeholder_is_obviously_a_placeholder() -> None:
+    """A reader pastes this and has to point it somewhere; a path would run."""
+    assert INVENTORY_PLACEHOLDER in command_for(DeleteElement(address="a"))
+
+
+def test_a_rendered_command_actually_does_what_the_operation_did(tmp_path: Path) -> None:
+    """The whole claim of the module, checked by running it.
+
+    Two trees from one source: one edited through :mod:`netgraph.edit`, the
+    other through the command line the renderer produced. They must end up
+    holding the same bytes.
+    """
+    operations: list[Operation] = [
+        SetField(address="pc-desk", path="spec.model", value="OptiPlex 7020"),
+        RenameElement(address="ap-home", new_name="ap-attic"),
+        DeleteElement(address="srv-nas", cascade=True),
+    ]
+    direct, replayed = tmp_path / "direct", tmp_path / "replayed"
+    for root in (direct, replayed):
+        shutil.copytree(REPO_ROOT / "examples" / "home-lab", root)
+
+    session = EditSession(root=direct)
+    session.apply_all(operations)
+    session.commit()
+
+    for operation in operations:
+        result = _replay(replayed, command_for(operation, inventory=replayed.name))
+        assert result.returncode == 0, result.stderr
+
+    left = {path.relative_to(direct): path.read_bytes() for path in sorted(direct.rglob("*.yaml"))}
+    right = {
+        path.relative_to(replayed): path.read_bytes() for path in sorted(replayed.rglob("*.yaml"))
+    }
+    assert left == right

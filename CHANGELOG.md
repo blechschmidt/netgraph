@@ -18,6 +18,55 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **`netgraph diff`, and a changes drawer in the editor: a changeset, drawn.** `netgraph
+  plan` already answered *what changed* and every renderer already answered *what the
+  network looks like*; nothing put the two together. `netgraph diff` renders one diagram
+  holding both states — added elements and links **green**, removed ones **red and dashed
+  but still in place**, changed ones **amber with a badge naming the fields that moved**,
+  everything untouched **faded**.
+
+  A removed node keeps the position its layout document gave it. A deletion that reshuffled
+  the diagram would hide itself in the churn it caused, which is the one thing a change
+  review cannot afford.
+
+  Two things decide the marks and there is no third opinion about what changed. **Presence**
+  in the two drawings decides added and removed — the only thing that can answer for a
+  derived node, since nothing declares `subnet:10.0.0.0/24`. **The plan** decides everything
+  finer: that an element was updated rather than merely still present, which of its fields
+  moved, and that a box is the same device under another name. A rename is therefore one
+  amber box badged `was <old address>`, not a red box beside a green one.
+
+  The two sides come from wherever `netgraph plan` reads them, plus `--against HEAD` (the
+  same side as `--from`, spelled the way the question is asked) and `--plan FILE`, which
+  executes a saved plan into an edit session that is never committed — so what is drawn on
+  the right is the text `netgraph apply` would write, not a reconstruction of it. Every
+  `render` format is supported except Mermaid, which can neither colour a node nor hold a
+  changeset beside one and says so rather than drawing a diagram in which nothing
+  distinguishes the deleted switch. `-f json` publishes a `diff` object on every node and
+  edge — untouched ones included — plus the whole changeset under `changeset`.
+
+- **A changes drawer in `netgraph web --write`.** It lists every gesture made in the
+  session — one entry per gesture, not per operation, so deleting a switch is one line
+  rather than five — each with the YAML hunk it wrote as a unified diff, a click on its
+  label that reveals the document it changed at its line, and a per-entry **Revert**.
+
+  A revert is a new change, not a rewind: it applies the gesture's own inverse as a fresh
+  edit, which is itself logged and itself undoable, so reverting the third of ten gestures
+  leaves the other nine alone — and fails, loudly and without writing, when one of them
+  depended on what the third one did.
+
+  Opening the drawer repaints the canvas as a diff against the state the session started
+  from, or against `git HEAD` when the inventory is in a repository, so an afternoon's
+  editing can be reviewed as a diagram before it is committed. Three new API routes carry
+  it: `GET /api/changes`, `GET /api/diff?against=session|git` and `POST /api/revert`.
+
+- **A handover button.** *Copy commands* hands the session over as a list of `netgraph
+  edit` invocations, in the order they happened, for a pull-request description or somebody
+  else's terminal. The rendering is never lossy: an operation a subcommand takes exactly
+  becomes that subcommand, and one it does not becomes `netgraph edit apply -f -` with the
+  operation's own JSON on standard input. There is deliberately no third case where a
+  rendering approximates an operation.
+
 - **`user` and `group`, two new element kinds: who the network is for.** Every other kind
   in the schema answers *what is there*. These answer *whose is it, and who may touch it* —
   the question an audit asks first and the one an inventory of boxes and cables cannot

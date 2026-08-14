@@ -55,6 +55,7 @@ with :class:`ReadOnly`, so the preview use of the command survives intact and
 
 from __future__ import annotations
 
+import difflib
 import threading
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import AbstractContextManager
@@ -65,11 +66,13 @@ from typing import Any, Final
 from netgraph.config import Config, ValidationConfig, load_config
 from netgraph.edit import (
     ConflictError,
+    CreateElement,
     EditError,
     EditSession,
     Operation,
     ValidationRefused,
     WriteFile,
+    command_list,
     operation_from_dict,
 )
 from netgraph.edit.tree import digest_of
@@ -82,20 +85,42 @@ from netgraph.loader import (
     load_tree,
 )
 from netgraph.loader.tree import iter_inventory_files
+from netgraph.plan import PlanSourceError
+from netgraph.plan import diff as diff_states
+from netgraph.plan.sources import git_ref
 from netgraph.render import IconTheme
 from netgraph.validate import validate
 from netgraph.watch.pipeline import Problem, flatten_problems
-from netgraph.web.preview import Preview, ViewOptions, render_inventory
+from netgraph.web.preview import Preview, ViewOptions, render_diff, render_inventory
 
 __all__ = [
+    "BASELINES",
+    "GIT_BASELINE",
     "MAX_FILE_BYTES",
+    "SESSION_BASELINE",
     "Conflict",
     "EditingSession",
+    "Gesture",
     "ReadOnly",
     "SessionError",
     "TreeWatcher",
     "relative_path",
 ]
+
+#: The state the changes drawer compares against: the tree as this session first
+#: saw it. The default, because "what have I done this afternoon" is the question
+#: an editor is asked, and it is the one question neither git nor the undo stack
+#: answers — git may be behind or ahead of where the editing started, and a stack
+#: of steps is not a state.
+SESSION_BASELINE: Final = "session"
+
+#: The other one: ``HEAD``, as the inventory root looks in it. Offered only when
+#: the root is in a repository, which is what :meth:`EditingSession.baselines`
+#: is for.
+GIT_BASELINE: Final = "git"
+
+#: Both, in menu order.
+BASELINES: Final[tuple[str, ...]] = (SESSION_BASELINE, GIT_BASELINE)
 
 #: Largest file the editor will read into the page or accept back from it. A
 #: document bigger than this is one to open in a real editor; the browser is not
@@ -269,6 +294,55 @@ class _History:
     backward: tuple[Operation, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class Gesture:
+    """One thing the user did, and everything needed to review or undo it.
+
+    The unit is the *gesture*, not the operation: deleting a switch is one entry
+    even though it becomes a delete and four disconnects, because one entry is
+    what the user did and four is an implementation detail of doing it. A
+    gesture that wrote nothing is never recorded — saving an unedited file is
+    not a change to review.
+    """
+
+    #: Monotonic within the session. What a revert names.
+    id: int
+    #: What the gesture was, in the mutation layer's own words.
+    label: str
+    #: Tree revision the gesture produced.
+    revision: int
+    #: The operations it became, forward.
+    operations: tuple[Operation, ...]
+    #: What puts it back. A revert applies exactly this.
+    inverse: tuple[Operation, ...]
+    #: Unified diff of every file it touched, one hunk set per file.
+    hunk: str
+    #: Files it wrote or removed, in path order.
+    files: tuple[str, ...]
+    #: Addresses the gesture names, for click-to-reveal. Derived from the
+    #: operations rather than from the diff: an operation says which *element*
+    #: it is about, and a diff only says which lines moved.
+    addresses: tuple[str, ...]
+    #: The ``netgraph edit …`` lines that would replay it.
+    commands: tuple[str, ...]
+    #: Has it since been put back — by this entry's revert, or by an undo?
+    reverted: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "label": self.label,
+            "revision": self.revision,
+            "operations": [operation.to_dict() for operation in self.operations],
+            "hunk": self.hunk,
+            "files": list(self.files),
+            "addresses": list(self.addresses),
+            "commands": list(self.commands),
+            "reverted": self.reverted,
+            "revertible": bool(self.inverse) and not self.reverted,
+        }
+
+
 def _problem(problem: Problem) -> dict[str, Any]:
     return {
         "severity": str(problem.severity),
@@ -312,6 +386,14 @@ class EditingSession:
     _inventory: Inventory | None = field(default=None, init=False, repr=False)
     _undo: list[_History] = field(default_factory=list, init=False, repr=False)
     _redo: list[_History] = field(default_factory=list, init=False, repr=False)
+    #: Every gesture this session made, oldest first. Unlike the undo stack this
+    #: is never popped: a change that was undone is still something the session
+    #: did, and a log that quietly forgets it cannot be reviewed.
+    _journal: list[Gesture] = field(default_factory=list, init=False, repr=False)
+    #: The tree as it was when the session opened, kept for the diff overlay.
+    #: Captured on the first load rather than in ``__post_init__`` so that
+    #: opening a session costs nothing until somebody looks at it.
+    _origin: Inventory | None = field(default=None, init=False, repr=False)
     #: The inverse the last committed batch produced, which is what undo and
     #: redo push onto the other stack. Held on the session rather than returned
     #: because :meth:`_commit` answers with the page's payload, not with mine.
@@ -345,7 +427,22 @@ class EditingSession:
             if self._inventory is None:
                 self.config = load_config(self.root)
                 self._inventory = load_tree(self.root, cache=self.cache)
+            if self._origin is None:
+                self._origin = self._inventory
             return self._inventory
+
+    def origin(self) -> Inventory:
+        """The tree as it was when this session first looked at it.
+
+        What the changes drawer draws against by default, and the only honest
+        answer to "what have I done this afternoon" — the undo stack is a stack
+        of steps, not a state, and git HEAD may be behind or ahead of where the
+        editing started.
+        """
+        with self._lock:
+            self.inventory()
+            assert self._origin is not None  # set by the load above
+            return self._origin
 
     def settings(self) -> ValidationConfig:
         """How this tree grades findings: its own ``netgraph.toml``."""
@@ -590,6 +687,7 @@ class EditingSession:
         label: str,
         force: bool,
         history: bool = True,
+        reverts: int | None = None,
     ) -> Change:
         """Apply and write one batch through the mutation layer.
 
@@ -605,9 +703,18 @@ class EditingSession:
         page refetch the tree, and every other tab's undo stack grow, for an
         edit that did not happen.
         """
+        # Pin the session's starting state before the first write rather than
+        # after it. Everything below eventually loads the tree, and a baseline
+        # captured on the way *out* of the first commit would be the state after
+        # that commit — so the drawer would never show the first thing you did.
+        self.origin()
         session = EditSession(root=self.root, config=self.config, cache=self.cache)
         applied = session.apply_all(operations)
         changes = dict(session.changes)
+        # Read before the write, which is the only moment the old text is still
+        # on disk. The journal's hunk is the one thing here that cannot be
+        # recomputed afterwards.
+        previous = {path: self._text_on_disk(path) for path in changes}
         session.commit(force=force)
         summary = session.summary(written=tuple(changes), changes=changes)
         # An empty inverse is the honest record of a batch that changed nothing:
@@ -623,6 +730,14 @@ class EditingSession:
                 del self._undo[:-MAX_HISTORY]
                 self._redo.clear()
             self.invalidate()
+            self._record(
+                label=label,
+                operations=tuple(operations),
+                inverse=summary.inverse,
+                changes=changes,
+                previous=previous,
+                reverts=reverts,
+            )
         return Change(
             revision=self._revision,
             applied=tuple(
@@ -643,6 +758,177 @@ class EditingSession:
             undo_depth=len(self._undo),
             redo_depth=len(self._redo),
         )
+
+    def _record(
+        self,
+        *,
+        label: str,
+        operations: tuple[Operation, ...],
+        inverse: tuple[Operation, ...],
+        changes: Mapping[str, str | None],
+        previous: Mapping[str, str | None],
+        reverts: int | None,
+    ) -> None:
+        """Add one gesture to the journal, and mark what it put back.
+
+        Called only for a batch that actually wrote something, so the log holds
+        gestures rather than attempts.
+        """
+        entry = Gesture(
+            id=len(self._journal) + 1,
+            label=label,
+            revision=self._revision,
+            operations=operations,
+            inverse=inverse,
+            hunk=_unified_diff(previous, changes),
+            files=tuple(sorted(changes)),
+            addresses=_addresses_of(operations),
+            commands=command_list(operations, inventory=str(self.root)),
+        )
+        self._journal.append(entry)
+        if reverts is not None:
+            self._mark_reverted(reverts)
+
+    def _mark_reverted(self, entry_id: int) -> None:
+        for index, entry in enumerate(self._journal):
+            if entry.id == entry_id:
+                self._journal[index] = replace(entry, reverted=True)
+                return
+
+    def _text_on_disk(self, relative: str) -> str | None:
+        """One file's text as it is now, or ``None`` when it is not there."""
+        try:
+            return (self.root / PurePosixPath(relative)).read_bytes().decode("utf-8-sig")
+        except (OSError, UnicodeDecodeError):
+            return None
+
+    # -- the journal -----------------------------------------------------
+
+    def journal(self) -> tuple[Gesture, ...]:
+        """Every gesture this session made, oldest first."""
+        with self._lock:
+            return tuple(self._journal)
+
+    def changes(self) -> dict[str, Any]:
+        """The changes drawer's payload: the log, and the handover.
+
+        ``commands`` is the whole session as a ``netgraph edit`` script, in the
+        order it happened and with reverted gestures left in — a script that
+        skipped them would not reproduce the tree, which is the one thing the
+        handover has to do.
+        """
+        with self._lock:
+            entries = tuple(self._journal)
+            revision = self._revision
+        return {
+            "revision": revision,
+            "root": str(self.root),
+            "entries": [entry.to_dict() for entry in entries],
+            "commands": [command for entry in entries for command in entry.commands],
+        }
+
+    def revert(self, entry_id: int, *, revision: int | None = None) -> Change:
+        """Put one gesture back, whatever has happened since.
+
+        A revert is an ordinary edit, not a rewind: it applies the gesture's own
+        inverse as a new change, which is itself journalled and itself
+        undoable. Reverting the third of ten gestures therefore leaves the other
+        nine in place — and fails, loudly and without writing, when one of them
+        depended on what the third one did.
+
+        Raises:
+            ReadOnly: This session does not write.
+            SessionError: There is no such gesture, or it has been reverted.
+            Conflict: ``revision`` is not the current one.
+            EditError: The inverse cannot be applied; nothing is written.
+        """
+        self._require_writable()
+        with self._lock:
+            if revision is not None and revision != self._revision:
+                raise Conflict(
+                    f"the inventory has changed since revision {revision} "
+                    f"(it is now at {self._revision}); reload before reverting"
+                )
+            entry = next((item for item in self._journal if item.id == entry_id), None)
+            if entry is None:
+                raise SessionError(f"this session made no change numbered {entry_id}")
+            if entry.reverted:
+                raise SessionError(f"change {entry_id} ({entry.label}) has already been put back")
+            if not entry.inverse:
+                raise SessionError(f"change {entry_id} ({entry.label}) records nothing to put back")
+            # ``force``: this restores a state the tree was already in, so
+            # refusing it for problems it already had would leave no way back.
+            return self._commit(
+                entry.inverse, label=f"revert {entry.label}", force=True, reverts=entry.id
+            )
+
+    # -- the diff overlay ------------------------------------------------
+
+    def diff(
+        self, view: ViewOptions | None = None, *, against: str = SESSION_BASELINE
+    ) -> tuple[Preview, int]:
+        """Draw the tree with what has changed since ``against`` painted on.
+
+        Args:
+            view: Which graph to build and how to draw it, as :meth:`graph`
+                takes it.
+            against: :data:`SESSION_BASELINE` — the tree as this session first
+                saw it — or :data:`GIT_BASELINE`, which is ``HEAD`` as the
+                inventory root looks in it.
+
+        Returns:
+            The rendering and the revision it was made from, like :meth:`graph`.
+
+        Raises:
+            SessionError: ``against`` is not one of the two, or a git baseline
+                was asked for and cannot be read.
+        """
+        if against not in BASELINES:
+            raise SessionError(f"unknown baseline {against!r}; expected {' or '.join(BASELINES)}")
+        with self._lock:
+            inventory = self.inventory()
+            revision = self._revision
+            origin = self._origin
+        assert origin is not None  # ``inventory()`` above sets ``_origin``
+        before = origin if against == SESSION_BASELINE else self._head()
+        options = view or ViewOptions()
+        if options.icons is None and self.icons is not None:
+            options = replace(options, icons=self.icons)
+        settings = self.settings().with_overrides(strict=True if options.strict else None)
+        plan = diff_states(before, inventory)
+        return render_diff(before, inventory, plan, options, settings=settings), revision
+
+    def baselines(self) -> tuple[str, ...]:
+        """Which baselines this session can draw against, in menu order.
+
+        ``git`` is offered only when the root is in a repository with a
+        readable ``HEAD``, because an option that always fails is not an option.
+        """
+        return BASELINES if self.in_repository() else (SESSION_BASELINE,)
+
+    def in_repository(self) -> bool:
+        """Is the inventory root inside a git repository with a commit in it?"""
+        try:
+            with git_ref(self.root, "HEAD"):
+                return True
+        except (PlanSourceError, OSError):
+            return False
+
+    def _head(self) -> Inventory:
+        """The inventory as ``HEAD`` has it.
+
+        Read afresh each time rather than cached: a session outlives commits,
+        and a drawer that says "since HEAD" while comparing against a HEAD from
+        two commits ago is worse than one that takes a moment.
+
+        Raises:
+            SessionError: There is no repository, no ``git``, or no ``HEAD``.
+        """
+        try:
+            with git_ref(self.root, "HEAD") as exported:
+                return load_tree(exported)
+        except PlanSourceError as exc:
+            raise SessionError(str(exc)) from exc
 
     def _restated(self, change: Change) -> Change:
         """``change`` with the stack depths as they are after the history moved."""
@@ -685,6 +971,48 @@ class EditingSession:
             self._revision += 1
             self._inventory = None
             return self._revision
+
+
+def _unified_diff(before: Mapping[str, str | None], after: Mapping[str, str | None]) -> str:
+    """The YAML hunk one gesture produced, over every file it touched.
+
+    Unified diff because that is the form everyone already reads, and with
+    ``a/`` and ``b/`` prefixes because that is the form ``git apply`` takes: a hunk
+    copied out of the drawer should paste into a patch file without editing.
+    A created file diffs against nothing and a deleted one against nothing, both
+    of which unified diff already spells.
+    """
+    pieces: list[str] = []
+    for path in sorted(after):
+        old = (before.get(path) or "").splitlines(keepends=True)
+        new = (after.get(path) or "").splitlines(keepends=True)
+        pieces.extend(
+            difflib.unified_diff(
+                old, new, fromfile=f"a/{path}", tofile=f"b/{path}", lineterm="\n", n=3
+            )
+        )
+        if pieces and not pieces[-1].endswith("\n"):
+            pieces.append("\n")
+    return "".join(pieces)
+
+
+def _addresses_of(operations: Sequence[Operation]) -> tuple[str, ...]:
+    """Every element address the operations name, in first-seen order.
+
+    Read off the operations rather than out of the diff: an operation says which
+    *element* it is about, which is what "reveal this in the file" needs, while
+    a diff only says which lines moved.
+    """
+    found: dict[str, None] = {}
+    for operation in operations:
+        address = getattr(operation, "address", None)
+        if isinstance(address, str) and address:
+            found.setdefault(address, None)
+        name = getattr(operation, "name", None)
+        if isinstance(operation, CreateElement) and isinstance(name, str):
+            namespace = operation.namespace
+            found.setdefault(f"{namespace}/{name}" if namespace else name, None)
+    return tuple(found)
 
 
 def _decode(payload: Sequence[Mapping[str, Any]]) -> tuple[Operation, ...]:

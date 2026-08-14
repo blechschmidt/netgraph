@@ -75,7 +75,15 @@
     redo: document.getElementById("redo"),
     editorTitle: document.getElementById("editor-title"),
     editorHint: document.getElementById("editor-hint"),
-    editorState: document.getElementById("editor-state")
+    editorState: document.getElementById("editor-state"),
+    changes: document.getElementById("changes"),
+    changesList: document.getElementById("changes-list"),
+    changesToggle: document.getElementById("changes-toggle"),
+    changesClose: document.getElementById("changes-close"),
+    changesCopy: document.getElementById("changes-copy"),
+    changesCount: document.getElementById("changes-count"),
+    changesAgainst: document.getElementById("changes-against"),
+    legend: document.getElementById("legend")
   };
 
   var details = {};
@@ -146,7 +154,10 @@
 
   function request() {
     if (mode === "session") {
-      return fetch("/api/graph?" + query(), { cache: "no-store" });
+      // Which of the two the session wants -- the tree, or the tree as a diff
+      // against a baseline -- is session.js's decision; this file only draws
+      // what comes back, and a diff comes back in the same shape.
+      return fetch(netgraphSession.graphPath(query()), { cache: "no-store" });
     }
     return fetch("/api/render", {
       method: "POST",
@@ -163,6 +174,10 @@
 
   function apply(result) {
     details = result.details || {};
+    // A diff is drawn by the same renderer into the same canvas; what marks the
+    // page as showing one is the legend, which is furniture without it.
+    el.canvas.classList.toggle("diffing", !!result.diff);
+    el.legend.hidden = !result.diff;
     setStatus(result.status, result.message, result.counts, result.durationMs);
     showProblems(result.problems || [], result.dangling || []);
     hideInfo(true);

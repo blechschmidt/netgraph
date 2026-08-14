@@ -324,9 +324,7 @@ def test_the_overlay_serialises_to_plain_data(home_lab: Drawing) -> None:
 
 def test_diff_overlay_needs_no_plan_at_all(trees: dict[str, Inventory]) -> None:
     """Presence alone is a usable overlay; the plan only adds the fine detail."""
-    overlay = diff_overlay(
-        build_graph(trees["home-lab"]), build_graph(trees["home-lab-proposed"])
-    )
+    overlay = diff_overlay(build_graph(trees["home-lab"]), build_graph(trees["home-lab-proposed"]))
     assert overlay.node("hosts/pc-new") is Mark.ADDED
     assert overlay.fields == {}
 

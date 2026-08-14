@@ -861,3 +861,128 @@ def test_a_stale_save_is_refused_rather_than_clobbering(open_editor: OpenEditor)
     expect(page.locator("#toast")).to_contain_text("save again to overwrite it")
     expect(page.locator("#editor-state")).to_have_text("changed on disk since you opened it")
     assert editor.read(relative) == elsewhere, "the other editor's work is still there"
+
+
+# --------------------------------------------------------------------------- #
+# The changes drawer
+# --------------------------------------------------------------------------- #
+
+
+def _edit_a_file(editor: Editor, relative: str = "hosts/pc-desk.yaml") -> str:
+    """Make one reviewable change through the page, and return the file path."""
+    page = editor.page
+    original = editor.read(relative)
+    page.locator(f'#file-list .file[data-path="{relative}"]').click()
+    expect(page.locator("#source")).to_have_value(original)
+    page.locator("#source").fill(original.replace("OptiPlex 7010", "OptiPlex 7020", 1))
+    expect(page.locator("#save")).to_be_enabled()
+    page.keyboard.press("Control+s")
+    expect(page.locator("#toast")).to_contain_text(f"saved {relative}")
+    return relative
+
+
+def test_the_changes_drawer_lists_the_session_and_paints_the_diff(
+    open_editor: OpenEditor,
+) -> None:
+    """The whole feature, end to end: edit, open the drawer, read the change.
+
+    What is asserted is what a reviewer would look at — the gesture named once,
+    the YAML hunk it produced, and the diagram repainted as a diff — rather than
+    the requests that produced them, which ``tests/test_web_session.py`` covers.
+    """
+    editor = open_editor(writable=True)
+    page = editor.page
+
+    # Nothing has happened yet, so the drawer says so rather than being empty.
+    expect(page.locator("#changes")).to_be_hidden()
+    page.locator("#changes-toggle").click()
+    expect(page.locator("#changes")).to_be_visible()
+    expect(page.locator("#changes-list")).to_contain_text("nothing changed yet")
+    expect(page.locator("#legend")).to_be_visible()
+    expect(page.locator("#summary")).to_contain_text("nothing has changed yet")
+    page.locator("#changes-close").click()
+    expect(page.locator("#changes")).to_be_hidden()
+
+    relative = _edit_a_file(editor)
+
+    page.locator("#changes-toggle").click()
+    entry = page.locator("#changes-list .change").first
+    expect(entry).to_contain_text(f"edit {relative}")
+    expect(entry).to_contain_text(relative)
+    # The hunk is the point of the entry: the text that was actually written.
+    expect(entry.locator("pre .del")).to_contain_text("OptiPlex 7010")
+    expect(entry.locator("pre .add")).to_contain_text("OptiPlex 7020")
+    expect(page.locator("#changes-count")).to_have_text("(1)")
+
+    # And the canvas is now a diff: one amber box, badged with the field.
+    expect(page.locator("#summary")).to_contain_text("1 changed")
+    expect(page.locator("#viewport")).to_contain_text("spec.model")
+
+
+def test_a_drawer_entry_reveals_the_document_it_changed(open_editor: OpenEditor) -> None:
+    """Click-to-reveal, from the log rather than from the diagram."""
+    editor = open_editor(writable=True)
+    page = editor.page
+    relative = _edit_a_file(editor)
+
+    # Open something else, so that revealing has somewhere to travel from.
+    page.locator('#file-list .file[data-path="switches/sw-home.yaml"]').click()
+    expect(page.locator("#editor-title")).to_have_text("switches/sw-home.yaml")
+
+    page.locator("#changes-toggle").click()
+    page.locator("#changes-list .change .label").first.click()
+    expect(page.locator("#editor-title")).to_have_text(relative)
+
+
+def test_reverting_one_entry_puts_that_change_back(open_editor: OpenEditor) -> None:
+    """A revert is a new change, not a rewind: the log keeps both."""
+    editor = open_editor(writable=True)
+    page = editor.page
+    relative = "hosts/pc-desk.yaml"
+    original = editor.read(relative)
+    _edit_a_file(editor, relative)
+    assert editor.read(relative) != original
+
+    page.locator("#changes-toggle").click()
+    page.locator("#changes-list .change button").first.click()
+
+    expect(page.locator("#toast")).to_contain_text("put change #1 back")
+    assert editor.read(relative) == original, "a revert restores the file byte for byte"
+    # Two entries now — the change and its reversal — and the first is marked.
+    expect(page.locator("#changes-list .change")).to_have_count(2)
+    expect(page.locator("#changes-list .change.reverted")).to_have_count(1)
+    expect(page.locator("#summary")).to_contain_text("nothing has changed yet")
+
+
+def test_the_handover_copies_the_equivalent_edit_commands(open_editor: OpenEditor) -> None:
+    """A change explored visually has to be able to leave the browser."""
+    editor = open_editor(writable=True)
+    page = editor.page
+    _edit_a_file(editor)
+
+    page.locator("#changes-toggle").click()
+    expect(page.locator("#changes-copy")).to_be_enabled()
+
+    page.context.grant_permissions(["clipboard-read", "clipboard-write"])
+    page.locator("#changes-copy").click()
+    expect(page.locator("#toast")).to_contain_text("copied 1 command")
+
+    copied = str(page.evaluate("() => navigator.clipboard.readText()"))
+    # A whole-file save has no subcommand of its own, so it hands over as the
+    # exact JSON form. What matters is that it is runnable and complete.
+    assert copied.startswith("echo ") or copied.startswith("netgraph ")
+    assert "netgraph" in copied and "edit" in copied
+
+
+def test_a_read_only_session_offers_the_drawer_but_no_revert(
+    open_editor: OpenEditor,
+) -> None:
+    """Reviewing is a read; only putting a change back is a write."""
+    editor = open_editor(writable=False)
+    page = editor.page
+    # The toggle lives in the session actions, which a read-only page hides
+    # wholesale — the drawer is reachable from the API, and the API answers.
+    expect(page.locator("#session-actions")).to_be_hidden()
+    payload = editor.api("/api/changes")
+    assert payload["entries"] == []
+    assert payload["baselines"] == ["session"]

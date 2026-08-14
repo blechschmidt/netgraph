@@ -29,6 +29,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import subprocess
 import urllib.error
 import urllib.request
 from collections.abc import Iterator
@@ -598,3 +599,229 @@ def test_the_command_documents_both_faces() -> None:
     assert result.exit_code == 0
     assert "--write" in result.output
     assert "--read-only" in result.output
+
+
+# --------------------------------------------------------------------------- #
+# The changes drawer: the journal, the diff overlay, the handover
+# --------------------------------------------------------------------------- #
+
+
+def test_a_gesture_is_one_journal_entry(session: EditingSession) -> None:
+    """Deleting a switch is one entry even though it is five operations."""
+    session.apply([{"op": "delete", "address": "srv-nas", "cascade": True}])
+    entries = session.journal()
+    assert len(entries) == 1
+    assert entries[0].label.startswith("delete srv-nas")
+    assert len(entries[0].operations) >= 1
+
+
+def test_a_batch_that_writes_nothing_is_not_logged(session: EditingSession) -> None:
+    """A log of attempts is not a log of changes."""
+    read = session.read_file("hosts/pc-desk.yaml")
+    session.write_file("hosts/pc-desk.yaml", read["text"], base_hash=read["hash"])
+    assert session.journal() == ()
+
+
+def test_an_entry_carries_the_yaml_it_produced(session: EditingSession) -> None:
+    """The hunk is the point: what was written, in the form a reviewer reads."""
+    session.apply(
+        [{"op": "set", "address": "pc-desk", "path": "spec.model", "value": "OptiPlex 7020"}]
+    )
+    hunk = session.journal()[0].hunk
+    assert "--- a/hosts/pc-desk.yaml" in hunk
+    assert "+++ b/hosts/pc-desk.yaml" in hunk
+    assert "-  model: OptiPlex 7010" in hunk
+    assert "+  model: OptiPlex 7020" in hunk
+
+
+def test_an_entry_names_the_element_it_is_about(session: EditingSession) -> None:
+    """Which is what "reveal this in the file" needs; a diff only has lines."""
+    session.apply([{"op": "rename", "address": "sw-home", "new_name": "sw-attic"}])
+    assert session.journal()[0].addresses == ("sw-home",)
+
+
+def test_an_entry_carries_the_command_that_would_replay_it(session: EditingSession) -> None:
+    session.apply([{"op": "delete", "address": "srv-nas", "cascade": True}])
+    assert session.journal()[0].commands == (
+        f"netgraph -i {session.root} edit delete srv-nas --cascade",
+    )
+
+
+def test_the_handover_is_the_whole_session_in_order(session: EditingSession) -> None:
+    session.apply(
+        [{"op": "set", "address": "pc-desk", "path": "spec.model", "value": "OptiPlex 7020"}]
+    )
+    session.apply([{"op": "delete", "address": "srv-nas", "cascade": True}])
+    commands = session.changes()["commands"]
+    assert len(commands) == 2
+    assert "edit set pc-desk spec.model" in commands[0]
+    assert "edit delete srv-nas --cascade" in commands[1]
+
+
+def test_a_revert_restores_the_file_byte_for_byte(session: EditingSession) -> None:
+    path = session.root / "hosts/pc-desk.yaml"
+    original = path.read_bytes()
+    session.apply(
+        [{"op": "set", "address": "pc-desk", "path": "spec.model", "value": "OptiPlex 7020"}]
+    )
+    assert path.read_bytes() != original
+
+    session.revert(1)
+    assert path.read_bytes() == original
+
+
+def test_a_revert_is_a_new_change_not_a_rewind(session: EditingSession) -> None:
+    """So the log keeps both, and the revert is itself undoable."""
+    session.apply(
+        [{"op": "set", "address": "pc-desk", "path": "spec.model", "value": "OptiPlex 7020"}]
+    )
+    session.revert(1)
+    entries = session.journal()
+    assert [entry.reverted for entry in entries] == [True, False]
+    assert entries[1].label.startswith("revert ")
+
+
+def test_a_second_revert_of_one_entry_is_refused(session: EditingSession) -> None:
+    session.apply(
+        [{"op": "set", "address": "pc-desk", "path": "spec.model", "value": "OptiPlex 7020"}]
+    )
+    session.revert(1)
+    with pytest.raises(SessionError, match="already been put back"):
+        session.revert(1)
+
+
+def test_reverting_a_change_this_session_never_made_is_refused(
+    session: EditingSession,
+) -> None:
+    with pytest.raises(SessionError, match="no change numbered 7"):
+        session.revert(7)
+
+
+def test_a_revert_against_a_stale_revision_is_refused(session: EditingSession) -> None:
+    session.apply(
+        [{"op": "set", "address": "pc-desk", "path": "spec.model", "value": "OptiPlex 7020"}]
+    )
+    with pytest.raises(Conflict):
+        session.revert(1, revision=1)
+
+
+def test_a_read_only_session_reads_the_log_but_reverts_nothing(tree: Path) -> None:
+    session = EditingSession(root=tree, writable=False)
+    assert session.changes()["entries"] == []
+    with pytest.raises(ReadOnly):
+        session.revert(1)
+
+
+@requires_dot
+def test_the_diff_is_drawn_against_where_the_session_started(
+    session: EditingSession,
+) -> None:
+    """Including the very first change, which is the one a lazy baseline loses."""
+    session.apply(
+        [{"op": "set", "address": "pc-desk", "path": "spec.model", "value": "OptiPlex 7020"}]
+    )
+    preview, revision = session.diff(ViewOptions())
+    assert revision == session.revision
+    assert preview.diff is not None
+    assert preview.diff["nodes"]["hosts/pc-desk"] == "changed"
+    assert preview.diff["changeset"]["summary"]["update"] == 1
+    assert preview.message == "1 changed"
+
+
+@requires_dot
+def test_a_removed_element_is_still_drawn_in_the_diff(session: EditingSession) -> None:
+    session.apply([{"op": "delete", "address": "srv-nas", "cascade": True}])
+    preview, _ = session.diff(ViewOptions())
+    assert preview.diff is not None
+    assert preview.diff["nodes"]["hosts/srv-nas"] == "removed"
+    assert "srv-nas" in (preview.svg or "")
+
+
+@requires_dot
+def test_an_untouched_session_diffs_to_nothing(session: EditingSession) -> None:
+    preview, _ = session.diff(ViewOptions())
+    assert preview.diff is not None
+    assert preview.diff["counts"] == {"added": 0, "changed": 0, "removed": 0}
+    assert "nothing has changed yet" in preview.message
+
+
+def test_a_baseline_the_session_does_not_have_is_refused(session: EditingSession) -> None:
+    with pytest.raises(SessionError, match="unknown baseline"):
+        session.diff(ViewOptions(), against="yesterday")
+
+
+def test_git_is_offered_only_inside_a_repository(session: EditingSession) -> None:
+    """An option that always fails is not an option."""
+    assert session.baselines() == ("session",)
+    assert not session.in_repository()
+
+
+@requires_dot
+def test_the_repository_baseline_reads_head(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    shutil.copytree(HOME_LAB, root)
+    git = shutil.which("git")
+    if git is None:  # pragma: no cover - git is present on every supported runner
+        pytest.skip("git is not installed")
+    for arguments in (
+        ["init", "-q"],
+        ["config", "user.email", "t@example.invalid"],
+        ["config", "user.name", "t"],
+        ["add", "-A"],
+        ["commit", "-qm", "initial"],
+    ):
+        subprocess.run([git, *arguments], cwd=root, check=True, capture_output=True)
+
+    session = EditingSession(root=root, writable=True)
+    assert session.baselines() == ("session", "git")
+    session.apply([{"op": "delete", "address": "srv-nas", "cascade": True}])
+    preview, _ = session.diff(ViewOptions(), against="git")
+    assert preview.diff is not None
+    assert preview.diff["nodes"]["hosts/srv-nas"] == "removed"
+
+
+@requires_dot
+def test_the_api_serves_the_log_the_diff_and_the_revert(served: str) -> None:
+    status, empty = call(served, "/api/changes")
+    assert status == 200
+    assert empty["entries"] == [] and empty["baselines"] == ["session"]
+
+    status, _ = call(
+        served,
+        "/api/ops",
+        "POST",
+        {"ops": [{"op": "set", "address": "pc-desk", "path": "spec.model", "value": "X"}]},
+    )
+    assert status == 200
+
+    status, log = call(served, "/api/changes")
+    assert status == 200
+    assert len(log["entries"]) == 1
+    assert log["entries"][0]["revertible"] is True
+    assert log["commands"] and "edit set pc-desk" in log["commands"][0]
+
+    status, drawn = call(served, "/api/diff?view=l1&against=session")
+    assert status == 200
+    assert drawn["against"] == "session"
+    assert drawn["diff"]["nodes"]["hosts/pc-desk"] == "changed"
+
+    status, done = call(served, "/api/revert", "POST", {"id": 1})
+    assert status == 200
+    assert done["revision"] > log["revision"]
+
+    status, refused = call(served, "/api/revert", "POST", {"id": "one"})
+    assert status == 400
+    assert "must be the number of the change" in refused["message"]
+
+
+def test_the_api_refuses_an_unknown_baseline(served: str) -> None:
+    status, body = call(served, "/api/diff?against=yesterday")
+    assert status == 400
+    assert "unknown baseline" in body["message"]
+
+
+def test_the_ordinary_graph_route_carries_no_diff(served: str) -> None:
+    """An absent key must not mean two different things; see Preview.diff."""
+    status, body = call(served, "/api/graph?view=l1")
+    assert status == 200
+    assert body["diff"] is None

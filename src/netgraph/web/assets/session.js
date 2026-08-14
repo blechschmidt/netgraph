@@ -42,6 +42,9 @@ var netgraphSession = (function () {
    *  the text has been typed into or has moved on disk since. */
   var open = { path: null, hash: null, dirty: false, conflicted: false };
   var timer = null;
+  /** The changes drawer: is it showing, what has it been told, and what is the
+   *  diagram being drawn against while it is. */
+  var changes = { open: false, against: "session", entries: [], commands: [], baselines: [] };
 
   /* ------------------------------------------------------------- attaching */
 
@@ -66,6 +69,7 @@ var netgraphSession = (function () {
     el.source.readOnly = true;
     bindControls();
     refreshTree();
+    refreshChanges();
     poll();
     return true;
   }
@@ -74,7 +78,15 @@ var netgraphSession = (function () {
     el.save.addEventListener("click", function () { save(false); });
     el.undo.addEventListener("click", function () { step("undo"); });
     el.redo.addEventListener("click", function () { step("redo"); });
+    el.changesToggle.addEventListener("click", function () { showChanges(!changes.open); });
+    el.changesClose.addEventListener("click", function () { showChanges(false); });
+    el.changesCopy.addEventListener("click", copyCommands);
+    el.changesAgainst.addEventListener("change", function () {
+      changes.against = el.changesAgainst.value;
+      if (changes.open) { host.render(); }
+    });
     document.addEventListener("keydown", function (event) {
+      if (event.key === "Escape" && changes.open) { showChanges(false); return; }
       if (!(event.ctrlKey || event.metaKey)) { return; }
       var key = event.key.toLowerCase();
       if (key === "s") { event.preventDefault(); save(false); }
@@ -111,6 +123,9 @@ var netgraphSession = (function () {
    * moved on disk was the one thing the reconciliation left alone. */
   function reconcile() {
     host.render();
+    // The drawer is a view of the session's own log, but the *diff* it paints
+    // is against the tree -- which anything may have moved. Refetch both.
+    refreshChanges();
     return refreshTree().then(function () {
       if (!open.path) { return; }
       var entry = fileEntry(open.path);
@@ -319,6 +334,7 @@ var netgraphSession = (function () {
       }
     });
     host.render();
+    refreshChanges();
     if (result.diagnostics && host.diagnostics) { host.diagnostics(result.diagnostics); }
   }
 
@@ -384,6 +400,214 @@ var netgraphSession = (function () {
     return true;
   }
 
+  /* ------------------------------------------------------- changes drawer */
+
+  /* The drawer is a log of *gestures*, not of operations: deleting a switch is
+   * one entry even though the mutation layer made it four operations. Each one
+   * carries the YAML it produced, because that is the thing being reviewed --
+   * this editor's whole claim is that the picture and the text are one document,
+   * and a change log that showed only the picture would quietly give that up.
+   *
+   * Opening it also repaints the canvas as a diff against the baseline, which is
+   * why it is a mode rather than a panel: the drawer and the diagram are two
+   * views of one answer. */
+
+  /** Which URL app.js should fetch the diagram from, given the view options.
+   *
+   * The drawer decides, not app.js: whether the canvas is showing a state or a
+   * change is this file's business, and app.js only has to draw what comes back.
+   */
+  function graphPath(query) {
+    if (!changes.open) { return "/api/graph?" + query; }
+    return "/api/diff?" + query + "&against=" + encodeURIComponent(changes.against);
+  }
+
+  function showChanges(next) {
+    changes.open = !!next;
+    el.changes.hidden = !changes.open;
+    el.changesToggle.setAttribute("aria-expanded", changes.open ? "true" : "false");
+    el.changesToggle.classList.toggle("on", changes.open);
+    el.legend.hidden = !changes.open;
+    if (changes.open) { refreshChanges(); }
+    host.render();
+  }
+
+  function refreshChanges() {
+    return fetch("/api/changes", { cache: "no-store" })
+      .then(readBody)
+      .then(function (next) {
+        changes.entries = next.entries || [];
+        changes.commands = next.commands || [];
+        changes.baselines = next.baselines || ["session"];
+        paintBaselines();
+        paintChanges();
+      })
+      .catch(function () {});
+  }
+
+  /** Offer git only when the server says the tree is in a repository. */
+  function paintBaselines() {
+    var labels = { session: "this session started", git: "git HEAD" };
+    if (changes.baselines.indexOf(changes.against) === -1) { changes.against = "session"; }
+    el.changesAgainst.replaceChildren();
+    changes.baselines.forEach(function (name) {
+      var option = document.createElement("option");
+      option.value = name;
+      option.textContent = labels[name] || name;
+      option.selected = name === changes.against;
+      el.changesAgainst.appendChild(option);
+    });
+  }
+
+  function paintChanges() {
+    var live = changes.entries.filter(function (entry) { return !entry.reverted; }).length;
+    el.changesCount.textContent = live ? "(" + live + ")" : "";
+    el.changesCopy.disabled = !changes.commands.length;
+    var list = el.changesList;
+    list.replaceChildren();
+    if (!changes.entries.length) {
+      var none = document.createElement("p");
+      none.className = "empty";
+      none.textContent = "nothing changed yet in this session";
+      list.appendChild(none);
+      return;
+    }
+    // Newest first: the thing just done is the thing being looked for.
+    changes.entries.slice().reverse().forEach(function (entry) {
+      list.appendChild(changeRow(entry));
+    });
+  }
+
+  function changeRow(entry) {
+    var row = document.createElement("div");
+    row.className = "change" + (entry.reverted ? " reverted" : "");
+    row.dataset.id = String(entry.id);
+
+    var head = document.createElement("div");
+    head.className = "change-head";
+    var number = document.createElement("span");
+    number.className = "n";
+    number.textContent = "#" + entry.id;
+    var label = document.createElement("span");
+    label.className = "label";
+    label.textContent = entry.label + (entry.reverted ? " (put back)" : "");
+    // Click-to-reveal: the gesture names an element, the tree says which file
+    // and line declares it, and the editor goes there. The same mapping the
+    // diagram uses when a shape is clicked. A gesture that named no element --
+    // a whole-file save, a deletion whose document is gone -- falls back to the
+    // file it wrote, which is the next most useful place to be.
+    var address = (entry.addresses || [])[0];
+    if (address || (entry.files || []).length) {
+      label.classList.add("revealable");
+      label.title = "reveal " + (address || (entry.files || [])[0]);
+      label.addEventListener("click", function () {
+        if (!reveal(address) && !revealFile(entry)) {
+          host.toast("nothing left to reveal for this change", "error");
+        }
+      });
+    }
+    head.appendChild(number);
+    head.appendChild(label);
+    if (entry.revertible && state.writable) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "ghost";
+      button.textContent = "Revert";
+      button.title = "Apply the inverse of this change as a new change";
+      button.addEventListener("click", function () { revert(entry.id); });
+      head.appendChild(button);
+    }
+    row.appendChild(head);
+
+    var where = document.createElement("div");
+    where.className = "where";
+    where.textContent = (entry.files || []).join(", ");
+    row.appendChild(where);
+
+    if (entry.hunk) { row.appendChild(hunkBlock(entry.hunk)); }
+    return row;
+  }
+
+  /** The unified diff, one line per element so each can carry its own colour.
+   *
+   * textContent throughout: a hunk is file content, and file content is the last
+   * thing to hand to innerHTML. */
+  function hunkBlock(hunk) {
+    var pre = document.createElement("pre");
+    hunk.split("\n").forEach(function (line, index, all) {
+      if (index === all.length - 1 && line === "") { return; }
+      var span = document.createElement("span");
+      span.className = hunkClass(line);
+      span.textContent = line + "\n";
+      pre.appendChild(span);
+    });
+    return pre;
+  }
+
+  function hunkClass(line) {
+    if (line.indexOf("+++") === 0 || line.indexOf("---") === 0) { return "file"; }
+    if (line.charAt(0) === "+") { return "add"; }
+    if (line.charAt(0) === "-") { return "del"; }
+    if (line.charAt(0) === "@") { return "at"; }
+    return "";
+  }
+
+  /** Fall back to opening the file a gesture touched, when its element is gone.
+   *
+   * A deletion is the case: there is no document left to reveal, and the file
+   * it was removed from is the next most useful place to be. */
+  function revealFile(entry) {
+    var path = (entry.files || []).find(function (file) { return !!fileEntry(file); });
+    if (!path) { return false; }
+    openFile(path);
+    return true;
+  }
+
+  function revert(id) {
+    if (!state.writable) { return; }
+    fetch("/api/revert", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ id: id, revision: state.revision })
+    })
+      .then(readBody)
+      .then(function (result) { applied(result, "put change #" + id + " back", true); })
+      .catch(function (error) { refused(error, false); })
+      .then(refreshChanges);
+  }
+
+  /** The handover: the session as a script somebody else can run or review. */
+  function copyCommands() {
+    var text = changes.commands.join("\n") + (changes.commands.length ? "\n" : "");
+    if (!text) { host.toast("nothing to copy yet", "error"); return; }
+    var done = function () {
+      host.toast("copied " + changes.commands.length + " command(s)", "ok");
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text, done); });
+      return;
+    }
+    fallbackCopy(text, done);
+  }
+
+  /* No clipboard API over plain HTTP in some browsers, and this page is served
+   * over loopback without TLS. A hidden textarea and execCommand is the old way
+   * and still the working one. */
+  function fallbackCopy(text, done) {
+    var area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (error) { ok = false; }
+    document.body.removeChild(area);
+    if (ok) { done(); } else { host.toast("could not copy; select the text instead", "error"); }
+  }
+
   /* ------------------------------------------------------------- painting */
 
   function paintHistory() {
@@ -429,6 +653,10 @@ var netgraphSession = (function () {
     reveal: reveal,
     locate: locate,
     isOpen: function () { return !!open.path; },
-    save: save
+    save: save,
+    graphPath: graphPath,
+    showChanges: showChanges,
+    refreshChanges: refreshChanges,
+    isDiffing: function () { return changes.open; }
   };
 })();

@@ -25,6 +25,7 @@ leaves every comment in it alone.
 - [Placement](#placement)
 - [The two gates](#the-two-gates)
 - [Using it from Python](#using-it-from-python)
+- [Reviewing what you changed](#reviewing-what-you-changed)
 - [What it deliberately does not do](#what-it-deliberately-does-not-do)
 
 ---
@@ -296,6 +297,69 @@ Between operations the session reloads the inventory from its own overlay, so a
 batch that creates a device and then sets a field on it works, and every
 operation resolves names against the tree the previous one left behind.
 
+## Reviewing what you changed
+
+An afternoon of editing is a changeset, and a changeset is something to read
+before it is committed. There are three ways to read the same one, and all three
+are built on the parts above rather than on a fourth notion of what changed.
+
+### As a diagram
+
+[`netgraph diff`](commands/diff.md) draws two inventory states as one picture:
+added elements green, removed ones red and dashed but still in place, changed
+ones amber with a badge naming the fields that moved, everything untouched
+faded.
+
+<!-- run: cwd=. -->
+```console
+$ netgraph -i tests/fixtures/diff/home-lab-proposed diff --from examples/home-lab -f json -o /dev/null
+diff at layer l1: 2 added, 4 changed, 2 removed
+```
+
+The comparison is [`netgraph plan`](commands/plan.md)'s and the drawing is the
+renderer's; nothing between them decides what changed.
+
+### In the editor
+
+[`netgraph web DIR --write`](commands/web.md) has a **changes** drawer. It lists
+every gesture made in the session — one entry per gesture, not per operation, so
+deleting a switch is one line rather than five — and each entry carries:
+
+- the YAML hunk it wrote, as a unified diff you could paste into a patch;
+- a click on its label, which reveals the document it changed at its line;
+- a **Revert** button.
+
+Opening the drawer also repaints the canvas as a diff against the state the
+session started from, or against `git HEAD` when the inventory is in a
+repository. So the afternoon can be reviewed as a diagram before it is committed,
+and the two halves of the review — the picture and the text — are two views of
+one answer rather than two answers.
+
+**A revert is a new change, not a rewind.** It applies the gesture's own inverse
+as a fresh edit, which is itself logged and itself undoable. Reverting the third
+of ten gestures leaves the other nine alone — and fails, loudly and without
+writing, when one of them depended on what the third one did. That is the honest
+behaviour: the alternative is a rewind that silently discards work.
+
+### As a script
+
+The drawer's **Copy commands** button hands the session over as a list of
+[`netgraph edit`](commands/edit.md) invocations, in the order they happened.
+Paste it into a pull-request description, a runbook, or a colleague's terminal.
+
+```text
+netgraph -i net edit set pc-desk spec.model 'OptiPlex 7020'
+netgraph -i net edit rename ap-home ap-attic
+netgraph -i net edit delete srv-nas --cascade
+```
+
+The rendering is never lossy. An operation a subcommand takes exactly becomes
+that subcommand; one it does not — a whole-file write, a stored arrangement, an
+interface richer than `--field` can carry — becomes `netgraph edit apply -f -`
+with the operation's own JSON on standard input. There is deliberately no third
+case where the rendering *approximates* the operation: a command list that
+quietly drops the length of a cable is worse than one with a JSON blob in it.
+
 ## What it deliberately does not do
 
 **It does not repair documents.** Like `netgraph fmt`, it changes what you asked
@@ -326,4 +390,6 @@ job, and drawing it there is the renderer's.
   not a person: it stores a diagram's arrangement as `set-geometry` operations.
 - [`netgraph plan`](commands/plan.md) and [`netgraph apply`](commands/apply.md) — a
   changeset between two inventory states, and its execution through these operations.
+- [`netgraph diff`](commands/diff.md) — the same changeset, drawn.
+- [`netgraph web`](commands/web.md) — the editor, and the changes drawer over a session.
 - [`docs/architecture.md`](architecture.md) — where the write path sits in the pipeline.

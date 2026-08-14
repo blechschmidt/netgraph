@@ -29,13 +29,15 @@ from __future__ import annotations
 
 import time
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Final
 
 from netgraph.config import ValidationConfig
+from netgraph.diff import Drawing, draw
 from netgraph.errors import NetgraphError
 from netgraph.layout.geometry import Geometry
 from netgraph.loader import Inventory, load_stream
+from netgraph.plan import Plan
 from netgraph.render import (
     DETAIL_OPTIONS,
     FilterSpec,
@@ -53,7 +55,14 @@ from netgraph.validate import validate as run_validation
 from netgraph.watch.pipeline import Problem, Status, flatten_problems
 from netgraph.web.svgdoc import prepare
 
-__all__ = ["MAX_VLAN", "Preview", "ViewOptions", "render_inventory", "render_source"]
+__all__ = [
+    "MAX_VLAN",
+    "Preview",
+    "ViewOptions",
+    "render_diff",
+    "render_inventory",
+    "render_source",
+]
 
 #: The highest VLAN id ``--vlan`` and the browser may ask for (§9.1).
 MAX_VLAN: Final = 4094
@@ -209,6 +218,11 @@ class Preview:
     geometry: Mapping[str, Any] | None = None
     #: Wall-clock duration of the pass, in seconds.
     duration: float = 0.0
+    #: What changed between two states, when this pass drew a *diff* — the marks
+    #: keyed by node and edge id, exactly as ``netgraph diff -f json`` publishes
+    #: them, with the changeset under ``changeset``. ``None`` for the ordinary
+    #: single-state rendering, which is every pass but the changes drawer's.
+    diff: Mapping[str, Any] | None = None
 
     @property
     def error_count(self) -> int:
@@ -243,6 +257,7 @@ class Preview:
                 "warnings": self.warning_count,
             },
             "durationMs": round(self.duration * 1000, 1),
+            "diff": dict(self.diff) if self.diff is not None else None,
         }
 
 
@@ -327,6 +342,91 @@ def render_inventory(
         geometry=_geometry(graph),
         duration=time.monotonic() - started,
     )
+
+
+def render_diff(
+    before: Inventory,
+    after: Inventory,
+    plan: Plan,
+    view: ViewOptions | None = None,
+    *,
+    settings: ValidationConfig | None = None,
+    started: float | None = None,
+) -> Preview:
+    """Draw ``after`` with what ``plan`` says changed since ``before`` painted on.
+
+    The same pass :func:`render_inventory` makes, over the *union* of the two
+    states rather than over one of them: added things green, removed things red
+    and dashed but still placed, changed things amber. Nothing here decides what
+    changed — :mod:`netgraph.diff` joins the changeset to the two drawings, and
+    the same code answers ``netgraph diff`` on the command line.
+
+    The problems reported are ``after``'s. A diff is shown *while editing*, and
+    the problems a user needs are the ones in the tree they are editing, not the
+    ones in the state they have left behind.
+
+    Args:
+        before: The state being compared against — the session's starting tree,
+            or git HEAD.
+        after: The tree as it is now.
+        plan: The changeset between them, from :func:`netgraph.plan.diff`.
+        view: Which graph to build and how to draw it.
+        settings: Validation settings for ``after``.
+        started: When the pass began, for the duration this reports.
+
+    Returns:
+        The diagram, its info-box records, every problem in ``after``, and the
+        marks under :attr:`Preview.diff`.
+    """
+    options = view or ViewOptions()
+    started = time.monotonic() if started is None else started
+
+    findings = run_validation(
+        after, settings if settings is not None else ValidationConfig(strict=options.strict)
+    )
+    problems = flatten_problems(after.errors, findings)
+    rejected = bool(after.errors) or any(finding.severity.is_fatal for finding in findings)
+
+    try:
+        drawing = draw(
+            plan,
+            filter_graph(build_graph(before, layer=options.layer), options.filter_spec),
+            filter_graph(build_graph(after, layer=options.layer), options.filter_spec),
+        )
+        graph = drawing.graph
+        payload = to_image(
+            graph, replace(options.render_options, diff=drawing.overlay), format="svg"
+        )
+        svg = prepare(payload)
+    except (NetgraphError, OSError) as exc:
+        return Preview(
+            status=Status.FAILED,
+            message=_describe(exc),
+            problems=problems,
+            duration=time.monotonic() - started,
+        )
+
+    return Preview(
+        status=Status.INVALID if rejected else Status.OK,
+        message=_diff_summary(drawing, rejected=rejected),
+        svg=svg,
+        details=build_details(graph, DETAIL_OPTIONS),
+        problems=problems,
+        nodes=len(graph.nodes),
+        edges=len(graph.edges),
+        dangling=tuple(graph.dangling),
+        geometry=_geometry(graph),
+        duration=time.monotonic() - started,
+        diff=drawing.overlay.to_dict() | {"changeset": plan.to_dict()},
+    )
+
+
+def _diff_summary(drawing: Drawing, *, rejected: bool) -> str:
+    """The one-line message over a diff: what moved, not how big the graph is."""
+    if drawing.is_empty:
+        return "nothing has changed yet; the whole diagram is drawn untouched"
+    counted = drawing.overlay.summary()
+    return f"{counted} (drawn despite the problems below)" if rejected else counted
 
 
 def _geometry(graph: Graph) -> dict[str, Any] | None:
