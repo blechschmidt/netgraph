@@ -1,0 +1,62 @@
+{
+  "name": "netgraph",
+  "displayName": "netgraph",
+  "description": "Diagnostics, completion, hover, go-to-definition, rename and formatting for netgraph inventory YAML.",
+  "version": "0.1.0",
+  "publisher": "netgraph",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/blechschmidt/netgraph.git",
+    "directory": "editors/vscode"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "activationEvents": [
+    "onLanguage:yaml"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "netgraph",
+      "properties": {
+        "netgraph.server.path": {
+          "type": "string",
+          "default": "netgraph",
+          "markdownDescription": "The `netgraph` executable. Set this to an absolute path when netgraph is in a virtual environment VS Code does not activate."
+        },
+        "netgraph.server.args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["lsp"],
+          "markdownDescription": "Arguments passed to the executable. `--no-watch` turns off netgraph's own folder watching; `--log FILE` records what the server did."
+        },
+        "netgraph.server.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run the netgraph language server for YAML files."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "netgraph.restart",
+        "title": "netgraph: Restart language server"
+      }
+    ],
+    "yamlValidation": [
+      {
+        "fileMatch": ["*.yaml", "*.yml"],
+        "url": "https://raw.githubusercontent.com/blechschmidt/netgraph/main/schema/netgraph.schema.json"
+      }
+    ]
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  }
+}

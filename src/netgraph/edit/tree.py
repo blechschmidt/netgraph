@@ -66,6 +66,9 @@ class EditableTree:
     _files: dict[str, _Tracked] = field(default_factory=dict, repr=False)
     #: Pre-images recorded for the operation currently being applied.
     _journal: dict[str, str | None] | None = field(default=None, repr=False)
+    #: Text handed to :meth:`seed`, which the disk does not hold and which every
+    #: load through :meth:`overlay` therefore has to be told about separately.
+    _seeded: dict[str, str] = field(default_factory=dict, repr=False)
 
     # -- reading ---------------------------------------------------------
 
@@ -105,6 +108,31 @@ class EditableTree:
         self._files[relative] = _Tracked(
             file=parsed, digest=digest_of(payload), original=parsed.render()
         )
+        return parsed
+
+    def seed(self, relative: str, text: str) -> YamlFile:
+        """Take ``relative`` to hold ``text`` rather than what is on the disk.
+
+        An editor is holding the file open and the user has not saved it. The
+        edit still has to be computed against what they can see, or a rename
+        offered in a language server would rewrite a reference that is no longer
+        written there. Seeding is not an edit: the text becomes the file's
+        *original*, so it does not appear in :attr:`changes`, and the digest
+        stays the disk's, so a later :meth:`commit` still refuses to overwrite a
+        file somebody else moved underneath.
+
+        Raises:
+            EditError: The text is not parseable as a YAML file, or the file on
+                disk is there but cannot be read.
+        """
+        path = self.path_of(relative)
+        try:
+            digest = digest_of(path.read_bytes()) if path.is_file() else None
+        except OSError as exc:  # pragma: no cover - unreadable but existing
+            raise EditError(f"cannot read {relative}: {exc.strerror or exc}") from exc
+        parsed = YamlFile.parse(text, relative=relative)
+        self._files[relative] = _Tracked(file=parsed, digest=digest, original=parsed.render())
+        self._seeded[relative] = parsed.render()
         return parsed
 
     def create(self, relative: str) -> YamlFile:
@@ -308,8 +336,14 @@ class EditableTree:
         return None if tracked is None else tracked.original
 
     def overlay(self) -> Overlay:
-        """The pending changes, in the form :func:`~netgraph.loader.load_tree` takes."""
-        return Overlay(files=dict(self.changes))
+        """The pending changes, in the form :func:`~netgraph.loader.load_tree` takes.
+
+        Seeded text is part of it even where nothing has changed it: the point
+        of seeding is that the disk does not hold what the session is editing.
+        """
+        files: dict[str, str | None] = dict(self._seeded)
+        files.update(self.changes)
+        return Overlay(files=files)
 
     def check_conflicts(self) -> None:
         """Compare every file to be written against the bytes it was read as.

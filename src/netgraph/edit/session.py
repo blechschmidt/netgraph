@@ -37,7 +37,7 @@ from netgraph.edit.errors import Problem, ValidationRefused
 from netgraph.edit.operations import Operation
 from netgraph.edit.tree import EditableTree
 from netgraph.fmt.runner import diff_text
-from netgraph.loader import DocumentCache, Inventory, load_tree
+from netgraph.loader import DocumentCache, Inventory, Overlay, load_tree
 from netgraph.validate import validate
 
 __all__ = ["EditSession", "EditSummary"]
@@ -94,14 +94,30 @@ class EditSession:
     #: The parse cache, shared with the rest of the run. Only the *baseline*
     #: load uses it: an overlaid file's bytes are not the bytes on disk.
     cache: DocumentCache | None = None
+    #: Files an editor is holding open with unsaved changes, keyed by POSIX path
+    #: relative to :attr:`root`. They are the text the session reads, and the
+    #: text every gate judges against, so an edit computed here is an edit
+    #: against what the user is looking at rather than against a stale disk.
+    buffers: Mapping[str, str] = field(default_factory=dict)
 
     _tree: EditableTree = field(init=False, repr=False)
     _inventory: Inventory | None = field(default=None, init=False, repr=False)
     _baseline: Inventory | None = field(default=None, init=False, repr=False)
     _applied: list[AppliedOperation] = field(default_factory=list, init=False, repr=False)
+    _overlay: Overlay | None = field(default=None, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self._tree = EditableTree(root=self.root)
+        if not self.buffers:
+            return
+        for relative in sorted(self.buffers):
+            self._tree.seed(relative, self.buffers[relative])
+        # What the seeded files render as, which is what the tree will compare
+        # its changes against -- not the raw buffer, which may differ from it by
+        # a trailing newline the round-trip parser normalises.
+        self._overlay = Overlay(
+            files={relative: self._tree.text_of(relative) for relative in self.buffers}
+        )
 
     # -- the tree --------------------------------------------------------
 
@@ -113,7 +129,11 @@ class EditSession:
     def baseline(self) -> Inventory:
         """The inventory as it is on disk, loaded once and kept for comparison."""
         if self._baseline is None:
-            self._baseline = load_tree(self.root, cache=self.cache)
+            self._baseline = (
+                load_tree(self.root, cache=self.cache)
+                if self._overlay is None
+                else load_tree(self.root, overlay=self._overlay)
+            )
             self._inventory = self._baseline
         return self._baseline
 

@@ -1,0 +1,35 @@
+{
+  "// what this is": [
+    "Workspace settings for an inventory, for people who would rather not build",
+    "the extension next to this file. Copy into .vscode/settings.json at the root",
+    "of your inventory. docs/lsp.md explains what each half buys you.",
+    "",
+    "The schema half needs only redhat.vscode-yaml and gives key completion and",
+    "single-document validation with no netgraph process at all. The server half",
+    "needs a generic LSP bridge extension and gives everything that spans more",
+    "than one document: resolving references, hover, rename, quick fixes.",
+    "Running both is the intended arrangement."
+  ],
+
+  "yaml.schemas": {
+    "https://raw.githubusercontent.com/blechschmidt/netgraph/main/schema/netgraph.schema.json": [
+      "**/*.yaml",
+      "**/*.yml"
+    ]
+  },
+  "yaml.format.enable": false,
+  "yaml.validate": true,
+
+  "netgraph.server.path": "netgraph",
+  "netgraph.server.args": ["lsp"],
+
+  "[yaml]": {
+    "editor.formatOnSave": true,
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true
+  },
+
+  "files.associations": {
+    "netgraph.toml": "toml"
+  }
+}

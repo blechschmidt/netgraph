@@ -524,7 +524,19 @@ promised, that is a bug in netgraph rather than in your typing.
 ## Editor setup: autocompletion and inline errors
 
 Inventories are written by hand, so the editor is the first place a mistake can
-be caught. `netgraph schema` emits a
+be caught. There are two ways to wire it up, and they compose.
+
+**The language server** is the better one. `netgraph lsp` is a Language Server
+Protocol server over stdio, and it answers about the whole folder: the
+diagnostics are the ones `netgraph validate` prints, the completion for a cable
+endpoint offers the switches you actually have and then the ports they actually
+have, hover resolves a reference, and rename rewrites every mention of an
+element across every file. [`docs/lsp.md`](lsp.md) has the configuration for
+VS Code, Neovim, Helix and Emacs, and [`editors/`](../editors) has a minimal
+VS Code client.
+
+**The JSON Schema** is the other, and it needs no netgraph process at all.
+`netgraph schema` emits a
 [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/release-notes)
 document generated from the pydantic models; the yaml-language-server behind
 VS Code, Neovim and the JetBrains IDEs turns it into completion, hover
@@ -584,8 +596,9 @@ its own rather than replacing it.
 **It does not replace `netgraph validate`.** The schema sees one document at a
 time, so it checks structure, value grammars and rules within a single object.
 Whether a cable endpoint names an element that exists, whether names are unique,
-whether two ends of a link agree on a VLAN — all of that needs the whole tree
-and stays with `netgraph validate`. Keep running it in CI.
+whether two ends of a link agree on a VLAN — all of that needs the whole tree,
+and it is exactly what [`netgraph lsp`](lsp.md) adds on top. Keep running
+`netgraph validate` in CI either way.
 [`docs/schema.md` §13](schema.md#13-editor-integration) has the full comparison
 and the per-kind setup, and [`netgraph schema`](commands/schema.md) has the
 command's own options.

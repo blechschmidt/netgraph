@@ -2,7 +2,7 @@
 
 The suite is in three halves, and they answer different questions.
 
-**Example tests** — everything in `tests/` except the four files below — say what
+**Example tests** — everything in `tests/` except the five files below — say what
 a feature *does*. Each one names an inventory somebody wrote, calls one thing,
 and asserts one outcome. When they fail, the failure is a sentence.
 
@@ -15,12 +15,16 @@ accepts: unicode-bearing free text, near-boundary names, interfaces with
 consistent types and members, cables whose endpoints resolve, nested tunnel
 stacks, adapters, patch panels, templates and interface ranges.
 
-**The browser layer** — `tests/test_browser.py` — says what `netgraph web` *does
-in a browser*. It is the only thing in the repository that executes the page's
-CSS and JavaScript; see [The browser layer](#the-browser-layer) below.
+**The two protocol layers** — `tests/test_browser.py` and `tests/test_lsp.py` —
+say what the two editors do *through the thing that connects them to a client*.
+The first is the only place in the repository that executes the page's CSS and
+JavaScript; the second is the only place that speaks JSON-RPC frames. See
+[The browser layer](#the-browser-layer) and
+[The language server](#the-language-server).
 
-The first two run under a plain `pytest`. The third skips unless a browser is
-installed, so a plain `pytest` never fails for the want of one.
+The first two and `tests/test_lsp.py` run under a plain `pytest`.
+`tests/test_browser.py` skips unless a browser is installed, so a plain `pytest`
+never fails for the want of one.
 
 ```console
 $ pip install --editable ".[dev]"
@@ -244,6 +248,41 @@ whatever the test wrote is still there to look at afterwards.
 
 [axe]: https://github.com/dequelabs/axe-core
 [playwright]: https://playwright.dev/python/
+
+## The language server
+
+`tests/test_lsp.py` is the browser layer's opposite number for
+[`netgraph lsp`](lsp.md), and it is built on the same principle: a component
+defined by what it puts on a wire has to be tested through that wire.
+
+Every test drives a real
+[`LanguageServer`](../src/netgraph/lsp/server.py) over real pipes, in
+`Content-Length` frames, with a forty-line client in the module itself. Nothing
+calls a handler directly. That is not thoroughness for its own sake — the bugs
+that make a language server work in one editor and hang in the next all live in
+the layers a direct call skips: the framing, the byte-versus-character length,
+the gate that refuses everything before `initialize`, and the order a
+notification arrives in relative to a response.
+
+Two of them are worth knowing about because they are easy to write badly:
+
+* **Waiting for the right publication.** Diagnostics are published when the
+  server's queue runs dry, so an edit may legitimately produce two publications
+  for one file. `Driver.wait_for_diagnostics` takes a predicate, and a test that
+  expects an edit to *change* the answer passes one. Asserting on the next
+  publication instead is a race that passes locally and fails in CI.
+* **A buffer shadows the file it is opened over.** Opening a document with
+  invented text takes the elements that file declared out of the tree — which is
+  correct, and which makes a test that opens a made-up cable over
+  `cables/links.yaml` and then expects to complete against those cables a test
+  about nothing. The completion tests open new paths for that reason.
+
+`TestCommand` runs the real `netgraph lsp` as a subprocess, once with the pipe
+closed and once with it deliberately left open. The second is there because a
+client is entitled to send `exit` and keep stdin open; before
+`netgraph.cli._exit_from_stdio` existed, that shut the interpreter down with a
+thread inside a blocking read and aborted the process, which an editor reports
+as a crash immediately after a clean shutdown.
 
 ## The properties
 

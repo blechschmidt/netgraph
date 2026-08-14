@@ -210,6 +210,7 @@ report.txt` both do what they look like they do.
 | [`netgraph layout`](docs/commands/layout.md) | Store the diagram's arrangement, so a hand-placed node stays put. | [layout.md](docs/commands/layout.md) |
 | [`netgraph watch`](docs/commands/watch.md) | Re-render on every save, optionally serving the result. | [watch.md](docs/commands/watch.md) |
 | [`netgraph web`](docs/commands/web.md) | Edit the YAML and see the diagram side by side in a browser. | [web.md](docs/commands/web.md) |
+| [`netgraph lsp`](docs/commands/lsp.md) | Serve completion, diagnostics and rename to an editor over LSP. | [lsp.md](docs/commands/lsp.md) |
 | [`netgraph path`](docs/commands/path.md) | Trace how two elements reach each other, hop by hop. | [path.md](docs/commands/path.md) |
 | [`netgraph list`](docs/commands/list.md) | Tabulate devices, cables, tunnels, VLANs, BSSs or subnets. | [list.md](docs/commands/list.md) |
 | [`netgraph ipam`](docs/commands/ipam.md) | Report utilisation, free space, overlaps and aggregates. | [ipam.md](docs/commands/ipam.md) |
@@ -293,6 +294,7 @@ over the whole set. The pages a new reader wants first:
 | [`docs/schema.md`](docs/schema.md) | The normative specification, if you want the reasoning as well as the rules. |
 | [`docs/ci.md`](docs/ci.md) | Making a pull request fail when the inventory stops adding up. |
 | [`docs/configuration.md`](docs/configuration.md) | `netgraph.toml`, so you type the flags once instead of every time. |
+| [`docs/lsp.md`](docs/lsp.md) | `netgraph lsp` in VS Code, Neovim, Helix and Emacs: diagnostics, completion, hover, rename and quick fixes on the YAML you are typing. |
 | [`docs/docker.md`](docs/docker.md) | The image and the compose file: the CLI, the preview and the editor in a container. |
 
 ## Examples

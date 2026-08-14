@@ -75,14 +75,15 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 import sys
 import threading
 import webbrowser
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager, suppress
 from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
-from typing import TYPE_CHECKING, Any, Final, TypeVar
+from typing import IO, TYPE_CHECKING, Any, Final, TypeVar, cast
 
 import click
 import click.core
@@ -4687,6 +4688,113 @@ def _open_browser(app: AppContext, url: str) -> None:
         return
     if not opened:
         app.log("no browser could be opened; the address above still works", level=1)
+
+
+# --------------------------------------------------------------------------- #
+# lsp
+# --------------------------------------------------------------------------- #
+
+
+@cli.command("lsp")
+@click.option(
+    "--stdio",
+    "stdio",
+    is_flag=True,
+    default=True,
+    help="Speak the protocol over stdin and stdout. The only transport; accepted "
+    "because most clients pass it.",
+)
+@click.option(
+    "--watch/--no-watch",
+    "watch",
+    default=True,
+    help="Watch the folder, so an edit made outside the editor refreshes diagnostics.",
+)
+@click.option(
+    "--log",
+    "log_path",
+    metavar="FILE",
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
+    help="Append a trace of what the server did to FILE. Never stderr: some "
+    "clients treat anything there as a crash.",
+)
+@click.pass_obj
+def lsp_command(app: AppContext, stdio: bool, watch: bool, log_path: Path | None) -> None:
+    """Serve inventory YAML to an editor over the Language Server Protocol.
+
+    Reads JSON-RPC from stdin and writes it to stdout, so it is started by the
+    editor rather than by you. ``docs/lsp.md`` has the configuration for VS Code
+    and Neovim, and ``schema/netgraph.schema.json`` covers the editors that want
+    a JSON Schema instead.
+
+    The inventory is whatever the client says it opened; ``-i`` is only the
+    fallback for a client that opens a lone file, and in that case the checks
+    that need the rest of the tree are held back rather than reported against a
+    file that cannot satisfy them.
+
+    Everything it answers comes from the commands you already run: ``validate``
+    for the diagnostics, ``fmt`` for formatting, ``validate --fix`` for the quick
+    fixes, ``edit rename`` for renaming, and the JSON Schema for completion.
+    """
+    from netgraph.lsp import Connection, serve
+
+    del stdio  # There is one transport; the flag exists so clients may pass it.
+    # Binary streams, because the protocol frames by *byte* count and Python's
+    # text layer would translate newlines on Windows and desynchronise the
+    # stream on the first frame.
+    # ``getattr`` rather than ``.buffer``: a harness that replaced the streams
+    # with text buffers should meet a protocol error rather than an
+    # ``AttributeError`` from inside an argument list.
+    reader = cast("IO[bytes]", getattr(sys.stdin, "buffer", sys.stdin))
+    writer = cast("IO[bytes]", getattr(sys.stdout, "buffer", sys.stdout))
+    with _lsp_log(log_path) as log:
+        code = serve(
+            Connection(reader, writer),
+            root=app.inventory if app.inventory.is_dir() else None,
+            watch=watch,
+            log=log,
+        )
+    _exit_from_stdio(code)
+
+
+def _exit_from_stdio(code: int) -> None:
+    """End the process now, without waiting for the reader thread.
+
+    The thread that frames the client's stream is parked in a blocking read on
+    stdin, and only the client can end that read. A client that has sent ``exit``
+    is entitled to leave the pipe open — several do — so a normal interpreter
+    shutdown would find a thread inside a buffered read and abort the process
+    with ``_enter_buffered_busy``. The editor then reports a crash immediately
+    after a clean shutdown, which is both alarming and false.
+
+    Everything that had to be written has been: every response is flushed as it
+    is framed, and the log file was closed by the caller's ``with``. So the
+    honest thing left to do is stop.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        with suppress(ValueError, OSError):
+            stream.flush()
+    os._exit(code)
+
+
+@contextmanager
+def _lsp_log(path: Path | None) -> Iterator[Callable[[str], None] | None]:
+    """A line-per-message log, or nothing at all.
+
+    Opened for the life of the session and flushed on every line: a log that
+    only appears once the server exits is no use for diagnosing a server that
+    did not.
+    """
+    if path is None:
+        yield None
+        return
+    with path.open("a", encoding="utf-8") as handle:
+
+        def write(message: str) -> None:
+            handle.write(f"{message}\n")
+            handle.flush()
+
+        yield write
 
 
 # --------------------------------------------------------------------------- #

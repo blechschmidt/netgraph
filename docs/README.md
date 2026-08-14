@@ -20,6 +20,7 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
 | find out how two machines reach each other | [paths.md](paths.md) |
 | keep the YAML in one canonical form | [format.md](format.md) |
 | change the inventory safely, from a script or an editor | [editing.md](editing.md) |
+| get completion, inline errors and rename in your editor | [lsp.md](lsp.md) |
 | diff two inventory states, review the change, and apply it | [commands/plan.md](commands/plan.md), [commands/apply.md](commands/apply.md) |
 | adopt what a live network reports into the declared inventory | [commands/drift.md](commands/drift.md), [commands/plan.md](commands/plan.md) |
 | gate a pull request on the inventory validating | [ci.md](ci.md) |
@@ -76,6 +77,9 @@ run netgraph before, [getting-started.md](getting-started.md) is the one to read
 * **[docker.md](docker.md)** — the image and the compose file: the CLI, the live preview and
   the browser editor in a container, what they mount, what they publish, and who owns the
   files they write.
+* **[lsp.md](lsp.md)** — `netgraph lsp` in VS Code, Neovim, Helix and Emacs: what each
+  capability is answered by, how it degrades when the editor opens a lone file, and where
+  the published JSON Schema stops being enough.
 
 ### Reference — look things up
 

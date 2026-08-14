@@ -18,6 +18,32 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **`netgraph lsp`, a language server, so the editor knows what netgraph knows.** An
+  inventory is written by hand in a plain text editor, and until now the editor could be
+  told the shape of one document — through the published JSON Schema — but nothing about
+  the tree it belongs to. The server closes that: LSP 3.17 over stdio, no new dependency,
+  started by your editor rather than by you.
+
+  Diagnostics are `netgraph validate`'s, on the line and column that caused them, carrying
+  the `NG-*` rule id as the diagnostic code and a link to that rule's section of
+  [`docs/validation-rules.md`](docs/validation-rules.md). Completion is the JSON Schema for
+  keys, enums and their documentation, *and the tree* for references: typing under a
+  cable's `endpoints` offers the switches you have, and `sw-home:` offers the ports that
+  switch has. Hover resolves a reference to the device, the port, its addresses, its VLAN
+  and what is already cabled to it. Go-to-definition and find-references work across the
+  whole folder. Rename goes through the same write path as `netgraph edit rename`, so every
+  reference in every file is rewritten with the comments intact. Formatting is
+  `netgraph fmt`; the code actions are the `--fix` catalogue.
+
+  It answers about the text on your screen — unsaved buffers are overlaid on the tree
+  before it is loaded — and it watches the folder the way `netgraph watch` does, so an edit
+  made in a terminal refreshes the diagnostics. Opened on a lone file rather than a folder,
+  the checks that can only be judged against a whole tree are held back rather than
+  reported against a document that cannot satisfy them.
+
+  [`docs/lsp.md`](docs/lsp.md) has the setup for VS Code, Neovim, Helix and Emacs, and a
+  minimal VS Code client ships in [`editors/vscode/`](editors/vscode).
+
 - **`netgraph validate --fix` repairs what the inventory itself determines, and the editor
   puts a `fix` button on each of those diagnostics.** Half the value of a diagnostic is
   knowing what to do about it, and for a good part of the catalogue the tree already says:

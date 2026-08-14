@@ -110,6 +110,9 @@ include = [
     "/docs",
     "/tools",
     "/schema",
+    # docs/lsp.md documents this as the shipped VS Code client and
+    # tests/test_docs.py checks that every link in it resolves.
+    "/editors",
     "/.github",
     "/.pre-commit-hooks.yaml",
     "/.pre-commit-config.yaml",

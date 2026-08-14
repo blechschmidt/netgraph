@@ -35,6 +35,7 @@ a flag that is documented exists. The prose around them is written by hand.
 | [`netgraph layout`](layout.md) | Store the diagram's arrangement, so a hand-placed node stays put. | [layout.md](layout.md) |
 | [`netgraph watch`](watch.md) | Re-render on every save, optionally serving the result. | [watch.md](watch.md) |
 | [`netgraph web`](web.md) | Edit the YAML and see the diagram side by side in a browser. | [web.md](web.md) |
+| [`netgraph lsp`](lsp.md) | Serve completion, diagnostics and rename to an editor over LSP. | [lsp.md](lsp.md) |
 | [`netgraph path`](path.md) | Trace how two elements reach each other, hop by hop. | [path.md](path.md) |
 | [`netgraph list`](list.md) | Tabulate devices, cables, tunnels, VLANs, BSSs or subnets. | [list.md](list.md) |
 | [`netgraph ipam`](ipam.md) | Report utilisation, free space, overlaps and aggregates. | [ipam.md](ipam.md) |
