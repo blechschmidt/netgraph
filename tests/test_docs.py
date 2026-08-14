@@ -455,3 +455,29 @@ def test_the_documented_example_is_what_netgraph_prints(block: Any) -> None:
         )
     problem = EXAMPLES.check(block)
     assert problem is None, f"{block.id}: {problem}"
+
+
+@pytest.mark.parametrize("block", _BLOCKS, ids=[block.id for block in _BLOCKS])
+def test_no_transcript_holds_the_path_this_checkout_happens_to_live_at(block: Any) -> None:
+    """A transcript quoting an absolute path passes here and fails on CI.
+
+    The test above diffs what a command prints against what the page says, so a
+    command that prints the inventory root as ``/root/Projects/netgraph/...``
+    agrees with a transcript written on the machine that generated it — and with
+    nothing else. It went red on ``ubuntu-24.04`` and ``macos-14`` for exactly
+    that on 2026-08-14, from a ``netgraph test -F junit`` ``<property>``.
+
+    Asserting it separately is what makes the diagnosis immediate: "this page
+    names your checkout" is a different problem from "the output changed", and
+    the diff of the first reads exactly like the diff of the second.
+
+    The fix is always in the *command*, not the page: netgraph prints a path
+    relative to the working directory wherever a person reads it, and keeps the
+    absolute form only in a JSON envelope a consumer resolves rather than reads
+    (:func:`netgraph.drift.report._root_text`).
+    """
+    text = "\n".join(block.lines)
+    assert str(REPO_ROOT) not in text, (
+        f"{block.id} quotes the absolute path of this checkout, so it can only ever "
+        f"pass on this machine; print the path relative to the working directory instead"
+    )

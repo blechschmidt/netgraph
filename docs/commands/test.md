@@ -265,7 +265,7 @@ $ netgraph -i tests/fixtures/testsuite test -F junit
 <testsuites name="netgraph test" tests="5" failures="4" errors="0" skipped="0">
   <testsuite name="netgraph test" tests="5" failures="4" errors="0" skipped="0">
     <properties>
-      <property name="inventory" value="/root/Projects/netgraph/tests/fixtures/testsuite"/>
+      <property name="inventory" value="tests/fixtures/testsuite"/>
       <property name="netgraph" value="0.1.0"/>
     </properties>
     <testcase classname="netgraph.test.office" name="both desks reach the router" file="tests.yaml" line="8"/>
