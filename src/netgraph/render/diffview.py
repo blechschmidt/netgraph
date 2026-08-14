@@ -59,6 +59,7 @@ from enum import Enum
 from typing import Any, Final
 
 from netgraph.layout.geometry import Geometry
+from netgraph.loader import short_name
 from netgraph.render.graph import Edge, Graph, Node
 
 __all__ = [
@@ -245,7 +246,15 @@ def union_graph(before: Graph, after: Graph, *, renames: Mapping[str, str] = {})
         translated = _translate(fqn, renames)
         if translated in nodes:
             continue
-        nodes[translated] = node if translated == fqn else replace(node, fqn=translated)
+        # Reachable when a filter kept the before side of a rename and dropped
+        # the after side: the box has to be drawn under the name it will have,
+        # label included, or the diagram would caption it with a name the
+        # inventory no longer holds.
+        nodes[translated] = (
+            node
+            if translated == fqn
+            else replace(node, fqn=translated, name=short_name(translated))
+        )
 
     seen = {edge.id for edge in after.edges}
     edges: list[Edge] = list(after.edges)
