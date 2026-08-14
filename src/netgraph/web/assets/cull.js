@@ -127,7 +127,13 @@ window.netgraphCull = (function () {
     drawn = found.length;
     active = found.length > CULL_ABOVE;
     regions = active ? namespaces(details || {}) : {};
-    if (active) { update(); }
+    // Scheduled rather than run: a11y.js and links.js walk the drawing straight
+    // after this, and both are entitled to find it whole. a11y in particular
+    // hides each node's Graphviz <title> so a screen reader does not read the
+    // name twice, and a group whose contents were already parked would keep an
+    // unhidden one. The first cull lands a fraction of a second later, which
+    // nobody sees and everything downstream survives.
+    if (active) { schedule(); }
   }
 
   /** Forget the drawing. Everything parked is dropped with the SVG that owned it. */
