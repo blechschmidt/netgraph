@@ -719,6 +719,78 @@ jobs:
 
           exit "$status"
 
+      # The composite action shipped for other people's repositories, run from
+      # this very checkout: a change to it is tested by the pull request that
+      # makes it rather than by whoever pulls it next. ``netgraph-pages.yml``
+      # is this step and an upload, so exercising it here is what keeps the
+      # published-diagram path honest without deploying a second site over the
+      # one ``pages.yml`` maintains.
+      - name: Render a page through the action
+        id: page
+        uses: ./.github/actions/netgraph-render
+        with:
+          inventory: examples/campus
+          layer: l1,l2,l3
+          title: campus (netgraph CI)
+          output: out/campus.html
+          strict: "true"
+          # Both are already on this runner; the action's own installers are
+          # exercised by consumers, not by re-running them here.
+          install: "false"
+          graphviz: "false"
+
+      # ``format`` is not decoration: the mermaid path never touches Graphviz,
+      # so it also proves ``graphviz: auto`` skips the install rather than
+      # failing to find a package manager it did not need.
+      - name: Render a Mermaid diagram through the action
+        id: mermaid
+        uses: ./.github/actions/netgraph-render
+        with:
+          inventory: examples/campus
+          format: mermaid
+          output: out/campus.mmd
+          install: "false"
+
+      - name: Check what the action produced
+        env:
+          PAGE: ${{ steps.page.outputs.file }}
+          PAGE_BYTES: ${{ steps.page.outputs.bytes }}
+          PAGE_DIR: ${{ steps.page.outputs.directory }}
+          MERMAID: ${{ steps.mermaid.outputs.file }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import pathlib
+          import sys
+
+          page = pathlib.Path(os.environ["PAGE"])
+          if page != pathlib.Path("out/campus.html"):
+              sys.exit(f"::error::the action reported {page}, not the output it was given")
+          if pathlib.Path(os.environ["PAGE_DIR"]) != page.parent:
+              sys.exit("::error::the 'directory' output is not the directory of 'file'")
+
+          text = page.read_text(encoding="utf-8")
+          if int(os.environ["PAGE_BYTES"]) != len(page.read_bytes()):
+              sys.exit("::error::the 'bytes' output is not the size of the page")
+          # One page, three layers, one switcher over them: the thing that
+          # makes an HTML render publishable as-is rather than as three files.
+          import re
+
+          drawn = re.findall(r'<option value="\d+">(l\d)[^<]*</option>', text)
+          if drawn != ["l1", "l2", "l3"]:
+              sys.exit(f"::error::the page offers the layers {drawn}, not the three asked for")
+          # The default is the inventory's own name, so a title that reached the
+          # page is a title that says something the default does not.
+          if "<h1>campus (netgraph CI)</h1>" not in text:
+              sys.exit("::error::the page does not carry the title it was given")
+
+          mermaid = pathlib.Path(os.environ["MERMAID"])
+          if not mermaid.read_text(encoding="utf-8").startswith("flowchart"):
+              sys.exit(f"::error::{mermaid} is not a Mermaid flowchart")
+          print(f"{page} ({len(text)} bytes), {mermaid} ok")
+          PY
+
       - name: Upload the rendered diagrams
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4

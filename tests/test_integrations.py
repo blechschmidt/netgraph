@@ -1,16 +1,25 @@
 """The CI integrations this repository ships to other repositories.
 
-``.pre-commit-hooks.yaml`` and ``.github/actions/netgraph-validate/action.yml``
-are consumed by *other people's* repositories, at a tag, through machinery this
-test suite never runs. Nothing else in the project would notice an option
-renamed out from under them, a hook whose ``entry`` no longer resolves, or a
-documented input the action does not declare — so the promises those files make
-are asserted against the CLI here, where a break is cheap.
+``.pre-commit-hooks.yaml``, the two composite actions under ``.github/actions/``
+and the reusable workflow ``.github/workflows/netgraph-pages.yml`` are consumed
+by *other people's* repositories, at a tag, through machinery this test suite
+never runs. Nothing else in the project would notice an option renamed out from
+under them, a hook whose ``entry`` no longer resolves, or a documented input the
+action does not declare — so the promises those files make are asserted against
+the CLI here, where a break is cheap.
+
+The render action goes one step further than assertion: its shell is *run*, with
+the environment the action file itself says it builds. Quoting, word splitting
+and the suffix it derives are not things a schema check can see.
 """
 
 from __future__ import annotations
 
+import os
 import re
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -20,14 +29,30 @@ from click.testing import CliRunner
 
 from netgraph.cli import cli
 from netgraph.diagnostics import FORMATS
+from netgraph.render import FORMATS as RENDER_FORMATS
+from netgraph.render import TEXT_FORMATS, suffix_for
+
+from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HOOKS_FILE = REPO_ROOT / ".pre-commit-hooks.yaml"
 ACTION_DIR = REPO_ROOT / ".github" / "actions" / "netgraph-validate"
 ACTION_FILE = ACTION_DIR / "action.yml"
 ACTION_README = ACTION_DIR / "README.md"
+RENDER_ACTION_DIR = REPO_ROOT / ".github" / "actions" / "netgraph-render"
+RENDER_ACTION_FILE = RENDER_ACTION_DIR / "action.yml"
+RENDER_ACTION_README = RENDER_ACTION_DIR / "README.md"
+PAGES_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "netgraph-pages.yml"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 CI_DOC = REPO_ROOT / "docs" / "ci.md"
+HOME_LAB = REPO_ROOT / "examples" / "home-lab"
+
+#: The action's steps are written in bash — arrays, ``set -f`` — so ``sh`` will
+#: not do. Git Bash satisfies this on the Windows runner, which is the point:
+#: the action declares ``shell: bash`` and GitHub honours it there too.
+requires_bash = pytest.mark.skipif(
+    shutil.which("bash") is None, reason="the action's steps are bash, and there is no bash here"
+)
 
 
 def load_yaml(path: Path) -> Any:
@@ -204,8 +229,504 @@ def test_the_action_readme_shows_a_usable_snippet() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# The render action
+# --------------------------------------------------------------------------- #
+
+
+#: The other half of the promise: what the README and ``docs/ci.md`` say a
+#: workflow may set on ``netgraph-render``.
+EXPECTED_RENDER_INPUTS = {
+    "inventory",
+    "format",
+    "output",
+    "layer",
+    "title",
+    "theme",
+    "args",
+    "strict",
+    "force",
+    "graphviz",
+    "install",
+    "version",
+}
+EXPECTED_RENDER_OUTPUTS = {"file", "directory", "bytes"}
+
+#: ``${{ inputs.name }}`` and nothing else. Every value the shell steps read is
+#: passed through the ``env`` block in exactly that form, which is what lets a
+#: test build the same environment without reimplementing the action.
+_INPUT_EXPRESSION = re.compile(r"^\$\{\{\s*inputs\.([a-z-]+)\s*\}\}$")
+
+
+@pytest.fixture(scope="module")
+def render_action() -> dict[str, Any]:
+    parsed = load_yaml(RENDER_ACTION_FILE)
+    assert isinstance(parsed, dict)
+    return parsed
+
+
+def step_of(action: dict[str, Any], step_id: str) -> dict[str, Any]:
+    return next(step for step in action["runs"]["steps"] if step.get("id") == step_id)
+
+
+def environment_for(action: dict[str, Any], step_id: str, values: dict[str, str]) -> dict[str, str]:
+    """The env GitHub would build for ``step_id``, from the action's own ``env``.
+
+    Reading the mapping out of the file rather than repeating it here is what
+    makes a renamed variable a failure: the step would be handed an environment
+    that no longer matches the one it reads.
+    """
+    defaults = {name: str(spec["default"]) for name, spec in action["inputs"].items()}
+    unknown = set(values) - set(defaults)
+    assert not unknown, f"no such input: {sorted(unknown)}"
+
+    environment = {}
+    for variable, expression in step_of(action, step_id)["env"].items():
+        matched = _INPUT_EXPRESSION.match(expression)
+        assert matched is not None, f"{variable} is not a plain input reference: {expression}"
+        name = matched.group(1)
+        environment[variable] = values.get(name, defaults[name])
+    return environment
+
+
+def run_step(
+    action: dict[str, Any], step_id: str, values: dict[str, str], tmp_path: Path
+) -> subprocess.CompletedProcess[str]:
+    """Run one of the action's steps for real, in a scratch directory."""
+    environment = dict(os.environ)
+    environment.update(environment_for(action, step_id, values))
+    environment["RUNNER_TEMP"] = str(tmp_path / "runner-temp")
+    environment["GITHUB_OUTPUT"] = str(tmp_path / "github-output")
+    # The console script lives beside the interpreter running the tests, in the
+    # venv's bin/ (Scripts/ on Windows); the action calls ``netgraph``, not
+    # ``python -m``.
+    environment["PATH"] = os.pathsep.join([str(Path(sys.executable).parent), environment["PATH"]])
+    Path(environment["RUNNER_TEMP"]).mkdir(parents=True, exist_ok=True)
+    Path(environment["GITHUB_OUTPUT"]).touch()
+
+    return subprocess.run(
+        ["bash", "-c", step_of(action, step_id)["run"]],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+    )
+
+
+def run_render_step(
+    action: dict[str, Any], values: dict[str, str], tmp_path: Path
+) -> subprocess.CompletedProcess[str]:
+    return run_step(action, "render", values, tmp_path)
+
+
+def outputs_of(tmp_path: Path) -> dict[str, str]:
+    text = (tmp_path / "github-output").read_text(encoding="utf-8")
+    return dict(line.split("=", 1) for line in text.splitlines() if line)
+
+
+def test_the_render_action_is_a_composite_action(render_action: dict[str, Any]) -> None:
+    assert render_action["runs"]["using"] == "composite"
+    assert render_action["name"] and render_action["description"]
+    for step in render_action["runs"]["steps"]:
+        assert step["shell"] == "bash" or "uses" in step
+
+
+def test_the_render_action_declares_the_documented_inputs_and_outputs(
+    render_action: dict[str, Any],
+) -> None:
+    assert set(render_action["inputs"]) == EXPECTED_RENDER_INPUTS
+    assert set(render_action["outputs"]) == EXPECTED_RENDER_OUTPUTS
+    for name, spec in render_action["inputs"].items():
+        assert spec["description"].strip(), f"input {name} is undocumented"
+        assert "default" in spec, f"input {name} has no default, so it is effectively required"
+
+
+def test_the_render_action_defaults_agree_with_the_cli(render_action: dict[str, Any]) -> None:
+    inputs = render_action["inputs"]
+    assert inputs["format"]["default"] in RENDER_FORMATS
+    assert inputs["inventory"]["default"] == "."
+    # Booleans are strings in the Actions expression language; anything else
+    # would silently compare unequal to 'true' in the step's shell.
+    for name in ("strict", "force", "install"):
+        assert inputs[name]["default"] in {"true", "false"}, name
+    assert inputs["graphviz"]["default"] == "auto"
+
+
+def test_the_render_action_knows_every_format_the_cli_has(render_action: dict[str, Any]) -> None:
+    """A typo in ``format`` must fail loudly, not fall through to a default."""
+    script = step_of(render_action, "render")["run"]
+    assert "|".join(RENDER_FORMATS) in script, "the guard is not the CLI's format list"
+    # And every one of them is checked for the shape it should have; a format
+    # with no arm would be published on the strength of its byte count alone.
+    checked = set(re.findall(r'^\s*(\w+)\) expect="', script, re.MULTILINE))
+    assert checked == set(RENDER_FORMATS)
+
+
+def test_the_render_action_derives_the_suffix_the_renderer_would(
+    render_action: dict[str, Any],
+) -> None:
+    """The default output path is ``netgraph`` plus the format's own extension."""
+    script = step_of(render_action, "render")["run"]
+    odd = {name for name in RENDER_FORMATS if suffix_for(name) != f".{name}"}
+    assert odd == {"mermaid"}, (
+        f"{sorted(odd)} no longer take their own name as an extension, so the "
+        "action's single special case is not enough"
+    )
+    assert 'mermaid) extension="mmd" ;;' in script
+
+
+def test_the_render_action_installs_graphviz_for_exactly_the_formats_that_need_it(
+    render_action: dict[str, Any],
+) -> None:
+    """A format netgraph writes by itself must not pay for the install.
+
+    The text formats are emitted by netgraph directly — except ``html``, which
+    embeds an SVG that Graphviz laid out, and so needs ``dot`` as much as
+    ``svg`` does.
+    """
+    script = step_of(render_action, "graphviz")["run"]
+    needs_dot = set(RENDER_FORMATS) - (set(TEXT_FORMATS) - {"html"})
+    guard = re.search(r"^\s*([\w|]+)\) needs_dot=true ;;", script, re.MULTILINE)
+    assert guard is not None, "the guard is no longer a single case arm"
+    assert set(guard.group(1).split("|")) == needs_dot
+
+
+@requires_bash
+def test_the_graphviz_step_installs_nothing_for_a_format_that_needs_no_layout(
+    render_action: dict[str, Any], tmp_path: Path
+) -> None:
+    """Run rather than read: the branch that decides not to spend a minute."""
+    result = run_step(render_action, "graphviz", {"format": "mermaid"}, tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "not installing Graphviz" in result.stdout
+
+
+@requires_bash
+@requires_dot
+def test_the_graphviz_step_leaves_a_runner_that_already_has_it_alone(
+    render_action: dict[str, Any], tmp_path: Path
+) -> None:
+    """``auto`` on a self-hosted image that ships Graphviz reaches no package manager."""
+    result = run_step(render_action, "graphviz", {"format": "html"}, tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "apt-get" not in result.stdout and "apt-get" not in result.stderr
+    assert "graphviz version" in result.stderr, "dot -V is the proof it found one"
+
+
+def test_the_render_action_readme_documents_every_input_and_output(
+    render_action: dict[str, Any],
+) -> None:
+    readme = RENDER_ACTION_README.read_text(encoding="utf-8")
+    for name in render_action["inputs"]:
+        assert f"`{name}`" in readme, f"input {name} is not in the action README"
+    for name in render_action["outputs"]:
+        assert f"`{name}`" in readme, f"output {name} is not in the action README"
+
+
+def test_the_render_action_readme_shows_a_usable_snippet() -> None:
+    readme = RENDER_ACTION_README.read_text(encoding="utf-8")
+    assert "uses: blechschmidt/netgraph/.github/actions/netgraph-render@" in readme
+    assert "actions/setup-python" in readme, "the action deliberately installs no interpreter"
+    assert "upload-pages-artifact" in readme
+
+
+@requires_bash
+@requires_dot
+@pytest.mark.parametrize("format", RENDER_FORMATS)
+def test_the_render_step_recognises_what_the_renderer_writes(
+    render_action: dict[str, Any], tmp_path: Path, format: str
+) -> None:
+    """Every shape check has to match the thing it is checking.
+
+    The markers are literals in a shell script — ``<svg``, ``graph netgraph``,
+    ``%PDF`` — and the renderers they describe are free to change. Rendering
+    each format and letting the step judge its own output is what ties the two
+    together; a marker that stopped matching would otherwise turn into a step
+    that fails on a diagram that is perfectly good.
+    """
+    result = run_render_step(
+        render_action,
+        {"inventory": str(HOME_LAB), "format": format, "output": str(tmp_path / f"out.{format}")},
+        tmp_path,
+    )
+    assert result.returncode == 0, f"{result.stdout}\n{result.stderr}"
+
+
+@requires_bash
+@requires_dot
+def test_the_render_step_writes_the_page_and_reports_where(
+    render_action: dict[str, Any], tmp_path: Path
+) -> None:
+    """The whole contract of the step, run rather than read."""
+    output = tmp_path / "site" / "index.html"
+    result = run_render_step(
+        render_action,
+        {
+            "inventory": str(HOME_LAB),
+            "format": "html",
+            "output": str(output),
+            "layer": "l1,l2",
+            "title": "a title with spaces",
+        },
+        tmp_path,
+    )
+    assert result.returncode == 0, result.stderr
+
+    page = output.read_text(encoding="utf-8")
+    assert "<h1>a title with spaces</h1>" in page, "the title was word-split on its way through"
+    drawn = re.findall(r'<option value="\d+">(l\d)[^<]*</option>', page)
+    assert drawn == ["l1", "l2"], "the layer list did not reach the renderer as two layers"
+
+    reported = outputs_of(tmp_path)
+    assert reported["file"] == str(output)
+    assert reported["directory"] == str(output.parent)
+    assert int(reported["bytes"]) == len(output.read_bytes())
+
+
+@requires_bash
+def test_the_render_step_defaults_the_output_to_the_runner_temp(
+    render_action: dict[str, Any], tmp_path: Path
+) -> None:
+    """And names it with the format's extension, ``.mmd`` included."""
+    result = run_render_step(
+        render_action, {"inventory": str(HOME_LAB), "format": "mermaid"}, tmp_path
+    )
+    assert result.returncode == 0, result.stderr
+
+    written = Path(outputs_of(tmp_path)["file"])
+    assert written == tmp_path / "runner-temp" / "netgraph.mmd"
+    assert written.read_text(encoding="utf-8").startswith("flowchart")
+
+
+@requires_bash
+def test_the_render_step_passes_extra_arguments_through_without_expanding_them(
+    render_action: dict[str, Any], tmp_path: Path
+) -> None:
+    """``args`` is word-split, and globbing is off while that happens.
+
+    A ``--name 'sw*'`` filter run in a directory holding a file called ``sw-x``
+    would otherwise reach netgraph as that filename and quietly draw everything.
+    """
+    (tmp_path / "sw-a-file-not-a-device").touch()
+    output = tmp_path / "filtered.dot"
+    result = run_render_step(
+        render_action,
+        {
+            "inventory": str(HOME_LAB),
+            "format": "dot",
+            "output": str(output),
+            "args": "--name sw* --rankdir lr",
+        },
+        tmp_path,
+    )
+    assert result.returncode == 0, result.stderr
+
+    dot = output.read_text(encoding="utf-8")
+    assert "rankdir=LR" in dot
+    assert "sw-home" in dot
+    assert "pc-desk" not in dot, "the glob was expanded by the shell, so nothing was filtered"
+
+
+@requires_bash
+def test_the_render_step_refuses_a_format_that_does_not_exist(
+    render_action: dict[str, Any], tmp_path: Path
+) -> None:
+    result = run_render_step(
+        render_action, {"inventory": str(HOME_LAB), "format": "svgz"}, tmp_path
+    )
+    assert result.returncode == 2
+    assert "::error::" in result.stdout
+    assert "svgz" in result.stdout
+
+
+@requires_bash
+@requires_dot
+def test_the_render_step_fails_when_the_file_is_not_the_format_it_asked_for(
+    render_action: dict[str, Any], tmp_path: Path
+) -> None:
+    """The shape check, provoked: a render that writes over a decoy.
+
+    ``--show-config`` makes ``netgraph render`` print its resolved settings and
+    exit without drawing, so the file it was told to write is left as it was —
+    which is exactly the "exit 0, bytes on disk, no diagram" case the check
+    exists for.
+    """
+    output = tmp_path / "not-a-page.svg"
+    output.write_text("this is not an svg\n", encoding="utf-8")
+    result = run_render_step(
+        render_action,
+        {
+            "inventory": str(HOME_LAB),
+            "format": "svg",
+            "output": str(output),
+            "args": "--show-config",
+        },
+        tmp_path,
+    )
+    assert result.returncode == 1
+    assert "does not look like svg" in result.stdout
+
+
+# --------------------------------------------------------------------------- #
+# The reusable workflow
+# --------------------------------------------------------------------------- #
+
+
+@pytest.fixture(scope="module")
+def pages_workflow() -> dict[str, Any]:
+    parsed = load_yaml(PAGES_WORKFLOW)
+    assert isinstance(parsed, dict)
+    return parsed
+
+
+def triggers_of(workflow: dict[str, Any]) -> dict[str, Any]:
+    """``on:`` is the YAML 1.1 boolean ``True`` once safe_load has had it."""
+    return workflow.get("on", workflow.get(True))
+
+
+#: What a caller may set. Each one is in the table in ``docs/ci.md``.
+EXPECTED_PAGES_INPUTS = {
+    "runs-on",
+    "inventory",
+    "layer",
+    "title",
+    "theme",
+    "args",
+    "strict",
+    "page",
+    "python-version",
+    "version",
+    "ref",
+    "graphviz",
+    "deploy",
+    "environment",
+}
+
+
+def test_the_pages_workflow_is_reusable_and_only_reusable(
+    pages_workflow: dict[str, Any],
+) -> None:
+    """No ``push`` trigger: it publishes a site, and only when asked to.
+
+    A repository that also publishes something else from Pages would otherwise
+    find this workflow overwriting it on the next commit — which is precisely
+    what would happen here, where ``pages.yml`` maintains the demo site.
+    """
+    assert list(triggers_of(pages_workflow)) == ["workflow_call"]
+
+
+def test_the_pages_workflow_declares_the_documented_inputs(
+    pages_workflow: dict[str, Any],
+) -> None:
+    call = triggers_of(pages_workflow)["workflow_call"]
+    assert set(call["inputs"]) == EXPECTED_PAGES_INPUTS
+    for name, spec in call["inputs"].items():
+        assert spec["description"].strip(), f"input {name} is undocumented"
+        assert "default" in spec, f"input {name} has no default, so it is effectively required"
+        assert spec["type"] in {"string", "boolean"}, name
+    assert set(call["outputs"]) == {"page-url"}
+
+
+def test_the_pages_workflow_defaults_match_the_action(
+    pages_workflow: dict[str, Any], render_action: dict[str, Any]
+) -> None:
+    """The two files describe the same knobs; a default in only one of them drifts."""
+    call = triggers_of(pages_workflow)["workflow_call"]["inputs"]
+    shared = set(call) & set(render_action["inputs"])
+    assert shared >= {"inventory", "layer", "title", "theme", "args", "strict", "graphviz"}
+    for name in shared:
+        expected = render_action["inputs"][name]["default"]
+        actual = call[name]["default"]
+        # ``strict`` is a real boolean in a workflow input and a string in an
+        # action input; everything else compares directly.
+        assert str(actual).lower() == str(expected).lower(), name
+
+
+def test_every_job_of_the_pages_workflow_honours_the_runs_on_input(
+    pages_workflow: dict[str, Any],
+) -> None:
+    """The whole point of the input is that neither job is pinned to a runner."""
+    jobs = pages_workflow["jobs"]
+    assert set(jobs) == {"build", "deploy"}
+    for name, job in jobs.items():
+        runs_on = job["runs-on"]
+        assert "inputs['runs-on']" in runs_on, f"{name} does not use the runs-on input"
+        # A JSON array or object has to survive as one, or a label set and a
+        # runner group would both arrive as a single nonsense label.
+        assert "fromJSON" in runs_on, f"{name} cannot take a JSON array of labels"
+
+
+def test_only_the_deploy_job_of_the_pages_workflow_can_write(
+    pages_workflow: dict[str, Any],
+) -> None:
+    """A render that fails cannot have reached the Pages API to publish anything."""
+    jobs = pages_workflow["jobs"]
+    assert "permissions" not in jobs["build"], "the build job inherits the read-only default"
+    assert pages_workflow["permissions"] == {"contents": "read"}
+    assert jobs["deploy"]["permissions"] == {"pages": "write", "id-token": "write"}
+    assert jobs["deploy"]["if"] == "inputs.deploy"
+    assert jobs["deploy"]["needs"] == "build"
+    assert jobs["deploy"]["environment"]["name"] == "${{ inputs.environment }}"
+
+
+def test_the_pages_workflow_renders_through_the_action(pages_workflow: dict[str, Any]) -> None:
+    """One renderer, not two: the page is whatever ``netgraph render`` writes."""
+    steps = pages_workflow["jobs"]["build"]["steps"]
+    render = next(step for step in steps if "netgraph-render" in step.get("uses", ""))
+    assert render["with"]["format"] == "html", "only the self-contained page can be published as-is"
+    for name in ("inventory", "layer", "title", "theme", "args", "strict", "graphviz", "version"):
+        assert f"inputs.{name}" in str(render["with"][name]), f"{name} never reaches the action"
+
+    uploaded = next(step for step in steps if "upload-pages-artifact" in step.get("uses", ""))
+    assert render["with"]["output"].startswith(uploaded["with"]["path"]), (
+        "the page is written somewhere other than the directory that gets uploaded"
+    )
+
+
+def test_the_pages_workflow_renders_with_the_action_that_belongs_to_it(
+    pages_workflow: dict[str, Any],
+) -> None:
+    """The action is netgraph's own, at the commit the caller pinned the workflow at.
+
+    ``uses:`` takes no expression, so an action referenced by name would have to
+    name a fixed ref — and a workflow called ``@v0.1.0`` that then reached for
+    the action on ``main`` would be pinned in name only. Checking netgraph out
+    at ``github.job_workflow_sha`` and using the local path is what keeps the
+    two halves the same release.
+    """
+    steps = pages_workflow["jobs"]["build"]["steps"]
+    checkout = next(
+        step for step in steps if step.get("with", {}).get("repository") == "blechschmidt/netgraph"
+    )
+    assert checkout["with"]["ref"] == "${{ github.job_workflow_sha }}"
+    assert checkout["with"]["persist-credentials"] is False
+
+    render = next(step for step in steps if "netgraph-render" in step["uses"])
+    # Derived from where the action actually lives, so moving the directory
+    # fails here rather than in somebody's deployment.
+    inside = RENDER_ACTION_DIR.relative_to(REPO_ROOT).as_posix()
+    assert render["uses"] == f"./{checkout['with']['path']}/{inside}"
+    assert steps.index(checkout) < steps.index(render), "the action is used before it is fetched"
+
+
+# --------------------------------------------------------------------------- #
 # This repository eats its own cooking
 # --------------------------------------------------------------------------- #
+
+
+def test_ci_renders_an_example_through_the_render_action() -> None:
+    """The published-diagram path, exercised without publishing a second site."""
+    workflow = load_yaml(WORKFLOW)
+    steps = workflow["jobs"]["render-examples"]["steps"]
+    used = [step.get("uses", "") for step in steps]
+    assert used.count("./.github/actions/netgraph-render") == 2, (
+        "the Graphviz path and a format that needs no Graphviz are both meant to be exercised"
+    )
+    formats = {
+        step.get("with", {}).get("format", "html")
+        for step in steps
+        if step.get("uses") == "./.github/actions/netgraph-render"
+    }
+    assert formats == {"html", "mermaid"}
 
 
 def test_ci_runs_the_action_over_the_examples() -> None:
@@ -235,5 +756,22 @@ def test_the_ci_documentation_covers_every_format() -> None:
     text = CI_DOC.read_text(encoding="utf-8")
     for name in FORMATS:
         assert f"`{name}`" in text
-    for section in ("pre-commit", "The GitHub Action", "The JSON envelope"):
+    for section in (
+        "pre-commit",
+        "The GitHub Action",
+        "The JSON envelope",
+        "The render action",
+        "Workflow: publish the diagram to GitHub Pages",
+    ):
         assert section in text
+
+
+def test_the_ci_documentation_covers_every_input_of_the_reusable_workflow(
+    pages_workflow: dict[str, Any],
+) -> None:
+    """The workflow has no README of its own; this page is where a caller looks."""
+    text = CI_DOC.read_text(encoding="utf-8")
+    for name in triggers_of(pages_workflow)["workflow_call"]["inputs"]:
+        assert f"`{name}`" in text, f"docs/ci.md never mentions the {name} input"
+    for name in RENDER_FORMATS:
+        assert f"`{name}`" in text

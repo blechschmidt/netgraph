@@ -18,6 +18,31 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **An action that draws the inventory, and a reusable workflow that publishes it.** A
+  pipeline could already gate a pull request on the inventory validating; what it could not
+  do was show anybody the network.
+  [`.github/actions/netgraph-render`](.github/actions/netgraph-render/) installs netgraph
+  *and* Graphviz — which is not a Python dependency, and whose absence is otherwise
+  discovered at the last step of a job that has already done all the work — runs
+  `netgraph render`, and reports where the diagram landed. It defaults to `format: html`,
+  the one self-contained format: layer switcher, search box and every element's detail in a
+  single file with nothing to fetch, and so publishable as it stands. `layer: l1 l2 l3`
+  becomes three views behind one switcher, `args` carries anything the action does not name
+  an input for, and `graphviz: auto` skips the install for the formats netgraph writes
+  itself. A file that is not the format it was asked for fails the step rather than the
+  site.
+
+  [`.github/workflows/netgraph-pages.yml`](.github/workflows/netgraph-pages.yml) is that
+  render plus a deployment: an inventory repository that calls it gets a live diagram of its
+  own network at a URL, rebuilt from the YAML on every push, instead of the export somebody
+  drew in draw.io eighteen months ago. **`runs-on` is an input** — a single label, a JSON
+  array of labels, or a runner group — because the network worth drawing is often the one
+  where a GitHub-hosted runner is not allowed near the repository; `python-version: ""` and
+  `graphviz: false` are there for the same self-hosted image. Only the deploy job holds
+  `pages: write`, so a render that fails cannot have reached the Pages API, and
+  `deploy: false` gives a pull request the render as a gate without replacing the published
+  site. See [`docs/ci.md`](docs/ci.md#the-render-action).
+
 - **Per-element styling, with a theme layer and an editor style panel.** Every diagram
   looked identical, because appearance was entirely implicit. Now it is inventory data:
   an optional `style` block ([§22](docs/schema.md#22-per-element-styling-and-themes)) on

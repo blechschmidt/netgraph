@@ -1508,3 +1508,7 @@ schedule, a power load schedule, a DNS zone, an SVG rack elevation — see
   the same pipeline, redrawn on every save.
 * [`netgraph path --highlight`](paths.md#drawing-the-answer---highlight) — one
   traced route drawn over the topology it crosses.
+* [`docs/ci.md`](ci.md#the-render-action) — the same render as a GitHub Action,
+  and the reusable workflow that
+  [publishes the page](ci.md#workflow-publish-the-diagram-to-github-pages) on
+  every push.

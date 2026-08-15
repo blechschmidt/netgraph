@@ -14,9 +14,9 @@ no problems found
 `netgraph test` is the second gate, and it answers a different question — see
 [below](#netgraph-test-assertions-as-a-gate).
 
-This page covers the rest: the machine-readable output formats, the composite
-GitHub Action, the pre-commit hook, and complete workflows for the ways findings
-can reach a pull request.
+This page covers the rest: the machine-readable output formats, the two composite
+GitHub Actions, the reusable workflow that publishes a diagram, the pre-commit
+hook, and complete workflows for the ways findings can reach a pull request.
 
 * [Output formats](#output-formats)
 * [Exit codes](#exit-codes)
@@ -26,6 +26,8 @@ can reach a pull request.
 * [The GitHub Action](#the-github-action)
 * [Workflow: upload SARIF](#workflow-upload-sarif)
 * [Workflow: annotate the diff](#workflow-annotate-the-diff)
+* [The render action](#the-render-action)
+* [Workflow: publish the diagram to GitHub Pages](#workflow-publish-the-diagram-to-github-pages)
 * [`netgraph test`: assertions as a gate](#netgraph-test-assertions-as-a-gate)
 * [Workflow: a scheduled drift check](#workflow-a-scheduled-drift-check)
 * [pre-commit](#pre-commit)
@@ -292,6 +294,141 @@ Without the action, the same thing by hand:
       - run: pip install netgraph
       - run: netgraph --inventory inventory validate --output-format github --strict
 ```
+
+## The render action
+
+Everything above answers "did this change break the inventory?" The other half
+of a pipeline is "what does the network look like now?" — and the answer nobody
+reads is the one they have to check out a repository and install Graphviz to see.
+
+[`.github/actions/netgraph-render`](../.github/actions/netgraph-render/) installs
+netgraph *and* Graphviz, runs [`netgraph render`](commands/render.md), and leaves
+the diagram on disk. Its own
+[README](../.github/actions/netgraph-render/README.md) has the input and output
+tables. Three things are worth knowing before reading them.
+
+**`html` is the default format**, and it is the only one that is publishable on
+its own: one file, no CDN, no stylesheet to serve beside it, with the layer
+switcher, the search box and every element's detail already in it — see
+[rendering.md](rendering.md#the-interactive-html-page). `format:` takes the
+other six all the same — `svg` and `dot` for something to embed, `png` and `pdf`
+for something to print, `mermaid` for a Markdown page, `json` for a step of your
+own.
+
+**Graphviz is installed for you**, because it is not a Python dependency and a
+missing `dot` is otherwise a failure at the last step of a job that has already
+done all the work. `graphviz: auto` — the default — installs it only when the
+chosen format needs a layout and the runner does not already have one, so a
+self-hosted image that ships Graphviz is left alone, and `mermaid`, `dot` and
+`json` never pay for it.
+
+**A diagram that was not drawn fails the step.** The file is checked for the
+shape of the format that was asked for, so an empty or truncated page fails in
+the job that produced it rather than on the site it was published to.
+
+```yaml
+      - id: diagram
+        uses: blechschmidt/netgraph/.github/actions/netgraph-render@main
+        with:
+          inventory: inventory
+          format: svg
+          args: --icons cisco --collapse-depth 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: topology
+          path: ${{ steps.diagram.outputs.file }}
+```
+
+## Workflow: publish the diagram to GitHub Pages
+
+A rendered page in an artifact is a page somebody has to download and unzip.
+[`netgraph-pages.yml`](../.github/workflows/netgraph-pages.yml) is a **reusable
+workflow** that takes the same render and publishes it, so the inventory
+repository grows a live diagram of its own network at a URL — rebuilt from the
+YAML on every push, and therefore never the stale export somebody drew in
+draw.io eighteen months ago.
+
+```yaml
+name: diagram
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  diagram:
+    permissions:
+      contents: read
+      # Wanted by the deploy job of the called workflow. A reusable workflow
+      # cannot hold more than its caller grants, so the grant is here.
+      pages: write
+      id-token: write
+    uses: blechschmidt/netgraph/.github/workflows/netgraph-pages.yml@main
+    with:
+      inventory: inventory
+      # Three layers, one page: the switcher is in the HTML.
+      layer: l1 l2 l3
+      title: ${{ github.repository }}
+      strict: true
+      # A pull request renders — that is the gate — and publishes nothing.
+      deploy: ${{ github.event_name != 'pull_request' }}
+```
+
+Turn Pages on for the repository first, with **GitHub Actions** as the source
+(*Settings → Pages → Build and deployment*). The URL the page landed at comes
+back as the `page-url` output, and shows up on the run's deployment.
+
+### `runs-on` is an input
+
+```yaml
+    with:
+      runs-on: '["self-hosted", "linux", "network"]'
+```
+
+The network that has an inventory worth drawing is often the one where a
+GitHub-hosted runner is not allowed anywhere near the repository. `runs-on`
+takes a single label (`ubuntu-latest`, `self-hosted`), a JSON array of labels, or
+a JSON runner-group object — anything the `runs-on:` key itself accepts — and
+both jobs use it.
+
+On a runner image that has no Python tool cache, set `python-version: ""` to skip
+`actions/setup-python` and use the interpreter that is already there; on one that
+ships Graphviz, `graphviz: "false"` skips the install.
+
+### The rest of the inputs
+
+| Input | Default | Meaning |
+|---|---|---|
+| `runs-on` | `ubuntu-latest` | Where both jobs run: a label, a JSON array of labels, or a runner group. |
+| `inventory` | `.` | Root folder of the YAML tree, or a single YAML file. |
+| `layer` | *(empty)* | Layers to draw, separated by commas or whitespace. Several become one page with a switcher. |
+| `title` | *(empty)* | Caption for the diagram. |
+| `theme` | *(empty)* | `blueprint`, `mono`, `none`, or a path to a `kind: theme` document. |
+| `args` | *(empty)* | Further `netgraph render` flags, split on whitespace. |
+| `strict` | `false` | Treat validation warnings as errors and publish nothing. |
+| `page` | `index.html` | Name of the page inside the published site. |
+| `python-version` | `3.12` | Interpreter to set up. Empty uses the runner's own. |
+| `version` | *(empty)* | netgraph to install, as a pip requirement. |
+| `ref` | *(empty)* | Branch, tag or SHA of the calling repository to render. |
+| `graphviz` | `auto` | Install `dot`: `auto`, `true` or `false`. |
+| `deploy` | `true` | Publish. `false` builds and uploads the artifact and stops. |
+| `environment` | `github-pages` | Deployment environment. |
+
+Only the deploy job holds `pages: write` and `id-token: write`; the job that
+renders runs read-only, so a workflow that fails to draw the inventory cannot
+have reached the Pages API to publish anything. And because `netgraph render`
+validates before it draws, an inventory with a dangling cable stops the
+deployment rather than publishing a diagram that misrepresents the network. A
+tree still under construction opts out of that with `args: --force`, which is
+also the honest way to spell it: the page is published *despite* the inventory
+not validating.
+
+**Several inventories, several pages** is a matrix in the caller, one call per
+inventory, each writing a different `page:` — but Pages publishes one artifact
+per deployment, so that shape wants a job of your own that renders each with the
+action above, assembles the site, and deploys it once.
 
 ## `netgraph test`: assertions as a gate
 

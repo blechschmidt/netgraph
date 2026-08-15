@@ -31,6 +31,7 @@ This whole documentation set is also published, with those demos beside it, at
 | diff two inventory states, review the change, and apply it | [commands/plan.md](commands/plan.md), [commands/apply.md](commands/apply.md) |
 | adopt what a live network reports into the declared inventory | [commands/drift.md](commands/drift.md), [commands/plan.md](commands/plan.md) |
 | gate a pull request on the inventory validating | [ci.md](ci.md) |
+| publish a live diagram of your own network, rebuilt on every push | [ci.md](ci.md#workflow-publish-the-diagram-to-github-pages) |
 | write down what the network is *for*, and fail CI when it stops being true | [commands/test.md](commands/test.md) |
 | bootstrap an inventory from a network that already exists | [importing.md](importing.md) |
 | stop retyping the same flags | [configuration.md](configuration.md) |
@@ -66,8 +67,8 @@ This whole documentation set is also published, with those demos beside it, at
 * **[validation.md](validation.md)** — the three passes, severities, `--strict`, the four
   ways to suppress a rule, and how to read a finding.
 * **[ci.md](ci.md)** — `netgraph validate` and `netgraph test` as gates: the JSON
-  envelope, SARIF and code scanning, inline annotations, JUnit, the GitHub Action,
-  pre-commit, GitLab.
+  envelope, SARIF and code scanning, inline annotations, JUnit, the two GitHub Actions,
+  the reusable workflow that publishes the diagram to Pages, pre-commit, GitLab.
 * **[commands/test.md](commands/test.md)** — `kind: testsuite` documents and the eleven
   assertions `netgraph test` grades. Validation says whether the files cohere; this says
   whether the network still does what somebody built it to do.
