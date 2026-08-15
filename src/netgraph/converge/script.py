@@ -86,10 +86,23 @@ def script_for(
     *,
     rollback: bool = False,
 ) -> str | None:
-    """One element's script, or ``None`` when it has nothing to run."""
+    """One element's script, or ``None`` when it has nothing to run.
+
+    A rollback runs the plan **backwards**. Undoing in the order the plan was
+    written would try to delete VLAN 20 while the port the previous line created
+    is still in it, and would take an interface away before the address that was
+    put on it comes off -- which is the same discipline the forward order has
+    (:mod:`netgraph.converge.intent`), applied to the other direction. Reversing
+    is exactly right rather than approximately right, because every rank in the
+    forward table has its mirror in the same table: the inverse of a create is a
+    delete, the inverse of an add is a remove, and reading the ranks upwards puts
+    the additions first and the deletions last all over again.
+    """
     blocks = [
         change for change in device.changes if (change.rollback if rollback else change.commands)
     ]
+    if rollback:
+        blocks.reverse()
     if not blocks:
         return None
     lines = [*_header(plan, device, blocks, rollback=rollback)]
@@ -124,7 +137,9 @@ def _header(
         yield f"# netgraph-batch: {device.batch}"
     yield "#"
     if rollback:
-        yield "# These commands put the device back the way the capture found it."
+        yield "# These commands put the device back the way the capture found it. They are"
+        yield "# the plan read backwards, which is the order an undo has to run in: run"
+        yield "# them top to bottom."
     else:
         yield "# These commands move the device from what the capture found to what the"
         yield "# inventory declares. They are in dependency order: run them top to bottom."

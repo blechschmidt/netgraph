@@ -433,7 +433,11 @@ comments at the foot of any script it does have.
 
 `--rollback` writes `rollback.txt` instead of `converge.txt`, from the inverse
 commands: the state the capture found, not some previous plan and not a state
-nobody measured. Run it twice into the same directory and the two land side by
+nobody measured. It is the plan read **backwards**, which is the order an undo
+has to run in — releasing the port before deleting the VLAN it was put in, and
+taking the address off before removing the interface under it. That falls out of
+the same rank table: read upwards, the inverses come out additions-first and
+deletions-last all over again. Run it twice into the same directory and the two land side by
 side, which is the point of the different name rather than a different tree — a
 reviewer comparing them does not have to hold two paths in their head.
 

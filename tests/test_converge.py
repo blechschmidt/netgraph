@@ -914,6 +914,37 @@ def test_a_rollback_script_holds_the_inverse_commands(plan: ConvergePlan, tmp_pa
     assert all(name.endswith("/rollback.txt") for name in written)
 
 
+def test_a_rollback_script_runs_the_plan_backwards(lab_plan: ConvergePlan) -> None:
+    """Undoing in the plan's own order deletes a VLAN a port is still in.
+
+    The forward plan creates VLAN 20 and then puts ``port9`` in it. Its inverse
+    has to release the port before the VLAN goes, which is the plan read upwards
+    -- the same rule the forward order follows, pointed the other way.
+    """
+    device = lab_plan.device("srv-lab")
+    assert device is not None
+    forward = [change.id for change in device.changes if change.commands]
+    text = script_for(lab_plan, device, rollback=True)
+    assert text is not None
+
+    order = [
+        change.id
+        for change in device.changes
+        if change.rollback and _position(text, change.rollback[0].text) >= 0
+    ]
+    order.sort(key=lambda name: _position(text, _first_rollback(device, name)))
+    assert order == list(reversed(forward))
+    assert text.index("delete interface port9") < text.index("delete vlan 20")
+
+
+def _first_rollback(device: DeviceConverge, change_id: str) -> str:
+    return next(change.rollback[0].text for change in device.changes if change.id == change_id)
+
+
+def _position(text: str, needle: str) -> int:
+    return text.find(f"\n{needle}\n")
+
+
 def test_a_script_never_holds_an_absolute_checkout_path(plan: ConvergePlan) -> None:
     for _relative, text in script_files(plan):
         assert str(REPO_ROOT) not in text
