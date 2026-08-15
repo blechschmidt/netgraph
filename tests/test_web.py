@@ -52,7 +52,13 @@ from netgraph.web import (
     prepare,
     render_source,
 )
-from netgraph.web.bindings import markdown_table
+from netgraph.web.bindings import (
+    MENU_TARGETS,
+    MENUS,
+    markdown_menus,
+    markdown_table,
+)
+from netgraph.web.bindings import payload as bindings_payload
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -868,3 +874,82 @@ def test_the_shortcut_reference_is_the_documented_one() -> None:
     assert markdown_table() in page
     for binding in BINDINGS:
         assert binding.title in page, binding.id
+
+
+# --------------------------------------------------------------------------- #
+# The context menus: a layout over the same table
+# --------------------------------------------------------------------------- #
+
+
+def test_the_menus_are_served_with_the_bindings() -> None:
+    """One fetch, because they are one table: the menu is a view of the commands.
+
+    A page that fetched its menus separately could draw one before it knew what
+    the rows meant, and would have a window in which right-clicking offers a row
+    with no title, no chord and no idea whether it may run.
+    """
+    payload = bindings_payload()
+    assert [menu["target"] for menu in payload["menus"]] == list(MENU_TARGETS)
+    for menu in payload["menus"]:
+        assert menu["groups"], f"{menu['target']} offers nothing"
+        for group in menu["groups"]:
+            for item in group:
+                assert set(item) == {"binding", "label", "submenu"}, item
+
+
+def test_every_menu_row_names_a_declared_command() -> None:
+    """The one invariant that makes the menu a view rather than a second list.
+
+    A row naming an id that is not in :data:`BINDINGS` would draw with no title
+    and refuse with "not available in this build" — a dead row nobody could
+    explain. It cannot happen, and this is why.
+    """
+    declared = {binding.id for binding in BINDINGS}
+    for menu in MENUS:
+        assert menu.target in MENU_TARGETS, menu.target
+        seen: set[tuple[str, str]] = set()
+        for group in menu.groups:
+            assert group, f"{menu.target} has an empty group, which draws as a stray rule"
+            for item in group:
+                assert item.binding in declared, f"{menu.target}: {item.binding}"
+                assert item.submenu in ("", "kinds"), item.binding
+                # A command twice in one menu is two rows that do the same thing
+                # under two names, which is the worst way to learn either.
+                key = (item.binding, item.label)
+                assert key not in seen, f"{menu.target} offers {item.binding} twice"
+                seen.add(key)
+
+
+def test_every_target_has_a_menu() -> None:
+    """A right-click that opens nothing is a right-click that looks broken.
+
+    ``menu.js`` falls back to the browser's own menu when a target has no rows,
+    which is the right behaviour for a build that has lost one and the wrong
+    thing to ship on purpose.
+    """
+    assert {menu.target for menu in MENUS} == set(MENU_TARGETS)
+
+
+def test_a_menu_row_is_worded_for_the_thing_it_was_opened_on() -> None:
+    """The labels are overridden deliberately, so check they were.
+
+    "Delete the focused element" is how you name a command you cannot point at.
+    Every row here *was* pointed at, so every row that would otherwise say
+    "focused" carries its own wording.
+    """
+    for menu in MENUS:
+        for group in menu.groups:
+            for item in group:
+                binding = next(one for one in BINDINGS if one.id == item.binding)
+                shown = item.label or binding.title
+                assert shown.strip(), item.binding
+                assert "focused" not in shown, (
+                    f"{menu.target}: {item.binding} still reads as a palette row"
+                )
+
+
+def test_the_context_menus_are_the_documented_ones() -> None:
+    """Same bargain as the shortcut sheet: generated, never written twice."""
+    page = (REPO_ROOT / "docs" / "commands" / "web.md").read_text(encoding="utf-8")
+    assert "<!-- generated: context-menus -->" in page
+    assert markdown_menus() in page

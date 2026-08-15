@@ -18,6 +18,25 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **A context menu in the editor.** Right-clicking the diagram now offers the handful of
+  commands that make sense where you clicked: on an element, on a link, and on the paper
+  between them, where `New ▸` lists every element kind and creating one is two clicks and
+  a name. Until now the only way to reach a command was `Ctrl-K`, which you had to know
+  about first.
+
+  It is a *view* of the existing commands, not a second set of them. Every row runs a
+  binding from `netgraph.web.bindings` under that binding's own id, and the same table now
+  declares which rows each target offers — so a menu cannot offer a gesture the keyboard
+  does not have, and `docs/commands/web.md` generates the menus beside the shortcuts.
+  Every row prints its own chord, the way a palette row does.
+
+  What the pointer adds is a target: right-clicking a shape **focuses it first**, so
+  `Delete it` deletes the one under the cursor rather than the one the keyboard was left
+  on, and the menu's heading is that element's address so there is no doubt which. A row
+  that cannot run is greyed with the reason rather than hidden, <kbd>Shift-F10</kbd> and
+  the menu key open it from the keyboard, the arrow keys walk it and <kbd>Esc</kbd> leaves
+  it. Right-clicking a *bend* still removes that bend and shows no menu.
+
 - **A published demo site: <https://blechschmidt.github.io/netgraph/>.** Until now nothing
   in the project let a stranger see what netgraph does without first installing Python
   *and* Graphviz. The site is the whole documentation set as browsable pages, and — the

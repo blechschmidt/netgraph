@@ -54,6 +54,17 @@ hidden — "why can I not do this" is a question the interface should answer:
     ``--write`` as well: the session may put bytes on disk.
 ``focus``
     Something in the diagram is focused for the command to act on.
+
+What the pointer offers
+-----------------------
+
+:data:`MENUS` is the second half of the same idea: what right-clicking a shape
+puts in front of somebody who has never opened the palette. It is a *layout*, not
+a second catalogue — every row names a :attr:`Binding.id` declared above, so a
+context menu cannot offer a command the keyboard does not have, and a command
+cannot be reached from the pointer without appearing in the reference under its
+own shortcut. ``menu.js`` draws it; ``tests/test_web.py`` checks that every row
+resolves.
 """
 
 from __future__ import annotations
@@ -66,8 +77,13 @@ from netgraph.models import KINDS
 
 __all__ = [
     "BINDINGS",
+    "MENUS",
+    "MENU_TARGETS",
     "SECTIONS",
     "Binding",
+    "Menu",
+    "MenuItem",
+    "markdown_menus",
     "markdown_table",
     "payload",
 ]
@@ -104,6 +120,50 @@ class Binding:
         }
 
 
+@dataclass(frozen=True)
+class MenuItem:
+    """One row of a context menu: a command, under the name that context gives it."""
+
+    #: The :attr:`Binding.id` this row runs. Naming one that is not declared is
+    #: a failure in ``tests/test_web.py`` rather than a row that does nothing.
+    binding: str
+    #: What the row reads as. ``""`` takes the binding's own title, which is the
+    #: right answer whenever the palette's wording still fits. It often does not:
+    #: "Delete the focused element" is how you ask for a command you cannot point
+    #: at, and "Delete" is how you ask for one you have just right-clicked.
+    label: str = ""
+    #: ``""`` for a plain row. ``"kinds"`` for a row that opens a submenu of one
+    #: entry per element kind, each running the command with that kind already
+    #: chosen — how a new switch is two clicks rather than a form.
+    submenu: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"binding": self.binding, "label": self.label, "submenu": self.submenu}
+
+
+@dataclass(frozen=True)
+class Menu:
+    """What right-clicking one kind of thing offers, in the order it offers it."""
+
+    #: What was under the pointer; one of :data:`MENU_TARGETS`.
+    target: str
+    #: The rows, in groups. A group is drawn with a rule above it, so "what this
+    #: does to the picture" and "what this does to the files" do not run together.
+    groups: tuple[tuple[MenuItem, ...], ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "target": self.target,
+            "groups": [[item.to_dict() for item in group] for group in self.groups],
+        }
+
+
+#: What a right-click can land on. ``node`` and ``link`` are the two kinds of
+#: shape the diagram draws; ``canvas`` is the paper between them, which is where
+#: "make a new one" belongs because it is the one place nothing else is meant.
+MENU_TARGETS: Final[tuple[str, ...]] = ("node", "link", "canvas")
+
+
 #: The order the reference and the palette group commands in. A reader looking
 #: for "how do I delete this" should not have to read the view toggles first.
 SECTIONS: Final[tuple[str, ...]] = (
@@ -133,6 +193,17 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         section="Everywhere",
         keys=("?", "F1"),
         detail="This table, rendered from the bindings the page actually registered.",
+    ),
+    Binding(
+        id="menu.open",
+        title="Open the context menu",
+        section="Everywhere",
+        keys=("ContextMenu", "Shift-F10"),
+        detail=(
+            "What the pointer's right-click offers, on whatever the diagram has "
+            "focused — the element, the link, or the canvas itself when nothing is."
+        ),
+        where="canvas",
     ),
     Binding(
         id="tour",
@@ -592,6 +663,72 @@ BINDINGS: Final[tuple[Binding, ...]] = (
 )
 
 
+#: What right-clicking offers, per target.
+#:
+#: A short menu on purpose. The palette already has all fifty commands and is one
+#: keystroke away; what the pointer is for is the handful somebody reaches for
+#: while looking at a shape, and a menu long enough to need reading is a menu
+#: that has stopped being faster than typing.
+#:
+#: The order is the same argument three times: what this tells you, then what it
+#: adds, then what it changes, then what it removes — so the destructive row is
+#: never where the reflex click lands.
+MENUS: Final[tuple[Menu, ...]] = (
+    Menu(
+        target="node",
+        groups=(
+            (
+                MenuItem("node.inspect", "Inspect it"),
+                MenuItem("node.select", "Pin the inspector"),
+            ),
+            (
+                MenuItem("element.connect", "Cable it to…"),
+                MenuItem("interface.add", "Add an interface…"),
+            ),
+            (
+                MenuItem("element.rename", "Rename it…"),
+                MenuItem("element.set", "Set a field…"),
+                MenuItem("element.unset", "Remove a field…"),
+                MenuItem("element.move", "Move its document…"),
+            ),
+            (MenuItem("element.delete", "Delete it"),),
+        ),
+    ),
+    Menu(
+        target="link",
+        groups=(
+            (MenuItem("node.inspect", "Inspect it"),),
+            (
+                MenuItem("link.bend", "Add a bend"),
+                MenuItem("link.straighten", "Straighten it"),
+                MenuItem("link.route", "Route it…"),
+                MenuItem("link.label.reset", "Put the label back on the line"),
+            ),
+            (
+                MenuItem("element.set", "Set a field…"),
+                MenuItem("element.delete", "Disconnect it"),
+            ),
+        ),
+    ),
+    Menu(
+        target="canvas",
+        groups=(
+            (MenuItem("element.create", "New", submenu="kinds"),),
+            (
+                MenuItem("view.layer", "Show another layer…"),
+                MenuItem("view.fit", "Fit the diagram"),
+            ),
+            (
+                MenuItem("history.undo", "Undo"),
+                MenuItem("history.redo", "Redo"),
+                MenuItem("changes.toggle", "Show what changed"),
+            ),
+            (MenuItem("palette", "All commands…"),),
+        ),
+    ),
+)
+
+
 def payload() -> dict[str, Any]:
     """What ``/api/bindings`` answers: the table, and the order to group it in.
 
@@ -603,6 +740,7 @@ def payload() -> dict[str, Any]:
     return {
         "sections": list(SECTIONS),
         "bindings": [binding.to_dict() for binding in BINDINGS],
+        "menus": [menu.to_dict() for menu in MENUS],
         "kinds": list(KINDS),
     }
 
@@ -648,5 +786,44 @@ def markdown_table() -> str:
                 f"| {keys} | {_cell(binding.title)} | {_WHERE[binding.where]} "
                 f"| {_NEEDS[binding.needs]} | {_cell(binding.detail)} |"
             )
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks) + "\n"
+
+
+#: What each target is called in prose, and what right-clicking it means.
+_TARGETS: Final[dict[str, str]] = {
+    "node": "an element",
+    "link": "a link",
+    "canvas": "the canvas",
+}
+
+
+def markdown_menus() -> str:
+    """The context menus as Markdown, one block per target.
+
+    Used by ``tools/gen_docs.py`` for the ``context-menus`` region of
+    ``docs/commands/web.md``. Each row shows the label the menu draws and the
+    chord that runs the same command, which is the point of the arrangement: the
+    menu is how the shortcut is *learnt*, so the page that documents one has to
+    document the other beside it.
+    """
+    blocks: list[str] = []
+    for menu in MENUS:
+        lines = [
+            f"**Right-clicking {_TARGETS[menu.target]}**",
+            "",
+            "| Offers | Same as | Needs |",
+            "|---|---|---|",
+        ]
+        for group in menu.groups:
+            for item in group:
+                binding = next(one for one in BINDINGS if one.id == item.binding)
+                label = _cell(item.label or binding.title)
+                if item.submenu == "kinds":
+                    label += " ▸ *(one row per element kind)*"
+                chord = f"`{binding.keys[0]}`" if binding.keys else "*palette only*"
+                lines.append(
+                    f"| {label} | {_cell(binding.title)} — {chord} | {_NEEDS[binding.needs]} |"
+                )
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks) + "\n"

@@ -295,6 +295,80 @@ is on loopback and none of the write routes exist unless `--write` was given.
 absolute path, a `..`, a component the loader skips and a suffix that is not
 YAML are each refused by name. No other request ever becomes a file name.
 
+## Right-clicking
+
+**Right-click the diagram and you get the handful of commands that make sense
+where you clicked.** On an element, on a link, and on the paper between them
+— three menus, listed below.
+
+Two things it is not. It is not a second set of gestures: every row runs a
+command from [the table](#the-bindings) under that command's own id, so the
+menu, the palette and the key are three ways to the same one implementation.
+And it is not a full list: the palette is one keystroke away with all fifty in
+it, and a menu long enough to need reading has stopped being quicker than
+typing. `All commands…` is the last row of the canvas menu for exactly that.
+
+What it does add is a target. Right-clicking a shape **focuses it first**, so
+`Delete it` deletes the one you pointed at rather than the one the keyboard was
+left on, and the menu's heading is the element's address so there is no doubt
+which that is. Every row also prints its own shortcut, the same way a palette
+row does: use the menu for a week and you will not need it.
+
+**A row that cannot run now is greyed, with the reason on it** — `this session
+is read-only; restart it with --write` — rather than missing. `Escape` closes
+it, the arrow keys walk it, and <kbd>Shift-F10</kbd> or the menu key opens it on
+whatever the diagram has focused, because a menu only a mouse can open is a set
+of commands a screen-reader user does not have.
+
+Right-clicking a **bend** on a link still removes that bend, and shows no menu:
+the handle is a control of its own, and burying its one gesture two rows deep
+would be a loss. Right-clicking anywhere off the canvas is the browser's own
+menu, untouched.
+
+<!-- generated: context-menus -->
+**Right-clicking an element**
+
+| Offers | Same as | Needs |
+|---|---|---|
+| Inspect it | Open the inspector — `Enter` | a focused element |
+| Pin the inspector | Pin the inspector — `Space` | a focused element |
+| Cable it to… | Connect this element… — `c` | `--write` |
+| Add an interface… | Add an interface… — `i` | `--write` |
+| Rename it… | Rename the focused element… — `F2` | `--write` |
+| Set a field… | Set a field… — `e` | `--write` |
+| Remove a field… | Remove a field… — *palette only* | `--write` |
+| Move its document… | Move to another file… — *palette only* | `--write` |
+| Delete it | Delete the focused element — `Delete` | `--write` |
+
+**Right-clicking a link**
+
+| Offers | Same as | Needs |
+|---|---|---|
+| Inspect it | Open the inspector — `Enter` | a focused element |
+| Add a bend | Add a bend to the focused link — `b` | `--write` |
+| Straighten it | Straighten the focused link — `Shift-B` | `--write` |
+| Route it… | Change how the link is routed… — `r` | `--write` |
+| Put the label back on the line | Put the link's label back on the line — *palette only* | `--write` |
+| Set a field… | Set a field… — `e` | `--write` |
+| Disconnect it | Delete the focused element — `Delete` | `--write` |
+
+**Right-clicking the canvas**
+
+| Offers | Same as | Needs |
+|---|---|---|
+| New ▸ *(one row per element kind)* | Create an element… — `n` | `--write` |
+| Show another layer… | Switch layer… — *palette only* | — |
+| Fit the diagram | Fit the diagram — `0` | — |
+| Undo | Undo — `Ctrl-Z` | `--write` |
+| Redo | Redo — `Ctrl-Shift-Z` | `--write` |
+| Show what changed | Changes drawer — `Ctrl-B` | a folder |
+| All commands… | Command palette — `Ctrl-K` | — |
+<!-- /generated -->
+
+`New ▸` opens one row per element kind, and picking one opens the create form
+with that answer already filled in — the same form `n` opens, writing the same
+document through the same [`netgraph edit create`](edit.md).
+
 ## The keyboard
 
 **Everything this page does is reachable without a pointer**, and the page says
@@ -309,6 +383,10 @@ are three views of one table:
   `--write`" — rather than quietly missing.
 * **`?` — the shortcut sheet.** The table below, in a dialog.
 * **the keys themselves.**
+
+A fourth, for the pointer: [right-clicking the diagram](#right-clicking) offers
+the few of these that fit what is under the cursor, each row printing the chord
+that also runs it.
 
 A chord written `Ctrl-…` means the platform's command modifier: ⌘ on a Mac. A
 single letter is a *canvas* gesture and fires only while the diagram has focus —
@@ -424,6 +502,7 @@ cable it, undo both — without dispatching a single mouse event.
 |---|---|---|---|---|
 | `Ctrl-K` / `Ctrl-Shift-P` | Command palette | anywhere | — | Every command on this page, searched by name — and every element address and file path in the inventory, so one field is also 'go to'. |
 | `?` / `F1` | Keyboard shortcuts | anywhere | — | This table, rendered from the bindings the page actually registered. |
+| `ContextMenu` / `Shift-F10` | Open the context menu | the diagram | — | What the pointer's right-click offers, on whatever the diagram has focused — the element, the link, or the canvas itself when nothing is. |
 | *palette only* | Take the guided tour | anywhere | a folder | Sixty seconds that create a device, cable it up, move its document, show the YAML that changed and undo the lot — on a throwaway copy of this inventory, so nothing here is written to your files. |
 | `Escape` | Close what is open | anywhere | — | The palette, the reference, a prompt, the changes drawer, the inspector — in that order. |
 | `Alt-1` | Focus the inventory list | anywhere | a folder | The file list. Arrow keys move down it; Enter opens a file. |

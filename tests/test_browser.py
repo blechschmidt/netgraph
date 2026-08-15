@@ -71,6 +71,7 @@ import pytest
 
 from netgraph.layout.geometry import Routing
 from netgraph.layout.routing import Anchor, route
+from netgraph.models import KINDS
 from netgraph.web.server import WebServer
 from netgraph.web.session import EditingSession, TreeWatcher
 
@@ -1183,6 +1184,223 @@ def _anchor(anchor: Anchor) -> dict[str, float]:
 
 
 # --------------------------------------------------------------------------- #
+# The context menu
+# --------------------------------------------------------------------------- #
+#
+# The other door into the commands, and the only one somebody who has never
+# pressed Ctrl-K will find. Everything asserted here is about the *wiring*: the
+# menu draws itself from netgraph.web.bindings, aims at what was clicked, and
+# hands off to the same handlers the keyboard runs. What each of those handlers
+# then does is already tested above, once.
+
+
+def menu(editor: Editor) -> Locator:
+    return editor.page.locator(".menu-layer .menu").first
+
+
+def menu_row(editor: Editor, command: str) -> Locator:
+    """One row of the open menu, by the command it runs rather than its wording.
+
+    The label is the table's to change; the id is the contract.
+    """
+    return editor.page.locator(f'.menu-layer .menu-item[data-command="{command}"]').first
+
+
+def open_menu_on(editor: Editor, address: str) -> Locator:
+    """Right-click a shape and wait for its menu."""
+    press_on(editor, editor.shape(address), button="right")
+    expect(menu(editor)).to_be_visible()
+    return menu(editor)
+
+
+def open_menu_on_canvas(editor: Editor) -> Locator:
+    """Right-click the paper between the shapes — the corner nothing is drawn in."""
+    box = editor.page.locator("#canvas").bounding_box()
+    assert box is not None
+    editor.page.mouse.click(
+        box["x"] + box["width"] - 24, box["y"] + box["height"] - 24, button="right"
+    )
+    expect(menu(editor)).to_be_visible()
+    return menu(editor)
+
+
+def test_right_clicking_an_element_offers_what_acts_on_it(open_editor: OpenEditor) -> None:
+    """The menu is drawn from the binding table, and says what it is drawn on.
+
+    The heading is the element's *address* on purpose: two switches called
+    something similar are told apart by nothing else, and Delete is on this menu.
+    """
+    editor = open_editor(writable=True)
+
+    panel = open_menu_on(editor, "switches/sw-home")
+
+    expect(panel.locator(".menu-head")).to_have_text("switches/sw-home")
+    for command in ("node.inspect", "element.connect", "element.rename", "element.delete"):
+        expect(menu_row(editor, command)).to_be_visible()
+    # Every row teaches its own shortcut, the way a palette row does.
+    expect(menu_row(editor, "element.delete").locator(".menu-chord")).to_have_text("Delete")
+    # And nothing that belongs to another target leaked in.
+    expect(menu_row(editor, "link.bend")).to_have_count(0)
+    expect(menu_row(editor, "element.create")).to_have_count(0)
+
+
+def test_the_menu_aims_at_what_was_clicked_not_at_what_was_focused(
+    open_editor: OpenEditor,
+) -> None:
+    """The whole reason the pointer needs its own door.
+
+    Every edit command defaults to "the focused element", which is right for a
+    keyboard and useless for a right-click on a third one. So opening the menu
+    moves the focus first, and this is the assertion that says so: the form the
+    menu opens is filled in with the shape under the cursor.
+    """
+    editor = open_editor(writable=True)
+    editor.shape("switches/sw-home").click()
+
+    open_menu_on(editor, "hosts/pc-desk")
+    menu_row(editor, "element.rename").click()
+
+    expect(editor.page.locator(".prompt")).to_be_visible()
+    assert editor.page.input_value(".prompt input") == "hosts/pc-desk"
+
+
+def test_creating_from_the_canvas_menu_writes_the_document(open_editor: OpenEditor) -> None:
+    """Resource creation, the way somebody who has never read the docs finds it.
+
+    Right-click the paper, pick a kind, name it — and a file appears, through
+    the same ``netgraph edit create`` the palette and ``n`` reach.
+    """
+    editor = open_editor(writable=True)
+    assert editor.session is not None
+    before = editor.session.revision
+
+    open_menu_on_canvas(editor)
+    expect(menu_row(editor, "element.create")).to_be_visible()
+    menu_row(editor, "element.create").click()
+
+    # The submenu is the kinds, from netgraph.models.KINDS by way of the API.
+    kinds = editor.page.locator(".menu-sub .menu-item")
+    expect(kinds).to_have_count(len(KINDS))
+    editor.page.locator('.menu-sub .menu-item[data-kind="router"]').click()
+
+    prompt = editor.page.locator(".prompt")
+    expect(prompt).to_be_visible()
+    assert editor.page.input_value(".prompt select") == "router", "the kind was already answered"
+    prompt.locator("input").first.fill("rtr-from-the-menu")
+    prompt.locator('button[type="submit"]').click()
+
+    assert editor.settles(
+        lambda: (editor.root / "rtr-from-the-menu.yaml").exists(), timeout=TIMEOUT_MS / 1000
+    ), "the create the menu asked for never reached a file"
+    assert editor.session is not None and editor.session.revision != before
+    created = editor.read("rtr-from-the-menu.yaml")
+    assert "kind: router" in created and "name: rtr-from-the-menu" in created
+
+
+def test_right_clicking_a_link_offers_its_routing(open_editor: OpenEditor) -> None:
+    """A cable's menu is about its *shape*, which is the half it alone has."""
+    editor = arranged(open_editor)
+
+    press_on(editor, band(editor), button="right")
+    expect(menu(editor)).to_be_visible()
+
+    expect(menu(editor).locator(".menu-head")).to_contain_text("cbl-sw-desk")
+    for command in ("link.bend", "link.straighten", "link.route"):
+        expect(menu_row(editor, command)).to_be_visible()
+    # A cable is deleted by disconnecting it, and the row says so.
+    expect(menu_row(editor, "element.delete")).to_have_text(re.compile("Disconnect"))
+
+
+def test_right_clicking_a_bend_removes_it_and_shows_no_menu(open_editor: OpenEditor) -> None:
+    """The one gesture the menu must not swallow.
+
+    A handle is a control, and burying "remove this bend" two rows into a menu
+    would trade a gesture for a list. Both halves matter: the bend goes, and the
+    menu does not come.
+    """
+    editor = arranged(open_editor)
+    original = len(bends(editor))
+    box = band(editor).bounding_box()
+    assert box is not None
+    editor.page.mouse.dblclick(box["x"] + box["width"] / 2, box["y"] + box["height"] / 4)
+    assert editor.settles(lambda: len(bends(editor)) == original + 1, timeout=TIMEOUT_MS / 1000), (
+        "no bend to right-click"
+    )
+
+    press_on(editor, editor.page.locator(".ng-handle-bend").first, button="right")
+
+    assert editor.settles(lambda: len(bends(editor)) == original, timeout=TIMEOUT_MS / 1000), (
+        "the bend outlived its right-click"
+    )
+    expect(menu(editor)).to_have_count(0)
+
+
+def test_a_read_only_session_greys_the_rows_that_would_write(open_editor: OpenEditor) -> None:
+    """Greyed with the reason, never missing.
+
+    "Why is Delete grey" is a question the interface can answer; "where did
+    Delete go" is one it cannot. Clicking it anyway says the same thing out loud
+    rather than writing.
+    """
+    editor = open_editor(writable=False)
+    before = editor.read("switches/sw-home.yaml")
+
+    open_menu_on(editor, "switches/sw-home")
+
+    delete = menu_row(editor, "element.delete")
+    expect(delete).to_have_class(re.compile("unavailable"))
+    expect(delete.locator(".menu-why")).to_contain_text("read-only")
+    # What does not write is still offered, because it still works.
+    expect(menu_row(editor, "node.inspect")).not_to_have_class(re.compile("unavailable"))
+
+    # With the real mouse: the row is `aria-disabled`, which Playwright rightly
+    # declines to click and a person can click all day. What it must do then is
+    # say why — the same refusal the palette gives — and write nothing.
+    press_on(editor, delete)
+
+    expect(editor.page.locator("#toast")).to_contain_text("read-only")
+    expect(editor.page.locator(".prompt")).to_have_count(0)
+    assert editor.read("switches/sw-home.yaml") == before
+
+
+def test_the_menu_opens_and_walks_from_the_keyboard(open_editor: OpenEditor) -> None:
+    """A menu only a mouse can open is a set of commands somebody does not have.
+
+    Shift-F10 is what a screen reader sends for a context menu, so it opens this
+    one on whatever the diagram has focused — and the arrow keys walk it, and
+    Escape leaves it with the focus back where it started.
+    """
+    editor = open_editor(writable=True)
+    editor.press("Alt+3")
+    editor.press("Home")
+
+    editor.press("Shift+F10")
+
+    panel = menu(editor)
+    expect(panel).to_be_visible()
+    expect(panel.locator(".menu-list")).to_have_attribute("role", "menu")
+    first = panel.locator(".menu-item").first
+    expect(first).to_be_focused()
+    editor.press("ArrowDown")
+    expect(panel.locator(".menu-item").nth(1)).to_be_focused()
+
+    editor.press("Escape")
+
+    expect(menu(editor)).to_have_count(0)
+    expect(editor.page.locator("#canvas")).to_be_focused()
+
+
+def test_clicking_off_the_menu_closes_it(open_editor: OpenEditor) -> None:
+    """It is a menu, not a dialog: anywhere else dismisses it and writes nothing."""
+    editor = open_editor(writable=True)
+    open_menu_on(editor, "switches/sw-home")
+
+    editor.page.mouse.click(40, 40)
+
+    expect(menu(editor)).to_have_count(0)
+
+
+# --------------------------------------------------------------------------- #
 # Read-only
 # --------------------------------------------------------------------------- #
 
@@ -2104,6 +2322,29 @@ def test_the_overlays_have_no_accessibility_violations(open_editor: OpenEditor) 
 
 
 @pytest.mark.skipif(not HAVE_AXE, reason=NO_AXE)
+def test_the_context_menu_has_no_accessibility_violations(open_editor: OpenEditor) -> None:
+    """A `role="menu"` is easy to build and easy to build wrongly.
+
+    Both panels are audited, because a submenu is where the roles usually come
+    apart: the list owns what its children mean, so the heading is beside it and
+    the row that opens the submenu has to say that it does.
+    """
+    editor = open_editor(writable=True)
+
+    open_menu_on(editor, "switches/sw-home")
+    on_element = _violations(editor)
+    assert not on_element, "the element's context menu:\n" + _explain(on_element)
+
+    editor.press("Escape")
+    open_menu_on_canvas(editor)
+    menu_row(editor, "element.create").click()
+    expect(editor.page.locator(".menu-sub")).to_be_visible()
+    with_submenu = _violations(editor)
+    assert not with_submenu, "the canvas menu and its submenu:\n" + _explain(with_submenu)
+    editor.press("Escape", "Escape")
+
+
+@pytest.mark.skipif(not HAVE_AXE, reason=NO_AXE)
 def test_the_changes_drawer_has_no_accessibility_violations(open_editor: OpenEditor) -> None:
     """The diff view, which is where the colour-only encoding used to live.
 
@@ -2427,6 +2668,23 @@ def test_the_scratchpad_offers_the_same_commands_and_refuses_the_write(
     # And the view commands, which need nothing, still work here.
     editor.press("]")
     expect(page.locator("#layer")).to_have_value("l1")
+
+
+def test_the_scratchpad_has_the_context_menu_too(open_editor: OpenEditor) -> None:
+    """The same bargain as the palette, at the other door.
+
+    A scratchpad has no tree, so `New` cannot write one — and says so, rather
+    than the menu being a shorter list here than it is over a folder. Somebody
+    who learns this interface on a paste has learnt the same interface.
+    """
+    editor = open_editor(source=TWO_HOSTS)
+
+    open_menu_on_canvas(editor)
+
+    create = menu_row(editor, "element.create")
+    expect(create).to_have_class(re.compile("unavailable"))
+    expect(create.locator(".menu-why")).to_contain_text("open a folder")
+    expect(menu_row(editor, "view.fit")).not_to_have_class(re.compile("unavailable"))
 
 
 def test_the_links_of_an_element_are_a_cycle_of_their_own(open_editor: OpenEditor) -> None:

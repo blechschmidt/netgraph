@@ -40,7 +40,7 @@ var netgraphKeys = (function () {
   var MAX_RESULTS = 60;
 
   /** The table, as /api/bindings gave it. */
-  var table = { sections: [], bindings: [], kinds: [] };
+  var table = { sections: [], bindings: [], menus: [], kinds: [] };
   var byId = {};
   /** id -> { run, enabled } */
   var handlers = {};
@@ -119,6 +119,7 @@ var netgraphKeys = (function () {
     table = {
       sections: (payload && payload.sections) || [],
       bindings: (payload && payload.bindings) || [],
+      menus: (payload && payload.menus) || [],
       kinds: (payload && payload.kinds) || []
     };
     byId = {};
@@ -154,7 +155,12 @@ var netgraphKeys = (function () {
         return "open a folder with 'netgraph web DIR' for this";
       }
       if (binding.needs === "write" && !host.isWritable()) {
-        return "this session is read-only; restart it with --write";
+        // Two ways to be unable to write, and they are fixed differently: a
+        // scratchpad has no files at all, so "restart it with --write" would
+        // send somebody looking for a flag that would not help them.
+        return host.isSession()
+          ? "this session is read-only; restart it with --write"
+          : "open a folder with 'netgraph web DIR --write' for this";
       }
       if (binding.needs === "focus" && !host.hasFocus()) {
         return "focus an element in the diagram first";
@@ -765,6 +771,10 @@ var netgraphKeys = (function () {
     overlayOpen: overlayOpen,
     /** The element kinds this build has, for the create gesture's menu. */
     kinds: function () { return table.kinds.slice(); },
+    /** What right-clicking each kind of shape offers, for menu.js. Layout only:
+     *  every row names a binding above, and is drawn from the title, the chord
+     *  and the refusal this file already answers for the palette. */
+    menus: function () { return table.menus.slice(); },
     /** For tests and for the reference: what was actually registered. */
     bindings: function () { return table.bindings.slice(); },
     handled: function () { return Object.keys(handlers).sort(); }

@@ -34,6 +34,10 @@ are:
     Every command the web interface has, and the keys that reach it, from
     :data:`netgraph.web.bindings.BINDINGS` — which is also what the page fetches
     to build its palette and its shortcut sheet.
+``context-menus``
+    What right-clicking each kind of shape offers, from
+    :data:`netgraph.web.bindings.MENUS`, with the chord that runs the same
+    command beside it.
 
 Usage::
 
@@ -62,7 +66,7 @@ import click  # noqa: E402
 from netgraph.cli import cli  # noqa: E402
 from netgraph.fixes import FIXES  # noqa: E402
 from netgraph.rules import RULES, rule_for  # noqa: E402
-from netgraph.web.bindings import markdown_table  # noqa: E402
+from netgraph.web.bindings import markdown_menus, markdown_table  # noqa: E402
 
 DOCS: Final = REPO_ROOT / "docs"
 COMMANDS: Final = DOCS / "commands"
@@ -467,6 +471,8 @@ def body_for(spec: str) -> str:
         return fix_index()
     if kind == "keybindings":
         return markdown_table()
+    if kind == "context-menus":
+        return markdown_menus()
     raise SystemExit(f"unknown generated region {spec!r}")
 
 

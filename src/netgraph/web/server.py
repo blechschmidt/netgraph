@@ -187,6 +187,7 @@ ASSETS: Final[dict[str, tuple[str, str]]] = {
     "/a11y.js": ("a11y.js", "text/javascript; charset=utf-8"),
     "/cull.js": ("cull.js", "text/javascript; charset=utf-8"),
     "/links.js": ("links.js", "text/javascript; charset=utf-8"),
+    "/menu.js": ("menu.js", "text/javascript; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/session.js": ("session.js", "text/javascript; charset=utf-8"),
     "/tour.js": ("tour.js", "text/javascript; charset=utf-8"),

@@ -1368,8 +1368,16 @@ var netgraphSession = (function () {
     });
 
     K.define("element.create", {
-      run: function () {
+      run: function (context) {
         var kinds = K.kinds();
+        // The context menu's New submenu names the kind, so the form opens with
+        // that question already answered. It stays a field rather than
+        // disappearing: choosing "switch" and then wanting a router is one
+        // correction, not a cancel and a second right-click.
+        var wanted = context && context.kind;
+        var kind = kinds.indexOf(wanted) === -1
+          ? (kinds.indexOf("switch") === -1 ? kinds[0] : "switch")
+          : wanted;
         K.prompt({
           title: "Create an element",
           detail: "The same thing 'netgraph edit create' does: a document, placed "
@@ -1379,8 +1387,8 @@ var netgraphSession = (function () {
               name: "kind",
               label: "kind",
               type: "select",
-              value: kinds.indexOf("switch") === -1 ? kinds[0] : "switch",
-              options: kinds.map(function (kind) { return { value: kind, label: kind }; })
+              value: kind,
+              options: kinds.map(function (kind_) { return { value: kind_, label: kind_ }; })
             },
             { name: "name", label: "name", hint: "as metadata.name, e.g. sw-lab" },
             {

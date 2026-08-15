@@ -636,6 +636,26 @@
     return group && details[group.id] ? { group: group, record: details[group.id] } : null;
   }
 
+  /** The same question, asked on behalf of the pointer rather than of hover.
+   *
+   * A link's clickable band is in the routing overlay, not inside Graphviz's own
+   * `g.edge`: a cable drawn as a hairline is nearly impossible to hit otherwise,
+   * which is why links.js draws the band at all. So the shape a right-click
+   * lands on is not the shape carrying the detail record, and the menu has to
+   * ask links.js which line it was before deciding there was nothing there.
+   */
+  function hitAt(target) {
+    var hit = recordAt(target);
+    if (hit) { return hit; }
+    var address = netgraphLinks.linkAt(target);
+    if (!address) { return null; }
+    var ids = Object.keys(details);
+    for (var i = 0; i < ids.length; i++) {
+      if (details[ids[i]].id === address) { return { record: details[ids[i]] }; }
+    }
+    return null;
+  }
+
   function showInfo(hit, at) {
     el.info.replaceChildren(describe(hit.record));
     el.info.hidden = false;
@@ -922,9 +942,12 @@
   });
 
   el.canvas.addEventListener("contextmenu", function (event) {
-    // Right-clicking a bend removes it. The browser menu is only suppressed
-    // when a bend was actually under the cursor.
-    if (netgraphLinks.remove(event)) { event.preventDefault(); }
+    // Right-clicking a *bend* removes it: the handle is a control of its own and
+    // burying its one gesture two rows into a menu would be a loss. Everything
+    // else on the canvas gets the menu, and the browser's own is only suppressed
+    // when one of the two actually answered.
+    if (netgraphLinks.remove(event)) { event.preventDefault(); return; }
+    if (netgraphMenu.openAt(event)) { event.preventDefault(); }
   });
 
   el.canvas.addEventListener("click", function (event) {
@@ -1014,6 +1037,10 @@
 
     K.define("palette", { run: function () { K.palette(null, ""); } });
     K.define("help", { run: function () { K.reference(); } });
+    /* The pointer's way in, from the keyboard. The menu key and Shift-F10 are
+     * what a screen reader presses for a context menu, and a menu only a mouse
+     * can open is a set of commands somebody does not have. */
+    K.define("menu.open", { run: function () { netgraphMenu.openFocused(); } });
     K.define("dismiss", {
       run: function () {
         // In order of how modal each thing is. Anything else and Escape becomes
@@ -1253,6 +1280,19 @@
     view: function () { return el.layer.value; },
     refuse: function (why) { toast(why, "error"); },
     write: function (operation, said) { netgraphSession.ops([operation], said); }
+  });
+
+  /* What menu.js is given: what a right-click landed on, where a focused shape
+   * is on screen, and how to say no. It reads the command table itself, because
+   * a context menu is a view of the bindings and not a second list of them. */
+  netgraphMenu.attach({
+    el: el,
+    recordAt: hitAt,
+    boxOf: function (element) {
+      var group = el.viewport.querySelector('[id="' + cssEscape(element) + '"]');
+      return group ? group.getBoundingClientRect() : null;
+    },
+    refuse: function (why) { toast(why, "error"); }
   });
 
   netgraphCull.attach({ el: el, culled: culled });

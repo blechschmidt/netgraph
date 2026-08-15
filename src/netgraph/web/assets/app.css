@@ -1116,6 +1116,78 @@ main {
 .prompt-actions { display: flex; gap: .4rem; margin: 0; }
 .prompt-actions button { padding: .3rem .8rem; }
 
+/* --------------------------------------------------------- context menu */
+
+/* The layer is what makes a click anywhere else close the menu, and it is the
+ * only reason it exists: no backdrop, no dimming. The palette dims the page
+ * because it is asking a question; a context menu is answering one, and the
+ * diagram it was opened on has to stay readable behind it. */
+.menu-layer { position: fixed; inset: 0; z-index: 30; }
+
+.menu {
+  position: fixed;
+  min-width: 14rem;
+  max-width: 24rem;
+  max-height: 80vh;
+  overflow: auto;
+  padding: .25rem;
+  animation: panel-in 120ms ease-out;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  box-shadow: 0 12px 40px var(--shadow);
+}
+
+.menu-list { margin: 0; padding: 0; list-style: none; }
+/* The kinds are one word each, and a submenu as wide as the menu it hangs off
+ * covers the thing the menu was opened on. */
+.menu-sub { min-width: 9rem; }
+
+/* What the menu is about to act on, in the element's own address. A menu that
+ * does not say what it will delete is a menu nobody should press Delete in. */
+.menu-head {
+  margin: 0;
+  padding: .3rem .5rem .35rem;
+  color: var(--muted);
+  font: 11px/1.5 var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-sep {
+  height: 0;
+  margin: .25rem .35rem;
+  border-top: 1px solid var(--line);
+}
+
+.menu-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1.2rem;
+  align-items: baseline;
+  width: 100%;
+  padding: .3rem .5rem;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: 12px/1.5 var(--mono);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-item:hover, .menu-item:focus { background: color-mix(in srgb, var(--focus) 18%, transparent); }
+.menu-item:focus { outline: none; }
+/* Out of reach, and the row says why rather than disappearing — the same
+ * bargain the palette makes, for the same reason. */
+.menu-item.unavailable { cursor: not-allowed; }
+.menu-item.unavailable .menu-title { color: var(--muted); }
+.menu-chord { font-weight: 600; color: var(--info); white-space: nowrap; }
+.menu-why { color: var(--warning); font-size: 11px; }
+.menu-more { color: var(--muted); }
+
 /* ---------------------------------------------------------- guided tour */
 
 /* The tour's card. Not a backdrop and not `position: fixed` over the middle:
