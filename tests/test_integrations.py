@@ -20,6 +20,7 @@ import re
 import shutil
 import subprocess
 import sys
+import sysconfig
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +33,10 @@ from netgraph.diagnostics import FORMATS
 from netgraph.render import FORMATS as RENDER_FORMATS
 from netgraph.render import TEXT_FORMATS, suffix_for
 
-from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
+from platform_marks import (  # isort: skip -- tests/ is on sys.path, not a package
+    ON_WINDOWS,
+    requires_dot,
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HOOKS_FILE = REPO_ROOT / ".pre-commit-hooks.yaml"
@@ -47,11 +51,42 @@ WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 CI_DOC = REPO_ROOT / "docs" / "ci.md"
 HOME_LAB = REPO_ROOT / "examples" / "home-lab"
 
-#: The action's steps are written in bash — arrays, ``set -f`` — so ``sh`` will
-#: not do. Git Bash satisfies this on the Windows runner, which is the point:
-#: the action declares ``shell: bash`` and GitHub honours it there too.
+
+def find_bash() -> str | None:
+    """The bash GitHub would run a ``shell: bash`` step with, or ``None``.
+
+    The steps are bash — arrays, ``set -f`` — so ``sh`` will not do, and on
+    Windows ``shutil.which`` is not the answer either: it finds
+    ``C:\\Windows\\System32\\bash.exe`` first, which is the WSL launcher, and on
+    a runner with no distribution installed that answers every command with
+    "Windows Subsystem for Linux has no installed distributions". GitHub itself
+    runs these steps with Git Bash, and so does this. Which one works is
+    *measured* rather than assumed, for the same reason
+    ``platform_marks._can_symlink`` measures.
+    """
+    candidates = [r"C:\Program Files\Git\bin\bash.exe"] if ON_WINDOWS else []
+    found = shutil.which("bash")
+    if found is not None:
+        candidates.append(found)
+    for candidate in candidates:
+        if not Path(candidate).is_file():
+            continue
+        try:
+            probe = subprocess.run(
+                [candidate, "-c", "echo ok"], capture_output=True, text=True, timeout=60
+            )
+        except OSError:  # pragma: no cover - a bash that cannot be started at all
+            continue
+        if probe.returncode == 0 and probe.stdout.strip() == "ok":
+            return candidate
+    return None
+
+
+#: The bash the action's steps are handed to, or ``None`` where there is none.
+BASH = find_bash()
+
 requires_bash = pytest.mark.skipif(
-    shutil.which("bash") is None, reason="the action's steps are bash, and there is no bash here"
+    BASH is None, reason="the action's steps are bash, and there is no working bash here"
 )
 
 
@@ -296,15 +331,20 @@ def run_step(
     environment.update(environment_for(action, step_id, values))
     environment["RUNNER_TEMP"] = str(tmp_path / "runner-temp")
     environment["GITHUB_OUTPUT"] = str(tmp_path / "github-output")
-    # The console script lives beside the interpreter running the tests, in the
-    # venv's bin/ (Scripts/ on Windows); the action calls ``netgraph``, not
-    # ``python -m``.
-    environment["PATH"] = os.pathsep.join([str(Path(sys.executable).parent), environment["PATH"]])
+    # The action calls ``netgraph``, so the console script has to be findable.
+    # ``sysconfig`` is asked where it went rather than assuming "next to the
+    # interpreter", because those are the same directory only on POSIX: Windows
+    # puts console scripts in ``Scripts\`` beside ``python.exe``. The same
+    # lookup, and the same reason, as ``tools/check_examples.py``.
+    environment["PATH"] = os.pathsep.join(
+        [sysconfig.get_path("scripts"), str(Path(sys.executable).parent), environment["PATH"]]
+    )
     Path(environment["RUNNER_TEMP"]).mkdir(parents=True, exist_ok=True)
     Path(environment["GITHUB_OUTPUT"]).touch()
 
+    assert BASH is not None
     return subprocess.run(
-        ["bash", "-c", step_of(action, step_id)["run"]],
+        [BASH, "-c", step_of(action, step_id)["run"]],
         cwd=tmp_path,
         env=environment,
         capture_output=True,
@@ -476,9 +516,13 @@ def test_the_render_step_writes_the_page_and_reports_where(
     drawn = re.findall(r'<option value="\d+">(l\d)[^<]*</option>', page)
     assert drawn == ["l1", "l2"], "the layer list did not reach the renderer as two layers"
 
+    assert output.parent.is_dir(), "the render was given a directory that did not exist yet"
+
     reported = outputs_of(tmp_path)
-    assert reported["file"] == str(output)
-    assert reported["directory"] == str(output.parent)
+    # Forward slashes whatever the platform spells them with: the step
+    # normalises the path it was given, because the shell splits on '/' alone.
+    assert reported["file"] == output.as_posix()
+    assert reported["directory"] == output.parent.as_posix()
     assert int(reported["bytes"]) == len(output.read_bytes())
 
 

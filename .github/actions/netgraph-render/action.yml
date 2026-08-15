@@ -215,11 +215,15 @@ runs:
           esac
           output="${RUNNER_TEMP}/netgraph.${extension}"
         fi
-        # Only when it is missing: on Windows ``$RUNNER_TEMP`` is a backslashed
-        # path, and asking for a directory that is already there is the one way
-        # to be sure nothing tries to create it under that name.
+        # Normalise the separators once, here. On Windows -- where this step is
+        # Git Bash -- ``$RUNNER_TEMP`` is ``D:\a\_temp``, and every tool below
+        # splits a path on '/' alone: ``dirname`` would answer '.' for a
+        # backslashed path and the shape check would look for a file with a
+        # very odd name. Python takes either spelling, so netgraph is
+        # unaffected, and forward slashes are what the outputs report.
+        output="${output//\\//}"
+        # No mkdir: ``netgraph render`` creates the parent of --output itself.
         directory="$(dirname "${output}")"
-        [ -d "${directory}" ] || mkdir -p "${directory}"
 
         args=(--inventory "${NETGRAPH_INVENTORY}" render --format "${NETGRAPH_FORMAT}" --output "${output}")
         # Split on whitespace and commas, so the list can be written as
