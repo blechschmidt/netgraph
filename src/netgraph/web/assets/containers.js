@@ -58,6 +58,12 @@ window.netgraphContainers = (function () {
   var HEADER = 15;
   /** Font size of a header caption, in SVG user units. */
   var CAPTION = 10;
+  /** Space between a frame and what is inside it, in SVG user units. */
+  var PADDING = 8;
+  /** How many levels of nesting a frame leaves room for below itself. Each one
+   *  costs a header's height plus the padding, so that a site's caption and the
+   *  caption of the rack inside it never land on the same line. */
+  var NESTING = 4;
 
   var ctx = null;
   /** The frames, behind the drawing. */
@@ -149,7 +155,26 @@ window.netgraphContainers = (function () {
     tools.setAttribute("aria-hidden", "true");
     graph.appendChild(tools);
     if (picked && !frame.byNs[picked]) { picked = null; }
+    hideClusterLabels();
     paint();
+  }
+
+  /** Take Graphviz's own caption off every cluster this file captions.
+   *
+   * Otherwise a namespace is named twice, a few points apart: once inside the
+   * top of the cluster by the renderer and once in the header drawn above it.
+   * Hidden rather than suppressed in the DOT, because the same drawing is what
+   * `netgraph render` writes to a file — where there is no header and the
+   * caption is the only thing naming the box.
+   */
+  function hideClusterLabels() {
+    visible().forEach(function (entry) {
+      var shape = entry.element && !entry.collapsed && shapeOf(entry.element);
+      if (!shape || shape.id.indexOf("cluster") !== 0) { return; }
+      Array.prototype.forEach.call(shape.querySelectorAll("text"), function (caption) {
+        caption.setAttribute("display", "none");
+      });
+    });
   }
 
   /** Which namespaces are folded, for the render request. app.js asks. */
@@ -231,10 +256,12 @@ window.netgraphContainers = (function () {
       bottom = bottom === null ? box.y + box.h : Math.max(bottom, box.y + box.h);
     });
     if (left === null) { return null; }
-    // Padded by one level per step of depth, so a site's frame clears the racks
-    // inside it instead of tracing them. The same idea as an annotation area's
-    // `spec.padding`, derived rather than declared because a namespace has none.
-    var pad = 6 + Math.max(0, 4 - (entry.depth || 1)) * 6;
+    // Padded by one step per level of nesting, so a site's frame clears the
+    // racks inside it instead of tracing them -- and clears them by more than a
+    // header is tall, or the two captions would sit on top of each other. The
+    // same idea as an annotation area's `spec.padding`, derived rather than
+    // declared because a namespace does not carry one.
+    var pad = PADDING + Math.max(0, NESTING - (entry.depth || 1)) * (HEADER + PADDING);
     return { x: left - pad, y: top - pad, w: right - left + pad * 2, h: bottom - top + pad * 2 };
   }
 

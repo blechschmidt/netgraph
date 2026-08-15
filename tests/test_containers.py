@@ -25,7 +25,11 @@ where a gesture can be pressed rather than described.
 
 from __future__ import annotations
 
+import json
 import shutil
+import urllib.error
+import urllib.request
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, Final
 
@@ -45,6 +49,7 @@ from netgraph.loader import load_tree
 from netgraph.render import Layer, build_graph
 from netgraph.validate import validate
 from netgraph.web.preview import MAX_COLLAPSED, RequestError, ViewOptions, render_inventory
+from netgraph.web.server import WebServer
 from netgraph.web.session import Conflict, EditingSession, ReadOnly
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
@@ -425,6 +430,99 @@ def test_a_refused_drop_leaves_the_session_at_the_same_revision(tmp_path: Path) 
     assert "name: sw-north-acc-01" in (root / "sites/north/access/switches.yaml").read_text(
         encoding="utf-8"
     )
+
+
+# --------------------------------------------------------------------------- #
+# Over HTTP: the route the drop actually posts to
+# --------------------------------------------------------------------------- #
+
+
+def call(base: str, path: str, body: Any) -> tuple[int, Any]:
+    """One POST against the running server, with its body or its refusal."""
+    request = urllib.request.Request(
+        base + path,
+        method="POST",
+        data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=10) as response:
+            return response.status, json.loads(response.read())
+    except urllib.error.HTTPError as exc:
+        return exc.code, json.loads(exc.read())
+
+
+@pytest.fixture()
+def served(campus: Path) -> Iterator[str]:
+    session = EditingSession(root=campus, writable=True)
+    with WebServer.create(session=session, host="127.0.0.1", port=0) as server:
+        yield server.url.rstrip("/")
+
+
+def test_the_route_moves_the_document(served: str, campus: Path) -> None:
+    status, change = call(
+        served,
+        "/api/reparent",
+        {
+            "addresses": ["sites/north/access/sw-north-acc-01"],
+            "namespace": "sites/south/access",
+        },
+    )
+    assert status == 200
+    assert sorted(change["files"]) == [
+        "sites/north/access/switches.yaml",
+        "sites/south/access/switches.yaml",
+    ]
+    assert "name: sw-north-acc-01" in (campus / "sites/south/access/switches.yaml").read_text(
+        encoding="utf-8"
+    )
+
+
+def test_the_route_takes_the_empty_namespace_to_mean_the_root(served: str) -> None:
+    """The one string field where ``""`` is the value and not a client bug."""
+    status, change = call(
+        served,
+        "/api/reparent",
+        {"addresses": ["sites/north/access/sw-north-acc-01"], "namespace": ""},
+    )
+    assert status == 200
+    assert "sw-north-acc-01.yaml" in change["files"]
+
+
+def test_the_route_refuses_a_drop_it_cannot_make(served: str) -> None:
+    status, refused = call(
+        served,
+        "/api/reparent",
+        {"addresses": ["there-is-no-such-switch"], "namespace": "sites/south"},
+    )
+    assert status == 400
+    assert "there is no element or namespace" in refused["message"]
+
+
+def test_the_route_refuses_a_stale_revision(served: str) -> None:
+    status, refused = call(
+        served,
+        "/api/reparent",
+        {
+            "addresses": ["sites/north/access/sw-north-acc-01"],
+            "namespace": "sites/south/access",
+            "revision": 99,
+        },
+    )
+    assert status == 409
+    assert "reload before moving" in refused["message"]
+
+
+def test_a_read_only_server_refuses_the_route(campus: Path) -> None:
+    session = EditingSession(root=campus)
+    with WebServer.create(session=session, host="127.0.0.1", port=0) as server:
+        status, refused = call(
+            server.url.rstrip("/"),
+            "/api/reparent",
+            {"addresses": ["sites/north/access/sw-north-acc-01"], "namespace": "estate"},
+        )
+    assert status == 403
+    assert "--write" in refused["message"]
 
 
 # --------------------------------------------------------------------------- #
