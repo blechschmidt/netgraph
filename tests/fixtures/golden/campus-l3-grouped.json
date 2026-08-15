@@ -45,7 +45,7 @@
         {
           "name": "GigabitEthernet1/0/1",
           "type": "ethernet",
-          "description": "Desk - pc-north-01",
+          "description": "Desk - pc-north-01 (moved to the window bay)",
           "mac": "00:1b:0d:01:a1:01",
           "mtu": 1500,
           "vlan": {
