@@ -50,7 +50,14 @@ from netgraph.render import (
     build_graph,
     filter_graph,
 )
-from netgraph.render.dot import to_dot, to_image
+from netgraph.render.aggregate import (
+    AGGREGATE_ID_PREFIX,
+    AggregateSpec,
+    collapse_namespaces,
+    collapse_targets,
+)
+from netgraph.render.dot import cluster_keys, to_dot, to_image
+from netgraph.render.ids import element_ids
 from netgraph.render.jsonexport import annotations_payload
 from netgraph.render.routes import RouteCache, anchors_of, default_routing, fans_of, route_plan
 from netgraph.render.styles import StyleMap
@@ -92,6 +99,19 @@ MAX_VLAN: Final = 4094
 #: order somebody reads them in anyway.
 MAX_PROBLEMS: Final = 200
 
+#: How many namespaces one request may ask to have folded. A collapse is a
+#: triangle somebody clicked on a container header, and a page that has folded
+#: five hundred of them is not a page anybody is reading — so the cap is a
+#: bound on a malformed request rather than on a gesture.
+MAX_COLLAPSED: Final = 500
+
+#: The deepest namespace level drawn as a container frame. A namespace may nest
+#: as far as the folders do; the *editor* draws a frame per level, and past this
+#: the frames are thinner than their own captions. Everything deeper is still
+#: inside its ancestors' frames and is still dropped into by name — only the
+#: box for it is not drawn.
+MAX_CONTAINER_DEPTH: Final = 8
+
 #: What the browser is allowed to ask for, mapped to the field it sets. Keeping
 #: this closed is what stops a request from reaching a rendering knob the web
 #: interface does not offer.
@@ -132,6 +152,13 @@ class ViewOptions:
     #: no fact, turning it off is never a different answer, only a plainer
     #: picture.
     annotations: bool = True
+    #: Namespaces drawn as one node instead of as a box full of them, exactly as
+    #: ``netgraph render --collapse`` folds them
+    #: (:func:`~netgraph.render.aggregate.collapse_namespaces`). The browser's,
+    #: not the command line's: collapsing a container is a *view* gesture — a
+    #: triangle on its header — and writes nothing, so it belongs beside the
+    #: layer and the VLAN filter rather than in a document.
+    collapse: tuple[str, ...] = ()
     #: Keep only elements participating in these VLANs; empty keeps everything.
     vlans: frozenset[int] = frozenset()
     #: Keep only these element kinds; empty keeps everything.
@@ -177,6 +204,8 @@ class ViewOptions:
             values["vlans"] = _vlans(payload["vlans"])
         if "kinds" in payload:
             values["kinds"] = _strings(payload["kinds"], "kinds")
+        if "collapse" in payload:
+            values["collapse"] = _namespaces(payload["collapse"])
         if payload.get("title"):
             values["title"] = _text(payload["title"], "title")
         return cls(**values)
@@ -218,6 +247,10 @@ class ViewOptions:
         if query.get("kinds"):
             payload["kinds"] = [
                 item for value in query["kinds"] for item in value.split(",") if item
+            ]
+        if query.get("collapse"):
+            payload["collapse"] = [
+                item for value in query["collapse"] for item in value.split(",") if item
             ]
         return cls.from_request(payload, icons=icons, theme=theme)
 
@@ -280,6 +313,16 @@ class Preview:
     #: and what it says — none of which can be read off the SVG, because an area
     #: in an arranged drawing is a rectangle in the background with no id at all.
     annotations: Mapping[str, Any] | None = None
+    #: One entry per namespace the editor may draw a container frame around, in
+    #: namespace order; see :func:`_containers`. Empty for a drawing with no
+    #: namespaces, which is the single-folder inventory most people start with.
+    #:
+    #: Beside :attr:`geometry` for the same reason it is: the boundary of a
+    #: namespace box is an editing surface — things are dropped into it, it is
+    #: folded and unfolded, and its rectangle is written to a document — and
+    #: none of what that needs can be read off the SVG, where a namespace is a
+    #: rounded path with a caption and no members.
+    containers: Sequence[Mapping[str, Any]] = ()
     #: The resolved appearance of everything this pass drew (§22), keyed by
     #: address: ``{"nodes": {fqn: style}, "edges": {id: style}}``, each style
     #: in the form ``netgraph render -f json`` publishes it, provenance
@@ -341,6 +384,7 @@ class Preview:
             "dangling": list(self.dangling),
             "geometry": dict(self.geometry) if self.geometry is not None else None,
             "annotations": dict(self.annotations) if self.annotations is not None else None,
+            "containers": [dict(entry) for entry in self.containers],
             "styles": dict(self.styles) if self.styles is not None else None,
             "counts": {
                 "nodes": self.nodes,
@@ -480,7 +524,14 @@ def render_inventory(
     rejected = bool(inventory.errors) or any(finding.severity.is_fatal for finding in findings)
 
     try:
-        graph = filter_graph(build_graph(inventory, layer=options.layer), options.filter_spec)
+        whole = filter_graph(build_graph(inventory, layer=options.layer), options.filter_spec)
+        # Folding is applied *after* the filters and before anything is drawn or
+        # fingerprinted, so a folded container is a different picture and gets a
+        # different hash. ``whole`` is kept: the container payload is built from
+        # the unfolded drawing, because a folded namespace still has to report
+        # what it stands for and how to unfold it.
+        folded = collapse_targets(whole, AggregateSpec(collapse=options.collapse))
+        graph = collapse_namespaces(whole, folded) if folded else whole
         digest = graph_digest(graph, options.render_options)
         status = Status.INVALID if rejected else Status.OK
         message = _summary(inventory, graph, rejected=rejected)
@@ -517,10 +568,101 @@ def render_inventory(
         dangling=tuple(graph.dangling),
         geometry=_geometry(graph, options.render_options, cache=routes),
         annotations=annotations_payload(graph, options.render_options),
+        containers=_containers(whole, graph, options, folded),
         styles=_styles(graph, options.render_options),
         duration=time.monotonic() - started,
         graph_hash=digest,
     )
+
+
+def _containers(
+    graph: Graph, drawn: Graph, options: ViewOptions, collapsed: Sequence[str]
+) -> list[dict[str, Any]]:
+    """One entry per namespace the editor can draw a frame around (§2).
+
+    The container layer is the editor's, not Graphviz's, and this is why. A
+    ``--group-by-namespace`` render boxes the namespaces that hold elements
+    *directly* — Graphviz has no reason to draw ``sites`` around three sites
+    that each have their own box — but the editing gesture needs every level:
+    dragging a switch onto ``sites/south`` is a legal move whether or not
+    ``sites/south`` has a device of its own in it. So every level from the root
+    down is published, each with the members whose hull the frame follows, and
+    the browser draws the ones it can fit.
+
+    ``boxed`` is the difference that matters for writing. A namespace Graphviz
+    boxes is one :func:`~netgraph.render.dot.cluster_keys` names, and only such
+    a namespace has somewhere for a resize to *go*: its rectangle is stored
+    under that key in the layout document's ``groups`` and drawn back from it
+    (:func:`netgraph.render.dot._frames`). A level in between is drawn round
+    whatever is under it and has no stored box, exactly as an annotation area
+    following its members does — so it is a drop target and a collapse target,
+    but not a resize target, and the page says so rather than writing a number
+    the next render would ignore.
+
+    Computed from ``graph`` — the drawing *before* any collapsing — so that a
+    folded container still reports what it stands for and can be unfolded. What
+    it is drawn *as* comes from ``drawn``: a cluster id while it is open, and
+    the aggregate node's id once it is folded.
+
+    **Empty unless the drawing is grouped by namespace**, and that is the
+    contract rather than an optimisation. A container frame promises that
+    everything inside the rectangle is in that namespace; an ungrouped layout
+    scatters a namespace's members across the page, so a frame round them would
+    enclose half the diagram and dropping something into it would be a lie. The
+    editor's whole container layer — the frames, the headers, the drag — is
+    therefore off exactly when the drawing does not group.
+    """
+    if graph.is_empty or not options.group_by_namespace:
+        return []
+    boxed = set(cluster_keys(graph, options.render_options).values())
+    folded = set(collapsed)
+    identity, aggregates = element_ids(graph), element_ids(drawn)
+    members: dict[str, list[str]] = {}
+    for node in graph.nodes.values():
+        namespace = node.namespace
+        if not namespace:
+            continue
+        for level in _levels(namespace):
+            members.setdefault(level, []).append(node.fqn)
+    entries: list[dict[str, Any]] = []
+    for namespace in sorted(members):
+        depth = namespace.count("/") + 1
+        if depth > MAX_CONTAINER_DEPTH:
+            continue
+        inside = members[namespace]
+        parent = namespace.rpartition("/")[0]
+        is_folded = namespace in folded
+        entries.append(
+            {
+                "namespace": namespace,
+                "label": namespace.rpartition("/")[2],
+                "parent": parent if parent in members else "",
+                "depth": depth,
+                "count": len(inside),
+                "members": inside,
+                "boxed": namespace in boxed,
+                "collapsed": is_folded,
+                # Which shape on the page *is* this container: the cluster
+                # Graphviz drew round it, or — once folded — the single node it
+                # became. Either way the browser measures the box off the
+                # drawing rather than guessing it.
+                "element": (
+                    aggregates.node(f"{AGGREGATE_ID_PREFIX}{namespace}")
+                    if is_folded
+                    else identity.cluster(namespace)
+                ),
+                # Whether an *ancestor* is folded, in which case this container
+                # is not on the page at all and must not be drawn or dropped on.
+                "hidden": any(level in folded for level in _levels(parent)),
+            }
+        )
+    return entries
+
+
+def _levels(namespace: str) -> tuple[str, ...]:
+    """``a/b/c`` as ``('a', 'a/b', 'a/b/c')``; the root contributes nothing."""
+    parts = [part for part in namespace.split("/") if part]
+    return tuple("/".join(parts[: index + 1]) for index in range(len(parts)))
 
 
 def _styles(graph: Graph, options: RenderOptions) -> Mapping[str, Any]:
@@ -820,6 +962,31 @@ def _text(value: Any, field_name: str) -> str:
     if not isinstance(value, str):
         raise RequestError(f"{field_name!r} must be a string")
     return value
+
+
+def _namespaces(value: Any) -> tuple[str, ...]:
+    """``collapse`` as the namespace prefixes it names.
+
+    Bounded, and bounded deliberately: a collapse list is one triangle per
+    container the reader has folded, and a request carrying thousands of them
+    is not a person's. Each entry is stripped of its slashes so that
+    ``sites/north`` and ``/sites/north/`` are the same container, which is what
+    :func:`~netgraph.render.aggregate.collapse_targets` also assumes.
+    """
+    if isinstance(value, str):
+        items = [part for part in value.split(",") if part]
+    elif isinstance(value, list) and all(isinstance(item, str) for item in value):
+        items = [item for item in value if item]
+    else:
+        raise RequestError("'collapse' must be a namespace, or a list of them")
+    wanted = tuple(dict.fromkeys(item.strip().strip("/") for item in items))
+    kept = tuple(item for item in wanted if item)
+    if len(kept) > MAX_COLLAPSED:
+        raise RequestError(
+            f"'collapse' names {len(kept)} namespaces, which is more than the "
+            f"{MAX_COLLAPSED} one drawing can usefully fold"
+        )
+    return kept
 
 
 # --------------------------------------------------------------------------- #

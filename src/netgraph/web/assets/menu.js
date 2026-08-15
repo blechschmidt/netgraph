@@ -66,7 +66,19 @@ window.netgraphMenu = (function () {
       window.netgraphNotes.select(annotation.id);
       return show({ annotation: annotation }, at);
     }
-    return show(host.recordAt(event.target), at);
+    var record = host.recordAt(event.target);
+    // Then the containers, and only where there is no element: a namespace box
+    // is the paper its members sit on, so a right-click on a switch inside a
+    // rack is about the switch. What is left -- the frame, its header, the
+    // space between the members -- is about the rack.
+    if (!record) {
+      var container = window.netgraphContainers.at(event.target, event);
+      if (container) {
+        window.netgraphContainers.select(container.namespace);
+        return show({ container: container }, at);
+      }
+    }
+    return show(record, at);
   }
 
   /** Open on whatever the keyboard has focused, anchored under its shape.
@@ -89,6 +101,16 @@ window.netgraphMenu = (function () {
         y: canvasBox.top + canvasBox.height / 3
       });
     }
+    // And the same for a selected container, for the same reason: a namespace
+    // frame is not in the diagram's focus order, so what stands in for "focused"
+    // is what the canvas has picked.
+    var container = window.netgraphContainers.selection();
+    if (container) {
+      return show({ container: container }, {
+        x: canvasBox.left + canvasBox.width / 2,
+        y: canvasBox.top + canvasBox.height / 3
+      });
+    }
     var here = window.netgraphA11y.focused();
     var box = here ? host.boxOf(here.element) : null;
     // A shape scrolled out of the drawn window has a box, and it is the empty
@@ -104,7 +126,8 @@ window.netgraphMenu = (function () {
     close();
     var record = hit ? hit.record : null;
     var annotation = hit ? hit.annotation : null;
-    var target = annotation ? "annotation" : targetFor(record);
+    var container = hit ? hit.container : null;
+    var target = annotation ? "annotation" : (container ? "container" : targetFor(record));
     var groups = rowsFor(target);
     if (!groups.length) { return false; }
 
@@ -131,7 +154,7 @@ window.netgraphMenu = (function () {
       close();
     });
 
-    var root = panel(groups, caption(record, annotation, target), target);
+    var root = panel(groups, caption(record, annotation, target, container), target);
     layer.appendChild(root);
 
     var entry = window.netgraphKeys.overlay(layer, {
@@ -142,7 +165,15 @@ window.netgraphMenu = (function () {
     // `at` and `on` travel with the menu because one command needs them: a note
     // is created where the pointer was, on the thing the pointer was over. Every
     // other row acts on the focus or the selection, which are already aimed.
-    open = { entry: entry, layer: layer, root: root, sub: null, at: at, on: record };
+    open = {
+      entry: entry,
+      layer: layer,
+      root: root,
+      sub: null,
+      at: at,
+      on: record,
+      container: container
+    };
     place(root, at);
     return true;
   }
@@ -206,7 +237,7 @@ window.netgraphMenu = (function () {
    * switches indistinguishable at the moment it matters most. For a set, the
    * count: naming one of eleven would be worse than naming none.
    */
-  function caption(record, annotation, target) {
+  function caption(record, annotation, target, container) {
     if (target === "selection") {
       var count = window.netgraphSelect.size();
       return count + " selected element" + (count === 1 ? "" : "s");
@@ -215,6 +246,9 @@ window.netgraphMenu = (function () {
     // `core` may sit beside a switch called `core`, which is the whole reason
     // §21 has its own operations.
     if (annotation) { return annotation.kind + " " + annotation.fqn; }
+    // The whole path, not the last segment the header shows: two racks called
+    // `r1` in two sites are the case where it matters most.
+    if (container) { return "namespace " + container.namespace; }
     if (!record) { return "the diagram"; }
     var address = String(record.id || "");
     if (!address) { return target === "link" ? "this link" : "this element"; }
@@ -337,6 +371,9 @@ window.netgraphMenu = (function () {
   function aimed(spec) {
     var context = { from: "menu", at: open ? open.at : null, on: open ? open.on : null };
     if (spec.context && spec.context.kind) { context.kind = spec.context.kind; }
+    // Which namespace the menu was opened on, so "New switch" inside a rack
+    // makes one *in* the rack rather than at the root.
+    if (open && open.container) { context.namespace = open.container.namespace; }
     return context;
   }
 

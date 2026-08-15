@@ -345,6 +345,7 @@ menu, untouched.
 | Set a field on all of them… | Set a field… — `e` | `--write` |
 | Remove a field from all of them… | Remove a field… — *palette only* | `--write` |
 | Move their documents… | Move to another file… — *palette only* | `--write` |
+| Move into a namespace… | Move into a namespace… — *palette only* | `--write` |
 | Clear the selection | Clear the selection — `Ctrl-Shift-A` | — |
 | Delete all of them | Delete the selection — `Delete` | `--write` |
 
@@ -389,11 +390,21 @@ menu, untouched.
 | Edit the text… | Edit the note's text… — `Shift-E` | `--write` |
 | Delete it | Delete the selection — `Delete` | `--write` |
 
+**Right-clicking a namespace box**
+
+| Offers | Same as | Needs |
+|---|---|---|
+| Fold or unfold it | Fold or unfold this namespace — `f` | — |
+| New in it ▸ *(one row per element kind)* | Create an element… — `n` | `--write` |
+| Move the selection into it… | Move into a namespace… — *palette only* | `--write` |
+| New namespace inside it… | New namespace… — *palette only* | `--write` |
+
 **Right-clicking the canvas**
 
 | Offers | Same as | Needs |
 |---|---|---|
 | New ▸ *(one row per element kind)* | Create an element… — `n` | `--write` |
+| New namespace… | New namespace… — *palette only* | `--write` |
 | New note | Add a note to the diagram… — `Shift-N` | `--write` |
 | Paste here | Paste — `Ctrl-V` | `--write` |
 | Show another layer… | Switch layer… — *palette only* | — |
@@ -642,6 +653,8 @@ cable it, undo both — without dispatching a single mouse event.
 | `e` | Set a field… | the diagram | `--write` | A dotted path and a YAML value, on every selected element at once — or on the focused one when nothing is selected. 'netgraph edit set'. |
 | *palette only* | Remove a field… | anywhere | `--write` | 'netgraph edit unset', across the whole selection as one change. |
 | *palette only* | Move to another file… | anywhere | `--write` | Moves the selected documents into a different file, together. 'netgraph edit move'. |
+| *palette only* | New namespace… | anywhere | `--write` | Makes a namespace by putting something in it — the selection, moved there, or a new element created there. A namespace *is* a folder and a folder netgraph would read is one holding a document, so an empty one is not a thing the inventory can record. |
+| *palette only* | Move into a namespace… | anywhere | `--write` | Re-homes the selection into another namespace: the typed form of dragging it into that container's box. The documents are rewritten into the folder and every reference to them is re-spelled. 'netgraph edit move'. |
 | *palette only* | Disconnect a cable… | anywhere | `--write` | Removes a cable, leaving both devices. 'netgraph edit disconnect'. |
 | `b` | Add a bend to the focused link | the diagram | `--write` | Drops a waypoint half way along the link, which the route then passes through. Double-clicking the line does the same at the point clicked. |
 | `Shift-B` | Straighten the focused link | the diagram | `--write` | Clears every bend, leaving the link to run directly between its two devices. The routing style and the label position are kept. |
@@ -679,6 +692,7 @@ cable it, undo both — without dispatching a single mouse event.
 | `Alt-I` | Toggle IP addresses | anywhere | — | Whether the picture prints addresses. The inspector shows them either way. |
 | `Alt-V` | Toggle VLANs | anywhere | — | Whether the picture prints VLAN membership. |
 | `Alt-G` | Toggle namespace grouping | anywhere | — | Collapse each namespace into one box. |
+| `f` | Fold or unfold this namespace | the diagram | — | Draws a namespace box as the single node it stands for, or opens it again — the container the pointer picked, or the one holding the focused element. The same folding 'netgraph render --collapse' does. A view, not an edit: nothing is written, and how much of a diagram somebody wants to look at is not a fact about the network. |
 | `Alt-N` | Toggle annotations | anywhere | — | Whether the notes, areas and legends of §21 are drawn. They are commentary, never topology, so hiding them changes nothing the tool concludes — only how much of the picture is somebody's explanation. |
 | `Alt-S` | Toggle strict | anywhere | — | Report warnings as errors. |
 | *palette only* | Filter by VLAN… | anywhere | — | Keep only elements participating in the VLANs given. |

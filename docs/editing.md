@@ -27,6 +27,7 @@ leaves every comment in it alone.
 - [Batches: many operations, one change](#batches-many-operations-one-change)
 - [Copying, cutting and pasting](#copying-cutting-and-pasting)
 - [Arranging a selection](#arranging-a-selection)
+- [Containers: dragging a document into a namespace](#containers-dragging-a-document-into-a-namespace)
 - [Annotating a diagram](#annotating-a-diagram)
 - [Using it from Python](#using-it-from-python)
 - [Reviewing what you changed](#reviewing-what-you-changed)
@@ -542,6 +543,106 @@ A property of the diagram rather than of the person looking at it, because
 snapping writes real coordinates into a real document: two people tidying the
 same inventory to two different lattices would spend the afternoon undoing each
 other.
+
+## Containers: dragging a document into a namespace
+
+A namespace is a folder and a folder is a namespace
+([§2](inventory-layout.md#folders-are-namespaces)). That one fact is what lets
+the editor draw a namespace as a box and *mean* it: the rectangle round
+`sites/north/racks/r1` is the boundary of a directory, so dragging a switch into
+it is not a picture of a move — it is `netgraph edit move`, and the file moves.
+
+```
+netgraph edit move sites/north/access/sw-north-acc-01 sites/north/racks/r1/sw-north-acc-01.yaml
+```
+
+is the command line for the same gesture, and the two go through the same
+operation. What the editor adds is *which file*: you point at a namespace, and
+[placement](#placement) decides whether the document joins a `switches.yaml`
+that is already there or gets a file of its own — the same answer
+`netgraph edit create` gives, so a dragged tree and a typed one do not diverge.
+
+### The gestures
+
+| Gesture | What it writes |
+|---|---|
+| Drag an element into a container's frame | one `move` per document, as one change |
+| Drag a multi-selection into one | the same, in one batch and one `Ctrl-Z` |
+| Drag a container into another | every document under it, keeping the subtree's own shape |
+| Drop on empty canvas | a `move` into the root namespace |
+| Drop where it already was | nothing; the status line says so |
+| **New namespace…** in the canvas or container menu | a `create` in the new folder, or the selection moved into it |
+| Drag a container's corner | `set-geometry`, into that view's `groups` |
+| The triangle on a header, or `f` | nothing: folding is a view |
+
+The frames are drawn only when the diagram is **grouped by namespace** — the
+*group* box, or `Alt-G`. A container frame promises that everything inside the
+rectangle is in that namespace, and an ungrouped layout scatters a namespace's
+members across the page, so a frame round them would enclose half the diagram
+and dropping into it would be a lie. With grouping off there are no frames, no
+drop targets and no gesture, and a drag pans the canvas.
+
+### What a drop is refused for, and when
+
+Before anything is written. The two refusals worth knowing about are both
+knowable from the inventory alone, so the answer is the sentence naming both
+sides rather than a half-applied batch and a validator's complaint:
+
+- **the name is taken.** `sw-01` dropped into a rack that already holds an
+  `sw-01` is refused, naming the one that is already there. Rename one of them
+  first — two elements in one namespace cannot share a name.
+- **two of the dragged documents would collide with each other.** Select two
+  racks' worth of switches, drop them into one rack, and any two that share a
+  name are named in the refusal.
+
+A namespace the loader would skip is refused for the same reason: a folder whose
+name starts with `.` or `_` is not read
+([`NG-L002`](validation-rules.md)), so a document moved there would silently
+leave the inventory.
+
+### What travels with the document
+
+Everything the [references](#references) section describes. The document is
+moved *verbatim* — every comment, blank line and quoting choice arrives
+unchanged — and then two rewrites happen around it:
+
+- every reference **to** it is re-spelled wherever the old spelling stopped
+  resolving, keeping the shape each document's author chose;
+- every reference **it makes** is re-spelled for its new folder, because a plain
+  name resolves outwards from the directory the document sits in and a document
+  that changes directory can otherwise silently start naming something else.
+
+Cables, tunnels, adapters, group memberships, PDU outlets, layouts and
+annotations are all covered, because they are all read off the models by
+`netgraph.edit.references` rather than by a list kept here.
+
+### Making a namespace
+
+There is no operation that creates an empty one, and that is not an oversight: a
+folder netgraph reads is one holding a document, so an empty directory is not
+something the inventory can record. **New namespace…** therefore makes the
+folder by putting something in it — a new element created there, or the current
+selection moved there — and the directory comes into existence with the write.
+
+### The size of a container
+
+A container's rectangle is stored in the `groups` section of a
+[`kind: layout`](schema.md#18-layout-diagram-geometry) document, keyed by
+namespace, and drawn back from it. Dragging a corner writes it; nothing else
+does, which is the rule
+[`docs/follow-ups.md` §16](follow-ups.md#16-diagram-geometry-is-a-sidecar-not-a-field-on-each-element)
+states for sizes generally — a stored size that nobody asked for goes stale the
+moment the thing inside it changes.
+
+Two conditions, and the editor offers no handles unless both hold:
+
+- **the diagram is arranged.** Under an automatic layout Graphviz sizes a
+  cluster to fit its members on every run and ignores the stored box, so a
+  resize would write a number nothing reads.
+- **Graphviz boxes that namespace.** It boxes the ones holding elements
+  *directly*; a level in between — `sites`, above three sites that each have
+  their own box — is drawn by the editor round whatever is under it and has no
+  stored box of its own. It is still a drop target and still folds.
 
 ## Annotating a diagram
 

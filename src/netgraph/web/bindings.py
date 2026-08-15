@@ -165,7 +165,14 @@ class Menu:
 #: ``selection`` outranks the rest: right-clicking inside a multi-selection is
 #: asking about the *set*, and offering "Rename it…" there would be offering to
 #: rename whichever of the eleven happened to be under the pointer.
-MENU_TARGETS: Final[tuple[str, ...]] = ("selection", "node", "link", "annotation", "canvas")
+MENU_TARGETS: Final[tuple[str, ...]] = (
+    "selection",
+    "node",
+    "link",
+    "annotation",
+    "container",
+    "canvas",
+)
 
 
 #: The order the reference and the palette group commands in. A reader looking
@@ -522,6 +529,32 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         needs="write",
     ),
     Binding(
+        id="container.create",
+        title="New namespace…",
+        section="Editing the inventory",
+        keys=(),
+        detail=(
+            "Makes a namespace by putting something in it — the selection, moved "
+            "there, or a new element created there. A namespace *is* a folder and a "
+            "folder netgraph would read is one holding a document, so an empty one "
+            "is not a thing the inventory can record."
+        ),
+        needs="write",
+    ),
+    Binding(
+        id="container.move",
+        title="Move into a namespace…",
+        section="Editing the inventory",
+        keys=(),
+        detail=(
+            "Re-homes the selection into another namespace: the typed form of "
+            "dragging it into that container's box. The documents are rewritten "
+            "into the folder and every reference to them is re-spelled. "
+            "'netgraph edit move'."
+        ),
+        needs="write",
+    ),
+    Binding(
         id="element.disconnect",
         title="Disconnect a cable…",
         section="Editing the inventory",
@@ -782,6 +815,20 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         detail="Collapse each namespace into one box.",
     ),
     Binding(
+        id="container.fold",
+        title="Fold or unfold this namespace",
+        section="The view",
+        keys=("f",),
+        detail=(
+            "Draws a namespace box as the single node it stands for, or opens it "
+            "again — the container the pointer picked, or the one holding the focused "
+            "element. The same folding 'netgraph render --collapse' does. A view, not "
+            "an edit: nothing is written, and how much of a diagram somebody wants to "
+            "look at is not a fact about the network."
+        ),
+        where="canvas",
+    ),
+    Binding(
         id="view.annotations",
         title="Toggle annotations",
         section="The view",
@@ -978,6 +1025,7 @@ MENUS: Final[tuple[Menu, ...]] = (
                 MenuItem("element.set", "Set a field on all of them…"),
                 MenuItem("element.unset", "Remove a field from all of them…"),
                 MenuItem("element.move", "Move their documents…"),
+                MenuItem("container.move", "Move into a namespace…"),
             ),
             (
                 MenuItem("select.none", "Clear the selection"),
@@ -1045,11 +1093,28 @@ MENUS: Final[tuple[Menu, ...]] = (
             (MenuItem("element.delete", "Delete it"),),
         ),
     ),
+    # A namespace frame. Its rows are about the *box*: what to put in it, how
+    # much of it to show, and how big it is. Deliberately short — everything
+    # else a reader wants is a row on the thing inside it.
+    Menu(
+        target="container",
+        groups=(
+            (
+                MenuItem("container.fold", "Fold or unfold it"),
+                MenuItem("element.create", "New in it", submenu="kinds"),
+            ),
+            (
+                MenuItem("container.move", "Move the selection into it…"),
+                MenuItem("container.create", "New namespace inside it…"),
+            ),
+        ),
+    ),
     Menu(
         target="canvas",
         groups=(
             (
                 MenuItem("element.create", "New", submenu="kinds"),
+                MenuItem("container.create", "New namespace…"),
                 MenuItem("annotation.create", "New note"),
                 # Here and nowhere else, because *this* is where a paste gets
                 # its anchor: the fragment lands where the pointer was rather
@@ -1138,6 +1203,7 @@ _TARGETS: Final[dict[str, str]] = {
     "node": "an element",
     "link": "a link",
     "annotation": "a note, an area or a legend",
+    "container": "a namespace box",
     "canvas": "the canvas",
 }
 

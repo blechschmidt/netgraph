@@ -151,6 +151,10 @@
   /** The notes, areas and legends on screen, or null. What makes one of them
    *  draggable, and what says which document is behind it: see notes.js. */
   var annotations = null;
+  /** The namespace boxes on screen: one per level, with what is inside each and
+   *  whether it is folded. What makes a drop into one a `netgraph edit move`:
+   *  see containers.js. Empty unless the drawing is grouped by namespace. */
+  var containers = [];
   var pending = null;
   var inFlight = false;
   var queued = false;
@@ -197,6 +201,7 @@
       show_vlans: el.showVlans.checked,
       annotations: el.annotations.checked,
       group_by_namespace: el.group.checked,
+      collapse: netgraphContainers.collapsed(),
       strict: el.strict.checked
     };
   }
@@ -213,6 +218,11 @@
     ];
     var vlans = parseVlans(el.vlans.value);
     if (vlans.length) { parts.push("vlans=" + vlans.join(",")); }
+    // Which containers the reader has folded is part of *which drawing this is*
+    // -- a folded namespace is one node instead of twelve -- so it belongs in
+    // the request, and in the cache key the request doubles as.
+    var folded = netgraphContainers.collapsed();
+    if (folded.length) { parts.push("collapse=" + encodeURIComponent(folded.join(","))); }
     return parts.join("&");
   }
 
@@ -330,6 +340,7 @@
     details = reuse ? held.details : (result.details || {});
     geometry = reuse ? held.geometry : (result.geometry || null);
     annotations = reuse ? held.annotations : (result.annotations || null);
+    containers = reuse ? held.containers : (result.containers || []);
     // A diff is drawn by the same renderer into the same canvas; what marks the
     // page as showing one is the legend, which is furniture without it.
     el.canvas.classList.toggle("diffing", !!result.diff);
@@ -352,7 +363,8 @@
       }
       el.placeholder.hidden = true;
       if (key) {
-        remember(key, result.graphHash || held.hash, svg, details, geometry, annotations);
+        remember(key, result.graphHash || held.hash, svg, details, geometry, annotations,
+          containers);
       }
       currentView = key;
       paintRemote();
@@ -379,6 +391,11 @@
     // before, so that a note dropped on top of a cable is the thing a click
     // lands on -- the annotation is the newer object and the one in front.
     netgraphNotes.annotate(el.viewport.firstElementChild, geometry, annotations, details);
+    // And the namespace boxes underneath all of it. Last of the three overlays
+    // because it is the one that goes *behind* the drawing -- a container is the
+    // paper its members sit on -- and because its frames are measured off the
+    // boxes cull.js indexed above.
+    netgraphContainers.annotate(el.viewport.firstElementChild, geometry, containers, details);
     // And the resolved appearance of everything just drawn (§22), which is the
     // one thing the inspector cannot read off the SVG: by the time a colour is
     // an attribute, the element, the theme, the icon set and the palette have
@@ -407,14 +424,15 @@
   }
 
   /** Keep this view's drawing, dropping the least recently drawn if need be. */
-  function remember(key, hash, svg, records, arrangement, commentary) {
+  function remember(key, hash, svg, records, arrangement, commentary, boxes) {
     if (!hash) { return; }
     views[key] = {
       hash: hash,
       svg: svg,
       details: records,
       geometry: arrangement,
-      annotations: commentary
+      annotations: commentary,
+      containers: boxes
     };
     viewOrder = viewOrder.filter(function (other) { return other !== key; });
     viewOrder.unshift(key);
@@ -1075,6 +1093,14 @@
       // Between the two: a note is a shape somebody is moving, so it beats the
       // rubber band and the pan, and loses to a bend handle that is on top of it.
       if (event.button === 0 && netgraphNotes.grab(event)) { event.preventDefault(); return; }
+      // Then the containers: a shape being dragged towards a namespace box, a
+      // fold triangle, or a frame's own border. Claims nothing at all when the
+      // drawing is not grouped by namespace, which is what leaves a plain drag
+      // panning the canvas exactly as it did before containers existed.
+      if (event.button === 0 && netgraphContainers.grab(event)) {
+        event.preventDefault();
+        return;
+      }
       if (event.button === 0 && !event.altKey && netgraphSelect.grab(event)) {
         event.preventDefault();
         return;
@@ -1086,6 +1112,7 @@
     window.addEventListener("mousemove", function (event) {
       if (netgraphLinks.dragging()) { netgraphLinks.move(event); return; }
       if (netgraphNotes.dragging()) { netgraphNotes.move(event); return; }
+      if (netgraphContainers.dragging()) { netgraphContainers.move(event); return; }
       if (netgraphSelect.dragging()) { netgraphSelect.move(event); return; }
       if (!origin) { return; }
       view.x = event.clientX - origin.x;
@@ -1095,6 +1122,7 @@
     window.addEventListener("mouseup", function () {
       netgraphLinks.release();
       netgraphNotes.release();
+      netgraphContainers.release();
       if (netgraphSelect.release()) { banded = true; }
       origin = null;
       el.canvas.classList.remove("panning");
@@ -1256,6 +1284,19 @@
     K.define("view.annotations", {
       run: function () { toggle(el.annotations, "annotations"); }
     });
+    /* Folding one container rather than every namespace, which is what
+     * `view.group` does. A view command and not an edit -- see containers.js --
+     * so it lives here beside the other three and not in session.js. */
+    K.define("container.fold", {
+      run: function (context) {
+        var wanted = context && context.namespace;
+        if (wanted) { netgraphContainers.select(wanted); }
+        // With nothing picked, the focused element names the namespace: see
+        // netgraphContainers.toggle for why the keyboard needs that path.
+        var focused = netgraphA11y.focused();
+        return netgraphContainers.toggle(focused ? focused.record.id : "");
+      }
+    });
     K.define("view.strict", { run: function () { toggle(el.strict, "strict"); } });
     K.define("view.failure", {
       run: function () { return showFailure(); },
@@ -1410,6 +1451,28 @@
     refuse: function (why) { toast(why, "error"); },
     say: function (what) { toast(what, "ok"); },
     write: function (operations, said) { return netgraphSession.ops(operations, said); }
+  });
+
+  /* What containers.js is given: the same three questions, plus the two things
+   * only this file can answer -- what shape the pointer is over, and how to ask
+   * for the drawing again once a container has been folded. The drop goes to its
+   * own route rather than through `ops`, because which *file* each document
+   * lands in is the placement convention's answer and the convention is the
+   * server's; see netgraph/edit/containers.py. */
+  netgraphContainers.attach({
+    writable: function () { return mode === "session" && netgraphSession.isWritable(); },
+    view: function () { return el.layer.value; },
+    recordAt: function (shape) {
+      var hit = shape && recordAt(shape);
+      return hit ? hit.record : null;
+    },
+    refuse: function (why) { toast(why, "error"); },
+    say: function (what) { toast(what, "ok"); },
+    rerender: function () { render(); },
+    write: function (operations, said) { return netgraphSession.ops(operations, said); },
+    reparent: function (addresses, namespace, said) {
+      return netgraphSession.reparent(addresses, namespace, said);
+    }
   });
 
   /* What menu.js is given: what a right-click landed on, where a focused shape

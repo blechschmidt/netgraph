@@ -1345,6 +1345,34 @@ var netgraphSession = (function () {
       .then(paintHistory);
   }
 
+  /** Re-home a selection into a namespace: the drop half of a container drag.
+   *
+   * A route of its own for the same reason `arrange` has one: the decision this
+   * makes is "which file does each of these documents land in", and that is the
+   * placement convention's answer, which lives on the server beside the tree it
+   * is about. The browser knows which namespace the pointer was over and nothing
+   * else -- see netgraph/edit/containers.py and containers.js.
+   *
+   * Answers with a promise so containers.js can put its preview back when the
+   * drop is refused; a refusal has already been toasted by then.
+   */
+  function reparent(addresses, namespace, said) {
+    if (!state.writable) {
+      host.toast("this session is read-only", "error");
+      return Promise.reject(new Error("read-only"));
+    }
+    return request("/api/reparent", { addresses: addresses, namespace: namespace })
+      .then(function (result) {
+        if (!Object.keys(result.files || {}).length) {
+          host.toast("nothing moved: they are already there", "ok");
+          return result;
+        }
+        applied(result, said, true);
+        paintHistory();
+        return result;
+      });
+  }
+
   /** How one arrangement reads in a sentence. */
   function said(command) {
     if (command === "snap") { return "snapped to the grid"; }
@@ -1532,6 +1560,8 @@ var netgraphSession = (function () {
             {
               name: "namespace",
               label: "namespace",
+              value: (context && context.namespace) || "",
+              list: netgraphContainers.namespaces(),
               hint: "optional; the folder the document goes in"
             },
             {
@@ -1731,6 +1761,106 @@ var netgraphSession = (function () {
             ops(on.map(function (address) {
               return { op: "move", address: address, file: values.file };
             }), "moved " + subject(on) + " to " + values.file).catch(function () {});
+          }
+        });
+      }
+    });
+
+    /* Making a namespace, and moving things into one. Two commands rather than
+     * one because they are two questions -- "where should this live" and "what
+     * lives here" -- but one route: both end in /api/reparent, which is the
+     * typed spelling of dragging something into a container's box. */
+    K.define("container.move", {
+      run: function (context) {
+        var on = chosen();
+        K.prompt({
+          title: on.length > 1 ? "Move " + many(on.length, "element") + " into a namespace"
+            : "Move into a namespace",
+          detail: "The same thing dragging it into that container's box does, and the "
+            + "same thing 'netgraph edit move' does: the documents are rewritten into "
+            + "the folder, and every reference to them is re-spelled. Leave it blank "
+            + "for the root namespace.",
+          fields: [
+            element(on.length > 1 ? on : null),
+            {
+              name: "namespace",
+              label: "namespace",
+              value: (context && context.namespace) || "",
+              list: netgraphContainers.namespaces(),
+              hint: "the folder they go in; blank is the inventory root"
+            }
+          ],
+          confirm: "Move",
+          onSubmit: function (values) {
+            var wanted = on.length > 1 ? on : (values.address ? [values.address] : []);
+            if (!wanted.length) { return "name what to move"; }
+            reparent(wanted, values.namespace || "",
+              "moved " + subject(wanted) + " into "
+                + (values.namespace || "the root namespace")).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.define("container.create", {
+      run: function (context) {
+        var on = chosen();
+        var inside = (context && context.namespace) || "";
+        K.prompt({
+          title: "New namespace",
+          detail: "A namespace is a folder, and a folder netgraph reads is one with a "
+            + "document in it — so an empty namespace is not something the inventory "
+            + "can record. This makes the folder by putting something in it: the "
+            + "selection, moved there, or a new element created there.",
+          fields: [
+            {
+              name: "namespace",
+              label: "namespace",
+              value: inside ? inside + "/" : "",
+              list: netgraphContainers.namespaces(),
+              hint: "a path, e.g. sites/north/racks/r1"
+            },
+            {
+              name: "name",
+              label: "first element",
+              value: on.length ? "" : "site",
+              hint: on.length
+                ? "leave blank to move the " + many(on.length, "selected element")
+                  + " in instead"
+                : "the document that makes the folder exist"
+            },
+            {
+              name: "kind",
+              label: "of kind",
+              type: "select",
+              value: "switch",
+              options: K.kinds().map(function (kind) { return { value: kind, label: kind }; })
+            }
+          ],
+          confirm: "Create",
+          onSubmit: function (values) {
+            var namespace = String(values.namespace || "").replace(/^\/+|\/+$/g, "");
+            if (!namespace) { return "a namespace is a path; name one"; }
+            if (!values.name) {
+              if (!on.length) {
+                return "a namespace needs something in it: name an element, or select "
+                  + "what to move there first";
+              }
+              reparent(on, namespace,
+                "moved " + subject(on) + " into the new namespace " + namespace)
+                .catch(function () {});
+              return undefined;
+            }
+            var address = addressOf(namespace, values.name);
+            ops([{
+              op: "create",
+              kind: values.kind,
+              name: values.name,
+              namespace: namespace,
+              spec: {}
+            }], "created namespace " + namespace + " with " + values.kind + " " + address)
+              .then(function () { focusLater(address, 12); }, function () {});
+            return undefined;
           }
         });
       }
@@ -1944,6 +2074,9 @@ var netgraphSession = (function () {
     /* Align, distribute and snap. Its own route because the arithmetic needs
      * the layout documents, which the page does not have; see arrange above. */
     arrange: arrange,
+    /* Dropping a selection into a namespace box. Its own route for the reason
+     * arrange has one; see reparent above. */
+    reparent: reparent,
     markDirty: markDirty,
     /* The history, as a promise. tour.js undoes its own three batches with it. */
     step: step,

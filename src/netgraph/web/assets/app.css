@@ -560,6 +560,85 @@ main {
 
 .canvas.panning svg .ng-handle { cursor: grabbing; }
 
+/* The namespace containers of §2: the overlay containers.js appends *behind*
+ * the drawing, so that a frame is the paper its members sit on rather than a
+ * rectangle you cannot click a switch through.
+ *
+ * The frame itself takes events on its outline only, the same trick the
+ * annotation band and the link band use, so the middle of a site stays
+ * clickable for the racks inside it. The header does take them across its whole
+ * width, because that is what it is for. */
+.viewport svg .ng-container {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+  pointer-events: stroke;
+  cursor: default;
+  rx: 4;
+}
+
+.viewport svg .ng-container-picked {
+  stroke: var(--selected);
+  stroke-width: 1.6;
+  stroke-dasharray: 10 4;
+}
+
+/* A shallower namespace is drawn fainter, so three nested frames read as three
+ * levels rather than as one thick border. */
+.viewport svg .ng-container[data-depth="1"] { opacity: 0.45; }
+.viewport svg .ng-container[data-depth="2"] { opacity: 0.7; }
+
+.viewport svg .ng-container-header {
+  fill: color-mix(in srgb, var(--line) 25%, transparent);
+  stroke: none;
+  pointer-events: all;
+  cursor: move;
+}
+
+.viewport svg .ng-container-label {
+  fill: var(--muted);
+  pointer-events: all;
+  cursor: move;
+  user-select: none;
+}
+
+/* The fold triangle. Bigger hit area than it looks, because it is a glyph a
+ * few points across and a target nobody can hit is a command nobody has. */
+.viewport svg .ng-container-toggle {
+  fill: var(--fg);
+  cursor: pointer;
+  pointer-events: all;
+  user-select: none;
+  paint-order: stroke;
+  stroke: transparent;
+  stroke-width: 10;
+}
+
+.viewport svg .ng-container-toggle:hover { fill: var(--selected); }
+
+/* The container a drag is currently over. Filled rather than outlined: while
+ * something is in the air, "it would land here" is the only question. */
+.viewport svg .ng-container-drop {
+  fill: color-mix(in srgb, var(--selected) 12%, transparent);
+  stroke: var(--selected);
+  stroke-width: 2;
+  pointer-events: none;
+  rx: 4;
+}
+
+/* A corner handle on a container. Drawn like an annotation's -- it means the
+ * same thing -- under its own class for the same reason that one has one. */
+.viewport svg .ng-container-handle {
+  fill: var(--bg);
+  stroke: var(--selected);
+  stroke-width: 1.6;
+  cursor: nwse-resize;
+}
+
+.viewport svg .ng-container-handle:hover { fill: var(--selected); }
+.canvas.panning svg .ng-container-handle { cursor: grabbing; }
+
 /* The commentary of §21: the overlay notes.js appends inside the drawing.
  *
  * An area in an arranged drawing is a rectangle painted into the graph's

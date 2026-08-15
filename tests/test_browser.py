@@ -329,9 +329,15 @@ class Editor:
         assert isinstance(payload, dict)
         return payload
 
-    def graph(self) -> dict[str, Any]:
-        """The same payload the page fetched, for comparing screen against source."""
-        return self.api("/api/graph?" + PAGE_QUERY)
+    def graph(self, *, grouped: bool = False) -> dict[str, Any]:
+        """The same payload the page fetched, for comparing screen against source.
+
+        ``grouped`` asks the way a page with the *group* box ticked asks, which
+        is the only way the namespace containers come back at all — see
+        ``netgraph.web.preview._containers``.
+        """
+        query = PAGE_QUERY.replace("group_by_namespace=0", "group_by_namespace=1")
+        return self.api("/api/graph?" + (query if grouped else PAGE_QUERY))
 
     def element_id(self, address: str) -> str:
         """The SVG id of the shape drawn for ``address``.
@@ -1788,6 +1794,210 @@ def test_clicking_off_the_menu_closes_it(open_editor: OpenEditor) -> None:
     editor.page.mouse.click(40, 40)
 
     expect(menu(editor)).to_have_count(0)
+
+
+# --------------------------------------------------------------------------- #
+# Containers
+# --------------------------------------------------------------------------- #
+
+#: A rack, made real the only way a namespace can be: by holding a document.
+#: A switch rather than a patch panel, because the physical layer splices panels
+#: out — and a namespace whose only member is not drawn is not a box on screen.
+A_RACK: Final = """\
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-rack
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+"""
+
+
+#: A second ``pc-desk``, already in the rack. Legal on its own — two racks may
+#: each hold a ``pc-01`` — and exactly what makes dropping the first one in
+#: illegal, which is the refusal the drop has to make before it writes.
+TWIN_DESK: Final = """\
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-desk
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+"""
+
+
+def grouped(open_editor: OpenEditor, **kwargs: Any) -> Editor:
+    """A writable session drawing namespace containers.
+
+    The container layer is off unless the drawing groups by namespace, which is
+    the contract ``netgraph.web.preview._containers`` states and the reason this
+    helper exists: without the checkbox there are no frames, no drop targets and
+    no gesture, and a plain drag pans the canvas as it always did.
+    """
+    extra = {"racks/r1/sw-rack.yaml": A_RACK}
+    extra.update(kwargs.pop("extra", {}))
+    editor = open_editor(writable=True, extra=extra, **kwargs)
+    editor.page.check("#group")
+    expect(editor.page.locator(".ng-container").first).to_be_attached(timeout=TIMEOUT_MS)
+    return editor
+
+
+def container(editor: Editor, namespace: str) -> Locator:
+    """The frame drawn around one namespace."""
+    return editor.page.locator(f'.ng-container[data-container="{namespace}"]').first
+
+
+def _rect_size(locator: Locator) -> tuple[float, float]:
+    """One SVG rectangle's own width and height, in the drawing's units."""
+    return (
+        float(locator.get_attribute("width") or 0),
+        float(locator.get_attribute("height") or 0),
+    )
+
+
+def container_header(editor: Editor, namespace: str) -> Locator:
+    """Its caption band, which is what a container is picked up by.
+
+    The frame itself takes events on its *outline* only, so that the middle of a
+    site stays clickable for the racks inside it — pressing its centre goes
+    through to whatever is under it, by design.
+    """
+    return editor.page.locator(f'.ng-container-header[data-container="{namespace}"]').first
+
+
+def test_each_namespace_is_drawn_as_a_container_with_a_header(
+    open_editor: OpenEditor,
+) -> None:
+    """One frame per level, each saying what it is and how much is in it."""
+    editor = grouped(open_editor)
+    published = {entry["namespace"] for entry in editor.graph(grouped=True)["containers"]}
+    assert {"hosts", "switches", "racks", "racks/r1"} <= published
+
+    expect(container(editor, "racks/r1")).to_be_attached()
+    # The header states the name and the count, which is the one fact an open
+    # container cannot say for itself.
+    caption = editor.page.locator('.ng-container-label[data-container="hosts"]')
+    expect(caption).to_have_text(re.compile(r"^hosts\s+·\s+\d+ elements$"))
+    expect(editor.page.locator('[data-toggle="racks/r1"]')).to_be_attached()
+
+
+def test_dragging_a_device_into_a_rack_moves_the_file_on_disk(
+    open_editor: OpenEditor,
+) -> None:
+    """The gesture the whole feature exists for, asserted where it lands: on disk.
+
+    Nothing about the picture is checked here. What is checked is that the YAML
+    document left one directory and arrived in another, that its name did not
+    change on the way, and that the tree still resolves afterwards — which is
+    the 1:1 mapping between the box and the folder, stated as a file system.
+    """
+    editor = grouped(open_editor)
+    assert editor.session is not None
+    before = editor.session.revision
+    assert (editor.root / "hosts" / "pc-desk.yaml").exists()
+
+    editor.drag(editor.shape("hosts/pc-desk"), container(editor, "racks/r1"))
+
+    assert editor.settles(
+        lambda: editor.session is not None and editor.session.revision != before,
+        timeout=TIMEOUT_MS / 1000,
+    ), "dropping a device into a container has to reach a file"
+
+    assert not (editor.root / "hosts" / "pc-desk.yaml").exists()
+    landed = sorted((editor.root / "racks" / "r1").glob("*.yaml"))
+    text = "\n".join(path.read_text(encoding="utf-8") for path in landed)
+    assert "name: pc-desk" in text
+    assert "racks/r1/pc-desk" in {
+        record["id"] for record in editor.graph(grouped=True)["details"].values()
+    }
+
+
+def test_a_drop_that_would_collide_is_refused_with_the_reason(
+    open_editor: OpenEditor,
+) -> None:
+    """Refused before writing, and the page says which two names clash."""
+    editor = grouped(open_editor, extra={"racks/r1/twin.yaml": TWIN_DESK})
+    assert editor.session is not None
+    before = editor.session.revision
+    editor.console.allow("409")
+    editor.console.allow("400")
+
+    editor.drag(editor.shape("hosts/pc-desk"), container(editor, "racks/r1"))
+
+    expect(editor.page.locator("#toast")).to_contain_text("pc-desk", timeout=TIMEOUT_MS)
+    assert editor.session.revision == before
+    assert (editor.root / "hosts" / "pc-desk.yaml").exists()
+
+
+def test_folding_a_container_redraws_it_as_one_node_and_writes_nothing(
+    open_editor: OpenEditor,
+) -> None:
+    """A view, not an edit: the picture changes and the tree does not."""
+    editor = grouped(open_editor)
+    assert editor.session is not None
+    before = editor.session.revision
+    nodes = editor.page.locator("#viewport g.node").count()
+
+    # The raw mouse rather than `locator.click()`: a fold triangle is an SVG
+    # glyph a few points across whose "visibility" Playwright is right to be
+    # suspicious of in general and wrong about here.
+    press_on(editor, editor.page.locator('[data-toggle="hosts"]').first)
+
+    assert editor.settles(
+        lambda: editor.page.locator("#viewport g.node").count() < nodes,
+        timeout=TIMEOUT_MS / 1000,
+    ), "folding a namespace has to draw it as one node"
+    assert editor.session.revision == before
+    assert editor.session.changes()["entries"] == []
+
+
+def test_resizing_a_container_writes_its_box_to_disk(open_editor: OpenEditor) -> None:
+    """The other half of a container being a real object: it has a size.
+
+    Only on an *arranged* diagram, and only for a namespace Graphviz boxes.
+    Anywhere else the engine sizes the cluster to its members on every run and a
+    written rectangle would be a number nothing reads — so the handles are not
+    offered, which is what this test's setup is establishing before it drags.
+    """
+    editor = open_editor(writable=True, extra={"layout.yaml": ARRANGED_LAYOUT})
+    editor.page.select_option("#layer", ARRANGED_LAYER)
+    editor.page.check("#group")
+    expect(editor.page.locator(".ng-container").first).to_be_attached(timeout=TIMEOUT_MS)
+    assert editor.session is not None
+    before = editor.session.revision
+
+    # `switches` rather than the widest container on the page: a corner handle
+    # of a frame that reaches the edge of the canvas is a handle over the YAML
+    # pane, and a test that presses one is testing the layout of the window.
+    drawn = _rect_size(container(editor, "switches"))
+    press_on(editor, container_header(editor, "switches"))
+    handle = editor.page.locator('.ng-container-handle[data-which="se"]').first
+    expect(handle).to_be_attached(timeout=TIMEOUT_MS)
+    start = _centre(handle)
+    mouse = editor.page.mouse
+    mouse.move(*start)
+    mouse.down()
+    mouse.move(start[0] + 40, start[1] + 30)
+    mouse.move(start[0] + 90, start[1] + 70)
+    mouse.up()
+
+    assert editor.settles(
+        lambda: editor.session is not None and editor.session.revision != before,
+        timeout=TIMEOUT_MS / 1000,
+    ), "resizing a container has to reach a kind: layout document"
+
+    # Read back as the *arrangement*, not as a string in a file: what a resize
+    # has to produce is a box the next render draws from.
+    arrangement = editor.api(f"/api/graph?view={ARRANGED_LAYER}&group_by_namespace=1")["geometry"]
+    stored = (arrangement or {}).get("groups") or {}
+    assert "switches" in stored, "the box has to come back as the arrangement"
+    assert stored["switches"]["width"] > drawn[0]
+    assert stored["switches"]["height"] > drawn[1]
+    assert "groups:" in (editor.root / "layout.yaml").read_text(encoding="utf-8")
 
 
 # --------------------------------------------------------------------------- #

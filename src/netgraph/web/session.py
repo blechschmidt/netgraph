@@ -89,6 +89,7 @@ from netgraph.edit import (
     CopyPlan,
     CreateElement,
     DeleteElement,
+    EditableTree,
     EditError,
     EditSession,
     Operation,
@@ -99,6 +100,7 @@ from netgraph.edit import (
     command_list,
     copy_plan,
     describe_arrangement,
+    move_plan,
     operation_from_dict,
     paste_plan,
 )
@@ -995,6 +997,51 @@ class EditingSession:
                     force=False,
                     client=client,
                 )
+            )
+
+    def reparent(
+        self,
+        addresses: Sequence[str],
+        *,
+        namespace: str,
+        revision: int | None = None,
+        force: bool = False,
+        client: str | None = None,
+    ) -> Change:
+        """Re-home a selection into ``namespace``: the drop half of a drag (§2).
+
+        What the canvas calls "dropping a switch into a rack" and what
+        ``netgraph edit move`` calls a move are the same thing, and this is the
+        one place that says so. :func:`~netgraph.edit.containers.move_plan`
+        turns the drop into ``move`` operations and refuses an illegal one
+        *before* any of them is applied, so the answer to a collision is the
+        sentence naming both elements rather than a rolled-back batch and a
+        validator's complaint.
+
+        ``namespace`` is ``""`` for the root, which is what dropping onto empty
+        canvas means. A drop that changes nothing — everything selected was
+        already in that namespace — writes nothing and does not move the
+        revision, for the reason :meth:`arrange` gives.
+
+        Raises:
+            ReadOnly: This session does not write.
+            Conflict: ``revision`` is not the current one.
+            EditError: The drop is not legal; nothing is written.
+        """
+        self._require_writable()
+        with self._lock:
+            self._check_revision(revision, "moving")
+            inventory = self.inventory()
+            plan = move_plan(
+                inventory,
+                list(addresses),
+                namespace=namespace,
+                files=EditableTree(root=self.root).facts(inventory),
+            )
+            if not plan.operations:
+                return self._unchanged()
+            return self._committed(
+                self._commit(plan.operations, label=plan.describe(), force=force, client=client)
             )
 
     def _unchanged(self) -> Change:

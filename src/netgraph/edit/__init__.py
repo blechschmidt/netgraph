@@ -68,6 +68,13 @@ from netgraph.edit.commands import (
     command_list,
     commands_text,
 )
+from netgraph.edit.containers import (
+    MAX_MOVES,
+    MovePlan,
+    Rehome,
+    check_namespace,
+    move_plan,
+)
 from netgraph.edit.errors import (
     AddressError,
     CascadeRequired,
@@ -117,6 +124,7 @@ __all__ = [
     "DEFAULT_SUFFIX",
     "DISTRIBUTIONS",
     "INVENTORY_PLACEHOLDER",
+    "MAX_MOVES",
     "OPERATIONS",
     "UNIQUE_FIELDS",
     "AddInterface",
@@ -141,6 +149,7 @@ __all__ = [
     "FileFacts",
     "Mark",
     "MoveElement",
+    "MovePlan",
     "NameIndex",
     "Operation",
     "OperationError",
@@ -148,6 +157,7 @@ __all__ = [
     "Problem",
     "Reference",
     "ReferenceRole",
+    "Rehome",
     "RemoveFile",
     "RemoveInterface",
     "RenameElement",
@@ -163,6 +173,7 @@ __all__ = [
     "YamlFile",
     "apply_operation",
     "arrange_operations",
+    "check_namespace",
     "choose_file",
     "clipboard_payload",
     "command_for",
@@ -173,6 +184,7 @@ __all__ = [
     "describe_arrangement",
     "digest_of",
     "format_field_path",
+    "move_plan",
     "operation_from_dict",
     "operations_from_json",
     "operations_to_json",

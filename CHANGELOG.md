@@ -18,6 +18,34 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **Namespaces are containers you can drag things into.** The editor draws a frame per
+  namespace level whenever the diagram is grouped by namespace, captioned with the namespace
+  and how many elements are under it, with a triangle that folds it into the single node
+  `netgraph render --collapse` would draw. Dropping an element — or a multi-selection, or a
+  whole container — inside a frame runs `netgraph edit move`: the document is rewritten into
+  that directory, and every cable, tunnel, group, layout and annotation that referred to it
+  is re-spelled. Dropping on empty canvas moves it to the root.
+
+  A drop is refused **before** anything is written, naming both sides: a name already taken
+  in the target namespace, two dragged documents that would collide with each other, or a
+  folder the loader would skip. The new `POST /api/reparent` and
+  `netgraph.edit.containers.move_plan` are the one place that decides, so the browser's drop
+  and the command line's move cannot diverge — including which *file* the document lands in,
+  which stays the placement convention's answer.
+
+  Containers can also be resized, and the rectangle is stored in the `groups` section of a
+  `kind: layout` document keyed by namespace — the first thing that writes one from the
+  canvas. Handles are only offered on an arranged diagram and only for a namespace Graphviz
+  boxes, because anywhere else the engine sizes the cluster on every run and a written box
+  would be a number nothing reads.
+
+  **New namespace…** in the canvas and container menus makes a folder by putting the first
+  document in it; there is deliberately no operation that makes an empty one, because a
+  folder netgraph reads is one holding a document. `f` folds the container under the pointer
+  or the one holding the focused element. See
+  [`docs/editing.md`](docs/editing.md#containers-dragging-a-document-into-a-namespace) and
+  [`docs/inventory-layout.md`](docs/inventory-layout.md#rearranging-the-tree-from-the-diagram).
+
 - **A clipboard, in the editor and on the command line.** `Ctrl-C`, `Ctrl-X`, `Ctrl-V` and
   `Ctrl-D` over the existing multi-selection, and `netgraph edit copy` /
   `netgraph edit duplicate` for the same thing without a browser. On this canvas they do not

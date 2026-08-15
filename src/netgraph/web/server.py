@@ -137,6 +137,7 @@ __all__ = [
     "PRESENCE_PATH",
     "REDO_PATH",
     "RENDER_PATH",
+    "REPARENT_PATH",
     "REVERT_PATH",
     "SOURCE_PATH",
     "STATE_PATH",
@@ -172,6 +173,12 @@ COPY_PATH: Final = "/api/copy"
 CUT_PATH: Final = "/api/cut"
 PASTE_PATH: Final = "/api/paste"
 DUPLICATE_PATH: Final = "/api/duplicate"
+#: Re-home a selection into a namespace: what dropping it into a container box
+#: on the canvas means (§2). A route of its own rather than a batch of ``move``
+#: operations built in the browser, because *which file* each document lands in
+#: is the placement convention's answer and the convention lives here — see
+#: :mod:`netgraph.edit.containers`.
+REPARENT_PATH: Final = "/api/reparent"
 #: The changes drawer: the session's own log, and the handover command list.
 CHANGES_PATH: Final = "/api/changes"
 #: The same tree, drawn as a diff against a baseline (``?against=session|git``).
@@ -209,6 +216,7 @@ ASSETS: Final[dict[str, tuple[str, str]]] = {
     "/cull.js": ("cull.js", "text/javascript; charset=utf-8"),
     "/links.js": ("links.js", "text/javascript; charset=utf-8"),
     "/notes.js": ("notes.js", "text/javascript; charset=utf-8"),
+    "/containers.js": ("containers.js", "text/javascript; charset=utf-8"),
     "/menu.js": ("menu.js", "text/javascript; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/select.js": ("select.js", "text/javascript; charset=utf-8"),
@@ -605,6 +613,7 @@ class _Handler(LocalHandler):
             FIX_PATH,
             PASTE_PATH,
             DUPLICATE_PATH,
+            REPARENT_PATH,
         ):
             self.send_text(HTTPStatus.NOT_FOUND, f"nothing to post to at {path}")
             return
@@ -619,6 +628,15 @@ class _Handler(LocalHandler):
                     namespace=_optional(payload, "namespace"),
                     view=_optional(payload, "view"),
                     at=_point(payload.get("at")),
+                    revision=_revision(payload),
+                    force=bool(payload.get("force", False)),
+                    client=_client(payload),
+                )
+            elif path == REPARENT_PATH:
+                payload = self._read_json()
+                change = session.reparent(
+                    _addresses(payload),
+                    namespace=_namespace(payload),
                     revision=_revision(payload),
                     force=bool(payload.get("force", False)),
                     client=_client(payload),
@@ -1016,6 +1034,24 @@ def _optional(payload: dict[str, Any], key: str) -> str | None:
         return None
     if not isinstance(value, str) or not value:
         raise RequestError(f"{key!r} must be a non-empty string when it is given")
+    return value
+
+
+def _namespace(payload: dict[str, Any]) -> str:
+    """Where a drop landed. Absent, null and ``""`` all mean the root.
+
+    Unlike every other string field, the empty one is *meaningful* here rather
+    than a client bug: the root namespace is spelled ``""`` throughout netgraph,
+    and dropping something onto empty canvas is how it is asked for.
+
+    Raises:
+        RequestError: It is present and is not a string.
+    """
+    value = payload.get("namespace")
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise RequestError("'namespace' must be a string; the root namespace is ''")
     return value
 
 

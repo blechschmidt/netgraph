@@ -23,6 +23,7 @@ this page paraphrases, and it is the one to read when two statements disagree.
 - [A layout for an estate](#a-layout-for-an-estate)
 - [Declaring a 48-port switch without typing it 48 times](#declaring-a-48-port-switch-without-typing-it-48-times)
 - [Annotations](#annotations)
+- [Rearranging the tree, from the diagram](#rearranging-the-tree-from-the-diagram)
 - [Keeping the tree tidy](#keeping-the-tree-tidy)
 
 ---
@@ -380,6 +381,46 @@ three ways to silence a rule in
 [`docs/validation-rules.md`](validation-rules.md#3-per-element-with-an-annotation)
 — which is also where you will find the argument for annotating the element the
 exception genuinely belongs to rather than the nearest one.
+
+## Rearranging the tree, from the diagram
+
+Because a folder *is* a namespace, the tree has a picture: every namespace is a
+box, and every box is a directory. [`netgraph web`](commands/web.md) draws them
+— one frame per level, captioned with the namespace and how many elements are
+under it — whenever the diagram is grouped by namespace (the *group* box, or
+`Alt-G`).
+
+The frames are editable, and every gesture on one lands in the file system:
+
+| On the diagram | On disk |
+|---|---|
+| Drag an element into a frame | its document is rewritten into that directory |
+| Drag a selection into one | all of them, as one change and one `Ctrl-Z` |
+| Drag a frame into another frame | the whole subtree, keeping its own shape |
+| Drop on empty canvas | the document moves to the inventory root |
+| **New namespace…** | the directory, made by putting something in it |
+
+So `sites/north/access/sw-north-acc-01` dropped into the `sites/north/racks/r1`
+box becomes `sites/north/racks/r1/sw-north-acc-01` — a new folder if there was
+none, the document moved verbatim into it, and every cable, tunnel, group,
+layout and annotation that referred to it re-spelled so it still resolves. It is
+exactly [`netgraph edit move`](commands/edit.md), and it is refused — before
+anything is written — when the target namespace already holds that name, because
+`NG-N002` says two elements in one namespace cannot share one.
+
+There is deliberately no way to make an *empty* namespace. A folder netgraph
+reads is one holding a document ([which files](#which-files-the-loader-reads)),
+so an empty directory declares nothing and would not survive a `git clone`
+anyway. **New namespace…** makes the folder by putting the first document in it.
+
+The frames themselves can be resized, and the rectangle is stored in the
+`groups` section of a [`kind: layout`](schema.md#18-layout-diagram-geometry)
+document keyed by namespace — the one place a folder acquires a coordinate.
+Folding a frame with the triangle on its header draws the whole namespace as a
+single node, which is `netgraph render --collapse` and writes nothing.
+
+[`docs/editing.md`](editing.md#containers-dragging-a-document-into-a-namespace)
+has the operations behind all of this, and what each one is refused for.
 
 ## Keeping the tree tidy
 
