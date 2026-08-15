@@ -317,7 +317,12 @@ def environment_for(action: dict[str, Any], step_id: str, values: dict[str, str]
     environment = {}
     for variable, expression in step_of(action, step_id)["env"].items():
         matched = _INPUT_EXPRESSION.match(expression)
-        assert matched is not None, f"{variable} is not a plain input reference: {expression}"
+        if matched is None:
+            # A constant, such as MSYS=noglob. It has to be set here too, or the
+            # step is run in an environment GitHub would not have given it.
+            assert "${{" not in expression, f"{variable} is neither an input nor a constant"
+            environment[variable] = expression
+            continue
         name = matched.group(1)
         environment[variable] = values.get(name, defaults[name])
     return environment
@@ -542,13 +547,46 @@ def test_the_render_step_defaults_the_output_to_the_runner_temp(
 
 
 @requires_bash
-def test_the_render_step_passes_extra_arguments_through_without_expanding_them(
+def test_the_render_step_passes_extra_arguments_through(
     render_action: dict[str, Any], tmp_path: Path
 ) -> None:
-    """``args`` is word-split, and globbing is off while that happens.
+    """``args`` is word-split and handed to the CLI as written."""
+    output = tmp_path / "wide.dot"
+    result = run_render_step(
+        render_action,
+        {
+            "inventory": str(HOME_LAB),
+            "format": "dot",
+            "output": str(output),
+            "args": "--rankdir lr --no-show-ips",
+        },
+        tmp_path,
+    )
+    assert result.returncode == 0, result.stderr
 
-    A ``--name 'sw*'`` filter run in a directory holding a file called ``sw-x``
-    would otherwise reach netgraph as that filename and quietly draw everything.
+    dot = output.read_text(encoding="utf-8")
+    assert "rankdir=LR" in dot
+    assert "192.168" not in dot, "--no-show-ips never reached the renderer"
+
+
+@requires_bash
+@pytest.mark.skipif(
+    ON_WINDOWS,
+    reason=(
+        "the MSYS runtime Git Bash is built on expands wildcards in the arguments it hands "
+        "to a native program, after the shell has finished with them; 'set -f' cannot reach "
+        "that, and the step sets MSYS=noglob instead"
+    ),
+)
+def test_the_render_step_does_not_expand_a_glob_in_its_arguments(
+    render_action: dict[str, Any], tmp_path: Path
+) -> None:
+    """A ``--name 'sw*'`` filter is a filter, not a file listing.
+
+    Run in a directory that happens to hold a file called ``sw-…``, an
+    unprotected word split would hand netgraph that filename, which matches no
+    element — so the diagram would come back either empty or unfiltered rather
+    than wrong in a way anybody notices.
     """
     (tmp_path / "sw-a-file-not-a-device").touch()
     output = tmp_path / "filtered.dot"
@@ -558,16 +596,15 @@ def test_the_render_step_passes_extra_arguments_through_without_expanding_them(
             "inventory": str(HOME_LAB),
             "format": "dot",
             "output": str(output),
-            "args": "--name sw* --rankdir lr",
+            "args": "--name sw*",
         },
         tmp_path,
     )
     assert result.returncode == 0, result.stderr
 
     dot = output.read_text(encoding="utf-8")
-    assert "rankdir=LR" in dot
-    assert "sw-home" in dot
-    assert "pc-desk" not in dot, "the glob was expanded by the shell, so nothing was filtered"
+    assert "sw-home" in dot, "the glob was expanded, so the filter matched nothing"
+    assert "pc-desk" not in dot, "nothing was filtered at all"
 
 
 @requires_bash

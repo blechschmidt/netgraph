@@ -194,6 +194,12 @@ runs:
         NETGRAPH_ARGS: ${{ inputs.args }}
         NETGRAPH_STRICT: ${{ inputs.strict }}
         NETGRAPH_FORCE: ${{ inputs.force }}
+        # Windows only, and nothing to do with the shell: the MSYS runtime Git
+        # Bash is built on expands wildcards in the arguments it hands to a
+        # *native* program, after bash has finished with them -- so a '--name
+        # sw*' in `args` would arrive at netgraph.exe as whatever the workspace
+        # happens to be holding. This turns that off. Ignored everywhere else.
+        MSYS: noglob
       run: |
         set -euo pipefail
 
@@ -221,7 +227,12 @@ runs:
         # backslashed path and the shape check would look for a file with a
         # very odd name. Python takes either spelling, so netgraph is
         # unaffected, and forward slashes are what the outputs report.
-        output="${output//\\//}"
+        #
+        # Through ``tr`` rather than ``${output//\\//}``: the two agree on the
+        # bash this was written with and not on the one the Windows runner
+        # ships, which read that pattern as a bare '/' and deleted the
+        # separators instead of the backslashes.
+        output="$(printf '%s' "${output}" | tr '\\' '/')"
         # No mkdir: ``netgraph render`` creates the parent of --output itself.
         directory="$(dirname "${output}")"
 
