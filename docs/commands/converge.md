@@ -148,6 +148,9 @@ One entry of the plan is one thing to do to one device. It carries:
 | `id` | Stable within the plan, and between runs over unchanged inputs: `hosts/pc-desk#interface.set/eno1/mac`. |
 | `action` | `create`, `update`, `delete`, or `manual` — something no command closes. |
 | `object` | `vlan`, `interface`, `address`, `member`, `field`, `file`, `link` or `device`. |
+| `interface` | The interface it is on, or absent for a device-wide change and for a file. |
+| `target` | Which one, in the device's own words: `eno1`, `mtu`, `20`, `10.0.0.5/24`. |
+| `value` / `previous` | What the change sets, and what the capture reported in its place — carried on the change rather than only inside the command text, so a consumer never has to parse a command back apart. `previous` is what the rollback restores, and is absent when the capture reported nothing. |
 | `summary` | One imperative sentence. |
 | `rank` | Position in the dependency order — see below. |
 | `risk` | `safe` or `disruptive`. |
@@ -428,10 +431,25 @@ scrolling the middle of a long script can still see *why* a line is there. An
 element whose changes are all manual gets no file; its items are listed as
 comments at the foot of any script it does have.
 
-`--rollback` writes `rollback.txt` beside it instead, from the inverse commands:
-the state the capture found, not some previous plan and not a state nobody
-measured. The two files sit side by side on purpose, so a reviewer comparing
-them does not have to hold two paths in their head.
+`--rollback` writes `rollback.txt` instead of `converge.txt`, from the inverse
+commands: the state the capture found, not some previous plan and not a state
+nobody measured. Run it twice into the same directory and the two land side by
+side, which is the point of the different name rather than a different tree — a
+reviewer comparing them does not have to hold two paths in their head.
+
+<!-- norun: writes a tree into the reader's directory -->
+```console
+$ netgraph -i net converge plan --allow-disruptive -o scripts/ caps/*
+2 script(s) written under scripts/
+$ netgraph -i net converge plan --allow-disruptive --rollback -o scripts/ caps/*
+2 script(s) written under scripts/
+$ ls scripts/hosts/pc-desk/
+converge.txt  rollback.txt
+```
+
+Without `-o` the plan already carries every inverse command — `-F json` shows
+them per change under `rollback` — so `--rollback` on its own says so rather
+than silently doing nothing.
 
 ---
 
