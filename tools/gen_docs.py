@@ -38,6 +38,10 @@ are:
     What right-clicking each kind of shape offers, from
     :data:`netgraph.web.bindings.MENUS`, with the chord that runs the same
     command beside it.
+``unique-fields``
+    The fields a copy drops and the rule each would break, from
+    :data:`netgraph.edit.clipboard.UNIQUE_FIELDS` — so the documented table and
+    the one ``netgraph edit copy`` applies cannot drift.
 
 Usage::
 
@@ -64,6 +68,7 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 import click  # noqa: E402
 
 from netgraph.cli import cli  # noqa: E402
+from netgraph.edit import unique_fields_markdown  # noqa: E402
 from netgraph.fixes import FIXES  # noqa: E402
 from netgraph.rules import RULES, rule_for  # noqa: E402
 from netgraph.web.bindings import markdown_menus, markdown_table  # noqa: E402
@@ -95,6 +100,8 @@ PAGE: Final[dict[str, str]] = {
     "edit set": "edit.md",
     "edit unset": "edit.md",
     "edit create": "edit.md",
+    "edit copy": "edit.md",
+    "edit duplicate": "edit.md",
     "edit delete": "edit.md",
     "edit rename": "edit.md",
     "edit move": "edit.md",
@@ -141,6 +148,8 @@ INDEX_ORDER: Final = [
     "edit set",
     "edit unset",
     "edit create",
+    "edit copy",
+    "edit duplicate",
     "edit delete",
     "edit rename",
     "edit move",
@@ -187,6 +196,8 @@ SUMMARY: Final[dict[str, str]] = {
     "edit set": "Set a field on an element, in place, comments and all.",
     "edit unset": "Remove a field from an element.",
     "edit create": "Declare a new element and place its document.",
+    "edit copy": "Copy an element or a whole namespace, links and all.",
+    "edit duplicate": "Copy an element into the namespace it is already in.",
     "edit delete": "Remove an element, and what cannot survive it.",
     "edit rename": "Rename an element and every reference to it.",
     "edit move": "Move an element's document to another file.",
@@ -473,6 +484,8 @@ def body_for(spec: str) -> str:
         return markdown_table()
     if kind == "context-menus":
         return markdown_menus()
+    if kind == "unique-fields":
+        return unique_fields_markdown()
     raise SystemExit(f"unknown generated region {spec!r}")
 
 

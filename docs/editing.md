@@ -25,6 +25,7 @@ leaves every comment in it alone.
 - [Placement](#placement)
 - [The two gates](#the-two-gates)
 - [Batches: many operations, one change](#batches-many-operations-one-change)
+- [Copying, cutting and pasting](#copying-cutting-and-pasting)
 - [Arranging a selection](#arranging-a-selection)
 - [Annotating a diagram](#annotating-a-diagram)
 - [Using it from Python](#using-it-from-python)
@@ -59,12 +60,13 @@ are the whole design:
 
 ## The operations
 
-There are eighteen. Sixteen are **semantic** — the vocabulary a person or a
+There are nineteen. Seventeen are **semantic** — the vocabulary a person or a
 diagram uses:
 
 | Operation | JSON `op` | What it does |
 |---|---|---|
 | `CreateElement(kind, name, namespace, spec, metadata, file)` | `create` | Adds a document declaring a new element. |
+| `CopyElement(address, name, namespace, suffix, keep_unique, rewrite, file)` | `copy` | Writes a second element built from an existing one; see [copying](#copying-cutting-and-pasting). |
 | `DeleteElement(address, cascade)` | `delete` | Removes it, and the file if it was the last document in it. |
 | `RenameElement(address, new_name)` | `rename` | Changes `metadata.name`, and every reference to it. |
 | `MoveElement(address, file, index)` | `move` | Moves the document, verbatim, possibly to another namespace. |
@@ -134,7 +136,7 @@ by removing one. `SetAnnotation` is the operation a dragged note is made of, and
 the one rule worth knowing about it is written up under
 [annotating a diagram](#annotating-a-diagram).
 
-The set is deliberately closed. A nineteenth kind of change is a nineteenth
+The set is deliberately closed. A twentieth kind of change is a twentieth
 operation, defined here, and not a caller reaching for the file system.
 
 ## What an operation guarantees
@@ -356,6 +358,135 @@ a result, and comes back as a single entry in the changes drawer.
 order and stops at the first refusal, keeping what the earlier ones did. That is
 right for a caller replaying a list it already trusts — an undo stack, a plan —
 and wrong for one acting on somebody's selection.
+
+## Copying, cutting and pasting
+
+The most-used gesture in any diagram editor, and the one that is least like a
+diagram gesture underneath: a copy of a switch is a *second document*, and a
+second document that says the same thing as the first one does not load.
+
+So a copy is three decisions, all of them made in `netgraph.edit.clipboard` and
+none of them in JavaScript — the browser, `netgraph edit copy` and a script all
+get the same answer.
+
+### The name
+
+`sw1` becomes `sw1-copy`, then `sw1-copy-2`, `sw1-copy-3`. The series is per
+*family*, not per document: copying `sw1-copy` gives `sw1-copy-2`, never
+`sw1-copy-copy`. `--suffix` changes the word for an inventory whose convention
+is `-b` or `-standby`, and `--name` names one copy outright.
+
+A copy that lands in a **different** namespace keeps its name where that name is
+free there, because "the same switch, in the lab folder" is what copying to a
+folder means. Only a collision makes it derive one.
+
+### The fields a copy cannot keep
+
+Everything comes across — vendor, model, MTU, the VLAN database, the
+description, the labels, the style, the routes, and the comments somebody wrote
+beside them. What goes is what two elements in one inventory cannot both have:
+
+<!-- generated: unique-fields -->
+| Field | Rule | Why a copy cannot keep it |
+|---|---|---|
+| `metadata.location.position` | — | two things cannot be bolted into the same rack unit |
+| `spec.serial` | — | a serial number names one physical unit |
+| `spec.label` | — | the identifier printed on a cable is on exactly one cable |
+| `spec.login` | `NG-S013` | two accounts cannot share a login |
+| `spec.uid` | `NG-S013` | two users cannot share a uid |
+| `spec.gid` | `NG-S013` | two groups cannot share a gid |
+| `spec.bridge.address` | — | a bridge address is one bridge component's own MAC address |
+| `spec.interfaces[].mac` | `NG-I008` | a MAC address is unique across the inventory |
+| `spec.interfaces[].ipv4.addresses` | `NG-A004` | a fixed address is claimed by one interface in its subnet |
+| `spec.interfaces[].ipv6.addresses` | `NG-A004` | a fixed address is claimed by one interface in its subnet |
+| `spec.interfaces[].wireless.bss[].bssid` | `NG-W008` | a BSSID is one radio's own MAC address |
+| `spec.power.inputs` | `NG-E010` | one PDU outlet feeds one power supply |
+| `spec.routing.ospf.router_id` | `NG-F012` | two routers cannot share a router id |
+| `spec.routing.bgp.router_id` | `NG-F012` | two routers cannot share a router id |
+<!-- /generated -->
+
+Stripping a field tidies up after it: `spec.power` loses `redundant` with its
+`inputs` — a claim about feeds that are no longer written — and an `ipv4` block
+left holding nothing but `enabled: true` goes entirely, since that is what its
+absence already says. `--keep-unique` turns the whole table off, for the copy
+that is a starting point you are about to edit; the validation gate will
+usually refuse the result, and that is the point of it being a flag.
+
+### The links
+
+A cable is not a property of a switch; it is an element joining two of them. So:
+
+* copying a **switch** copies no cables — there would be nothing at the far end;
+* copying a **set** clones every cable whose *both* ends are in the set, rewired
+  to the clones;
+* a cable with only **one** end in the set is dropped, and named. A cable joining
+  a clone to an original is a claim about the network nobody made;
+* copying a cable **on its own** is refused, because the copy would land a second
+  cable on interfaces that already have one (`NG-C001`).
+
+Copying a **namespace** copies its subtree: every element below it lands under
+`--to` with the same shape, and the same link rule applies across the whole set.
+
+### Geometry
+
+Given `--view`, the copies are placed in that view's stored geometry — offset
+from the originals by the grid pitch, or centred on a point when the editor
+passes one, which is what makes `Ctrl-V` after a right-click land under the
+pointer. The entries go into the same `kind: layout` document the originals are
+placed in, so a site's arrangement stays in the site's own file.
+
+### From the command line
+
+<!-- norun: illustrative one-liners over elements that are not in this repository -->
+```bash
+netgraph edit copy sw1                      # -> sw1-copy, beside it
+netgraph edit copy sw1 --to sites/lab       # -> sites/lab/sw1
+netgraph edit copy sw1 --name sw2           # -> sw2
+netgraph edit copy sites/hq --to sites/dr   # the whole subtree, cables and all
+netgraph edit duplicate sw1 --view l1       # and place it in the l1 diagram
+```
+
+`duplicate` *is* `copy` with no `--to`: one operation, two spellings, because
+that is what the keyboard calls it.
+
+### In the editor
+
+`Ctrl-C`, `Ctrl-X`, `Ctrl-V` and `Ctrl-D` over the existing multi-selection,
+each one batch and each one `Ctrl-Z`. All four are canvas bindings, so `Ctrl-C`
+in the YAML pane is still the text.
+
+`Ctrl-C` puts a **serialised fragment** on the system clipboard — JSON holding
+the copied documents, their namespaces and their positions — so a fragment can
+be pasted into another editor session, into a different inventory, or into a
+text editor where it reads as data:
+
+```json
+{
+  "format": "netgraph.dev/clipboard/v1",
+  "root": "devices",
+  "documents": [
+    {"address": "devices/sw-access", "namespace": "",
+     "document": {"apiVersion": "netgraph.dev/v1alpha1", "kind": "switch", "…": "…"}}
+  ],
+  "geometry": {"devices/sw-access": {"position": {"x": 277, "y": 43}}},
+  "dropped": []
+}
+```
+
+The documents in it are dumped from the *models*, so a template a document
+inherits ([§6.6](schema.md#66-template--reusable-partial-device-specs)) and an interface range it declares are
+already expanded — which is what lets the fragment be pasted into an inventory
+that has never heard of that template. Defaults are left out, so the fragment is
+short enough to read.
+
+Pasting prefers the system clipboard and falls back to the last fragment this
+page copied, so `Ctrl-V` works even where the browser will not hand over
+clipboard read permission. A clipboard holding anything else — a URL, a line of
+YAML — is left alone rather than treated as an error.
+
+The four routes are `POST /api/copy`, `/api/cut`, `/api/paste` and
+`/api/duplicate`. `copy` writes nothing and a read-only session answers it, since
+reading a fragment out of one tree to paste into another is a read.
 
 ## Arranging a selection
 

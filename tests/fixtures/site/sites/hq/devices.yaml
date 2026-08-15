@@ -1,0 +1,70 @@
+# The core of one site, in one folder: the folder is the namespace (§2), so
+# every short name written below resolves inside `sites/hq` and nowhere else.
+# That is what makes the whole site copyable as a unit.
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-hq
+  description: Site edge router
+  labels:
+    site: hq
+spec:
+  vendor: MikroTik
+  model: CCR2004
+  serial: HQ-RTR-0001
+  interfaces:
+    - name: wan0
+      type: ethernet
+      description: Uplink to the carrier
+      mtu: 1500
+    - name: lan0
+      type: ethernet
+      description: Downlink to the access switch
+      mac: '00:1a:2b:00:00:01'
+      mtu: 1500
+      ipv4:
+        addresses: [10.10.0.1/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-hq
+  description: Access switch in the comms room
+spec:
+  vendor: Cisco
+  model: C9200-24T
+  serial: HQ-SW-0001
+  bridge:
+    name: br0
+    address: '00:1a:2b:00:00:02'
+  interfaces:
+    # port1 is the uplink; the rest hang off it.
+    - name: port1
+      type: ethernet
+      description: Uplink to rtr-hq
+      mtu: 1500
+    - name: port2
+      type: ethernet
+      description: To the application server
+      mtu: 1500
+    - name: port3
+      type: ethernet
+      description: To the rack switch
+      mtu: 1500
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-hq
+  description: The one application server
+spec:
+  vendor: Dell
+  serial: HQ-SRV-0001
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mac: '00:1a:2b:00:00:03'
+      mtu: 1500
+      ipv4:
+        addresses: [10.10.0.10/24]
+        gateway: 10.10.0.1

@@ -29,6 +29,7 @@ from typing import Any, Final
 from netgraph.edit.operations import (
     AddInterface,
     Connect,
+    CopyElement,
     CreateElement,
     DeleteElement,
     Disconnect,
@@ -91,6 +92,8 @@ def _arguments(operation: Operation) -> list[str] | None:
     """The subcommand and its arguments, or ``None`` for "no exact spelling"."""
     if isinstance(operation, CreateElement):
         return _create(operation)
+    if isinstance(operation, CopyElement):
+        return _copy(operation)
     if isinstance(operation, DeleteElement):
         return ["delete", operation.address, *(["--cascade"] if operation.cascade else [])]
     if isinstance(operation, RenameElement):
@@ -132,6 +135,35 @@ def _create(operation: CreateElement) -> list[str] | None:
         arguments += ["--metadata", json.dumps(operation.metadata, sort_keys=True)]
     if operation.file is not None:
         arguments += ["--file", operation.file]
+    return arguments
+
+
+def _copy(operation: CopyElement) -> list[str] | None:
+    """``copy``, or ``duplicate`` where that is the same request said shorter.
+
+    ``duplicate`` is a copy that stays where it is and takes the name it is
+    given: no ``--to``, no ``--name``. Rendering that as ``duplicate`` is exact
+    rather than approximate — the CLI builds the identical operation — and it is
+    what somebody reading the script pressed.
+
+    A copy carrying a ``rewrite`` map has no spelling at all: the map is what
+    makes a cloned cable join the cloned switches, and it is decided over the
+    *whole selection* by :func:`~netgraph.edit.clipboard.copy_plan`. There is no
+    flag that could carry it, and a rendering that dropped it would produce a
+    cable joining the originals — so it goes through ``apply``, verbatim.
+    """
+    if operation.rewrite or operation.keep_unique or operation.file is not None:
+        return None
+    named = operation.namespace is not None or operation.name is not None
+    arguments = ["copy" if named else "duplicate", operation.address]
+    if operation.namespace is not None:
+        # Including the empty string, which is the root namespace and is a
+        # different request from "leave it where it is".
+        arguments += ["--to", operation.namespace]
+    if operation.name:
+        arguments += ["--name", operation.name]
+    if operation.suffix != "copy":
+        arguments += ["--suffix", operation.suffix]
     return arguments
 
 

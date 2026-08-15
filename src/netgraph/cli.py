@@ -133,10 +133,12 @@ from netgraph.drift import FORMATS as DRIFT_FORMATS
 from netgraph.drift import CompareSpec, DriftReport, check_drift, render_drift
 from netgraph.drift import write_text as write_drift
 from netgraph.edit import (
+    DEFAULT_SUFFIX,
     AddInterface,
     AddressError,
     CascadeRequired,
     Connect,
+    CopyPlan,
     CreateElement,
     DeleteElement,
     Disconnect,
@@ -149,6 +151,7 @@ from netgraph.edit import (
     SetField,
     UnsetField,
     ValidationRefused,
+    copy_plan,
     operations_from_json,
 )
 from netgraph.errors import (
@@ -238,7 +241,7 @@ from netgraph.loader import (
     subset,
 )
 from netgraph.models import DOCUMENT_KINDS, KINDS, Element, Medium
-from netgraph.models.layout import ROUTING_STYLES
+from netgraph.models.layout import LAYOUT_VIEWS, ROUTING_STYLES
 from netgraph.plan import (
     PLAN_FORMATS,
     Plan,
@@ -1970,6 +1973,209 @@ def edit_create_command(
         as_json=as_json,
         force=force,
     )
+
+
+#: The flags ``copy`` and ``duplicate`` share. ``duplicate`` is ``copy`` that
+#: stays where it is, so it takes every one of these except ``--to``.
+_COPY_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
+    click.option(
+        "--name",
+        "new_name",
+        default=None,
+        help=(
+            "metadata.name of the copy. Derived from the original's when absent; "
+            "only meaningful when copying one element."
+        ),
+    ),
+    click.option(
+        "--suffix",
+        default=DEFAULT_SUFFIX,
+        show_default=True,
+        help="What a derived name gets before its counter: sw1 -> sw1-copy -> sw1-copy-2.",
+    ),
+    click.option(
+        "--keep-unique",
+        is_flag=True,
+        help=(
+            "Keep the MAC addresses, fixed IP addresses, serials and outlets a copy "
+            "normally drops. The result usually fails validation; use it when the copy "
+            "is a starting point you are about to edit."
+        ),
+    ),
+    click.option(
+        "--view",
+        default=None,
+        type=click.Choice(LAYOUT_VIEWS),
+        help=(
+            "Place the copies in this view's stored geometry, offset from the originals. "
+            "Nothing is written to a layout document when absent."
+        ),
+    ),
+)
+
+
+def _copy_flags(command: Any) -> Any:
+    """Apply :data:`_COPY_OPTIONS`, keeping their written order in ``--help``."""
+    for option in reversed(_COPY_OPTIONS):
+        command = option(command)
+    return command
+
+
+@edit_command.command("copy")
+@click.argument("address", shell_complete=complete_element)
+@click.option(
+    "--to",
+    "namespace",
+    default=None,
+    help=(
+        "Namespace to write the copies into; the folder each original is in by default. "
+        "The empty string is the inventory root."
+    ),
+)
+@_copy_flags
+@_edit_flags
+@click.pass_obj
+def edit_copy_command(
+    app: AppContext,
+    address: str,
+    namespace: str | None,
+    new_name: str | None,
+    suffix: str,
+    keep_unique: bool,
+    view: str | None,
+    dry_run: bool,
+    as_json: bool,
+    force: bool,
+) -> None:
+    """Copy an element, or a whole namespace, into a new document.
+
+    ADDRESS is an element or a namespace. A namespace copies its subtree: every
+    element below it lands under --to with the same shape, and the cables between
+    them are cloned and rewired to the clones. A cable with only one end in the
+    copied set is left behind and named, because a cable joining a clone to an
+    original is a claim about the network nobody made.
+
+    The copy is the original document, comments and all, with three changes: a
+    free name, the references that point inside the copied set redirected to the
+    copies, and the fields two elements cannot both have -- MAC addresses, fixed
+    IP addresses, serials, PDU outlets -- dropped. See docs/editing.md for the
+    whole table.
+    """
+    _run_copy(
+        app,
+        [address],
+        namespace=namespace,
+        name=new_name,
+        suffix=suffix,
+        keep_unique=keep_unique,
+        view=view,
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+    )
+
+
+@edit_command.command("duplicate")
+@click.argument("address", shell_complete=complete_element)
+@_copy_flags
+@_edit_flags
+@click.pass_obj
+def edit_duplicate_command(
+    app: AppContext,
+    address: str,
+    new_name: str | None,
+    suffix: str,
+    keep_unique: bool,
+    view: str | None,
+    dry_run: bool,
+    as_json: bool,
+    force: bool,
+) -> None:
+    """Copy an element into the namespace it is already in.
+
+    'netgraph edit copy' with no --to, under the name a diagram editor gives it:
+    it is the same operation, and Ctrl-D in 'netgraph web' does exactly this.
+    """
+    _run_copy(
+        app,
+        [address],
+        namespace=None,
+        name=new_name,
+        suffix=suffix,
+        keep_unique=keep_unique,
+        view=view,
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+    )
+
+
+def _run_copy(
+    app: AppContext,
+    addresses: Sequence[str],
+    *,
+    namespace: str | None,
+    name: str | None,
+    suffix: str,
+    keep_unique: bool,
+    view: str | None,
+    dry_run: bool,
+    as_json: bool,
+    force: bool,
+) -> None:
+    """Plan a copy against the loaded tree, then apply it like any other edit.
+
+    A step more than :func:`_run_edit` does, and it is the step that makes a copy
+    a copy: which elements are in the set, what each one is called and which
+    cables come with them are decided by
+    :func:`~netgraph.edit.clipboard.copy_plan` against the *inventory*, and only
+    then does the resulting list of operations go through the same two gates
+    every other edit goes through.
+    """
+    console = app.console()
+    root = app.inventory if app.inventory.is_dir() else app.inventory.parent
+    session = EditSession(root=root, config=_edit_config(app), cache=app.cache())
+    try:
+        plan: CopyPlan = copy_plan(
+            session.inventory,
+            addresses,
+            namespace=namespace,
+            name=name,
+            suffix=suffix,
+            keep_unique=keep_unique,
+            view=view,
+        )
+        session.apply_all(plan.operations)
+    except EditError as exc:
+        _report_edit_error(console, exc)
+        raise click.exceptions.Exit(EXIT_INVALID) from exc
+    for entry in plan.dropped:
+        console.warn(f"not copied -- {entry}")
+    _run_edit_session(
+        app,
+        session,
+        dry_run=dry_run,
+        as_json=as_json,
+        force=force,
+        note=_copy_note(plan),
+    )
+
+
+#: How many name pairs the copy summary spells out before it counts the rest.
+#: A site copy is hundreds of them, and a terminal line nobody can read is not a
+#: summary; the whole mapping is in ``--json``.
+_COPY_LISTED: Final = 10
+
+
+def _copy_note(plan: CopyPlan) -> str | None:
+    """One line naming what the copy produced: the new names, or how many."""
+    if not plan.mapping:
+        return None
+    pairs = [f"{source} -> {target}" for source, target in plan.mapping.items()]
+    listed = ", ".join(pairs[:_COPY_LISTED])
+    if len(pairs) > _COPY_LISTED:
+        listed += f", and {len(pairs) - _COPY_LISTED} more"
+    return f"copied {len(pairs)} element(s): {listed}"
 
 
 @edit_command.command("delete")

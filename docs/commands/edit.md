@@ -248,6 +248,59 @@ netgraph [GLOBAL OPTIONS] edit create [OPTIONS] {switch|router|hub|computer|serv
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
 <!-- /generated -->
 
+### `netgraph edit copy`
+
+Copies an element — or a whole namespace, subtree and all — into a new document.
+The copy keeps the original's comments, gets a free name (`sw1` → `sw1-copy` →
+`sw1-copy-2`), and loses the fields two elements in one inventory cannot both
+have. A cable whose two ends are both in the copied set is cloned and rewired to
+the clones; one with only a single end in it is left behind and named. See
+[the copy chapter of `docs/editing.md`](../editing.md#copying-cutting-and-pasting)
+for the whole table.
+
+<!-- generated: synopsis edit copy -->
+```text
+netgraph [GLOBAL OPTIONS] edit copy [OPTIONS] ADDRESS
+```
+<!-- /generated -->
+
+<!-- generated: options edit copy -->
+| Flag | Value | Default | Meaning |
+|---|---|---|---|
+| `--to` | `TEXT` | — | Namespace to write the copies into; the folder each original is in by default. The empty string is the inventory root. |
+| `--name` | `TEXT` | — | metadata.name of the copy. Derived from the original's when absent; only meaningful when copying one element. |
+| `--suffix` | `TEXT` | `copy` | What a derived name gets before its counter: sw1 -> sw1-copy -> sw1-copy-2. |
+| `--keep-unique` | — | off | Keep the MAC addresses, fixed IP addresses, serials and outlets a copy normally drops. The result usually fails validation; use it when the copy is a starting point you are about to edit. |
+| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity]` | — | Place the copies in this view's stored geometry, offset from the originals. Nothing is written to a layout document when absent. |
+| `-n`, `--dry-run` | — | off | Write nothing; print the unified diff the edit would apply. |
+| `--json` | — | off | Print the applied operations and their inverses as JSON, so a caller can keep an undo stack. |
+| `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
+<!-- /generated -->
+
+### `netgraph edit duplicate`
+
+`netgraph edit copy` with no `--to`: the copy lands in the namespace the
+original is in. The same operation under the name a diagram editor gives it —
+`Ctrl-D` in `netgraph web` writes exactly this.
+
+<!-- generated: synopsis edit duplicate -->
+```text
+netgraph [GLOBAL OPTIONS] edit duplicate [OPTIONS] ADDRESS
+```
+<!-- /generated -->
+
+<!-- generated: options edit duplicate -->
+| Flag | Value | Default | Meaning |
+|---|---|---|---|
+| `--name` | `TEXT` | — | metadata.name of the copy. Derived from the original's when absent; only meaningful when copying one element. |
+| `--suffix` | `TEXT` | `copy` | What a derived name gets before its counter: sw1 -> sw1-copy -> sw1-copy-2. |
+| `--keep-unique` | — | off | Keep the MAC addresses, fixed IP addresses, serials and outlets a copy normally drops. The result usually fails validation; use it when the copy is a starting point you are about to edit. |
+| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity]` | — | Place the copies in this view's stored geometry, offset from the originals. Nothing is written to a layout document when absent. |
+| `-n`, `--dry-run` | — | off | Write nothing; print the unified diff the edit would apply. |
+| `--json` | — | off | Print the applied operations and their inverses as JSON, so a caller can keep an undo stack. |
+| `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
+<!-- /generated -->
+
 ### `netgraph edit delete`
 
 <!-- generated: synopsis edit delete -->

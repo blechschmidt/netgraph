@@ -18,6 +18,32 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **A clipboard, in the editor and on the command line.** `Ctrl-C`, `Ctrl-X`, `Ctrl-V` and
+  `Ctrl-D` over the existing multi-selection, and `netgraph edit copy` /
+  `netgraph edit duplicate` for the same thing without a browser. On this canvas they do not
+  move shapes about, they write documents — so a copy is three decisions rather than a
+  memcpy, and all three are made in `netgraph.edit.clipboard` where the browser, the command
+  line and a script get the same answer.
+
+  The **name** is deduplicated in a series (`sw1` → `sw1-copy` → `sw1-copy-2`, and a copy of
+  a copy re-joins the series rather than nesting it; `--suffix` and `--name` override it).
+  The **fields two elements in one inventory cannot both have** are dropped — MAC addresses,
+  fixed IP addresses, serials, BSSIDs, PDU outlets, router ids, a rack unit; the table is in
+  [`docs/editing.md`](docs/editing.md#the-fields-a-copy-cannot-keep) and `--keep-unique`
+  turns it off. The **links** follow the set: a cable with both ends in the selection is
+  cloned and rewired to the clones, one with a single end in it is left behind and *named*,
+  and copying a cable on its own is refused rather than silently landing a second cable on a
+  port that has one. Copying a namespace copies its subtree. Everything else — the vendor,
+  the VLAN database, the comments somebody wrote beside them — comes across verbatim,
+  because the copy starts as the original document's own text.
+
+  Pasted elements are placed in the current view's stored geometry, offset from the
+  originals or centred on the point a right-click named, so a paste lands where it was
+  asked for rather than being re-laid-out. `Ctrl-C` also puts a **serialised fragment** —
+  JSON holding the copied documents, their namespaces and their positions — on the system
+  clipboard, so a piece of one inventory can be pasted into another window, another
+  inventory, or a text editor.
+
 - **An action that draws the inventory, and a reusable workflow that publishes it.** A
   pipeline could already gate a pull request on the inventory validating; what it could not
   do was show anybody the network.

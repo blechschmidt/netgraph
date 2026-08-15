@@ -22,6 +22,8 @@ a flag that is documented exists. The prose around them is written by hand.
 | [`netgraph edit set`](edit.md) | Set a field on an element, in place, comments and all. | [edit.md](edit.md) |
 | [`netgraph edit unset`](edit.md) | Remove a field from an element. | [edit.md](edit.md) |
 | [`netgraph edit create`](edit.md) | Declare a new element and place its document. | [edit.md](edit.md) |
+| [`netgraph edit copy`](edit.md) | Copy an element or a whole namespace, links and all. | [edit.md](edit.md) |
+| [`netgraph edit duplicate`](edit.md) | Copy an element into the namespace it is already in. | [edit.md](edit.md) |
 | [`netgraph edit delete`](edit.md) | Remove an element, and what cannot survive it. | [edit.md](edit.md) |
 | [`netgraph edit rename`](edit.md) | Rename an element and every reference to it. | [edit.md](edit.md) |
 | [`netgraph edit move`](edit.md) | Move an element's document to another file. | [edit.md](edit.md) |

@@ -1,0 +1,18 @@
+# A namespace below the site's own, so copying the site has to carry the shape
+# of its subtree and not just its top level.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-rack
+  description: Top-of-rack switch
+  location:
+    site: hq
+    rack: r1
+    position: 42
+spec:
+  vendor: Cisco
+  serial: HQ-TOR-0001
+  interfaces:
+    - name: uplink
+      type: ethernet
+      mtu: 1500

@@ -923,7 +923,15 @@ def _normalise_chord(chord: str) -> str:
 #: the tidying that needs one, ``session.js`` everything that writes, ``style.js``
 #: the style inspector, ``tour.js`` the guided tour — but which of the six a
 #: given id is in is not this test's business.
-_COMMAND_FILES = ("keys.js", "app.js", "select.js", "session.js", "style.js", "tour.js")
+_COMMAND_FILES = (
+    "keys.js",
+    "app.js",
+    "select.js",
+    "session.js",
+    "style.js",
+    "tour.js",
+    "clipboard.js",
+)
 
 
 def _registered() -> set[str]:

@@ -3901,3 +3901,209 @@ def test_a_link_is_offered_no_shape_and_no_icon(open_editor: OpenEditor) -> None
 
     set_style(editor, "stroke", "#ff0000")
     expect_style(editor, A_CABLE, {"stroke": "#ff0000"})
+
+
+# --------------------------------------------------------------------------- #
+# The clipboard
+# --------------------------------------------------------------------------- #
+#
+# Ctrl-C, Ctrl-X, Ctrl-V, Ctrl-D. On this canvas they do not move shapes around,
+# they write documents — so every claim below is asserted on the *files*, and
+# the undo that takes them back is asserted on the bytes.
+#
+# The system clipboard is deliberately not required. Headless Chromium refuses
+# `navigator.clipboard` without a permission grant, which is exactly the
+# situation clipboard.js's in-page fallback exists for; a test that granted the
+# permission would be testing a case some real users never reach.
+
+
+def fragment(editor: Editor) -> dict[str, Any] | None:
+    """What this page is holding on its clipboard, read out of clipboard.js."""
+    held = editor.page.evaluate("() => window.netgraphClipboard.held()")
+    assert held is None or isinstance(held, dict)
+    return held
+
+
+def copied_names(editor: Editor) -> list[str]:
+    """The addresses on the clipboard, in the order the server put them there."""
+    held = fragment(editor)
+    return [] if held is None else [str(entry["address"]) for entry in held["documents"]]
+
+
+def pick(editor: Editor, *addresses: str) -> None:
+    """Shift-click a set of shapes and leave the canvas focused."""
+    editor.page.keyboard.down("Shift")
+    for address in addresses:
+        press_on(editor, editor.shape(address))
+    editor.page.keyboard.up("Shift")
+    editor.page.locator("#canvas").focus()
+    assert sorted(selected(editor)) == sorted(addresses)
+
+
+def test_copy_paste_and_undo_writes_documents_and_takes_them_back(
+    open_editor: OpenEditor,
+) -> None:
+    """The whole gesture, on the files: Ctrl-C, Ctrl-V, and one Ctrl-Z back."""
+    editor = arranged(open_editor)
+    assert editor.session is not None
+    before = _tree(editor.root)
+    depth = editor.api("/api/state")["undo"]
+
+    pick(editor, "switches/sw-home", "hosts/pc-desk")
+    editor.press("Control+c")
+
+    assert editor.settles(lambda: fragment(editor) is not None, timeout=TIMEOUT_MS / 1000), (
+        "Ctrl-C put nothing on the clipboard"
+    )
+    held = fragment(editor)
+    assert held is not None
+    assert held["format"] == "netgraph.dev/clipboard/v1"
+    assert sorted(copied_names(editor)) == ["hosts/pc-desk", "switches/sw-home"]
+    assert _tree(editor.root) == before, "a copy must write nothing"
+
+    editor.press("Control+v")
+    assert editor.settles(
+        lambda: "switches/sw-home-copy.yaml" in _tree(editor.root), timeout=TIMEOUT_MS / 1000
+    ), "Ctrl-V wrote no document"
+    after = _tree(editor.root)
+    assert "hosts/pc-desk-copy.yaml" in after
+    # The originals are untouched: a paste adds, it does not rewrite.
+    assert after["switches/sw-home.yaml"] == before["switches/sw-home.yaml"]
+
+    # One entry in the stack for the whole paste, and one Ctrl-Z back.
+    assert editor.api("/api/state")["undo"] == depth + 1
+    editor.page.locator("#undo").click()
+    assert editor.settles(lambda: _tree(editor.root) == before, timeout=TIMEOUT_MS / 1000), (
+        "one undo has to put the whole paste back"
+    )
+
+
+def test_a_pasted_cable_joins_the_copies(open_editor: OpenEditor) -> None:
+    """Both ends selected means the cable comes too — rewired, not duplicated."""
+    editor = arranged(open_editor)
+    assert editor.session is not None
+
+    editor.page.keyboard.down("Shift")
+    press_on(editor, editor.shape("switches/sw-home"))
+    press_on(editor, editor.shape("hosts/pc-desk"))
+    press_on(editor, band(editor))
+    editor.page.keyboard.up("Shift")
+    editor.page.locator("#canvas").focus()
+    assert A_CABLE in selected(editor)
+
+    editor.press("Control+c")
+    assert editor.settles(lambda: len(copied_names(editor)) == 3, timeout=TIMEOUT_MS / 1000)
+    editor.press("Control+v")
+    assert editor.settles(
+        lambda: "cbl-sw-desk-copy" in editor.read("cables/links.yaml"), timeout=TIMEOUT_MS / 1000
+    ), "the cable between the two copied devices did not come with them"
+
+    links = editor.read("cables/links.yaml")
+    assert "sw-home-copy:port2" in links
+    assert "pc-desk-copy:eno1" in links
+
+
+def test_ctrl_d_duplicates_without_touching_the_clipboard(open_editor: OpenEditor) -> None:
+    """Copy and paste in one keystroke: the system clipboard is not involved."""
+    editor = arranged(open_editor)
+    assert editor.session is not None
+    assert fragment(editor) is None
+
+    pick(editor, "switches/sw-home")
+    editor.press("Control+d")
+
+    assert editor.settles(
+        lambda: "switches/sw-home-copy.yaml" in _tree(editor.root), timeout=TIMEOUT_MS / 1000
+    ), "Ctrl-D wrote no document"
+    assert fragment(editor) is None, "a duplicate must not overwrite what you copied earlier"
+
+
+def test_ctrl_x_cuts_and_one_undo_puts_it_back(open_editor: OpenEditor) -> None:
+    """A cut is a delete that also fills the clipboard, and it asks first."""
+    editor = arranged(open_editor)
+    assert editor.session is not None
+    before = _tree(editor.root)
+
+    pick(editor, "hosts/srv-nas")
+    asked: list[str] = []
+    editor.page.once("dialog", lambda dialog: (asked.append(dialog.message), dialog.accept()))
+    editor.press("Control+x")
+
+    assert editor.settles(
+        lambda: "hosts/srv-nas.yaml" not in _tree(editor.root), timeout=TIMEOUT_MS / 1000
+    ), "the cut removed nothing"
+    assert len(asked) == 1, "a cut removes documents, so it has to ask"
+    # The document goes before the answer comes back, so what it took has to be
+    # waited for rather than read the instant the file disappears.
+    assert editor.settles(
+        lambda: copied_names(editor) == ["hosts/srv-nas"], timeout=TIMEOUT_MS / 1000
+    ), "what a cut removed has to be on the clipboard"
+
+    editor.page.locator("#undo").click()
+    assert editor.settles(lambda: _tree(editor.root) == before, timeout=TIMEOUT_MS / 1000), (
+        "one undo has to put a cut back"
+    )
+
+
+def test_a_fragment_pastes_into_a_second_session(open_editor: OpenEditor) -> None:
+    """The between-windows case: JSON out of one page, documents into another.
+
+    A second browser context over a second :class:`EditingSession` — its own
+    revision, its own undo stack, no memory of the copy. All that crosses is the
+    JSON, handed over through `remember` exactly as the system clipboard would
+    hand it over when the browser allows one to be read. Pasting into a
+    *different inventory* is the same code path and is asserted in
+    ``tests/test_clipboard.py``, where no browser is needed to prove it.
+    """
+    source = arranged(open_editor)
+    pick(source, "switches/sw-home")
+    source.press("Control+c")
+    assert source.settles(lambda: fragment(source) is not None, timeout=TIMEOUT_MS / 1000)
+    payload = fragment(source)
+    assert payload is not None
+
+    target = open_editor(writable=True)
+    assert target.session is not None
+    assert target.session is not source.session, "a second session, not a second tab"
+    assert fragment(target) is None, "the second page has copied nothing"
+    before = _tree(target.root)
+    target.page.evaluate("payload => window.netgraphClipboard.remember(payload)", payload)
+    target.page.locator("#canvas").focus()
+    target.press("Control+v")
+
+    assert target.settles(lambda: _tree(target.root) != before, timeout=TIMEOUT_MS / 1000), (
+        "the fragment from the other window wrote nothing"
+    )
+    # It landed under the name it was copied as, because this tree has one too.
+    assert "switches/sw-home-copy.yaml" in _tree(target.root)
+
+
+def test_ctrl_c_in_the_yaml_pane_is_still_the_text(open_editor: OpenEditor) -> None:
+    """A canvas binding must not reach into a text field — Ctrl-C least of all."""
+    editor = arranged(open_editor)
+    pick(editor, "switches/sw-home")
+    editor.page.locator('.doc[data-address="switches/sw-home"]').first.click()
+    expect(editor.page.locator("#editor-title")).to_have_text("switches/sw-home.yaml")
+
+    editor.page.locator("#source").focus()
+    editor.press("Control+a", "Control+c")
+
+    assert fragment(editor) is None, "Ctrl-C in the editor copied the diagram"
+
+
+def test_a_read_only_session_will_not_paste_but_will_copy(open_editor: OpenEditor) -> None:
+    """Reading a fragment out of a tree is a read; writing one into it is not."""
+    editor = arranged(open_editor, writable=False)
+    before = _tree(editor.root)
+
+    pick(editor, "switches/sw-home")
+    editor.press("Control+c")
+    assert editor.settles(lambda: fragment(editor) is not None, timeout=TIMEOUT_MS / 1000), (
+        "a read-only session still has documents to copy"
+    )
+
+    editor.press("Control+v")
+    assert editor.settles(
+        lambda: editor.page.locator(".toast").count() > 0, timeout=TIMEOUT_MS / 1000
+    )
+    assert _tree(editor.root) == before, "a read-only session wrote a pasted document"

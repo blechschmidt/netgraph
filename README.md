@@ -206,6 +206,8 @@ report.txt` both do what they look like they do.
 | [`netgraph edit set`](docs/commands/edit.md) | Set a field on an element, in place, comments and all. | [edit.md](docs/commands/edit.md) |
 | [`netgraph edit unset`](docs/commands/edit.md) | Remove a field from an element. | [edit.md](docs/commands/edit.md) |
 | [`netgraph edit create`](docs/commands/edit.md) | Declare a new element and place its document. | [edit.md](docs/commands/edit.md) |
+| [`netgraph edit copy`](docs/commands/edit.md) | Copy an element or a whole namespace, links and all. | [edit.md](docs/commands/edit.md) |
+| [`netgraph edit duplicate`](docs/commands/edit.md) | Copy an element into the namespace it is already in. | [edit.md](docs/commands/edit.md) |
 | [`netgraph edit delete`](docs/commands/edit.md) | Remove an element, and what cannot survive it. | [edit.md](docs/commands/edit.md) |
 | [`netgraph edit rename`](docs/commands/edit.md) | Rename an element and every reference to it. | [edit.md](docs/commands/edit.md) |
 | [`netgraph edit move`](docs/commands/edit.md) | Move an element's document to another file. | [edit.md](docs/commands/edit.md) |

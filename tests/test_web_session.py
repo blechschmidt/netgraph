@@ -320,6 +320,96 @@ def test_an_unknown_operation_is_a_request_error(session: EditingSession) -> Non
 
 
 # --------------------------------------------------------------------------- #
+# The clipboard
+# --------------------------------------------------------------------------- #
+#
+# Four routes, and the property that separates them: two write and two do not.
+# The *semantics* of a copy are ``tests/test_clipboard.py``'s; what is asserted
+# here is that the session wraps them in what a session adds — the revision
+# precondition, the writability gate, one entry in the undo stack.
+
+
+def test_a_copy_serialises_the_selection_and_writes_nothing(session: EditingSession) -> None:
+    before = session.revision
+    payload = session.copy(["sw-home", "cbl-rtr-sw"], view="l1")
+
+    assert payload["format"] == "netgraph.dev/clipboard/v1"
+    # The cable has one end outside the selection, so it is left behind — and
+    # said so rather than silently omitted.
+    assert [entry["address"] for entry in payload["documents"]] == ["switches/sw-home"]
+    assert [entry["address"] for entry in payload["dropped"]] == ["cables/cbl-rtr-sw"]
+    assert session.revision == before, "a copy is a read"
+
+
+def test_a_read_only_session_still_copies(tree: Path) -> None:
+    """Reading a fragment out of a tree to paste into another one is a read."""
+    reader = EditingSession(root=tree, writable=False)
+    assert reader.copy(["sw-home"])["documents"]
+    with pytest.raises(ReadOnly):
+        reader.paste({"format": "netgraph.dev/clipboard/v1", "documents": []})
+    with pytest.raises(ReadOnly):
+        reader.duplicate(["sw-home"])
+    with pytest.raises(ReadOnly):
+        reader.cut(["sw-home"])
+
+
+def test_a_paste_writes_the_fragment_and_one_undo_takes_it_back(
+    session: EditingSession,
+) -> None:
+    before = _tree_bytes(session.root)
+    payload = session.copy(["sw-home"])
+    change = session.paste(payload, revision=session.revision)
+
+    assert (session.root / "switches" / "sw-home-copy.yaml").is_file()
+    assert change.files, "a paste writes"
+    session.undo()
+    assert _tree_bytes(session.root) == before, "one undo has to put a paste back"
+
+
+def test_a_duplicate_is_the_same_operations_the_command_line_writes(
+    session: EditingSession,
+) -> None:
+    change = session.duplicate(["sw-home"], revision=session.revision)
+    assert [entry["operation"]["op"] for entry in change.applied] == ["copy"]
+    assert (session.root / "switches" / "sw-home-copy.yaml").is_file()
+
+
+def test_a_cut_answers_the_fragment_and_the_change_together(session: EditingSession) -> None:
+    before = _tree_bytes(session.root)
+    payload, change = session.cut(["srv-nas"], revision=session.revision)
+
+    assert [entry["address"] for entry in payload["documents"]] == ["hosts/srv-nas"]
+    assert not (session.root / "hosts" / "srv-nas.yaml").is_file()
+    assert change.files
+    session.undo()
+    assert _tree_bytes(session.root) == before
+
+
+def test_a_clipboard_write_decided_against_an_older_tree_is_refused(
+    session: EditingSession,
+) -> None:
+    stale = session.revision
+    session.invalidate()
+    for call in (
+        lambda: session.duplicate(["sw-home"], revision=stale),
+        lambda: session.cut(["sw-home"], revision=stale),
+        lambda: session.paste(
+            {"format": "netgraph.dev/clipboard/v1", "documents": []}, revision=stale
+        ),
+    ):
+        with pytest.raises(Conflict):
+            call()
+
+
+def _tree_bytes(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
+# --------------------------------------------------------------------------- #
 # Annotations (§21)
 # --------------------------------------------------------------------------- #
 

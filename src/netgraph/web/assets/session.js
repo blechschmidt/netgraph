@@ -1267,6 +1267,48 @@ var netgraphSession = (function () {
       });
   }
 
+  /** Post to any of this session's routes, and turn a refusal into an Error.
+   *
+   * The half of `ops` that is not about operations: the revision precondition,
+   * the client id, and the one place a refusal becomes a toast. `clipboard.js`
+   * uses it for the four routes whose body is not a list of operations — a copy
+   * answers with a fragment and no change at all, and folding that into `ops`
+   * would mean `ops` growing a second meaning.
+   */
+  function request(path, body) {
+    var payload = { revision: state.revision, client: me.id };
+    Object.keys(body || {}).forEach(function (key) { payload[key] = body[key]; });
+    return fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify(payload)
+    })
+      .then(readBody)
+      .catch(function (error) {
+        refused(error, false);
+        paintHistory();
+        throw error;
+      });
+  }
+
+  /** Adopt a changeset that came back from one of those routes.
+   *
+   * Split from `request` because not every one of them produces a change: a
+   * copy writes nothing, so calling this for it would announce a revision that
+   * did not move and refetch a tree that did not change.
+   */
+  function adopt(result, said) {
+    if (!result || !result.files) { return result; }
+    if (!Object.keys(result.files).length) {
+      host.toast("nothing to write", "ok");
+      return result;
+    }
+    applied(result, said, true);
+    paintHistory();
+    return result;
+  }
+
   /** Post one tidying of the selection: align, distribute or snap.
    *
    * A route of its own rather than a batch of set-geometry operations built
@@ -1891,6 +1933,14 @@ var netgraphSession = (function () {
      * geometry through it, so a bend written from the canvas takes exactly
      * the route a rename does. */
     ops: ops,
+    /* The generic form of it, for the routes whose body is not operations:
+     * clipboard.js posts /api/copy, /api/cut, /api/paste and /api/duplicate
+     * through these two, so a paste reaches the disk exactly the way a rename
+     * does and shows up in the same drawer. */
+    request: request,
+    adopt: adopt,
+    /* Who this tab is, so a write it made is not echoed back to it. */
+    client: function () { return me.id; },
     /* Align, distribute and snap. Its own route because the arithmetic needs
      * the layout documents, which the page does not have; see arrange above. */
     arrange: arrange,

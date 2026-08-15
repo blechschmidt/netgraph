@@ -19,6 +19,10 @@ document stream in the browser and renders what it is sent::
     PUT  /api/file/<path>     that file back, refusing a stale one
     POST /api/ops             a batch of netgraph.edit operations, applied
     POST /api/arrange         align, distribute or snap a selection
+    POST /api/copy            a selection, serialised for the system clipboard
+    POST /api/cut             the same, and the selection deleted, as one change
+    POST /api/paste           a clipboard fragment written into this tree
+    POST /api/duplicate       a selection copied in place, links and all
     POST /api/undo, /api/redo the server-side history
     GET  /api/events          server-sent events: what changed, as it changes
     POST /api/presence        what this client has selected and is editing
@@ -115,8 +119,11 @@ __all__ = [
     "ASSETS",
     "BINDINGS_PATH",
     "CHANGES_PATH",
+    "COPY_PATH",
+    "CUT_PATH",
     "DEFAULT_PORT",
     "DIFF_PATH",
+    "DUPLICATE_PATH",
     "EVENTS_PATH",
     "FILE_PREFIX",
     "FIX_PATH",
@@ -126,6 +133,7 @@ __all__ = [
     "IMPACT_PATH",
     "MAX_SOURCE_BYTES",
     "OPS_PATH",
+    "PASTE_PATH",
     "PRESENCE_PATH",
     "REDO_PATH",
     "RENDER_PATH",
@@ -155,6 +163,15 @@ TREE_PATH: Final = "/api/tree"
 GRAPH_PATH: Final = "/api/graph"
 OPS_PATH: Final = "/api/ops"
 ARRANGE_PATH: Final = "/api/arrange"
+#: The clipboard, in four routes. Two of them write and two do not, which is why
+#: they are four routes and not one with a verb in the body: a caller — and a
+#: reverse proxy, and a log — can tell what a request does by looking at it.
+#: ``copy`` serialises a selection and is answered by a read-only session too;
+#: ``cut`` does that and deletes what it serialised, as one change.
+COPY_PATH: Final = "/api/copy"
+CUT_PATH: Final = "/api/cut"
+PASTE_PATH: Final = "/api/paste"
+DUPLICATE_PATH: Final = "/api/duplicate"
 #: The changes drawer: the session's own log, and the handover command list.
 CHANGES_PATH: Final = "/api/changes"
 #: The same tree, drawn as a diff against a baseline (``?against=session|git``).
@@ -195,6 +212,7 @@ ASSETS: Final[dict[str, tuple[str, str]]] = {
     "/menu.js": ("menu.js", "text/javascript; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/select.js": ("select.js", "text/javascript; charset=utf-8"),
+    "/clipboard.js": ("clipboard.js", "text/javascript; charset=utf-8"),
     "/style.js": ("style.js", "text/javascript; charset=utf-8"),
     "/session.js": ("session.js", "text/javascript; charset=utf-8"),
     "/tour.js": ("tour.js", "text/javascript; charset=utf-8"),
@@ -575,11 +593,47 @@ class _Handler(LocalHandler):
         if path == PRESENCE_PATH:
             self._presence(session)
             return
-        if path not in (OPS_PATH, ARRANGE_PATH, UNDO_PATH, REDO_PATH, REVERT_PATH, FIX_PATH):
+        if path in (COPY_PATH, CUT_PATH):
+            self._clipboard(session, path)
+            return
+        if path not in (
+            OPS_PATH,
+            ARRANGE_PATH,
+            UNDO_PATH,
+            REDO_PATH,
+            REVERT_PATH,
+            FIX_PATH,
+            PASTE_PATH,
+            DUPLICATE_PATH,
+        ):
             self.send_text(HTTPStatus.NOT_FOUND, f"nothing to post to at {path}")
             return
         try:
-            if path == UNDO_PATH:
+            if path == PASTE_PATH:
+                payload = self._read_json()
+                fragment = payload.get("payload")
+                if not isinstance(fragment, dict):
+                    raise RequestError("'payload' must be the clipboard fragment, as an object")
+                change = session.paste(
+                    fragment,
+                    namespace=_optional(payload, "namespace"),
+                    view=_optional(payload, "view"),
+                    at=_point(payload.get("at")),
+                    revision=_revision(payload),
+                    force=bool(payload.get("force", False)),
+                    client=_client(payload),
+                )
+            elif path == DUPLICATE_PATH:
+                payload = self._read_json()
+                change = session.duplicate(
+                    _addresses(payload),
+                    view=_optional(payload, "view"),
+                    namespace=_optional(payload, "namespace"),
+                    revision=_revision(payload),
+                    force=bool(payload.get("force", False)),
+                    client=_client(payload),
+                )
+            elif path == UNDO_PATH:
                 change = session.undo(client=_client_id(self._query))
             elif path == REDO_PATH:
                 change = session.redo(client=_client_id(self._query))
@@ -620,6 +674,33 @@ class _Handler(LocalHandler):
             self._refuse(exc)
             return
         self._json(HTTPStatus.OK, change.to_dict())
+
+    def _clipboard(self, session: EditingSession, path: str) -> None:
+        """Serialise a selection, and — for a cut — delete it in the same breath.
+
+        Answered separately from the rest of the POSTs because its body is not a
+        :class:`~netgraph.web.session.Change`: a copy produces a *fragment* and
+        no change at all, and a cut produces both. Folding the fragment into a
+        change would mean every other route carrying an empty ``clipboard`` key.
+        """
+        try:
+            payload = self._read_json()
+            view = _optional(payload, "view")
+            if path == COPY_PATH:
+                fragment = session.copy(_addresses(payload), view=view)
+                self._json(HTTPStatus.OK, {"clipboard": fragment})
+                return
+            fragment, change = session.cut(
+                _addresses(payload),
+                view=view,
+                revision=_revision(payload),
+                force=bool(payload.get("force", False)),
+                client=_client(payload),
+            )
+        except Exception as exc:  # narrowed by ``_refuse``, which re-raises the rest
+            self._refuse(exc)
+            return
+        self._json(HTTPStatus.OK, {"clipboard": fragment, **change.to_dict()})
 
     def _presence(self, session: EditingSession) -> None:
         """Say who you are and what you are doing; hear who else is here.
@@ -962,6 +1043,23 @@ def _revision(payload: dict[str, Any]) -> int | None:
     if not isinstance(value, int) or isinstance(value, bool):
         raise RequestError("'revision' must be the tree revision this batch was built from")
     return value
+
+
+def _point(value: Any) -> tuple[float, float] | None:
+    """A paste anchor, in netgraph's own coordinates, or ``None``.
+
+    ``{"x": 240, "y": 396}`` — the point the fragment's middle should land on,
+    which is where the pointer was when somebody pressed ``Ctrl-V``. Absent
+    means "offset from the originals", which is what the keyboard means.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise RequestError('\'at\' must be a point, as {"x": …, "y": …}')
+    try:
+        return (float(value["x"]), float(value["y"]))
+    except (KeyError, TypeError, ValueError) as exc:
+        raise RequestError("'at' must carry a numeric 'x' and 'y'") from exc
 
 
 class WebServer(BackgroundServer):

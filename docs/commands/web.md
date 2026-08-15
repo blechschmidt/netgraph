@@ -339,6 +339,9 @@ menu, untouched.
 | Distribute horizontally | Distribute horizontally — *palette only* | `--write` |
 | Distribute vertically | Distribute vertically — *palette only* | `--write` |
 | Snap to the grid | Snap to the grid — *palette only* | `--write` |
+| Copy | Copy the selection — `Ctrl-C` | a folder |
+| Cut | Cut the selection — `Ctrl-X` | `--write` |
+| Duplicate | Duplicate the selection — `Ctrl-D` | `--write` |
 | Set a field on all of them… | Set a field… — `e` | `--write` |
 | Remove a field from all of them… | Remove a field… — *palette only* | `--write` |
 | Move their documents… | Move to another file… — *palette only* | `--write` |
@@ -354,6 +357,9 @@ menu, untouched.
 | Cable it to… | Connect this element… — `c` | `--write` |
 | Add an interface… | Add an interface… — `i` | `--write` |
 | Note about it… | Add a note to the diagram… — `Shift-N` | `--write` |
+| Copy | Copy the selection — `Ctrl-C` | a folder |
+| Cut | Cut the selection — `Ctrl-X` | `--write` |
+| Duplicate | Duplicate the selection — `Ctrl-D` | `--write` |
 | Rename it… | Rename the focused element… — `F2` | `--write` |
 | Change how it looks… | Restyle the selection — *palette only* | `--write` |
 | Set a field… | Set a field… — `e` | `--write` |
@@ -389,6 +395,7 @@ menu, untouched.
 |---|---|---|
 | New ▸ *(one row per element kind)* | Create an element… — `n` | `--write` |
 | New note | Add a note to the diagram… — `Shift-N` | `--write` |
+| Paste here | Paste — `Ctrl-V` | `--write` |
 | Show another layer… | Switch layer… — *palette only* | — |
 | Fit the diagram | Fit the diagram — `0` | — |
 | Undo | Undo — `Ctrl-Z` | `--write` |
@@ -627,6 +634,10 @@ cable it, undo both — without dispatching a single mouse event.
 | `n` | Create an element… | the diagram | `--write` | Asks for a kind and a name, and writes the document. 'netgraph edit create'. |
 | `c` | Connect this element… | the diagram | `--write` | Cables the focused element to another, port to port. 'netgraph edit connect'. |
 | `Delete` / `Backspace` | Delete the selection | the diagram | `--write` | Removes everything selected, or the focused element when nothing is. Asks once, listing what goes and the cables that dangle as a result, and writes it as one change. 'netgraph edit delete' / 'disconnect'. |
+| `Ctrl-C` | Copy the selection | the diagram | a folder | Puts the selected elements on the system clipboard as JSON — the documents themselves, plus any cable whose two ends are both selected. Paste it into another netgraph window, or into a text editor to read it. 'netgraph edit copy'. |
+| `Ctrl-X` | Cut the selection | the diagram | `--write` | Copy, and then delete what was copied — as one change, so one Ctrl-Z puts the documents back. Asks first, listing what goes. |
+| `Ctrl-V` | Paste | the diagram | `--write` | Writes the clipboard fragment into this inventory: new documents, with free names, the internal cables rewired to the copies, and positions offset from the originals — or dropped where you last right-clicked. A fragment from another inventory pastes the same way. |
+| `Ctrl-D` | Duplicate the selection | the diagram | `--write` | Copy and paste in one keystroke, without touching the system clipboard: each selected element gets a sibling called 'sw1-copy' beside it. 'netgraph edit duplicate'. |
 | `F2` | Rename the focused element… | the diagram | `--write` | Renames it and every reference to it. 'netgraph edit rename'. |
 | `e` | Set a field… | the diagram | `--write` | A dotted path and a YAML value, on every selected element at once — or on the focused one when nothing is selected. 'netgraph edit set'. |
 | *palette only* | Remove a field… | anywhere | `--write` | 'netgraph edit unset', across the whole selection as one change. |

@@ -1,0 +1,38 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-rtr-sw
+spec:
+  # Short names, resolved in this folder's namespace.
+  endpoints:
+    - rtr-hq:lan0
+    - sw-hq:port1
+  medium: copper
+  speed: 1Gbps
+  label: HQ-001
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-sw-srv
+spec:
+  endpoints:
+    - sw-hq:port2
+    - srv-hq:eth0
+  medium: copper
+  speed: 1Gbps
+  label: HQ-002
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-sw-rack
+spec:
+  # A qualified reference, relative to this document's own namespace: the other
+  # spelling a copy has to keep meaning what it meant.
+  endpoints:
+    - sw-hq:port3
+    - racks/r1/sw-rack:uplink
+  medium: fiber
+  speed: 10Gbps
+  label: HQ-003

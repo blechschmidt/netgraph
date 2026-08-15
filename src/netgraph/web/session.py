@@ -82,18 +82,25 @@ from typing import Any, Final
 from netgraph.config import DEFAULT_MAX_REVISIONS, Config, ValidationConfig, load_config
 from netgraph.edit import (
     ARRANGEMENTS,
+    DEFAULT_SUFFIX,
     Batch,
     ConflictError,
+    CopyElement,
+    CopyPlan,
     CreateElement,
+    DeleteElement,
     EditError,
     EditSession,
     Operation,
     ValidationRefused,
     WriteFile,
     arrange_operations,
+    clipboard_payload,
     command_list,
+    copy_plan,
     describe_arrangement,
     operation_from_dict,
+    paste_plan,
 )
 from netgraph.edit.batch import describe as describe_batch
 from netgraph.edit.tree import digest_of
@@ -1002,6 +1009,154 @@ class EditingSession:
             redo_depth=len(self._redo),
         )
 
+    # -- the clipboard ---------------------------------------------------
+    #
+    # Four routes rather than one with a verb, because they are four different
+    # kinds of thing: two of them write and two of them do not, and a caller has
+    # to be able to tell which by looking at the URL. What they share is the
+    # planning, and that is not here: it is
+    # :mod:`netgraph.edit.clipboard`, so the browser, ``netgraph edit copy`` and
+    # a script all get the same answer about what a copy is.
+
+    def copy(self, addresses: Sequence[str], *, view: str | None = None) -> dict[str, Any]:
+        """Serialise a selection for the system clipboard. Writes nothing.
+
+        Deliberately *not* gated on ``--write``: reading a fragment out of a
+        read-only session and pasting it into a writable one is a reasonable
+        thing to do, and refusing it would be refusing a read.
+
+        Raises:
+            EditError: Nothing was named, or something named does not exist.
+        """
+        with self._lock:
+            return clipboard_payload(self.inventory(), list(addresses), view=view)
+
+    def cut(
+        self,
+        addresses: Sequence[str],
+        *,
+        view: str | None = None,
+        revision: int | None = None,
+        force: bool = False,
+        client: str | None = None,
+    ) -> tuple[dict[str, Any], Change]:
+        """Copy a selection to the clipboard and delete it, as one change.
+
+        One change rather than two, because a cut that half-failed — the payload
+        made, the delete refused, or worse the other way round — is a state
+        nobody asked for. The payload is built *first*, from the tree as it
+        still is, and the delete only then goes through the ordinary batch.
+
+        Returns:
+            The clipboard payload, and what the delete did.
+
+        Raises:
+            ReadOnly: This session does not write.
+            Conflict: ``revision`` is not the current one.
+            EditError: The selection cannot be deleted; nothing is written.
+        """
+        self._require_writable()
+        with self._lock:
+            self._check_revision(revision, "cutting")
+            payload = clipboard_payload(self.inventory(), list(addresses), view=view)
+            wanted = [str(entry["address"]) for entry in payload["documents"]]
+            operations: tuple[Operation, ...] = tuple(
+                DeleteElement(address=address, cascade=True) for address in wanted
+            )
+            label = f"cut {len(wanted)} element{'' if len(wanted) == 1 else 's'}"
+            return payload, self._committed(
+                self._commit(operations, label=label, force=force, client=client)
+            )
+
+    def duplicate(
+        self,
+        addresses: Sequence[str],
+        *,
+        view: str | None = None,
+        namespace: str | None = None,
+        suffix: str = DEFAULT_SUFFIX,
+        revision: int | None = None,
+        force: bool = False,
+        client: str | None = None,
+    ) -> Change:
+        """Copy a selection in place, links and geometry included.
+
+        ``Ctrl-D``. The plan is
+        :func:`~netgraph.edit.clipboard.copy_plan`'s, so what the browser writes
+        and what ``netgraph edit duplicate`` writes are the same operations.
+
+        Raises:
+            ReadOnly: This session does not write.
+            Conflict: ``revision`` is not the current one.
+            EditError: The selection cannot be copied; nothing is written.
+        """
+        self._require_writable()
+        with self._lock:
+            self._check_revision(revision, "duplicating")
+            plan = copy_plan(
+                self.inventory(),
+                list(addresses),
+                namespace=namespace,
+                suffix=suffix,
+                view=view,
+            )
+            return self._applied_plan(plan, force=force, client=client)
+
+    def paste(
+        self,
+        payload: Mapping[str, Any],
+        *,
+        namespace: str | None = None,
+        view: str | None = None,
+        at: tuple[float, float] | None = None,
+        suffix: str = DEFAULT_SUFFIX,
+        revision: int | None = None,
+        force: bool = False,
+        client: str | None = None,
+    ) -> Change:
+        """Write a clipboard fragment into this tree, as one change.
+
+        The fragment may have come from this window, from another tab, or from
+        another inventory entirely — nothing here reads a source element, so all
+        three are the same code path.
+
+        Raises:
+            ReadOnly: This session does not write.
+            Conflict: ``revision`` is not the current one.
+            EditError: The payload is not a netgraph fragment, or cannot be
+                written; nothing is written.
+        """
+        self._require_writable()
+        with self._lock:
+            self._check_revision(revision, "pasting")
+            plan = paste_plan(
+                self.inventory(),
+                payload,
+                namespace=namespace,
+                suffix=suffix,
+                view=view,
+                at=at,
+            )
+            return self._applied_plan(plan, force=force, client=client)
+
+    def _applied_plan(self, plan: CopyPlan, *, force: bool, client: str | None) -> Change:
+        """Commit a copy plan, or answer that it had nothing to write."""
+        if not plan.operations:
+            # Every link in the fragment was dropped and there was nothing else:
+            # answered rather than refused, for the reason ``arrange`` gives.
+            return self._unchanged()
+        return self._committed(
+            self._commit(plan.operations, label=plan.describe(), force=force, client=client)
+        )
+
+    def _check_revision(self, revision: int | None, doing: str) -> None:
+        """Refuse a write decided against a tree that has since moved on."""
+        if revision is not None and revision != self._revision:
+            raise Conflict(
+                f"the inventory has changed since revision {revision} "
+                f"(it is now at {self._revision}); reload before {doing}"
+            )
+
     def fix(
         self,
         rule: str,
@@ -1827,8 +1982,8 @@ def _addresses_of(operations: Sequence[Operation]) -> tuple[str, ...]:
         if isinstance(address, str) and address:
             found.setdefault(address, None)
         name = getattr(operation, "name", None)
-        if isinstance(operation, CreateElement) and isinstance(name, str):
-            namespace = operation.namespace
+        if isinstance(operation, (CreateElement, CopyElement)) and isinstance(name, str):
+            namespace = operation.namespace or ""
             found.setdefault(f"{namespace}/{name}" if namespace else name, None)
     return tuple(found)
 

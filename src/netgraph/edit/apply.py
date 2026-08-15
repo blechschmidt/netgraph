@@ -22,6 +22,8 @@ disturb a byte that the operation did not write:
 ======================== =====================================================
 create                   delete: the document did not exist, so removing it
                          leaves the file as it was
+copy                     delete, for the same reason: a copy is a whole new
+                         document and never re-emits the one it came from
 connect                  disconnect, for the same reason
 move within a namespace  move back to the index it came from, the document
                          being carried across verbatim -- unless the move
@@ -50,11 +52,13 @@ from typing import Any, Final
 
 import yaml as pyyaml
 
+from netgraph.edit.clipboard import dedupe_name, strip_unique
 from netgraph.edit.errors import AddressError, CascadeRequired, EditError, OperationError
 from netgraph.edit.operations import (
     AddInterface,
     AppendItem,
     Connect,
+    CopyElement,
     CreateAnnotation,
     CreateElement,
     DeleteAnnotation,
@@ -84,7 +88,7 @@ from netgraph.edit.references import (
     references_of,
     rewrite_reference,
 )
-from netgraph.edit.roundtrip import YamlFile
+from netgraph.edit.roundtrip import YamlDocument, YamlFile
 from netgraph.edit.tree import EditableTree
 from netgraph.errors import SchemaError
 from netgraph.fmt.canonical import format_stream
@@ -288,6 +292,153 @@ def _emit(document: Mapping[str, Any]) -> str:
         dict(document), sort_keys=False, default_flow_style=False, allow_unicode=True, width=1 << 30
     )
     return format_stream(dumped)
+
+
+def _copy(context: _Context, operation: CopyElement) -> tuple[Operation, ...]:
+    """Write a second element built from an existing one.
+
+    The copy starts as the source's *text*, re-parsed into a document of its own,
+    so it arrives carrying the original's comments, its key order and its quoting
+    — a copied switch reads like the switch it was copied from rather than like
+    something a generator produced. Only three things are then changed on the way
+    out: the name, the references
+    :attr:`~netgraph.edit.operations.CopyElement.rewrite` redirects, and the
+    fields two elements cannot both have.
+
+    Re-parsed rather than deep-copied, and that is not a stylistic choice:
+    ``copy.deepcopy`` of a ``ruamel`` tree drops the comments attached to
+    sequence *entries*, which in an inventory is most of them — the note above a
+    port, the reason a VLAN exists. Parsing the text again is the only way to get
+    a tree that is independent of the source and still says everything the source
+    said.
+
+    The inverse is a delete, exact by construction for the reason a create's is:
+    the document did not exist, so removing it leaves the file as it was.
+    """
+    located = context.locate(operation.address)
+    namespace = operation.namespace if operation.namespace is not None else located.namespace
+    siblings = {
+        short_name(fqn) for fqn in context.inventory.elements if namespace_of(fqn) == namespace
+    }
+    name = operation.name or dedupe_name(
+        located.element.metadata.name, siblings, suffix=operation.suffix
+    )
+    fqn = qualify(namespace, name)
+    if fqn in context.inventory.elements:
+        raise EditError(f"{fqn} already exists; a name is unique within its namespace (NG-N002)")
+
+    source = context.tree.document(located.relative, located.index)
+    if source.inline:
+        raise EditError(
+            f"{located.fqn} is introduced by an inline '--- key: value' marker and cannot be "
+            f"copied without moving its first key; run 'netgraph fmt' on {located.relative} first"
+        )
+    made = YamlDocument(text=source.render())
+    data = made.touch()
+    metadata = data.get("metadata") if isinstance(data, MutableMapping) else None
+    if not isinstance(metadata, MutableMapping):
+        raise EditError(  # pragma: no cover - the loader read metadata.name from here
+            f"{located.fqn}: its document has no metadata block to rename, so it cannot be copied"
+        )
+    metadata["name"] = name
+
+    # Before the strip, so that a reference inside a field the strip removes is
+    # never looked for at a path that has just gone.
+    _rewire_copy(context, operation, located, data, namespace=namespace, new_fqn=fqn)
+    if not operation.keep_unique:
+        strip_unique(data)
+
+    try:
+        parse_document(_plain(data))
+    except SchemaError as exc:
+        problems = "; ".join(str(issue) for issue in exc.issues)
+        raise EditError(f"the copy of {located.fqn} does not match the schema: {problems}") from exc
+    relative = choose_file(
+        kind=located.element.kind,
+        namespace=namespace,
+        name=name,
+        files=context.tree.facts(context.inventory),
+        requested=operation.file,
+    )
+    context.tree.insert_document(relative, -1, made.render())
+    return (DeleteElement(address=fqn),)
+
+
+def _rewire_copy(
+    context: _Context,
+    operation: CopyElement,
+    located: _Located,
+    data: Any,
+    *,
+    namespace: str,
+    new_fqn: str,
+) -> None:
+    """Point the copy's references where the copy should point them.
+
+    Two jobs at once, and they are the same arithmetic
+    :func:`_requalify` does for a move:
+
+    * **redirection.** A reference whose target is in ``rewrite`` names the
+      *copy* of that target instead — which is what makes a cloned cable join
+      the cloned switches.
+    * **re-spelling.** A reference that is not redirected still has to keep
+      meaning what it meant: a plain name resolves outwards from the folder its
+      document sits in, so a copy that lands in another namespace can silently
+      start naming something else.
+
+    Raises:
+        EditError: The element is a cable and nothing was redirected, which
+            would put a second cable on an interface that already has one.
+    """
+    before = context.index
+    after = NameIndex([*context.inventory.elements, new_fqn])
+    redirected = 0
+    for reference in references_of(located.fqn, located.element):
+        target = before.lookup(reference.target, located.namespace)
+        wanted = _redirected(operation, reference.target, target)
+        if wanted is not None:
+            redirected += 1
+        elif target is None:  # already dangling; a copy is not the place to fix it
+            continue
+        else:
+            wanted = target
+        replacement = reference_text(
+            wanted, namespace=namespace, written=reference.target, index=after
+        )
+        if replacement != reference.target:
+            rewrite_reference(data, reference, replacement)
+    if isinstance(located.element, Cable) and not redirected:
+        raise EditError(
+            f"copying {located.fqn} on its own would land a second cable on interfaces that "
+            f"already have one (NG-C001); copy the elements it joins as well and the cable "
+            f"comes with them, rewired to the copies"
+        )
+
+
+def _redirected(operation: CopyElement, written: str, resolved: str | None) -> str | None:
+    """Which copy this reference should name instead, or ``None`` for none.
+
+    The resolved name is tried first and is the normal answer. The *written*
+    form is the fallback, and it is not a nicety: copying a set writes the
+    copies one at a time, so by the time the cable in a set is copied the tree
+    already holds ``clone/routers/rtr-home`` beside ``routers/rtr-home`` — and
+    ``rtr-home`` no longer resolves to either of them. Resolution has become
+    ambiguous *because of this very batch*, and refusing to redirect there would
+    leave the cloned cable joining the originals.
+
+    The written fallback is safe because ``rewrite`` is not a guess: it was
+    computed over the whole selection against the tree as it was before any of
+    it was copied. A written name is accepted only when exactly one entry claims
+    it, so an ambiguity that was already in the document stays an ambiguity.
+    """
+    if resolved is not None and resolved in operation.rewrite:
+        return operation.rewrite[resolved]
+    matches = [
+        new
+        for old, new in operation.rewrite.items()
+        if old == written or short_name(old) == written or old.endswith(f"/{written}")
+    ]
+    return matches[0] if len(matches) == 1 else None
 
 
 def _delete(context: _Context, operation: DeleteElement) -> tuple[Operation, ...] | None:
@@ -1288,6 +1439,7 @@ _Handler = Callable[[_Context, Any], "tuple[Operation, ...] | None"]
 #: one that is exact, and ``None`` to have the pre-images used instead.
 _HANDLERS: Final[dict[type[Operation], _Handler]] = {
     CreateElement: _create,
+    CopyElement: _copy,
     DeleteElement: _delete,
     RenameElement: _rename,
     MoveElement: _move,

@@ -420,6 +420,68 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         where="canvas",
         needs="write",
     ),
+    # -- The clipboard -----------------------------------------------------
+    #
+    # The four chords everybody already knows, and the reason they are worth
+    # spelling out here: on this canvas they do not move *shapes*, they write
+    # *documents*. Ctrl-C serialises the selected elements — and the cables
+    # between them — onto the system clipboard as JSON, so the fragment can be
+    # pasted into another window, another inventory, or a text editor. Ctrl-V
+    # writes those documents into this tree with free names. All four are
+    # ``canvas`` bindings on purpose: Ctrl-C in the YAML pane is still the text.
+    Binding(
+        id="clipboard.copy",
+        title="Copy the selection",
+        section="Editing the inventory",
+        keys=("Ctrl-C",),
+        detail=(
+            "Puts the selected elements on the system clipboard as JSON — the "
+            "documents themselves, plus any cable whose two ends are both "
+            "selected. Paste it into another netgraph window, or into a text "
+            "editor to read it. 'netgraph edit copy'."
+        ),
+        where="canvas",
+        needs="session",
+    ),
+    Binding(
+        id="clipboard.cut",
+        title="Cut the selection",
+        section="Editing the inventory",
+        keys=("Ctrl-X",),
+        detail=(
+            "Copy, and then delete what was copied — as one change, so one "
+            "Ctrl-Z puts the documents back. Asks first, listing what goes."
+        ),
+        where="canvas",
+        needs="write",
+    ),
+    Binding(
+        id="clipboard.paste",
+        title="Paste",
+        section="Editing the inventory",
+        keys=("Ctrl-V",),
+        detail=(
+            "Writes the clipboard fragment into this inventory: new documents, "
+            "with free names, the internal cables rewired to the copies, and "
+            "positions offset from the originals — or dropped where you last "
+            "right-clicked. A fragment from another inventory pastes the same way."
+        ),
+        where="canvas",
+        needs="write",
+    ),
+    Binding(
+        id="clipboard.duplicate",
+        title="Duplicate the selection",
+        section="Editing the inventory",
+        keys=("Ctrl-D",),
+        detail=(
+            "Copy and paste in one keystroke, without touching the system "
+            "clipboard: each selected element gets a sibling called 'sw1-copy' "
+            "beside it. 'netgraph edit duplicate'."
+        ),
+        where="canvas",
+        needs="write",
+    ),
     Binding(
         id="element.rename",
         title="Rename the focused element…",
@@ -908,6 +970,11 @@ MENUS: Final[tuple[Menu, ...]] = (
                 MenuItem("geometry.snap", "Snap to the grid"),
             ),
             (
+                MenuItem("clipboard.copy", "Copy"),
+                MenuItem("clipboard.cut", "Cut"),
+                MenuItem("clipboard.duplicate", "Duplicate"),
+            ),
+            (
                 MenuItem("element.set", "Set a field on all of them…"),
                 MenuItem("element.unset", "Remove a field from all of them…"),
                 MenuItem("element.move", "Move their documents…"),
@@ -932,6 +999,11 @@ MENUS: Final[tuple[Menu, ...]] = (
                 # note gets an anchor: one created over an element is about that
                 # element and follows it when the diagram is laid out again.
                 MenuItem("annotation.create", "Note about it…"),
+            ),
+            (
+                MenuItem("clipboard.copy", "Copy"),
+                MenuItem("clipboard.cut", "Cut"),
+                MenuItem("clipboard.duplicate", "Duplicate"),
             ),
             (
                 MenuItem("element.rename", "Rename it…"),
@@ -979,6 +1051,10 @@ MENUS: Final[tuple[Menu, ...]] = (
             (
                 MenuItem("element.create", "New", submenu="kinds"),
                 MenuItem("annotation.create", "New note"),
+                # Here and nowhere else, because *this* is where a paste gets
+                # its anchor: the fragment lands where the pointer was rather
+                # than offset from wherever it was copied.
+                MenuItem("clipboard.paste", "Paste here"),
             ),
             (
                 MenuItem("view.layer", "Show another layer…"),

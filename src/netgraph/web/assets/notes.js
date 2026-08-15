@@ -218,6 +218,19 @@ window.netgraphNotes = (function () {
     return toGraph(local.x, local.y);
   }
 
+  /** A screen point in the diagram's own coordinates, or null when the overlay
+   *  is not up yet.
+   *
+   * Exported because clipboard.js needs exactly this and nothing else: a paste
+   * from the canvas menu lands where the pointer was, and the transform from a
+   * `clientX` to a netgraph coordinate is this file's, not a second copy of it.
+   */
+  function graphPoint(clientX, clientY) {
+    if (!host) { return null; }
+    var where = pointerAt({ clientX: clientX, clientY: clientY });
+    return { x: where[0], y: where[1] };
+  }
+
   /* ------------------------------------------------------------- the boxes */
 
   /** Where one annotation is drawn, in graph coordinates, or null.
@@ -885,6 +898,7 @@ window.netgraphNotes = (function () {
     attach: attach,
     annotate: annotate,
     at: at,
+    graphPoint: graphPoint,
     select: select,
     selection: selection,
     token: token,

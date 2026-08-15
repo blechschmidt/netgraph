@@ -48,6 +48,7 @@ __all__ = [
     "AddInterface",
     "AppendItem",
     "Connect",
+    "CopyElement",
     "CreateAnnotation",
     "CreateElement",
     "DeleteAnnotation",
@@ -153,6 +154,82 @@ class DeleteElement(Operation):
 
     def describe(self) -> str:
         return f"delete {self.address}" + (" and everything that needs it" if self.cascade else "")
+
+
+@dataclass(frozen=True)
+class CopyElement(Operation):
+    """Write a second element built from an existing one (``copy``/``duplicate``).
+
+    One element, deliberately. A multi-selection, a namespace and a pasted
+    fragment are all *plans* over this operation
+    (:func:`~netgraph.edit.clipboard.copy_plan`), because deciding which cables
+    come along and what each copy is called needs the whole set in view, and
+    because keeping the set out of the operation keeps each copy separately
+    describable, separately undoable and separately reviewable.
+
+    Three things make a copy something other than "write the document twice":
+
+    * ``metadata.name`` is deduplicated — ``sw1`` becomes ``sw1-copy``, then
+      ``sw1-copy-2`` (:func:`~netgraph.edit.clipboard.dedupe_name`), unless
+      :attr:`name` says otherwise;
+    * the fields two elements in one inventory cannot both have are dropped
+      (:data:`~netgraph.edit.clipboard.UNIQUE_FIELDS`), unless
+      :attr:`keep_unique` is set;
+    * the references named in :attr:`rewrite` are pointed at the copies instead
+      of the originals, which is what makes a copied cable join the copied
+      switches rather than reaching back to the ones it was cloned from.
+
+    Everything else — the comments, the key order, the quoting — comes across
+    verbatim, because the source document's round-trip tree is what is copied.
+
+    ``duplicate`` is this operation with no :attr:`namespace` and no
+    :attr:`name`: the same semantics under the name a diagram editor gives them,
+    which is why there is one applier and not two. :mod:`netgraph.edit.commands`
+    renders it back as ``netgraph edit duplicate``.
+    """
+
+    op: ClassVar[str] = "copy"
+
+    #: The element to copy.
+    address: str
+    #: ``metadata.name`` of the copy; derived from the source's when absent.
+    name: str | None = None
+    #: Namespace to write it into; the source's own when absent.
+    namespace: str | None = None
+    #: What a derived name gets before its counter.
+    suffix: str = "copy"
+    #: Keep the values :data:`~netgraph.edit.clipboard.UNIQUE_FIELDS` lists.
+    keep_unique: bool = False
+    #: Fully-qualified name to fully-qualified name: references this element
+    #: makes that should point at a copy instead of at the original.
+    rewrite: Mapping[str, str] = field(default_factory=dict)
+    #: Relative POSIX path to write into, or ``None`` to let placement decide.
+    file: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.address:
+            raise OperationError("a copy must name what it copies")
+        if not self.suffix:
+            raise OperationError("a copy suffix cannot be empty")
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"op": self.op, "address": self.address}
+        for key in ("name", "namespace", "file"):
+            value = getattr(self, key)
+            if value is not None:
+                payload[key] = value
+        if self.suffix != "copy":
+            payload["suffix"] = self.suffix
+        if self.keep_unique:
+            payload["keep_unique"] = True
+        if self.rewrite:
+            payload["rewrite"] = dict(self.rewrite)
+        return payload
+
+    def describe(self) -> str:
+        where = f" into {self.namespace}" if self.namespace else ""
+        called = f" as {self.name}" if self.name else ""
+        return f"copy {self.address}{called}{where}"
 
 
 @dataclass(frozen=True)
@@ -828,6 +905,7 @@ OPERATIONS: Final[dict[str, type[Operation]]] = {
     cls.op: cls
     for cls in (
         CreateElement,
+        CopyElement,
         DeleteElement,
         RenameElement,
         MoveElement,
@@ -855,6 +933,10 @@ OPERATIONS: Final[dict[str, type[Operation]]] = {
 #: nothing.
 _FIELDS: Final[dict[str, tuple[tuple[str, ...], tuple[str, ...]]]] = {
     "create": (("kind", "name"), ("namespace", "spec", "metadata", "file")),
+    "copy": (
+        ("address",),
+        ("name", "namespace", "suffix", "keep_unique", "rewrite", "file"),
+    ),
     "delete": (("address",), ("cascade",)),
     "rename": (("address", "new_name"), ()),
     "move": (("address", "file"), ("index",)),

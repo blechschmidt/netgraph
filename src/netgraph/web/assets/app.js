@@ -1456,6 +1456,17 @@
     refuse: function (why) { toast(why, "error"); }
   });
   netgraphStyle.defineCommands(netgraphKeys);
+  /* What clipboard.js is given: which view it is copying out of, the two ways
+   * anything reaches this session's routes, and how to say something. It asks
+   * select.js for the selection itself, the same way every other bulk gesture
+   * does -- there is no second idea of "what is copied". */
+  netgraphClipboard.defineCommands({
+    layer: function () { return el.layer.value; },
+    post: function (path, body) { return netgraphSession.request(path, body); },
+    applied: function (result, said) { return netgraphSession.adopt(result, said); },
+    toast: toast,
+    refuse: function (why) { toast(why, "error"); }
+  });
   netgraphSession.defineCommands(bridge);
   netgraphTour.defineCommands(bridge);
   netgraphKeys.attach(keyHost);
