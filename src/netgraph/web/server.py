@@ -18,6 +18,7 @@ document stream in the browser and renders what it is sent::
     GET  /api/file/<path>     one file's text, with the hash a write must quote
     PUT  /api/file/<path>     that file back, refusing a stale one
     POST /api/ops             a batch of netgraph.edit operations, applied
+    POST /api/arrange         align, distribute or snap a selection
     POST /api/undo, /api/redo the server-side history
     GET  /api/events          server-sent events: what changed, as it changes
     POST /api/presence        what this client has selected and is editing
@@ -109,6 +110,7 @@ from netgraph.web.session import (
 from netgraph.web.tour import TOUR_END_PATH, TOUR_PATH, Scratch, Tours
 
 __all__ = [
+    "ARRANGE_PATH",
     "ASSETS",
     "BINDINGS_PATH",
     "CHANGES_PATH",
@@ -151,6 +153,7 @@ BINDINGS_PATH: Final = "/api/bindings"
 TREE_PATH: Final = "/api/tree"
 GRAPH_PATH: Final = "/api/graph"
 OPS_PATH: Final = "/api/ops"
+ARRANGE_PATH: Final = "/api/arrange"
 #: The changes drawer: the session's own log, and the handover command list.
 CHANGES_PATH: Final = "/api/changes"
 #: The same tree, drawn as a diff against a baseline (``?against=session|git``).
@@ -189,6 +192,7 @@ ASSETS: Final[dict[str, tuple[str, str]]] = {
     "/links.js": ("links.js", "text/javascript; charset=utf-8"),
     "/menu.js": ("menu.js", "text/javascript; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/select.js": ("select.js", "text/javascript; charset=utf-8"),
     "/session.js": ("session.js", "text/javascript; charset=utf-8"),
     "/tour.js": ("tour.js", "text/javascript; charset=utf-8"),
 }
@@ -567,7 +571,7 @@ class _Handler(LocalHandler):
         if path == PRESENCE_PATH:
             self._presence(session)
             return
-        if path not in (OPS_PATH, UNDO_PATH, REDO_PATH, REVERT_PATH, FIX_PATH):
+        if path not in (OPS_PATH, ARRANGE_PATH, UNDO_PATH, REDO_PATH, REVERT_PATH, FIX_PATH):
             self.send_text(HTTPStatus.NOT_FOUND, f"nothing to post to at {path}")
             return
         try:
@@ -581,6 +585,15 @@ class _Handler(LocalHandler):
                     _required(payload, "rule"),
                     _required(payload, "message"),
                     key=_optional(payload, "fix"),
+                    revision=_revision(payload),
+                    client=_client(payload),
+                )
+            elif path == ARRANGE_PATH:
+                payload = self._read_json()
+                change = session.arrange(
+                    _required(payload, "command"),
+                    view=_required(payload, "view"),
+                    addresses=_addresses(payload),
                     revision=_revision(payload),
                     client=_client(payload),
                 )
@@ -919,6 +932,22 @@ def _optional(payload: dict[str, Any], key: str) -> str | None:
     if not isinstance(value, str) or not value:
         raise RequestError(f"{key!r} must be a non-empty string when it is given")
     return value
+
+
+def _addresses(payload: dict[str, Any]) -> tuple[str, ...]:
+    """The selection an arrangement is about.
+
+    Raises:
+        RequestError: It is missing, is not a list, or holds something that is
+            not an element address.
+    """
+    value = payload.get("addresses")
+    if not isinstance(value, list) or not value:
+        raise RequestError("'addresses' must be a non-empty list of element addresses")
+    for entry in value:
+        if not isinstance(entry, str) or not entry:
+            raise RequestError("every entry of 'addresses' must be a non-empty string")
+    return tuple(str(entry) for entry in value)
 
 
 def _revision(payload: dict[str, Any]) -> int | None:

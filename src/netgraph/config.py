@@ -45,6 +45,7 @@ from types import MappingProxyType
 from typing import Any, Final
 
 from netgraph.errors import ConfigurationError
+from netgraph.layout.geometry import DEFAULT_GRID
 from netgraph.loader.cache import DEFAULT_MAX_BYTES
 from netgraph.rules import RULE_IDS, WILDCARD, Severity, resolve_rule_id
 from netgraph.settings import (
@@ -64,14 +65,17 @@ __all__ = [
     "CACHE_TABLE",
     "CONFIG_FILE_NAME",
     "DEFAULT_MAX_REVISIONS",
+    "EDITOR_TABLE",
     "HISTORY_TABLE",
     "CacheConfig",
     "Config",
+    "EditorConfig",
     "HistoryConfig",
     "ValidationConfig",
     "load_config",
     "parse_cache",
     "parse_config",
+    "parse_editor",
     "parse_history",
 ]
 
@@ -96,6 +100,12 @@ DEFAULT_MAX_REVISIONS: Final = 100
 
 #: Keys accepted inside ``[history]``.
 _HISTORY_KEYS: Final[frozenset[str]] = frozenset({"max-revisions"})
+
+#: The table configuring the visual editor's own behaviour.
+EDITOR_TABLE: Final = "editor"
+
+#: Keys accepted inside ``[editor]``.
+_EDITOR_KEYS: Final[frozenset[str]] = frozenset({"grid"})
 
 #: Keys accepted inside ``[cache]``.
 _CACHE_KEYS: Final[frozenset[str]] = frozenset({"enabled", "dir", "max-size"})
@@ -218,6 +228,22 @@ class HistoryConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class EditorConfig:
+    """The ``[editor]`` table: how the visual editor arranges things.
+
+    One key, because there is one decision the *inventory* gets to make rather
+    than the person looking at it. Snapping a selection to a grid writes real
+    coordinates into a real document, so the pitch is a property of the diagram
+    — everybody editing this inventory should snap to the same lattice, or the
+    second person's tidy-up undoes the first's.
+    """
+
+    #: Grid pitch in points that ``snap to grid`` rounds to. Points because
+    #: everything in ``kind: layout`` is points (§18).
+    grid: float = DEFAULT_GRID
+
+
+@dataclass(frozen=True, slots=True)
 class Config:
     """Everything ``netgraph.toml`` configures."""
 
@@ -233,6 +259,8 @@ class Config:
     cache: CacheConfig = field(default_factory=CacheConfig)
     #: The ``[history]`` table.
     history: HistoryConfig = field(default_factory=HistoryConfig)
+    #: The ``[editor]`` table.
+    editor: EditorConfig = field(default_factory=EditorConfig)
 
     @property
     def is_default(self) -> bool:
@@ -333,7 +361,32 @@ def parse_config(data: Mapping[str, Any], *, path: Path | None = None) -> Config
         profiles=parse_profiles(data.get(PROFILE_TABLE, {}), prefix=where, base=base),
         cache=parse_cache(data.get(CACHE_TABLE, {}), where=where, base=base),
         history=parse_history(data.get(HISTORY_TABLE, {}), where=where),
+        editor=parse_editor(data.get(EDITOR_TABLE, {}), where=where),
     )
+
+
+def parse_editor(value: Any, *, where: str = "") -> EditorConfig:
+    """Parse the ``[editor]`` table.
+
+    Raises:
+        ConfigurationError: The table holds an unknown key or a bad value.
+    """
+    if not isinstance(value, Mapping):
+        raise ConfigurationError(f"{where}'{EDITOR_TABLE}' must be a table, got {_kind(value)}")
+    unknown = sorted(set(value) - _EDITOR_KEYS)
+    if unknown:
+        known = ", ".join(sorted(_EDITOR_KEYS))
+        raise ConfigurationError(
+            f"{where}unknown key(s) in [{EDITOR_TABLE}]: {', '.join(unknown)}; "
+            f"expected one of {known}"
+        )
+    key = f"{EDITOR_TABLE}.grid"
+    raw = value.get("grid", DEFAULT_GRID)
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        raise ConfigurationError(f"{where}{key} must be a number of points, got {_kind(raw)}")
+    if not raw > 0:
+        raise ConfigurationError(f"{where}{key} must be greater than 0, got {raw}")
+    return EditorConfig(grid=float(raw))
 
 
 def parse_history(value: Any, *, where: str = "") -> HistoryConfig:

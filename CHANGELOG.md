@@ -18,6 +18,39 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **Multi-select, bulk edit and alignment in the editor.** The canvas could only ever act
+  on one focused element, which was the largest remaining gap against draw.io. It now has
+  a real selection: drag on the paper for a rubber band, <kbd>Shift</kbd>- or
+  <kbd>Ctrl</kbd>-click to add or take away, <kbd>Ctrl-A</kbd> for the whole view,
+  <kbd>Shift</kbd>-arrow to extend along the links, <kbd>Esc</kbd> to clear.
+
+  The selection is a set of **element addresses**, not of shapes, which is what lets it
+  survive a redraw and lets an element culled off screen stay in it on a thousand-device
+  inventory. It is drawn as a halo over the drawing rather than as a class on each shape —
+  a culled element has no shape left to mark — and it is mirrored into the accessible
+  outline, where a screen reader hears the count and each selected entry as pressed.
+
+  With more than one thing selected, **Delete asks once**, listing what goes *and* the
+  cables that will dangle as a result, and writes the lot as one entry in the undo stack;
+  **Set a field**, **Remove a field** and **Move to another file** apply to every selected
+  element in one batch. Behind them is `netgraph.edit.Batch`: N typed operations across N
+  documents as a single transaction — all-or-nothing, one conflict check, one save, one
+  inverse. A batch whose seventh operation is refused leaves the tree byte-identical to
+  the one it started on.
+
+- **Align, distribute and snap-to-grid.** Nine commands that mean nothing about a single
+  shape: `align.left/centre/right/top/middle/bottom`, `distribute.horizontal/vertical` and
+  `geometry.snap`, from the palette or by right-clicking inside a selection. Each is
+  computed by `netgraph.edit.arrange` against the tree's `kind: layout` documents and
+  emitted as one `set-geometry` per document that loses an entry — so a whole alignment is
+  one reviewable YAML diff and one <kbd>Ctrl-Z</kbd>, and an entry that did not move comes
+  out byte-identical. The grid pitch is the inventory's, in `netgraph.toml`:
+
+  ```toml
+  [editor]
+  grid = 20     # points; the default
+  ```
+
 - **A context menu in the editor.** Right-clicking the diagram now offers the handful of
   commands that make sense where you clicked: on an element, on a link, and on the paper
   between them, where `New ▸` lists every element kind and creating one is two clicks and

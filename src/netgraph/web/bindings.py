@@ -161,7 +161,10 @@ class Menu:
 #: What a right-click can land on. ``node`` and ``link`` are the two kinds of
 #: shape the diagram draws; ``canvas`` is the paper between them, which is where
 #: "make a new one" belongs because it is the one place nothing else is meant.
-MENU_TARGETS: Final[tuple[str, ...]] = ("node", "link", "canvas")
+#: ``selection`` outranks all three: right-clicking inside a multi-selection is
+#: asking about the *set*, and offering "Rename it…" there would be offering to
+#: rename whichever of the eleven happened to be under the pointer.
+MENU_TARGETS: Final[tuple[str, ...]] = ("selection", "node", "link", "canvas")
 
 
 #: The order the reference and the palette group commands in. A reader looking
@@ -170,6 +173,7 @@ SECTIONS: Final[tuple[str, ...]] = (
     "Everywhere",
     "Moving around",
     "Editing the inventory",
+    "Arranging the diagram",
     "The view",
     "Files and history",
 )
@@ -346,6 +350,43 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         detail="The palette, opened over the inventory's file paths alone.",
         needs="session",
     ),
+    # -- Selecting ---------------------------------------------------------
+    #
+    # A selection is a set of element addresses, not a shape and not a DOM node,
+    # which is what lets it survive a re-render and be posted verbatim as the
+    # subject of a batch. ``select.js`` owns it; every command below is the same
+    # set said a different way.
+    Binding(
+        id="select.all",
+        title="Select everything in this view",
+        section="Moving around",
+        keys=("Ctrl-A",),
+        detail=(
+            "Every element and link the diagram is drawing, including the ones "
+            "culled off screen. The canvas only — Ctrl-A in the YAML pane is "
+            "still the text."
+        ),
+        where="canvas",
+    ),
+    Binding(
+        id="select.none",
+        title="Clear the selection",
+        section="Moving around",
+        keys=("Ctrl-Shift-A",),
+        detail="Escape does this too, before it closes anything else.",
+    ),
+    Binding(
+        id="select.extend",
+        title="Extend the selection",
+        section="Moving around",
+        keys=("Shift-ArrowRight", "Shift-ArrowLeft", "Shift-ArrowUp", "Shift-ArrowDown"),
+        detail=(
+            "Steps the way the arrow keys do — preferring an element this one is "
+            "linked to — and adds what it lands on, so a trunk and everything "
+            "hanging off it can be collected without a pointer."
+        ),
+        where="canvas",
+    ),
     # -- Editing the inventory ---------------------------------------------
     Binding(
         id="element.create",
@@ -367,12 +408,13 @@ BINDINGS: Final[tuple[Binding, ...]] = (
     ),
     Binding(
         id="element.delete",
-        title="Delete the focused element",
+        title="Delete the selection",
         section="Editing the inventory",
         keys=("Delete", "Backspace"),
         detail=(
-            "Removes the element, or the cable when a link is focused. Asks first. "
-            "'netgraph edit delete' / 'disconnect'."
+            "Removes everything selected, or the focused element when nothing is. "
+            "Asks once, listing what goes and the cables that dangle as a result, "
+            "and writes it as one change. 'netgraph edit delete' / 'disconnect'."
         ),
         where="canvas",
         needs="write",
@@ -391,7 +433,10 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         title="Set a field…",
         section="Editing the inventory",
         keys=("e",),
-        detail="A dotted path and a YAML value, on the focused element. 'netgraph edit set'.",
+        detail=(
+            "A dotted path and a YAML value, on every selected element at once — or "
+            "on the focused one when nothing is selected. 'netgraph edit set'."
+        ),
         where="canvas",
         needs="write",
     ),
@@ -400,7 +445,7 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         title="Remove a field…",
         section="Editing the inventory",
         keys=(),
-        detail="'netgraph edit unset'.",
+        detail="'netgraph edit unset', across the whole selection as one change.",
         needs="write",
     ),
     Binding(
@@ -408,7 +453,9 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         title="Move to another file…",
         section="Editing the inventory",
         keys=(),
-        detail="Moves the element's document into a different file. 'netgraph edit move'.",
+        detail=(
+            "Moves the selected documents into a different file, together. 'netgraph edit move'."
+        ),
         needs="write",
     ),
     Binding(
@@ -488,6 +535,95 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         section="Editing the inventory",
         keys=(),
         detail="'netgraph edit remove-interface'.",
+        needs="write",
+    ),
+    # -- Arranging the diagram ---------------------------------------------
+    #
+    # Nine commands that mean nothing about one shape. Each one is a *selection*
+    # turned into a batch of ``set-geometry`` operations by
+    # :mod:`netgraph.edit.arrange` — one per layout document that loses an
+    # entry — so a whole alignment is one reviewable diff and one ``Ctrl-Z``.
+    #
+    # None of them carries a chord. They are pointer-and-palette gestures in
+    # every editor that has them, the letters left on the canvas are worth more
+    # to the commands somebody uses every minute, and each is two keystrokes
+    # away through the palette and one row away from a right-click.
+    Binding(
+        id="align.left",
+        title="Align left",
+        section="Arranging the diagram",
+        keys=(),
+        detail="Every selected element onto the leftmost one's left edge.",
+        needs="write",
+    ),
+    Binding(
+        id="align.centre",
+        title="Align centres",
+        section="Arranging the diagram",
+        keys=(),
+        detail="Onto the vertical axis half way across the selection.",
+        needs="write",
+    ),
+    Binding(
+        id="align.right",
+        title="Align right",
+        section="Arranging the diagram",
+        keys=(),
+        detail="Onto the rightmost one's right edge.",
+        needs="write",
+    ),
+    Binding(
+        id="align.top",
+        title="Align top",
+        section="Arranging the diagram",
+        keys=(),
+        detail="Onto the topmost one's top edge.",
+        needs="write",
+    ),
+    Binding(
+        id="align.middle",
+        title="Align middles",
+        section="Arranging the diagram",
+        keys=(),
+        detail="Onto the horizontal axis half way down the selection.",
+        needs="write",
+    ),
+    Binding(
+        id="align.bottom",
+        title="Align bottom",
+        section="Arranging the diagram",
+        keys=(),
+        detail="Onto the bottommost one's bottom edge.",
+        needs="write",
+    ),
+    Binding(
+        id="distribute.horizontal",
+        title="Distribute horizontally",
+        section="Arranging the diagram",
+        keys=(),
+        detail=(
+            "Equal gaps between the boxes, left to right, with the two outermost "
+            "left where they are. Needs three."
+        ),
+        needs="write",
+    ),
+    Binding(
+        id="distribute.vertical",
+        title="Distribute vertically",
+        section="Arranging the diagram",
+        keys=(),
+        detail="The same, top to bottom.",
+        needs="write",
+    ),
+    Binding(
+        id="geometry.snap",
+        title="Snap to the grid",
+        section="Arranging the diagram",
+        keys=(),
+        detail=(
+            "Rounds each selected element's position to the pitch this inventory "
+            "sets in 'netgraph.toml' ([editor] grid, 20 points by default)."
+        ),
         needs="write",
     ),
     # -- The view ----------------------------------------------------------
@@ -675,6 +811,33 @@ BINDINGS: Final[tuple[Binding, ...]] = (
 #: never where the reflex click lands.
 MENUS: Final[tuple[Menu, ...]] = (
     Menu(
+        target="selection",
+        groups=(
+            (
+                MenuItem("align.left", "Align left"),
+                MenuItem("align.centre", "Align centres"),
+                MenuItem("align.right", "Align right"),
+                MenuItem("align.top", "Align top"),
+                MenuItem("align.middle", "Align middles"),
+                MenuItem("align.bottom", "Align bottom"),
+            ),
+            (
+                MenuItem("distribute.horizontal", "Distribute horizontally"),
+                MenuItem("distribute.vertical", "Distribute vertically"),
+                MenuItem("geometry.snap", "Snap to the grid"),
+            ),
+            (
+                MenuItem("element.set", "Set a field on all of them…"),
+                MenuItem("element.unset", "Remove a field from all of them…"),
+                MenuItem("element.move", "Move their documents…"),
+            ),
+            (
+                MenuItem("select.none", "Clear the selection"),
+                MenuItem("element.delete", "Delete all of them"),
+            ),
+        ),
+    ),
+    Menu(
         target="node",
         groups=(
             (
@@ -792,6 +955,7 @@ def markdown_table() -> str:
 
 #: What each target is called in prose, and what right-clicking it means.
 _TARGETS: Final[dict[str, str]] = {
+    "selection": "a multi-selection",
     "node": "an element",
     "link": "a link",
     "canvas": "the canvas",

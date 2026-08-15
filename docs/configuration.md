@@ -43,6 +43,7 @@ declared the defaults, and `netgraph init` scaffolds a fully commented copy.
 - [Every render setting](#every-render-setting)
 - [`[cache]` — remembering parsed files](#cache--remembering-parsed-files)
 - [`[history]` — how far back a timeline goes](#history--how-far-back-a-timeline-goes)
+- [`[editor]` — the visual editor's grid](#editor--the-visual-editors-grid)
 - [Errors](#errors)
 
 ## Where the file is looked for
@@ -407,6 +408,28 @@ name. The editor **truncates** to the newest and says how many there are,
 because a scrubber that shows nothing is not a better answer than a scrubber
 that shows the recent past. `netgraph log --max-revisions` overrides the file
 for one invocation.
+
+## `[editor]` — the visual editor's grid
+
+```toml
+[editor]
+grid = 20
+```
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `grid` | number > 0 | `20` | Pitch in points that **snap to grid** rounds a selection's positions to. |
+
+Read by [`netgraph web`](commands/web.md), which offers it as one of the
+[alignment commands](editing.md#arranging-a-selection) on a multi-selection.
+Points, because everything in a `kind: layout` document is points (§18); twenty
+is half of Graphviz's default rank separation and a little under a node's
+height, so a snapped diagram lines up without every device landing on its
+neighbour.
+
+It is in the file rather than in the browser because snapping writes real
+coordinates into a real document. Everybody editing this inventory should snap
+to the same lattice, or the second person's tidy-up quietly undoes the first's.
 
 ## Errors
 

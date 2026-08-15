@@ -1193,3 +1193,118 @@ def test_stopping_the_server_deletes_every_copy(session: EditingSession) -> None
         roots = [Path(call(base, "/api/tour", "POST")[1]["root"]) for _ in range(2)]
         assert all(root.is_dir() for root in roots)
     assert not any(root.exists() for root in roots)
+
+
+# --------------------------------------------------------------------------- #
+# Arranging a selection
+# --------------------------------------------------------------------------- #
+#
+# The session's half of align/distribute/snap: the revision precondition, one
+# entry in the undo stack, and the refusals. The arithmetic itself is
+# ``tests/test_edit_batch.py``'s.
+
+#: The l1 view of the example inventory, arranged — three nodes ragged enough
+#: for an alignment to have something to do.
+RAGGED_LAYOUT = """\
+apiVersion: netgraph.dev/v1alpha1
+kind: layout
+metadata:
+  name: default
+spec:
+  views:
+    l1:
+      nodes:
+        switches/sw-home: {position: {x: 10, y: 300}}
+        hosts/pc-desk: {position: {x: 40, y: 200}}
+        hosts/srv-nas: {position: {x: 70, y: 100}}
+"""
+
+ARRANGE_THREE = ["switches/sw-home", "hosts/pc-desk", "hosts/srv-nas"]
+
+
+@pytest.fixture
+def ragged(tree: Path) -> EditingSession:
+    (tree / "layout.yaml").write_text(RAGGED_LAYOUT, encoding="utf-8", newline="\n")
+    return EditingSession(root=tree, writable=True)
+
+
+def test_aligning_is_one_change_and_one_undo(ragged: EditingSession) -> None:
+    before = ragged.revision
+    change = ragged.arrange(
+        "align.left", view="l1", addresses=ARRANGE_THREE, revision=ragged.revision
+    )
+    assert change.revision != before
+    assert list(change.files) == ["layout.yaml"], "one file, however many nodes moved"
+    assert change.undo_depth == 1, "a whole alignment is one step to undo"
+    text = (ragged.root / "layout.yaml").read_text(encoding="utf-8")
+    assert text.count("x: 10") == 3
+
+    ragged.undo()
+    assert (ragged.root / "layout.yaml").read_text(encoding="utf-8") == RAGGED_LAYOUT
+
+
+def test_aligning_something_already_aligned_writes_nothing(ragged: EditingSession) -> None:
+    ragged.arrange("align.left", view="l1", addresses=ARRANGE_THREE)
+    settled = ragged.revision
+    change = ragged.arrange("align.left", view="l1", addresses=ARRANGE_THREE)
+    assert change.files == {}
+    assert change.revision == settled, "a no-op must not move the revision"
+    assert change.undo_depth == 1, "nor grow the undo stack"
+
+
+def test_snapping_uses_the_grid_from_netgraph_toml(tree: Path) -> None:
+    (tree / "layout.yaml").write_text(RAGGED_LAYOUT, encoding="utf-8", newline="\n")
+    (tree / "netgraph.toml").write_text("[editor]\ngrid = 100\n", encoding="utf-8", newline="\n")
+    session = EditingSession(root=tree, writable=True)
+    assert session.grid() == 100
+    assert session.state()["grid"] == 100
+
+    session.arrange("snap", view="l1", addresses=ARRANGE_THREE)
+    text = (session.root / "layout.yaml").read_text(encoding="utf-8")
+    assert "x: 0" in text and "x: 100" in text
+
+
+def test_an_unknown_arrangement_is_refused(ragged: EditingSession) -> None:
+    with pytest.raises(SessionError, match="unknown arrangement"):
+        ragged.arrange("align.diagonally", view="l1", addresses=ARRANGE_THREE)
+
+
+def test_an_arrangement_decided_against_an_older_tree_is_refused(
+    ragged: EditingSession,
+) -> None:
+    stale = ragged.revision
+    ragged.invalidate()
+    with pytest.raises(Conflict, match="reload before arranging"):
+        ragged.arrange("align.left", view="l1", addresses=ARRANGE_THREE, revision=stale)
+
+
+def test_a_read_only_session_will_not_arrange(tree: Path) -> None:
+    (tree / "layout.yaml").write_text(RAGGED_LAYOUT, encoding="utf-8", newline="\n")
+    with pytest.raises(ReadOnly):
+        EditingSession(root=tree).arrange("align.left", view="l1", addresses=ARRANGE_THREE)
+
+
+def test_arranging_an_unarranged_view_says_what_is_missing(session: EditingSession) -> None:
+    with pytest.raises(EditError, match="0 of the 3 selected"):
+        session.arrange("align.left", view="l1", addresses=ARRANGE_THREE)
+
+
+def test_the_arrange_route_writes_and_refuses_over_http(ragged: EditingSession) -> None:
+    with WebServer.create(session=ragged, host="127.0.0.1", port=0) as server:
+        base = server.url.rstrip("/")
+        status, body = call(
+            base,
+            "/api/arrange",
+            "POST",
+            {"command": "align.left", "view": "l1", "addresses": ARRANGE_THREE},
+        )
+        assert status == 200, body
+        assert list(body["files"]) == ["layout.yaml"]
+
+        # The two shapes of a bad request, each named rather than 500ed.
+        status, body = call(base, "/api/arrange", "POST", {"view": "l1", "addresses": ["a"]})
+        assert status == 400 and "command" in body["message"]
+        status, body = call(
+            base, "/api/arrange", "POST", {"command": "snap", "view": "l1", "addresses": []}
+        )
+        assert status == 400 and "addresses" in body["message"]

@@ -81,6 +81,8 @@ from typing import Any, Final
 
 from netgraph.config import DEFAULT_MAX_REVISIONS, Config, ValidationConfig, load_config
 from netgraph.edit import (
+    ARRANGEMENTS,
+    Batch,
     ConflictError,
     CreateElement,
     EditError,
@@ -88,15 +90,19 @@ from netgraph.edit import (
     Operation,
     ValidationRefused,
     WriteFile,
+    arrange_operations,
     command_list,
+    describe_arrangement,
     operation_from_dict,
 )
+from netgraph.edit.batch import describe as describe_batch
 from netgraph.edit.tree import digest_of
 from netgraph.errors import NetgraphError
 from netgraph.fixes import Fix, apply_fix, fixes_for, offers_for
 from netgraph.history import FrameCache, HistoryError, Timeline
 from netgraph.impact import LAYERS as IMPACT_LAYERS
 from netgraph.impact import ImpactError, ImpactReport, simulate
+from netgraph.layout.geometry import DEFAULT_GRID
 from netgraph.loader import (
     YAML_SUFFIXES,
     DocumentCache,
@@ -571,6 +577,11 @@ class EditingSession:
         self.inventory()  # ensures ``config`` matches the loaded revision
         return self.config.validation if self.config is not None else ValidationConfig()
 
+    def grid(self) -> float:
+        """The grid pitch ``snap to grid`` rounds to, in points."""
+        self.inventory()  # ensures ``config`` matches the loaded revision
+        return self.config.editor.grid if self.config is not None else DEFAULT_GRID
+
     def state(self, *, me: str | None = None) -> dict[str, Any]:
         """The small answer: has anything moved, may I write, and who else is here?
 
@@ -591,6 +602,10 @@ class EditingSession:
                 "undoLabel": self._undo[-1].label if self._undo else None,
                 "redoLabel": self._redo[-1].label if self._redo else None,
                 "maxFileBytes": MAX_FILE_BYTES,
+                # The lattice ``snap to grid`` rounds to, so the page can say
+                # what it is about to do rather than only doing it. A property
+                # of the inventory (``[editor] grid``), not of the browser.
+                "grid": self.grid(),
             }
         state["events"] = {
             "path": EVENTS_PATH,
@@ -892,12 +907,89 @@ class EditingSession:
                     f"the inventory has changed since revision {revision} "
                     f"(it is now at {self._revision}); reload before editing"
                 )
-            label = operations[0].describe()
-            if len(operations) > 1:
-                label += f" (+{len(operations) - 1} more)"
             return self._committed(
-                self._commit(operations, label=label, force=force, client=client)
+                self._commit(
+                    operations, label=describe_batch(operations), force=force, client=client
+                )
             )
+
+    def arrange(
+        self,
+        command: str,
+        *,
+        view: str,
+        addresses: Sequence[str],
+        revision: int | None = None,
+        client: str | None = None,
+    ) -> Change:
+        """Align, distribute or snap a selection, as one change.
+
+        The tidying itself is :func:`~netgraph.edit.arrange.arrange_operations`,
+        which reads the arrangement out of the tree's ``kind: layout`` documents
+        and answers with one ``set-geometry`` per document that loses an entry.
+        This adds what a session adds to any other write: the revision
+        precondition, one entry in the undo stack, one validation, one save.
+
+        A tidying that would move nothing writes nothing and does not move the
+        revision — repeating an align is a no-op rather than a second identical
+        step to undo.
+
+        Args:
+            command: One of :data:`~netgraph.edit.arrange.ARRANGEMENTS`.
+            view: The layer being arranged.
+            addresses: The selection, as element addresses.
+            revision: The tree the page was looking at, as a precondition.
+            client: Who asked, so their own tab is not told to reload.
+
+        Raises:
+            ReadOnly: This session does not write.
+            SessionError: ``command`` is not one netgraph has.
+            Conflict: ``revision`` is not the current one.
+            EditError: The selection cannot be arranged; nothing is written.
+        """
+        self._require_writable()
+        if command not in ARRANGEMENTS:
+            raise SessionError(
+                f"unknown arrangement {command!r}; expected one of {', '.join(ARRANGEMENTS)}"
+            )
+        with self._lock:
+            if revision is not None and revision != self._revision:
+                raise Conflict(
+                    f"the inventory has changed since revision {revision} "
+                    f"(it is now at {self._revision}); reload before arranging"
+                )
+            operations = arrange_operations(
+                self.inventory(),
+                command=command,
+                view=view,
+                addresses=list(addresses),
+                grid=self.grid(),
+            )
+            if not operations:
+                # Nothing moved. Answered rather than refused: aligning a row
+                # that is already aligned succeeded, and a refusal would send
+                # somebody looking for what they did wrong.
+                return self._unchanged()
+            return self._committed(
+                self._commit(
+                    operations,
+                    label=describe_arrangement(command, len(addresses)),
+                    force=False,
+                    client=client,
+                )
+            )
+
+    def _unchanged(self) -> Change:
+        """The answer to a write that turned out to have nothing to write."""
+        return Change(
+            revision=self._revision,
+            applied=(),
+            inverse=(),
+            files={},
+            diagnostics=self.diagnostics(),
+            undo_depth=len(self._undo),
+            redo_depth=len(self._redo),
+        )
 
     def fix(
         self,
@@ -1052,6 +1144,13 @@ class EditingSession:
         history and does not move the revision. Anything else would make the
         page refetch the tree, and every other tab's undo stack grow, for an
         edit that did not happen.
+
+        The batch is atomic in the strong sense: a bulk delete whose seventh
+        element cannot go leaves the first six alone, because
+        :class:`~netgraph.edit.Batch` puts the tree back before re-raising. That
+        matters here and not on the command line, where a refusal ends the
+        process anyway — this session is long-lived and goes on serving the tab
+        that asked.
         """
         # Pin the session's starting state before the first write rather than
         # after it. Everything below eventually loads the tree, and a baseline
@@ -1059,13 +1158,15 @@ class EditingSession:
         # that commit — so the drawer would never show the first thing you did.
         self.origin()
         session = EditSession(root=self.root, config=self.config, cache=self.cache)
-        applied = session.apply_all(operations)
-        changes = dict(session.changes)
+        batch = Batch(session, label=label)
+        result = batch.apply(operations)
+        applied = result.applied
+        changes = dict(result.changes)
         # Read before the write, which is the only moment the old text is still
         # on disk. The journal's hunk is the one thing here that cannot be
         # recomputed afterwards.
         previous = {path: self._text_on_disk(path) for path in changes}
-        session.commit(force=force)
+        batch.commit(force=force)
         summary = session.summary(written=tuple(changes), changes=changes)
         # An empty inverse is the honest record of a batch that changed nothing:
         # it keeps a later redo from replaying whatever the *previous* batch

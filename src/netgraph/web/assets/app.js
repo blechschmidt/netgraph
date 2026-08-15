@@ -173,6 +173,9 @@
   var failure = { on: false, element: null };
   /** Element addresses somebody else has selected, drawn faintly. */
   var remote = {};
+  /** Set when a rubber band has just finished, so the click that follows the
+   *  mouseup does not undo what the band selected. Cleared by that click. */
+  var banded = false;
 
   /* ------------------------------------------------------------ requests */
 
@@ -350,6 +353,10 @@
     // the ones that reuse a cached SVG -- a view switched back to has to be as
     // legible as one drawn fresh.
     netgraphA11y.annotate(details, { view: el.layer.value });
+    // The selection is a set of *addresses*, so it survives this: re-resolved
+    // against the new records, its halo redrawn, and anything the drawing no
+    // longer holds quietly dropped. See select.js.
+    netgraphSelect.annotate(details);
     // The handles that route a cable live *inside* the drawing, so they are
     // rebuilt whenever the drawing is -- a view switched back to out of the
     // cache has to be as editable as one drawn fresh.
@@ -459,6 +466,9 @@
   /** Re-say the status line after a cull changed how much is on screen. */
   function culled() {
     el.summary.textContent = lastStatus.concat(culling()).join("  ·  ");
+    // The halo is drawn per visible element, so a pan that brought a selected
+    // one into view has to bring its ring with it.
+    netgraphSelect.paint();
   }
 
   /** Redraw the problems list.
@@ -681,7 +691,13 @@
     el.info.classList.add("pinned");
     if (mode === "session") {
       netgraphSession.reveal(here.record.id);
-      netgraphSession.select(here.record.id);
+      // Not the *selection*: opening the inspector says what you are looking
+      // at, and a selection of eleven that Enter quietly narrowed to one would
+      // be the worst kind of surprise. What this tab is looking at, on the
+      // other hand, is exactly what the other tabs should see.
+      netgraphSession.select(netgraphSelect.size()
+        ? netgraphSelect.addresses()
+        : [String(here.record.id || "")]);
       netgraphA11y.select(here.element);
     }
     netgraphA11y.announce("inspecting " + netgraphA11y.label(here.record), false);
@@ -953,9 +969,28 @@
   el.canvas.addEventListener("click", function (event) {
     // Selecting a link is what reveals its handles, so it happens whether or
     // not the click also landed on something with a detail record.
+    // A rubber band ends with a mouseup, and the browser follows that with a
+    // click on whatever the pointer happened to be over. Left alone, that click
+    // would replace the selection the band had just made with one element.
+    if (banded) { banded = false; return; }
     netgraphLinks.select(netgraphLinks.linkAt(event.target));
+    // Shift or Ctrl turns a click into a set operation and nothing else: no
+    // reveal, no inspector, no pin. Adding a switch to a selection of eleven
+    // must not also throw the YAML pane to its document. The wider hit test,
+    // because a cable is a hairline and shift-clicking one has to be possible.
+    if (event.shiftKey || event.ctrlKey || event.metaKey) {
+      var picked = hitAt(event.target);
+      if (picked) {
+        netgraphSelect.toggle([String(picked.record.id || "")]);
+        netgraphA11y.focus(picked.record.element, { quiet: true, scroll: false });
+      }
+      return;
+    }
     var hit = recordAt(event.target);
     if (!hit) { hideInfo(true); return; }
+    // A plain click on a shape replaces whatever was selected with it, which is
+    // what makes "click away, then click this" mean one thing.
+    netgraphSelect.set([String(hit.record.id || "")], { quiet: true });
     // Failure mode owns the click: the gesture asks a question about the shape
     // rather than opening it, and jumping the editor to a file nobody asked to
     // edit would be the opposite of read-only.
@@ -964,11 +999,9 @@
     // that mapping is the whole point of the command. `record.id` is the
     // element's address, which is what the tree keys documents by --
     // `record.element` is the SVG id, and matched nothing.
-    if (mode === "session") {
-      netgraphSession.reveal(hit.record.id);
-      // What this page is looking at, so the other tabs can draw it faintly.
-      netgraphSession.select(hit.record.id);
-    }
+    // What this page is looking at is announced by the selection above, which
+    // has already told the other tabs; all that is left is to open the document.
+    if (mode === "session") { netgraphSession.reveal(hit.record.id); }
     if (pinned === hit.record.element) { hideInfo(true); netgraphA11y.select(null); return; }
     pinned = hit.record.element;
     showInfo(hit, event);
@@ -988,13 +1021,22 @@
   (function draggable() {
     var origin = null;
     el.canvas.addEventListener("mousedown", function (event) {
-      if (event.button !== 0) { return; }
+      // Three things a press can start, in the order they win. A bend handle
+      // beats everything; the paper draws a rubber band; anything else pans.
+      // The middle button pans wherever it is pressed, which is the escape
+      // hatch for somebody who wants to move a diagram they have selected in.
       if (netgraphLinks.grab(event)) { event.preventDefault(); return; }
+      if (event.button === 0 && !event.altKey && netgraphSelect.grab(event)) {
+        event.preventDefault();
+        return;
+      }
+      if (event.button !== 0 && event.button !== 1) { return; }
       origin = { x: event.clientX - view.x, y: event.clientY - view.y };
       el.canvas.classList.add("panning");
     });
     window.addEventListener("mousemove", function (event) {
       if (netgraphLinks.dragging()) { netgraphLinks.move(event); return; }
+      if (netgraphSelect.dragging()) { netgraphSelect.move(event); return; }
       if (!origin) { return; }
       view.x = event.clientX - origin.x;
       view.y = event.clientY - origin.y;
@@ -1002,6 +1044,7 @@
     });
     window.addEventListener("mouseup", function () {
       netgraphLinks.release();
+      if (netgraphSelect.release()) { banded = true; }
       origin = null;
       el.canvas.classList.remove("panning");
     });
@@ -1046,6 +1089,9 @@
         // In order of how modal each thing is. Anything else and Escape becomes
         // a key you have to think about.
         if (K.dismiss()) { return; }
+        // Before the inspector: a selection is the thing most likely to be in
+        // the way, and Escape is what every diagram editor drops one with.
+        if (netgraphSelect.size() && netgraphSelect.clear()) { return; }
         if (!el.info.hidden) { hideInfo(true); netgraphA11y.select(null); return; }
         if (failure.on) { showFailure(false); return; }
         if (mode === "session" && netgraphSession.isScrubbing()) {
@@ -1098,7 +1144,9 @@
         if (!here) { return; }
         pinned = here.element;
         netgraphA11y.select(here.element);
-        if (mode === "session") { netgraphSession.select(here.record.id); }
+        // Space is also how a selection is built without a pointer: it makes
+        // the focused element *the* selection, which Shift-arrow then extends.
+        netgraphSelect.set([String(here.record.id || "")], { quiet: true });
         inspectFocused();
       }
     });
@@ -1297,10 +1345,27 @@
 
   netgraphCull.attach({ el: el, culled: culled });
   netgraphA11y.attach({ el: el, bringIntoView: bringIntoView });
+  /* What select.js is given: the elements, how to refuse, and where to send the
+   * news. The status line says how many are selected because that is the one
+   * fact the halo cannot state for a diagram larger than the screen. */
+  netgraphSelect.attach({
+    el: el,
+    refuse: function (why) { toast(why, "error"); },
+    changed: function (addresses) {
+      el.summary.textContent = lastStatus
+        .concat(culling())
+        .concat(addresses.length > 1 ? [addresses.length + " selected"] : [])
+        .join("  ·  ");
+      // Everybody else's page draws what this one has picked, which used to be
+      // one address and is now the set.
+      if (mode === "session") { netgraphSession.select(addresses); }
+    }
+  });
   // A resized canvas is a different viewport, so a different part of the
   // diagram has to be drawn.
   window.addEventListener("resize", function () { netgraphCull.schedule(); });
   defineCommands();
+  netgraphSelect.defineCommands();
   netgraphSession.defineCommands(bridge);
   netgraphTour.defineCommands(bridge);
   netgraphKeys.attach(keyHost);

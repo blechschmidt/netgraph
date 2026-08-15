@@ -166,6 +166,29 @@ window.netgraphCull = (function () {
     return box ? { x: box.x + box.w / 2, y: box.y + box.h / 2 } : null;
   }
 
+  /** How SVG user space maps to client pixels right now, or null.
+   *
+   * Exposed because select.js has to turn a rubber band — which is a rectangle
+   * in client pixels — into the coordinates the box index above is in, and
+   * there is to be one place that reads the drawing's transform.
+   */
+  function matrix() {
+    var svg = el && el.viewport.firstElementChild;
+    return svg ? frame(svg) : null;
+  }
+
+  /** The part of the drawing the canvas is showing, in SVG user space.
+   *
+   * Answered whether or not culling is switched on, because the caller is not
+   * asking about culling: select.js draws a halo per selected element and skips
+   * the ones nobody can see, which is worth doing on a diagram of forty as well
+   * as on one of four thousand. Null when there is nothing drawn.
+   */
+  function viewportBox() {
+    var svg = el && el.viewport.firstElementChild;
+    return svg ? visible(svg) : null;
+  }
+
   /** Screen pixels per unit of the drawing at a zoom of 1, or 0 if unknown.
    *
    * The SVG is sized to the canvas, so this is a fact about how big the drawing
@@ -439,6 +462,8 @@ window.netgraphCull = (function () {
     schedule: schedule,
     boxOf: boxOf,
     centreOf: centreOf,
+    matrix: matrix,
+    viewportBox: viewportBox,
     naturalScale: naturalScale,
     materialise: materialise,
     stats: stats,

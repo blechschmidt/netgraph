@@ -24,7 +24,7 @@ difference between a tool that can back a web editor and one that cannot.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
@@ -36,7 +36,7 @@ from netgraph.loader.inventory import Inventory, SourceLocation
 from netgraph.loader.tree import Overlay, iter_inventory_files
 from netgraph.models import LAYOUT_KIND
 
-__all__ = ["EditableTree", "digest_of"]
+__all__ = ["EditableTree", "TreeSnapshot", "digest_of"]
 
 
 def digest_of(payload: bytes) -> str:
@@ -56,6 +56,34 @@ class _Tracked:
     original: str | None
     #: Set when the whole file is to be removed.
     removed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class _Frozen:
+    """One tracked file, reduced to text so that nothing can mutate it later."""
+
+    text: str
+    digest: str | None
+    original: str | None
+    removed: bool
+    created: bool
+
+
+@dataclass(frozen=True, slots=True)
+class TreeSnapshot:
+    """Every tracked file at one moment, and nothing that can change under it.
+
+    What makes a batch all-or-nothing. :meth:`EditableTree.snapshot` renders
+    each tracked file to a string and :meth:`EditableTree.restore` parses it
+    back, so a rolled-back tree is byte-identical to the one the batch started
+    on — including the files the batch created, which simply stop being tracked.
+
+    Text rather than the parsed trees themselves, because an applier mutates
+    those in place: a snapshot holding the same ``YamlFile`` objects the tree
+    holds would follow the tree instead of remembering it.
+    """
+
+    files: Mapping[str, _Frozen]
 
 
 @dataclass(eq=False)
@@ -205,6 +233,47 @@ class EditableTree:
                 continue
             tracked.file = YamlFile.parse(before, relative=relative)
             tracked.removed = False
+
+    # -- transactions ----------------------------------------------------
+
+    def snapshot(self) -> TreeSnapshot:
+        """Everything this tree holds right now, frozen.
+
+        The journal above is per *operation*; this is per *batch*. An applier
+        that refuses part-way through undoes itself, but a batch whose fourth
+        operation refuses has three applied operations to put back, and those
+        are already finished and journalled. See :class:`~netgraph.edit.Batch`.
+        """
+        return TreeSnapshot(
+            files={
+                relative: _Frozen(
+                    text=tracked.file.render(),
+                    digest=tracked.digest,
+                    original=tracked.original,
+                    removed=tracked.removed,
+                    created=tracked.file.created,
+                )
+                for relative, tracked in self._files.items()
+            }
+        )
+
+    def restore(self, snapshot: TreeSnapshot) -> None:
+        """Put the tree back the way ``snapshot`` found it.
+
+        A file tracked since the snapshot was taken is dropped rather than
+        reverted: it was not tracked, so there is nothing to revert it to, and
+        untracking it is what makes it read from the disk again.
+        """
+        self._journal = None
+        self._files = {
+            relative: _Tracked(
+                file=_parse_as(frozen, relative=relative),
+                digest=frozen.digest,
+                original=frozen.original,
+                removed=frozen.removed,
+            )
+            for relative, frozen in snapshot.files.items()
+        }
 
     def text_of(self, relative: str) -> str | None:
         """What ``relative`` would be written as now, or ``None`` if it is gone.
@@ -450,6 +519,13 @@ class EditableTree:
             relative: FileFacts(relative=relative, kinds=tuple(kinds), names=tuple(names))
             for relative, (kinds, names) in found.items()
         }
+
+
+def _parse_as(frozen: _Frozen, *, relative: str) -> YamlFile:
+    """One frozen file, parsed back into the tree it was rendered from."""
+    parsed = YamlFile.parse(frozen.text, relative=relative)
+    parsed.created = frozen.created
+    return parsed
 
 
 def _discovered(root: Path) -> Iterator[str]:

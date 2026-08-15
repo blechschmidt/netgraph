@@ -403,9 +403,14 @@ var netgraphSession = (function () {
       .catch(function () { me.reported = ""; });   // try again next time
   }
 
-  /** Note what this page has selected, and let the others draw it. */
+  /** Note what this page has selected, and let the others draw it.
+   *
+   * One address or a list of them: the canvas has a multi-selection now, and
+   * everybody else's page draws every element of it faintly. Advisory, like the
+   * rest of presence — nothing here is a lock.
+   */
   function select(address) {
-    me.selection = address ? [address] : [];
+    me.selection = Array.isArray(address) ? address.slice() : (address ? [address] : []);
     announce(false);
   }
 
@@ -1262,10 +1267,101 @@ var netgraphSession = (function () {
       });
   }
 
+  /** Post one tidying of the selection: align, distribute or snap.
+   *
+   * A route of its own rather than a batch of set-geometry operations built
+   * here, because the arithmetic needs the *stored* arrangement — which layout
+   * document holds which node, and what every other entry in it says — and the
+   * page has the merged view of that, not the documents. The server answers
+   * with one changeset, so a whole alignment is one Ctrl-Z. See
+   * netgraph/edit/arrange.py.
+   */
+  function arrange(command, addresses) {
+    if (!state.writable) { host.toast("this session is read-only", "error"); return; }
+    fetch("/api/arrange", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({
+        command: command,
+        view: host.layer(),
+        addresses: addresses,
+        revision: state.revision,
+        client: me.id
+      })
+    })
+      .then(readBody)
+      .then(function (result) {
+        if (!Object.keys(result.files || {}).length) {
+          host.toast("nothing moved: they are already " + said(command), "ok");
+          return;
+        }
+        applied(result, said(command) + " " + addresses.length + " element"
+          + (addresses.length === 1 ? "" : "s"), true);
+      })
+      .catch(function (error) { refused(error, false); })
+      .then(paintHistory);
+  }
+
+  /** How one arrangement reads in a sentence. */
+  function said(command) {
+    if (command === "snap") { return "snapped to the grid"; }
+    var parts = command.split(".");
+    return parts[0] === "align" ? "aligned " + parts[1] : "distributed " + parts[1] + "ly";
+  }
+
   /** The address of whatever the diagram has focused, or "". */
   function here() {
     var focused = netgraphA11y.focused();
     return focused ? String(focused.record.id || "") : "";
+  }
+
+  /** What a bulk gesture acts on: the selection, or the focused element. */
+  function chosen() {
+    return netgraphSelect.targets();
+  }
+
+  /** A count, worded. */
+  function many(count, noun) {
+    return count + " " + noun + (count === 1 ? "" : "s");
+  }
+
+  /** The selection when it is worth acting on as one, or null.
+   *
+   * Null for a selection of one, because a bulk gesture over a single element
+   * is just that gesture and the prompt should read the way it always has.
+   */
+  function bulk(kind) {
+    var selected = chosen().filter(function (address) {
+      return kind === "edge" ? isLink(address) : !isLink(address);
+    });
+    return selected.length > 1 ? selected : null;
+  }
+
+  /** The element field of a gesture's prompt, worded for how many it acts on.
+   *
+   * Read-only and pre-filled with the list when there are several. Editable
+   * text would invite somebody to change one name of twelve and wonder why the
+   * change landed on the other eleven anyway. */
+  function element(selected) {
+    if (!selected) {
+      return { name: "address", label: "element", value: here(), list: addresses("node") };
+    }
+    return {
+      name: "address",
+      label: "elements",
+      type: "select",
+      value: selected[0],
+      options: selected.map(function (address) {
+        return { value: address, label: address };
+      }),
+      hint: "the whole selection; Escape on the canvas clears it"
+    };
+  }
+
+  /** What a gesture's log line calls the thing it acted on. */
+  function subject(on) {
+    return on.length === 1 ? on[0] : many(on.length, "element");
   }
 
   /** Is this address a link rather than an element? A cable is deleted by
@@ -1454,7 +1550,9 @@ var netgraphSession = (function () {
 
     K.define("element.delete", {
       run: function () {
-        var target = here();
+        var selected = chosen();
+        if (selected.length > 1) { deleteMany(selected); return; }
+        var target = selected[0] || here();
         K.prompt({
           title: "Delete",
           detail: "An element goes with whatever cannot survive it; a cable leaves "
@@ -1497,22 +1595,35 @@ var netgraphSession = (function () {
       }
     });
 
+    /* The three field gestures below are one shape three times: they act on the
+     * *selection* when there is one and on the focused element when there is
+     * not, and either way the result is one batch through /api/ops -- so
+     * setting `spec.site` on twelve switches is one entry in the undo stack,
+     * one validation of the tree it would produce, and one save. The element
+     * field says so rather than disappearing: a bulk edit somebody cannot see
+     * the extent of is a bulk edit they should not be making. */
+
     K.define("element.set", {
       run: function () {
+        var many_ = bulk("node");
         K.prompt({
-          title: "Set a field",
-          detail: "'netgraph edit set'. The document keeps its comments and its order.",
+          title: many_ ? "Set a field on " + many(many_.length, "element") : "Set a field",
+          detail: "'netgraph edit set'. The document keeps its comments and its order."
+            + (many_ ? " Applied to every selected element as one change." : ""),
           fields: [
-            { name: "address", label: "element", value: here(), list: addresses("node") },
+            element(many_),
             { name: "path", label: "field", hint: "a dotted path, e.g. spec.model" },
             { name: "value", label: "value", hint: "JSON when it parses as JSON, text otherwise" }
           ],
           confirm: "Set",
           onSubmit: function (values) {
-            if (!values.address || !values.path) { return "an element and a field, please"; }
-            ops([{
-              op: "set", address: values.address, path: values.path, value: scalar(values.value)
-            }], "set " + values.path + " on " + values.address).catch(function () {});
+            var on = many_ || (values.address ? [values.address] : []);
+            if (!on.length || !values.path) { return "an element and a field, please"; }
+            ops(on.map(function (address) {
+              return {
+                op: "set", address: address, path: values.path, value: scalar(values.value)
+              };
+            }), "set " + values.path + " on " + subject(on)).catch(function () {});
           }
         });
       }
@@ -1520,18 +1631,22 @@ var netgraphSession = (function () {
 
     K.define("element.unset", {
       run: function () {
+        var many_ = bulk("node");
         K.prompt({
-          title: "Remove a field",
-          detail: "'netgraph edit unset'.",
+          title: many_ ? "Remove a field from " + many(many_.length, "element") : "Remove a field",
+          detail: "'netgraph edit unset'."
+            + (many_ ? " Applied to every selected element as one change." : ""),
           fields: [
-            { name: "address", label: "element", value: here(), list: addresses("node") },
+            element(many_),
             { name: "path", label: "field", hint: "a dotted path, e.g. spec.model" }
           ],
           confirm: "Remove",
           onSubmit: function (values) {
-            if (!values.address || !values.path) { return "an element and a field, please"; }
-            ops([{ op: "unset", address: values.address, path: values.path }],
-              "removed " + values.path + " from " + values.address).catch(function () {});
+            var on = many_ || (values.address ? [values.address] : []);
+            if (!on.length || !values.path) { return "an element and a field, please"; }
+            ops(on.map(function (address) {
+              return { op: "unset", address: address, path: values.path };
+            }), "removed " + values.path + " from " + subject(on)).catch(function () {});
           }
         });
       }
@@ -1539,19 +1654,23 @@ var netgraphSession = (function () {
 
     K.define("element.move", {
       run: function () {
+        var many_ = bulk("node");
         K.prompt({
-          title: "Move a document",
+          title: many_ ? "Move " + many(many_.length, "document") : "Move a document",
           detail: "'netgraph edit move'. The element is untouched; only the file it "
-            + "is declared in changes.",
+            + "is declared in changes."
+            + (many_ ? " Every selected element lands in the same file, as one change." : ""),
           fields: [
-            { name: "address", label: "element", value: here(), list: addresses("node") },
+            element(many_),
             { name: "file", label: "file", hint: "relative to the inventory root", list: paths() }
           ],
           confirm: "Move",
           onSubmit: function (values) {
-            if (!values.address || !values.file) { return "an element and a file, please"; }
-            ops([{ op: "move", address: values.address, file: values.file }],
-              "moved " + values.address + " to " + values.file).catch(function () {});
+            var on = many_ || (values.address ? [values.address] : []);
+            if (!on.length || !values.file) { return "an element and a file, please"; }
+            ops(on.map(function (address) {
+              return { op: "move", address: address, file: values.file };
+            }), "moved " + subject(on) + " to " + values.file).catch(function () {});
           }
         });
       }
@@ -1636,6 +1755,58 @@ var netgraphSession = (function () {
     });
   }
 
+  /** Delete a whole selection, once, having said exactly what goes.
+   *
+   * Two things this owes the person pressing Delete on eleven shapes:
+   *
+   *   * **One question.** Eleven confirmations is eleven chances to click
+   *     through without reading. The prompt lists what will go, in full for a
+   *     handful and counted for a rack.
+   *   * **The collateral, before the fact.** A cable dies with either of its
+   *     ends -- that is netgraph.edit's rule, not this file's -- so the cables
+   *     that will dangle are named here, and the batch carries `cascade` so the
+   *     server does not have to ask a second time. The set comes from the
+   *     records the drawing arrived with; see select.js.
+   *
+   * The links go first and the elements after, so a cable that is both selected
+   * *and* collateral is removed once rather than named twice.
+   */
+  function deleteMany(selected) {
+    var links = netgraphSelect.links();
+    var nodes = netgraphSelect.nodes();
+    var collateral = netgraphSelect.dangling();
+    var lines = [
+      "Delete " + many(selected.length, "element") + "?",
+      "",
+      listed(nodes.concat(links))
+    ];
+    if (collateral.length) {
+      lines.push("");
+      lines.push("These links terminate on them and will go too:");
+      lines.push(listed(collateral));
+    }
+    lines.push("");
+    lines.push("This is one change: Ctrl-Z puts all of it back.");
+    if (!window.confirm(lines.join("\n"))) { return; }
+    var batch = links.map(function (address) {
+      return { op: "disconnect", address: address.split("#")[0] };
+    }).concat(nodes.map(function (address) {
+      return { op: "delete", address: address, cascade: true };
+    }));
+    ops(batch, "deleted " + many(selected.length, "element")).then(function () {
+      netgraphSelect.clear({ quiet: true });
+    }, function () {});
+  }
+
+  /** How many names a confirmation spells out before it counts the rest. */
+  var MAX_LISTED = 12;
+
+  function listed(items) {
+    if (items.length <= MAX_LISTED) { return items.join("\n"); }
+    return items.slice(0, MAX_LISTED).join("\n")
+      + "\n… and " + (items.length - MAX_LISTED) + " more";
+  }
+
   /** A typed value, as JSON when it is JSON and as text when it is not.
    *
    * `mtu: 9000` has to arrive as a number and `model: C9300` as a string, and
@@ -1702,6 +1873,9 @@ var netgraphSession = (function () {
      * geometry through it, so a bend written from the canvas takes exactly
      * the route a rename does. */
     ops: ops,
+    /* Align, distribute and snap. Its own route because the arithmetic needs
+     * the layout documents, which the page does not have; see arrange above. */
+    arrange: arrange,
     markDirty: markDirty,
     /* The history, as a promise. tour.js undoes its own three batches with it. */
     step: step,

@@ -2981,3 +2981,278 @@ def test_the_tour_has_no_accessibility_violations(open_editor: OpenEditor) -> No
 
     editor.press("Escape")
     expect(page.locator("#tour")).to_have_count(0, timeout=TIMEOUT_MS)
+
+
+# --------------------------------------------------------------------------- #
+# Multi-select, bulk edit and alignment
+# --------------------------------------------------------------------------- #
+#
+# The half of a diagram editor that only exists once more than one thing can be
+# picked: a rubber band, a bulk delete that asks once, and the alignment
+# commands that mean nothing about a single shape. Every one of them is a
+# gesture, so every one of them can only be asserted here.
+
+
+def selected(editor: Editor) -> list[str]:
+    """What the page says is selected, read out of select.js itself."""
+    return list(editor.page.evaluate("() => window.netgraphSelect.addresses()"))
+
+
+def halos(editor: Editor) -> int:
+    """How many selection rings are drawn. Not the same as the count above: a
+    ring is only drawn for an element that is on screen."""
+    return int(editor.page.locator("#viewport svg .ng-halo").count())
+
+
+def sweep(editor: Editor, *, over: Sequence[str]) -> None:
+    """Drag a rubber band across the paper, enclosing these shapes.
+
+    Started from a corner of the canvas that no shape occupies, because a press
+    that lands on a shape pans instead — which is the split app.js makes and the
+    thing this is testing the other half of.
+    """
+    boxes = []
+    for address in over:
+        box = editor.shape(address).bounding_box(timeout=TIMEOUT_MS)
+        assert box is not None, f"{address} is not on screen"
+        boxes.append(box)
+    frame = editor.page.locator("#canvas").bounding_box()
+    assert frame is not None
+    # Clamped to the canvas: a band that started a few pixels further left would
+    # start in the YAML pane, and a press there is a press in a text field.
+    left = max(min(box["x"] for box in boxes) - 12, frame["x"] + 2)
+    top = max(min(box["y"] for box in boxes) - 12, frame["y"] + 2)
+    right = min(max(box["x"] + box["width"] for box in boxes) + 12, frame["x"] + frame["width"] - 2)
+    bottom = min(
+        max(box["y"] + box["height"] for box in boxes) + 12, frame["y"] + frame["height"] - 2
+    )
+    mouse = editor.page.mouse
+    mouse.move(left, top)
+    mouse.down()
+    mouse.move((left + right) / 2, (top + bottom) / 2)
+    mouse.move(right, bottom)
+    mouse.up()
+
+
+def test_a_rubber_band_selects_what_it_encloses(open_editor: OpenEditor) -> None:
+    """Drag on the paper and everything inside is picked, halo and all."""
+    editor = arranged(open_editor)
+    assert selected(editor) == []
+
+    sweep(editor, over=["hosts/srv-nas", "routers/rtr-home"])
+
+    picked = selected(editor)
+    assert "hosts/srv-nas" in picked and "routers/rtr-home" in picked
+    assert "hosts/phone" not in picked, "the band caught something it did not enclose"
+    assert halos(editor) >= 2, "a selection has to be visible"
+    # And it is said out loud, which is the only form of it a screen reader has.
+    expect(editor.page.locator("#outline-summary")).to_contain_text(f"{len(picked)} selected")
+
+
+def test_shift_clicking_adds_and_takes_away(open_editor: OpenEditor) -> None:
+    editor = arranged(open_editor)
+
+    press_on(editor, editor.shape("switches/sw-home"))
+    assert selected(editor) == ["switches/sw-home"]
+
+    editor.page.keyboard.down("Shift")
+    press_on(editor, editor.shape("hosts/pc-desk"))
+    editor.page.keyboard.up("Shift")
+    assert sorted(selected(editor)) == ["hosts/pc-desk", "switches/sw-home"]
+
+    # The same chord again on the same shape is how one is taken back out.
+    editor.page.keyboard.down("Shift")
+    press_on(editor, editor.shape("hosts/pc-desk"))
+    editor.page.keyboard.up("Shift")
+    assert selected(editor) == ["switches/sw-home"]
+
+
+def test_select_all_and_escape(open_editor: OpenEditor) -> None:
+    """Ctrl-A on the canvas takes the view; Escape gives it back."""
+    editor = arranged(open_editor)
+    editor.page.locator("#canvas").focus()
+    editor.press("Control+a")
+
+    picked = selected(editor)
+    drawn = editor.api(f"/api/graph?view={ARRANGED_LAYER}")["details"]
+    assert len(picked) == len(drawn), "select-all has to take everything drawn"
+
+    editor.press("Escape")
+    assert selected(editor) == []
+    assert halos(editor) == 0
+
+
+def test_ctrl_a_in_the_yaml_pane_is_still_the_text(open_editor: OpenEditor) -> None:
+    """A canvas binding must not reach into a text field. Ctrl-A least of all."""
+    editor = arranged(open_editor)
+    editor.page.locator('.doc[data-address="switches/sw-home"]').first.click()
+    expect(editor.page.locator("#editor-title")).to_have_text("switches/sw-home.yaml")
+
+    editor.page.locator("#source").focus()
+    editor.press("Control+a")
+
+    assert selected(editor) == [], "Ctrl-A in the editor selected the diagram"
+    assert editor.selection().startswith("apiVersion:")
+
+
+def test_shift_arrow_extends_the_selection_along_the_links(open_editor: OpenEditor) -> None:
+    """The keyboard's rubber band: the same neighbour search, collecting as it goes."""
+    editor = arranged(open_editor)
+    editor.page.locator("#canvas").focus()
+    editor.press("Home")
+    first = editor.focus_ring()
+    assert first
+
+    editor.press("Shift+ArrowRight")
+    picked = selected(editor)
+    assert len(picked) >= 2, "Shift-arrow has to add rather than replace"
+    assert editor.focus_ring() != first, "and has to follow where it went"
+
+
+def test_a_selection_survives_a_re_render(open_editor: OpenEditor) -> None:
+    """It is addresses, not DOM nodes: a redraw must not drop it."""
+    editor = arranged(open_editor)
+    sweep(editor, over=["hosts/srv-nas", "routers/rtr-home"])
+    before = sorted(selected(editor))
+    assert len(before) >= 2
+
+    editor.page.locator("#render").click()
+    expect(editor.page.locator("#viewport svg")).to_be_visible()
+    assert editor.settles(lambda: sorted(selected(editor)) == before, timeout=TIMEOUT_MS / 1000), (
+        "the selection did not survive the redraw"
+    )
+    assert halos(editor) >= 2
+
+
+def test_deleting_a_selection_asks_once_and_undoes_in_one_step(
+    open_editor: OpenEditor,
+) -> None:
+    """The claim the whole batch layer exists for, asserted on the files."""
+    editor = arranged(open_editor)
+    assert editor.session is not None
+    before = _tree(editor.root)
+    depth = editor.api("/api/state")["undo"]
+
+    editor.page.keyboard.down("Shift")
+    press_on(editor, editor.shape("hosts/pc-desk"))
+    press_on(editor, editor.shape("hosts/srv-nas"))
+    editor.page.keyboard.up("Shift")
+    assert sorted(selected(editor)) == ["hosts/pc-desk", "hosts/srv-nas"]
+
+    asked: list[str] = []
+    editor.page.once("dialog", lambda dialog: (asked.append(dialog.message), dialog.accept()))
+    editor.page.locator("#canvas").focus()
+    editor.press("Delete")
+
+    assert editor.settles(
+        lambda: editor.session is not None and editor.session.revision != 1,
+        timeout=TIMEOUT_MS / 1000,
+    ), "the bulk delete reached no file"
+    assert len(asked) == 1, "a bulk delete must ask once, not once per element"
+    # It listed what goes -- and the cables that go with them, which is the part
+    # a person cannot work out from the picture.
+    assert "pc-desk" in asked[0] and "srv-nas" in asked[0]
+    assert "cbl-sw-desk" in asked[0], asked[0]
+
+    after = _tree(editor.root)
+    assert "hosts/pc-desk.yaml" not in after
+    assert "hosts/srv-nas.yaml" not in after
+    # One entry in the stack for the whole gesture, and one Ctrl-Z back.
+    assert editor.api("/api/state")["undo"] == depth + 1
+    editor.page.locator("#undo").click()
+    assert editor.settles(lambda: _tree(editor.root) == before, timeout=TIMEOUT_MS / 1000), (
+        "one undo has to put the whole batch back"
+    )
+
+
+def _positions(editor: Editor, view: str = ARRANGED_LAYER) -> dict[str, tuple[float, float]]:
+    """Where the server says each node is placed, from the render payload."""
+    geometry = editor.api(f"/api/graph?view={view}")["geometry"] or {}
+    return {key: (entry["x"], entry["y"]) for key, entry in (geometry.get("nodes") or {}).items()}
+
+
+def test_aligning_a_selection_writes_one_change(open_editor: OpenEditor) -> None:
+    """Align from the palette, and the YAML moves in one reviewable step."""
+    editor = arranged(open_editor)
+    assert editor.session is not None
+    before = _positions(editor)
+    depth = editor.api("/api/state")["undo"]
+    wanted = ["hosts/pc-desk", "hosts/srv-nas", "routers/rtr-home"]
+    assert len({before[address][0] for address in wanted}) == 3, "they start out ragged"
+    # Centres rather than edges, so the assertion below is one number and not
+    # three: these three nodes have three different widths.
+
+    editor.page.keyboard.down("Shift")
+    for address in wanted:
+        press_on(editor, editor.shape(address))
+    editor.page.keyboard.up("Shift")
+    assert sorted(selected(editor)) == sorted(wanted)
+
+    editor.press("Control+k")
+    editor.page.locator(".palette-input").fill("Align centres")
+    editor.press("Enter")
+
+    assert editor.settles(
+        lambda: len({_positions(editor)[address][0] for address in wanted}) == 1,
+        timeout=TIMEOUT_MS / 1000,
+    ), "aligning centres has to give the three of them one x"
+
+    after = _positions(editor)
+    assert after["switches/sw-home"] == before["switches/sw-home"], "an unselected node moved"
+    assert "layout.yaml" in editor.api("/api/changes")["entries"][-1]["files"]
+    assert editor.api("/api/state")["undo"] == depth + 1
+    editor.page.locator("#undo").click()
+    assert editor.settles(lambda: _positions(editor) == before, timeout=TIMEOUT_MS / 1000), (
+        "one undo has to put a whole alignment back"
+    )
+
+
+def test_right_clicking_a_selection_offers_the_commands_that_need_one(
+    open_editor: OpenEditor,
+) -> None:
+    """A set has its own menu: no rename, and every alignment."""
+    editor = arranged(open_editor)
+    editor.page.keyboard.down("Shift")
+    press_on(editor, editor.shape("hosts/pc-desk"))
+    press_on(editor, editor.shape("hosts/srv-nas"))
+    editor.page.keyboard.up("Shift")
+
+    press_on(editor, editor.shape("hosts/pc-desk"), button="right")
+    expect(menu(editor)).to_be_visible()
+
+    expect(menu(editor).locator(".menu-head")).to_have_text("2 selected elements")
+    for command in ("align.left", "distribute.vertical", "geometry.snap", "element.delete"):
+        expect(menu_row(editor, command)).to_be_visible()
+    # Nothing that can only mean one element: renaming two things is not a thing.
+    expect(menu_row(editor, "element.rename")).to_have_count(0)
+
+
+def test_a_read_only_session_selects_but_will_not_arrange(open_editor: OpenEditor) -> None:
+    """Looking at a diagram must never become rearranging it."""
+    editor = arranged(open_editor, writable=False)
+    sweep(editor, over=["hosts/srv-nas", "routers/rtr-home"])
+    assert len(selected(editor)) >= 2, "a read-only session can still select"
+
+    editor.press("Control+k")
+    editor.page.locator(".palette-input").fill("Align left")
+    row = editor.page.locator(".palette-item").first
+    expect(row).to_have_class(re.compile(r"unavailable"))
+    editor.press("Escape")
+
+
+@requires_dot
+def test_a_selection_of_a_thousand_devices_stays_workable(open_editor: OpenEditor) -> None:
+    """Ctrl-A on a culled diagram: every address held, only the visible ones drawn."""
+    editor = crowded(open_editor)
+    editor.page.locator("#canvas").focus()
+    editor.press("Control+a")
+
+    picked = selected(editor)
+    stats = cull_stats(editor)
+    assert stats["active"], "this diagram is meant to be big enough to cull"
+    assert len(picked) == stats["total"], "an off-screen element is still selectable"
+    assert 0 < halos(editor) <= len(picked), "only what is on screen needs a ring"
+    expect(editor.page.locator("#outline-summary")).to_contain_text(f"{len(picked)} selected")
+
+    editor.press("Escape")
+    assert selected(editor) == []

@@ -473,6 +473,17 @@ main {
 
 .canvas.panning { cursor: grabbing; }
 
+/* The rubber band. A plain <div> over the canvas rather than a rectangle inside
+ * the SVG: it is a gesture, not part of the drawing, so it lives in client
+ * pixels and needs no transform to follow the pointer. */
+.rubber {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  border: 1px dashed var(--selected);
+  background: color-mix(in srgb, var(--selected) 12%, transparent);
+}
+
 /* The canvas is one tab stop and says so. Inside it the arrow keys move, which
  * is why the ring here is on the container and the ring below is on a shape. */
 .canvas:focus-visible { outline: 2px solid var(--focus); outline-offset: -3px; }
@@ -560,6 +571,20 @@ main {
   stroke: var(--selected);
   stroke-width: 2.5;
   stroke-dasharray: 10 4;
+}
+
+/* The multi-selection: one rectangle per selected element, drawn into an
+ * overlay of its own rather than as a class on each shape. That is what lets an
+ * element whose contents cull.js has parked still show a ring -- there is no
+ * shape left to put a class on, and it is still selected. See select.js. */
+.viewport svg g.ng-selection { pointer-events: none; }
+
+.viewport svg .ng-halo {
+  fill: color-mix(in srgb, var(--selected) 10%, transparent);
+  stroke: var(--selected);
+  stroke-width: 1.5;
+  stroke-dasharray: 10 4;
+  rx: 3;
 }
 
 /* What somebody *else* has selected. Short dash, and their attention, not
@@ -702,6 +727,14 @@ main {
 }
 
 .outline-entry:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+
+/* The outline is the selection said in text, so an entry in it is marked the
+ * same way the halo marks a shape. `aria-pressed` is what carries it to a
+ * screen reader; this is the sighted half of the same fact. */
+.outline-entry[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--selected) 18%, transparent);
+  box-shadow: inset 2px 0 0 var(--selected);
+}
 
 /* ------------------------------------------------------------- info box */
 

@@ -326,6 +326,25 @@ would be a loss. Right-clicking anywhere off the canvas is the browser's own
 menu, untouched.
 
 <!-- generated: context-menus -->
+**Right-clicking a multi-selection**
+
+| Offers | Same as | Needs |
+|---|---|---|
+| Align left | Align left — *palette only* | `--write` |
+| Align centres | Align centres — *palette only* | `--write` |
+| Align right | Align right — *palette only* | `--write` |
+| Align top | Align top — *palette only* | `--write` |
+| Align middles | Align middles — *palette only* | `--write` |
+| Align bottom | Align bottom — *palette only* | `--write` |
+| Distribute horizontally | Distribute horizontally — *palette only* | `--write` |
+| Distribute vertically | Distribute vertically — *palette only* | `--write` |
+| Snap to the grid | Snap to the grid — *palette only* | `--write` |
+| Set a field on all of them… | Set a field… — `e` | `--write` |
+| Remove a field from all of them… | Remove a field… — *palette only* | `--write` |
+| Move their documents… | Move to another file… — *palette only* | `--write` |
+| Clear the selection | Clear the selection — `Ctrl-Shift-A` | — |
+| Delete all of them | Delete the selection — `Delete` | `--write` |
+
 **Right-clicking an element**
 
 | Offers | Same as | Needs |
@@ -338,7 +357,7 @@ menu, untouched.
 | Set a field… | Set a field… — `e` | `--write` |
 | Remove a field… | Remove a field… — *palette only* | `--write` |
 | Move its document… | Move to another file… — *palette only* | `--write` |
-| Delete it | Delete the focused element — `Delete` | `--write` |
+| Delete it | Delete the selection — `Delete` | `--write` |
 
 **Right-clicking a link**
 
@@ -350,7 +369,7 @@ menu, untouched.
 | Route it… | Change how the link is routed… — `r` | `--write` |
 | Put the label back on the line | Put the link's label back on the line — *palette only* | `--write` |
 | Set a field… | Set a field… — `e` | `--write` |
-| Disconnect it | Delete the focused element — `Delete` | `--write` |
+| Disconnect it | Delete the selection — `Delete` | `--write` |
 
 **Right-clicking the canvas**
 
@@ -408,6 +427,43 @@ Two rings, deliberately different: **focus** is a solid violet halo — where th
 keyboard is — and **selection** is a long dash, with somebody else's selection a
 short one. Three patterns, not three shades, so they are told apart without
 colour.
+
+### Selecting several things
+
+Most of the editor acts on a **selection**, and a selection is a set:
+
+| Gesture | What it does |
+|---|---|
+| drag on the paper | A rubber band. Everything it encloses is selected; hold `Shift` to add to what was already there rather than replace it. A drag that starts *on* a shape still pans. |
+| `Shift`- or `Ctrl`-click | Adds one element, or takes it back out. Works on the outline entries too. |
+| `Ctrl-A` | Everything the current view draws — including whatever is culled off screen. Only on the canvas: `Ctrl-A` in the YAML pane is still the text. |
+| `Shift`-arrow | Extends along the same neighbour search the arrow keys use, so a trunk and everything hanging off it is collected without a pointer. |
+| `Escape` | Clears it, before it closes anything else. |
+
+The selection is held as **element addresses**, not as shapes, which is what
+lets it survive a redraw — a save, an undo, somebody else's edit — and lets a
+culled element half a screen away stay in it. The ring is drawn for the ones on
+screen; the count is on the diagram outline, where a screen reader hears *"8
+elements, 3 links, 2 selected"* and each selected entry as pressed.
+
+With more than one thing selected, the gestures that can mean a set act on all
+of it, as **one change**:
+
+* **Delete** asks once — listing what goes, and the cables that will dangle as a
+  result — and writes the lot as a single entry in the undo stack. One `Ctrl-Z`
+  puts all of it back.
+* **Set a field**, **Remove a field** and **Move to another file** apply to
+  every selected element in one batch, so twelve switches gain `spec.site` in
+  one validated, conflict-checked write.
+* **Align**, **distribute** and **snap to grid** appear, from the palette or by
+  right-clicking inside the selection. Each writes one reviewable diff into the
+  `kind: layout` documents that hold the arrangement — see
+  [`docs/editing.md`](../editing.md#arranging-a-selection) — and the grid pitch
+  is the inventory's `[editor] grid`.
+
+Right-clicking inside a multi-selection opens the selection's own menu rather
+than the element's: the subject is the set, and "Rename it…" on eleven shapes
+would have to mean whichever one the pointer happened to be over.
 
 ### A thousand devices
 
@@ -524,6 +580,9 @@ cable it, undo both — without dispatching a single mouse event.
 | `Space` | Pin the inspector | the diagram | a focused element | Keeps the inspector up, and tells the other tabs what this one is looking at. |
 | `Ctrl-G` | Go to element… | anywhere | — | The palette, opened over element addresses alone. |
 | `Ctrl-O` | Open file… | anywhere | a folder | The palette, opened over the inventory's file paths alone. |
+| `Ctrl-A` | Select everything in this view | the diagram | — | Every element and link the diagram is drawing, including the ones culled off screen. The canvas only — Ctrl-A in the YAML pane is still the text. |
+| `Ctrl-Shift-A` | Clear the selection | anywhere | — | Escape does this too, before it closes anything else. |
+| `Shift-ArrowRight` / `Shift-ArrowLeft` / `Shift-ArrowUp` / `Shift-ArrowDown` | Extend the selection | the diagram | — | Steps the way the arrow keys do — preferring an element this one is linked to — and adds what it lands on, so a trunk and everything hanging off it can be collected without a pointer. |
 
 **Editing the inventory**
 
@@ -531,11 +590,11 @@ cable it, undo both — without dispatching a single mouse event.
 |---|---|---|---|---|
 | `n` | Create an element… | the diagram | `--write` | Asks for a kind and a name, and writes the document. 'netgraph edit create'. |
 | `c` | Connect this element… | the diagram | `--write` | Cables the focused element to another, port to port. 'netgraph edit connect'. |
-| `Delete` / `Backspace` | Delete the focused element | the diagram | `--write` | Removes the element, or the cable when a link is focused. Asks first. 'netgraph edit delete' / 'disconnect'. |
+| `Delete` / `Backspace` | Delete the selection | the diagram | `--write` | Removes everything selected, or the focused element when nothing is. Asks once, listing what goes and the cables that dangle as a result, and writes it as one change. 'netgraph edit delete' / 'disconnect'. |
 | `F2` | Rename the focused element… | the diagram | `--write` | Renames it and every reference to it. 'netgraph edit rename'. |
-| `e` | Set a field… | the diagram | `--write` | A dotted path and a YAML value, on the focused element. 'netgraph edit set'. |
-| *palette only* | Remove a field… | anywhere | `--write` | 'netgraph edit unset'. |
-| *palette only* | Move to another file… | anywhere | `--write` | Moves the element's document into a different file. 'netgraph edit move'. |
+| `e` | Set a field… | the diagram | `--write` | A dotted path and a YAML value, on every selected element at once — or on the focused one when nothing is selected. 'netgraph edit set'. |
+| *palette only* | Remove a field… | anywhere | `--write` | 'netgraph edit unset', across the whole selection as one change. |
+| *palette only* | Move to another file… | anywhere | `--write` | Moves the selected documents into a different file, together. 'netgraph edit move'. |
 | *palette only* | Disconnect a cable… | anywhere | `--write` | Removes a cable, leaving both devices. 'netgraph edit disconnect'. |
 | `b` | Add a bend to the focused link | the diagram | `--write` | Drops a waypoint half way along the link, which the route then passes through. Double-clicking the line does the same at the point clicked. |
 | `Shift-B` | Straighten the focused link | the diagram | `--write` | Clears every bend, leaving the link to run directly between its two devices. The routing style and the label position are kept. |
@@ -543,6 +602,20 @@ cable it, undo both — without dispatching a single mouse event.
 | *palette only* | Put the link's label back on the line | anywhere | `--write` | Undoes a nudged label, leaving it half way along the route where the renderer puts one nobody has moved. |
 | `i` | Add an interface… | the diagram | `--write` | 'netgraph edit add-interface'. |
 | *palette only* | Remove an interface… | anywhere | `--write` | 'netgraph edit remove-interface'. |
+
+**Arranging the diagram**
+
+| Keys | Command | Where | Needs | What it does |
+|---|---|---|---|---|
+| *palette only* | Align left | anywhere | `--write` | Every selected element onto the leftmost one's left edge. |
+| *palette only* | Align centres | anywhere | `--write` | Onto the vertical axis half way across the selection. |
+| *palette only* | Align right | anywhere | `--write` | Onto the rightmost one's right edge. |
+| *palette only* | Align top | anywhere | `--write` | Onto the topmost one's top edge. |
+| *palette only* | Align middles | anywhere | `--write` | Onto the horizontal axis half way down the selection. |
+| *palette only* | Align bottom | anywhere | `--write` | Onto the bottommost one's bottom edge. |
+| *palette only* | Distribute horizontally | anywhere | `--write` | Equal gaps between the boxes, left to right, with the two outermost left where they are. Needs three. |
+| *palette only* | Distribute vertically | anywhere | `--write` | The same, top to bottom. |
+| *palette only* | Snap to the grid | anywhere | `--write` | Rounds each selected element's position to the pitch this inventory sets in 'netgraph.toml' ([editor] grid, 20 points by default). |
 
 **The view**
 

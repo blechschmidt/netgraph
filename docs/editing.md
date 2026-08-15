@@ -24,6 +24,8 @@ leaves every comment in it alone.
 - [References](#references)
 - [Placement](#placement)
 - [The two gates](#the-two-gates)
+- [Batches: many operations, one change](#batches-many-operations-one-change)
+- [Arranging a selection](#arranging-a-selection)
 - [Using it from Python](#using-it-from-python)
 - [Reviewing what you changed](#reviewing-what-you-changed)
 - [What it deliberately does not do](#what-it-deliberately-does-not-do)
@@ -297,6 +299,103 @@ Writes themselves go through a temporary file and a rename, so a reader sees the
 old file or the new one and never half of either. There is no cross-file
 transaction — a plain filesystem does not offer one — so a write that fails
 part-way through a multi-file change says which files it had already written.
+
+## Batches: many operations, one change
+
+An operation is atomic: an applier that refuses leaves the tree exactly as it
+found it, down to the byte. That is the right grain for one edit and the wrong
+grain for a *gesture*. Selecting eleven switches in the editor and pressing
+Delete is eleven operations that mean one thing, and if the seventh cannot go —
+something still refers to it, a file moved on disk — the honest outcome is that
+none of them went. Six deleted devices and an error message is a state nobody
+asked for and nobody can undo in one step.
+
+`Batch` is that grain:
+
+```python
+from netgraph.edit import Batch, DeleteElement, EditSession
+
+session = EditSession(root=Path("inventory"))
+batch = Batch(session, label="retire the old access layer")
+batch.add(DeleteElement(address=address, cascade=True) for address in doomed)
+
+result = batch.apply()  # every one of them, or none of them
+print(result.files)  # what it would write
+batch.commit()  # one validation, one hash check, one write
+```
+
+Four things it adds, and they are the four an editor needs:
+
+| | |
+|---|---|
+| **One transaction** | The tree is snapshotted before the first operation and restored if any of them refuses. The refusal names which one it was and its position in the batch. |
+| **One entry in the undo stack** | `result.inverse` is the inverse of each operation in reverse order — one `Ctrl-Z` for the whole gesture. |
+| **One conflict check, one save** | `commit` validates the tree the batch *would* produce once, hashes every file it touches once, and writes them together. |
+| **One label** | `describe()` names the batch after its first operation and how many followed: `delete sites/hq/sw-a (+10 more)`. |
+
+The web editor puts every gesture through this, which is why deleting a
+multi-selection asks once, lists what goes *and* the cables that will dangle as
+a result, and comes back as a single entry in the changes drawer.
+
+`EditSession.apply_all` is the other thing, and stays what it was: it applies in
+order and stops at the first refusal, keeping what the earlier ones did. That is
+right for a caller replaying a list it already trusts — an undo stack, a plan —
+and wrong for one acting on somebody's selection.
+
+## Arranging a selection
+
+Align, distribute and snap-to-grid are the three gestures a diagram editor has
+that mean nothing about a single shape. They live in `netgraph.edit.arrange`,
+not in the browser, for the same reason every other mutation does: an
+arrangement is `kind: layout` documents (§18), and deciding which document holds
+which node — then writing back only the entries that moved, keeping the comments
+and the key spellings of the ones that did not — is the mutation layer's job.
+
+```python
+from netgraph.edit import Batch, EditSession, arrange_operations
+
+session = EditSession(root=Path("inventory"))
+operations = arrange_operations(
+    session.inventory,
+    command="align.left",
+    view="l1",
+    addresses=["core/sw-a", "core/sw-b", "core/sw-c"],
+)
+Batch(session).apply(operations)
+session.commit()
+```
+
+| Command | What it does |
+|---|---|
+| `align.left` / `align.centre` / `align.right` | Settles the `x` axis: onto the leftmost left edge, the selection's own vertical axis, or the rightmost right edge. |
+| `align.top` / `align.middle` / `align.bottom` | Settles the `y` axis. `y` grows *upwards* here, so "top" is the largest value. |
+| `distribute.horizontal` / `distribute.vertical` | Equal *gaps* between the boxes, the two outermost left where they are. Needs three. |
+| `snap` | Rounds each position to the grid pitch. |
+
+The answer is one `SetGeometry` per layout document that loses an entry, each
+carrying that document's whole `nodes` section for the view — whole, because
+`SetGeometry` replaces a section, and the replacement is itself a keyed merge,
+so an entry whose coordinates did not change comes out of it byte-identical. Two
+hundred aligned nodes spread across three layout documents is three operations
+and three touched files.
+
+A tidying that would move nothing produces no operation at all, so aligning an
+already-aligned row is a no-op rather than a second identical step to undo. A
+node whose entry stores no `size` is treated as a point, which is the honest
+reading — the size is a consequence of the label, and the arrangement did not
+decide it.
+
+The grid pitch is the inventory's, in `netgraph.toml`:
+
+```toml
+[editor]
+grid = 20     # points; the default
+```
+
+A property of the diagram rather than of the person looking at it, because
+snapping writes real coordinates into a real document: two people tidying the
+same inventory to two different lattices would spend the afternoon undoing each
+other.
 
 ## Using it from Python
 

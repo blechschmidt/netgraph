@@ -83,14 +83,16 @@ window.netgraphMenu = (function () {
   function show(hit, at) {
     close();
     var record = hit ? hit.record : null;
-    var target = record ? (record.type === "edge" ? "link" : "node") : "canvas";
+    var target = targetFor(record);
     var groups = rowsFor(target);
     if (!groups.length) { return false; }
 
     // Point the commands at what was clicked before any of them is run. They
     // all default to "the focused element", so this is the whole of how the
-    // pointer and the keyboard end up meaning the same thing.
-    if (record) {
+    // pointer and the keyboard end up meaning the same thing. Not inside a
+    // multi-selection, though: focusing one of eleven there would be the only
+    // gesture in the editor that quietly narrowed what a command acts on.
+    if (record && target !== "selection") {
       var element = record.element || (hit.group ? hit.group.id : "");
       if (element) { window.netgraphA11y.focus(element, { quiet: true, scroll: false }); }
     }
@@ -157,13 +159,34 @@ window.netgraphMenu = (function () {
     }).filter(function (group) { return group.length > 0; });
   }
 
+  /** Which menu a right-click gets: the set, the shape, or the paper.
+   *
+   * A shape that is *part of a multi-selection* gets the selection's menu, and
+   * one that is not gets its own — which is also how the click resolves the
+   * ambiguity of right-clicking outside a selection while one exists: that is a
+   * new subject, so it is that shape's menu.
+   */
+  function targetFor(record) {
+    var address = record ? String(record.id || "") : "";
+    if (address && window.netgraphSelect.size() > 1 && window.netgraphSelect.has(address)) {
+      return "selection";
+    }
+    if (!record) { return "canvas"; }
+    return record.type === "edge" ? "link" : "node";
+  }
+
   /** What the menu says it is about to act on.
    *
    * The element's address, because that is what the commands take and what the
    * file list keys documents by — a heading that said "switch" would leave two
-   * switches indistinguishable at the moment it matters most.
+   * switches indistinguishable at the moment it matters most. For a set, the
+   * count: naming one of eleven would be worse than naming none.
    */
   function caption(record, target) {
+    if (target === "selection") {
+      var count = window.netgraphSelect.size();
+      return count + " selected element" + (count === 1 ? "" : "s");
+    }
     if (!record) { return "the diagram"; }
     var address = String(record.id || "");
     if (!address) { return target === "link" ? "this link" : "this element"; }

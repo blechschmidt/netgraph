@@ -44,6 +44,7 @@ from netgraph.models.layout import (
 
 __all__ = [
     "COORDINATE_PLACES",
+    "DEFAULT_GRID",
     "DEFAULT_ROUTING",
     "Box",
     "Geometry",
@@ -60,6 +61,12 @@ __all__ = [
 #: three-thousandth of a millimetre on paper, so rounding here costs nothing
 #: visible and buys a file that a person can read and a diff can show.
 COORDINATE_PLACES: Final = 2
+
+#: Grid pitch in points that "snap to grid" rounds to when the inventory does
+#: not set one (``[editor] grid`` in ``netgraph.toml``). Twenty is half of
+#: Graphviz's default rank separation and a little under a node's height, so a
+#: snapped diagram lines up without every device landing on its neighbour.
+DEFAULT_GRID: Final = 20.0
 
 
 def round_coordinate(value: float) -> float:

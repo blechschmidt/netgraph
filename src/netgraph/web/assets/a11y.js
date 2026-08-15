@@ -59,6 +59,15 @@ var netgraphA11y = (function () {
   var cycling = false;
   /** What this tab has selected, which is not the same as what it has focused. */
   var selected = null;
+  /** The multi-selection, as SVG ids: select.js owns it, this file speaks it.
+   *  A screen reader hears the count on the outline's summary and hears which
+   *  entries are in it from their own pressed state. */
+  var marked = {};
+  var markedCount = 0;
+  /** What the outline is currently listing, so its summary can be re-said when
+   *  the selection moves without the drawing having changed. */
+  var outlined = [];
+  var outlineMeta = null;
 
   /* --------------------------------------------------------------- attach */
 
@@ -220,29 +229,77 @@ var netgraphA11y = (function () {
     var list = el.outlineList;
     if (!list) { return; }
     list.replaceChildren();
-    if (el.outlineSummary) {
-      var nodes = ids.filter(function (id) { return records[id].type !== "edge"; }).length;
-      el.outlineSummary.textContent = ids.length
-        ? ((meta && meta.view) || "diagram") + " view: " + nodes +
-          " element" + (nodes === 1 ? "" : "s") + ", " + (ids.length - nodes) +
-          " link" + (ids.length - nodes === 1 ? "" : "s")
-        : "nothing is drawn";
-    }
+    outlined = ids.slice();
+    outlineMeta = meta || null;
+    sayOutline();
     ids.forEach(function (id) {
       var record = records[id];
       var item = document.createElement("li");
       var button = document.createElement("button");
       button.type = "button";
-      button.className = "outline-entry";
+      button.className = "outline-entry" + (marked[id] ? " picked" : "");
       button.dataset.element = id;
+      // A multi-selection is a set of toggles, and `aria-pressed` is what a
+      // screen reader reads as "selected" on a control that is one. Set on
+      // every entry rather than only on the selected ones, so the state is
+      // *announced* as off rather than merely absent.
+      button.setAttribute("aria-pressed", marked[id] ? "true" : "false");
       button.textContent = labelOf(record);
-      button.addEventListener("click", function () {
+      button.addEventListener("click", function (event) {
+        // The same modifiers the canvas takes, so the outline is a way of
+        // building a selection and not only of jumping to one thing.
+        if ((event.shiftKey || event.ctrlKey || event.metaKey) && window.netgraphSelect) {
+          window.netgraphSelect.toggle([String(record.id || "")]);
+          return;
+        }
         focus(id, { quiet: false });
         el.canvas.focus();
       });
       item.appendChild(button);
       list.appendChild(item);
     });
+  }
+
+  /** What the outline says it is: the view, its size, and what is selected. */
+  function sayOutline() {
+    if (!el.outlineSummary) { return; }
+    var ids = outlined;
+    if (!ids.length) {
+      el.outlineSummary.textContent = "nothing is drawn";
+      return;
+    }
+    var nodes = ids.filter(function (id) { return records[id].type !== "edge"; }).length;
+    var text = ((outlineMeta && outlineMeta.view) || "diagram") + " view: " + nodes +
+      " element" + (nodes === 1 ? "" : "s") + ", " + (ids.length - nodes) +
+      " link" + (ids.length - nodes === 1 ? "" : "s");
+    if (markedCount) { text += ", " + markedCount + " selected"; }
+    el.outlineSummary.textContent = text;
+  }
+
+  /** Adopt select.js's set. Nothing here decides what is selected; see that
+   *  file. What this does is make it *audible*: the count on the summary and a
+   *  pressed state on each entry, which is the whole of what a screen reader
+   *  needs to answer "what am I about to delete".
+   *
+   *  `count` is passed rather than derived from `ids` because an address that
+   *  is selected and off this layer is still selected, and the summary should
+   *  say so rather than quietly under-count. */
+  function mark(ids, count) {
+    marked = {};
+    (ids || []).forEach(function (id) { marked[id] = true; });
+    markedCount = count === undefined ? (ids || []).length : count;
+    // Deliberately *not* `aria-multiselectable` on the canvas: it is a
+    // `role="application"`, which does not take it, and axe is right to say so.
+    // The set is announced on the outline's summary and carried on each entry's
+    // pressed state, which are both roles that mean it.
+    if (el.outlineList) {
+      el.outlineList.querySelectorAll(".outline-entry").forEach(function (entry) {
+        var on = !!marked[entry.dataset.element];
+        entry.classList.toggle("picked", on);
+        entry.setAttribute("aria-pressed", on ? "true" : "false");
+      });
+    }
+    sayOutline();
   }
 
   /* --------------------------------------------------------------- focus */
@@ -347,10 +404,24 @@ var netgraphA11y = (function () {
    */
   function move(direction) {
     if (!current) { return first({ quiet: false }); }
+    var best = neighbour(direction);
+    if (!best) { announce("nothing to the " + direction, false); return false; }
+    return focus(best, { quiet: false });
+  }
+
+  /** The id `move` would step to, without stepping to it.
+   *
+   * Separated so that Shift-arrow can *extend a selection* along exactly the
+   * same search — a second, subtly different notion of "the thing to the right"
+   * would be a diagram that walks one way with the arrow keys and another way
+   * with Shift held.
+   */
+  function neighbour(direction) {
+    if (!current) { return null; }
     var here = centre(current);
-    if (!here) { return false; }
+    if (!here) { return null; }
     var wanted = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 }[direction];
-    if (wanted === undefined) { return false; }
+    if (wanted === undefined) { return null; }
     var neighbours = linkedTo(current);
     var best = null;
     order.forEach(function (id) {
@@ -375,8 +446,7 @@ var netgraphA11y = (function () {
         best = candidate;
       }
     });
-    if (!best) { announce("nothing to the " + direction, false); return false; }
-    return focus(best.id, { quiet: false });
+    return best ? best.id : null;
   }
 
   /** Normalise an angle into (-pi, pi]. */
@@ -487,9 +557,11 @@ var netgraphA11y = (function () {
     focus: focus,
     focused: focused,
     select: select,
+    mark: mark,
     first: first,
     last: last,
     move: move,
+    neighbour: neighbour,
     cycleLink: cycleLink,
     announce: announce,
     /** Every drawn element, for the palette's "go to" entries. */

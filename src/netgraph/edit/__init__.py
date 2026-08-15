@@ -39,6 +39,15 @@ before writing any of it.
 from __future__ import annotations
 
 from netgraph.edit.apply import AppliedOperation, apply_operation
+from netgraph.edit.arrange import (
+    ALIGNMENTS,
+    ARRANGEMENTS,
+    DEFAULT_GRID,
+    DISTRIBUTIONS,
+    arrange_operations,
+    describe_arrangement,
+)
+from netgraph.edit.batch import Batch, BatchResult
 from netgraph.edit.commands import (
     INVENTORY_PLACEHOLDER,
     command_for,
@@ -81,17 +90,23 @@ from netgraph.edit.paths import format_field_path, parse_field_path
 from netgraph.edit.placement import COLLECTION_STEMS, FileFacts, choose_file
 from netgraph.edit.references import NameIndex, Reference, ReferenceRole, references_of
 from netgraph.edit.roundtrip import YamlDocument, YamlFile
-from netgraph.edit.session import EditSession, EditSummary
-from netgraph.edit.tree import EditableTree, digest_of
+from netgraph.edit.session import EditSession, EditSummary, Mark
+from netgraph.edit.tree import EditableTree, TreeSnapshot, digest_of
 
 __all__ = [
+    "ALIGNMENTS",
+    "ARRANGEMENTS",
     "COLLECTION_STEMS",
+    "DEFAULT_GRID",
+    "DISTRIBUTIONS",
     "INVENTORY_PLACEHOLDER",
     "OPERATIONS",
     "AddInterface",
     "AddressError",
     "AppendItem",
     "AppliedOperation",
+    "Batch",
+    "BatchResult",
     "CascadeRequired",
     "ConflictError",
     "Connect",
@@ -103,6 +118,7 @@ __all__ = [
     "EditSummary",
     "EditableTree",
     "FileFacts",
+    "Mark",
     "MoveElement",
     "NameIndex",
     "Operation",
@@ -117,16 +133,19 @@ __all__ = [
     "RoundTripError",
     "SetField",
     "SetGeometry",
+    "TreeSnapshot",
     "UnsetField",
     "ValidationRefused",
     "WriteFile",
     "YamlDocument",
     "YamlFile",
     "apply_operation",
+    "arrange_operations",
     "choose_file",
     "command_for",
     "command_list",
     "commands_text",
+    "describe_arrangement",
     "digest_of",
     "format_field_path",
     "operation_from_dict",

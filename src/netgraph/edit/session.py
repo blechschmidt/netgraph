@@ -35,12 +35,21 @@ from netgraph.config import Config, ValidationConfig
 from netgraph.edit.apply import AppliedOperation, apply_operation
 from netgraph.edit.errors import Problem, ValidationRefused
 from netgraph.edit.operations import Operation
-from netgraph.edit.tree import EditableTree
+from netgraph.edit.tree import EditableTree, TreeSnapshot
 from netgraph.fmt.runner import diff_text
 from netgraph.loader import DocumentCache, Inventory, Overlay, load_tree
 from netgraph.validate import validate
 
-__all__ = ["EditSession", "EditSummary"]
+__all__ = ["EditSession", "EditSummary", "Mark"]
+
+
+@dataclass(frozen=True, slots=True)
+class Mark:
+    """Where a session was before a batch started; see :meth:`EditSession.begin`."""
+
+    tree: TreeSnapshot
+    #: How many operations had been applied. Everything after this is undone.
+    applied: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,8 +182,36 @@ class EditSession:
         return applied
 
     def apply_all(self, operations: Iterable[Operation]) -> tuple[AppliedOperation, ...]:
-        """Apply operations in order, stopping at the first that refuses."""
+        """Apply operations in order, stopping at the first that refuses.
+
+        The tree keeps whatever the operations before the refusal did. That is
+        the right default for a caller replaying a known-good list — an undo
+        stack, a plan — and the wrong one for a caller acting on a user's
+        selection, which wants :class:`~netgraph.edit.batch.Batch` instead.
+        """
         return tuple(self.apply(operation) for operation in operations)
+
+    # -- transactions ----------------------------------------------------
+
+    def begin(self) -> Mark:
+        """Remember where the session is, so a batch can be given up on.
+
+        Cheap: the tracked files are rendered to strings, and a session that has
+        touched three documents of a thousand has three of them.
+        """
+        return Mark(tree=self._tree.snapshot(), applied=len(self._applied))
+
+    def rollback(self, mark: Mark) -> None:
+        """Put the session back to where :meth:`begin` found it.
+
+        Both halves of it: the files, and the record of what was done to them.
+        A rolled-back operation that stayed in :attr:`applied` would be reported
+        as part of the next batch and would contribute an inverse for a change
+        that is not there.
+        """
+        self._tree.restore(mark.tree)
+        del self._applied[mark.applied :]
+        self._inventory = None
 
     # -- reporting -------------------------------------------------------
 
