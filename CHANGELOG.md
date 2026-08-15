@@ -18,6 +18,44 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **A published demo site: <https://blechschmidt.github.io/netgraph/>.** Until now nothing
+  in the project let a stranger see what netgraph does without first installing Python
+  *and* Graphviz. The site is the whole documentation set as browsable pages, and — the
+  part that matters — every example inventory rendered by `netgraph render -f html`, so
+  the layers, the filters and the per-element detail are clickable at
+  <https://blechschmidt.github.io/netgraph/demo/>.
+
+  Those pages are the command's own output rather than a viewer written to look like it,
+  which is what keeps them honest: there is no second front end to fall behind the first.
+  `.github/workflows/pages.yml` rebuilds and deploys on every push to `main`, runs on pull
+  requests without deploying, and **fails if any example fails to render** — a demo site
+  quietly missing the inventory that stopped working would be a regression nobody sees.
+  The builder is `tools/build_site.py`, one command to run locally, and its one dependency
+  is the new `site` extra.
+
+  `docs/getting-started.md` now opens with *Try it without installing*, and the README
+  carries a badge pointing at the demos.
+
+- **A first-run guided tour in the editor.** `netgraph web DIR` opens a canvas and a
+  command palette with four dozen entries, and nothing on screen said which of them was
+  the point. The tour says it in about sixty seconds: it creates a device, cables it to
+  one of yours, moves its document into another file, opens the changes drawer on the YAML
+  all three gestures wrote, and undoes the lot — proving that every shape on the canvas is
+  a document and that the mapping runs both ways.
+
+  Every step is a real batch through `netgraph.edit`, because a tour that mimed its writes
+  would demonstrate the one thing it exists to demonstrate least well. What makes that
+  safe is where the writes land: starting the tour copies the inventory's documents into a
+  temporary directory and points the page at a second, always-writable session over the
+  copy, so **your files are never touched** — and a read-only session can take the tour
+  too, which is the session somebody exploring is most likely to have open. The copy is
+  deleted when the tour finishes, when it is skipped, when the tab closes and when the
+  server stops.
+
+  It is offered once, on a first visit; `Esc` declines it for good and `Ctrl-K` → *Take the
+  guided tour* runs it again. Keyboard-driven throughout, audited by axe-core like every
+  other dialog on that page, and covered end to end in `tests/test_browser.py`.
+
 - **`netgraph export` now writes the configuration a device would actually run.** Six new
   formats — `netplan`, `networkd`, `ifupdown`, `frr`, `wireguard` and `interfaces` —
   generate `etc/netplan/10-netgraph.yaml`, a `.network`/`.netdev` pair per stacked link,

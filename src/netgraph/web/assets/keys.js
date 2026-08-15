@@ -757,6 +757,11 @@ var netgraphKeys = (function () {
     reference: openReference,
     prompt: prompt,
     dismiss: dismiss,
+    /* The modal machinery itself, for a panel this file does not own: the
+     * guided tour's card is one focus trap and one Escape handler like every
+     * other overlay, and there is to be only one implementation of both. */
+    overlay: openOverlay,
+    closeOverlay: closeOverlay,
     overlayOpen: overlayOpen,
     /** The element kinds this build has, for the create gesture's menu. */
     kinds: function () { return table.kinds.slice(); },

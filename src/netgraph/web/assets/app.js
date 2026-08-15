@@ -1262,6 +1262,7 @@
   window.addEventListener("resize", function () { netgraphCull.schedule(); });
   defineCommands();
   netgraphSession.defineCommands(bridge);
+  netgraphTour.defineCommands(bridge);
   netgraphKeys.attach(keyHost);
 
   el.commands.addEventListener("click", function () { netgraphKeys.palette(null, ""); });
@@ -1285,12 +1286,18 @@
     return fetch("/api/state", { cache: "no-store" })
       .then(function (response) { return response.json(); })
       .then(function (state) {
-        if (state.mode !== "session") { return bootStream(); }
+        if (state.mode !== "session") { return bootStream().then(function () { return null; }); }
         mode = "session";
         netgraphSession.attach(bridge, state);
         render();
+        return state;
       })
-      .catch(bootStream);
+      .catch(function () { return bootStream().then(function () { return null; }); })
+      // Last, and after the face is up: the tour drives the real controls, so
+      // there have to be real controls for it to drive. It is handed the state
+      // rather than only the mode because it has to check *which* session
+      // answered -- see netgraphTour.boot.
+      .then(function (state) { netgraphTour.boot(mode, state); });
   }
 
   function bootStream() {

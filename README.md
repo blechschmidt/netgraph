@@ -1,5 +1,7 @@
 # netgraph
 
+[![Live demo](https://img.shields.io/badge/demo-try%20it%20in%20your%20browser-0b5ed7)](https://blechschmidt.github.io/netgraph/demo/)
+
 Declare your network — switches, routers, hubs, computers, servers, cables, adapters,
 tunnels and patch panels — in a folder tree of YAML files, then render it as a network
 graph.
@@ -15,6 +17,11 @@ for the list; see [the bindings](docs/commands/web.md#the-keyboard).
 
 <sub>Produced from [`examples/home-lab`](examples/home-lab) with
 `netgraph -i examples/home-lab render --layer l2 --title "home-lab — layer 2" -f svg -o docs/images/home-lab.svg`.</sub>
+
+**Nothing to install to look:** every example inventory in this repository is published as
+a live diagram at **<https://blechschmidt.github.io/netgraph/demo/>** — switch layers,
+filter by VLAN, hover a node for its interfaces and addresses. Those pages are the output
+of `netgraph render -f html`, not a demo built to look like it.
 
 > **Status: early development (0.1.0).** The schema, loader, validator, renderers and CLI
 > work end to end; the schema may still change before 1.0. See

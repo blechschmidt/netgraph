@@ -60,6 +60,29 @@ unsaved edits in it is `conflict`, and netgraph will not resolve that for you: i
 says so and leaves both versions alone until you decide. A file that was deleted
 underneath you says `deleted on disk`.
 
+### The guided tour
+
+The first time you open a session, the page offers a sixty-second tour. Take it
+with <kbd>Enter</kbd>, decline it with <kbd>Esc</kbd> — declining is remembered,
+and `Ctrl-K` → *Take the guided tour* runs it again whenever you want it.
+
+It creates a device, cables it to one of yours, moves its document to another
+file, opens the changes drawer on the YAML all three wrote, and undoes the lot.
+The point is the mapping: every shape on the canvas is a document, so a shape
+cannot appear without a file appearing, and undoing the gesture brings the bytes
+back.
+
+**It never touches your inventory.** Starting the tour copies the tree — only
+the documents the loader reads, plus `netgraph.toml` — into a temporary
+directory and points the page at a second session over the copy. That session is
+always writable, so a read-only `netgraph web DIR` can take the tour too; the
+panel names both directories so there is no doubt which one is being written.
+Finishing, skipping or closing the tab deletes the copy, and so does stopping
+the server.
+
+Any step may be refused — it is the real write path, and it is allowed to say
+no. The tour shows the refusal and carries on to the next card.
+
 ### Writing
 
 `--write` is off by default, and it is refused unless the server is bound to
@@ -401,6 +424,7 @@ cable it, undo both — without dispatching a single mouse event.
 |---|---|---|---|---|
 | `Ctrl-K` / `Ctrl-Shift-P` | Command palette | anywhere | — | Every command on this page, searched by name — and every element address and file path in the inventory, so one field is also 'go to'. |
 | `?` / `F1` | Keyboard shortcuts | anywhere | — | This table, rendered from the bindings the page actually registered. |
+| *palette only* | Take the guided tour | anywhere | a folder | Sixty seconds that create a device, cable it up, move its document, show the YAML that changed and undo the lot — on a throwaway copy of this inventory, so nothing here is written to your files. |
 | `Escape` | Close what is open | anywhere | — | The palette, the reference, a prompt, the changes drawer, the inspector — in that order. |
 | `Alt-1` | Focus the inventory list | anywhere | a folder | The file list. Arrow keys move down it; Enter opens a file. |
 | `Alt-2` | Focus the YAML pane | anywhere | — | The text of the open document. Escape leaves it again. |

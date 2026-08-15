@@ -179,6 +179,11 @@
 <script src="/cull.js"></script>
 <script src="/links.js"></script>
 <script src="/session.js"></script>
+<!-- Before app.js, and that is load-bearing: a tour this tab has already
+     reloaded into wraps fetch and EventSource at parse time, so that every
+     request the page then makes is answered from the tour's scratch copy
+     rather than from the inventory. -->
+<script src="/tour.js"></script>
 <script src="/app.js"></script>
 </body>
 </html>

@@ -135,6 +135,18 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         detail="This table, rendered from the bindings the page actually registered.",
     ),
     Binding(
+        id="tour",
+        title="Take the guided tour",
+        section="Everywhere",
+        keys=(),
+        detail=(
+            "Sixty seconds that create a device, cable it up, move its document, show "
+            "the YAML that changed and undo the lot — on a throwaway copy of this "
+            "inventory, so nothing here is written to your files."
+        ),
+        needs="session",
+    ),
+    Binding(
         id="dismiss",
         title="Close what is open",
         section="Everywhere",

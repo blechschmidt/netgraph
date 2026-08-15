@@ -268,6 +268,22 @@ pip install cairosvg                     # only this tool needs it
 python tools/render_icons.py
 ```
 
+**The published site** is built the same way, from `docs/` and `examples/`, and
+is never committed — `.github/workflows/pages.yml` builds and deploys it on every
+push to `main`, and builds it without deploying on every pull request. Run it
+locally when you have changed a page, an example or the builder:
+
+<!-- norun: writes ./site and then serves it until interrupted -->
+```bash
+pip install -e '.[site]'
+python tools/build_site.py --output site
+python -m http.server -d site 8000
+```
+
+The build fails if any example stops rendering or any link points at nothing
+published; `tests/test_site.py` asserts the same things, plus that the anchors it
+derives are the ones every `NG-*` help URL promises.
+
 ## Documentation conventions
 
 * **Every netgraph example carries a marker.** Immediately above the fence (blank

@@ -2,12 +2,18 @@
 
 Everything netgraph can do, arranged by what you are trying to get done. Start with the
 table: find the row that describes your problem and follow the link. If you have never
-run netgraph before, [getting-started.md](getting-started.md) is the one to read first.
+run netgraph before, [getting-started.md](getting-started.md) is the one to read first —
+or spend two minutes in [the live demo](https://blechschmidt.github.io/netgraph/demo/)
+first, which needs nothing installed.
+
+This whole documentation set is also published, with those demos beside it, at
+<https://blechschmidt.github.io/netgraph/>.
 
 ## If you want to…
 
 | If you want to… | Read |
 |---|---|
+| see what netgraph draws before installing anything | [the live demo](https://blechschmidt.github.io/netgraph/demo/), then [getting-started.md](getting-started.md#try-it-without-installing) |
 | install netgraph and draw your first diagram | [getting-started.md](getting-started.md) |
 | decide how to lay out your files, namespaces and templates | [inventory-layout.md](inventory-layout.md) |
 | know exactly what a field means or what values it accepts | [schema-reference.md](schema-reference.md) |

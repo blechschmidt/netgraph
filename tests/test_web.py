@@ -820,8 +820,9 @@ def _normalise_chord(chord: str) -> str:
 
 #: Where a command's implementation may live. ``keys.js`` owns the machinery,
 #: ``app.js`` the view and navigation commands, ``session.js`` everything that
-#: writes — but which of the three a given id is in is not this test's business.
-_COMMAND_FILES = ("keys.js", "app.js", "session.js")
+#: writes, ``tour.js`` the guided tour — but which of the four a given id is in
+#: is not this test's business.
+_COMMAND_FILES = ("keys.js", "app.js", "session.js", "tour.js")
 
 
 def _registered() -> set[str]:

@@ -540,6 +540,7 @@ def open_editor(
             source: str | None = None,
             extra: Mapping[str, str] | None = None,
             beside: Editor | None = None,
+            first_run: bool = False,
         ) -> Editor:
             root = tmp_path / "inventory"
             if not root.exists():
@@ -569,6 +570,17 @@ def open_editor(
             context = stack.enter_context(
                 chromium.new_context(viewport={"width": 1400, "height": 900})
             )
+            if not first_run:
+                # Every context is a fresh profile, so every test below would
+                # otherwise be a first run and would boot behind the guided
+                # tour's invitation. Answered here once, in the same
+                # ``localStorage`` key the page writes when a person answers it,
+                # so a test opts *in* to the first-run experience rather than
+                # every other test having to dismiss it.
+                context.add_init_script(
+                    "try { window.localStorage.setItem('netgraph.tour.seen', 'yes'); }"
+                    " catch (error) { /* no storage, no invitation */ }"
+                )
             page = context.new_page()
             page.set_default_timeout(TIMEOUT_MS)
             page.on("console", console.message)
@@ -2448,3 +2460,266 @@ def test_the_links_of_an_element_are_a_cycle_of_their_own(open_editor: OpenEdito
     assert page.locator(".prompt input").first.input_value(), "the cable is pre-filled"
     editor.press("Enter")
     expect(page.locator("#toast")).to_contain_text("disconnected")
+
+
+# --------------------------------------------------------------------------- #
+# The guided tour
+# --------------------------------------------------------------------------- #
+
+
+def _tree(root: Path) -> dict[str, bytes]:
+    """Every file under ``root``, by relative path. The evidence for "untouched"."""
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
+def _documents(root: Path) -> dict[str, bytes]:
+    """The same, narrowed to what the loader reads — and therefore what is copied.
+
+    ``netgraph.web.tour`` copies the inventory, not the folder: a README beside
+    it is not part of the tree and is deliberately left behind.
+    """
+    return {name: text for name, text in _tree(root).items() if name.endswith((".yaml", ".yml"))}
+
+
+def _take_the_tour(editor: Editor) -> None:
+    """Start the tour from the palette and wait for the page to come back on it.
+
+    Starting it reloads the page — the token goes in ``sessionStorage`` and
+    ``tour.js`` points the whole boot at the scratch — so "the tour started" is
+    the card being on screen after a navigation, not the command returning.
+    """
+    editor.press("Control+k")
+    editor.page.keyboard.type("guided tour")
+    expect(editor.page.locator(".palette-item").first).to_contain_text("guided tour")
+    editor.press("Enter")
+    expect(editor.page.locator("#tour")).to_be_visible(timeout=TIMEOUT_MS)
+    expect(editor.page.locator("#viewport svg")).to_be_visible(timeout=TIMEOUT_MS)
+
+
+def test_the_first_run_offers_the_tour_and_takes_no_for_an_answer(
+    open_editor: OpenEditor,
+) -> None:
+    """The one thing a first-time visitor is shown without asking for it.
+
+    And it is shown once. "No thanks" has to be remembered across reloads, or
+    the page nags — which is the reason most first-run experiences get switched
+    off before they have taught anybody anything.
+    """
+    editor = open_editor(writable=True, first_run=True)
+    page = editor.page
+
+    invitation = page.locator("#tour-invite")
+    expect(invitation).to_be_visible()
+    expect(invitation).to_contain_text("throwaway copy")
+    # It is a dialog, it is labelled, and the keyboard is already in it.
+    expect(invitation).to_have_attribute("role", "dialog")
+    assert page.evaluate("() => document.activeElement.id") == "tour-take"
+
+    editor.press("Escape")
+    expect(invitation).to_have_count(0)
+    assert page.evaluate("() => localStorage.getItem('netgraph.tour.seen')") == "yes"
+
+    page.reload(wait_until="domcontentloaded")
+    expect(page.locator("#viewport svg")).to_be_visible()
+    expect(page.locator("#tour-invite")).to_have_count(0)
+
+
+def test_the_tour_creates_connects_moves_diffs_and_undoes_a_copy(
+    open_editor: OpenEditor,
+) -> None:
+    """The whole sixty seconds, asserted step by step — and the files it wrote.
+
+    This is the test the tour exists for. Each card's claim is checked against
+    the thing it claims about: the device appears in the diagram, the cable
+    appears as a link, the document moves to a file that did not exist, the
+    drawer holds three hunks of YAML, and the undo puts the scratch back byte
+    for byte. Throughout, the inventory the session was opened on is compared
+    against a snapshot taken before the tour started — because "a real
+    inventory is never touched" is the promise that makes the rest of it safe,
+    and it is the one promise a screenshot cannot show.
+    """
+    editor = open_editor(writable=True)
+    page = editor.page
+    before = _tree(editor.root)
+
+    _take_the_tour(editor)
+    scratch = Path(page.locator("#files-root").inner_text())
+    assert scratch != editor.root, "the tour is editing the tree it was supposed to copy"
+    assert scratch.is_dir()
+    assert _documents(scratch) == _documents(editor.root), "the copy is not a copy"
+    expect(page.locator("#tour-title")).to_have_text("A sixty-second tour")
+    expect(page.locator("#tour-progress")).to_have_text("Step 1 of 7")
+    expect(page.locator("#tour-safe")).to_contain_text(str(editor.root))
+    # The real session is read-only or not, but either way it is not the one
+    # being written: the scratch always is.
+    expect(page.locator("#files-mode")).to_have_text("read-write")
+
+    # 2. Create. A shape in the diagram, and a document on disk to declare it.
+    editor.press("Enter")
+    expect(page.locator("#tour-title")).to_have_text("Create a device")
+    editor.press("Enter")
+    expect(page.locator("#tour-outcome")).to_contain_text("created sw-tour")
+    expect(page.locator("#viewport")).to_contain_text("sw-tour")
+    declared = [name for name in _documents(scratch) if name not in before]
+    assert len(declared) == 1, f"one new file, not {declared}"
+    assert "sw-tour" in (scratch / declared[0]).read_text(encoding="utf-8")
+
+    # 3. Connect. A cable document, and therefore an edge.
+    expect(page.locator("#tour-title")).to_contain_text("Cable it to")
+    links = page.locator("#viewport g.edge").count()
+    editor.press("Enter")
+    expect(page.locator("#tour-outcome")).to_contain_text("cabled sw-tour")
+    expect(page.locator("#viewport g.edge")).to_have_count(links + 1)
+
+    # 4. Move. The same element, a different file — the point of the whole tour.
+    expect(page.locator("#tour-title")).to_have_text("Move its document")
+    editor.press("Enter")
+    expect(page.locator("#tour-outcome")).to_contain_text("tour/sw-tour.yaml")
+    expect(page.locator('#file-list .file[data-path="tour/sw-tour.yaml"]')).to_be_visible()
+    assert "sw-tour" in (scratch / "tour" / "sw-tour.yaml").read_text(encoding="utf-8")
+    assert not (scratch / declared[0]).exists() or "sw-tour" not in (
+        scratch / declared[0]
+    ).read_text(encoding="utf-8")
+    expect(page.locator("#viewport")).to_contain_text("sw-tour"), "moving a file moved the element"
+
+    # 5. The diff. Three gestures, each with the YAML it wrote.
+    expect(page.locator("#tour-title")).to_have_text("The YAML that changed")
+    editor.press("Enter")
+    expect(page.locator("#changes")).to_be_visible()
+    expect(page.locator("#changes-list .change")).to_have_count(3)
+    expect(page.locator("#changes-list")).to_contain_text("+  name: sw-tour")
+
+    # 6. Undo. All three, and the copy is what it was.
+    expect(page.locator("#tour-title")).to_have_text("Undo the lot")
+    editor.press("Enter")
+    expect(page.locator("#tour-outcome")).to_contain_text("files are back")
+    expect(page.locator("#tour-title")).to_have_text("That is the whole idea")
+    expect(page.locator("#viewport")).not_to_contain_text("sw-tour")
+    assert editor.settles(lambda: _documents(scratch) == _documents(editor.root)), (
+        "three undos did not put the scratch copy back"
+    )
+
+    # Finishing deletes the copy and puts the page back on the inventory.
+    editor.press("Enter")
+    expect(page.locator("#files-root")).to_have_text(str(editor.root), timeout=TIMEOUT_MS)
+    expect(page.locator("#tour")).to_have_count(0)
+    assert editor.settles(lambda: not scratch.exists()), "the scratch copy was left behind"
+    assert len(editor.server.tours or []) == 0
+
+    # And the whole of it: not one byte of the inventory was written.
+    assert _tree(editor.root) == before
+
+
+def test_the_tour_is_skippable_with_one_key(open_editor: OpenEditor) -> None:
+    """Escape, at any point, and the copy goes with it."""
+    editor = open_editor(writable=True)
+    page = editor.page
+    before = _tree(editor.root)
+
+    _take_the_tour(editor)
+    scratch = Path(page.locator("#files-root").inner_text())
+    editor.press("Enter")  # off the welcome card
+    editor.press("Enter")  # and through the first step that writes
+    expect(page.locator("#tour-outcome")).to_contain_text("created sw-tour")
+
+    editor.press("Escape")
+
+    expect(page.locator("#files-root")).to_have_text(str(editor.root), timeout=TIMEOUT_MS)
+    expect(page.locator("#tour")).to_have_count(0)
+    expect(page.locator("#viewport")).not_to_contain_text("sw-tour")
+    assert editor.settles(lambda: not scratch.exists())
+    assert _tree(editor.root) == before
+
+
+def test_a_tour_whose_copy_has_gone_does_not_resume_on_the_inventory(
+    open_editor: OpenEditor,
+) -> None:
+    """The one way this feature could do the exact harm it exists to prevent.
+
+    A token the server no longer has — it restarted, or the copy expired — is
+    answered from the *tree* rather than refused, deliberately, so that a
+    reloaded tab gets a working page instead of a dead one. A tour that resumed
+    without checking which session answered would then run its create, its
+    connect and its move against the inventory. So the page checks, and this is
+    the test that it does: the copy is deleted underneath a running tour, and
+    the reload has to come back on the inventory with no tour on it.
+    """
+    editor = open_editor(writable=True)
+    page = editor.page
+    before = _tree(editor.root)
+
+    _take_the_tour(editor)
+    scratch = Path(page.locator("#files-root").inner_text())
+
+    # Exactly what a server restart looks like from the browser's side.
+    assert editor.server.tours is not None
+    editor.server.tours.close_all()
+    assert not scratch.exists()
+
+    page.reload(wait_until="domcontentloaded")
+
+    expect(page.locator("#viewport svg")).to_be_visible(timeout=TIMEOUT_MS)
+    expect(page.locator("#files-root")).to_have_text(str(editor.root))
+    expect(page.locator("#tour")).to_have_count(0)
+    assert _tree(editor.root) == before
+
+
+def test_a_read_only_session_can_still_take_the_tour(open_editor: OpenEditor) -> None:
+    """The session most likely to be somebody's first is the one that cannot write.
+
+    ``netgraph web DIR`` without ``--write`` refuses every mutating route, and
+    the tour writes — to files of its own. So it is offered here, it works here,
+    and the refusal the palette shows for every *other* edit command is still
+    the refusal for those.
+    """
+    editor = open_editor(writable=False)
+    page = editor.page
+    before = _tree(editor.root)
+
+    editor.press("Control+k")
+    page.keyboard.type("guided tour")
+    row = page.locator(".palette-item").first
+    expect(row).to_contain_text("guided tour")
+    expect(row).not_to_have_class(re.compile(r"unavailable"))
+    editor.press("Escape")
+
+    _take_the_tour(editor)
+    expect(page.locator("#files-mode")).to_have_text("read-write")
+    scratch = Path(page.locator("#files-root").inner_text())
+    editor.press("Enter")
+    editor.press("Enter")
+    expect(page.locator("#tour-outcome")).to_contain_text("created sw-tour")
+    assert _documents(scratch) != _documents(editor.root), "the tour wrote nothing at all"
+
+    editor.press("Escape")
+    expect(page.locator("#files-mode")).to_have_text("read-only", timeout=TIMEOUT_MS)
+    assert _tree(editor.root) == before
+
+
+@pytest.mark.skipif(not HAVE_AXE, reason=NO_AXE)
+def test_the_tour_has_no_accessibility_violations(open_editor: OpenEditor) -> None:
+    """The two panels a first-time visitor reads first, held to the same standard.
+
+    They are also the only two things on this page that appear without being
+    asked for, so a contrast failure or an unlabelled dialog here is met by
+    somebody who has not yet decided whether the tool is worth their afternoon.
+    """
+    editor = open_editor(writable=True, first_run=True)
+    page = editor.page
+
+    expect(page.locator("#tour-invite")).to_be_visible()
+    invitation = _violations(editor)
+    assert not invitation, "the first-run invitation:\n" + _explain(invitation)
+
+    editor.press("Enter")
+    expect(page.locator("#tour")).to_be_visible(timeout=TIMEOUT_MS)
+    expect(page.locator("#viewport svg")).to_be_visible(timeout=TIMEOUT_MS)
+    card = _violations(editor)
+    assert not card, "the guided tour's card:\n" + _explain(card)
+
+    editor.press("Escape")
+    expect(page.locator("#tour")).to_have_count(0, timeout=TIMEOUT_MS)

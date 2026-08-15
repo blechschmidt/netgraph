@@ -683,16 +683,22 @@ var netgraphSession = (function () {
       .then(paintHistory);
   }
 
+  /* Returns a promise that settles when the history has actually moved, so a
+   * caller that has to wait for it -- the guided tour, which undoes three
+   * batches in a row -- can, and a button that does not simply ignores it. */
   function step(verb) {
-    if (!state.writable) { return; }
-    if (verb === "undo" && !state.undo) { return; }
-    if (verb === "redo" && !state.redo) { return; }
+    if (!state.writable) { return Promise.resolve(false); }
+    if (verb === "undo" && !state.undo) { return Promise.resolve(false); }
+    if (verb === "redo" && !state.redo) { return Promise.resolve(false); }
     var query = me.id ? "?client=" + encodeURIComponent(me.id) : "";
-    fetch("/api/" + verb + query, { method: "POST", cache: "no-store" })
+    return fetch("/api/" + verb + query, { method: "POST", cache: "no-store" })
       .then(readBody)
-      .then(function (result) { applied(result, verb + "ne", true); })
-      .catch(function (error) { host.toast(String(error.message || error), "error"); })
-      .then(paintHistory);
+      .then(function (result) { applied(result, verb + "ne", true); return true; })
+      .catch(function (error) {
+        host.toast(String(error.message || error), "error");
+        return false;
+      })
+      .then(function (moved) { paintHistory(); return moved; });
   }
 
   /** What every successful write does: adopt the new revision and redraw.
@@ -1689,6 +1695,12 @@ var netgraphSession = (function () {
      * the route a rename does. */
     ops: ops,
     markDirty: markDirty,
+    /* The history, as a promise. tour.js undoes its own three batches with it. */
+    step: step,
+    /* What the page is looking at, for anything that has to wait for a write to
+     * land before it says something about it. */
+    revision: function () { return state.revision || 0; },
+    depth: function () { return { undo: state.undo || 0, redo: state.redo || 0 }; },
     isWritable: function () { return !!state.writable; },
     reveal: reveal,
     locate: locate,

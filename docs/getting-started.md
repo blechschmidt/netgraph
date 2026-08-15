@@ -13,6 +13,7 @@ report — both are shown below — but the shape of a document is worth typing 
 
 ## Contents
 
+- [Try it without installing](#try-it-without-installing)
 - [Installation](#installation)
   - [Graphviz is a system prerequisite](#graphviz-is-a-system-prerequisite)
   - [On Windows and macOS](#on-windows-and-macos)
@@ -28,6 +29,40 @@ report — both are shown below — but the shape of a document is worth typing 
 - [Keep the loop running while you edit](#keep-the-loop-running-while-you-edit)
 - [Editor setup: autocompletion and inline errors](#editor-setup-autocompletion-and-inline-errors)
 - [Where next](#where-next)
+
+---
+
+## Try it without installing
+
+Before spending anything on an install, spend two minutes here:
+
+**<https://blechschmidt.github.io/netgraph/demo/>**
+
+Every example inventory in the repository is published there as a live diagram.
+Those pages are not a demo built to look like netgraph — they are the output of
+`netgraph render -f html`, the same command [step 7](#7-draw-it) below runs, and
+they are rebuilt from `main` on every push. Each one is a single self-contained
+file, so everything in it works with the network unplugged.
+
+What to do when you get there:
+
+1. Open **home-lab**. It is a house: a router, a switch, an access point, three
+   computers, a server and a USB-to-Ethernet adapter.
+2. Use the **layer switcher** at the top. `l1` is the cabling; `l2` adds the
+   VLANs to it; `l3` throws the cabling away and draws the IP subnets instead.
+   The same files, three questions.
+3. **Hover or focus a node.** The panel that opens is every interface, address,
+   VLAN and cable that element has — the detail a diagram has no room for, which
+   is why netgraph keeps the text and the picture as one thing rather than two.
+4. Open **campus** and collapse a site, or **overlay** for VXLAN over IPsec, or
+   **patch-room** for the rack elevation and the power feeds.
+
+Then come back and build one of your own. It is the same tool: everything on
+those pages came out of the eight steps below, run over
+[`examples/`](../examples).
+
+If you would rather not install Python and Graphviz at all, the container is the
+other way in — see [docker.md](docker.md).
 
 ---
 

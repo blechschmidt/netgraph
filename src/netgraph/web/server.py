@@ -21,8 +21,17 @@ document stream in the browser and renders what it is sent::
     POST /api/undo, /api/redo the server-side history
     GET  /api/events          server-sent events: what changed, as it changes
     POST /api/presence        what this client has selected and is editing
+    POST /api/tour            a scratch copy of the tree, for the guided tour
+    POST /api/tour/end        drop one, and delete its files
 
-Plus the page itself and its three assets, which are the same either way.
+Plus the page itself and its assets, which are the same either way.
+
+**The guided tour is the same session, over other files.** ``POST /api/tour``
+copies the inventory into a temporary directory and opens a second, writable
+session over the copy (:mod:`netgraph.web.tour`); every route above answers from
+that copy when a request carries ``?scratch=<token>``. The tour therefore drives
+the real write path — real operations, a real undo stack, real YAML — against
+files nobody will miss, and a read-only session can take it.
 
 **The stream is an optimisation, not a channel of authority.** ``/api/events``
 says what moved so that a client can refetch one file instead of a tree and skip
@@ -97,6 +106,7 @@ from netgraph.web.session import (
     ReadOnly,
     SessionError,
 )
+from netgraph.web.tour import TOUR_END_PATH, TOUR_PATH, Scratch, Tours
 
 __all__ = [
     "ASSETS",
@@ -119,6 +129,8 @@ __all__ = [
     "REVERT_PATH",
     "SOURCE_PATH",
     "STATE_PATH",
+    "TOUR_END_PATH",
+    "TOUR_PATH",
     "TREE_PATH",
     "UNDO_PATH",
     "WebServer",
@@ -177,6 +189,7 @@ ASSETS: Final[dict[str, tuple[str, str]]] = {
     "/links.js": ("links.js", "text/javascript; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/session.js": ("session.js", "text/javascript; charset=utf-8"),
+    "/tour.js": ("tour.js", "text/javascript; charset=utf-8"),
 }
 
 #: Where an asset is looked for, in order. ``detail.js`` — how one detail record
@@ -227,7 +240,26 @@ class _Handler(LocalHandler):
     source: str
     icons: IconTheme | None
     session: EditingSession | None
+    #: The scratch copies the guided tour edits; see :mod:`netgraph.web.tour`.
+    tours: Tours
     on_render: Callable[[Preview], None]
+
+    @property
+    def _scratch(self) -> Scratch | None:
+        """The scratch this request named in ``?scratch=``, or ``None``."""
+        values = self._query.get("scratch") or ()
+        return self.tours.get(values[-1] if values else None)
+
+    def _active(self) -> EditingSession | None:
+        """The session this request is answered from.
+
+        A tour's scratch when it named one, and the real session otherwise. This
+        is the *only* place the substitution happens: every route below reads a
+        session it was handed, so none of them can accidentally write to the
+        inventory during a tour or read the copy outside one.
+        """
+        scratch = self._scratch
+        return scratch.session if scratch is not None else self.session
 
     def handle_request(self, method: str, *, body: bool) -> None:
         path = urlsplit(self.path).path
@@ -257,11 +289,12 @@ class _Handler(LocalHandler):
         if path == BINDINGS_PATH:
             self._json(HTTPStatus.OK, bindings_payload(), body=body)
             return
-        if self.session is None:
+        session = self._active()
+        if session is None:
             self._get_stream(path, body=body)
             return
         try:
-            self._get_session(self.session, path, body=body)
+            self._get_session(session, path, body=body)
         except (SessionError, EditError) as exc:
             self._refuse(exc, body=body)
 
@@ -469,10 +502,48 @@ class _Handler(LocalHandler):
     # -- POST ------------------------------------------------------------
 
     def _post(self, path: str) -> None:
-        if self.session is None:
+        if path in (TOUR_PATH, TOUR_END_PATH):
+            self._tour(path)
+            return
+        session = self._active()
+        if session is None:
             self._post_stream(path)
         else:
-            self._post_session(self.session, path)
+            self._post_session(session, path)
+
+    def _tour(self, path: str) -> None:
+        """Start or end a guided tour.
+
+        Started against the *real* session — the tree that is copied — and never
+        against another tour's scratch, which is why this is decided before
+        :meth:`_active` is consulted. Ending is answered ``200`` whether or not
+        there was a tour to end, because the two callers that end one are a
+        button and a closing tab's beacon, and neither has anywhere to put a
+        refusal.
+        """
+        if path == TOUR_END_PATH:
+            token = (self._query.get("scratch") or [""])[-1]
+            if not token:
+                try:
+                    token = str(self._read_json().get("scratch") or "")
+                except RequestError:
+                    token = ""
+            self._json(HTTPStatus.OK, {"ended": self.tours.close(token or None)})
+            return
+        if self.session is None:
+            self._refuse(
+                RequestError(
+                    "the guided tour edits a copy of an inventory, and this is a "
+                    "document-stream scratchpad; open a folder with 'netgraph web DIR'"
+                )
+            )
+            return
+        try:
+            scratch = self.tours.open(self.session, icons=self.icons)
+        except Exception as exc:  # narrowed by ``_refuse``, which re-raises the rest
+            self._refuse(exc)
+            return
+        self._json(HTTPStatus.OK, scratch.to_dict() | scratch.session.state())
 
     def _post_stream(self, path: str) -> None:
         if path != RENDER_PATH:
@@ -583,7 +654,7 @@ class _Handler(LocalHandler):
     # -- PUT -------------------------------------------------------------
 
     def _put(self, path: str) -> None:
-        session = self.session
+        session = self._active()
         if session is None or not path.startswith(FILE_PREFIX):
             self.send_text(
                 HTTPStatus.METHOD_NOT_ALLOWED,
@@ -626,7 +697,9 @@ class _Handler(LocalHandler):
         gets the same incremental instructions — refetch *these* files, this
         picture did not move — rather than only "the revision is different".
         """
-        if self.session is None:
+        scratch = self._scratch
+        session = scratch.session if scratch is not None else self.session
+        if session is None:
             return {
                 "mode": "stream",
                 "revision": 0,
@@ -638,13 +711,17 @@ class _Handler(LocalHandler):
         query = self._query
         identity = _client_id(query)
         if identity is not None:
-            self.session.presence.touch(identity)
-        state = self.session.state(me=identity)
+            session.presence.touch(identity)
+        state = session.state(me=identity)
+        if scratch is not None:
+            # So a page that reloaded into a tour can tell that it did, and say
+            # whose copy it is looking at rather than implying it is the tree.
+            state |= scratch.to_dict()
         since = _integer(query, "since")
         if since is not None:
             state["events"] = dict(state["events"]) | {
                 "since": since,
-                "replay": [event.to_dict() for event in self.session.events.history(since)],
+                "replay": [event.to_dict() for event in session.events.history(since)],
             }
         return state
 
@@ -870,10 +947,17 @@ class WebServer(BackgroundServer):
     #: socket does not wake it.
     session: EditingSession | None = None
 
+    #: The guided tour's scratch copies. Held here so that stopping the server
+    #: deletes every temporary directory it made, rather than leaving one per
+    #: tour that was open when somebody pressed Ctrl-C.
+    tours: Tours | None = None
+
     def stop(self) -> None:
         """Stop answering, close every open event stream, and release the port."""
         if self.session is not None:
             self.session.close()
+        if self.tours is not None:
+            self.tours.close_all()
         super().stop()
 
     @classmethod
@@ -906,12 +990,14 @@ class WebServer(BackgroundServer):
         Raises:
             ServeError: The address cannot be bound.
         """
+        tours = Tours()
         handler = type(
             "_BoundHandler",
             (_Handler,),
             {
                 "source": source,
                 "session": session,
+                "tours": tours,
                 "icons": icons,
                 "on_render": staticmethod(on_render),
                 "loopback_only": is_loopback(host),
@@ -920,4 +1006,5 @@ class WebServer(BackgroundServer):
         )
         web = cls(bind(handler, host=host, port=port, subject="the web interface"), host=host)
         web.session = session
+        web.tours = tours
         return web

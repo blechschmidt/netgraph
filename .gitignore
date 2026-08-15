@@ -65,3 +65,8 @@ junit.xml
 # Screenshots, page source and console logs left behind by a failing browser
 # test (tests/test_browser.py). Uploaded as an artefact in CI; scratch locally.
 /.browser-artifacts/
+
+# The published site, as built by tools/build_site.py. Derived from docs/ and
+# examples/ every time, deployed from .github/workflows/pages.yml, and never
+# committed -- a checked-in copy of generated HTML is a second source of truth.
+/site/

@@ -1116,6 +1116,73 @@ main {
 .prompt-actions { display: flex; gap: .4rem; margin: 0; }
 .prompt-actions button { padding: .3rem .8rem; }
 
+/* ---------------------------------------------------------- guided tour */
+
+/* The tour's card. Not a backdrop and not `position: fixed` over the middle:
+ * the whole point is that the page behind it is doing the things the card is
+ * describing, so it sits in a corner and leaves the diagram, the file list and
+ * the changes drawer visible. It is still an overlay in keys.js's stack, so
+ * Escape leaves it and Tab stays inside it. */
+.tour {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 40;
+  width: min(26rem, calc(100vw - 2rem));
+  padding: .8rem .9rem;
+  animation: panel-in 120ms ease-out;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--focus);
+  border-left: 4px solid var(--focus);
+  border-radius: 8px;
+  box-shadow: 0 12px 40px var(--shadow);
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.tour-invite { border-color: var(--edge); border-left-color: var(--info); }
+
+.tour-progress {
+  margin: 0 0 .2rem;
+  font: 600 11px/1.6 var(--mono);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tour h2 { margin: 0 0 .4rem; font: 600 15px/1.4 var(--mono); }
+.tour-body { font-size: 13px; line-height: 1.5; }
+.tour-body code { font: 12px/1.4 var(--mono); }
+
+.tour-note { margin: .5rem 0 0; font-size: 12px; color: var(--muted); min-height: 1.2em; }
+.tour-note.done { color: var(--ok); }
+.tour-note.done::before { content: "\2713\00a0"; }
+.tour-note.failed { color: var(--error); }
+
+.tour-actions { display: flex; gap: .4rem; margin: .7rem 0 0; }
+.tour-actions button { padding: .3rem .8rem; }
+.tour-actions button[disabled] { cursor: progress; }
+
+.tour-safe {
+  margin: .6rem 0 0;
+  padding-top: .5rem;
+  border-top: 1px solid var(--edge);
+  font-size: 11px;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.tour-sigil { font: 600 12px/1 var(--mono); color: var(--diff-added); }
+
+/* What the current card is talking about. A halo rather than a mask: masking
+ * the rest of the page would hide the diagram redrawing, which is the evidence
+ * the card is offering. */
+.tour-spot {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
 /* --------------------------------------------------------- high contrast */
 
 /* Windows high-contrast mode replaces every colour with the user's own. The
@@ -1124,6 +1191,7 @@ main {
 @media (forced-colors: active) {
   .viewport svg g.focused > *:not(text) { stroke: Highlight; }
   .palette-item.current { background: Highlight; color: HighlightText; forced-color-adjust: none; }
+  .tour-spot { outline-color: Highlight; }
   kbd { border-color: CanvasText; }
 }
 

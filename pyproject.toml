@@ -72,6 +72,15 @@ dev = [
 # megabytes a contributor typing ``pytest`` did not ask for. The module skips
 # itself — with the command to run — when either half is missing, and
 # ``.github/workflows/ci.yml`` has a job that installs both. See docs/testing.md.
+# ``tools/build_site.py``, which ``.github/workflows/pages.yml`` runs to publish
+# the demo site. One dependency, and a pure-Python one: the documentation is
+# CommonMark plus GitHub's tables, and this renders exactly that. Not part of
+# ``dev`` for the same reason ``browser`` is not — a contributor typing
+# ``pytest`` is not building a website — and ``tests/test_site.py`` skips itself
+# when it is absent, with the command to install it.
+site = [
+    "markdown-it-py>=3.0",
+]
 browser = [
     "playwright>=1.44",
     # The accessibility gate. Ships axe-core itself, so the check is pinned with

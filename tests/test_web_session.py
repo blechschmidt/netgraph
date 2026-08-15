@@ -52,6 +52,7 @@ from netgraph.web.session import (
     TreeWatcher,
     relative_path,
 )
+from netgraph.web.tour import MAX_SCRATCHES, TooLarge, Tours, copy_inventory
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -983,3 +984,212 @@ def test_the_api_fixes_a_diagnostic(served_repairable: str) -> None:
 def served_repairable(repairable: EditingSession) -> Iterator[str]:
     with WebServer.create(session=repairable, host="127.0.0.1", port=0) as server:
         yield server.url.rstrip("/")
+
+
+# --------------------------------------------------------------------------- #
+# The guided tour's scratch copies
+# --------------------------------------------------------------------------- #
+
+
+def _yaml(root: Path) -> dict[str, bytes]:
+    return {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file() and path.suffix in (".yaml", ".yml")
+    }
+
+
+def test_a_scratch_is_a_copy_of_the_documents_and_nothing_else(tmp_path: Path) -> None:
+    """``copy_inventory`` copies what the loader reads, and leaves the rest.
+
+    A README beside the tree, a rendered SVG, a ``.git`` directory and a
+    ``_drafts`` folder are all things a real inventory folder has and none of
+    them are the inventory. Copying them would make the tour slower and would
+    put files in a temporary directory that nobody asked to duplicate.
+    """
+    source = tmp_path / "inventory"
+    shutil.copytree(HOME_LAB, source)
+    (source / "netgraph.toml").write_text("[render]\nlayer = 'l2'\n", encoding="utf-8")
+    (source / "notes.txt").write_text("not an inventory document\n", encoding="utf-8")
+    (source / "diagram.svg").write_text("<svg/>\n", encoding="utf-8")
+    (source / ".git").mkdir()
+    (source / ".git" / "config.yaml").write_text("kind: not-read\n", encoding="utf-8")
+    (source / "_drafts").mkdir()
+    (source / "_drafts" / "wip.yaml").write_text("kind: skipped\n", encoding="utf-8")
+
+    destination = tmp_path / "copy"
+    destination.mkdir()
+    copied = copy_inventory(source, destination)
+
+    assert copied == len(_yaml(source)) - 2, "the skipped documents were copied anyway"
+    assert _yaml(destination) == {
+        name: text for name, text in _yaml(source).items() if not name.startswith((".", "_"))
+    }
+    assert (destination / "netgraph.toml").is_file(), "the copy renders with other defaults"
+    assert not (destination / "notes.txt").exists()
+    assert not (destination / "diagram.svg").exists()
+    assert not (destination / ".git").exists()
+    assert not (destination / "_drafts").exists()
+
+
+def test_a_tour_edits_the_copy_and_leaves_the_tree_alone(tree: Path) -> None:
+    """The whole promise, at the level the browser is not involved in."""
+    session = EditingSession(root=tree, writable=False)
+    before = _yaml(tree)
+    tours = Tours()
+
+    scratch = tours.open(session)
+    assert scratch.root != tree
+    assert scratch.session.writable, "a read-only session must still be tourable"
+    assert scratch.origin == tree
+    assert scratch.files == len(before)
+    assert scratch.peer in session.inventory().devices
+
+    scratch.session.apply(
+        [
+            {
+                "op": "create",
+                "kind": "switch",
+                "name": "sw-tour",
+                "namespace": "",
+                "spec": {"interfaces": [{"name": "eth0", "type": "ethernet"}]},
+            }
+        ]
+    )
+    assert _yaml(scratch.root) != before, "the tour wrote nothing"
+    assert _yaml(tree) == before, "the tour wrote to the inventory"
+    assert session.revision == 1, "the real session's revision moved"
+
+    root = scratch.root
+    assert tours.close(scratch.token) is True
+    assert not root.exists()
+    assert tours.close(scratch.token) is False, "closing twice is not two tours"
+    assert _yaml(tree) == before
+
+
+def test_the_routes_answer_from_the_scratch_only_when_asked(served: str, tree: Path) -> None:
+    """``?scratch=`` is the whole of the substitution, and it is opt-in.
+
+    Two clients, one server: the one that is on a tour sees its copy, and the
+    one that is not sees the tree. That is the property that lets a tour run in
+    a session somebody else has open.
+    """
+    before = _yaml(tree)
+    status, started = call(served, "/api/tour", "POST")
+    assert status == 200
+    token = started["scratch"]
+    assert started["root"] != str(tree)
+    assert started["origin"] == str(tree)
+    assert started["mode"] == "session" and started["writable"]
+
+    # The tab that is not on the tour is unaffected, and says so.
+    status, state = call(served, "/api/state")
+    assert status == 200 and state["root"] == str(tree)
+    assert "scratch" not in state
+
+    # The one that is, is answered from the copy — and can write, which the
+    # session it is a copy of also could here, so the interesting half is where.
+    status, state = call(served, f"/api/state?scratch={token}")
+    assert status == 200 and state["scratch"] == token and state["root"] == started["root"]
+
+    status, applied = call(
+        served,
+        f"/api/ops?scratch={token}",
+        "POST",
+        {
+            "ops": [
+                {
+                    "op": "create",
+                    "kind": "switch",
+                    "name": "sw-tour",
+                    "namespace": "",
+                    "spec": {"interfaces": [{"name": "eth0", "type": "ethernet"}]},
+                }
+            ]
+        },
+    )
+    assert status == 200, applied
+    assert _yaml(tree) == before
+
+    status, tour_tree = call(served, f"/api/tree?scratch={token}")
+    assert status == 200
+    assert any("sw-tour" in entry["path"] for entry in tour_tree["files"])
+    status, real_tree = call(served, "/api/tree")
+    assert not any("sw-tour" in entry["path"] for entry in real_tree["files"])
+
+    status, ended = call(served, f"/api/tour/end?scratch={token}", "POST")
+    assert status == 200 and ended["ended"] is True
+    assert not Path(started["root"]).exists()
+    assert _yaml(tree) == before
+
+
+def test_a_stale_token_is_answered_from_the_tree_rather_than_refused(served: str) -> None:
+    """A reloaded tab whose scratch has gone gets an ordinary session back.
+
+    The alternative — a 400 on every route — leaves a page with nothing to draw
+    and nothing to do about it. Degrading to the tree is safe because the tree
+    is only writable if the command line said so.
+    """
+    status, state = call(served, "/api/state?scratch=nothing-of-the-sort")
+    assert status == 200
+    assert "scratch" not in state
+
+
+def test_the_scratchpad_has_no_inventory_to_tour() -> None:
+    """``netgraph web`` on a stream copies nothing, and says why."""
+    with WebServer.create(source="", host="127.0.0.1", port=0) as server:
+        status, body = call(server.url.rstrip("/"), "/api/tour", "POST")
+    assert status == 400
+    assert "scratchpad" in body["message"]
+
+
+def test_only_so_many_tours_may_run_at_once(tree: Path) -> None:
+    """A cap, because each one is a copy of the tree on the disk."""
+    session = EditingSession(root=tree, writable=False)
+    tours = Tours()
+    try:
+        opened = [tours.open(session) for _ in range(MAX_SCRATCHES)]
+        assert len(tours) == MAX_SCRATCHES
+        with pytest.raises(SessionError, match="already running"):
+            tours.open(session)
+    finally:
+        tours.close_all()
+    assert len(tours) == 0
+    for scratch in opened:
+        assert not scratch.root.exists()
+
+
+def test_an_inventory_too_big_to_copy_is_refused_rather_than_copied(
+    tree: Path, monkeypatch: Any
+) -> None:
+    """The bound exists so a mistyped root cannot fill a disk.
+
+    Lowered here rather than by generating twenty thousand files: the number is
+    a policy and the refusal is the behaviour, and only one of the two is worth
+    two minutes of a test run.
+    """
+    monkeypatch.setattr("netgraph.web.tour.MAX_FILES", 1)
+    tours = Tours()
+    with pytest.raises(TooLarge, match="too big to tour"):
+        tours.open(EditingSession(root=tree))
+    assert len(tours) == 0, "the half-made copy was left behind"
+
+
+def test_an_untouched_tour_expires(tree: Path, monkeypatch: Any) -> None:
+    """The backstop for the tab that crashed instead of saying goodbye."""
+    tours = Tours()
+    scratch = tours.open(EditingSession(root=tree))
+    monkeypatch.setattr("netgraph.web.tour.TTL_SECONDS", -1.0)
+    assert tours.open(EditingSession(root=tree)).token != scratch.token
+    assert not scratch.root.exists()
+    assert tours.get(scratch.token) is None
+    tours.close_all()
+
+
+def test_stopping_the_server_deletes_every_copy(session: EditingSession) -> None:
+    """Ctrl-C on ``netgraph web`` should not leave a tree in /tmp."""
+    with WebServer.create(session=session, host="127.0.0.1", port=0) as server:
+        base = server.url.rstrip("/")
+        roots = [Path(call(base, "/api/tour", "POST")[1]["root"]) for _ in range(2)]
+        assert all(root.is_dir() for root in roots)
+    assert not any(root.exists() for root in roots)

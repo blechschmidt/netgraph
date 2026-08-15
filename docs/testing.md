@@ -249,6 +249,36 @@ whatever the test wrote is still there to look at afterwards.
 [axe]: https://github.com/dequelabs/axe-core
 [playwright]: https://playwright.dev/python/
 
+## The published site
+
+`tests/test_site.py` builds the whole of <https://blechschmidt.github.io/netgraph/>
+into a temporary directory — documentation, hero diagrams and every example
+rendered by `netgraph render -f html` — and asserts three things a look at the
+page would not catch:
+
+* **the anchors are GitHub's.** Every `NG-*` finding netgraph prints carries a
+  help URL ending in an anchor derived from a heading. The builder's slug
+  function and `tests/test_docs.py`'s are asserted equal over every heading in
+  the repository, not merely written to look alike.
+* **no link points at nothing.** The build rewrites `.md` targets to `.html` and
+  sends the ones that go into the source tree at GitHub instead; that rewriting
+  is the part that can be wrong.
+* **every example still renders**, and every example is listed. An inventory
+  added to `examples/` and forgotten in `DEMOS` fails here rather than being
+  quietly absent from the site.
+
+It needs Graphviz and `markdown-it-py`, and skips itself with the command to
+install the second:
+
+```console
+$ pip install -e '.[site]'
+$ pytest tests/test_site.py
+```
+
+`.github/workflows/pages.yml` runs the same builder and fails the job if any
+example fails to render, so a pull request that breaks a diagram is red before
+anything is published.
+
 ## The language server
 
 `tests/test_lsp.py` is the browser layer's opposite number for
