@@ -24,12 +24,23 @@ on:
       - .github/actions/netgraph-review/**
       - .github/workflows/netgraph-review.yml
       - .github/workflows/review.yml
+  # On demand, against whatever base you name. There is no pull request to
+  # comment on, so the review lands in the job summary -- which is also how a
+  # maintainer reads the review of a fork's pull request, and is worth being
+  # able to exercise deliberately rather than only when a fork turns up.
+  workflow_dispatch:
+    inputs:
+      base:
+        description: The state to compare the chosen ref against.
+        type: string
+        required: false
+        default: main
 
 # One review per inventory per pull request. A second push supersedes the first,
 # and the comment it edits is the same comment either way -- but a cancelled run
 # is still cheaper than a run whose comment is already stale when it lands.
 concurrency:
-  group: review-${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: review-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -88,6 +99,9 @@ jobs:
     uses: ./.github/workflows/netgraph-review.yml
     with:
       inventory: examples/${{ matrix.inventory }}
+      # Empty on a pull request, where the reusable workflow uses the pull
+      # request's own base commit; named on a manual run, which has none.
+      base: ${{ inputs.base }}
       title: netgraph (examples/${{ matrix.inventory }})
       # One category per inventory: uploads that share a category replace each
       # other, so five inventories under one category would leave one review's

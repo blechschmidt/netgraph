@@ -614,6 +614,12 @@ repository reviews its own examples — see
 [`.github/workflows/review.yml`](../.github/workflows/review.yml), which is the
 dogfooding of everything above.
 
+**Without a pull request**, the workflow still produces the review: give it a
+`base` and call it from a `workflow_dispatch`, and everything lands in the job
+summary. That is the same path a fork's pull request takes, so it is worth
+having a way to run it deliberately rather than discovering how it reads the
+first time a fork turns up.
+
 ## `netgraph test`: assertions as a gate
 
 `validate` answers "do these files cohere?" Every rule it applies is a statement
