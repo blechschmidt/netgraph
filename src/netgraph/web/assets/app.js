@@ -75,6 +75,7 @@
     vlans: document.getElementById("vlans"),
     showIps: document.getElementById("show-ips"),
     showVlans: document.getElementById("show-vlans"),
+    annotations: document.getElementById("show-annotations"),
     group: document.getElementById("group"),
     strict: document.getElementById("strict"),
     render: document.getElementById("render"),
@@ -142,6 +143,9 @@
   /** The stored arrangement behind the drawing on screen, or null. What makes
    *  a cable routable: see links.js. */
   var geometry = null;
+  /** The notes, areas and legends on screen, or null. What makes one of them
+   *  draggable, and what says which document is behind it: see notes.js. */
+  var annotations = null;
   var pending = null;
   var inFlight = false;
   var queued = false;
@@ -186,6 +190,7 @@
       vlans: parseVlans(el.vlans.value),
       show_ips: el.showIps.checked,
       show_vlans: el.showVlans.checked,
+      annotations: el.annotations.checked,
       group_by_namespace: el.group.checked,
       strict: el.strict.checked
     };
@@ -197,6 +202,7 @@
       "view=" + encodeURIComponent(el.layer.value),
       "show_ips=" + (el.showIps.checked ? "1" : "0"),
       "show_vlans=" + (el.showVlans.checked ? "1" : "0"),
+      "annotations=" + (el.annotations.checked ? "1" : "0"),
       "group_by_namespace=" + (el.group.checked ? "1" : "0"),
       "strict=" + (el.strict.checked ? "1" : "0")
     ];
@@ -318,6 +324,7 @@
     }
     details = reuse ? held.details : (result.details || {});
     geometry = reuse ? held.geometry : (result.geometry || null);
+    annotations = reuse ? held.annotations : (result.annotations || null);
     // A diff is drawn by the same renderer into the same canvas; what marks the
     // page as showing one is the legend, which is furniture without it.
     el.canvas.classList.toggle("diffing", !!result.diff);
@@ -339,7 +346,9 @@
         measureZoomCeiling();
       }
       el.placeholder.hidden = true;
-      if (key) { remember(key, result.graphHash || held.hash, svg, details, geometry); }
+      if (key) {
+        remember(key, result.graphHash || held.hash, svg, details, geometry, annotations);
+      }
       currentView = key;
       paintRemote();
     } else {
@@ -361,6 +370,10 @@
     // rebuilt whenever the drawing is -- a view switched back to out of the
     // cache has to be as editable as one drawn fresh.
     netgraphLinks.annotate(el.viewport.firstElementChild, geometry, details);
+    // And the same for the commentary drawn over it. After links.js rather than
+    // before, so that a note dropped on top of a cable is the thing a click
+    // lands on -- the annotation is the newer object and the one in front.
+    netgraphNotes.annotate(el.viewport.firstElementChild, geometry, annotations, details);
     // A frame of the history carries facts the canvas has nowhere to put: which
     // commit it is, and what that commit did. The scrubber puts them beside
     // itself; app.js only has to say that a drawing arrived.
@@ -384,9 +397,15 @@
   }
 
   /** Keep this view's drawing, dropping the least recently drawn if need be. */
-  function remember(key, hash, svg, records, arrangement) {
+  function remember(key, hash, svg, records, arrangement, commentary) {
     if (!hash) { return; }
-    views[key] = { hash: hash, svg: svg, details: records, geometry: arrangement };
+    views[key] = {
+      hash: hash,
+      svg: svg,
+      details: records,
+      geometry: arrangement,
+      annotations: commentary
+    };
     viewOrder = viewOrder.filter(function (other) { return other !== key; });
     viewOrder.unshift(key);
     // Bounded by bytes as well as by count, because the two disagree by three
@@ -936,9 +955,8 @@
     if (mode === "session") { netgraphSession.markDirty(); } else { schedule(); }
   });
 
-  [el.layer, el.showIps, el.showVlans, el.group, el.strict].forEach(function (control) {
-    control.addEventListener("change", render);
-  });
+  [el.layer, el.showIps, el.showVlans, el.annotations, el.group, el.strict]
+    .forEach(function (control) { control.addEventListener("change", render); });
   el.vlans.addEventListener("input", schedule);
   el.render.addEventListener("click", render);
   el.fit.addEventListener("click", resetView);
@@ -952,8 +970,11 @@
   el.canvas.addEventListener("mouseleave", function () { hideInfo(); });
 
   el.canvas.addEventListener("dblclick", function (event) {
-    // Double-clicking a link drops a bend where it was clicked -- the gesture
-    // every diagram editor has, and the one that needs no chrome at all.
+    // Double-clicking a note opens it for typing and double-clicking a link
+    // drops a bend where it was clicked -- two gestures nothing has to teach.
+    // The note is asked first: it is drawn over the diagram, so a note sitting
+    // on a cable is what the pointer meant.
+    if (netgraphNotes.editAt(event)) { event.preventDefault(); return; }
     if (netgraphLinks.insert(event)) { event.preventDefault(); }
   });
 
@@ -974,6 +995,21 @@
     // would replace the selection the band had just made with one element.
     if (banded) { banded = false; return; }
     netgraphLinks.select(netgraphLinks.linkAt(event.target));
+    // The commentary has a selection of its own, for the same reason: it is
+    // what reveals the handles, and what the Delete gesture acts on. Clicking
+    // anything else clears it, so "click away, then click this" means one thing
+    // here too.
+    var note = netgraphNotes.at(event.target);
+    netgraphNotes.select(note ? note.id : null);
+    if (note) {
+      // A plain click on a note is a click *away* from the elements, so it drops
+      // their selection too. Delete has to mean one thing, and what it means is
+      // whatever was last pointed at.
+      if (!(event.shiftKey || event.ctrlKey || event.metaKey)) {
+        netgraphSelect.clear({ quiet: true });
+      }
+      return;
+    }
     // Shift or Ctrl turns a click into a set operation and nothing else: no
     // reveal, no inspector, no pin. Adding a switch to a selection of eleven
     // must not also throw the YAML pane to its document. The wider hit test,
@@ -1026,6 +1062,9 @@
       // The middle button pans wherever it is pressed, which is the escape
       // hatch for somebody who wants to move a diagram they have selected in.
       if (netgraphLinks.grab(event)) { event.preventDefault(); return; }
+      // Between the two: a note is a shape somebody is moving, so it beats the
+      // rubber band and the pan, and loses to a bend handle that is on top of it.
+      if (event.button === 0 && netgraphNotes.grab(event)) { event.preventDefault(); return; }
       if (event.button === 0 && !event.altKey && netgraphSelect.grab(event)) {
         event.preventDefault();
         return;
@@ -1036,6 +1075,7 @@
     });
     window.addEventListener("mousemove", function (event) {
       if (netgraphLinks.dragging()) { netgraphLinks.move(event); return; }
+      if (netgraphNotes.dragging()) { netgraphNotes.move(event); return; }
       if (netgraphSelect.dragging()) { netgraphSelect.move(event); return; }
       if (!origin) { return; }
       view.x = event.clientX - origin.x;
@@ -1044,6 +1084,7 @@
     });
     window.addEventListener("mouseup", function () {
       netgraphLinks.release();
+      netgraphNotes.release();
       if (netgraphSelect.release()) { banded = true; }
       origin = null;
       el.canvas.classList.remove("panning");
@@ -1177,6 +1218,17 @@
       run: function () { pickLink(); return netgraphLinks.resetLabel(); }
     });
 
+    /* The commentary (§21). Two commands, both reachable from the pointer as
+     * well: a note somebody can only add with a mouse is a note a keyboard user
+     * cannot add at all. notes.js owns both, and both end in the annotation
+     * operations rather than in the element ones -- an annotation is a sidecar,
+     * not a device. */
+    K.define("annotation.create", { run: function (context) { netgraphNotes.create(context); } });
+    K.define("annotation.edit", {
+      run: function () { return netgraphNotes.edit(); },
+      enabled: function () { return netgraphNotes.editable(); }
+    });
+
     K.define("view.layer", { run: function () { K.palette("layers", ""); } });
     K.define("view.layer.next", { run: function () { stepLayer(1); } });
     K.define("view.layer.previous", { run: function () { stepLayer(-1); } });
@@ -1187,6 +1239,9 @@
     K.define("view.ips", { run: function () { toggle(el.showIps, "IP addresses"); } });
     K.define("view.vlans", { run: function () { toggle(el.showVlans, "VLANs"); } });
     K.define("view.group", { run: function () { toggle(el.group, "namespace grouping"); } });
+    K.define("view.annotations", {
+      run: function () { toggle(el.annotations, "annotations"); }
+    });
     K.define("view.strict", { run: function () { toggle(el.strict, "strict"); } });
     K.define("view.failure", {
       run: function () { return showFailure(); },
@@ -1328,6 +1383,19 @@
     view: function () { return el.layer.value; },
     refuse: function (why) { toast(why, "error"); },
     write: function (operation, said) { netgraphSession.ops([operation], said); }
+  });
+
+  /* What notes.js is given: the same three questions links.js is asked, plus
+   * where the canvas is on screen -- a note created from the keyboard goes in
+   * the middle of the view, and there is no pointer to ask. The batch is passed
+   * through whole: one gesture is one POST, so undoing a drag puts the whole
+   * drag back. */
+  netgraphNotes.attach({
+    writable: function () { return mode === "session" && netgraphSession.isWritable(); },
+    canvas: function () { return el.canvas.getBoundingClientRect(); },
+    refuse: function (why) { toast(why, "error"); },
+    say: function (what) { toast(what, "ok"); },
+    write: function (operations, said) { return netgraphSession.ops(operations, said); }
   });
 
   /* What menu.js is given: what a right-click landed on, where a focused shape

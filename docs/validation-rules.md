@@ -2031,8 +2031,6 @@ worklist.
 user. The legitimate case is a group that is deliberately a historical record —
 who was on a project — rather than a grant of access.
 
-### Info
-
 #### `W141` — unknown redundancy expectation
 
 *Severity: warning.*
@@ -2058,6 +2056,98 @@ were being checked. The failure mode is a pull request approved because
 
 **Suppress with** `W141`, or an annotation on the element — appropriate when the
 inventory is shared with a newer netgraph that does understand the token.
+
+#### `W142` — annotation about something that is gone
+
+*Alias: `NG-G001`. Severity: warning.*
+
+A diagram annotation (§21) names an element the inventory does not declare. Two
+documents can do it: a `note` whose `anchor` points at an `element` or a `link`
+that has been deleted or was mistyped, and an `area` whose `members` list one.
+The finding names the annotation, the reference it could not resolve, and the
+line inside the document that holds it.
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: note
+metadata:
+  name: why-two-uplinks
+spec:
+  text: The second uplink is for the annexe, which is on its own feed.
+  anchor:
+    element: sw-gone      # deleted last quarter — W142
+```
+
+A `legend` never trips it. Its entries are colours and words, so it names
+nothing that could go stale — which is the whole argument for `auto: layers`,
+the form of key that is generated from what the drawing actually drew.
+
+**Why it matters.** Not because it draws anything wrong: a note whose anchor is
+missing simply loses its leader line, and an area's dead member drops out of the
+hull. It matters because an annotation is *prose about the network*, and prose
+goes stale silently. A callout explaining why `sw-gone` had two uplinks still
+reads, in the file and in review, as though it explained something — and the one
+reader who needs it is the one who will act on it.
+
+A warning rather than an error, and this one is not a close call. An annotation
+is presentational, and §21's central promise is that it is **barred from
+changing what the tool concludes**: adding a note cannot move a hop in `netgraph
+path`, cannot appear in a generated configuration, and cannot fail a build. A
+rule about one that could fail a build would be exactly the leak that promise
+exists to prevent. Deleting a switch must not stop `netgraph validate` because
+somebody once wrote a note about it.
+
+**Suppress with** `W142` / `NG-G001`, or an annotation on the note or area
+itself — an annotation document carries `metadata.annotations` like any other,
+and `netgraph/ignore` on one silences findings about it. The legitimate case is
+a note about equipment that has been removed and whose removal is the point:
+"the old core switch sat here; the fibre it used is still in the duct". The fix
+otherwise is to re-point the anchor or drop the member.
+
+#### `W143` — area that encloses nothing
+
+*Alias: `NG-G004`. Severity: warning.*
+
+An `area` whose `selector` matches no element of the inventory. The box would be
+drawn round an empty set, so it is not drawn at all.
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: area
+metadata:
+  name: dmz
+spec:
+  label: DMZ
+  selector:
+    labels:
+      zone: dmz         # nothing carries this label — W143
+```
+
+Only a *selector* is judged. An explicit `members` list that has gone stale is
+[`W142`](#w142--annotation-about-something-that-is-gone)'s finding, reported
+per name, which says more than "this box is empty"; and an area with an explicit
+`geometry` is never reported, because a rectangle drawn on the canvas encloses
+whatever happens to be inside it and "nothing yet" is a legitimate state for one.
+
+**Why it matters.** An empty box reads as a claim, and the claim is false. A
+`DMZ` zone that matches nothing looks on the diagram exactly like a DMZ with
+nothing in it — which is a thing somebody might rely on — when what actually
+happened is that the label was renamed, or the namespace moved, and the selector
+was not updated with it. The picture keeps its caption and loses its contents.
+
+A warning rather than an error, for the same reason as `W142` and with the same
+force: an annotation is presentational and cannot be allowed to change what the
+tool concludes, so a rule about one can never fail a build. It is also the rule
+most likely to be right tomorrow — an area written for a zone that is about to
+be populated is a normal thing to commit ahead of the elements.
+
+**Suppress with** `W143` / `NG-G004`, or an annotation on the area. The
+legitimate case is exactly that one: a zone declared before what goes in it.
+Otherwise the fix is in the selector — check the `namespace` prefix, the label
+key and its value, and the `kinds` — or turn it into a `members` list, which
+says which elements were meant and reports each one that is missing.
+
+### Info
 
 #### `I001` — locally administered MAC address
 
@@ -2225,7 +2315,7 @@ schema rule is a usage error:
 <!-- run: rc=2 -->
 ```console
 $ netgraph validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, I001, I002, I003, I004, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, I001, I002, I003, I004, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 Every mechanism accepts both spellings of an id — `W102` and `NG-C010` select

@@ -4062,5 +4062,148 @@
       "vlans": []
     }
   ],
+  "annotations": {
+    "notes": [
+      {
+        "id": "note-why-fibre",
+        "fqn": "why-fibre",
+        "text": "The backbone is **single-mode fibre**: 4.2 km between sites, which is\npast what copper does at any speed.\n\n- `os2`, LC, 10Gbps\n- the ring survives one break\n",
+        "blocks": [
+          {
+            "kind": "paragraph",
+            "spans": [
+              {
+                "text": "The backbone is "
+              },
+              {
+                "style": "bold",
+                "text": "single-mode fibre"
+              },
+              {
+                "text": ": 4.2 km between sites, which is past what copper does at any speed."
+              }
+            ]
+          },
+          {
+            "kind": "bullet",
+            "spans": [
+              {
+                "style": "code",
+                "text": "os2"
+              },
+              {
+                "text": ", LC, 10Gbps"
+              }
+            ]
+          },
+          {
+            "kind": "bullet",
+            "spans": [
+              {
+                "text": "the ring survives one break"
+              }
+            ]
+          }
+        ],
+        "color": "#fef3c7",
+        "stroke": "#8b856d",
+        "leader": false
+      },
+      {
+        "id": "note-mgmt-is-not-routed",
+        "fqn": "mgmt-is-not-routed",
+        "text": "`Vlan99` lives in the *mgmt* VRF and its default route is a discard\nroute, so management does not leave the site.\n",
+        "blocks": [
+          {
+            "kind": "paragraph",
+            "spans": [
+              {
+                "style": "code",
+                "text": "Vlan99"
+              },
+              {
+                "text": " lives in the "
+              },
+              {
+                "style": "italic",
+                "text": "mgmt"
+              },
+              {
+                "text": " VRF and its default route is a discard route, so management does not leave the site."
+              }
+            ]
+          }
+        ],
+        "color": "#fef3c7",
+        "stroke": "#8b856d",
+        "leader": true,
+        "anchor": "sites/north/distribution/sw-north-dist-01",
+        "layout": {
+          "position": {
+            "x": 640.0,
+            "y": 900.0
+          }
+        }
+      }
+    ],
+    "areas": [
+      {
+        "id": "area-backbone-ring",
+        "fqn": "backbone-ring",
+        "members": [
+          "sites/north/core/rtr-north-core-01",
+          "sites/south/core/rtr-south-core-01",
+          "sites/west/core/rtr-west-core-01"
+        ],
+        "color": "#fee2e2",
+        "stroke": "#8b7c7c",
+        "border": "solid",
+        "padding": 24.0,
+        "label": "Backbone ring"
+      }
+    ],
+    "legends": [
+      {
+        "id": "legend-key",
+        "fqn": "key",
+        "corner": "bottom-right",
+        "color": "#ffffff",
+        "stroke": "#8c8c8c",
+        "entries": [
+          {
+            "label": "switch",
+            "color": "#dcf0dc",
+            "shape": "box"
+          },
+          {
+            "label": "router",
+            "color": "#dbe9f6",
+            "shape": "box"
+          },
+          {
+            "label": "computer",
+            "color": "#f5f5f5",
+            "shape": "box"
+          },
+          {
+            "label": "server",
+            "color": "#eae2f5",
+            "shape": "box"
+          },
+          {
+            "label": "subnet",
+            "color": "#e0f2f1",
+            "shape": "box"
+          },
+          {
+            "label": "subnet membership",
+            "color": "#0f766e",
+            "shape": "line"
+          }
+        ],
+        "title": "Key"
+      }
+    ]
+  },
   "title": "Campus, layer 3"
 }

@@ -17,6 +17,11 @@ So the file is deliberately more than a picture:
 * Every icon is inlined as a data URI, so the file is one file — it can be
   mailed, and it will draw the same on a machine that has never seen netgraph.
 
+* Every annotation of §21 — a note, a zone, a key — is a **native mxGraph
+  shape** rather than a picture of one: draw.io's own sticky note, a container,
+  a framed list of swatches. A stakeholder edits the callout in place, and
+  ``netgraph import drawio`` reads the edit back into the document it came from.
+
 What it does not hold is the model. A ``.drawio`` file records a device's name,
 kind and place; not its interfaces, its addresses, its VLANs or its routing.
 That is the lossiness this format is honest about, and it is why the import side
@@ -27,7 +32,8 @@ documents wholesale.
 from __future__ import annotations
 
 from netgraph.drawio.build import BuildOptions, build_diagram
-from netgraph.drawio.identity import CellRole, Scope
+from netgraph.drawio.identity import ATTR_KIND, ATTR_NAME, CellRole, Scope
+from netgraph.drawio.model import Diagram
 from netgraph.drawio.mxfile import write_mxfile
 from netgraph.drawio.notes import Note, Notes
 from netgraph.export.context import ExportContext
@@ -61,15 +67,34 @@ def emit(context: ExportContext) -> str:
             icons=options.icons,
             scope=Scope.COMPLETE if options.complete else Scope.PARTIAL,
             groups=options.frames,
+            annotations=options.annotations,
         ),
         notes=notes,
     )
     _record(context.recorder, notes.sealed())
-    context.recorder.considered += len(graph.nodes) + len(graph.edges)
-    context.recorder.emitted += len(diagram.of_role(CellRole.NODE)) + len(
-        diagram.of_role(CellRole.LINK)
+    context.recorder.considered += len(graph.nodes) + len(graph.edges) + graph.annotations.count
+    context.recorder.emitted += (
+        len(diagram.of_role(CellRole.NODE))
+        + len(diagram.of_role(CellRole.LINK))
+        + _annotations_drawn(diagram)
     )
     return write_mxfile(diagram, compress=options.compress)
+
+
+def _annotations_drawn(diagram: Diagram) -> int:
+    """How many §21 documents the file actually holds.
+
+    Counted as *documents* rather than as cells, because that is what the
+    reader of a manifest is counting against: one legend is one annotation and
+    fourteen rectangles, and "14 of 3 emitted" would be nonsense.
+    """
+    return len(
+        {
+            (cell.attribute(ATTR_KIND), cell.attribute(ATTR_NAME))
+            for role in (CellRole.NOTE, CellRole.AREA, CellRole.LEGEND)
+            for cell in diagram.of_role(role)
+        }
+    )
 
 
 def _record(recorder: Recorder, notes: tuple[Note, ...]) -> None:

@@ -56,6 +56,7 @@ expands §9 with the reasoning and with what is deliberately left uncovered.
 18. [Layout: diagram geometry](#18-layout-diagram-geometry)
 19. [Identity: users and groups](#19-identity-users-and-groups)
 20. [Test suites: executable assertions](#20-test-suites-executable-assertions)
+21. [Diagram annotations: notes, areas and legends](#21-diagram-annotations-notes-areas-and-legends)
 
 ---
 
@@ -210,16 +211,18 @@ spec:
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
 | `apiVersion` | string | M | — | MUST be `netgraph.dev/v1alpha1` for this revision. See §12. |
-| `kind` | enum | M | — | One of `switch`, `router`, `hub`, `computer`, `server`, `cable`, `adapter`, `tunnel`, `patchpanel`, `pdu`, `user`, `group`, `template`, `layout`, `testsuite`. Lower-case; other spellings are rejected. |
+| `kind` | enum | M | — | One of `switch`, `router`, `hub`, `computer`, `server`, `cable`, `adapter`, `tunnel`, `patchpanel`, `pdu`, `user`, `group`, `template`, `layout`, `testsuite`, `note`, `area`, `legend`. Lower-case; other spellings are rejected. |
 | `metadata` | mapping | M | — | §3.1 |
-| `spec` | mapping | M | — | Shape depends on `kind`: §6 (devices), §7 (cable), §8 (adapter), §14 (tunnel), §15 (patchpanel), §17.1 (pdu), §19 (user, group), §6.6 (template), §18 (layout), §20 (testsuite). |
+| `spec` | mapping | M | — | Shape depends on `kind`: §6 (devices), §7 (cable), §8 (adapter), §14 (tunnel), §15 (patchpanel), §17.1 (pdu), §19 (user, group), §6.6 (template), §18 (layout), §20 (testsuite), §21 (note, area, legend). |
 
 The first twelve kinds are **elements**: each becomes a node or an edge of the
-graph. The last three are not. `template` declares a reusable partial device
+graph. The last six are not. `template` declares a reusable partial device
 `spec` and is merged away by the loader (§6.6); `layout` carries diagram geometry
 for elements declared elsewhere (§18); `testsuite` carries assertions about the
-network the other documents describe (§20). None of the three is ever drawn as a
-node, listed by `netgraph list`, or resolvable as a cable endpoint.
+network the other documents describe (§20); `note`, `area` and `legend` carry
+what the *diagram* says about that network, and nothing the tool concludes from
+it (§21). None of the six is ever drawn as a node, listed by `netgraph list`, or
+resolvable as a cable endpoint.
 
 ### 3.1 `metadata`
 
@@ -1156,7 +1159,7 @@ named. §10.10 maps them.
 |---|---|---|
 | `NG-D001` | error | The document is a mapping with the four envelope keys; `apiVersion`, `kind`, `metadata`, `spec` are all present. |
 | `NG-D002` | error | `apiVersion` is a recognised version string. |
-| `NG-D003` | error | `kind` is one of the twelve element kinds, `template`, `layout` or `testsuite`, lower-case. |
+| `NG-D003` | error | `kind` is one of the twelve element kinds, `template`, `layout`, `testsuite`, `note`, `area` or `legend`, lower-case. |
 | `NG-D004` | error | `spec` matches the shape required by `kind`. |
 | `NG-D005` | error | No unknown keys anywhere in the document. |
 | `NG-N001` | error | `metadata.name` matches the name grammar (§4.1). |
@@ -3736,8 +3739,8 @@ value has not changed.
 ### 18.3 Views
 
 `spec.views` is keyed by the layer being drawn — `physical`, `l1`, `l2`, `l3`,
-`overlay`, `routing`, `rack`, `power` — because the same device sits somewhere
-different in each. The l3 diagram is a different graph with different neighbours,
+`overlay`, `routing`, `rack`, `power`, `identity` — because the same device sits
+somewhere different in each. The l3 diagram is a different graph with different neighbours,
 not the same diagram recoloured.
 
 An unknown view name is `NG-Y003`.
@@ -4171,3 +4174,426 @@ assertion's own file and line.
 | `NG-K001` | error | Two `testsuite` documents in one namespace do not share a name. The first declaration wins and the second is ignored, which keeps loading deterministic. |
 | `NG-K002` | error | `spec.assertions` holds between one and 1024 entries. |
 | `NG-K003` | error | Every key an assertion carries belongs to the assertion its `assert` names, every key that assertion requires is present, and a `count` compares against a bound it can satisfy. |
+
+---
+
+## 21. Diagram annotations: notes, areas and legends
+
+A diagram is not only its devices. A callout saying *why* a link is orange, a
+dashed box round the DMZ, a key explaining what the colours mean — every
+diagramming tool has them, and until this revision netgraph had nowhere to write
+one down. Whatever somebody added to an exported drawing was lost the next time
+the picture was rendered, which is a hole in the one-to-one contract between the
+visual form and the textual one that this specification exists to keep.
+
+Three kinds close it. A `note` is a callout, an `area` is a zone, a `legend` is
+a key:
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: note
+metadata:
+  name: why-orange
+spec:
+  text: |
+    **Orange** links are fibre. The run to the annexe is 180 m,
+    which is past what copper does.
+  anchor:
+    link: cables/cbl-annexe
+  color: "#fef3c7"
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: area
+metadata:
+  name: dmz
+spec:
+  label: DMZ
+  members: [edge/fw-1, edge/srv-proxy]
+  color: "#fee2e2"
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: legend
+metadata:
+  name: key
+spec:
+  title: Key
+  corner: bottom-right
+  auto: layers
+```
+
+**An annotation is purely presentational**, and that is a rule of this schema
+rather than a property of the current implementation. It is barred from:
+
+* **validation** — the only two rules §21.4 defines about an annotation's content
+  are warnings, and no annotation can produce an error that fails a build.
+  Deleting a switch must not stop `netgraph validate` because somebody once wrote
+  a note about it;
+* **the graph** — a view with three annotation documents has exactly the nodes
+  and the edges of the same view without them, at every layer;
+* **`netgraph path`** — nothing an annotation says can move a hop, add one, or
+  change which route is shortest;
+* **`netgraph plan` and `netgraph apply`** — the infrastructure half of a
+  changeset is byte-identical with the annotations in the tree and without them.
+  They are addressed after it, never paired with an element by rename detection,
+  and never proposed for removal by an import;
+* **generated device configuration** — nothing the configuration dialects of
+  `netgraph export` write for a device — `netplan`, `networkd`, `ifupdown`,
+  `frr`, `wireguard` — knows that a note about it exists.
+
+That bar is what makes the three kinds safe to add at all. netgraph's argument
+is that the diagram and the network description should be one artefact, and the
+price of that argument is that the description is also what generates
+configuration and answers "can these two hosts reach each other". A decorative
+layer inside such a file is only worth having if it *provably* cannot reach the
+conclusions — otherwise the first review question about any diagnostic becomes
+"is that real, or is it the annotations?". So each clause above is asserted
+separately, by `tests/test_render_annotations.py` and
+`tests/test_plan_annotations.py`, and the strongest of them is asserted as byte
+equality rather than as a spot check.
+
+**They are sidecars, not elements.** Like `layout` (§18) and `testsuite` (§20),
+an annotation is a document kind and not an element: it declares no network
+fact, owns no interface, terminates no cable, is never drawn as a node, is never
+resolvable as a cable endpoint and is never listed by `netgraph list`. It names
+elements; it does not join them.
+
+Each of the three is indexed in **a name space of its own**. A note called
+`core` beside a switch called `core` is not a clash, and neither is an area
+called `core` beside both of them: nothing ever resolves one where the other is
+meant, because an anchor and a member reference resolve against the *elements*
+and a `kind: note` document is only ever reached as a note. Uniqueness is
+therefore per kind and per namespace (`NG-G002`), exactly as it is for a layout.
+
+The alternative was `metadata.annotations` (§3.1), which already exists on every
+element and is already a bag of per-element input to the tooling. It was
+rejected for three reasons:
+
+* a callout is often about a **link**, or about a region of the canvas that no
+  element owns — "everything below this line is on the UPS" — and there is no
+  element to hang either on;
+* an annotation carries geometry, and geometry per element per view is exactly
+  what §18.1 refused to put on a device document, for the four reasons recorded
+  there;
+* `metadata.annotations` is read by the tool and never drawn; §21 is drawn and
+  never read. Two opposite contracts in one key is how a reviewer ends up
+  guessing which is which.
+
+**Two keys are shared by all three kinds**, and they are the two questions a
+renderer asks about one:
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `views` | string list | O | `[]` | Which drawings it appears in, by layer name. Empty means **every** one of them. |
+| `color` | string | O | *unset* | Fill colour, `#rgb` or `#rrggbb`. Absent takes the kind's default. |
+
+`views` is the closed set §18 scopes geometry by — `physical`, `l1`, `l2`, `l3`,
+`overlay`, `routing`, `rack`, `power`, `identity` — and an unknown name is
+refused (`NG-G003`) rather than accepted and silently drawn nowhere. Empty is
+the default because a remark about a site is a remark about the site in every
+picture of it; `views: [l3]` is for the remark that only makes sense once the
+diagram is prefixes rather than cables.
+
+`color` is a hex colour and **nothing else**: no `red`, no `rgb()`, no `hsl()`,
+no palette names of netgraph's own. That is deliberately narrow. The same value
+has to reach a Graphviz attribute, a Mermaid `classDef`, an SVG fill and an
+mxGraph style, and `#rrggbb` is the one syntax all four agree about — an
+annotation whose colour rendered in one exporter and came out black in another
+would be worse than one with no colour at all. It is lower-cased on load, so two
+documents that mean the same colour compare equal and a change of case does not
+show up in `netgraph plan`. The outline is derived from the fill rather than
+configured separately, so a custom colour brings its own matching stroke and
+there is no second field for somebody to leave inconsistent.
+
+### 21.1 `note` — a callout
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `text` | string | M | — | What it says, 1–4000 characters, in the markdown subset below. |
+| `anchor` | mapping | C | *unset* | What it is about: `element` **or** `link`, exactly one. Required unless `geometry` places the note. |
+| `geometry` | mapping | C | *unset* | Where it is drawn and how big. Required unless `anchor` attaches it to something. |
+| `leader` | boolean | O | `true` | Draw a line from the note to what it is anchored to. Inert without an `anchor`. |
+
+`views` and `color` are as above. Four thousand characters is the ceiling
+because a note is a callout and not a document: past a couple of thousand it is
+unreadable in a diagram and belongs in `metadata.description`, or in a file of
+its own that the note points at.
+
+**The markdown subset.** Exactly five constructs are understood, and they are
+the five a callout uses:
+
+| Written | Drawn |
+|---|---|
+| a blank line | a paragraph break |
+| `- item` (or `* item`) | a bullet |
+| `**bold**` | bold |
+| `*italic*` | italic |
+| `` `code` `` | monospace |
+
+**Everything else is literal.** A heading, a table, a link, a nested list, a
+block quote, a numbered list, an image, an unterminated `*` — each is drawn
+exactly as it was typed, character for character. That is said plainly here
+because a formatting language that silently swallows what it does not implement
+is worse than one that draws it: `# Note` coming out as an empty line is a bug
+report, and `# Note` coming out as `# Note` is a person removing a `#`.
+
+The subset is small for the same reason `color` is narrow. The text has to be
+drawn by Graphviz's HTML-like labels, by a Mermaid node caption, by an mxGraph
+cell and by the editor, and these are the constructs all of them can express —
+Graphviz has `<B>` and `<I>` but no `<CODE>`, so a code span becomes the
+monospace face, which is the difference a reader is looking for. Soft line
+breaks inside a paragraph are joined with a space, the way markdown joins them,
+so a note wrapped at 72 characters in YAML does not draw as a column of stumps.
+The parser never fails: it runs while a diagram is being rendered, so a note it
+does not understand degrades to its own text rather than to a traceback.
+
+**`anchor` — what the note is about.**
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `element` | reference | C | *unset* | A device, adapter, patch panel, PDU, user or group. |
+| `link` | reference | C | *unset* | A cable or a tunnel. |
+
+Exactly one of the two, and writing both — or neither — is `NG-G005`. They are
+separate keys rather than one `target` because a reader of the file should be
+able to tell what sort of thing is being commented on without resolving the
+name, and because the two are drawn differently: a note about a device sits
+beside a shape, a note about a cable sits beside a line.
+
+References are spelled the way every reference in this schema is spelled (§4):
+a short name resolved against the annotation document's own namespace, or a
+fully-qualified one. An anchor naming nothing is `NG-G001` — a warning — and the
+note keeps its text and loses its leader line.
+
+**`geometry` — where it sits.**
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `x` | number | C | *unset* | Written with `y` or not at all. |
+| `y` | number | C | *unset* | — |
+| `width` | number | O | *unset* | Omitted lets the text decide. |
+| `height` | number | O | *unset* | Omitted for the same reason. |
+
+The coordinates are §18.2's, deliberately and exactly: points, `x` rightwards,
+`y` **upwards**, origin at the bottom left, and `x`/`y` is the **centre** of the
+box rather than a corner. A note dragged around a canvas is stored by the same
+machinery that stores a dragged switch, so it had better be stored in the same
+system. Half a position — `x` without `y` — is `NG-G005`: it places nothing, and
+accepting it would draw the note at an origin nobody asked for.
+
+The shape is flat (`x`, `y`, `width`, `height`) rather than §18's nested
+`position`/`size`, because these four numbers are what one drag and one resize
+produce and what an editor writes back. A note is one box; a node is a thing
+with an optional extent.
+
+**An anchor, a point, or both.** At least one of `anchor` and a placed
+`geometry` is required (`NG-G005`); otherwise nothing knows where to draw the
+note. The two are not alternatives so much as two different promises:
+
+* **anchored** — the note follows what it is about when the diagram is laid out
+  again. This is the form worth writing by hand;
+* **placed** — the note is pinned at a coordinate, and a re-layout moves
+  everything else around it.
+
+When a note carries **both**, the point places it and the anchor is what the
+leader line points at. That combination is exactly what dragging an anchored
+note produces, so it has to be expressible — reading it any other way would mean
+an editor could not write back what somebody had just done.
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: note
+metadata:
+  name: ups-boundary
+spec:
+  text: |
+    Everything in this room is on the *UPS*.
+
+    - 40 minutes at the measured load
+    - the door controller is `not` on it
+  anchor:
+    element: edge/sw-core
+  geometry: {x: 640, y: 900, width: 220}
+  views: [l1, power]
+```
+
+### 21.2 `area` — a zone
+
+An area is a box drawn *behind* the nodes.
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `label` | string | O | *unset* | The caption. Absent draws an unlabelled box, which is legitimate for a purely visual grouping. |
+| `members` | reference list | C | `[]` | Elements named outright, at most 1000. |
+| `selector` | mapping | C | *unset* | Elements matched, as a query rather than a list. |
+| `geometry` | mapping | C | *unset* | An explicit rectangle, in the coordinate system §21.1 uses. Needs a position **and** a size. |
+| `border` | enum | O | `dashed` | `solid`, `dashed`, `dotted` or `none`. |
+| `padding` | number | O | `16.0` | Points between the hull of the members and the box drawn round them. Ignored when `geometry` gives the rectangle outright. |
+
+At least one of `members`, `selector` and a fully specified `geometry` is
+required (`NG-G005`): an area that encloses nothing is a caption with no
+subject. `members` and `selector` may be combined, and the box is then the hull
+of both — the explicit names first, in the order they were written, then
+whatever the selector adds in load order. That ordering is not cosmetic: a
+committed rendering should not shuffle because a device was added somewhere
+unrelated.
+
+`dashed` is the default because a zone is a **convention** rather than a piece
+of hardware, and a solid box in a diagram of solid boxes reads as a real
+container — a chassis, a stack, something with a serial number. `none` keeps the
+fill and drops the edge, for a wash of colour behind part of the picture.
+
+A member that names nothing is `NG-G001` and is dropped from the hull; a
+`selector` that matches nothing is `NG-G004` and the box is not drawn at all.
+Both are warnings — [`W142`](validation-rules.md#w142--annotation-about-something-that-is-gone)
+and [`W143`](validation-rules.md#w143--area-that-encloses-nothing) — and both
+pages say when it is right to suppress them.
+
+**`selector` — a zone said as a query.**
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `namespace` | string | C | *unset* | A namespace prefix; matches it **and everything under it**. |
+| `labels` | map[string, string] | C | `{}` | Every one of these labels must be present with this value. |
+| `kinds` | string list | C | `[]` | Element kinds, for a zone that is about a class of thing. |
+
+Clauses are conjunctive — an element must satisfy every one that is given — and
+a selector with no clause at all is refused (`NG-G005`), because it would
+silently box the whole inventory. A relative `namespace` is resolved against the
+namespace the area was declared in, exactly as every other reference is: an area
+in `sites/hq` selecting `access` means `sites/hq/access`.
+
+**An area over a namespace is the declarative form of `--collapse`.** The flag
+folds a namespace into one node for the duration of one command; a `kind: area`
+over the same namespace draws the same set of elements *boxed rather than
+folded*, and it does it on every render, for everybody, because it lives in the
+tree instead of in somebody's shell history. The two are one selection seen from
+opposite ends — which is why a namespace clause matches the whole subtree rather
+than one level of it.
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: area
+metadata:
+  name: north-site
+spec:
+  label: Site North
+  selector:
+    namespace: sites/north
+  border: solid
+  padding: 24
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: area
+metadata:
+  name: on-the-ups
+spec:
+  label: On the UPS
+  geometry: {x: 480, y: 260, width: 900, height: 420}
+  color: "#f1f5f9"
+  views: [l1]
+```
+
+The second form — an explicit rectangle — is the one case where an area is about
+the *paper* rather than about a set of devices. It encloses whatever the
+arrangement happens to put inside it, which is why it is never reported as
+empty: "nothing in it yet" is a legitimate state for a region of canvas, and is
+not a legitimate state for a selector that was meant to match something.
+
+### 21.3 `legend` — a key
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `title` | string | O | *unset* | Heading of the key. Absent draws the swatches on their own. |
+| `corner` | enum | O | `bottom-right` | `top-left`, `top-right`, `bottom-left` or `bottom-right`. |
+| `auto` | enum | C | *unset* | `layers` derives the entries from what the drawing actually drew. |
+| `entries` | list | C | `[]` | The rows, written out. At most 64. |
+
+Exactly one of `auto` and `entries` (`NG-G005`): a key that was both generated
+and written out would have to merge two lists that disagree, and there is no
+right answer to which of them wins.
+
+A **corner** rather than a coordinate, because a key belongs at the edge of the
+paper and should stay there when the drawing is laid out again — a coordinate
+would put it in the middle of the diagram the first time the topology grew. How
+exactly a corner is honoured depends on the backend and on whether the view is
+arranged; [`docs/rendering.md`](rendering.md#annotations-notes-areas-and-legends)
+is that story, and the short of it is that a stored arrangement (§18) makes the
+corner exact while an automatic layout leaves the placement to Graphviz.
+
+`auto: layers` builds the entries from what *this* view contains: one swatch per
+node kind present, then one per reason a link is drawn, with the colours read
+out of the same palette the renderer draws with. It is the only form of key that
+cannot go stale — a hand-written one is wrong the first time somebody adds a
+fibre run, and a generated one on a `--vlan 10` diagram describes the ten
+devices that were drawn rather than the four hundred that were not. A legend is
+also the one annotation kind that never trips `NG-G001`: its content is colours
+and words, so it names nothing that can go missing.
+
+**`entries[]`.**
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `label` | string | M | — | What this swatch means, 1–200 characters. |
+| `color` | string | O | *unset* | `#rgb` or `#rrggbb`, as everywhere else in §21. |
+| `shape` | enum | O | `box` | `box`, `line`, `dashed`, `dotted` or `ellipse`. |
+| `description` | string | O | *unset* | A second line, for the row that needs one. |
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: legend
+metadata:
+  name: media
+spec:
+  title: Media
+  corner: top-left
+  entries:
+    - {label: fibre, color: "#f97316", shape: line}
+    - {label: copper, color: "#64748b", shape: line}
+    - label: wireless
+      color: "#a855f7"
+      shape: dotted
+      description: association, not a cable
+```
+
+Sixty-four rows is the ceiling, because a key nobody can read is not a key. An
+inventory that wants more is describing the drawing rather than summarising it,
+and the drawing is already there.
+
+### 21.4 Rules
+
+The group is lettered `G`, for *graphic*: `NG-A` was spent on addresses and
+`NG-N` on names, so neither initial of "annotation" was available.
+
+| Rule | Severity | Statement |
+|---|---|---|
+| `NG-G001` | warning | Every `anchor` and every `members` entry names something the inventory declares. Reported as `W142`; the stale reference is dropped and the rest of the annotation is still drawn. |
+| `NG-G002` | error | Two annotation documents of one kind in one namespace do not share a name. The first declaration wins and the second is ignored, which keeps loading deterministic. |
+| `NG-G003` | error | Every *value* an annotation carries is well formed: a colour is `#rgb` or `#rrggbb`, a view is one netgraph draws, a text is not empty. |
+| `NG-G004` | warning | An area's `selector` matches at least one element. Reported as `W143`; the box is not drawn. |
+| `NG-G005` | error | An annotation's fields *agree*: an anchor names exactly one of `element` and `link`, a position has both `x` and `y`, a note is anchored or placed, an area encloses something, a selector narrows something, and a legend is generated or written out but not both. |
+
+`NG-G003` and `NG-G005` are the same severity and are split for one reason,
+which is what an *editor* does with them. A gesture is several writes: dragging
+a note that has never been placed writes `spec.geometry.x` and then
+`spec.geometry.y`, and between those two the document says something `NG-G005`
+forbids. So `netgraph edit` refuses a write that trips `NG-G003` the moment it
+is made — `color: red` is wrong when it is typed and wrong afterwards — and lets
+one that trips `NG-G005` through, leaving it to the gate that judges the
+finished batch. A batch is atomic, so a document that is still incoherent when
+the batch ends is never written; the split buys the second half of a drag, and
+costs nothing.
+
+`NG-G002`, `NG-G003` and `NG-G005` are reported while the document is **read** —
+one by the loader, two by the schema — and are therefore deliberately absent
+from the suppressible rule catalogue in
+[`validation-rules.md`](validation-rules.md), exactly as `NG-Y002` and `NG-Y003`
+are (§18.7). A finding about a document that could not be loaded is about the
+*file* rather than about the network, and there is nothing to suppress: as far
+as everything downstream is concerned the annotation does not exist.
+
+`NG-G001` and `NG-G004` are the other kind of finding — the annotation loaded,
+and what it says about the network has stopped being true — so both are
+suppressible per rule and per document (§10.11), and both are **warnings**. That
+is not a close call: an annotation is barred from failing a build, and a rule
+about one that could fail a build would be exactly the leak the bar exists to
+prevent.

@@ -22,9 +22,15 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping
 
 from netgraph.loader.inventory import Inventory
-from netgraph.models import ElementBase, Layout
-from netgraph.plan.address import LAYOUT_TYPE, Address, address_of
-from netgraph.plan.document import body_of, diff_documents, document_of
+from netgraph.models import ElementBase
+from netgraph.plan.address import (
+    ANNOTATION_TYPES,
+    LAYOUT_TYPE,
+    SIDECAR_TYPES,
+    Address,
+    address_of,
+)
+from netgraph.plan.document import Diffable, body_of, diff_documents, document_of
 from netgraph.plan.identity import detect_renames
 from netgraph.plan.model import Action, Change, Plan, StateRef
 from netgraph.plan.order import dependencies, order_changes
@@ -32,7 +38,7 @@ from netgraph.plan.order import dependencies, order_changes
 __all__ = ["diff", "elements_by_address"]
 
 #: What either side of a diff holds: every addressable document of one state.
-Documents = dict[Address, ElementBase | Layout]
+Documents = dict[Address, Diffable]
 
 
 def diff(
@@ -127,22 +133,29 @@ def diff(
 def elements_by_address(inventory: Inventory) -> Documents:
     """Every addressable document of ``inventory``, keyed by address.
 
-    Elements and layouts together: a diagram's geometry is as much a part of the
-    declared state as the devices it arranges, and a plan that silently ignored
-    it would let ``apply`` leave a tree the plan said it had finished with.
+    Elements, layouts and annotations together: a diagram's geometry and the
+    notes written on it are as much a part of the declared state as the devices
+    they are about, and a plan that silently ignored them would let ``apply``
+    leave a tree the plan said it had finished with.
+
+    Each sidecar keeps its own name space. A note called ``dmz`` and an area
+    called ``dmz`` and a device called ``dmz`` are three documents at three
+    addresses, which is what stops any of them being mistaken for another.
     """
     documents: Documents = {
         address_of(element.kind, fqn): element for fqn, element in inventory.elements.items()
     }
     for fqn, layout in inventory.layouts.items():
         documents[Address(type=LAYOUT_TYPE, fqn=fqn)] = layout
+    for kind, fqn, annotation in inventory.annotations:
+        documents[address_of(kind, fqn)] = annotation
     return documents
 
 
 def _updated(
     address: Address,
-    old: ElementBase | Layout,
-    new: ElementBase | Layout,
+    old: Diffable,
+    new: Diffable,
     before: Inventory,
     *,
     at: Address | None = None,
@@ -163,30 +176,49 @@ def _updated(
         fields=fields,
         # Geometry is applied a whole view at a time, so a layout update has to
         # carry the view it wants rather than the deltas that got it there. Every
-        # other kind is applied field by field and needs no such thing.
+        # other kind is applied field by field and needs no such thing — an
+        # annotation included: a note's colour is written at ``spec.color``, so
+        # carrying the whole document would only cost the reader the one line
+        # that says what actually changed.
+        #
+        # That holds even though §21 re-checks an annotation after every write,
+        # which makes a half-written block a refusal. A block that is wholly new
+        # is already *one* field change here — ``_walk`` only descends into a
+        # mapping when both sides have one — so its change carries the block
+        # entire; and where a plan spells the leaves separately anyway,
+        # ``plan.execute`` grafts them back together against the tree it is
+        # writing to. Neither needs the document the change came from.
         document=document_of(new) if address.type == LAYOUT_TYPE else None,
         source=_source_of(before, at if at is not None else address),
     )
 
 
-def _elements_only(documents: Mapping[Address, ElementBase | Layout]) -> dict[Address, ElementBase]:
-    """Drop layouts: they carry nothing structural to be identified by.
+def _elements_only(documents: Mapping[Address, Diffable]) -> dict[Address, ElementBase]:
+    """Drop the sidecars: they carry nothing structural to be identified by.
 
     A layout is named by its author and describes elements by *their* names. Two
     of them with different names are two arrangements, and pairing them up on a
     guess would move somebody's saved diagram onto another view.
+
+    An annotation is the same argument with more at stake. Its identity is the
+    name somebody gave it and nothing else — two notes both anchored to the same
+    switch are two things a person wrote, not one thing renamed — so a note that
+    disappears and another that appears are a delete and a create, always.
+    Guessing otherwise would silently move one author's words onto another
+    element.
     """
     return {
         address: element
         for address, element in documents.items()
-        if isinstance(element, ElementBase) and address.type != LAYOUT_TYPE
+        if isinstance(element, ElementBase) and address.type not in SIDECAR_TYPES
     }
 
 
 def _source_of(inventory: Inventory, address: Address) -> str | None:
-    location = (
-        inventory.layout_sources.get(address.fqn)
-        if address.type == LAYOUT_TYPE
-        else inventory.sources.get(address.fqn)
-    )
+    if address.type in ANNOTATION_TYPES:
+        location = inventory.annotation_source(address.type, address.fqn)
+    elif address.type == LAYOUT_TYPE:
+        location = inventory.layout_sources.get(address.fqn)
+    else:
+        location = inventory.sources.get(address.fqn)
     return None if location is None else str(location)

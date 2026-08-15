@@ -178,6 +178,12 @@ class ExportOptions:
     compress: bool = False
     #: Draw a container frame per namespace.
     frames: bool = True
+    #: Draw the notes, areas and legends the inventory declares for the view
+    #: (§21) as native mxGraph shapes. On by default, for the same reason a
+    #: render draws them: an annotation is something somebody wrote down about
+    #: *this diagram*, and a stakeholder opening the file is the reader it was
+    #: written for. Off produces the topology alone.
+    annotations: bool = True
     #: Does the exported diagram hold every element of the view? Set by the CLI
     #: from whether a filter was given, and stamped into the file: importing a
     #: filtered diagram must never read a missing cell as a deletion.

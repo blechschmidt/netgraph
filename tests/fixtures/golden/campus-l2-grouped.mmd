@@ -2,22 +2,13 @@
 title: "Campus"
 ---
 flowchart TB
-    subgraph ns0["sites/north/access"]
+    subgraph area0["Site North"]
         direction TB
         n0["sw-north-acc-01<br/>[switch]<br/>10.1.99.11/24<br/>vlans: 1,10,20,30,99"]
         n1["sw-north-acc-02<br/>[switch]<br/>10.1.99.12/24<br/>vlans: 1,10,20,30,99"]
         n2["sw-north-acc-03<br/>[switch]<br/>10.1.99.13/24<br/>vlans: 1,10,20,30,99"]
-    end
-    subgraph ns1["sites/north/core"]
-        direction TB
         n3(["rtr-north-core-01<br/>[router]<br/>192.0.2.1/32<br/>2001:db8::1/128<br/>(+6 more)"])
-    end
-    subgraph ns2["sites/north/distribution"]
-        direction TB
         n4["sw-north-dist-01<br/>[switch]<br/>10.1.10.1/24<br/>2001:db8:1:10::1/64<br/>(+5 more)<br/>vlans: 1,10,20,30,99"]
-    end
-    subgraph ns3["sites/north/hosts"]
-        direction TB
         n5[/"pc-north-01<br/>[computer]<br/>10.1.10.51/24<br/>2001:db8:1:10::51/64<br/>vlans: 10"/]
         n6[("srv-north-01<br/>[server]<br/>10.1.20.11/24<br/>2001:db8:1:20::11/64<br/>vlans: 20")]
         n7[/"pc-north-02<br/>[computer]<br/>10.1.10.52/24<br/>2001:db8:1:10::52/64<br/>vlans: 10"/]
@@ -60,6 +51,8 @@ flowchart TB
         n20[("srv-west-01<br/>[server]<br/>10.3.20.11/24<br/>2001:db8:3:20::11/64<br/>vlans: 20")]
         n21[/"pc-west-02<br/>[computer]<br/>10.3.10.52/24<br/>2001:db8:3:10::52/64<br/>vlans: 10"/]
     end
+    note0["The backbone is single-mode fibre: 4.2 km between sites, which is past what copper does at any speed.<br/>• os2, LC, 10Gbps<br/>• the ring survives one break"]
+    note1["VLAN 30 (voice) is trunked everywhere and has no access port yet — the state a campus is in halfway through a telephony rollout."]
 
     n3 == "xe-0/0/1 ↔ xe-0/0/2" === n10
     n10 == "xe-0/0/1 ↔ xe-0/0/2" === n17
@@ -92,3 +85,7 @@ flowchart TB
     class n3,n10,n17 router
     class n6,n13,n20 server
     class n0,n1,n2,n4,n8,n9,n11,n15,n16,n18 switch
+    classDef netgraphNote fill:#fef3c7,stroke:#8b856d,stroke-width:1px,stroke-dasharray:3 2
+    class note0,note1 netgraphNote
+    style note1 fill:#e0f2fe,stroke:#7b858b,stroke-width:1px,stroke-dasharray:3 2
+%% areas are drawn as subgraphs: their colour, border style and padding are not expressible in mermaid

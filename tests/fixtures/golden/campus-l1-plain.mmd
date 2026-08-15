@@ -21,6 +21,7 @@ flowchart TB
     n19[/"pc-west-01<br/>[computer]"/]
     n20[("srv-west-01<br/>[server]")]
     n21[/"pc-west-02<br/>[computer]"/]
+    note0["The backbone is single-mode fibre: 4.2 km between sites, which is past what copper does at any speed.<br/>• os2, LC, 10Gbps<br/>• the ring survives one break"]
 
     n3 == "xe-0/0/1 ↔ xe-0/0/2 · BB-NS · fiber · 10Gbps" === n10
     n10 == "xe-0/0/1 ↔ xe-0/0/2 · BB-SW · fiber · 10Gbps" === n17
@@ -53,3 +54,6 @@ flowchart TB
     class n3,n10,n17 router
     class n6,n13,n20 server
     class n0,n1,n2,n4,n8,n9,n11,n15,n16,n18 switch
+    classDef netgraphNote fill:#fef3c7,stroke:#8b856d,stroke-width:1px,stroke-dasharray:3 2
+    class note0 netgraphNote
+%% area 'on-the-generator' is not drawn: it is a rectangle of canvas rather than a set of elements, and mermaid places nothing

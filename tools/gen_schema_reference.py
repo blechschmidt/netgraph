@@ -46,6 +46,9 @@ from pydantic.fields import FieldInfo  # noqa: E402
 from netgraph.models import (  # noqa: E402
     AcceptableFrames,
     AdapterSpec,
+    AnnotationGeometry,
+    AreaSelector,
+    AreaSpec,
     Assertion,
     BgpConfig,
     BgpNeighbor,
@@ -69,10 +72,14 @@ from netgraph.models import (  # noqa: E402
     IPv6Config,
     LabelGeometry,
     LayoutSpec,
+    LegendEntry,
+    LegendSpec,
     Location,
     Medium,
     Metadata,
     NodeGeometry,
+    NoteAnchor,
+    NoteSpec,
     OspfConfig,
     PatchPanelSpec,
     PduSpec,
@@ -107,7 +114,10 @@ from netgraph.models import (  # noqa: E402
 )
 from netgraph.models.document import ELEMENT_MODELS  # noqa: E402
 from netgraph.models.element import (  # noqa: E402
+    AREA_KIND,
     LAYOUT_KIND,
+    LEGEND_KIND,
+    NOTE_KIND,
     TEMPLATE_KIND,
     TEST_SUITE_KIND,
 )
@@ -614,6 +624,81 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "with `select` and the views with `layer`.",
         ),
     ),
+    # Annotations (§21). After the assertions, for the same reason again: they
+    # say how the network is *drawn*, not what it is, and nothing below reads
+    # them except a renderer.
+    Section(
+        NoteSpec,
+        "`spec` of a `note` document",
+        "One callout on the diagram. Presentational throughout: a note cannot make `netgraph "
+        "validate` fail, cannot move a hop in `netgraph path`, and never reaches an exported "
+        "configuration.",
+        notes=(
+            "A note needs somewhere to be: either an `anchor`, or a `geometry` giving `x` and "
+            "`y`. Both is the shape dragging an anchored note produces — the point places it, "
+            "the anchor is what the leader line points at.",
+            "`views` scopes the note to the drawings it makes sense in; empty means all of "
+            "them. A note naming an element the inventory no longer has is `NG-G001`, a "
+            "warning, exactly as a stale layout key is.",
+        ),
+    ),
+    Section(
+        NoteAnchor,
+        "`spec.anchor`",
+        "What a note is about: one element, or one link. Exactly one of the two, and what makes "
+        "the note survive the diagram being laid out again.",
+    ),
+    Section(
+        AnnotationGeometry,
+        "`spec.geometry` of an annotation",
+        "Where an annotation is drawn and how big it is. Flat rather than §18's nested "
+        "`position`/`size`, because these four numbers are what a drag and a resize produce.",
+        notes=(
+            "Coordinates are §18's: points, `y` upwards, origin at the bottom left, and `x`/`y` "
+            "is the **centre** of the box. Both or neither — half a position places nothing.",
+        ),
+    ),
+    Section(
+        AreaSpec,
+        "`spec` of an `area` document",
+        "A labelled box drawn behind the nodes. It says what it contains with `members`, a "
+        "`selector` or an explicit `geometry`, and at least one of the three is required.",
+        notes=(
+            "`members` and `selector` box wherever the elements were drawn, so the zone follows "
+            "them; `geometry` boxes a region of the canvas instead, for a zone that is about "
+            "the paper rather than about devices.",
+            "An area matching nothing is `NG-G004`, a warning: an empty box on a diagram reads "
+            "as a claim that the zone is empty.",
+        ),
+    ),
+    Section(
+        AreaSelector,
+        "`spec.selector`",
+        "Which elements an area contains, said as a query rather than a list — the form that "
+        "does not go stale when a rack gains a switch.",
+        notes=(
+            "Every clause given must match. A selector with no clause at all is refused: it "
+            "would silently box the whole inventory.",
+        ),
+    ),
+    Section(
+        LegendSpec,
+        "`spec` of a `legend` document",
+        "A key: what the colours and the line styles of this drawing mean. Positioned by corner "
+        "rather than by coordinate, because a key belongs at the edge of the paper and should "
+        "stay there when the diagram is laid out again.",
+        notes=(
+            "`auto: layers` builds the entries from what the view actually drew — the node "
+            "kinds present, the media of the links present — which is the only form of key that "
+            "cannot disagree with the picture. It excludes `entries`, and one of the two is "
+            "required.",
+        ),
+    ),
+    Section(
+        LegendEntry,
+        "`spec.entries[]`",
+        "One row of the key: a swatch, and what it means.",
+    ),
 )
 
 #: Enumerations rendered as value tables, with the note that explains them.
@@ -950,6 +1035,15 @@ def _kind_table() -> Iterator[str]:
         f"| `{TEST_SUITE_KIND}` | [TestSuiteSpec]({_MODEL_ANCHORS[TestSuiteSpec]}) | "
         f"{KIND_NOTES[TEST_SUITE_KIND]} |"
     )
+    for kind, spec_model in (
+        (NOTE_KIND, NoteSpec),
+        (AREA_KIND, AreaSpec),
+        (LEGEND_KIND, LegendSpec),
+    ):
+        yield (
+            f"| `{kind}` | [{spec_model.__name__}]({_MODEL_ANCHORS[spec_model]}) | "
+            f"{KIND_NOTES[kind]} |"
+        )
 
 
 def _enum_tables() -> Iterator[str]:

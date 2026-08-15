@@ -38,6 +38,9 @@ the field maps to, with `…` standing for
 | `template` | partial [DeviceSpec](#spec--switch-router-hub-computer-server) | A named partial device spec, merged into every device that names it in `spec.from`. Not an element: never drawn, never listed, never validated on its own. |
 | `layout` | [LayoutSpec](#spec-of-a-layout-document) | Diagram geometry for elements declared elsewhere, scoped by view. Not an element: it carries no network facts and is never drawn as a node. See `netgraph layout`. |
 | `testsuite` | [TestSuiteSpec](#spec-of-a-testsuite-document) | Named assertions about the network the other documents describe, graded by `netgraph test`. Not an element: it declares no device and is never drawn. |
+| `note` | [NoteSpec](#spec-of-a-note-document) | One free-text callout on the diagram, pinned to a point or anchored to an element or a link. Presentational: it declares no network fact and never changes what `validate`, `path`, `export` or `plan` conclude. |
+| `area` | [AreaSpec](#spec-of-an-area-document) | A labelled box drawn behind the nodes, enclosing the elements it names, matches or encircles. The declarative form of `--collapse` grouping: the same set of elements, boxed rather than folded. |
+| `legend` | [LegendSpec](#spec-of-a-legend-document) | A key: what the colours and line styles of the drawing mean, placed by corner rather than by coordinate. `auto: layers` derives the entries from what the view drew. |
 
 ## Document envelope
 
@@ -643,6 +646,100 @@ Named claims about the network the other documents describe. `netgraph test` gra
 * `reachable`, `not-reachable` and `path-shorter-than` take `from` and `to` in the spellings `netgraph path` accepts: an element, `element:interface`, an IP address, or a selector matching several of them.
 * `same-vlan`, `distinct-vlan`, `within-prefix`, `has-interface`, `port-count-at-least`, `unique` and `count` take `select`, in `netgraph render`'s filter vocabulary.
 * `no-single-point-of-failure` takes neither, and optionally narrows the candidates with `select` and the views with `layer`.
+
+## `spec` of a `note` document
+
+One callout on the diagram. Presentational throughout: a note cannot make `netgraph validate` fail, cannot move a hop in `netgraph path`, and never reaches an exported configuration.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `views` | string list | no | `()` | Which drawings the note appears in, by layer name. Empty means every one of them, which is what a remark about the site itself wants; `[l3]` is for a remark that only makes sense once the picture is prefixes rather than cables. | — |
+| `color` | string | no | *unset* | Fill colour, `#rgb` or `#rrggbb`. Absent lets the renderer pick, which is the one presentational decision it is allowed to make for itself. | — |
+| `text` | string, 1–4000 characters | **yes** | — | What the note says, in the markdown subset of §21.1: paragraphs, `**bold**`, `*italic*`, `` `code` `` and `- ` bullets. Anything else is drawn verbatim, because several very different exporters have to agree about the result. | — |
+| `anchor` | [NoteAnchor](#specanchor) | no | *unset* | What the note is about. An anchored note follows what it is anchored to when the diagram is laid out again; a note with only a position does not. | — |
+| `geometry` | [AnnotationGeometry](#specgeometry-of-an-annotation) | no | *unset* | Where the note is drawn, and how big. Required unless `anchor` says what to attach it to; given as well as an anchor, the point wins and the anchor is what the leader points at — which is what dragging an anchored note produces. | — |
+| `leader` | boolean | no | `true` | Draw a line from the note to what it is anchored to. Inert without an `anchor`. | — |
+
+* A note needs somewhere to be: either an `anchor`, or a `geometry` giving `x` and `y`. Both is the shape dragging an anchored note produces — the point places it, the anchor is what the leader line points at.
+* `views` scopes the note to the drawings it makes sense in; empty means all of them. A note naming an element the inventory no longer has is `NG-G001`, a warning, exactly as a stale layout key is.
+
+## `spec.anchor`
+
+What a note is about: one element, or one link. Exactly one of the two, and what makes the note survive the diagram being laid out again.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `element` | element reference | no | *unset* | The element the note is about, by reference. Exactly one of `element` and `link` is written. | — |
+| `link` | element reference | no | *unset* | The cable or tunnel the note is about, by reference. | — |
+
+## `spec.geometry` of an annotation
+
+Where an annotation is drawn and how big it is. Flat rather than §18's nested `position`/`size`, because these four numbers are what a drag and a resize produce.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `x` | number | no | *unset* | Points from the left edge of the drawing to the **centre** of the annotation. Written with `y` or not at all: half a position places nothing. | — |
+| `y` | number | no | *unset* | Points from the bottom edge of the drawing, growing upwards — §18's system, so a dragged note is stored by the machinery that stores a dragged switch. | — |
+| `width` | number, > 0.0 | no | *unset* | Width in points. Omitted lets the text decide, which is what keeps a note legible after it is edited. | — |
+| `height` | number, > 0.0 | no | *unset* | Height in points, omitted for the same reason. | — |
+
+* Coordinates are §18's: points, `y` upwards, origin at the bottom left, and `x`/`y` is the **centre** of the box. Both or neither — half a position places nothing.
+
+## `spec` of an `area` document
+
+A labelled box drawn behind the nodes. It says what it contains with `members`, a `selector` or an explicit `geometry`, and at least one of the three is required.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `views` | string list | no | `()` | Which drawings the area appears in, by layer name. Empty means every one of them. | — |
+| `color` | string | no | *unset* | Fill colour, `#rgb` or `#rrggbb`. The box is drawn behind the nodes, so a pale one is the readable choice. | — |
+| `label` | string | no | *unset* | The caption drawn on the box. Absent draws it unlabelled, which is legitimate for a purely visual grouping. | — |
+| `members` | element reference list, ≤ 1000 entries | no | `()` | The elements the zone encloses, named outright. The box is the hull of wherever they were drawn, so it follows them. | — |
+| `selector` | [AreaSelector](#specselector) | no | *unset* | The elements the zone encloses, said as a query instead of a list — the form that does not go stale when the inventory grows. | — |
+| `geometry` | [AnnotationGeometry](#specgeometry-of-an-annotation) | no | *unset* | An explicit rectangle, for a zone that is a region of the canvas rather than a set of devices: "everything below this line is on the UPS". Needs a position and a size. | — |
+| `border` | `solid` \| `dashed` \| `dotted` \| `none` | no | `dashed` | How the outline is drawn. `dashed` by default because a zone is a convention rather than a cable, and a solid box reads as a real container. | — |
+| `padding` | number, 0.0–400.0 | no | `16.0` | Space in points between the hull of the members and the box drawn round them. Ignored when `geometry` gives the rectangle outright. | — |
+
+* `members` and `selector` box wherever the elements were drawn, so the zone follows them; `geometry` boxes a region of the canvas instead, for a zone that is about the paper rather than about devices.
+* An area matching nothing is `NG-G004`, a warning: an empty box on a diagram reads as a claim that the zone is empty.
+
+## `spec.selector`
+
+Which elements an area contains, said as a query rather than a list — the form that does not go stale when a rack gains a switch.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `namespace` | string | no | *unset* | A namespace prefix: `sites/hq` matches `sites/hq` and everything under it. At least one clause is required — an empty selector would box the whole inventory. | — |
+| `labels` | map string → string | no | `{}` | Every one of these labels must be present with this value. Combined with the other clauses by and, never by or. | — |
+| `kinds` | string list | no | `()` | Element kinds, for a zone that is about a class of thing rather than a place. | — |
+
+* Every clause given must match. A selector with no clause at all is refused: it would silently box the whole inventory.
+
+## `spec` of a `legend` document
+
+A key: what the colours and the line styles of this drawing mean. Positioned by corner rather than by coordinate, because a key belongs at the edge of the paper and should stay there when the diagram is laid out again.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `views` | string list | no | `()` | Which drawings the key appears in, by layer name. Empty means every one of them. | — |
+| `color` | string | no | *unset* | Background of the key box, `#rgb` or `#rrggbb`. | — |
+| `title` | string | no | *unset* | Heading of the key. Absent draws the swatches on their own. | — |
+| `corner` | `top-left` \| `top-right` \| `bottom-left` \| `bottom-right` | no | `bottom-right` | Which corner of the drawing the key sits in. A corner rather than a coordinate, so it stays at the edge of the paper when the diagram is laid out again. | — |
+| `auto` | `layers` | no | *unset* | `layers` builds the entries from what the view actually drew — the node kinds and link media present — which is the only form of key that cannot go stale. Exclusive with `entries`. | — |
+| `entries` | [LegendEntry](#specentries) list, ≤ 64 entries | no | `()` | The rows, written out. Required unless `auto` derives them; a key nobody can read is not a key, so there is a ceiling on how many there may be. | — |
+
+* `auto: layers` builds the entries from what the view actually drew — the node kinds present, the media of the links present — which is the only form of key that cannot disagree with the picture. It excludes `entries`, and one of the two is required.
+
+## `spec.entries[]`
+
+One row of the key: a swatch, and what it means.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `label` | string, 1–200 characters | **yes** | — | What this swatch means, in the reader's words. | — |
+| `color` | string | no | *unset* | Colour of the swatch. Absent takes the renderer's colour for whatever the row is about. | — |
+| `shape` | `box` \| `line` \| `dashed` \| `dotted` \| `ellipse` | no | `box` | What the swatch is drawn as. A line style says the row is about links; a box says it is about nodes. | — |
+| `description` | string | no | *unset* | A second line, for the row that needs one. | — |
 
 ## Enumerations
 

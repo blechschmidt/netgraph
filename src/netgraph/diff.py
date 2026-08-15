@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from netgraph.plan.address import LAYOUT_TYPE
+from netgraph.plan.address import SIDECAR_TYPES
 from netgraph.plan.model import Action, Plan
 from netgraph.render.diffview import DiffOverlay, diff_overlay, union_graph
 from netgraph.render.graph import Graph
@@ -80,13 +80,16 @@ def updated_fields(plan: Plan) -> dict[str, tuple[str, ...]]:
     Keyed by fully-qualified name rather than by :class:`address
     <netgraph.plan.address.Address>`, because that is what a drawing keys
     things by and an inventory cannot hold two elements under one name.
-    ``layout`` documents are left out: a coordinate is not a fact about the
-    network, and marking a node amber because it was dragged would say the
-    device changed.
+    Every sidecar is left out — ``layout`` and the three annotation kinds of
+    §21. A coordinate is not a fact about the network, and neither is a callout:
+    marking a node amber because it was dragged would say the device changed,
+    and so would marking it amber because somebody reworded a note that happens
+    to share its name. An annotation is barred from changing what the tool
+    concludes, and a diff is one of the things it concludes.
     """
     updated: dict[str, tuple[str, ...]] = {}
     for change in plan:
-        if change.address.type == LAYOUT_TYPE:
+        if change.address.type in SIDECAR_TYPES:
             continue
         if change.action not in (Action.UPDATE, Action.RENAME):
             continue
@@ -104,11 +107,15 @@ def renamed_addresses(plan: Plan) -> dict[str, str]:
     device, red under its old name and green under its new one. Handing the map
     to :func:`~netgraph.render.diffview.union_graph` collapses the pair into one
     amber box that says where it came from.
+
+    Sidecars are skipped for the reason :func:`updated_fields` skips them: a
+    renamed arrangement or a renamed note is not a renamed device, and a note
+    may legitimately be called what a device is called.
     """
     return {
         change.address.fqn: change.new_address.fqn
         for change in plan
         if change.action is Action.RENAME
         and change.new_address is not None
-        and change.address.type != LAYOUT_TYPE
+        and change.address.type not in SIDECAR_TYPES
     }

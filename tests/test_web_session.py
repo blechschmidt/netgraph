@@ -34,7 +34,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import pytest
 from click.testing import CliRunner
@@ -319,6 +319,216 @@ def test_an_unknown_operation_is_a_request_error(session: EditingSession) -> Non
 
 
 # --------------------------------------------------------------------------- #
+# Annotations (§21)
+# --------------------------------------------------------------------------- #
+
+#: What the canvas writes when somebody drops a note on it: a callout at a point,
+#: with the placeholder text the inline editor opens on.
+A_NOTE: Final[dict[str, Any]] = {
+    "op": "create-annotation",
+    "kind": "note",
+    "name": "note-1",
+    "namespace": "",
+    "spec": {"text": "New note", "geometry": {"x": 40.0, "y": 90.0}},
+}
+
+
+def annotations_file(session: EditingSession) -> Path:
+    """Where placement puts the three annotation kinds; see edit/placement.py."""
+    return session.root / "annotations.yaml"
+
+
+def test_a_note_dropped_on_the_canvas_becomes_a_document(session: EditingSession) -> None:
+    change = session.apply([A_NOTE], revision=session.revision)
+    text = annotations_file(session).read_text(encoding="utf-8")
+    assert "kind: note" in text
+    assert "name: note-1" in text
+    assert "New note" in text
+    assert change.applied[0]["operation"]["op"] == "create-annotation"
+    session.undo()
+    assert not annotations_file(session).exists(), "the file went with the last document in it"
+
+
+def test_dragging_an_unplaced_note_writes_the_whole_geometry_block(
+    session: EditingSession,
+) -> None:
+    """One write, not two, and the reason is NG-G005.
+
+    A note anchored to a switch pins no point. Writing ``spec.geometry.x`` onto
+    it would leave a position with no ``y`` -- which §21 refuses -- so the first
+    drag has to send the block whole. See ``SetAnnotation``'s docstring and
+    ``netgraph/drawio/reconcile.py``, which writes the same gesture the same way.
+    """
+    session.apply(
+        [
+            {
+                "op": "create-annotation",
+                "kind": "note",
+                "name": "about-the-switch",
+                "spec": {"text": "the noisy one", "anchor": {"element": "switches/sw-home"}},
+            }
+        ],
+        revision=session.revision,
+    )
+    session.apply(
+        [
+            {
+                "op": "set-annotation",
+                "kind": "note",
+                "name": "about-the-switch",
+                "path": "spec.geometry",
+                "value": {"x": 120.0, "y": -40.0},
+            }
+        ],
+        revision=session.revision,
+    )
+    text = annotations_file(session).read_text(encoding="utf-8")
+    assert "x: 120.0" in text and "y: -40.0" in text
+    assert "element: switches/sw-home" in text, "the anchor survives being dragged"
+
+
+def test_a_leaf_at_a_time_drag_onto_a_missing_block_is_refused(
+    session: EditingSession,
+) -> None:
+    """The other half of the rule above, asserted rather than assumed.
+
+    If this ever stopped being true the canvas could go back to writing a
+    coordinate at a time; while it is true, the whole-block write is not an
+    optimisation but the only spelling that lands.
+    """
+    session.apply(
+        [
+            {
+                "op": "create-annotation",
+                "kind": "note",
+                "name": "about-the-switch",
+                "spec": {"text": "the noisy one", "anchor": {"element": "switches/sw-home"}},
+            }
+        ],
+        revision=session.revision,
+    )
+    with pytest.raises((EditError, ValidationRefused)):
+        session.apply(
+            [
+                {
+                    "op": "set-annotation",
+                    "kind": "note",
+                    "name": "about-the-switch",
+                    "path": "spec.geometry.x",
+                    "value": 120.0,
+                }
+            ],
+            revision=session.revision,
+        )
+
+
+def test_a_placed_note_is_dragged_a_field_at_a_time_and_undone_as_one(
+    session: EditingSession,
+) -> None:
+    """One gesture, one batch, one Ctrl-Z -- which is why the canvas posts both
+    coordinates together rather than a request per axis."""
+    session.apply([A_NOTE], revision=session.revision)
+    before = annotations_file(session).read_text(encoding="utf-8")
+    session.apply(
+        [
+            {
+                "op": "set-annotation",
+                "kind": "note",
+                "name": "note-1",
+                "path": "spec.geometry.x",
+                "value": 300.0,
+            },
+            {
+                "op": "set-annotation",
+                "kind": "note",
+                "name": "note-1",
+                "path": "spec.geometry.y",
+                "value": 220.0,
+            },
+        ],
+        revision=session.revision,
+    )
+    moved = annotations_file(session).read_text(encoding="utf-8")
+    assert "x: 300.0" in moved and "y: 220.0" in moved
+    session.undo()
+    assert annotations_file(session).read_text(encoding="utf-8") == before
+
+
+def test_retyping_a_note_rewrites_only_its_text(session: EditingSession) -> None:
+    session.apply([A_NOTE], revision=session.revision)
+    session.apply(
+        [
+            {
+                "op": "set-annotation",
+                "kind": "note",
+                "name": "note-1",
+                "path": "spec.text",
+                "value": "Two lines\nof it",
+            }
+        ],
+        revision=session.revision,
+    )
+    text = annotations_file(session).read_text(encoding="utf-8")
+    assert "Two lines" in text and "of it" in text
+    assert "New note" not in text
+    assert "x: 40.0" in text, "the position is untouched by a retype"
+
+
+def test_deleting_an_annotation_takes_nothing_with_it(session: EditingSession) -> None:
+    """No cascade, and there never will be one: nothing refers to an annotation."""
+    session.apply(
+        [
+            A_NOTE,
+            {
+                "op": "create-annotation",
+                "kind": "area",
+                "name": "the-rack",
+                "spec": {"label": "The rack", "members": ["switches/sw-home"]},
+            },
+        ],
+        revision=session.revision,
+    )
+    session.apply(
+        [{"op": "delete-annotation", "kind": "note", "name": "note-1"}],
+        revision=session.revision,
+    )
+    text = annotations_file(session).read_text(encoding="utf-8")
+    assert "name: note-1" not in text
+    assert "name: the-rack" in text, "its neighbour in the file is untouched"
+    assert (session.root / "switches" / "sw-home.yaml").exists()
+
+
+def test_an_area_dragged_off_its_members_carries_its_extent(session: EditingSession) -> None:
+    """A zone with a position and no size is drawn round its members again, so a
+    drag that did not send the extent would silently spring back."""
+    session.apply(
+        [
+            {
+                "op": "create-annotation",
+                "kind": "area",
+                "name": "the-rack",
+                "spec": {"label": "The rack", "members": ["switches/sw-home"]},
+            }
+        ],
+        revision=session.revision,
+    )
+    session.apply(
+        [
+            {
+                "op": "set-annotation",
+                "kind": "area",
+                "name": "the-rack",
+                "path": "spec.geometry",
+                "value": {"x": 10.0, "y": 20.0, "width": 300.0, "height": 200.0},
+            }
+        ],
+        revision=session.revision,
+    )
+    text = annotations_file(session).read_text(encoding="utf-8")
+    assert "width: 300.0" in text and "height: 200.0" in text
+
+
+# --------------------------------------------------------------------------- #
 # History
 # --------------------------------------------------------------------------- #
 
@@ -486,6 +696,35 @@ def test_the_api_draws_the_view_it_is_asked_for(served: str) -> None:
     assert body["status"] == "ok"
     assert body["svg"].startswith("<svg")
     assert body["revision"] >= 1
+
+
+@requires_dot
+def test_the_graph_route_carries_the_annotations_and_the_query_turns_them_off(
+    served: str, tree: Path
+) -> None:
+    """The canvas drags what this payload says is there, so the route has to say.
+
+    ``?annotations=0`` is spelled the way every other view toggle is, so a link
+    to a plainer picture is one somebody can type into an address bar.
+    """
+    (tree / "annotations.yaml").write_text(
+        "apiVersion: netgraph.dev/v1alpha1\n"
+        "kind: note\n"
+        "metadata:\n"
+        "  name: why-here\n"
+        "spec:\n"
+        "  text: because\n"
+        "  geometry: {x: 40, y: 90}\n",
+        encoding="utf-8",
+    )
+    status, body = call(served, "/api/graph?view=l1")
+    assert status == 200
+    assert [note["fqn"] for note in body["annotations"]["notes"]] == ["why-here"]
+
+    status, plain = call(served, "/api/graph?view=l1&annotations=0")
+    assert status == 200
+    assert plain["annotations"] is None
+    assert plain["graphHash"] != body["graphHash"]
 
 
 def test_a_request_path_never_becomes_a_file_name(served: str) -> None:

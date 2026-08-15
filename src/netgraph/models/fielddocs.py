@@ -24,6 +24,15 @@ from dataclasses import dataclass
 from typing import Final
 
 from netgraph.models.adapter import AdapterSpec, UpstreamPort
+from netgraph.models.annotation import (
+    AnnotationGeometry,
+    AreaSelector,
+    AreaSpec,
+    LegendEntry,
+    LegendSpec,
+    NoteAnchor,
+    NoteSpec,
+)
 from netgraph.models.base import NetgraphModel
 from netgraph.models.cable import CableSpec, InterfaceRef
 from netgraph.models.device import BridgeConfig, DeviceSpec, Forwarding, VlanDefinition
@@ -135,6 +144,13 @@ DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
     Size,
     TestSuiteSpec,
     Assertion,
+    NoteSpec,
+    NoteAnchor,
+    AnnotationGeometry,
+    AreaSpec,
+    AreaSelector,
+    LegendSpec,
+    LegendEntry,
 )
 
 #: What distinguishes one ``kind`` from the next, one sentence each.
@@ -164,6 +180,14 @@ KIND_NOTES: Final[dict[str, str]] = {
     "element: it carries no network facts and is never drawn as a node. See `netgraph layout`.",
     "testsuite": "Named assertions about the network the other documents describe, graded by "
     "`netgraph test`. Not an element: it declares no device and is never drawn.",
+    "note": "One free-text callout on the diagram, pinned to a point or anchored to an element "
+    "or a link. Presentational: it declares no network fact and never changes what `validate`, "
+    "`path`, `export` or `plan` conclude.",
+    "area": "A labelled box drawn behind the nodes, enclosing the elements it names, matches or "
+    "encircles. The declarative form of `--collapse` grouping: the same set of elements, boxed "
+    "rather than folded.",
+    "legend": "A key: what the colours and line styles of the drawing mean, placed by corner "
+    "rather than by coordinate. `auto: layers` derives the entries from what the view drew.",
 }
 
 #: One entry per ``(model name, field name)``. Checked for exact coverage.
@@ -1007,6 +1031,120 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "`no-single-point-of-failure`: ignore a candidate that isolates fewer endpoints than "
         "this. 1, the default, reports every one of them."
     ),
+    # -- annotations (§21) -------------------------------------------------
+    ("NoteSpec", "views"): Doc(
+        "Which drawings the note appears in, by layer name. Empty means every one of them, "
+        "which is what a remark about the site itself wants; `[l3]` is for a remark that only "
+        "makes sense once the picture is prefixes rather than cables."
+    ),
+    ("NoteSpec", "color"): Doc(
+        "Fill colour, `#rgb` or `#rrggbb`. Absent lets the renderer pick, which is the one "
+        "presentational decision it is allowed to make for itself."
+    ),
+    ("NoteSpec", "text"): Doc(
+        "What the note says, in the markdown subset of §21.1: paragraphs, `**bold**`, "
+        "`*italic*`, `` `code` `` and `- ` bullets. Anything else is drawn verbatim, because "
+        "several very different exporters have to agree about the result."
+    ),
+    ("NoteSpec", "anchor"): Doc(
+        "What the note is about. An anchored note follows what it is anchored to when the "
+        "diagram is laid out again; a note with only a position does not."
+    ),
+    ("NoteSpec", "geometry"): Doc(
+        "Where the note is drawn, and how big. Required unless `anchor` says what to attach it "
+        "to; given as well as an anchor, the point wins and the anchor is what the leader points "
+        "at — which is what dragging an anchored note produces."
+    ),
+    ("NoteSpec", "leader"): Doc(
+        "Draw a line from the note to what it is anchored to. Inert without an `anchor`."
+    ),
+    ("NoteAnchor", "element"): Doc(
+        "The element the note is about, by reference. Exactly one of `element` and `link` is "
+        "written."
+    ),
+    ("NoteAnchor", "link"): Doc("The cable or tunnel the note is about, by reference."),
+    ("AnnotationGeometry", "x"): Doc(
+        "Points from the left edge of the drawing to the **centre** of the annotation. Written "
+        "with `y` or not at all: half a position places nothing."
+    ),
+    ("AnnotationGeometry", "y"): Doc(
+        "Points from the bottom edge of the drawing, growing upwards — §18's system, so a "
+        "dragged note is stored by the machinery that stores a dragged switch."
+    ),
+    ("AnnotationGeometry", "width"): Doc(
+        "Width in points. Omitted lets the text decide, which is what keeps a note legible "
+        "after it is edited."
+    ),
+    ("AnnotationGeometry", "height"): Doc("Height in points, omitted for the same reason."),
+    ("AreaSpec", "views"): Doc(
+        "Which drawings the area appears in, by layer name. Empty means every one of them."
+    ),
+    ("AreaSpec", "color"): Doc(
+        "Fill colour, `#rgb` or `#rrggbb`. The box is drawn behind the nodes, so a pale one is "
+        "the readable choice."
+    ),
+    ("AreaSpec", "label"): Doc(
+        "The caption drawn on the box. Absent draws it unlabelled, which is legitimate for a "
+        "purely visual grouping."
+    ),
+    ("AreaSpec", "members"): Doc(
+        "The elements the zone encloses, named outright. The box is the hull of wherever they "
+        "were drawn, so it follows them."
+    ),
+    ("AreaSpec", "selector"): Doc(
+        "The elements the zone encloses, said as a query instead of a list — the form that does "
+        "not go stale when the inventory grows."
+    ),
+    ("AreaSpec", "geometry"): Doc(
+        "An explicit rectangle, for a zone that is a region of the canvas rather than a set of "
+        'devices: "everything below this line is on the UPS". Needs a position and a size.'
+    ),
+    ("AreaSpec", "border"): Doc(
+        "How the outline is drawn. `dashed` by default because a zone is a convention rather "
+        "than a cable, and a solid box reads as a real container."
+    ),
+    ("AreaSpec", "padding"): Doc(
+        "Space in points between the hull of the members and the box drawn round them. Ignored "
+        "when `geometry` gives the rectangle outright."
+    ),
+    ("AreaSelector", "namespace"): Doc(
+        "A namespace prefix: `sites/hq` matches `sites/hq` and everything under it. At least one "
+        "clause is required — an empty selector would box the whole inventory."
+    ),
+    ("AreaSelector", "labels"): Doc(
+        "Every one of these labels must be present with this value. Combined with the other "
+        "clauses by and, never by or."
+    ),
+    ("AreaSelector", "kinds"): Doc(
+        "Element kinds, for a zone that is about a class of thing rather than a place."
+    ),
+    ("LegendSpec", "views"): Doc(
+        "Which drawings the key appears in, by layer name. Empty means every one of them."
+    ),
+    ("LegendSpec", "color"): Doc("Background of the key box, `#rgb` or `#rrggbb`."),
+    ("LegendSpec", "title"): Doc("Heading of the key. Absent draws the swatches on their own."),
+    ("LegendSpec", "corner"): Doc(
+        "Which corner of the drawing the key sits in. A corner rather than a coordinate, so it "
+        "stays at the edge of the paper when the diagram is laid out again."
+    ),
+    ("LegendSpec", "auto"): Doc(
+        "`layers` builds the entries from what the view actually drew — the node kinds and link "
+        "media present — which is the only form of key that cannot go stale. Exclusive with "
+        "`entries`."
+    ),
+    ("LegendSpec", "entries"): Doc(
+        "The rows, written out. Required unless `auto` derives them; a key nobody can read is "
+        "not a key, so there is a ceiling on how many there may be."
+    ),
+    ("LegendEntry", "label"): Doc("What this swatch means, in the reader's words."),
+    ("LegendEntry", "color"): Doc(
+        "Colour of the swatch. Absent takes the renderer's colour for whatever the row is about."
+    ),
+    ("LegendEntry", "shape"): Doc(
+        "What the swatch is drawn as. A line style says the row is about links; a box says it "
+        "is about nodes."
+    ),
+    ("LegendEntry", "description"): Doc("A second line, for the row that needs one."),
 }
 
 

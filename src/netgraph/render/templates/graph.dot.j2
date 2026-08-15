@@ -28,7 +28,16 @@
   goes in it is never free-form: an icon file is named ``<kind>.<extension>``
   for a kind from a closed set, and the directory it lives in is kept out of
   the label entirely, in the ``imagepath`` graph attribute, where it is a DOT
-  string like any other.
+  string like any other. A legend swatch's ``BGCOLOR`` is the second, and it
+  is the same sort of value: a hex colour that
+  ``netgraph.render.annotations`` has re-checked against ``#rgb``/``#rrggbb``
+  on the way through, whatever the schema already promised.
+
+  The one interpolation that is *deliberately* not escaped is a note's
+  ``line.html``: the emphasis of §21.1 is markup (``<B>``, ``<I>``, ``<FONT>``)
+  wrapped around text that must not be, which is a distinction autoescaping
+  cannot make for a single value, so ``netgraph.render.dot._note_markup``
+  escapes the text itself and hands back Markup.
 -#}
 {% macro node_block(node, pad) %}
 {{ pad }}{{ node.id | dot_string }} [{% if node.element_id %}id={{ node.element_id | dot_string }}, {% endif %}shape={{ node.shape }}, fillcolor="{{ node.fill }}", color="{{ node.stroke }}"{% if node.style is not none %}, style="{{ node.style }}"{% endif %}{% if node.pos %}, pos={{ node.pos | dot_string }}{% endif %}{% if node.penwidth %}, penwidth={{ node.penwidth }}{% endif %}{% if node.fontcolor %}, fontcolor="{{ node.fontcolor }}"{% endif %}{% if node.tooltip %}, tooltip={{ node.tooltip | dot_string }}{% endif %}{% if node.url %}, URL={{ node.url | dot_string }}{% endif %}, label=<
@@ -77,9 +86,31 @@ graph netgraph {
 {% if frames %}
 
 {% for frame in frames %}
-  {{ frame.id | dot_string }} [shape=plaintext, style="", fillcolor="none", fontcolor="{{ frame_color }}", fontsize={{ frame_font_size }}, margin=0, pos={{ frame.caption | dot_string }}, label={{ frame.label | dot_string }}];
+  {{ frame.id | dot_string }} [shape=plaintext, style="", fillcolor="none", fontcolor="{{ frame.color }}", fontsize={{ frame_font_size }}, margin=0, pos={{ frame.caption | dot_string }}, label={{ frame.label | dot_string }}];
 {% endfor %}
 {% endif %}
+{% for area in areas %}
+
+  subgraph {{ area.id }} {
+{% if area.element_id %}
+    id={{ area.element_id | dot_string }};
+{% endif %}
+    label={{ area.label | dot_string }};
+    style="{{ area.style }}";
+    color="{{ area.stroke }}";
+    fillcolor="{{ area.fill }}";
+    fontcolor="{{ area.stroke }}";
+    fontsize={{ frame_font_size }};
+{% if area.penwidth %}
+    penwidth={{ area.penwidth }};
+{% endif %}
+    labeljust=l;
+    margin=12;
+{% for node in area.nodes %}
+{{ node_block(node, "    ") }}
+{% endfor %}
+  }
+{% endfor %}
 {% for group in groups %}
 
 {% if group.id %}
@@ -107,10 +138,46 @@ graph netgraph {
 {% endfor %}
 {% endif %}
 {% endfor %}
+{% if notes %}
+
+{% for note in notes %}
+  {{ note.id | dot_string }} [{% if note.element_id %}id={{ note.element_id | dot_string }}, {% endif %}shape=note, style=filled, fillcolor="{{ note.fill }}", color="{{ note.stroke }}"{% if note.pos %}, pos={{ note.pos | dot_string }}{% endif %}, label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+{% for line in note.lines %}
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">{% if line.bullet %}&#8226; {% endif %}{{ line.html }}</TD></TR>
+{% endfor %}
+    </TABLE>
+  >];
+{% endfor %}
+{% endif %}
+{% for legend in legends %}
+
+  subgraph {{ legend.id }} {
+{% if legend.element_id %}
+    id={{ legend.element_id | dot_string }};
+{% endif %}
+    style=rounded;
+    color="{{ legend.stroke }}";
+    fontcolor="{{ legend.stroke }}";
+    fontsize={{ frame_font_size }};
+    labeljust=l;
+    margin=8;
+    {{ legend.node | dot_string }} [shape=plaintext, style="", fillcolor="none"{% if legend.pos %}, pos={{ legend.pos | dot_string }}{% endif %}, label=<
+      <TABLE BORDER="{{ legend.border }}" COLOR="{{ legend.stroke }}" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="{{ legend.fill }}">
+{% if legend.title %}
+      <TR><TD COLSPAN="2" ALIGN="LEFT"><B>{{ legend.title }}</B></TD></TR>
+{% endif %}
+{% for row in legend.rows %}
+      <TR><TD FIXEDSIZE="TRUE" WIDTH="20" HEIGHT="{{ row.height }}" BGCOLOR="{{ row.color }}"></TD><TD ALIGN="LEFT">{{ row.label }}{% if row.description %} — {{ row.description }}{% endif %}</TD></TR>
+{% endfor %}
+      </TABLE>
+    >];
+  }
+{% endfor %}
 {% if edges %}
 
 {% for edge in edges %}
-  {{ edge.source | dot_string }} -- {{ edge.target | dot_string }} [{% if edge.element_id %}id={{ edge.element_id | dot_string }}, {% endif %}color="{{ edge.color }}", style={{ edge.style }}{% if edge.penwidth %}, penwidth={{ edge.penwidth }}{% endif %}{% if edge.weight %}, weight={{ edge.weight }}{% endif %}{% if edge.pos %}, pos={{ edge.pos | dot_string }}{% endif %}{% if edge.lp %}, lp={{ edge.lp | dot_string }}{% endif %}{% if edge.fontcolor %}, fontcolor="{{ edge.fontcolor }}"{% endif %}{% if edge.label %}, label={{ edge.label | dot_string }}{% endif %}{% if edge.xlabel %}, xlabel={{ edge.xlabel | dot_string }}{% endif %}{% if edge.tooltip %}, tooltip={{ edge.tooltip | dot_string }}{% endif %}{% if edge.url %}, URL={{ edge.url | dot_string }}{% endif %}];
+  {{ edge.source | dot_string }} -- {{ edge.target | dot_string }} [{% if edge.element_id %}id={{ edge.element_id | dot_string }}, {% endif %}color="{{ edge.color }}", style={{ edge.style }}{% if edge.penwidth %}, penwidth={{ edge.penwidth }}{% endif %}{% if edge.weight %}, weight={{ edge.weight }}{% endif %}{% if edge.pos %}, pos={{ edge.pos | dot_string }}{% endif %}{% if edge.lp %}, lp={{ edge.lp | dot_string }}{% endif %}{% if edge.fontcolor %}, fontcolor="{{ edge.fontcolor }}"{% endif %}{% if edge.label %}, label={{ edge.label | dot_string }}{% endif %}{% if edge.xlabel %}, xlabel={{ edge.xlabel | dot_string }}{% endif %}{% if edge.tooltip %}, tooltip={{ edge.tooltip | dot_string }}{% endif %}{% if edge.url %}, URL={{ edge.url | dot_string }}{% endif %}{% if edge.arrowhead %}, arrowhead={{ edge.arrowhead }}{% endif %}{% if edge.constraint %}, constraint={{ edge.constraint }}{% endif %}];
 {% endfor %}
 {% endif %}
 }

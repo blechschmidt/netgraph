@@ -272,6 +272,97 @@ def test_a_missing_graphviz_is_reported_rather_than_raised(monkeypatch: Any) -> 
 
 
 # --------------------------------------------------------------------------- #
+# Annotations (§21)
+# --------------------------------------------------------------------------- #
+
+#: Two hosts and something written on the drawing about them: a note pinned to a
+#: point, a zone that follows its members, and a generated key.
+ANNOTATED = """\
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: note
+metadata:
+  name: why-here
+spec:
+  text: |
+    **Two** of them, on purpose.
+  geometry: {x: 40, y: 90, width: 200, height: 60}
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: area
+metadata:
+  name: the-pair
+spec:
+  label: The pair
+  members: [pc-a, pc-b]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: legend
+metadata:
+  name: key
+spec:
+  title: Key
+  auto: layers
+"""
+
+
+@requires_dot
+def test_the_preview_publishes_the_annotations_it_drew() -> None:
+    """The browser cannot read them off the SVG, so the answer carries them.
+
+    An area in an arranged drawing is a rectangle in the graph's background with
+    no id on it at all, so a canvas that hit-tested the DOM would find notes and
+    silently nothing else. This payload is the same one
+    ``netgraph render -f json`` publishes: id, document, geometry, members.
+    """
+    preview = render_source(TWO_HOSTS + ANNOTATED)
+    payload = preview.to_dict()["annotations"]
+    assert [note["id"] for note in payload["notes"]] == ["note-why-here"]
+    assert payload["notes"][0]["fqn"] == "why-here"
+    assert payload["notes"][0]["layout"] == {
+        "position": {"x": 40.0, "y": 90.0},
+        "size": {"width": 200.0, "height": 60.0},
+    }
+    assert payload["areas"][0]["members"] == ["pc-a", "pc-b"]
+    # The zone follows its members, so it pins no rectangle -- which is exactly
+    # what tells the canvas to refuse to drag it rather than to offer handles.
+    assert "layout" not in payload["areas"][0]
+    assert payload["legends"][0]["entries"], "a generated key arrives generated"
+
+
+@requires_dot
+def test_an_inventory_with_nothing_written_on_it_publishes_nothing() -> None:
+    assert render_source(TWO_HOSTS).to_dict()["annotations"] is None
+
+
+@requires_dot
+def test_the_annotation_toggle_takes_them_out_of_the_picture_and_the_payload() -> None:
+    """And moves the fingerprint, so the browser's cache cannot serve the wrong one.
+
+    The other view toggles behave this way and the cache is keyed on the request,
+    so a toggle that did not reach the digest would show the annotated drawing
+    under an unannotated request until something else moved.
+    """
+    on = render_source(TWO_HOSTS + ANNOTATED)
+    off = render_source(TWO_HOSTS + ANNOTATED, ViewOptions(annotations=False))
+    assert on.to_dict()["annotations"] is not None
+    assert off.to_dict()["annotations"] is None
+    assert on.graph_hash != off.graph_hash
+    assert on.svg is not None and off.svg is not None
+    assert "note-why-here" in on.svg
+    assert "note-why-here" not in off.svg
+    # It is commentary, never topology: the same graph is drawn either way.
+    assert (on.nodes, on.edges) == (off.nodes, off.edges)
+
+
+def test_the_page_offers_the_annotation_toggle() -> None:
+    """A rendering knob the server takes and the page cannot ask for is a knob
+    nobody finds."""
+    page = asset("index.html").decode("utf-8")
+    assert 'id="show-annotations"' in page
+
+
+# --------------------------------------------------------------------------- #
 # The info-box records
 # --------------------------------------------------------------------------- #
 
@@ -402,6 +493,7 @@ def test_a_request_may_set_every_option_the_page_offers() -> None:
             "kinds": ["switch"],
             "show_ips": False,
             "show_vlans": False,
+            "annotations": False,
             "group_by_namespace": True,
             "strict": True,
             "title": "office",
@@ -412,6 +504,8 @@ def test_a_request_may_set_every_option_the_page_offers() -> None:
     assert view.kinds == ("switch",)
     assert not view.show_ips
     assert not view.show_vlans
+    assert not view.annotations
+    assert not view.render_options.annotations
     assert view.group_by_namespace
     assert view.strict
     assert view.title == "office"

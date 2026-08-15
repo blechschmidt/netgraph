@@ -69,6 +69,29 @@ gets its icons embedded as ``data:`` URIs on the way out
 (:func:`_embed_icons`), which is what makes ``netgraph render -f svg`` still
 produce one self-contained file.
 
+Annotations
+-----------
+
+The notes, areas and legends of §21 are drawn from
+:func:`~netgraph.render.annotations.annotation_views`, which resolves them once
+for every backend. Two of the three are drawn differently depending on who is
+laying the graph out, and that is forced rather than chosen — ``neato -n2``, the
+engine that reproduces a stored arrangement, draws no clusters at all:
+
+* an **area** is a ``subgraph cluster_area_N`` under an automatic layout and a
+  rectangle in the graph's ``_background`` under a fixed one, exactly as a
+  namespace frame is. A node is drawn inside at most one box, and an explicit
+  area outranks both the layer's own clustering and ``--group-by-namespace``;
+  see :func:`_area_groups` for the whole precedence rule.
+* a **note** is an ordinary node with ``shape=note``, so it is laid out with the
+  graph rather than floated over it, and its leader line is an edge with
+  ``constraint=false`` — a callout must not be able to move what it comments on.
+* a **legend** is a ``subgraph cluster_legend_N`` holding one ``plaintext``
+  table of swatches. Its ``corner`` is honoured only in a fixed drawing;
+  under an automatic layout Graphviz places it, because nothing in Graphviz
+  pins a cluster to a corner and the tricks that come close distort the
+  topology. :func:`_legend_views` says so at length.
+
 Determinism is a hard requirement: the same inventory must produce
 byte-identical DOT on every run, or golden-file tests and version control become
 useless. Nothing here iterates a set without sorting it.
@@ -81,11 +104,10 @@ import os
 import re
 import shutil
 import subprocess
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Container, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from pathlib import Path
-from types import MappingProxyType
 from typing import Final
 
 from jinja2 import Environment, PackageLoader, StrictUndefined
@@ -110,7 +132,17 @@ from netgraph.layout.routing import Route, label_position
 from netgraph.loader.inventory import namespace_of, short_name
 from netgraph.models import format_watts
 from netgraph.power import PowerNode
-from netgraph.render.aggregate import AGGREGATE_KIND, AggregateView
+from netgraph.render.aggregate import AggregateView
+from netgraph.render.annotations import (
+    AnnotationViews,
+    AreaView,
+    LegendSwatch,
+    LegendView,
+    NoteView,
+    Span,
+    annotation_views,
+    member_hull,
+)
 from netgraph.render.details import (
     build_details,
     detail_text,
@@ -120,13 +152,6 @@ from netgraph.render.details import (
 )
 from netgraph.render.diffview import Mark
 from netgraph.render.graph import (
-    GROUP_KIND,
-    PATCHPANEL_KIND,
-    PDU_KIND,
-    RACK_KIND,
-    SUBNET_KIND,
-    TUNNEL_KIND,
-    USER_KIND,
     Edge,
     EdgeKind,
     Graph,
@@ -142,6 +167,18 @@ from netgraph.render.icons import IconTheme, suffix_order
 from netgraph.render.ids import ElementIds, element_ids
 from netgraph.render.links import Linker
 from netgraph.render.options import DEFAULT_RANKDIR, RenderOptions
+from netgraph.render.palette import (
+    CLUSTER_FONT_SIZE,
+    CLUSTER_LABEL_COLOUR,
+    CLUSTER_PALETTE,
+    CLUSTER_STROKE,
+    DEFAULT_EDGE_PALETTE,
+    DEFAULT_NODE_PALETTE,
+    EDGE_PALETTE,
+    NODE_PALETTE,
+    edge_style_for,
+    node_style_for,
+)
 from netgraph.render.routes import anchors_of, default_routing, route_table
 
 __all__ = [
@@ -195,17 +232,30 @@ DOT_ENV_VAR: Final = "NETGRAPH_DOT"
 NOOP_ENGINE: Final = "neato"
 
 
-#: The cluster frame netgraph draws itself when the layout engine will not.
-#: The three colours match what ``graph.dot.j2`` sets on a ``subgraph cluster``,
-#: because the two are alternative ways of drawing the same frame and a diagram
-#: must not change appearance when it becomes fixed.
-_CLUSTER_STROKE: Final = "#9ca3af"
-_CLUSTER_LABEL_COLOUR: Final = "#4b5563"
-_CLUSTER_FONT: Final = "Helvetica,Arial,sans-serif"
-_CLUSTER_FONT_SIZE: Final = 11
 #: Prefix of the node id a frame's caption is emitted under. A colon cannot
 #: appear in an element name, so it can never collide with one.
 _FRAME_ID_PREFIX: Final = "cluster-label:"
+
+#: Prefix of the DOT node id an annotation is emitted under (§21). A colon again:
+#: a note is a node in the document, and it must not be possible for a device
+#: called ``note-why-orange`` to collide with the note called ``why-orange``.
+_ANNOTATION_ID_PREFIX: Final = "annotation:"
+
+#: Where an anchored note that pins no position of its own is drawn in a fixed
+#: arrangement, relative to the centre of what it is anchored to: up and to the
+#: right, which is where a hand-drawn callout goes and which keeps it clear of a
+#: label printed under the node.
+_NOTE_OFFSET: Final[tuple[float, float]] = (140.0, 70.0)
+
+#: How far outside the drawing a legend is placed in a fixed arrangement. Enough
+#: that a key never lands on a device; see :func:`_legend_pos`.
+_LEGEND_MARGIN: Final = 90.0
+
+#: Height of a legend swatch, in points: a block for a fill, a bar for a line
+#: style. The width is the table's to decide, so a long label does not stretch
+#: the swatch beside it.
+_SWATCH_BOX: Final = 12
+_SWATCH_RULE: Final = 4
 
 #: Directories to look in when ``PATH`` does not have it, per :data:`os.name`.
 #: Nothing here is a guess at a version number or a wildcard: each entry is the
@@ -308,152 +358,6 @@ def missing_dot_message(*, subject: str) -> str:
 _DOT_TIMEOUT_SECONDS: Final = 120
 
 _TEMPLATE_NAME: Final = "graph.dot.j2"
-
-#: Shape, fill and outline per element kind: the kind picks the glyph, so the
-#: topology is readable before a single label is. The outline is a saturated
-#: version of the fill, so kind stays legible in a greyscale print.
-#:
-#: ``hub`` and ``computer`` are both boxes (``rectangle`` is Graphviz's synonym
-#: for ``box``); they are told apart by their palette, and a hub is rare enough
-#: in a modern inventory that spending a third box shape on it would cost more
-#: than it buys. :data:`~netgraph.render.graph.SUBNET_KIND` is not hardware — it
-#: is a prefix the addresses imply — so it gets a palette entry of its own and
-#: is drawn with rounded corners (see :func:`_node_style`).
-_NODE_STYLE: Final[Mapping[str, tuple[str, str, str]]] = {
-    "router": ("diamond", "#dbe9f6", "#2563eb"),
-    "switch": ("box3d", "#dcf0dc", "#16a34a"),
-    "hub": ("box", "#f0e6d2", "#a16207"),
-    "computer": ("rectangle", "#f5f5f5", "#6b7280"),
-    "server": ("cylinder", "#eae2f5", "#7c3aed"),
-    "adapter": ("ellipse", "#fdf0e3", "#ea580c"),
-    # A patch panel is passive, so it gets the one shape that carries no
-    # direction and no processing: a plain rectangle, in a neutral slate that
-    # says "this is not a device" without borrowing another kind's colour.
-    PATCHPANEL_KIND: ("box", "#eef2f7", "#64748b"),
-    SUBNET_KIND: ("box", "#e0f2f1", "#0f766e"),
-    # A tunnel is not hardware either, but unlike a subnet it *is* declared, so
-    # it keeps a shape of its own rather than borrowing a box.
-    TUNNEL_KIND: ("hexagon", "#ede9fe", "#6d28d9"),
-    # A collapsed namespace is a *folder* of elements, and Graphviz's ``folder``
-    # shape says exactly that — a reader who has ever seen a file manager knows
-    # there is something inside it without being told. The slate palette is the
-    # one no element kind uses, so a box that is not a device cannot be mistaken
-    # for one at a glance.
-    AGGREGATE_KIND: ("folder", "#e2e8f0", "#475569"),
-    # A rack is a cabinet, not a thing on the network. ``box3d`` is already the
-    # switch's, so the elevation gets a plain frame and earns its identity from
-    # the table inside it.
-    RACK_KIND: ("box", "#f8fafc", "#334155"),
-    # A PDU is a strip, and ``box`` drawn tall is as close as Graphviz gets.
-    # Amber is the colour every electrical drawing uses for a live conductor and
-    # the one no element kind here had taken, which is what keeps a power node
-    # from being read as part of the data path.
-    PDU_KIND: ("box", "#fef3c7", "#b45309"),
-    # An identity is a person, and Graphviz has no person. An ``oval`` is the
-    # shape every organisation chart draws one with, and rose is the last accent
-    # left — which matters more than the hue itself: the identity view must not
-    # be mistakable for a fragment of the network views at a glance.
-    USER_KIND: ("oval", "#fce7f3", "#be185d"),
-    # A group is a *container* of those, so it borrows the folder shape the
-    # collapsed namespace uses and the identity palette, saying both things at
-    # once: something is inside it, and what is inside it is people.
-    GROUP_KIND: ("folder", "#fbcfe8", "#9d174d"),
-}
-_DEFAULT_NODE_STYLE: Final[tuple[str, str, str]] = ("box", "#f5f5f5", "#6b7280")
-
-#: Edge colour and line style per cable medium. Style carries the medium and
-#: colour repeats it, so a link stays classifiable in a greyscale print and for
-#: a reader who cannot distinguish the two accent colours.
-_MEDIUM_STYLE: Final[Mapping[str, tuple[str, str]]] = {
-    "copper": ("#4a4a4a", "solid"),
-    "fiber": ("#d97706", "bold"),
-    "wireless": ("#2563eb", "dashed"),
-}
-_DEFAULT_MEDIUM_STYLE: Final[tuple[str, str]] = ("#4a4a4a", "solid")
-
-#: An adapter attachment is a bus, not a cable (§8.2). Drawing it like one would
-#: claim a link that does not exist, so it gets a style no medium uses.
-_ATTACHMENT_STYLE: Final[tuple[str, str]] = ("#9ca3af", "dotted")
-
-#: A subnet membership is not a cable either, so it borrows the subnet's colour.
-_SUBNET_EDGE_STYLE: Final[tuple[str, str]] = ("#0f766e", "solid")
-
-#: A tunnel is drawn dashed, because it runs over a path the diagram already
-#: shows rather than over one of its own. Colour carries confidentiality — the
-#: one property of a tunnel a reader most needs at a glance — and the two are
-#: far enough apart in lightness to survive a greyscale print: violet when the
-#: payload is protected, crimson when it crosses the underlay in the clear.
-_TUNNEL_STYLE: Final[tuple[str, str]] = ("#6d28d9", "dashed")
-_CLEARTEXT_TUNNEL_STYLE: Final[tuple[str, str]] = ("#be123c", "dashed")
-
-#: A tunnel's ``over`` is not a path at all; it says one link is carried by
-#: another. Dotted and violet: the vocabulary of the tunnel it belongs to,
-#: with a line weight that keeps it behind the tunnels themselves.
-_ENCAPSULATION_STYLE: Final[tuple[str, str]] = ("#8b5cf6", "dotted")
-
-#: A membership (§19.3) is the only edge the identity view has, so it needs no
-#: contrast with a sibling: solid, in the identity rose, and told apart from
-#: everything else by being the only line on the page.
-_MEMBERSHIP_STYLE: Final[tuple[str, str]] = ("#be185d", "solid")
-
-#: The two adjacencies of the routing view (§16.6). A BGP session is a
-#: configured, point-to-point relationship, so it is drawn *solid*; an OSPF
-#: adjacency is discovered and belongs to an area rather than to a pair, so it is
-#: dotted. Both are blue-green — the colour of the routed layers here — and the
-#: difference in line style survives a greyscale print, which the difference in
-#: hue would not.
-_BGP_STYLE: Final[tuple[str, str]] = ("#0369a1", "solid")
-_OSPF_STYLE: Final[tuple[str, str]] = ("#0f766e", "dotted")
-
-#: The two feeds of the power view (§17.5). An outlet feed is a cord somebody can
-#: pull, so it is drawn *solid* in the PDU's amber; a PoE feed is power riding on
-#: a data run that the diagram draws elsewhere, so it is dashed — the same
-#: vocabulary a tunnel uses for "this runs over something else", in the power
-#: palette rather than the tunnel one. The line style is what survives a
-#: greyscale print, which is why the distinction is not carried by hue alone.
-_OUTLET_STYLE: Final[tuple[str, str]] = ("#b45309", "solid")
-_POE_STYLE: Final[tuple[str, str]] = ("#ca8a04", "dashed")
-
-#: Fill and outline per element kind, without the Graphviz shape — for a
-#: renderer that draws its own glyphs but must colour a node the way a diagram
-#: does. Derived from :data:`_NODE_STYLE` rather than restated, so the mxGraph
-#: export (:mod:`netgraph.drawio.styles`) cannot drift away from the picture
-#: netgraph itself draws.
-NODE_PALETTE: Final[Mapping[str, tuple[str, str]]] = MappingProxyType(
-    {kind: (fill, stroke) for kind, (_shape, fill, stroke) in _NODE_STYLE.items()}
-)
-
-#: What a node of an unknown kind is coloured.
-DEFAULT_NODE_PALETTE: Final[tuple[str, str]] = (
-    _DEFAULT_NODE_STYLE[1],
-    _DEFAULT_NODE_STYLE[2],
-)
-
-#: Colour and Graphviz line style per *reason a link is drawn*: the three
-#: cable media first, then the edge kinds that are not cables at all. Same
-#: reasoning as :data:`NODE_PALETTE` — one table, two renderers.
-EDGE_PALETTE: Final[Mapping[str, tuple[str, str]]] = MappingProxyType(
-    {
-        **_MEDIUM_STYLE,
-        "attachment": _ATTACHMENT_STYLE,
-        "subnet": _SUBNET_EDGE_STYLE,
-        "tunnel": _TUNNEL_STYLE,
-        "cleartext-tunnel": _CLEARTEXT_TUNNEL_STYLE,
-        "encapsulation": _ENCAPSULATION_STYLE,
-        "membership": _MEMBERSHIP_STYLE,
-        "bgp": _BGP_STYLE,
-        "ospf": _OSPF_STYLE,
-        "outlet": _OUTLET_STYLE,
-        "poe": _POE_STYLE,
-    }
-)
-
-#: What a link netgraph has no palette entry for is drawn as.
-DEFAULT_EDGE_PALETTE: Final[tuple[str, str]] = _DEFAULT_MEDIUM_STYLE
-
-#: The frame a namespace cluster is drawn with, so a group container in an
-#: exported diagram is the same colour as the box a rendering draws.
-CLUSTER_PALETTE: Final[tuple[str, str]] = (_CLUSTER_STROKE, _CLUSTER_LABEL_COLOUR)
 
 #: Outline and text colour of something a :class:`~netgraph.render.highlight.Highlight`
 #: emphasises. Crimson is the one accent no element kind and no medium already
@@ -639,11 +543,17 @@ class _EdgeView:
     #: Graphviz refuses to place a real edge label on an orthogonal route it
     #: laid out itself; a floating one it will place.
     xlabel: str | None = None
+    #: ``arrowhead`` and ``constraint``. Set only on a note's leader line (§21),
+    #: which is not a link: it must not draw a head, and it must not be allowed
+    #: to pull the ranking about, or a callout would reshape the topology it is
+    #: commenting on.
+    arrowhead: str | None = None
+    constraint: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class _FrameView:
-    """One namespace box drawn from stored geometry, and its caption.
+    """One namespace box or annotation area drawn from stored geometry.
 
     Two halves because Graphviz will draw only one of them for us: the rectangle
     goes into the graph's ``_background``, and the caption is a node — see
@@ -659,6 +569,14 @@ class _FrameView:
     outline: str
     #: ``pos`` of the caption node.
     caption: str
+    #: Colour of the caption text.
+    color: str = CLUSTER_LABEL_COLOUR
+    #: The xdot operations that set the pen before :attr:`outline` is drawn: the
+    #: line style, the pen colour and — for an area, which is a *filled* zone
+    #: rather than a frame — the fill. Held as text rather than as colours
+    #: because what may safely go into a ``_background`` is a very short list;
+    #: see :func:`_background`.
+    pen: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -896,6 +814,7 @@ def _frames(graph: Graph, options: RenderOptions, plan: LayoutPlan) -> tuple[_Fr
             label=key,
             outline=_dot_points(plan.geometry.groups[key]),
             caption=_caption_pos(plan.geometry.groups[key]),
+            pen=f"c {_xdot_text(CLUSTER_STROKE)}",
         )
         for key in cluster_keys(graph, options).values()
         if key in plan.geometry.groups
@@ -913,23 +832,33 @@ def _background(frames: Sequence[_FrameView]) -> str | None:
     whether anything else in the document has established a font, which makes it
     a landmine rather than a limitation. The caption is drawn as an ordinary
     node instead (:class:`_FrameView`), which every engine handles and which
-    also puts the caption inside the drawing's bounding box for free.
+    also puts the caption inside the drawing's bounding box for free. That is
+    true of an annotation area's label as well as of a namespace's
+    (``docs/follow-ups.md`` §17), and ``tests/test_render_annotations.py`` pins
+    it down: the operations here are the polygon, the pen and the fill, and
+    never text.
+
+    Each frame carries its own pen operations, so a dashed area cannot leak its
+    line style into the frame drawn after it.
     """
     if not frames:
         return None
-    return " ".join(
-        op for frame in frames for op in (f"c {_xdot_text(_CLUSTER_STROKE)}", frame.outline)
-    )
+    return " ".join(f"{frame.pen} {frame.outline}" for frame in frames)
 
 
-def _dot_points(box: Box) -> str:
-    """One rectangle as an xdot unfilled-polygon operation."""
+def _dot_points(box: Box, *, operation: str = "p") -> str:
+    """One rectangle as an xdot polygon operation.
+
+    ``p`` is an outline and ``P`` a filled polygon — the two operations a
+    ``_background`` is allowed to hold. Graphviz draws a filled one with the
+    current pen colour as its edge, so an area needs no second outline pass.
+    """
     left, bottom, right, top = box.bounds
     corners = " ".join(
         f"{_coordinate(x)} {_coordinate(y)}"
         for x, y in ((left, bottom), (left, top), (right, top), (right, bottom))
     )
-    return f"p 4 {corners}"
+    return f"{operation} 4 {corners}"
 
 
 def _caption_pos(box: Box) -> str:
@@ -951,7 +880,7 @@ def _caption_pos(box: Box) -> str:
     ``_background``, so nothing is clipped.
     """
     _, _, _, top = box.bounds
-    return _pos(box.x, top + _CLUSTER_FONT_SIZE)
+    return _pos(box.x, top + CLUSTER_FONT_SIZE)
 
 
 def _xdot_text(value: str) -> str:
@@ -982,6 +911,12 @@ def to_dot(
     because the no-op layout engine that reproduces the arrangement does not
     draw clusters. See :func:`layout_plan` for how the document is then run.
 
+    The annotations of §21 are drawn too, unless
+    :attr:`RenderOptions.annotations <netgraph.render.options.RenderOptions.annotations>`
+    is off; see the *Annotations* section of the module docstring for the
+    vocabulary each of the three is drawn in and why it differs between an
+    automatic and a fixed layout.
+
     Args:
         target: The output format this DOT is destined for. Only icon
             selection depends on it — see :func:`netgraph.render.icons.suffix_order`
@@ -1008,7 +943,13 @@ def to_dot(
     identity = element_ids(graph) if opts.tooltips or opts.element_ids else ElementIds()
     details = build_details(graph, opts, ids=identity) if opts.tooltips else {}
     plan = layout_plan(graph)
-    frames = _frames(graph, opts, plan) if plan.mode is LayoutMode.FIXED else ()
+    fixed = plan.mode is LayoutMode.FIXED
+    annotations = annotation_views(graph, opts)
+    # An area is a cluster when the engine is laying the graph out and a
+    # background rectangle when it is not, so exactly one of the two lists is
+    # ever non-empty and a node is never boxed twice.
+    areas = () if fixed else _area_groups(graph, annotations, opts, icons, identity, details, plan)
+    frames = (*_frames(graph, opts, plan), *_area_frames(annotations, plan)) if fixed else ()
     template = _environment().get_template(_TEMPLATE_NAME)
     return template.render(
         title=opts.title,
@@ -1023,8 +964,14 @@ def to_dot(
         # which case routing its edges is work whose answer is thrown away; see
         # ``route_edges``.
         splines=(_SPLINES_ATTRIBUTE[default_routing(graph, opts)] if route_edges else "false"),
-        groups=_groups(graph, opts, icons, identity, details, plan),
-        edges=tuple(_edge_views(graph, opts, identity, details, plan)),
+        areas=areas,
+        groups=_groups(graph, opts, icons, identity, details, plan, skip=frozenset(_boxed(areas))),
+        notes=_note_views(annotations, opts, plan),
+        legends=_legend_views(graph, annotations, opts, plan),
+        edges=(
+            *_edge_views(graph, opts, identity, details, plan),
+            *_leader_views(annotations),
+        ),
         imagepath=str(opts.icons.directory) if icons and opts.icons is not None else None,
         icon_width=_ICON_BOX[0],
         icon_height=_ICON_BOX[1],
@@ -1035,8 +982,7 @@ def to_dot(
         inputscale=POINTS_PER_INCH if plan.mode is not LayoutMode.AUTO else None,
         frames=frames,
         background=_background(frames),
-        frame_color=_CLUSTER_LABEL_COLOUR,
-        frame_font_size=_CLUSTER_FONT_SIZE,
+        frame_font_size=CLUSTER_FONT_SIZE,
     )
 
 
@@ -1408,6 +1354,8 @@ def _groups(
     identity: ElementIds,
     details: Mapping[str, Mapping[str, object]],
     plan: LayoutPlan,
+    *,
+    skip: Container[str] = frozenset(),
 ) -> tuple[_GroupView, ...]:
     """The node groups to draw: one per namespace, or a single loose group.
 
@@ -1419,20 +1367,31 @@ def _groups(
     A layer that groups its own nodes wins over ``--group-by-namespace``: the
     routing view boxes each VRF (§16.6), and that is the grouping the reader asked
     for by choosing the layer.
+
+    Args:
+        skip: Nodes some other container has already claimed — the members of an
+            annotation area (§21), which is drawn as a cluster of its own. A node
+            belongs to at most one box in a DOT document, so the two groupings
+            cannot both hold it; see :func:`_area_groups` for the precedence.
     """
     if graph.clusters:
-        return _cluster_groups(graph, options, icons, identity, details, plan)
+        return _cluster_groups(graph, options, icons, identity, details, plan, skip=skip)
 
     if not options.group_by_namespace:
-        nodes = _node_views(graph, graph.nodes.values(), options, icons, identity, details, plan)
+        loose = [node for node in graph.nodes.values() if node.fqn not in skip]
+        nodes = _node_views(graph, loose, options, icons, identity, details, plan)
         return (_GroupView(nodes=tuple(nodes)),)
 
     groups: list[_GroupView] = []
     for index, namespace in enumerate(graph.namespaces):
-        members = graph.nodes_in(namespace)
+        members = [node for node in graph.nodes_in(namespace) if node.fqn not in skip]
         views = tuple(_node_views(graph, members, options, icons, identity, details, plan))
         if not namespace:
             groups.append(_GroupView(nodes=views))
+            continue
+        if not views:
+            # Every node of this namespace is inside an area instead, and an
+            # empty cluster is a labelled box round nothing.
             continue
         groups.append(
             _GroupView(
@@ -1457,6 +1416,8 @@ def _cluster_groups(
     identity: ElementIds,
     details: Mapping[str, Mapping[str, object]],
     plan: LayoutPlan,
+    *,
+    skip: Container[str] = frozenset(),
 ) -> tuple[_GroupView, ...]:
     """One box per cluster the *layer* asked for, unboxed nodes first.
 
@@ -1467,7 +1428,7 @@ def _cluster_groups(
     loose = tuple(
         _node_views(
             graph,
-            [node for node in graph.nodes.values() if not node.cluster],
+            [node for node in graph.nodes.values() if not node.cluster and node.fqn not in skip],
             options,
             icons,
             identity,
@@ -1477,7 +1438,9 @@ def _cluster_groups(
     )
     groups: list[_GroupView] = [_GroupView(nodes=loose)] if loose else []
     for index, cluster in enumerate(graph.clusters):
-        members = graph.nodes_in_cluster(cluster)
+        members = [node for node in graph.nodes_in_cluster(cluster) if node.fqn not in skip]
+        if not members:
+            continue
         groups.append(
             _GroupView(
                 nodes=tuple(_node_views(graph, members, options, icons, identity, details, plan)),
@@ -1524,7 +1487,7 @@ def _node_views(
 ) -> Iterator[_NodeView]:
     for node in nodes:
         placement = plan.geometry.nodes.get(node.fqn)
-        shape, fill, stroke = _NODE_STYLE.get(node.kind, _DEFAULT_NODE_STYLE)
+        shape, fill, stroke = node_style_for(node.kind)
         emphasis = _node_emphasis(node, options.highlight)
         if emphasis is not None:
             fill, stroke = emphasis.fill or fill, emphasis.stroke
@@ -1810,6 +1773,437 @@ def _node_rows(node: Node, options: RenderOptions, layer: Layer) -> tuple[_Row, 
 
 
 # --------------------------------------------------------------------------- #
+# Annotations (§21)
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True, slots=True)
+class _AreaGroupView:
+    """One annotation area drawn as a Graphviz cluster.
+
+    Only reachable under an automatic layout. A fixed one is drawn by
+    ``neato -n2``, which draws no cluster at all, so there the same area becomes
+    a :class:`_FrameView` instead.
+    """
+
+    #: The subgraph's *name* in the DOT source. Positional and ``cluster``-prefixed
+    #: for the same two reasons a namespace group's is; see :func:`_groups`.
+    id: str
+    label: str
+    nodes: tuple[_NodeView, ...]
+    fill: str
+    stroke: str
+    #: The Graphviz ``style`` list, e.g. ``rounded,dashed``.
+    style: str
+    #: ``0`` for ``border: none``, which is how a cluster is drawn with a fill
+    #: and no edge; ``None`` leaves Graphviz's default.
+    penwidth: str | None = None
+    #: ``id`` attribute to emit; see :mod:`netgraph.render.annotations`.
+    element_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _NoteLine:
+    """One block of a note's label: whether it is a bullet, and its markup.
+
+    :attr:`html` is already escaped and already marked safe — it is built here
+    rather than in the template because the emphasis of §21.1 *is* markup
+    (``<B>``, ``<I>``, ``<FONT>``) wrapped around text that must not be, and
+    that is not a distinction a template's autoescaping can make. See
+    :func:`_note_markup`.
+    """
+
+    bullet: bool
+    html: Markup
+
+
+@dataclass(frozen=True, slots=True)
+class _NoteNodeView:
+    """One note, drawn as an ordinary node with ``shape=note``."""
+
+    id: str
+    lines: tuple[_NoteLine, ...]
+    fill: str
+    stroke: str
+    element_id: str | None = None
+    #: ``pos``, for a note in a fixed arrangement; ``None`` under an automatic
+    #: one, where Graphviz places it like any other node.
+    pos: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _LegendRowView:
+    """One swatch and its label."""
+
+    color: str
+    label: str
+    description: str = ""
+    #: Height of the swatch cell, in points. A line-shaped swatch is a bar
+    #: rather than a block, which is what tells a line style from a fill.
+    height: int = _SWATCH_BOX
+    #: Set for a ``line``/``dashed``/``dotted`` swatch, which is drawn as a rule
+    #: rather than as a filled box.
+    rule: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class _LegendBlockView:
+    """One legend, drawn as a cluster holding a single plaintext table."""
+
+    #: The subgraph's name in the DOT source.
+    id: str
+    #: The DOT node id of the table inside it.
+    node: str
+    #: The caption, drawn as the table's first row rather than as the cluster's
+    #: label: ``neato -n2`` draws no cluster, so a title on the box would
+    #: disappear from exactly the drawings that place the key most carefully.
+    title: str
+    rows: tuple[_LegendRowView, ...]
+    fill: str
+    stroke: str
+    element_id: str | None = None
+    pos: str | None = None
+    #: Width of the *table's* own border. ``0`` under an automatic layout, where
+    #: the cluster draws the frame; ``1`` under a fixed one, where nothing else
+    #: will — the same bargain :class:`_FrameView` makes for a namespace box.
+    border: str = "0"
+
+
+def _boxed(areas: Sequence[_AreaGroupView]) -> Iterator[str]:
+    """Every node an area cluster has claimed, so nothing else boxes it too."""
+    for area in areas:
+        for node in area.nodes:
+            yield node.id
+
+
+def _area_groups(
+    graph: Graph,
+    views: AnnotationViews,
+    options: RenderOptions,
+    icons: Mapping[str, str],
+    identity: ElementIds,
+    details: Mapping[str, Mapping[str, object]],
+    plan: LayoutPlan,
+) -> tuple[_AreaGroupView, ...]:
+    """The areas of an automatically laid out drawing, as clusters.
+
+    **Precedence.** A node is drawn inside at most one box, because that is all
+    a DOT document can express, so three groupings have to be put in an order
+    and this is it:
+
+    1. an explicit ``kind: area`` that names the node — the most specific thing
+       anybody wrote down about this diagram, and the only one of the three a
+       person stated on purpose;
+    2. among two areas that both name it, the one declared **first**. Declaration
+       order is the only tie-break that does not depend on the graph, so the
+       same inventory always draws the same picture;
+    3. whatever is left: the layer's own clustering (the VRFs of §16.6) and then
+       ``--group-by-namespace``, each of which loses the nodes an area took and
+       is omitted entirely when it has none left.
+
+    An area with an explicit ``geometry`` but no drawn members is not a cluster —
+    there is nothing to put in it — and is skipped here; under a fixed layout the
+    same area *is* drawn, as a rectangle, because there the coordinates mean
+    something.
+    """
+    groups: list[_AreaGroupView] = []
+    for index, area in enumerate(views.areas):
+        members = [
+            graph.nodes[member]
+            for member in area.members
+            # The first area to name a node keeps it; see the docstring.
+            if views.area_of(member) is area
+        ]
+        if not members:
+            continue
+        groups.append(
+            _AreaGroupView(
+                id=f"cluster_area_{index}",
+                label=area.label,
+                nodes=tuple(_node_views(graph, members, options, icons, identity, details, plan)),
+                fill=area.fill,
+                stroke=area.stroke,
+                style=_area_style(area.border),
+                penwidth="0" if area.border == "none" else None,
+                element_id=area.id if options.element_ids else None,
+            )
+        )
+    return tuple(groups)
+
+
+def _area_style(border: str) -> str:
+    """The Graphviz ``style`` an area's outline is drawn with.
+
+    Always rounded, because a zone is a convention rather than a container, and
+    a square box in a diagram of square boxes reads as another device. ``none``
+    keeps the rounded fill and loses the edge through ``penwidth`` instead:
+    Graphviz has no ``style`` value that means "filled but not outlined".
+    """
+    return "rounded,filled" if border in ("solid", "none") else f"rounded,filled,{border}"
+
+
+def _area_frames(views: AnnotationViews, plan: LayoutPlan) -> tuple[_FrameView, ...]:
+    """The areas of a *fixed* drawing, as background rectangles and captions.
+
+    ``neato -n2`` draws no clusters, so an arranged diagram would otherwise lose
+    every area exactly as it would lose every namespace frame — and the remedy is
+    the same one, for the same reason: the rectangle goes into ``_background``
+    and the caption is an ordinary ``plaintext`` node, because text in a
+    ``_background`` segfaults the Graphviz that Debian and Ubuntu ship. See
+    :func:`_background`.
+
+    The rectangle is ``spec.geometry`` when the area gives one, and otherwise the
+    box enclosing wherever the members were actually drawn, grown by the area's
+    padding — so an area follows the devices it names when the arrangement moves
+    them, which is the whole difference between naming members and pinning a box.
+    """
+    frames: list[_FrameView] = []
+    for area in views.areas:
+        box = area.box or member_hull(area, _member_corners(area, plan))
+        if box is None:
+            continue
+        frames.append(
+            _FrameView(
+                id=f"{_FRAME_ID_PREFIX}{area.id}",
+                label=area.label,
+                # Filled, unlike a namespace frame: an area is a zone behind the
+                # diagram rather than a line around part of it.
+                outline=_dot_points(box, operation="P"),
+                caption=_caption_pos(box),
+                color=area.stroke,
+                pen=_area_pen(area),
+            )
+        )
+    return tuple(frames)
+
+
+def _area_pen(area: AreaView) -> str:
+    """The xdot operations setting the pen for one area's rectangle.
+
+    Three operations, and every one of them is on the short list of what a
+    ``_background`` may safely hold: a line style, a pen colour and a fill
+    colour. Emitted per area rather than once, so a dashed zone cannot leak its
+    line style into whatever is drawn after it.
+    """
+    style = "solid" if area.border == "none" else area.border
+    stroke = area.fill if area.border == "none" else area.stroke
+    return f"S {_xdot_text(style)} c {_xdot_text(stroke)} C {_xdot_text(area.fill)}"
+
+
+def _member_corners(area: AreaView, plan: LayoutPlan) -> Iterator[tuple[float, float]]:
+    """The corners of every member's box, or its centre when nothing measured it.
+
+    A hull over centres alone would cut through the shapes at the edge of the
+    zone; the sizes are recorded by ``netgraph layout --write`` for exactly this
+    sort of reason, and the centre is the honest fallback when they are not.
+    """
+    for member in area.members:
+        placement = plan.geometry.nodes.get(member)
+        if placement is None:
+            continue
+        if placement.width is None or placement.height is None:
+            yield (placement.x, placement.y)
+            continue
+        half_width, half_height = placement.width / 2, placement.height / 2
+        yield (placement.x - half_width, placement.y - half_height)
+        yield (placement.x + half_width, placement.y + half_height)
+
+
+def _note_views(
+    views: AnnotationViews, options: RenderOptions, plan: LayoutPlan
+) -> tuple[_NoteNodeView, ...]:
+    """The notes, as nodes.
+
+    A note is an ordinary node with ``shape=note`` — the shape Graphviz has for
+    exactly this — so it is laid out with the graph instead of floating over it,
+    and a reader can select it, link it and search it like anything else.
+
+    Under a fixed arrangement it needs a ``pos`` like every other node. A note
+    that pins its own position uses it; an anchored one that does not is placed
+    beside whatever it is anchored to. A note that is neither — its anchor is on
+    another layer, or a filter removed it — is the one case a fixed drawing
+    leaves out, because the alternative is a ``pos`` of nothing, which the no-op
+    engine reads as the origin and draws the callout on top of whatever the
+    arrangement put in the corner.
+    """
+    placed = plan.mode is LayoutMode.FIXED
+    views_and_positions = ((note, _note_pos(note, plan)) for note in views.notes)
+    return tuple(
+        _NoteNodeView(
+            id=f"{_ANNOTATION_ID_PREFIX}{note.id}",
+            lines=_note_lines(note),
+            fill=note.fill,
+            stroke=note.stroke,
+            element_id=note.id if options.element_ids else None,
+            pos=pos,
+        )
+        for note, pos in views_and_positions
+        if pos is not None or not placed
+    )
+
+
+def _note_pos(note: NoteView, plan: LayoutPlan) -> str | None:
+    """Where a note sits in a fixed drawing, or ``None`` to let Graphviz decide."""
+    if plan.mode is not LayoutMode.FIXED:
+        return None
+    if note.x is not None and note.y is not None:
+        return _pos(note.x, note.y)
+    placement = plan.geometry.nodes.get(note.anchor)
+    if placement is None:
+        return None
+    return _pos(placement.x + _NOTE_OFFSET[0], placement.y + _NOTE_OFFSET[1])
+
+
+def _note_lines(note: NoteView) -> tuple[_NoteLine, ...]:
+    """One row per block of the parsed note; an empty note keeps one blank row."""
+    lines = tuple(
+        _NoteLine(bullet=block.kind == "bullet", html=_note_markup(block.spans))
+        for block in note.lines
+    )
+    return lines or (_NoteLine(bullet=False, html=Markup("")),)
+
+
+def _note_markup(spans: Sequence[Span]) -> Markup:
+    """One block's spans as Graphviz HTML-like markup.
+
+    The text of each span is escaped and the tag around it is not, which is the
+    one place in this renderer where those two have to be told apart inside a
+    single string — so it is done here, with :class:`~markupsafe.Markup`, rather
+    than in the template, where autoescaping can only make one decision for the
+    whole value. The template's escaping contract is unchanged: what it receives
+    is already exactly what belongs in an HTML-like label.
+
+    Graphviz's HTML-like labels have ``<B>`` and ``<I>`` but no ``<CODE>``, so
+    code spans are drawn in the monospace face, which is the difference a reader
+    is looking for.
+    """
+    return Markup("").join(_span_markup(span) for span in spans)
+
+
+def _span_markup(span: Span) -> Markup:
+    # ``printable`` rather than ``_inline``: the whitespace *between* two spans
+    # belongs to one of them, and collapsing it here would join a bold word to
+    # the one after it. The parser has already flattened the line breaks, so
+    # there is nothing left for the one-line rule to protect against.
+    text = Markup.escape(printable(span.text))
+    if span.style == "bold":
+        return Markup("<B>{}</B>").format(text)
+    if span.style == "italic":
+        return Markup("<I>{}</I>").format(text)
+    if span.style == "code":
+        return Markup('<FONT FACE="monospace">{}</FONT>').format(text)
+    return text
+
+
+def _leader_views(views: AnnotationViews) -> tuple[_EdgeView, ...]:
+    """One dotted line per note that points at something.
+
+    ``constraint=false`` is the important attribute: a leader is not a link, and
+    a note allowed to constrain the ranking would move the devices it is
+    commenting on. Every other attribute says the same thing more quietly — no
+    arrowhead, the note's own outline colour, and a dotted line no medium uses.
+
+    Emitted after every real link, so a document read by a human keeps the
+    topology in one block and the commentary after it.
+    """
+    return tuple(
+        _EdgeView(
+            source=f"{_ANNOTATION_ID_PREFIX}{note.id}",
+            target=note.anchor,
+            color=note.stroke,
+            style="dotted",
+            arrowhead="none",
+            constraint="false",
+        )
+        for note in views.notes
+        if note.leader
+    )
+
+
+def _legend_views(
+    graph: Graph, views: AnnotationViews, options: RenderOptions, plan: LayoutPlan
+) -> tuple[_LegendBlockView, ...]:
+    """The legends, each a cluster holding one plaintext table.
+
+    A cluster rather than a bare node so the key gets a frame without netgraph
+    measuring any text, and a ``plaintext`` node inside it because the swatches
+    are table cells — a legend is a table, and Graphviz's HTML-like labels are
+    the one place this renderer can draw one. The *title* goes inside the table
+    rather than on the cluster, because a fixed drawing has no cluster to put it
+    on and a key whose caption depended on the layout engine would be a key that
+    vanished from the arranged diagram somebody had taken most care over.
+
+    **Where it ends up.** Under a fixed arrangement the corner is honoured: the
+    table is placed just outside the bounding box of everything else, on the side
+    ``spec.corner`` names. Under an automatic layout **Graphviz decides**, and it
+    will generally put a disconnected cluster beside the drawing rather than in
+    the corner asked for — there is no Graphviz attribute that pins one, and the
+    alternatives (a rank constraint, an invisible edge) distort the topology to
+    move the key, which is a worse trade than a key in the wrong corner. Pin the
+    arrangement with ``netgraph layout --write`` to place it exactly.
+    """
+    bounds = _drawing_bounds(graph, plan) if plan.mode is LayoutMode.FIXED else None
+    return tuple(
+        _LegendBlockView(
+            id=f"cluster_legend_{index}",
+            node=f"{_ANNOTATION_ID_PREFIX}{legend.id}",
+            title=legend.title,
+            rows=tuple(_legend_row(entry) for entry in legend.entries),
+            fill=legend.fill,
+            stroke=legend.stroke,
+            element_id=legend.id if options.element_ids else None,
+            pos=None if bounds is None else _legend_pos(legend, bounds),
+            border="1" if bounds is not None else "0",
+        )
+        for index, legend in enumerate(views.legends)
+        if legend.entries
+    )
+
+
+def _legend_row(entry: LegendSwatch) -> _LegendRowView:
+    rule = entry.shape in ("line", "dashed", "dotted")
+    return _LegendRowView(
+        color=entry.color,
+        label=_inline(entry.label),
+        description=_inline(entry.description),
+        height=_SWATCH_RULE if rule else _SWATCH_BOX,
+        rule=rule,
+    )
+
+
+def _drawing_bounds(graph: Graph, plan: LayoutPlan) -> Box | None:
+    """The box enclosing everything placed, for putting a legend outside it."""
+    corners: list[tuple[float, float]] = []
+    for fqn in graph.nodes:
+        placement = plan.geometry.nodes.get(fqn)
+        if placement is None:
+            continue
+        width = (placement.width or 0.0) / 2
+        height = (placement.height or 0.0) / 2
+        corners.append((placement.x - width, placement.y - height))
+        corners.append((placement.x + width, placement.y + height))
+    if not corners:
+        return None
+    xs = [x for x, _ in corners]
+    ys = [y for _, y in corners]
+    return Box.from_bounds(min(xs), min(ys), max(xs), max(ys))
+
+
+def _legend_pos(legend: LegendView, bounds: Box) -> str:
+    """Where a legend's table sits in a fixed drawing: just outside a corner.
+
+    Outside rather than inside, because netgraph does not measure text and a key
+    placed inside the bounding box by guesswork would sooner or later be drawn
+    over a device. Graphviz grows the canvas to fit a node, so nothing is
+    clipped.
+    """
+    left, bottom, right, top = bounds.bounds
+    x = (left - _LEGEND_MARGIN) if legend.at_left else (right + _LEGEND_MARGIN)
+    y = (top + _LEGEND_MARGIN) if legend.at_top else (bottom - _LEGEND_MARGIN)
+    return _pos(x, y)
+
+
+# --------------------------------------------------------------------------- #
 # Edges
 # --------------------------------------------------------------------------- #
 
@@ -1830,29 +2224,10 @@ def _edge_views(
     # diagram whose annotations have silently moved.
     floating = plan.mode is not LayoutMode.FIXED and default_style is Routing.ORTHOGONAL
     for index, edge in enumerate(graph.edges):
-        colour, style = _MEDIUM_STYLE.get(edge.medium, _DEFAULT_MEDIUM_STYLE)
-        if edge.kind is EdgeKind.ATTACHMENT:
-            colour, style = _ATTACHMENT_STYLE
-        elif edge.kind is EdgeKind.SUBNET:
-            colour, style = _SUBNET_EDGE_STYLE
-        elif edge.kind is EdgeKind.ENCAPSULATION:
-            colour, style = _ENCAPSULATION_STYLE
-        elif edge.kind is EdgeKind.BGP:
-            colour, style = _BGP_STYLE
-        elif edge.kind is EdgeKind.OSPF:
-            colour, style = _OSPF_STYLE
-        elif edge.kind is EdgeKind.OUTLET:
-            colour, style = _OUTLET_STYLE
-        elif edge.kind is EdgeKind.POE:
-            colour, style = _POE_STYLE
-        elif edge.kind is EdgeKind.MEMBERSHIP:
-            colour, style = _MEMBERSHIP_STYLE
-        elif edge.kind is EdgeKind.TUNNEL:
-            colour, style = (
-                _TUNNEL_STYLE
-                if edge.tunnel is None or edge.tunnel.protected
-                else _CLEARTEXT_TUNNEL_STYLE
-            )
+        # Why the link is drawn decides how it looks, and the answer comes from
+        # the one table an ``auto: layers`` legend reads too (§21), so a swatch
+        # can never name a colour this drawing does not use.
+        colour, style = edge_style_for(edge)
         emphasis = _edge_emphasis(edge, options.highlight)
         if emphasis is not None:
             colour = emphasis.stroke

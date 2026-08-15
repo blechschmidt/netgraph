@@ -27,6 +27,24 @@ The translation, entry by entry:
              sequence entry cannot be written at a path that does not exist yet.
 ============ ===================================================================
 
+A layout entry is the exception to the table: geometry is written a whole view
+at a time by :class:`~netgraph.edit.operations.SetGeometry`, so it never goes
+through the field-path machinery at all. An annotation (§21) is *not* an
+exception — a note's text and an area's colour are ordinary fields at ordinary
+paths — so the three annotation kinds are applied field by field like everything
+else. They need operations of their own only because they are not elements: they
+have their own name space per kind, so no address the edit layer understands can
+name one.
+
+Field by field, with one qualification. An annotation is re-checked against §21
+after *every* write, so each write has to leave a document that is valid on its
+own — and a block the document does not have yet cannot be built a leaf at a
+time, because half of one is not a §21 document: ``spec.geometry.x`` on a note
+that has never been placed is a position with no ``y``. Writes that land inside
+an absent block are therefore collected into a single write *of* the block, and
+the block is field by field from then on. That is the same rule the draw.io
+reconciler applies to the first drag of an unplaced note, for the same reason.
+
 The one subtlety is the field path. A plan stores
 ``spec.interfaces[name=eth0].mtu``; the edit layer wants
 ``spec.interfaces[2].mtu``. The index is resolved here, against the document as
@@ -52,10 +70,11 @@ from netgraph.edit import (
     UnsetField,
     format_field_path,
 )
+from netgraph.edit.operations import CreateAnnotation, DeleteAnnotation, SetAnnotation
 from netgraph.errors import NetgraphError
-from netgraph.plan.address import LAYOUT_TYPE, Address
+from netgraph.plan.address import ANNOTATION_TYPES, LAYOUT_TYPE, Address
 from netgraph.plan.model import Action, Change, FieldChange, Plan
-from netgraph.plan.paths import MISSING, Selector, Step, format_path, resolve
+from netgraph.plan.paths import MISSING, Selector, Step, format_path, get_path, resolve
 
 __all__ = ["PlanExecutionError", "operations_for", "translate"]
 
@@ -90,6 +109,8 @@ def operations_for(change: Change, session: EditSession) -> tuple[Operation, ...
     """The operations one changeset entry becomes, against the current session."""
     if change.address.type == LAYOUT_TYPE:
         return tuple(_geometry(change))
+    if change.address.type in ANNOTATION_TYPES:
+        return tuple(_annotation(change, session))
     if change.action is Action.CREATE:
         return (_create(change),)
     if change.action is Action.DELETE:
@@ -103,23 +124,33 @@ def operations_for(change: Change, session: EditSession) -> tuple[Operation, ...
 
 
 def _create(change: Change) -> CreateElement:
-    document = change.document
-    if not isinstance(document, Mapping):
-        raise PlanExecutionError(
-            f"{change.address}: the plan has no document to create this element from"
-        )
-    metadata = document.get("metadata")
+    document = _created_document(change, "element")
     return CreateElement(
         kind=change.kind,
         name=change.address.name,
         namespace=change.address.namespace,
         spec=document.get("spec") or {},
-        metadata={
-            key: value
-            for key, value in (metadata or {}).items()
-            if key != "name" and value not in ({}, [])
-        },
+        metadata=_metadata_of(document),
     )
+
+
+def _created_document(change: Change, what: str) -> Mapping[str, Any]:
+    document = change.document
+    if not isinstance(document, Mapping):
+        raise PlanExecutionError(
+            f"{change.address}: the plan has no document to create this {what} from"
+        )
+    return document
+
+
+def _metadata_of(document: Mapping[str, Any]) -> dict[str, Any]:
+    """A planned document's metadata, less the name and the empty containers."""
+    metadata = document.get("metadata")
+    return {
+        key: value
+        for key, value in (metadata or {}).items()
+        if key != "name" and value not in ({}, [])
+    }
 
 
 def _updates(change: Change, session: EditSession) -> Iterator[Operation]:
@@ -177,13 +208,18 @@ def _interface_entry(field: FieldChange) -> Selector | None:
 
 def _resolved(address: Address, field: FieldChange, document: Any) -> str:
     """The plan's path, with every selector turned into the index it names."""
+    return format_field_path(_resolved_steps(address, field, document))
+
+
+def _resolved_steps(address: Address, field: FieldChange, document: Any) -> tuple[str | int, ...]:
+    """:func:`_resolved`, before it is spelled — for grouping paths by prefix."""
     try:
         # ``resolve`` leaves only keys and indices, which is exactly the edit
         # layer's grammar; the annotation is the wider plan one either way.
         resolved: Sequence[str | int] = [
             step for step in resolve(field.path, document) if not isinstance(step, Selector)
         ]
-        return format_field_path(resolved)
+        return tuple(resolved)
     except Exception as error:
         raise PlanExecutionError(
             f"{address}: cannot locate {format_path(field.path)} in the document as it "
@@ -201,6 +237,14 @@ def _document_of(address: Address, session: EditSession) -> Any:
     """
     from netgraph.plan.document import document_of
 
+    if address.type in ANNOTATION_TYPES:
+        annotation = session.inventory.annotations_of(address.type).get(address.fqn)
+        if annotation is None:
+            raise PlanExecutionError(
+                f"{address}: no such {address.type} in the tree; the plan was made "
+                f"against a different state"
+            )
+        return document_of(annotation)
     element = session.inventory.elements.get(address.fqn)
     if element is None:
         layout = session.inventory.layouts.get(address.fqn)
@@ -211,6 +255,130 @@ def _document_of(address: Address, session: EditSession) -> Any:
             )
         return document_of(layout)
     return document_of(element)
+
+
+def _annotation(change: Change, session: EditSession) -> Iterator[Operation]:
+    """A note, an area or a legend (§21): created, deleted, renamed or set.
+
+    All four actions, and every one but the create — which has to carry a
+    document — expressed as a write at a field path, because an annotation *is*
+    a small document of ordinary fields.
+
+    What it cannot use is the *element* operations. An annotation is not an
+    element and each kind has a name space of its own, so
+    ``DeleteElement(address="dmz")`` could not say whether it meant the area,
+    the note or the switch of that name. The three operations here name their
+    document the way :class:`~netgraph.edit.operations.SetGeometry` names a
+    layout — by kind, name and namespace — rather than by an address.
+    """
+    address = change.address
+    named: dict[str, Any] = {
+        "kind": address.type,
+        "name": address.name,
+        "namespace": address.namespace,
+    }
+    if change.action is Action.CREATE:
+        document = _created_document(change, address.type)
+        yield CreateAnnotation(
+            **named,
+            spec=document.get("spec") or {},
+            metadata=_metadata_of(document),
+        )
+        return
+    if change.action is Action.DELETE:
+        yield DeleteAnnotation(**named)
+        return
+    if change.action is Action.RENAME:
+        assert change.new_address is not None  # guaranteed by Change.from_dict
+        # Renaming an annotation really is a field write, and that is not a
+        # shortcut: nothing in an inventory refers to a note, an area or a
+        # legend by name — the references point outwards, from the annotation to
+        # the elements it is about — so there is nothing else in the tree for a
+        # rename to keep consistent.
+        yield SetAnnotation(**named, path="metadata.name", value=change.new_address.name)
+        return
+    document = _document_of(address, session)
+    for path, value in _annotation_writes(address, change.fields, document):
+        if value is MISSING:
+            yield SetAnnotation(**named, path=path, unset=True)
+        else:
+            yield SetAnnotation(**named, path=path, value=value)
+
+
+def _annotation_writes(
+    address: Address, fields: Sequence[FieldChange], document: Any
+) -> list[tuple[str, Any]]:
+    """The ``(path, value)`` pairs one annotation update becomes.
+
+    One pair per changed field, and :data:`MISSING` for a field that goes — with
+    the single exception the module docstring names. An annotation is re-parsed
+    against §21 after every write, so a sequence of writes has to be valid at
+    every step and not only at the end; a block the document does not have yet
+    cannot be built a leaf at a time, because the first leaf lands in a block
+    that says nothing else. So every write that falls inside an absent block is
+    grafted onto one write *of* that block, placed where the first of them was.
+
+    The rule is stated over the document rather than over §21's constraints on
+    purpose: the plan layer does not know which fields of a note constrain each
+    other, and does not need to. It knows that a block it is *creating* had
+    better arrive complete, and that a block that is already there can be
+    changed a field at a time — which is what a drag of a placed note is, and
+    what keeps the comments beside its neighbours.
+    """
+    writes: list[tuple[str, Any]] = []
+    blocks: dict[str, dict[str, Any]] = {}
+    for field in fields:
+        steps = _resolved_steps(address, field, document)
+        if field.after is MISSING:
+            # A removal cannot be inside a block that is not there, so there is
+            # nothing to graft it onto and nothing to make whole.
+            writes.append((format_field_path(steps), MISSING))
+            continue
+        block = _absent_block(steps, document)
+        if block is None:
+            writes.append((format_field_path(steps), _plain(field.after)))
+            continue
+        path = format_field_path(block)
+        if path not in blocks:
+            blocks[path] = {}
+            writes.append((path, blocks[path]))
+        _graft(blocks[path], steps[len(block) :], _plain(field.after))
+    return writes
+
+
+def _absent_block(steps: Sequence[str | int], document: Any) -> tuple[str, ...] | None:
+    """The shallowest mapping on the way to ``steps`` that ``document`` lacks.
+
+    ``None`` when every container on the way is already there — the ordinary
+    case, and the one that keeps a write as specific as the field it changes.
+    Also ``None`` when what is missing would have to be a *sequence*: an entry
+    of one cannot be written at a path that does not exist, which is
+    :class:`~netgraph.edit.operations.AppendItem`'s business and not something a
+    mapping-shaped graft could stand in for.
+    """
+    for cut in range(1, len(steps)):
+        if get_path(document, steps[:cut]) is not MISSING:
+            continue
+        if not all(isinstance(step, str) for step in steps[cut - 1 :]):
+            return None
+        return tuple(str(step) for step in steps[:cut])
+    return None
+
+
+def _graft(block: dict[str, Any], steps: Sequence[str | int], value: Any) -> None:
+    """Write ``value`` at ``steps`` within a block being assembled.
+
+    Every step is a mapping key: :func:`_absent_block` only claims a block when
+    the whole path below it is.
+    """
+    current = block
+    for step in steps[:-1]:
+        nested = current.setdefault(str(step), {})
+        if not isinstance(nested, dict):  # pragma: no cover - two writes, one path
+            nested = {}
+            current[str(step)] = nested
+        current = nested
+    current[str(steps[-1])] = value
 
 
 def _geometry(change: Change) -> Iterator[Operation]:

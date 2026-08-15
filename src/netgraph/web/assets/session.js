@@ -1552,25 +1552,43 @@ var netgraphSession = (function () {
       run: function () {
         var selected = chosen();
         if (selected.length > 1) { deleteMany(selected); return; }
-        var target = selected[0] || here();
+        // The commentary answers here too, so that Delete means one thing on
+        // this canvas. It wins only when nothing is *explicitly* selected:
+        // `chosen` falls back to the focused element, and a note somebody has
+        // just clicked is a better answer than a focus ring left behind by the
+        // arrow keys.
+        var target = netgraphSelect.size()
+          ? selected[0]
+          : (netgraphNotes.token() || selected[0] || here());
         K.prompt({
           title: "Delete",
           detail: "An element goes with whatever cannot survive it; a cable leaves "
-            + "both devices where they are.",
+            + "both devices where they are. A note, an area or a legend takes "
+            + "nothing with it — nothing in an inventory refers to one.",
           fields: [{
             name: "address",
             label: "element",
             value: target,
-            list: addresses("node").concat(addresses("edge"))
+            list: addresses("node").concat(addresses("edge"), netgraphNotes.tokens())
           }],
           confirm: "Delete",
           onSubmit: function (values) {
             if (!values.address) { return "name what to delete"; }
-            var link = isLink(values.address);
-            ops([link
-              ? { op: "disconnect", address: values.address.split("#")[0] }
-              : { op: "delete", address: values.address }],
-              (link ? "disconnected " : "deleted ") + values.address).catch(function () {});
+            var annotation = netgraphNotes.parse(values.address);
+            var link = !annotation && isLink(values.address);
+            var operation = annotation
+              ? {
+                op: "delete-annotation",
+                kind: annotation.kind,
+                name: annotation.name,
+                namespace: annotation.namespace
+              }
+              : (link
+                ? { op: "disconnect", address: values.address.split("#")[0] }
+                : { op: "delete", address: values.address });
+            ops([operation], annotation
+              ? "deleted " + annotation.kind + " " + annotation.fqn
+              : (link ? "disconnected " : "deleted ") + values.address).catch(function () {});
           }
         });
       }

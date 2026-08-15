@@ -51,6 +51,7 @@ from netgraph.render import (
     filter_graph,
 )
 from netgraph.render.dot import to_dot, to_image
+from netgraph.render.jsonexport import annotations_payload
 from netgraph.render.routes import anchors_of, default_routing, fans_of, route_table
 from netgraph.rules import Severity
 from netgraph.validate import Finding
@@ -92,7 +93,13 @@ MAX_PROBLEMS: Final = 200
 #: What the browser is allowed to ask for, mapped to the field it sets. Keeping
 #: this closed is what stops a request from reaching a rendering knob the web
 #: interface does not offer.
-_BOOLEAN_FIELDS: Final[tuple[str, ...]] = ("show_ips", "show_vlans", "group_by_namespace", "strict")
+_BOOLEAN_FIELDS: Final[tuple[str, ...]] = (
+    "show_ips",
+    "show_vlans",
+    "group_by_namespace",
+    "annotations",
+    "strict",
+)
 
 
 class RequestError(NetgraphError):
@@ -117,6 +124,12 @@ class ViewOptions:
     show_ips: bool = True
     show_vlans: bool = True
     group_by_namespace: bool = False
+    #: Draw the notes, areas and legends of §21. A per-view toggle rather than a
+    #: setting, because commentary is exactly the layer somebody wants off while
+    #: reading the topology and on while explaining it — and because it changes
+    #: no fact, turning it off is never a different answer, only a plainer
+    #: picture.
+    annotations: bool = True
     #: Keep only elements participating in these VLANs; empty keeps everything.
     vlans: frozenset[int] = frozenset()
     #: Keep only these element kinds; empty keeps everything.
@@ -208,6 +221,7 @@ class ViewOptions:
             show_ips=self.show_ips,
             show_vlans=self.show_vlans,
             group_by_namespace=self.group_by_namespace,
+            annotations=self.annotations,
             title=self.title,
             icons=self.icons,
             tooltips=False,
@@ -238,6 +252,14 @@ class Preview:
     #: netgraph thinks that node is, and whether the position is stored or was
     #: invented by the engine; see :mod:`netgraph.layout.geometry`.
     geometry: Mapping[str, Any] | None = None
+    #: The notes, areas and legends this pass drew (§21), in the form
+    #: ``netgraph render -f json`` publishes them, or ``None`` when the view
+    #: declares none or they are turned off. Beside :attr:`geometry` and for the
+    #: same reason: a canvas that lets somebody drag a note has to know which
+    #: document is behind the box under the pointer, where that box is pinned,
+    #: and what it says — none of which can be read off the SVG, because an area
+    #: in an arranged drawing is a rectangle in the background with no id at all.
+    annotations: Mapping[str, Any] | None = None
     #: Wall-clock duration of the pass, in seconds.
     duration: float = 0.0
     #: What changed between two states, when this pass drew a *diff* — the marks
@@ -288,6 +310,7 @@ class Preview:
             "problemsOmitted": omitted,
             "dangling": list(self.dangling),
             "geometry": dict(self.geometry) if self.geometry is not None else None,
+            "annotations": dict(self.annotations) if self.annotations is not None else None,
             "counts": {
                 "nodes": self.nodes,
                 "edges": self.edges,
@@ -453,6 +476,7 @@ def render_inventory(
         edges=len(graph.edges),
         dangling=tuple(graph.dangling),
         geometry=_geometry(graph, options.render_options),
+        annotations=annotations_payload(graph, options.render_options),
         duration=time.monotonic() - started,
         graph_hash=digest,
     )
@@ -550,6 +574,7 @@ def render_diff(
         edges=len(graph.edges),
         dangling=tuple(graph.dangling),
         geometry=_geometry(graph, options.render_options),
+        annotations=annotations_payload(graph, marked),
         duration=time.monotonic() - started,
         diff=drawing.overlay.to_dict() | {"changeset": plan.to_dict()},
         graph_hash=digest,

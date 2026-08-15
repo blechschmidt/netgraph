@@ -57,6 +57,14 @@ graph netgraph {
     </TABLE>
   >];
 
+  "annotation:note-why-fibre" [id="note-why-fibre", shape=note, style=filled, fillcolor="#fef3c7", color="#8b856d", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">The backbone is <B>single-mode fibre</B>: 4.2 km between sites, which is past what copper does at any speed.</TD></TR>
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">&#8226; <FONT FACE="monospace">os2</FONT>, LC, 10Gbps</TD></TR>
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">&#8226; the ring survives one break</TD></TR>
+    </TABLE>
+  >];
+
   "ns:sites/north" -- "ns:sites/south" [id="edge-backbone_cbl-bb-north-south", color="#d97706", style=bold, penwidth=2.5, label="xe-0/0/1 -- xe-0/0/2\nBB-NS\nfiber\n10Gbps", tooltip="cable backbone/cbl-bb-north-south\nns:sites/north:xe-0/0/1 — ns:sites/south:xe-0/0/2\nmedium: fiber, speed: 10Gbps, length: 4200 m, label: BB-NS"];
   "ns:sites/south" -- "ns:sites/west" [id="edge-backbone_cbl-bb-south-west", color="#d97706", style=bold, penwidth=2.5, label="xe-0/0/1 -- xe-0/0/2\nBB-SW\nfiber\n10Gbps", tooltip="cable backbone/cbl-bb-south-west\nns:sites/south:xe-0/0/1 — ns:sites/west:xe-0/0/2\nmedium: fiber, speed: 10Gbps, length: 4200 m, label: BB-SW"];
   "ns:sites/north" -- "ns:sites/west" [id="edge-backbone_cbl-bb-west-north", color="#d97706", style=bold, penwidth=2.5, label="xe-0/0/2 -- xe-0/0/1\nBB-WN\nfiber\n10Gbps", tooltip="cable backbone/cbl-bb-west-north\nns:sites/north:xe-0/0/2 — ns:sites/west:xe-0/0/1\nmedium: fiber, speed: 10Gbps, length: 4200 m, label: BB-WN"];

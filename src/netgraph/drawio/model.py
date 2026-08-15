@@ -34,11 +34,14 @@ chain so that the rest of the code can think in page coordinates.
 
 from __future__ import annotations
 
+import hashlib
+import re
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Final
 
 from netgraph.drawio.identity import (
+    ATTR_ANNOTATED,
     ATTR_ORIGIN_X,
     ATTR_ORIGIN_Y,
     ATTR_ROLE,
@@ -59,6 +62,7 @@ __all__ = [
     "Diagram",
     "Frame",
     "absolute_geometry",
+    "cell_id",
 ]
 
 #: The id of the layer every top-level cell hangs off. mxGraph reserves ``0``
@@ -183,6 +187,11 @@ class Diagram:
     version: str = ""
     #: What wrote it, for the report. Never trusted.
     generator: str = ""
+    #: Does the file come from an exporter that draws annotations (§21)? False
+    #: for a diagram written before they existed — and the difference matters
+    #: for exactly one decision, which
+    #: :data:`~netgraph.drawio.identity.ATTR_ANNOTATED` explains.
+    annotated: bool = False
 
     def __iter__(self) -> Iterator[Cell]:
         return iter(self.cells)
@@ -215,6 +224,7 @@ class Diagram:
 
     def metadata_cell(self) -> Cell:
         """The invisible cell carrying :attr:`frame`, :attr:`view` and the version."""
+        annotated = {ATTR_ANNOTATED: "1"} if self.annotated else {}
         return Cell(
             id=METADATA_ID,
             role=CellRole.METADATA,
@@ -232,6 +242,7 @@ class Diagram:
                 ATTR_SCOPE: self.scope.value,
                 ATTR_ORIGIN_X: _plain(self.frame.origin_x),
                 ATTR_ORIGIN_Y: _plain(self.frame.origin_y),
+                **annotated,
             },
         )
 
@@ -250,6 +261,31 @@ METADATA_STYLE: Final = (
     "shape=rectangle;html=1;fillColor=none;strokeColor=none;opacity=0;"
     "movable=0;resizable=0;deletable=0;editable=0;locked=1;connectable=0;"
 )
+
+
+#: Longest slug kept in a cell id before the digest. Enough to recognise the
+#: element in a raw XML diff, short enough that the ids stay one line each.
+_SLUG_LIMIT: Final = 48
+
+#: Anything that is not safe and readable inside an XML id.
+_UNSAFE_IN_ID: Final = re.compile(r"[^A-Za-z0-9]+")
+
+
+def cell_id(prefix: str, key: str) -> str:
+    """A stable, readable, unique cell id for ``key``.
+
+    Readable so an XML diff can be reviewed, and hashed so that two keys which
+    fold to the same slug — ``sites/hq`` and ``sites-hq`` — still get two ids.
+    Derived rather than random, because two exports of one inventory must
+    produce the same file.
+
+    Lives here rather than beside the builder that mints most of the ids,
+    because :mod:`netgraph.drawio.annotations` mints the rest and both sides of
+    that pair cannot import each other.
+    """
+    slug = _UNSAFE_IN_ID.sub("-", key).strip("-")[:_SLUG_LIMIT] or "x"
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:8]
+    return f"{prefix}-{slug}-{digest}"
 
 
 def absolute_geometry(cell: Cell, cells: Mapping[str, Cell]) -> tuple[float, float, float, float]:

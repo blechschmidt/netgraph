@@ -18,6 +18,7 @@ flowchart TB
         n10["sw-west-acc-02<br/>[switch]<br/>vrf mgmt (65001:99)"]
         n12["sw-west-dist-01<br/>[switch]<br/>id 10.3.0.2<br/>ospf area 0.0.0.0<br/>vrf mgmt (65001:99)<br/>0.0.0.0/0 via 10.3.0.1 dev Ethernet52/1 metric 10<br/>0.0.0.0/0 blackhole vrf mgmt"]
     end
+    note0["The backbone is single-mode fibre: 4.2 km between sites, which is past what copper does at any speed.<br/>• os2, LC, 10Gbps<br/>• the ring survives one break"]
 
     n3 -- "iBGP 65001 · iBGP to rtr-south-core-01" --- n7
     n3 -- "iBGP 65001 · iBGP to rtr-west-core-01" --- n11
@@ -33,3 +34,5 @@ flowchart TB
     classDef switch fill:#dcf0dc,stroke:#16a34a,stroke-width:1px
     class n3,n7,n11 router
     class n0,n1,n2,n4,n5,n6,n8,n9,n10,n12 switch
+    classDef netgraphNote fill:#fef3c7,stroke:#8b856d,stroke-width:1px,stroke-dasharray:3 2
+    class note0 netgraphNote

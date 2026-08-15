@@ -1061,7 +1061,12 @@ def test_group_by_namespace_emits_one_cluster_per_namespace(campus: Inventory) -
     assert "subgraph cluster_" in grouped
     for namespace in graph.namespaces:
         assert f'label="{namespace}"' in grouped
-    assert "subgraph" not in render_dot(graph, RenderOptions(group_by_namespace=False))
+    # Without the flag there is no *namespace* box. Annotations are drawn as
+    # clusters too (§21) and are not what this test is about, so they are turned
+    # off rather than asserted absent — otherwise adding a legend to an example
+    # would fail a test about namespace grouping.
+    plain = render_dot(graph, RenderOptions(group_by_namespace=False, annotations=False))
+    assert "subgraph cluster_" not in plain
 
 
 def _edge_labels(source: str) -> list[str]:
@@ -1231,7 +1236,10 @@ def test_mermaid_groups_namespaces_into_subgraphs(campus: Inventory) -> None:
     # Every node still appears exactly once, inside its group.
     for identifier in (f"n{index}" for index in range(len(graph.nodes))):
         assert grouped.count(f"    {identifier}[") + grouped.count(f"        {identifier}[") >= 0
-    assert "subgraph" not in render_mermaid(graph, RenderOptions(group_by_namespace=False))
+    # As in the DOT case: no namespace box without the flag, and annotations —
+    # which are subgraphs of their own (§21) — are out of scope here.
+    plain = render_mermaid(graph, RenderOptions(group_by_namespace=False, annotations=False))
+    assert "subgraph" not in plain
 
 
 def test_mermaid_escapes_a_label_that_would_break_the_parser(tmp_path: Path) -> None:

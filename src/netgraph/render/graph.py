@@ -98,6 +98,7 @@ from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import TYPE_CHECKING, Final, TypeAlias
 
+from netgraph.annotations import AnnotationSet, annotations_for_view, area_members, note_anchor
 from netgraph.identity import identities, identity_plan
 from netgraph.layout.geometry import Geometry
 from netgraph.layout.resolve import resolve_geometry
@@ -1088,6 +1089,29 @@ class Graph:
     #: what makes the SVG, HTML and JSON renderers agree on coordinates without
     #: any of them being told to.
     geometry: Geometry = field(default_factory=Geometry)
+    #: The notes, areas and legends that belong in this view (§21), in the order
+    #: they were declared. Presentational and *never* topology: nothing here is
+    #: a node or an edge, no annotation contributes to :attr:`nodes` or
+    #: :attr:`edges`, and a rendering made with annotations turned off is
+    #: byte-identical to one of an inventory that declares none. They ride on the
+    #: graph for the same reason :attr:`geometry` does — a renderer must not have
+    #: to be told twice which drawing it is making — and are carried through
+    #: every transform unchanged, because filtering a diagram narrows what an
+    #: annotation *encloses* rather than which annotations exist.
+    annotations: AnnotationSet = field(default_factory=AnnotationSet)
+    #: What each annotation is *about*, keyed by the annotation's fully-qualified
+    #: name: the elements an area encloses, or the one element a note is anchored
+    #: to. Resolved by :mod:`netgraph.annotations` against the inventory, which
+    #: is the only place that can do it — a member may be written relatively and
+    #: a selector is a query — and therefore resolved here, once, where the
+    #: inventory is still in scope.
+    #:
+    #: These are inventory names, not necessarily drawn ones: a filter narrows
+    #: the graph and not this map, and
+    #: :func:`~netgraph.render.annotations.annotation_views` intersects the two.
+    #: That split is what lets an area survive a filter that removes half of it
+    #: and disappear when it removes all of it.
+    annotation_targets: Mapping[str, tuple[str, ...]] = field(default_factory=dict)
 
     def source_of(self, fqn: str) -> SourceLocation | None:
         """Where the element called ``fqn`` was declared, if it was declared."""
@@ -1305,6 +1329,7 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
     elif layer is Layer.IDENTITY:
         nodes, edges = _identity_view(inventory)
     geometry = resolve_geometry(inventory, layer.value)
+    annotations = annotations_for_view(inventory, layer.value)
     return Graph(
         root=inventory.root,
         nodes=nodes,
@@ -1313,7 +1338,36 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         dangling=dangling,
         sources=dict(inventory.sources),
         geometry=_narrowed(geometry, nodes, edges),
+        annotations=annotations,
+        annotation_targets=_annotation_targets(inventory, annotations),
     )
+
+
+def _annotation_targets(
+    inventory: Inventory, annotations: AnnotationSet
+) -> dict[str, tuple[str, ...]]:
+    """What every annotation of this view refers to, resolved once (§21).
+
+    The renderers get a :class:`Graph`, not an :class:`Inventory`, and resolving
+    an area's members needs the inventory: a member may be written relative to
+    the namespace the area was declared in, and a selector is a query over
+    labels, kinds and namespaces. Doing it here means the answer is computed
+    exactly once per rendering and cannot differ from the one the validator
+    reports as ``W142``/``W143`` — a warning that disagreed with the picture
+    would be worse than no warning.
+
+    An annotation whose references resolve to nothing keeps an empty entry
+    rather than being dropped: whether that is fatal to the drawing is the
+    renderer's decision (an area with no members is not drawn; a note with no
+    anchor still says what it says), and this map does not make it.
+    """
+    targets: dict[str, tuple[str, ...]] = {}
+    for fqn, area in annotations.areas:
+        targets[fqn] = area_members(inventory, fqn, area)
+    for fqn, note in annotations.notes:
+        anchor = note_anchor(inventory, fqn, note)
+        targets[fqn] = () if anchor is None else (anchor,)
+    return targets
 
 
 # --------------------------------------------------------------------------- #
@@ -2570,6 +2624,12 @@ def filter_graph(graph: Graph, spec: FilterSpec) -> Graph:
         dangling=graph.dangling,
         sources=graph.sources,
         geometry=_narrowed(graph.geometry, nodes, edges),
+        # Carried whole. A filter narrows what an annotation *encloses* — which
+        # is decided against the surviving nodes when the drawing is made — and
+        # not which annotations the view has; an area that loses every member is
+        # dropped by the renderer, not here.
+        annotations=graph.annotations,
+        annotation_targets=graph.annotation_targets,
     )
 
 

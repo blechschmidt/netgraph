@@ -1,0 +1,54 @@
+# W143 (NG-G004) - an area selects nothing.
+#
+# The zone asks for everything labelled 'zone: dmz' and no element carries that
+# label, so the box encloses nothing and is not drawn. An empty box on a diagram
+# is worse than no box: it reads as a claim that the zone is empty, when what it
+# really says is that the label was renamed and the area was not.
+#
+# A warning rather than an error, for the reason W142 is one. An annotation is
+# presentational and is barred from changing what netgraph concludes, so a rule
+# about one can never fail a build; the selector is also the field most likely
+# to be right tomorrow, once the element it was written for is added.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        - 10.0.0.1/24
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-b
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        - 10.0.0.2/24
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - sw-a:port1
+    - sw-b:port1
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: area
+metadata:
+  name: dmz
+spec:
+  label: DMZ
+  selector:
+    labels:
+      zone: dmz

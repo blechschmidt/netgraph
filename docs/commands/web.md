@@ -279,7 +279,7 @@ is on loopback and none of the write routes exist unless `--write` was given.
 | `GET /api/events` | A `text/event-stream` of `tree-changed`, `file-changed`, `history-changed`, `disk-changed`, `presence`, opening with `hello` and beating every 15 s. Resumes from `Last-Event-ID`; a resume point older than the ring buffer opens with `resync`, meaning refetch. |
 | `POST /api/presence` | `{"client": …, "selection": [ … ], "editing": [ … ]}` — what this client is looking at and has unsaved edits in; answers with everybody. `{"leaving": true}` drops it at once. Advisory, and the one route here that a read-only session still accepts, because it writes nothing. |
 | `GET /api/tree` | Every file, its content hash, its documents, and each document's kind, name, address and line. `?path=a.yaml&path=b.yaml` answers for those files only, with `partial: true` and a `missing` list; `?diagnostics=0` leaves out the findings, which cost a validation of the whole tree either way. |
-| `GET /api/graph?view=l2` | The resolved graph as an embeddable SVG, its info-box records, its problems and its stored [geometry](../editing.md). `graphHash` fingerprints the drawing; passing it back as `?known=` answers `unchanged: true` with no SVG when this revision would draw the same picture, having skipped the layout. |
+| `GET /api/graph?view=l2` | The resolved graph as an embeddable SVG, its info-box records, its problems, its stored [geometry](../editing.md) and its [`annotations`](../schema.md#21-diagram-annotations-notes-areas-and-legends) — the same payload `netgraph render -f json` publishes, which is how the canvas knows where a note or a zone is, an arranged drawing having painted the zone into the background with no id on it. `&annotations=0` leaves both the drawing and the payload without them. `graphHash` fingerprints the drawing; passing it back as `?known=` answers `unchanged: true` with no SVG when this revision would draw the same picture, having skipped the layout. |
 | `GET /api/file/<path>` | One file's text and the hash a write of it must quote. |
 | `PUT /api/file/<path>` | That file back: `{"text": …, "hash": …}`. A stale `hash` is `409`; a new error is `422`, listing them; `"force": true` overrides the second, never the first. |
 | `POST /api/ops` | `{"revision": …, "ops": [ … ]}` — a batch of [edit operations](../editing.md), applied atomically. Answers with the applied operations, their inverses, the files changed and the tree's diagnostics. |
@@ -353,6 +353,7 @@ menu, untouched.
 | Pin the inspector | Pin the inspector — `Space` | a focused element |
 | Cable it to… | Connect this element… — `c` | `--write` |
 | Add an interface… | Add an interface… — `i` | `--write` |
+| Note about it… | Add a note to the diagram… — `Shift-N` | `--write` |
 | Rename it… | Rename the focused element… — `F2` | `--write` |
 | Set a field… | Set a field… — `e` | `--write` |
 | Remove a field… | Remove a field… — *palette only* | `--write` |
@@ -368,14 +369,23 @@ menu, untouched.
 | Straighten it | Straighten the focused link — `Shift-B` | `--write` |
 | Route it… | Change how the link is routed… — `r` | `--write` |
 | Put the label back on the line | Put the link's label back on the line — *palette only* | `--write` |
+| Note about it… | Add a note to the diagram… — `Shift-N` | `--write` |
 | Set a field… | Set a field… — `e` | `--write` |
 | Disconnect it | Delete the selection — `Delete` | `--write` |
+
+**Right-clicking a note, an area or a legend**
+
+| Offers | Same as | Needs |
+|---|---|---|
+| Edit the text… | Edit the note's text… — `Shift-E` | `--write` |
+| Delete it | Delete the selection — `Delete` | `--write` |
 
 **Right-clicking the canvas**
 
 | Offers | Same as | Needs |
 |---|---|---|
 | New ▸ *(one row per element kind)* | Create an element… — `n` | `--write` |
+| New note | Add a note to the diagram… — `Shift-N` | `--write` |
 | Show another layer… | Switch layer… — *palette only* | — |
 | Fit the diagram | Fit the diagram — `0` | — |
 | Undo | Undo — `Ctrl-Z` | `--write` |
@@ -522,6 +532,29 @@ gesture is one entry in the changes drawer with a YAML hunk under it. The line
 `tests/test_browser.py` runs against the Python it mirrors on every CI run, so a
 drag cannot land somewhere the render would not.
 
+### Writing on the diagram
+
+The commentary of
+[`docs/schema.md` §21](../schema.md#21-diagram-annotations-notes-areas-and-legends)
+— a callout, a zone, a key — is edited here the way a cable's route is.
+**`Shift-N`** drops a note at the pointer and opens it for typing; right-clicking
+an element or a link and choosing **Note about it…** anchors the note to that
+instead, so it follows the device when the diagram is laid out again. A note is
+retyped by **double-clicking** it, or with `Shift-E` on a selected one:
+`Ctrl-Enter` or clicking away writes it, `Escape` leaves it alone. Dragging a
+note moves it, its corner resizes it, and a zone pinned to a rectangle is dragged
+by its outline and resized by its corners. `Delete` removes whichever is
+selected. **`Alt-N`** hides the lot, which changes no file: commentary is never
+topology, so it is a way of looking at the diagram rather than a way of changing
+it.
+
+A zone drawn round its *members* has no box to move — it is wherever those
+devices are — so dragging it is refused with that sentence rather than quietly
+turned into a rectangle. Everything else lands as one `create-annotation`,
+`set-annotation` or `delete-annotation` batch through `/api/ops`, which is one
+entry in the changes drawer and one `Ctrl-Z`; the rules are in
+[`docs/editing.md`](../editing.md#annotating-a-diagram).
+
 ### Without a screen
 
 The rendered SVG is inert by default: Graphviz emits shapes, not semantics. This
@@ -600,6 +633,8 @@ cable it, undo both — without dispatching a single mouse event.
 | `Shift-B` | Straighten the focused link | the diagram | `--write` | Clears every bend, leaving the link to run directly between its two devices. The routing style and the label position are kept. |
 | `r` | Change how the link is routed… | the diagram | `--write` | Spline, orthogonal or straight, on this link alone. Clearing it takes the view's default back. Honoured by 'netgraph render' as well as here. |
 | *palette only* | Put the link's label back on the line | anywhere | `--write` | Undoes a nudged label, leaving it half way along the route where the renderer puts one nobody has moved. |
+| `Shift-N` | Add a note to the diagram… | the diagram | `--write` | Drops a note where the pointer is — or in the middle of the view when the keyboard asks — and opens it for typing. Right-clicking an element or a link anchors the note to it instead, so it follows what it is about. 'netgraph edit create-annotation'. |
+| `Shift-E` | Edit the note's text… | the diagram | `--write` | A text box over the note itself, in the markdown subset §21 defines. Ctrl-Enter or clicking away writes 'spec.text'; Escape abandons it and writes nothing. Double-clicking the note does the same. |
 | `i` | Add an interface… | the diagram | `--write` | 'netgraph edit add-interface'. |
 | *palette only* | Remove an interface… | anywhere | `--write` | 'netgraph edit remove-interface'. |
 
@@ -627,6 +662,7 @@ cable it, undo both — without dispatching a single mouse event.
 | `Alt-I` | Toggle IP addresses | anywhere | — | Whether the picture prints addresses. The inspector shows them either way. |
 | `Alt-V` | Toggle VLANs | anywhere | — | Whether the picture prints VLAN membership. |
 | `Alt-G` | Toggle namespace grouping | anywhere | — | Collapse each namespace into one box. |
+| `Alt-N` | Toggle annotations | anywhere | — | Whether the notes, areas and legends of §21 are drawn. They are commentary, never topology, so hiding them changes nothing the tool concludes — only how much of the picture is somebody's explanation. |
 | `Alt-S` | Toggle strict | anywhere | — | Report warnings as errors. |
 | *palette only* | Filter by VLAN… | anywhere | — | Keep only elements participating in the VLANs given. |
 | `Alt-F` | Failure mode | anywhere | a folder | Click an element and everything it would isolate from the gateways greys out; the status line names the count. Reads only — nothing is written, and Escape or the same key puts the diagram back. |

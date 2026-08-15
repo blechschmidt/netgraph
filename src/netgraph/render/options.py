@@ -39,6 +39,13 @@ class RenderOptions:
     show_vlans: bool = True
     #: Draw each namespace as a visual group (a Graphviz cluster / Mermaid subgraph).
     group_by_namespace: bool = False
+    #: Draw the notes, areas and legends the inventory declares for this view
+    #: (§21). On by default: an annotation is something somebody wrote down
+    #: *about this diagram*, so leaving it out has to be asked for. Off emits
+    #: none of them, in every backend, and produces exactly the bytes the same
+    #: inventory would produce with no annotation documents in it — which is what
+    #: makes this a display option rather than a filter.
+    annotations: bool = True
     #: Diagram caption; ``None`` leaves the rendering untitled.
     title: str | None = None
     #: Longest address list spelled out under a node before it is abbreviated.

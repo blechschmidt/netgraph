@@ -29,7 +29,7 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
 from netgraph.edit.errors import ConflictError, EditError
-from netgraph.edit.placement import FileFacts
+from netgraph.edit.placement import FileFacts, namespace_of_file
 from netgraph.edit.roundtrip import YamlDocument, YamlFile
 from netgraph.fsio import write_text_atomically
 from netgraph.loader.inventory import Inventory, SourceLocation
@@ -292,6 +292,53 @@ class EditableTree:
         except (OSError, UnicodeDecodeError) as exc:  # pragma: no cover - raced or binary
             raise EditError(f"cannot read {relative}: {exc}") from exc
 
+    def find_document(self, *, kind: str, name: str, namespace: str = "") -> tuple[str, int] | None:
+        """Where the ``kind`` document called ``name`` sits, read from the *files*.
+
+        The inventory is the right way to find a document and this is the
+        fallback for when it cannot answer — when a batch has already left the
+        document in a state the loader will not parse, and so has dropped it
+        from the index it is about to be asked for again.
+
+        That is a real sequence rather than a hypothetical one. Dragging an
+        unplaced note writes ``spec.geometry.x`` and then ``spec.geometry.y``;
+        between the two the note has an ``x`` and no ``y``, which §21 forbids
+        (:data:`~netgraph.models.annotation.COHERENCE_RULE`), so a reload
+        between the operations loses it and the second write would fail with
+        "there is no note called…". The batch is atomic and the *finished* state
+        is coherent, so the honest answer is to find the document anyway.
+
+        Dirty files are searched first: the document a batch cannot find is
+        almost always one the same batch just wrote, and a tree of a thousand
+        files should not be walked to learn that.
+
+        Returns:
+            ``(relative, index)``, or ``None`` when no document matches.
+        """
+        dirty = [relative for relative, tracked in self._files.items() if not tracked.removed]
+        rest = [
+            relative
+            for relative in _discovered(self.root)
+            if relative not in self._files and namespace_of_file(relative) == namespace
+        ]
+        for relative in (*sorted(dirty), *sorted(rest)):
+            if namespace_of_file(relative) != namespace:
+                continue
+            try:
+                parsed = self.open(relative)
+            except EditError:  # pragma: no cover - unreadable or unparseable
+                continue
+            for index, document in enumerate(parsed.documents):
+                data = document.data
+                if not isinstance(data, Mapping):
+                    continue
+                metadata = data.get("metadata")
+                if data.get("kind") != kind or not isinstance(metadata, Mapping):
+                    continue
+                if metadata.get("name") == name:
+                    return relative, index
+        return None
+
     # -- writing ---------------------------------------------------------
 
     def document(self, relative: str, index: int) -> YamlDocument:
@@ -491,9 +538,11 @@ class EditableTree:
         Files that declare no element — a file of templates — are listed with no
         documents, so placement never invents a path that is already taken.
 
-        Layout documents (§18) are listed alongside the elements even though
-        they declare none, because placing a *second* one has to find the first:
-        a tree whose geometry lives in ``layouts.yaml`` should keep it there.
+        Layout documents (§18) and annotations (§21) are listed alongside the
+        elements even though they declare none, because placing a *second* one
+        has to find the first: a tree whose geometry lives in ``layouts.yaml``
+        should keep it there, and a second note belongs in the file the first
+        one is in.
         """
         found: dict[str, tuple[list[str], list[str]]] = {}
         for relative in _discovered(self.root):
@@ -505,6 +554,10 @@ class EditableTree:
         declared += [
             (inventory.layout_sources.get(fqn), LAYOUT_KIND, layout.metadata.name)
             for fqn, layout in inventory.layouts.items()
+        ]
+        declared += [
+            (inventory.annotation_source(kind, fqn), kind, annotation.metadata.name)
+            for kind, fqn, annotation in inventory.annotations
         ]
         for source, kind, name in declared:
             if source is None or source.relative is None:  # pragma: no cover - always set

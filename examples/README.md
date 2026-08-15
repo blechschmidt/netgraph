@@ -10,7 +10,7 @@ fails the test suite.
 |---|---|---|
 | [`quickstart/`](quickstart/) | 3 devices, 2 cables | The walkthrough in the project README, checked in so it stays executable: a router, a switch and a computer in one VLAN. |
 | [`home-lab/`](home-lab/) | 5 devices, 1 adapter, 4 cables | The smallest realistic topology: one router, one switch, two computers, a server, and a USB-to-Ethernet adapter on a single VLAN. |
-| [`campus/`](campus/) | 22 devices, 22 cables, 1 template | Nested namespaces across three sites, layer-3 core routers in a backbone ring, VLAN trunks between access and distribution switches, fibre uplinks, one OSPF area with an iBGP mesh over it, a management VRF, and one access switch declared from a `kind: template` document instead of by hand. |
+| [`campus/`](campus/) | 22 devices, 22 cables, 1 template, 8 annotations | Nested namespaces across three sites, layer-3 core routers in a backbone ring, VLAN trunks between access and distribution switches, fibre uplinks, one OSPF area with an iBGP mesh over it, a management VRF, one access switch declared from a `kind: template` document instead of by hand, and the [notes, areas and legends](campus/README.md#what-is-said-about-the-diagram) of §21. |
 | [`overlay/`](overlay/) | 7 devices, 6 cables, 5 tunnels | WireGuard, IPsec, OpenVPN, VXLAN and GRE over one WAN — including VXLAN and GRE nested inside the IPsec tunnel, and a three-ended mesh. |
 | [`patch-room/`](patch-room/) | 4 devices, 2 patch panels, 7 cables | Two racks and a structured-cabling plant: every server link crosses two patch panels, and every element records where it is bolted. Draw it with `--layer physical` for the cabling record, `--layer l1` for the spliced topology, and `--layer rack` for the elevations. |
 

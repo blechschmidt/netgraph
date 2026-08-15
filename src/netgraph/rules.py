@@ -799,6 +799,20 @@ RULES: Final[tuple[Rule, ...]] = (
         title="unknown redundancy expectation",
     ),
     Rule(
+        "W142",
+        Severity.WARNING,
+        "A diagram annotation names an element the inventory does not declare.",
+        ("NG-G001",),
+        title="annotation about something that is gone",
+    ),
+    Rule(
+        "W143",
+        Severity.WARNING,
+        "An area's selector matches no element of the inventory.",
+        ("NG-G004",),
+        title="area that encloses nothing",
+    ),
+    Rule(
         "I001",
         Severity.INFO,
         "A MAC address is locally administered rather than vendor-assigned.",

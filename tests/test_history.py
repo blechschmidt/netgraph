@@ -542,6 +542,29 @@ def test_a_summary_orders_by_kind_and_names_every_action(tmp_path: Path) -> None
     assert summarise(plan) == "1 device added, 1 device renamed, 1 link removed"
 
 
+def test_a_summary_names_each_annotation_kind() -> None:
+    """A sidecar has a noun too: `1 note added`, not `1 element added`.
+
+    ``netgraph log`` is read by somebody working out what a commit did, and
+    "element" is the word for the thing the catalogue has no name for. The
+    three §21 kinds and the arrangement all have one.
+    """
+    from netgraph.plan.model import Action, Change, Plan
+
+    plan = Plan(
+        changes=(
+            Change(action=Action.CREATE, address=parse_address("layout.default"), kind="layout"),
+            Change(action=Action.CREATE, address=parse_address("note.why-orange"), kind="note"),
+            Change(action=Action.UPDATE, address=parse_address("area.dmz"), kind="area"),
+            Change(action=Action.DELETE, address=parse_address("legend.key"), kind="legend"),
+        )
+    )
+
+    assert summarise(plan) == (
+        "1 arrangement added, 1 note added, 1 area changed, 1 legend removed"
+    )
+
+
 # --------------------------------------------------------------------------- #
 # The cache
 # --------------------------------------------------------------------------- #

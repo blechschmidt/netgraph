@@ -33,6 +33,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Final, TypeAlias
 
+from netgraph.models.annotation import Area, Legend, Note
 from netgraph.models.base import NetgraphModel
 from netgraph.models.device import DeviceSpec
 from netgraph.models.document import ELEMENT_MODELS
@@ -67,6 +68,11 @@ _INHERIT_AFTER: Final = "interfaces"
 #: The two keys that are YAML but not model fields, spliced in by
 #: :func:`_with_loader_keys`. :func:`check_order` allows exactly these.
 LOADER_KEYS: Final[frozenset[str]] = frozenset({INHERIT_KEY, _RANGE_KEY})
+
+#: The three annotation documents (§21). Sidecars like a test suite, and like
+#: one their ``spec`` is modelled all the way down, so they order off the models
+#: with nothing to splice in.
+_ANNOTATION_MODELS: Final[tuple[type[NetgraphModel], ...]] = (Note, Area, Legend)
 
 
 @dataclass(frozen=True, slots=True)
@@ -167,7 +173,13 @@ def _reachable_models() -> list[type[NetgraphModel]]:
     Built by running the shape builder for its side effect on ``memo``, whose
     keys are exactly the models it recursed into.
     """
-    roots: list[type[NetgraphModel]] = [ElementBase, Template, TestSuite, *ELEMENT_MODELS]
+    roots: list[type[NetgraphModel]] = [
+        ElementBase,
+        Template,
+        TestSuite,
+        *_ANNOTATION_MODELS,
+        *ELEMENT_MODELS,
+    ]
     memo: dict[Any, Shape] = {}
     for model in roots:
         _model_shape(model, memo)
@@ -329,6 +341,13 @@ def _build() -> dict[str, Shape]:
     suite = _model_shape(TestSuite, memo)
     assert isinstance(suite, MappingShape)  # the envelope is a mapping
     shapes[TestSuite.model_fields["kind"].default] = suite
+    # The annotations (§21) order the same way and for the same reason: a note,
+    # an area and a legend are modelled shapes throughout, so 'text' precedes
+    # 'anchor' precedes 'geometry' because the model declares them that way.
+    for annotated in _ANNOTATION_MODELS:
+        annotation = _model_shape(annotated, memo)
+        assert isinstance(annotation, MappingShape)  # the envelope is a mapping
+        shapes[annotated.model_fields["kind"].default] = annotation
     return shapes
 
 

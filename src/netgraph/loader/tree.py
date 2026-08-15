@@ -53,11 +53,13 @@ from netgraph.loader.inventory import Inventory, LoadError, SourceLocation, qual
 from netgraph.loader.provenance import FieldPath, Provenance, Site
 from netgraph.loader.templates import INHERIT_KEY, TemplateRegistry, resolved_spec
 from netgraph.models import (
+    ANNOTATION_DOCUMENT_KINDS,
     DEVICE_KINDS,
     LAYOUT_KIND,
     TEMPLATE_KIND,
     TEST_SUITE_KIND,
     Element,
+    parse_annotation,
     parse_document,
     parse_layout,
     parse_template,
@@ -652,6 +654,7 @@ class _Mark:
     templates: int
     layouts: int
     suites: int
+    annotations: int
 
 
 @dataclass(eq=False)
@@ -686,6 +689,8 @@ class _Builder:
     _layouts_seen: int = 0
     #: The same count for ``kind: testsuite``; see :meth:`harvest`.
     _suites_seen: int = 0
+    #: The same count for the three annotation kinds of §21; see :meth:`harvest`.
+    _annotations_seen: int = 0
 
     # -- phase one: the walk ---------------------------------------------
 
@@ -702,6 +707,9 @@ class _Builder:
             return
         if kind == TEST_SUITE_KIND:
             self._add_test_suite(document, entry)
+            return
+        if kind in ANNOTATION_DOCUMENT_KINDS:
+            self._add_annotation(document, entry)
             return
 
         reference = _inherit_reference(document.data)
@@ -827,6 +835,52 @@ class _Builder:
                 )
             )
 
+    def _add_annotation(self, document: RawDocument, entry: InventoryFile) -> None:
+        """Register a ``note``, ``area`` or ``legend`` document (§21).
+
+        Indexed as it is read, like a layout and for the same reason: an
+        annotation names elements that may be declared in a file sorting later,
+        and whether it names anything at all is the validator's question
+        (``NG-G001``) rather than the loader's.
+
+        Its provenance carries the field-level redirect table unconditionally,
+        like a test suite's: the editor writes annotations back field by field —
+        a dragged note is ``spec.geometry.x`` — and an operation that cannot find
+        the line it is changing cannot preserve the comment above it.
+        """
+        self._annotations_seen += 1
+        try:
+            annotation = parse_annotation(document.data, source=document.source)
+        except SchemaError as exc:
+            for error in _schema_errors(exc, document):
+                self.inventory.record(error)
+            return
+        source = SourceLocation(
+            path=entry.path,
+            relative=entry.relative.as_posix(),
+            index=document.index,
+            line=document.line,
+            provenance=Provenance(base=document),
+        )
+        if self.inventory.add_annotation(annotation, namespace=entry.namespace, source=source):
+            return
+        fqn = qualify(entry.namespace, annotation.metadata.name)
+        first = self.inventory.annotation_source(annotation.kind, fqn)
+        where = f" (first declared at {first})" if first is not None else ""
+        self.inventory.record(
+            LoadError(
+                message=(
+                    f"duplicate {annotation.kind} name {fqn!r}{where}; this document is ignored"
+                ),
+                path=source.path,
+                relative=source.relative,
+                line=source.line,
+                index=source.index,
+                field_path=("metadata", "name"),
+                rule="NG-G002",
+            )
+        )
+
     def mark(self) -> _Mark:
         """Where the builder stands before a file is fed to it."""
         return _Mark(
@@ -835,6 +889,7 @@ class _Builder:
             templates=self._templates_seen,
             layouts=self._layouts_seen,
             suites=self._suites_seen,
+            annotations=self._annotations_seen,
         )
 
     def harvest(self, mark: _Mark) -> CachedFile | None:
@@ -850,10 +905,11 @@ class _Builder:
         * A device carrying ``spec.from``. Its element is the merge of this
           file's document with a template that may be declared anywhere, so a
           key over this file alone cannot notice the template changing.
-        * A file declaring a ``kind: layout`` or a ``kind: testsuite``. Both are
-          indexed apart from the elements and a replayed slot list would not
-          carry either, so a cached file would silently lose the arrangement, or
-          the assertions, that it declares.
+        * A file declaring a ``kind: layout``, a ``kind: testsuite`` or one of
+          the three annotation kinds of §21. All are indexed apart from the
+          elements and a replayed slot list would not carry any of them, so a
+          cached file would silently lose the arrangement, the assertions, or the
+          notes that it declares.
 
         Both stay on the slow path forever, which is the honest cost of a
         per-file cache. They are counted, so ``netgraph cache info`` can say how
@@ -863,6 +919,7 @@ class _Builder:
             self._templates_seen != mark.templates
             or self._layouts_seen != mark.layouts
             or self._suites_seen != mark.suites
+            or self._annotations_seen != mark.annotations
         ):
             return None
         slots: list[CachedSlot] = []

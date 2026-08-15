@@ -1,0 +1,52 @@
+# W142 (NG-G001) - a note is about something the inventory has not got.
+#
+# 'sw-gone' was deleted and the callout written about it was not, so the note
+# has nothing to point at: it is drawn nowhere and its leader line leads
+# nowhere, while reading in the file as though it still explained a switch.
+#
+# A warning rather than an error, and not a close call. An annotation is
+# presentational and is barred from changing what netgraph concludes, so no
+# rule about one may ever fail a build -- deleting a switch must not stop
+# 'netgraph validate' because somebody once wrote a note about it.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        - 10.0.0.1/24
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-b
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        - 10.0.0.2/24
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - sw-a:port1
+    - sw-b:port1
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: note
+metadata:
+  name: why-two-uplinks
+spec:
+  text: The second uplink is for the annexe, which is on its own feed.
+  anchor:
+    element: sw-gone

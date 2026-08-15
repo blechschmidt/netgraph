@@ -25,12 +25,11 @@ has one and from the bounding box of its members when it does not.
 
 from __future__ import annotations
 
-import hashlib
-import re
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from netgraph.drawio.annotations import PlacedAnnotations, annotation_cells, place_annotations
 from netgraph.drawio.identity import (
     ATTR_DOCUMENT,
     ATTR_HASH,
@@ -56,14 +55,16 @@ from netgraph.drawio.identity import (
     content_hash,
     format_points,
 )
-from netgraph.drawio.model import MARGIN, ROOT_ID, Cell, Diagram, Frame
+from netgraph.drawio.model import MARGIN, ROOT_ID, Cell, Diagram, Frame, cell_id
 from netgraph.drawio.notes import Level, Notes
 from netgraph.drawio.styles import edge_style, group_style, icon_data_uri, node_style, palette_key
 from netgraph.layout.geometry import Box, Placement
 from netgraph.loader.inventory import Inventory
 from netgraph.plan.document import body_of
+from netgraph.render.annotations import annotation_views
 from netgraph.render.graph import Edge, Graph, Node
 from netgraph.render.icons import IconTheme
+from netgraph.render.options import RenderOptions
 
 __all__ = [
     "AUTO_COLUMNS",
@@ -105,13 +106,6 @@ AUTO_ROW_HEIGHT: Final = 150.0
 #: frames drawn round them do not touch.
 _AUTO_NAMESPACE_GAP: Final = 80.0
 
-#: Longest slug kept in a cell id before the digest. Enough to recognise the
-#: element in a raw XML diff, short enough that the ids stay one line each.
-_SLUG_LIMIT: Final = 48
-
-#: Anything that is not safe and readable inside an XML id.
-_UNSAFE_IN_ID: Final = re.compile(r"[^A-Za-z0-9]+")
-
 #: The :class:`~netgraph.export.manifest.Reason` tokens this builder's notes
 #: map onto. Spelled as literals rather than imported: the export package
 #: imports *this* one, and a wire format has no business importing the artefact
@@ -138,6 +132,10 @@ class BuildOptions:
     #: Draw a frame per namespace. Off gives a flat canvas, which is easier to
     #: rearrange wholesale and says less about where the documents live.
     groups: bool = True
+    #: Draw the notes, areas and legends of §21. On by default, and off only for
+    #: a caller that wants the topology alone — the annotations are part of the
+    #: picture the inventory describes, not decoration added to it.
+    annotations: bool = True
 
 
 def build_diagram(
@@ -158,14 +156,16 @@ def build_diagram(
 
     Returns:
         A :class:`~netgraph.drawio.model.Diagram` whose cells are in a fixed
-        order — metadata, frames outermost first, nodes, links — so two exports
-        of an unchanged inventory are byte-identical.
+        order — metadata, areas, frames outermost first, nodes, links, then the
+        notes and legends — so two exports of an unchanged inventory are
+        byte-identical, and so the z-order draws each layer where it belongs.
     """
     record = notes if notes is not None else Notes()
     nodes = _ordered_nodes(graph)
     placements = _placements(graph, nodes, record)
     boxes = _group_boxes(graph, nodes, placements) if options.groups else {}
-    frame = _frame(placements, boxes)
+    placed = _annotations(graph, placements, boxes, options, record)
+    frame = _frame(placements, boxes, placed)
 
     frames = _frame_cells(boxes, frame)
     groups = _reparented(frames)
@@ -180,6 +180,7 @@ def build_diagram(
     )
     ids = {node.fqn: cell.id for node, cell in zip(nodes, node_cells, strict=True)}
     link_cells = tuple(_link_cells(graph, inventory, frame, ids, record))
+    annotations = annotation_cells(placed, frame, inventory, ids)
 
     diagram = Diagram(
         view=options.view,
@@ -187,8 +188,84 @@ def build_diagram(
         frame=frame,
         scope=options.scope,
         version=MODEL_VERSION,
+        annotated=options.annotations,
     )
-    return diagram.with_cells((diagram.metadata_cell(), *groups, *node_cells, *link_cells))
+    return diagram.with_cells(
+        (
+            diagram.metadata_cell(),
+            *annotations.background,
+            *groups,
+            *node_cells,
+            *link_cells,
+            *annotations.foreground,
+        )
+    )
+
+
+def _annotations(
+    graph: Graph,
+    placements: Mapping[str, _Placed],
+    boxes: Mapping[str, Box],
+    options: BuildOptions,
+    record: Notes,
+) -> PlacedAnnotations:
+    """Every annotation of this view, boxed in netgraph coordinates (§21).
+
+    Before the page frame, because the frame is computed from the answer: an
+    area drawn round the outermost devices sticks out past them, and a legend
+    sits outside the drawing entirely. Computing the frame first would put both
+    off the page.
+    """
+    if not options.annotations:
+        return PlacedAnnotations()
+    positions = {
+        fqn: Box(x=placed.x, y=placed.y, width=placed.width, height=placed.height)
+        for fqn, placed in placements.items()
+    }
+    placed = place_annotations(
+        annotation_views(graph, RenderOptions()),
+        positions,
+        drawing=_bounding_box([*(box.bounds for box in positions.values()), *_bounds(boxes)]),
+    )
+    _record_undrawn(graph, placed, record)
+    return placed
+
+
+def _record_undrawn(graph: Graph, placed: PlacedAnnotations, record: Notes) -> None:
+    """Say so when an annotation this view declares is not in the file.
+
+    An area whose members a filter removed, and a legend that turned out to have
+    nothing to put in it, are both dropped rather than drawn as an empty box —
+    which is right, and would be invisible. The manifest is where "it is
+    declared and it is not in your diagram" gets said out loud.
+    """
+    drawn = placed.names()
+    for fqn, annotation in graph.annotations:
+        if fqn in drawn:
+            continue
+        record.add(
+            Level.INFO,
+            f"{annotation.kind}/{fqn}",
+            "this drawing holds nothing for the annotation to be about, so it was left out; "
+            "it is still declared, and a diagram of a view that draws its members will have it",
+            reason=NOT_REPRESENTABLE,
+        )
+
+
+def _bounds(boxes: Mapping[str, Box]) -> Iterator[tuple[float, float, float, float]]:
+    for box in boxes.values():
+        yield box.bounds
+
+
+def _bounding_box(bounds: Sequence[tuple[float, float, float, float]]) -> Box | None:
+    if not bounds:
+        return None
+    return Box.from_bounds(
+        min(entry[0] for entry in bounds),
+        min(entry[1] for entry in bounds),
+        max(entry[2] for entry in bounds),
+        max(entry[3] for entry in bounds),
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -359,10 +436,19 @@ def _padded(bounds: Sequence[tuple[float, float, float, float]]) -> Box:
     return Box.from_bounds(left, bottom, right, top)
 
 
-def _frame(placements: Mapping[str, _Placed], boxes: Mapping[str, Box]) -> Frame:
-    """The coordinate map that puts the whole drawing on a positive page."""
+def _frame(
+    placements: Mapping[str, _Placed], boxes: Mapping[str, Box], placed: PlacedAnnotations
+) -> Frame:
+    """The coordinate map that puts the whole drawing on a positive page.
+
+    The annotations count towards it. A note pinned above the topmost switch and
+    a legend outside the bottom-right corner are both part of the picture, and a
+    frame computed without them would put each of them off the page — where
+    draw.io draws it perfectly well and nobody ever looks.
+    """
     bounds = [entry.bounds for entry in placements.values()]
     bounds.extend(box.bounds for box in boxes.values())
+    bounds.extend(placed.bounds())
     if not bounds:
         return Frame()
     return Frame(
@@ -599,19 +685,6 @@ def _link_attributes(
         if source is not None:
             attributes[ATTR_DOCUMENT] = source.relative
     return attributes
-
-
-def cell_id(prefix: str, key: str) -> str:
-    """A stable, readable, unique cell id for ``key``.
-
-    Readable so an XML diff can be reviewed, and hashed so that two keys which
-    fold to the same slug — ``sites/hq`` and ``sites-hq`` — still get two ids.
-    Derived rather than random, because two exports of one inventory must
-    produce the same file.
-    """
-    slug = _UNSAFE_IN_ID.sub("-", key).strip("-")[:_SLUG_LIMIT] or "x"
-    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:8]
-    return f"{prefix}-{slug}-{digest}"
 
 
 def _plain(value: float) -> str:

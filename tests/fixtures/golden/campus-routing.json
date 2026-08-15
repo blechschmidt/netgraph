@@ -2133,5 +2133,54 @@
       "vlans": []
     }
   ],
+  "annotations": {
+    "notes": [
+      {
+        "id": "note-why-fibre",
+        "fqn": "why-fibre",
+        "text": "The backbone is **single-mode fibre**: 4.2 km between sites, which is\npast what copper does at any speed.\n\n- `os2`, LC, 10Gbps\n- the ring survives one break\n",
+        "blocks": [
+          {
+            "kind": "paragraph",
+            "spans": [
+              {
+                "text": "The backbone is "
+              },
+              {
+                "style": "bold",
+                "text": "single-mode fibre"
+              },
+              {
+                "text": ": 4.2 km between sites, which is past what copper does at any speed."
+              }
+            ]
+          },
+          {
+            "kind": "bullet",
+            "spans": [
+              {
+                "style": "code",
+                "text": "os2"
+              },
+              {
+                "text": ", LC, 10Gbps"
+              }
+            ]
+          },
+          {
+            "kind": "bullet",
+            "spans": [
+              {
+                "text": "the ring survives one break"
+              }
+            ]
+          }
+        ],
+        "color": "#fef3c7",
+        "stroke": "#8b856d",
+        "leader": false
+      }
+    ]
+  },
   "title": "Campus, routing"
 }

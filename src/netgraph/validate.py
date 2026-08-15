@@ -56,6 +56,7 @@ from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Final, TypeAlias
 
+from netgraph.annotations import select_area_members
 from netgraph.config import ValidationConfig
 from netgraph.connectivity import Graph as ConnectivityGraph
 from netgraph.connectivity import Separator, reachable, separators
@@ -70,6 +71,8 @@ from netgraph.models import (
     GLOBAL_VRF,
     PATCHPANEL_KIND,
     Adapter,
+    Annotation,
+    Area,
     BgpConfig,
     BgpNeighbor,
     Bss,
@@ -85,6 +88,7 @@ from netgraph.models import (
     IPv4Address,
     IPv6Address,
     Medium,
+    Note,
     PanelSide,
     PatchPanel,
     RoutingConfig,
@@ -627,9 +631,17 @@ class _Context:
     def source_of(self, fqn: str | None) -> SourceLocation | None:
         if fqn is None:
             return None
-        # A layout document (§18) is not an element, so it is not in
-        # ``sources``; a finding about one still has to point at its file.
-        return self.inventory.source_of(fqn) or self.inventory.layout_sources.get(fqn)
+        # A layout document (§18) and an annotation (§21) are not elements, so
+        # neither is in ``sources``; a finding about one still has to point at
+        # its file.
+        if (source := self.inventory.source_of(fqn)) is not None:
+            return source
+        if (source := self.inventory.layout_sources.get(fqn)) is not None:
+            return source
+        for table in self.inventory.annotation_sources.values():
+            if (source := table.get(fqn)) is not None:
+                return source
+        return None
 
     def effective(self, endpoint: _Endpoint) -> Interface | None:
         """The interface whose configuration governs a link end (§10.6).
@@ -1129,14 +1141,19 @@ def _stacking_groups(owner: InterfaceOwner) -> dict[str, str]:
 
 
 def _collect_suppressions(inventory: Inventory) -> dict[str, frozenset[str]]:
-    """Read the ``netgraph/ignore`` annotation of every element and layout.
+    """Read the ``netgraph/ignore`` annotation of every element, layout and note.
 
-    A layout document (§18) is not an element, but ``W138`` is reported against
-    one, and a finding nobody can annotate away is a finding people learn to
-    ignore wholesale.
+    A layout document (§18) and a diagram annotation (§21) are not elements, but
+    ``W138``, ``W142`` and ``W143`` are reported against them, and a finding
+    nobody can annotate away is a finding people learn to ignore wholesale.
     """
     suppressions: dict[str, frozenset[str]] = {}
-    for fqn, element in (*inventory.elements.items(), *inventory.layouts.items()):
+    documents = (
+        *inventory.elements.items(),
+        *inventory.layouts.items(),
+        *((fqn, annotation) for _, fqn, annotation in inventory.annotations),
+    )
+    for fqn, element in documents:
         tokens: list[str] = []
         for key in IGNORE_ANNOTATIONS:
             raw = element.metadata.annotations.get(key)
@@ -4120,6 +4137,84 @@ def _qualified_namespace(key: str, namespace: str) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Diagram annotations (§21)
+# --------------------------------------------------------------------------- #
+
+
+def _check_stale_annotation(ctx: _Context) -> Iterator[_Draft]:
+    """W142 — a note or an area is about something the inventory no longer has.
+
+    A **warning**, and emphatically not an error. This is the one rule that has
+    to be gentle: deleting a switch must not make ``netgraph validate`` fail
+    because somebody once wrote a note about it, and a note whose anchor is gone
+    simply loses its leader line — it still says what it says. The whole point of
+    §21 is that an annotation cannot change what the tool concludes, and a rule
+    that could fail a build would be exactly that.
+    """
+    for kind, fqn, annotation in ctx.inventory.annotations:
+        namespace = namespace_of(fqn)
+        for reference, path in _annotation_references(annotation):
+            if ctx.inventory.resolve_fqn(reference, namespace=namespace) is not None:
+                continue
+            yield _Draft(
+                f"{kind} {_q(fqn)} is about {_q(reference)}, which this inventory does not "
+                f"declare; {_ANNOTATION_CONSEQUENCE[kind]}",
+                (fqn,),
+                path,
+            )
+
+
+#: What actually happens to an annotation whose reference is gone, per kind. The
+#: message says it, because the two outcomes differ and neither of them is "the
+#: annotation disappears": a note keeps its text and loses only the line pointing
+#: at nothing, and an area is still drawn round whichever members remain. Telling
+#: somebody their note is gone when it is on the diagram in front of them is a
+#: worse diagnostic than none.
+_ANNOTATION_CONSEQUENCE: Final[dict[str, str]] = {
+    "note": "the note is still drawn, without its leader line",
+    "area": "it is left out of the box",
+}
+
+
+def _annotation_references(annotation: Annotation) -> Iterator[tuple[str, tuple[str | int, ...]]]:
+    """Every element an annotation names, with the field path that named it.
+
+    A legend names nothing — its entries are colours and words — so it yields
+    nothing, which is why this is one function rather than three checks.
+    """
+    if isinstance(annotation, Note):
+        if annotation.spec.anchor is not None:
+            anchor = annotation.spec.anchor
+            key = "element" if anchor.element is not None else "link"
+            yield anchor.reference, ("spec", "anchor", key)
+    elif isinstance(annotation, Area):
+        for index, member in enumerate(annotation.spec.members):
+            yield member, ("spec", "members", index)
+
+
+def _check_empty_area(ctx: _Context) -> Iterator[_Draft]:
+    """W143 — an area's selector matches nothing.
+
+    Only a *selector* is checked, never an explicit member list: a stale member
+    is ``W142``'s business and reported per name, which is more useful than
+    "this box is empty". An area with an explicit ``geometry`` is never reported
+    either — a rectangle drawn on the canvas encloses whatever happens to be
+    inside it, and "nothing yet" is a legitimate state for one.
+    """
+    for fqn, area in ctx.inventory.areas.items():
+        selector = area.spec.selector
+        if selector is None:
+            continue
+        if select_area_members(ctx.inventory, selector, namespace=namespace_of(fqn)):
+            continue
+        yield _Draft(
+            f"area {_q(fqn)} selects no element of this inventory; it will not be drawn",
+            (fqn,),
+            ("spec", "selector"),
+        )
+
+
+# --------------------------------------------------------------------------- #
 
 
 def _check_outlet_claimed_twice(ctx: _Context) -> Iterator[_Draft]:
@@ -4939,6 +5034,8 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("W139", _check_empty_group),
     ("W140", _check_departed_member),
     ("W141", _check_unknown_expectation),
+    ("W142", _check_stale_annotation),
+    ("W143", _check_empty_area),
     ("I001", _check_local_mac),
     ("I002", _check_uncabled_interface),
     ("I003", _check_nonstandard_port),

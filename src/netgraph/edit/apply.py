@@ -55,7 +55,9 @@ from netgraph.edit.operations import (
     AddInterface,
     AppendItem,
     Connect,
+    CreateAnnotation,
     CreateElement,
+    DeleteAnnotation,
     DeleteElement,
     Disconnect,
     MoveElement,
@@ -63,6 +65,7 @@ from netgraph.edit.operations import (
     RemoveFile,
     RemoveInterface,
     RenameElement,
+    SetAnnotation,
     SetField,
     SetGeometry,
     SetLinkGeometry,
@@ -90,9 +93,11 @@ from netgraph.layout.document import as_yaml, canonical_geometry
 from netgraph.loader.inventory import Inventory, namespace_of, qualify, short_name
 from netgraph.models import (
     API_VERSION,
+    COHERENCE_RULE,
     LAYOUT_KIND,
     Cable,
     Element,
+    parse_annotation,
     parse_document,
     parse_layout,
 )
@@ -1110,6 +1115,172 @@ def _plain(data: Any) -> Any:
     return data
 
 
+# --------------------------------------------------------------------------- #
+# Annotations (§21)
+# --------------------------------------------------------------------------- #
+
+
+def _locate_annotation(
+    context: _Context, operation: DeleteAnnotation | SetAnnotation
+) -> tuple[str, int]:
+    """Where the named annotation's document lives, as ``(file, index)``.
+
+    Raises:
+        AddressError: No annotation of that kind carries that name. Spelled as
+            an address error rather than an edit error because that is what it
+            is — and because the editor turns one into "nothing here" rather
+            than "the write failed".
+    """
+    source = context.inventory.annotation_source(operation.kind, operation.address)
+    if source is not None and source.relative is not None:
+        return source.relative, source.index
+    # The inventory may not have it *because of an earlier operation in this
+    # batch*: one gesture is several writes, and an annotation is briefly
+    # incoherent between two of them (see
+    # :data:`~netgraph.models.annotation.COHERENCE_RULE`), which drops it from
+    # the reloaded index. The files still hold it, and the batch is atomic, so
+    # finding it there is the honest answer rather than a workaround.
+    found = context.tree.find_document(
+        kind=operation.kind, name=short_name(operation.address), namespace=operation.namespace
+    )
+    if found is None:
+        raise AddressError(
+            f"there is no {operation.kind} called {operation.address!r} in this inventory",
+            address=operation.address,
+        )
+    return found
+
+
+def _annotation_document(
+    *, kind: str, name: str, metadata: Mapping[str, Any], spec: Mapping[str, Any]
+) -> dict[str, Any]:
+    """The document a create writes, checked against §21 before it lands.
+
+    Same reasoning as :func:`_element_document`: a rejected ``spec`` should come
+    back as a rejected ``spec``, naming the field, rather than as a load error
+    against a file the user never typed.
+    """
+    if "name" in metadata and metadata["name"] != name:
+        raise OperationError(
+            f"metadata.name is {metadata['name']!r} but the {kind} was created as {name!r}"
+        )
+    document = {
+        "apiVersion": API_VERSION,
+        "kind": kind,
+        "metadata": {"name": name, **{k: v for k, v in metadata.items() if k != "name"}},
+        "spec": dict(spec),
+    }
+    try:
+        parse_annotation(document)
+    except SchemaError as exc:
+        problems = "; ".join(str(issue) for issue in exc.issues)
+        raise EditError(f"the new {kind} {name!r} does not match the schema: {problems}") from exc
+    return document
+
+
+def _create_annotation(context: _Context, operation: CreateAnnotation) -> tuple[Operation, ...]:
+    if operation.address in context.inventory.annotations_of(operation.kind):
+        raise EditError(
+            f"a {operation.kind} called {operation.address} already exists; "
+            "a name is unique within its namespace and its kind (NG-G002)"
+        )
+    document = _annotation_document(
+        kind=operation.kind,
+        name=operation.name,
+        metadata=operation.metadata,
+        spec=operation.spec,
+    )
+    relative = choose_file(
+        kind=operation.kind,
+        namespace=operation.namespace,
+        name=operation.name,
+        files=context.tree.facts(context.inventory),
+        requested=operation.file,
+    )
+    context.tree.insert_document(relative, -1, _emit(document))
+    return (
+        DeleteAnnotation(kind=operation.kind, name=operation.name, namespace=operation.namespace),
+    )
+
+
+def _delete_annotation(
+    context: _Context, operation: DeleteAnnotation
+) -> tuple[Operation, ...] | None:
+    relative, index = _locate_annotation(context, operation)
+    context.tree.remove_document(relative, index)
+    return None
+
+
+def _set_annotation(context: _Context, operation: SetAnnotation) -> tuple[Operation, ...] | None:
+    """Write one field of an annotation, or take it out.
+
+    ``metadata.name`` *is* settable here, unlike on an element, and that is the
+    whole rename story for §21: nothing in an inventory refers to an annotation,
+    so there are no references to rewrite and no reason for a second operation.
+    ``kind`` is not settable — a note is not an area with a different word on it.
+    """
+    relative, index = _locate_annotation(context, operation)
+    path = operation.parsed_path
+    if path[:1] == ("kind",):
+        raise OperationError("kind is not settable: create a new annotation of the kind you want")
+    if operation.unset and len(path) == 1 and path[0] in _ENVELOPE:
+        raise OperationError(f"{operation.path} is part of the document envelope and is required")
+    document = context.tree.document(relative, index).touch()
+    previous = get_field(document, path)
+    if operation.unset:
+        unset_field(document, path)
+    else:
+        set_field(document, path, operation.value)
+    _check_annotation(document, operation)
+    if (
+        previous is MISSING
+        and not operation.unset
+        and context.tree.document(relative, index).faithful
+    ):
+        return (
+            SetAnnotation(
+                kind=operation.kind,
+                name=operation.name,
+                namespace=operation.namespace,
+                path=operation.path,
+                unset=True,
+            ),
+        )
+    return None
+
+
+def _check_annotation(data: Any, operation: SetAnnotation) -> None:
+    """Refuse a write that puts a *value* outside §21, naming what is wrong.
+
+    Checked after every field write rather than only on create, because a
+    ``color`` that is not a colour should come back naming the field somebody
+    typed rather than as a load error against a file they never opened.
+
+    **Coherence is deliberately not checked here** (:data:`COHERENCE_RULE`). One
+    gesture is several writes: dragging a note that has never been placed writes
+    ``spec.geometry.x`` and then ``spec.geometry.y``, and between the two the
+    document says something §21 forbids — an ``x`` with no ``y``. Refusing there
+    would make the second half of every drag unreachable. A value problem is
+    never like that: ``color: red`` is wrong when it is written and wrong when
+    the batch ends. So the coherence rules are left to the commit gate, which
+    reloads the finished tree and reports them against the document; the batch
+    is atomic, so nothing incoherent is ever left on disk either way.
+
+    Raises:
+        EditError: A value in the result does not match the annotation schema.
+    """
+    try:
+        parse_annotation(_plain(data))
+    except SchemaError as exc:
+        issues = [issue for issue in exc.issues if issue.rule != COHERENCE_RULE]
+        if not issues:
+            return
+        problems = "; ".join(str(issue) for issue in issues)
+        raise EditError(
+            f"{operation.path} would leave {operation.kind} {operation.address} invalid: {problems}"
+        ) from exc
+
+
 _Handler = Callable[[_Context, Any], "tuple[Operation, ...] | None"]
 
 
@@ -1129,6 +1300,9 @@ _HANDLERS: Final[dict[type[Operation], _Handler]] = {
     Disconnect: _disconnect,
     SetGeometry: _set_geometry,
     SetLinkGeometry: _set_link_geometry,
+    CreateAnnotation: _create_annotation,
+    DeleteAnnotation: _delete_annotation,
+    SetAnnotation: _set_annotation,
     WriteFile: _write_file,
     RemoveFile: _remove_file,
 }

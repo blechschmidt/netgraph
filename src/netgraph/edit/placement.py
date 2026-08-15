@@ -48,12 +48,19 @@ __all__ = [
 ]
 
 #: Kinds whose documents are collected into one file per namespace, and what
-#: that file is called. Both are links: they are meaningless without the two
-#: elements they join, which is exactly the case the layout guide says to
-#: collect rather than to give a file each.
+#: that file is called. The first two are links: they are meaningless without the
+#: two elements they join, which is exactly the case the layout guide says to
+#: collect rather than to give a file each. The three annotations (§21) are
+#: collected for a different reason with the same conclusion — a callout is a
+#: sentence, and a file per sentence is a directory listing nobody can read.
+#: They share one file, because somebody reviewing what the diagram *says* wants
+#: to read it in one place, and because the three are edited together.
 COLLECTION_STEMS: Final[dict[str, str]] = {
     "cable": "cables",
     "tunnel": "tunnels",
+    "note": "annotations",
+    "area": "annotations",
+    "legend": "annotations",
 }
 
 #: The suffix a file netgraph creates gets. ``.yml`` is read but never written:

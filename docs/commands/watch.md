@@ -133,6 +133,7 @@ netgraph watch --serve --host 0.0.0.0 --port 9000        # deliberate, and warne
 | `--bundle-links`, `--no-bundle-links` | — | — | Draw parallel links between the same pair of elements as one edge, with the count in the label. Members of a declared 'lag' interface are bundled either way unless --no-bundle-links is given, since the inventory already says they are one logical link. |
 | `--show-ips`, `--no-show-ips` | — | `--show-ips` | Print configured IP addresses on the nodes. |
 | `--show-vlans`, `--no-show-vlans` | — | `--show-vlans` | Annotate nodes and links with VLAN membership. |
+| `--annotations`, `--no-annotations` | — | `--annotations` | Draw the notes, areas and legends the inventory declares for this view. Turn them off for a diagram that should carry the topology and nothing written about it — a printed page for an audit — and leave them on for one that is being read rather than checked, where the callout is the reason the screenshot is worth attaching to the ticket. |
 | `--group-by-namespace` | — | off | Draw each namespace as a visual group. |
 | `--icons` | `THEME\|DIR` | — | Draw each element as an icon instead of a plain shape. Built in: cisco, none. A directory of images named after element kinds (router.svg, switch.png, ...) also works. Graphviz formats only. |
 | `--tooltips`, `--no-tooltips` | — | `--tooltips` | Carry the full detail of each element — interfaces, addresses, VLANs, cabling — as hover text. Reaches a reader in svg output; png and pdf have nowhere to put it. |

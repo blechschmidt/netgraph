@@ -38,6 +38,7 @@ from netgraph.diff import Drawing, draw, renamed_addresses, updated_fields
 from netgraph.fsio import write_text
 from netgraph.loader import Inventory, load_tree
 from netgraph.plan import diff as diff_states
+from netgraph.plan.address import parse_address
 from netgraph.render import Layer, RenderOptions, build_graph, render_text, suffix_for
 from netgraph.render.diffview import DiffOverlay, Mark, diff_overlay, union_graph
 
@@ -157,6 +158,56 @@ def test_a_layout_change_marks_nothing(trees: dict[str, Inventory]) -> None:
     plan = diff_states(trees["arranged"], trees["arranged"])
     assert updated_fields(plan) == {}
     assert renamed_addresses(plan) == {}
+
+
+def test_an_annotation_change_marks_nothing_even_under_a_device_name() -> None:
+    """A note is presentational, and its name space is not the elements'.
+
+    Every §21 kind has its own name space, so a note called ``core`` may sit
+    beside a switch called ``core``. Keying the marks by fully-qualified name
+    would let the note's edit paint the switch amber — claiming the network
+    moved because somebody reworded a callout — which is exactly the leak an
+    annotation is barred from causing. Built by hand rather than loaded: the
+    point is what :mod:`netgraph.diff` does with the address *type*.
+    """
+    from netgraph.plan.model import Action, Change, Plan
+
+    plan = Plan(
+        changes=(
+            Change(action=Action.UPDATE, address=parse_address("note.hosts/pc-desk"), kind="note"),
+            Change(action=Action.UPDATE, address=parse_address("area.hosts/pc-desk"), kind="area"),
+            Change(
+                action=Action.UPDATE,
+                address=parse_address("legend.hosts/pc-desk"),
+                kind="legend",
+            ),
+            Change(
+                action=Action.RENAME,
+                address=parse_address("note.hosts/pc-desk"),
+                new_address=parse_address("note.hosts/pc-new"),
+                kind="note",
+            ),
+        )
+    )
+
+    assert updated_fields(plan) == {}
+    assert renamed_addresses(plan) == {}
+
+
+def test_an_element_change_beside_an_annotation_is_still_marked() -> None:
+    """The skip is by address type, not a blanket silence on the name."""
+    from netgraph.plan.model import Action, Change, Plan
+
+    plan = Plan(
+        changes=(
+            Change(action=Action.UPDATE, address=parse_address("note.hosts/pc-desk"), kind="note"),
+            Change(
+                action=Action.UPDATE, address=parse_address("device.hosts/pc-desk"), kind="computer"
+            ),
+        )
+    )
+
+    assert updated_fields(plan) == {"hosts/pc-desk": ()}
 
 
 def test_an_unchanged_pair_produces_an_empty_overlay(trees: dict[str, Inventory]) -> None:

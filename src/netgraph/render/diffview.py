@@ -291,6 +291,12 @@ def union_graph(before: Graph, after: Graph, *, renames: Mapping[str, str] = {})
         dangling=tuple(dict.fromkeys(dangling)),
         sources={**before.sources, **after.sources},
         geometry=_union_geometry(before.geometry, after.geometry, renames=renames),
+        # The *after* state's annotations, and only those: a note explaining a
+        # cable that has just been removed was itself removed with it, and
+        # drawing both states' callouts would put a diagram's two halves in
+        # conversation with each other.
+        annotations=after.annotations,
+        annotation_targets=after.annotation_targets,
     )
 
 

@@ -34,11 +34,24 @@ The attributes, all in the ``netgraph`` namespace:
     it was when the file was exported. Compared on import so a diagram edited
     against a version of the inventory that has since moved on is *reported*
     rather than silently reconciled against something else.
-``x`` / ``y`` / ``waypoints``
+``x`` / ``y`` / ``width`` / ``height`` / ``waypoints``
     Where the cell was when it left netgraph, in netgraph's own coordinates.
     This is what makes "was this dragged?" an exact question rather than a
     guess: a cell whose position still matches produces no geometry write at
-    all, which is what lets a round trip through draw.io be a no-op.
+    all, which is what lets a round trip through draw.io be a no-op. The two
+    extents are written for an annotation, which is a box somebody resizes as
+    readily as they move it, and not for a node, whose size is the icon's.
+``text`` / ``label``
+    What an annotation *said* when it left. A note's text is the markdown
+    subset (§21.1) and its cell label is HTML, so "was this edited?" cannot be
+    asked of the label alone; it is asked by rendering the stamped source again
+    and comparing. Same idea, one step shorter, for an area's caption.
+
+An annotation cell (§21) carries the same block, with ``kind`` holding the
+document kind — ``note``, ``area``, ``legend`` — and ``name`` its fully-qualified
+name. That is deliberate: an annotation is a document like any other, and the
+import reconciles a dragged note by exactly the machinery that reconciles a
+dragged switch.
 
 Nothing here reads or writes XML; :mod:`netgraph.drawio.mxfile` does that, and
 :mod:`netgraph.drawio.reconcile` is what acts on the answers.
@@ -52,10 +65,13 @@ from enum import Enum
 from typing import Any, Final
 
 __all__ = [
+    "ANNOTATION_ROLES",
     "ATTRIBUTES",
+    "ATTR_ANNOTATED",
     "ATTR_DOCUMENT",
     "ATTR_GENERATOR",
     "ATTR_HASH",
+    "ATTR_HEIGHT",
     "ATTR_KIND",
     "ATTR_LABEL",
     "ATTR_LINK",
@@ -71,9 +87,11 @@ __all__ = [
     "ATTR_SOURCE_PORT",
     "ATTR_TARGET",
     "ATTR_TARGET_PORT",
+    "ATTR_TEXT",
     "ATTR_VERSION",
     "ATTR_VIEW",
     "ATTR_WAYPOINTS",
+    "ATTR_WIDTH",
     "ATTR_X",
     "ATTR_Y",
     "HASH_DIGITS",
@@ -114,6 +132,9 @@ ATTR_HASH: Final = "hash"
 ATTR_VIEW: Final = "view"
 ATTR_X: Final = "x"
 ATTR_Y: Final = "y"
+ATTR_WIDTH: Final = "width"
+ATTR_HEIGHT: Final = "height"
+ATTR_TEXT: Final = "text"
 ATTR_PLACED: Final = "placed"
 ATTR_WAYPOINTS: Final = "waypoints"
 ATTR_ROUTING: Final = "routing"
@@ -127,6 +148,14 @@ ATTR_ORIGIN_Y: Final = "originY"
 ATTR_VERSION: Final = "version"
 ATTR_GENERATOR: Final = "generator"
 ATTR_SCOPE: Final = "scope"
+
+#: On the metadata cell: was this file written by an exporter that draws
+#: annotations at all? Read on import, and the answer decides one thing only —
+#: whether a *missing* annotation cell may be read as a deletion. A diagram
+#: exported before §21 holds no note cells because none were ever written, and
+#: reconciling that as "delete every note in the inventory" is the same class of
+#: mistake as deleting an estate from a filtered export.
+ATTR_ANNOTATED: Final = "annotated"
 
 #: Every attribute netgraph writes, so a reader can tell one of its own from a
 #: key some other tool put in the same namespace by accident.
@@ -142,6 +171,10 @@ ATTRIBUTES: Final[frozenset[str]] = frozenset(
         ATTR_VIEW,
         ATTR_X,
         ATTR_Y,
+        ATTR_WIDTH,
+        ATTR_HEIGHT,
+        ATTR_TEXT,
+        ATTR_LABEL,
         ATTR_PLACED,
         ATTR_WAYPOINTS,
         ATTR_ROUTING,
@@ -154,6 +187,7 @@ ATTRIBUTES: Final[frozenset[str]] = frozenset(
         ATTR_VERSION,
         ATTR_GENERATOR,
         ATTR_SCOPE,
+        ATTR_ANNOTATED,
     }
 )
 
@@ -176,9 +210,32 @@ class CellRole(str, Enum):
     #: The invisible cell carrying what is true of the whole diagram: the view,
     #: the coordinate origin, the model version.
     METADATA = "metadata"
+    #: A ``kind: note`` callout (§21). Its own role rather than a ``node`` with
+    #: an odd kind, because the import must never read one as an element: a note
+    #: that vanished is a deleted *note*, not a deleted switch.
+    NOTE = "note"
+    #: A ``kind: area`` zone, drawn behind the nodes it encloses.
+    AREA = "area"
+    #: Part of a ``kind: legend`` key — the frame, a swatch or a caption. All
+    #: three share the role because all three are generated presentation and the
+    #: import does exactly one thing with them: nothing.
+    LEGEND = "legend"
+    #: The dashed line from a note to what it is about. An edge in mxGraph and
+    #: nothing at all in the inventory, so it is kept out of the ``link`` role
+    #: that a cable takes.
+    LEADER = "leader"
 
     def __str__(self) -> str:
         return self.value
+
+
+#: The roles that stand for an annotation document, by the document kind. Every
+#: other role in a file stands for an element or for the file itself.
+ANNOTATION_ROLES: Final[dict[str, CellRole]] = {
+    "note": CellRole.NOTE,
+    "area": CellRole.AREA,
+    "legend": CellRole.LEGEND,
+}
 
 
 class Placedness(str, Enum):

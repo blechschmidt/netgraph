@@ -17,16 +17,49 @@ empty". A rack elevation is exactly those things, so ``--layer rack`` is
 refused here with a :class:`~netgraph.errors.RenderError` naming the formats
 that can draw one, rather than emitted as a box that quietly leaves out the
 free space — which is half of what an elevation is for.
+
+Annotations degrade, and say so
+-------------------------------
+
+Mermaid has no vocabulary for most of §21, so the three kinds are drawn as
+closely as a flowchart allows and every gap is stated in the output rather than
+left for a reader to notice:
+
+* an **area** with members becomes a ``subgraph``, which is Mermaid's only
+  container. It gets the area's label, and loses its colour, its border style
+  and its padding — a Mermaid subgraph has no style of its own. An area that is
+  a *rectangle of canvas* rather than a set of elements has nothing to become,
+  since Mermaid places nothing, and is dropped.
+* a **note** becomes an ordinary node with a note-like ``classDef`` and, when it
+  is anchored, a dotted link to what it is about. Mermaid has no note shape and
+  no free-floating text, so it is a box among the boxes; the parsed emphasis of
+  §21.1 is flattened to its text, because Mermaid label markup is a different
+  language again.
+* a **legend** is not expressible at all — there is no construct for a keyed
+  table that is not part of the graph.
+
+Everything dropped is named in a ``%%`` comment at the foot of the diagram. A
+Mermaid comment is invisible in the rendered picture and plain in the source,
+which is the right side of the trade: the reader of the *diagram* is not
+distracted by a limitation they cannot act on, and the reader of the *document*
+— who is usually the person wondering where their legend went — is told
+directly.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Container, Iterable, Iterator, Mapping
 from typing import Final
 
-from netgraph.errors import RenderError
+from netgraph.errors import RenderError, count_text
 from netgraph.models import format_watts
 from netgraph.render.aggregate import AGGREGATE_KIND, AggregateView
+from netgraph.render.annotations import (
+    DEFAULT_NOTE_FILL,
+    AnnotationViews,
+    annotation_views,
+    darken,
+)
 from netgraph.render.graph import (
     GROUP_KIND,
     PATCHPANEL_KIND,
@@ -121,6 +154,16 @@ _LOGICAL_EDGE_KINDS: Final[frozenset[EdgeKind]] = frozenset(
 
 _INDENT: Final = "    "
 
+#: The class every note is drawn with, and its style. Mermaid has no note shape,
+#: so the pale fill and the dashed edge are the whole of what says "this is
+#: commentary rather than a device" — which is why they are stated here even
+#: though a plain box would parse just as well.
+_NOTE_CLASS: Final = "netgraphNote"
+_NOTE_COLOURS: Final[tuple[str, str]] = (DEFAULT_NOTE_FILL, darken(DEFAULT_NOTE_FILL))
+_NOTE_STYLE: Final = (
+    f"fill:{_NOTE_COLOURS[0]},stroke:{_NOTE_COLOURS[1]},stroke-width:1px,stroke-dasharray:3 2"
+)
+
 
 def _refuse_rack(graph: Graph) -> None:
     """``--layer rack`` has no Mermaid form; say so, and say what does.
@@ -154,6 +197,12 @@ def to_mermaid(graph: Graph, options: RenderOptions | None = None) -> str:
     _refuse_rack(graph)
     opts = options or RenderOptions()
     ids = _identifiers(graph)
+    views = annotation_views(graph, opts)
+    # An area is a ``subgraph``, and so is a namespace, and a node may be in only
+    # one of them: the explicit annotation wins. See
+    # ``netgraph.render.dot._area_groups`` for the whole precedence rule, which
+    # every backend obeys.
+    boxed = views.clustered
 
     lines: list[str] = []
     if opts.title:
@@ -162,22 +211,34 @@ def to_mermaid(graph: Graph, options: RenderOptions | None = None) -> str:
     direction = opts.rankdir or DEFAULT_RANKDIR
     lines.append(f"flowchart {direction}")
 
+    lines.extend(_area_subgraphs(graph, views, ids, opts))
     if graph.clusters:
         # A layer that groups its own nodes wins over ``--group-by-namespace``;
         # see ``netgraph.render.dot._groups``.
-        lines.extend(_clustered_nodes(graph, ids, opts))
+        lines.extend(_clustered_nodes(graph, ids, opts, skip=boxed))
     elif opts.group_by_namespace:
-        lines.extend(_grouped_nodes(graph, ids, opts))
+        lines.extend(_grouped_nodes(graph, ids, opts, skip=boxed))
     else:
         lines.extend(
-            f"{_INDENT}{line}" for line in _nodes(graph.nodes.values(), ids, opts, graph.layer)
+            f"{_INDENT}{line}"
+            for line in _nodes(
+                [node for node in graph.nodes.values() if node.fqn not in boxed],
+                ids,
+                opts,
+                graph.layer,
+            )
         )
 
-    if graph.edges:
+    lines.extend(f"{_INDENT}{line}" for line in _note_nodes(views))
+
+    if graph.edges or views.notes:
         lines.append("")
         lines.extend(f"{_INDENT}{line}" for line in _edges(graph, ids, opts))
+        lines.extend(f"{_INDENT}{line}" for line in _leaders(views, ids))
 
     lines.extend(_class_definitions(graph, ids))
+    lines.extend(_note_styles(views))
+    lines.extend(_degradations(views))
     return "\n".join(lines) + "\n"
 
 
@@ -186,9 +247,19 @@ def _identifiers(graph: Graph) -> Mapping[str, str]:
     return {fqn: f"n{index}" for index, fqn in enumerate(graph.nodes)}
 
 
-def _grouped_nodes(graph: Graph, ids: Mapping[str, str], options: RenderOptions) -> Iterator[str]:
+def _grouped_nodes(
+    graph: Graph,
+    ids: Mapping[str, str],
+    options: RenderOptions,
+    *,
+    skip: Container[str] = frozenset(),
+) -> Iterator[str]:
     for index, namespace in enumerate(graph.namespaces):
-        members = graph.nodes_in(namespace)
+        members = [node for node in graph.nodes_in(namespace) if node.fqn not in skip]
+        if not members:
+            # Everything here is inside an annotation area instead, and an empty
+            # subgraph is a labelled box round nothing.
+            continue
         if not namespace:
             # Root-level elements, and every layer-3 subnet: a prefix spanning
             # two sites belongs inside neither site's box.
@@ -200,12 +271,20 @@ def _grouped_nodes(graph: Graph, ids: Mapping[str, str], options: RenderOptions)
         yield f"{_INDENT}end"
 
 
-def _clustered_nodes(graph: Graph, ids: Mapping[str, str], options: RenderOptions) -> Iterator[str]:
+def _clustered_nodes(
+    graph: Graph,
+    ids: Mapping[str, str],
+    options: RenderOptions,
+    *,
+    skip: Container[str] = frozenset(),
+) -> Iterator[str]:
     """One ``subgraph`` per box the layer asked for: the VRFs of §16.6."""
-    loose = [node for node in graph.nodes.values() if not node.cluster]
+    loose = [node for node in graph.nodes.values() if not node.cluster and node.fqn not in skip]
     yield from (f"{_INDENT}{line}" for line in _nodes(loose, ids, options, graph.layer))
     for index, cluster in enumerate(graph.clusters):
-        members = graph.nodes_in_cluster(cluster)
+        members = [node for node in graph.nodes_in_cluster(cluster) if node.fqn not in skip]
+        if not members:
+            continue
         yield f"{_INDENT}subgraph vrf{index}[{_label(f'vrf {cluster}')}]"
         yield f"{_INDENT * 2}direction {options.rankdir or DEFAULT_RANKDIR}"
         yield from (f"{_INDENT * 2}{line}" for line in _nodes(members, ids, options, graph.layer))
@@ -261,6 +340,106 @@ def _class_definitions(graph: Graph, ids: Mapping[str, str]) -> list[str]:
         if kind in _CLASS_STYLE:
             lines.append(f"{_INDENT}class {','.join(by_kind[kind])} {kind}")
     return lines
+
+
+# --------------------------------------------------------------------------- #
+# Annotations (§21)
+# --------------------------------------------------------------------------- #
+
+
+def _note_id(index: int) -> str:
+    """The flowchart id of the ``index``-th note.
+
+    Not the annotation's own slug: a Mermaid identifier is alphanumeric, and the
+    nodes of this document are already positional for the same reason
+    (:func:`_identifiers`). ``note`` cannot collide with the ``n0`` a node gets,
+    since no node id has a letter after its digits.
+    """
+    return f"note{index}"
+
+
+def _area_subgraphs(
+    graph: Graph, views: AnnotationViews, ids: Mapping[str, str], options: RenderOptions
+) -> Iterator[str]:
+    """Each area with members, as the one container Mermaid has.
+
+    Colour, border style and padding are all lost — a Mermaid subgraph has no
+    style — and the loss is reported by :func:`_degradations` rather than left
+    to be discovered.
+    """
+    for index, area in enumerate(views.areas):
+        members = [graph.nodes[member] for member in area.members if views.area_of(member) is area]
+        if not members:
+            continue
+        label = area.label or area.fqn
+        yield f"{_INDENT}subgraph area{index}[{_label(label)}]"
+        yield f"{_INDENT * 2}direction {options.rankdir or DEFAULT_RANKDIR}"
+        yield from (f"{_INDENT * 2}{line}" for line in _nodes(members, ids, options, graph.layer))
+        yield f"{_INDENT}end"
+
+
+def _note_nodes(views: AnnotationViews) -> Iterator[str]:
+    """Each note as a plain box; see the module docstring on why a plain one."""
+    for index, note in enumerate(views.notes):
+        yield f"{_note_id(index)}[{_label(note.plain)}]"
+
+
+def _leaders(views: AnnotationViews, ids: Mapping[str, str]) -> Iterator[str]:
+    """A dotted, unlabelled link from each anchored note to what it is about."""
+    for index, note in enumerate(views.notes):
+        if note.leader and note.anchor in ids:
+            yield f"{_note_id(index)} {_DOTTED[0]} {ids[note.anchor]}"
+
+
+def _note_styles(views: AnnotationViews) -> list[str]:
+    """The note class, and a ``style`` line for any note that is not its colour.
+
+    One ``classDef`` for the common case keeps the document short; a note that
+    chose its own colour gets a line of its own rather than a class nothing else
+    would use.
+    """
+    if not views.notes:
+        return []
+    lines = [f"{_INDENT}classDef {_NOTE_CLASS} {_NOTE_STYLE}"]
+    lines.append(
+        f"{_INDENT}class {','.join(_note_id(i) for i in range(len(views.notes)))} {_NOTE_CLASS}"
+    )
+    for index, note in enumerate(views.notes):
+        if (note.fill, note.stroke) != _NOTE_COLOURS:
+            lines.append(
+                f"{_INDENT}style {_note_id(index)} fill:{note.fill},stroke:{note.stroke},"
+                f"stroke-width:1px,stroke-dasharray:3 2"
+            )
+    return lines
+
+
+def _degradations(views: AnnotationViews) -> list[str]:
+    """What this diagram could not express, as Mermaid comments.
+
+    Visible in the source and invisible in the picture, which is the right side
+    of that trade: a reader of the drawing cannot act on the limitation, and a
+    reader of the document usually *is* the person wondering where their legend
+    went.
+    """
+    said: list[str] = []
+    for area in views.areas:
+        if not area.members:
+            said.append(
+                f"%% area '{area.fqn}' is not drawn: it is a rectangle of canvas rather than "
+                f"a set of elements, and mermaid places nothing"
+            )
+    if any(area.members for area in views.areas):
+        said.append(
+            "%% areas are drawn as subgraphs: their colour, border style and padding are "
+            "not expressible in mermaid"
+        )
+    for legend in views.legends:
+        said.append(
+            f"%% legend '{legend.fqn}' ({count_text(len(legend.entries), 'entry', 'entries')}) "
+            f"is not "
+            f"drawn: mermaid has no construct for a key that is not part of the graph"
+        )
+    return said
 
 
 # --------------------------------------------------------------------------- #

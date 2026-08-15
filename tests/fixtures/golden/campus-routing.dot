@@ -126,6 +126,14 @@ graph netgraph {
     >];
   }
 
+  "annotation:note-why-fibre" [shape=note, style=filled, fillcolor="#fef3c7", color="#8b856d", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">The backbone is <B>single-mode fibre</B>: 4.2 km between sites, which is past what copper does at any speed.</TD></TR>
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">&#8226; <FONT FACE="monospace">os2</FONT>, LC, 10Gbps</TD></TR>
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">&#8226; the ring survives one break</TD></TR>
+    </TABLE>
+  >];
+
   "sites/north/core/rtr-north-core-01" -- "sites/south/core/rtr-south-core-01" [color="#0369a1", style=solid, label="iBGP 65001\niBGP to rtr-south-core-01", tooltip="bgp sites/north/core/rtr-north-core-01#bgp#192.0.2.2\nsites/north/core/rtr-north-core-01 — sites/south/core/rtr-south-core-01:lo0\nbgp AS 65001 to AS 65001 (iBGP)\nneighbour 192.0.2.2\niBGP to rtr-south-core-01"];
   "sites/north/core/rtr-north-core-01" -- "sites/west/core/rtr-west-core-01" [color="#0369a1", style=solid, label="iBGP 65001\niBGP to rtr-west-core-01", tooltip="bgp sites/north/core/rtr-north-core-01#bgp#192.0.2.3\nsites/north/core/rtr-north-core-01 — sites/west/core/rtr-west-core-01:lo0\nbgp AS 65001 to AS 65001 (iBGP)\nneighbour 192.0.2.3\niBGP to rtr-west-core-01"];
   "sites/south/core/rtr-south-core-01" -- "sites/west/core/rtr-west-core-01" [color="#0369a1", style=solid, label="iBGP 65001\niBGP to rtr-west-core-01", tooltip="bgp sites/south/core/rtr-south-core-01#bgp#192.0.2.3\nsites/south/core/rtr-south-core-01 — sites/west/core/rtr-west-core-01:lo0\nbgp AS 65001 to AS 65001 (iBGP)\nneighbour 192.0.2.3\niBGP to rtr-west-core-01"];

@@ -5,6 +5,7 @@ flowchart TB
     n0[/"sites/north<br/>[namespace]<br/>8 elements: 2 computers, 1 router, 1 server, 4 switches<br/>7 links inside<br/>vlans: 1,10,20,30,99<br/>10.1.0.0/30<br/>10.1.10.0/24<br/>10.1.20.0/24<br/>10.1.99.0/24<br/>(+9 more)"\]
     n1[/"sites/south<br/>[namespace]<br/>7 elements: 2 computers, 1 router, 1 server, 3 switches<br/>6 links inside<br/>vlans: 1,10,20,30,99<br/>10.2.0.0/30<br/>10.2.10.0/24<br/>10.2.20.0/24<br/>10.2.99.0/24<br/>(+9 more)"\]
     n2[/"sites/west<br/>[namespace]<br/>7 elements: 2 computers, 1 router, 1 server, 3 switches<br/>6 links inside<br/>vlans: 1,10,20,30,99<br/>10.3.0.0/30<br/>10.3.10.0/24<br/>10.3.20.0/24<br/>10.3.99.0/24<br/>(+9 more)"\]
+    note0["The backbone is single-mode fibre: 4.2 km between sites, which is past what copper does at any speed.<br/>• os2, LC, 10Gbps<br/>• the ring survives one break"]
 
     n0 == "xe-0/0/1 ↔ xe-0/0/2 · BB-NS · fiber · 10Gbps" === n1
     n1 == "xe-0/0/1 ↔ xe-0/0/2 · BB-SW · fiber · 10Gbps" === n2
@@ -12,3 +13,6 @@ flowchart TB
 
     classDef namespace fill:#e2e8f0,stroke:#475569,stroke-width:2px
     class n0,n1,n2 namespace
+    classDef netgraphNote fill:#fef3c7,stroke:#8b856d,stroke-width:1px,stroke-dasharray:3 2
+    class note0 netgraphNote
+%% area 'on-the-generator' is not drawn: it is a rectangle of canvas rather than a set of elements, and mermaid places nothing

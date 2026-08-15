@@ -348,6 +348,12 @@ SETTINGS: Final[tuple[Setting, ...]] = (
         "show-vlans", "show_vlans", _boolean, "Annotate nodes and links with VLAN membership."
     ),
     _setting(
+        "annotations",
+        "annotations",
+        _boolean,
+        "Draw the notes, areas and legends the inventory declares for the view.",
+    ),
+    _setting(
         "group-by-namespace",
         "group_by_namespace",
         _boolean,

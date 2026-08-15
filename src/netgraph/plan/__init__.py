@@ -41,6 +41,9 @@ from __future__ import annotations
 
 from netgraph.plan.address import (
     ADDRESS_TYPES,
+    ANNOTATION_TYPES,
+    LAYOUT_TYPE,
+    SIDECAR_TYPES,
     Address,
     AddressSyntaxError,
     address_of,
@@ -77,11 +80,14 @@ from netgraph.plan.state import state_digest
 __all__ = [
     "ACTION_SIGILS",
     "ADDRESS_TYPES",
+    "ANNOTATION_TYPES",
     "DECISIVE",
     "EVIDENCE",
+    "LAYOUT_TYPE",
     "MISSING",
     "PLAN_FORMATS",
     "PLAN_SCHEMA_VERSION",
+    "SIDECAR_TYPES",
     "STABLE_ID_ANNOTATION",
     "Action",
     "Address",

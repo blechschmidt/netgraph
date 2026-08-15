@@ -13,6 +13,12 @@ addresses the element regardless of whether it is declared as a ``switch`` or a
 one element rather than the destruction of one and the creation of another.
 Every other category is its own kind already, so the distinction only shows up
 on devices — which is exactly where it matters.
+
+The sidecars are addressed the same way and sort after the elements: ``layout``
+first, then the three annotation kinds of §21. A changeset therefore reads the
+network before the picture of it, and — because a note has an address of its own
+that no device can collide with — a note can never be reported as a change to
+the thing it is about.
 """
 
 from __future__ import annotations
@@ -22,12 +28,24 @@ from fnmatch import fnmatchcase
 from typing import Final
 
 from netgraph.loader.inventory import namespace_of, qualify, short_name
-from netgraph.models import KINDS, LAYOUT_KIND
+from netgraph.models import (
+    ANNOTATION_DOCUMENT_KINDS,
+    AREA_KIND,
+    KINDS,
+    LAYOUT_KIND,
+    LEGEND_KIND,
+    NOTE_KIND,
+)
 
 __all__ = [
     "ADDRESS_TYPES",
+    "ANNOTATION_TYPES",
+    "AREA_TYPE",
     "DEVICE_TYPE",
     "LAYOUT_TYPE",
+    "LEGEND_TYPE",
+    "NOTE_TYPE",
+    "SIDECAR_TYPES",
     "TYPE_OF_KIND",
     "Address",
     "AddressSyntaxError",
@@ -41,6 +59,21 @@ DEVICE_TYPE: Final = "device"
 #: Geometry documents are addressable, so an arrangement can be planned and
 #: applied like anything else, but they live in their own name space.
 LAYOUT_TYPE: Final = "layout"
+
+#: The three annotation kinds (§21). Each is its own address type, spelled the
+#: same as its ``kind``: an annotation declares no network fact, so there is no
+#: category above it for two of them to share the way five device kinds do.
+NOTE_TYPE: Final = NOTE_KIND
+AREA_TYPE: Final = AREA_KIND
+LEGEND_TYPE: Final = LEGEND_KIND
+
+#: The annotation address types, for the callers that ask "is this presentation?".
+ANNOTATION_TYPES: Final[tuple[str, ...]] = (NOTE_TYPE, AREA_TYPE, LEGEND_TYPE)
+
+#: Every address type that is *not* an element: geometry and annotations. They
+#: are addressable and plannable, but they are never paired up structurally and
+#: nothing in the graph depends on one.
+SIDECAR_TYPES: Final[frozenset[str]] = frozenset((LAYOUT_TYPE, *ANNOTATION_TYPES))
 
 #: Every ``kind`` mapped to the address type that names it.
 TYPE_OF_KIND: Final[dict[str, str]] = {
@@ -57,10 +90,16 @@ TYPE_OF_KIND: Final[dict[str, str]] = {
     "user": "user",
     "group": "group",
     LAYOUT_KIND: LAYOUT_TYPE,
+    NOTE_KIND: NOTE_TYPE,
+    AREA_KIND: AREA_TYPE,
+    LEGEND_KIND: LEGEND_TYPE,
 }
 
-#: Every address type, in the order a plan lists them. Sorted longest-first for
-#: parsing so no prefix can shadow another; the tuple itself stays readable.
+#: Every address type, in the order a plan lists them: the elements first, then
+#: the sidecars that only describe how they are drawn. A reader of a changeset
+#: wants to know what happened to the network before what happened to the
+#: picture of it. Sorted longest-first for parsing so no prefix can shadow
+#: another; the tuple itself stays readable.
 ADDRESS_TYPES: Final[tuple[str, ...]] = (
     DEVICE_TYPE,
     "cable",
@@ -71,13 +110,14 @@ ADDRESS_TYPES: Final[tuple[str, ...]] = (
     "user",
     "group",
     LAYOUT_TYPE,
+    *ANNOTATION_TYPES,
 )
 
 #: Ranking used to order a changeset within one action, so that the thing a
 #: reader looks for first is printed first.
 _TYPE_ORDER: Final[dict[str, int]] = {name: rank for rank, name in enumerate(ADDRESS_TYPES)}
 
-_KNOWN_KINDS: Final[frozenset[str]] = frozenset((*KINDS, LAYOUT_KIND))
+_KNOWN_KINDS: Final[frozenset[str]] = frozenset((*KINDS, LAYOUT_KIND, *ANNOTATION_DOCUMENT_KINDS))
 
 
 class AddressSyntaxError(ValueError):

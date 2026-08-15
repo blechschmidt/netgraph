@@ -34,6 +34,15 @@
  *   a11y.js is for a screen reader, and hears "3 selected" and which three.
  *   Neither is derived from the other — both are derived from this.
  *
+ * An annotation is not in here, and that is not an oversight. This set holds
+ * *element addresses*, and an address is what /api/ops takes — so a bulk edit is
+ * the selection posted verbatim. A note is not addressable that way: it is named
+ * by a kind *and* a name, because a note called `core` may sit beside a switch
+ * called `core` (§21). One in this set would be an address `element.set`,
+ * `element.move` and every alignment would send to the server as an element and
+ * be refused. The commentary keeps its own one-at-a-time selection in notes.js,
+ * which is the same shape links.js has for the link it is routing.
+ *
  * Focus is not selection. The focus ring says where the keyboard is; the
  * selection says what a command will act on. They coincide most of the time,
  * which is why every bulk command falls back to the focused element when

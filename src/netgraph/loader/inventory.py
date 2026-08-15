@@ -26,12 +26,20 @@ from pathlib import Path, PurePosixPath
 from netgraph.errors import SchemaIssue, format_path
 from netgraph.loader.provenance import Provenance, Site
 from netgraph.models import (
+    ANNOTATION_DOCUMENT_KINDS,
+    AREA_KIND,
+    LEGEND_KIND,
+    NOTE_KIND,
     Adapter,
+    Annotation,
+    Area,
     Cable,
     Device,
     Element,
     Group,
     Layout,
+    Legend,
+    Note,
     PatchPanel,
     Pdu,
     TestSuite,
@@ -230,6 +238,14 @@ class Inventory:
     #: Assertions about the network (§20), keyed by fully-qualified name. Not
     #: elements either, and indexed apart for the same reason as :attr:`layouts`.
     test_suites: dict[str, TestSuite] = field(default_factory=dict)
+    #: Diagram callouts (§21), keyed by fully-qualified name. Purely
+    #: presentational: nothing here may reach the graph, the validator's verdict,
+    #: a traced path or a generated configuration.
+    notes: dict[str, Note] = field(default_factory=dict)
+    #: Diagram zones (§21), keyed the same way.
+    areas: dict[str, Area] = field(default_factory=dict)
+    #: Diagram keys (§21), keyed the same way.
+    legends: dict[str, Legend] = field(default_factory=dict)
     #: Provenance of each element, keyed by fully-qualified name.
     sources: dict[str, SourceLocation] = field(default_factory=dict)
     #: Provenance of each layout document, keyed the same way.
@@ -238,6 +254,11 @@ class Inventory:
     #: field-level redirect table, whatever ``keep_provenance`` says: a failing
     #: assertion has to name its own line, and there are never many suites.
     test_suite_sources: dict[str, SourceLocation] = field(default_factory=dict)
+    #: Provenance of each annotation document, keyed by ``kind`` then by
+    #: fully-qualified name. One table rather than three, because every consumer
+    #: that wants it — the validator, the editor, ``plan`` — is already holding
+    #: the kind, and three near-identical fields is three chances to update two.
+    annotation_sources: dict[str, dict[str, SourceLocation]] = field(default_factory=dict)
     #: Problems found while loading, in the order they were encountered.
     errors: list[LoadError] = field(default_factory=list)
 
@@ -322,6 +343,56 @@ class Inventory:
         self.test_suites[fqn] = suite
         self.test_suite_sources[fqn] = source
         return fqn
+
+    def annotations_of(self, kind: str) -> dict[str, Annotation]:
+        """The annotation table for one kind, by name.
+
+        Returns the live dictionary, so a caller may index it but must not
+        assume it is a copy. An unknown kind gets an empty mapping rather than
+        a ``KeyError``: the three kinds are a closed set and asking about a
+        fourth is a caller's bug, not an inventory's.
+        """
+        tables: dict[str, dict[str, Annotation]] = {
+            NOTE_KIND: self.notes,  # type: ignore[dict-item]
+            AREA_KIND: self.areas,  # type: ignore[dict-item]
+            LEGEND_KIND: self.legends,  # type: ignore[dict-item]
+        }
+        return tables.get(kind, {})
+
+    def add_annotation(
+        self, annotation: Annotation, *, namespace: str, source: SourceLocation
+    ) -> str | None:
+        """Index a diagram annotation (§21) under ``namespace``.
+
+        Each kind has its own name space, and both are separate from the
+        elements': a note called ``core`` beside a switch called ``core`` beside
+        an area called ``core`` is three different things, because nothing ever
+        resolves one where another is meant.
+
+        Returns:
+            The fully-qualified name, or ``None`` when an annotation of that kind
+            and name is already indexed. The caller reports the clash
+            (``NG-G002``) and the first declaration wins, which keeps loading
+            deterministic.
+        """
+        fqn = qualify(namespace, annotation.metadata.name)
+        table = self.annotations_of(annotation.kind)
+        if fqn in table:
+            return None
+        table[fqn] = annotation
+        self.annotation_sources.setdefault(annotation.kind, {})[fqn] = source
+        return fqn
+
+    def annotation_source(self, kind: str, fqn: str) -> SourceLocation | None:
+        """Where the annotation of this kind and name was declared."""
+        return self.annotation_sources.get(kind, {}).get(fqn)
+
+    @property
+    def annotations(self) -> Iterator[tuple[str, str, Annotation]]:
+        """Every annotation as ``(kind, fqn, annotation)``, in kind then load order."""
+        for kind in ANNOTATION_DOCUMENT_KINDS:
+            for fqn, annotation in self.annotations_of(kind).items():
+                yield kind, fqn, annotation
 
     def record(self, error: LoadError) -> None:
         """Append a problem to :attr:`errors`."""

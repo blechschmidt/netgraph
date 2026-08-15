@@ -26,6 +26,7 @@ leaves every comment in it alone.
 - [The two gates](#the-two-gates)
 - [Batches: many operations, one change](#batches-many-operations-one-change)
 - [Arranging a selection](#arranging-a-selection)
+- [Annotating a diagram](#annotating-a-diagram)
 - [Using it from Python](#using-it-from-python)
 - [Reviewing what you changed](#reviewing-what-you-changed)
 - [What it deliberately does not do](#what-it-deliberately-does-not-do)
@@ -58,7 +59,7 @@ are the whole design:
 
 ## The operations
 
-There are fifteen. Thirteen are **semantic** — the vocabulary a person or a
+There are eighteen. Sixteen are **semantic** — the vocabulary a person or a
 diagram uses:
 
 | Operation | JSON `op` | What it does |
@@ -76,6 +77,9 @@ diagram uses:
 | `Disconnect(address)` | `disconnect` | Removes a cable. |
 | `SetGeometry(view, nodes, edges, groups, routing, layout, namespace, file)` | `set-geometry` | Writes one view of a [`kind: layout`](schema.md#18-layout-diagram-geometry) document. |
 | `SetLinkGeometry(view, link, waypoints, routing, label, layout, namespace, file)` | `set-link-geometry` | Writes one *link's* geometry into that document: its bends, its routing style and where its label sits. |
+| `CreateAnnotation(kind, name, namespace, spec, metadata, file)` | `create-annotation` | Adds a `note`, `area` or `legend` document ([§21](schema.md#21-diagram-annotations-notes-areas-and-legends)). |
+| `DeleteAnnotation(kind, name, namespace)` | `delete-annotation` | Removes one, and the file if it was the last document in it. |
+| `SetAnnotation(kind, name, namespace, path, value, unset)` | `set-annotation` | Sets — or removes — one of its fields. |
 
 Two are **primitive**, and file-level:
 
@@ -119,7 +123,18 @@ it has to extend a device's VLAN database, and `AddInterface` stays as it is
 because a port also has to be *placed*, and a duplicate name has to mean
 something.
 
-The set is deliberately closed. A sixteenth kind of change is a sixteenth
+The three annotation operations are separate from the element ones for a reason
+that is about the *name space* rather than about the shape of a document. An
+annotation is a sidecar: a note called `core` may sit beside a switch called
+`core`, so a create that carried only a name could not say which of the two it
+meant — and one that went through the element path would refuse the note because
+the switch already has the name. `DeleteAnnotation` has no `cascade` and never
+will: nothing in an inventory refers to an annotation, so nothing can be orphaned
+by removing one. `SetAnnotation` is the operation a dragged note is made of, and
+the one rule worth knowing about it is written up under
+[annotating a diagram](#annotating-a-diagram).
+
+The set is deliberately closed. A nineteenth kind of change is a nineteenth
 operation, defined here, and not a caller reaching for the file system.
 
 ## What an operation guarantees
@@ -396,6 +411,60 @@ A property of the diagram rather than of the person looking at it, because
 snapping writes real coordinates into a real document: two people tidying the
 same inventory to two different lattices would spend the afternoon undoing each
 other.
+
+## Annotating a diagram
+
+A note, an area and a legend ([§21](schema.md#21-diagram-annotations-notes-areas-and-legends))
+are the one part of an inventory whose whole purpose is to be arranged by hand,
+so the editor treats them as directly as it treats a bend. Every gesture below
+ends in one of the three annotation operations, through `/api/ops`, into the
+document that declares the annotation — never into a browser-side model that
+could drift from the file.
+
+| Gesture | What it writes |
+|---|---|
+| `Shift-N`, or **New note** in the canvas menu | `create-annotation`, at the pointer or in the middle of the view |
+| **Note about it…** on an element or a link | the same, with `spec.anchor` instead of a coordinate |
+| Double-click a note, or `Shift-E` on a selected one | `set-annotation spec.text`, on `Ctrl-Enter` or on clicking away |
+| Drag a note | `set-annotation spec.geometry.x` and `.y` |
+| Drag its corner | `.width` and `.height` |
+| Drag an area's outline, or one of its corners | `.x`, `.y`, `.width` and `.height`, in one batch |
+| `Delete` on a selected one | `delete-annotation` |
+| `Alt-N` | nothing: the toggle is about the picture, not the files |
+
+Four things about it are decisions rather than details.
+
+**An unplaced annotation gets its whole `geometry` block in one write.** A note
+anchored to a switch pins no point, and `spec.geometry.x` written onto it would
+leave a position with no `y` — which §21 refuses under `NG-G005`. So the first
+drag of an unplaced note sends `spec.geometry` as a mapping, and every drag after
+that sends a field at a time, which is what a reviewer wants to read in the
+changes drawer. It is the same rule
+[the draw.io round trip](drawio.md) applies to a diagram coming home changed, and
+it is why `netgraph.edit.apply` lets a *coherence* failure through to the commit
+gate while refusing a *value* failure on the spot: one gesture is several writes,
+and the document is briefly incoherent and finally correct.
+
+**One gesture is one batch.** A drag posts both coordinates together, so `Ctrl-Z`
+puts the whole drag back rather than half of it.
+
+**An area that follows its members refuses to be dragged, and says why.** Its box
+is the hull of wherever those devices were drawn, so there is no rectangle to
+move: the status line answers "this area is drawn round its members; move them,
+or give it a geometry to pin it to the paper". The alternative — quietly
+converting it to an explicit rectangle — would change what the area *means*, from
+"wherever these two devices are" to "this piece of paper", and a change of
+meaning should not be a side effect of a drag. An area that does pin a rectangle
+gets corner handles, and carries its extent whenever it is written, because a
+zone with a position and no size is drawn round its members again.
+
+**Handles are offered only on an arranged diagram.** Under an automatic layout
+Graphviz places a note itself and `spec.geometry` changes nothing, so a drag
+would write a number nobody could see the effect of — the same bargain
+[link routing](commands/web.md#the-keyboard) makes. Selecting, retyping and
+deleting work either way, because none of the three is about coordinates. One
+caveat on resizing a note: the SVG renderer sizes a note to its text, so the box
+is written for `netgraph export drawio` rather than for the picture on screen.
 
 ## Using it from Python
 

@@ -39,12 +39,16 @@ from typing import Any, Final
 
 from pydantic import TypeAdapter
 
+from netgraph.models.annotation import Area, Legend, Note
 from netgraph.models.base import NetgraphModel
 from netgraph.models.device import Switch
 from netgraph.models.document import ELEMENT_MODELS, Element, element_model_for
 from netgraph.models.element import (
+    AREA_KIND,
     DOCUMENT_KINDS,
     LAYOUT_KIND,
+    LEGEND_KIND,
+    NOTE_KIND,
     TEMPLATE_KIND,
     TEST_SUITE_KIND,
     ElementBase,
@@ -112,18 +116,30 @@ _LAYOUT_DEF: Final = "Layout"
 #: Name of the ``$defs`` entry holding the ``kind: testsuite`` envelope (§20).
 _TEST_SUITE_DEF: Final = "TestSuite"
 
-#: The two document kinds that declare no element and have a model of their own.
-#: Both generate straight from pydantic and skip every element-shaped pass, so
-#: the two of them are one code path rather than two near-identical ones.
+#: Names of the ``$defs`` entries holding the three annotation envelopes (§21).
+_NOTE_DEF: Final = "Note"
+_AREA_DEF: Final = "Area"
+_LEGEND_DEF: Final = "Legend"
+
+#: Every document kind that declares no element and has a model of its own: the
+#: two sidecars of §18 and §20, and the three annotations of §21. All of them
+#: generate straight from pydantic and skip every element-shaped pass, so they
+#: are one code path rather than five near-identical ones.
 _SIDECAR_MODELS: Final[dict[str, type[NetgraphModel]]] = {
     LAYOUT_KIND: Layout,
     TEST_SUITE_KIND: TestSuite,
+    NOTE_KIND: Note,
+    AREA_KIND: Area,
+    LEGEND_KIND: Legend,
 }
 
 #: Where each sidecar's envelope lands in ``$defs``.
 _SIDECAR_DEFS: Final[dict[str, str]] = {
     LAYOUT_KIND: _LAYOUT_DEF,
     TEST_SUITE_KIND: _TEST_SUITE_DEF,
+    NOTE_KIND: _NOTE_DEF,
+    AREA_KIND: _AREA_DEF,
+    LEGEND_KIND: _LEGEND_DEF,
 }
 
 #: What each sidecar's ``spec`` holds, for the hover text on the key itself.
@@ -133,6 +149,15 @@ _SIDECAR_SPEC_NOTES: Final[dict[str, str]] = {
         "The body of a `testsuite` document: named assertions about the network, graded by "
         "`netgraph test`."
     ),
+    NOTE_KIND: (
+        "The body of a `note` document: what the callout says, what it is about and where it "
+        "is drawn."
+    ),
+    AREA_KIND: (
+        "The body of an `area` document: which elements the zone encloses, and how the box "
+        "round them is drawn."
+    ),
+    LEGEND_KIND: "The body of a `legend` document: the key, and which corner it sits in.",
 }
 _TEMPLATE_SPEC_DEF: Final = "TemplateSpec"
 
@@ -693,10 +718,10 @@ def _generate(kind: str | None) -> tuple[dict[str, Any], dict[str, Any], bool]:
     # with nothing required. Any device kind pulls in the same ``$defs``, so one
     # stands in as the carrier and is dropped again once they are collected.
     if kind in _SIDECAR_MODELS:
-        # A layout and a test suite each have a model of their own, and neither
-        # is anything like an element: no interfaces, no spec shorthands, no
-        # loader sugar. They generate directly, and every pass below finds
-        # nothing of its own to change.
+        # A layout, a test suite and the three annotations each have a model of
+        # their own, and none is anything like an element: no interfaces, no
+        # spec shorthands, no loader sugar. They generate directly, and every
+        # pass below finds nothing of its own to change.
         sidecar = _SIDECAR_MODELS[kind]
         root = sidecar.model_json_schema(mode="validation", by_alias=True)
         definitions = dict(root.pop("$defs", {}))
@@ -748,7 +773,7 @@ def _register_template_branch(root: dict[str, Any]) -> None:
 
 
 def _document_sidecars(definitions: dict[str, Any]) -> None:
-    """Describe the ``layout`` and ``testsuite`` envelopes in the element's words.
+    """Describe every sidecar envelope in the element's own words.
 
     ``apiVersion``, ``kind`` and ``metadata`` mean exactly what they mean on an
     element, so they take :class:`~netgraph.models.element.ElementBase`'s
@@ -782,11 +807,12 @@ def _document_sidecars(definitions: dict[str, Any]) -> None:
 
 
 def _register_sidecar_branch(root: dict[str, Any], definitions: dict[str, Any], kind: str) -> None:
-    """Add ``layout`` (§18) or ``testsuite`` (§20) to the all-kinds union.
+    """Add one sidecar — a layout, a test suite, an annotation — to the union.
 
     Generated separately and merged rather than being part of the element union,
-    because neither is an element: pydantic never sees them in ``Element``, and
-    the element passes above have nothing to say about a coordinate or a claim.
+    because none of them is an element: pydantic never sees them in ``Element``,
+    and the element passes above have nothing to say about a coordinate, a claim
+    or a callout.
     The shared definitions they pull in — ``Metadata``, ``Location`` — are the
     same models the elements use, so the versions already decorated with field
     docs win.

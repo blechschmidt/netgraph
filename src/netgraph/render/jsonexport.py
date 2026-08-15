@@ -59,6 +59,25 @@ network rather than merely about the picture:
 * a bundled edge carries a ``bundle`` object with the member count and the full
   record of each member link, exported by the same code that exports an
   unbundled one — so nothing is lost by asking for the summary.
+
+Annotations
+-----------
+
+A document whose view declares any (§21) carries a top-level ``annotations``
+object with ``notes``, ``areas`` and ``legends``. It is the contract the browser
+and every downstream tool read, so it is complete: each entry carries its stable
+id, the fully-qualified name of the document behind it, its resolved members or
+anchor, its colours and whatever geometry it pins. A note carries its text
+*twice* — once as the markdown-subset source and once as the parse
+(:func:`~netgraph.render.annotations.parse_markup`) — so that a consumer draws
+the same bold word netgraph draws without reimplementing the parser, and a
+generated legend carries the swatches it generated rather than the instruction
+to generate them, because the entries depend on what this drawing drew.
+
+None of it is topology, and none of it appears in ``nodes`` or ``edges``. The
+key is absent when the view declares nothing and absent when annotations are
+turned off, so a document from an inventory with no annotations in it is
+byte-identical to what it always was.
 """
 
 from __future__ import annotations
@@ -71,6 +90,7 @@ from netgraph.layout.routing import Route
 from netgraph.models import API_VERSION
 from netgraph.power import Feed, PowerNode
 from netgraph.render.aggregate import AggregateView, BundleView
+from netgraph.render.annotations import AreaView, LegendView, NoteView, annotation_views
 from netgraph.render.diffview import DiffOverlay, Mark
 from netgraph.render.graph import (
     AdjacencyView,
@@ -89,7 +109,7 @@ from netgraph.render.graph import (
 from netgraph.render.options import RenderOptions
 from netgraph.render.routes import default_routing, route_table
 
-__all__ = ["GRAPH_KIND", "graph_to_dict", "render_json", "to_json"]
+__all__ = ["GRAPH_KIND", "annotations_payload", "graph_to_dict", "render_json", "to_json"]
 
 #: ``kind`` of the exported document, mirroring the element envelope of §3.
 GRAPH_KIND: Final = "NetworkGraph"
@@ -158,6 +178,9 @@ def graph_to_dict(graph: Graph, options: RenderOptions | None = None) -> dict[st
     layout = _layout(graph)
     if layout is not None:
         document["layout"] = layout
+    annotations = annotations_payload(graph, opts)
+    if annotations is not None:
+        document["annotations"] = annotations
     if opts.title:
         document["title"] = opts.title
     if graph.dangling:
@@ -201,6 +224,121 @@ def _layout(graph: Graph) -> dict[str, Any] | None:
             }
             for key, box in sorted(geometry.groups.items())
         }
+    return payload
+
+
+def annotations_payload(
+    graph: Graph, options: RenderOptions | None = None
+) -> dict[str, Any] | None:
+    """The notes, areas and legends of this drawing (§21), or ``None``.
+
+    Resolved by :func:`~netgraph.render.annotations.annotation_views`, the same
+    call the picture backends make, so a consumer that draws this document
+    itself boxes the same elements and generates the same key. Members and
+    anchors are already narrowed to what this graph holds: an exporter that
+    published a member the ``nodes`` array does not contain would be handing out
+    a dangling reference.
+    """
+    views = annotation_views(graph, options)
+    if not views:
+        return None
+    payload: dict[str, Any] = {}
+    if views.notes:
+        payload["notes"] = [_note(note) for note in views.notes]
+    if views.areas:
+        payload["areas"] = [_area(area) for area in views.areas]
+    if views.legends:
+        payload["legends"] = [_legend(legend) for legend in views.legends]
+    return payload
+
+
+def _note(view: NoteView) -> dict[str, Any]:
+    """One callout: what it says, what it is about, and where it sits."""
+    payload: dict[str, Any] = {
+        "id": view.id,
+        "fqn": view.fqn,
+        "text": view.text,
+        # The parse, so a client renders the same emphasis without owning a
+        # markdown implementation; see the module docstring.
+        "blocks": [
+            {
+                "kind": block.kind,
+                "spans": [
+                    {"style": span.style, "text": span.text} if span.style else {"text": span.text}
+                    for span in block.spans
+                ],
+            }
+            for block in view.lines
+        ],
+        "color": view.fill,
+        "stroke": view.stroke,
+        "leader": view.leader,
+    }
+    if view.anchor:
+        payload["anchor"] = view.anchor
+    geometry = _annotation_geometry(view.x, view.y, view.width, view.height)
+    if geometry:
+        payload["layout"] = geometry
+    return payload
+
+
+def _area(view: AreaView) -> dict[str, Any]:
+    """One zone: what it encloses, how it is drawn, and any rectangle it pins."""
+    payload: dict[str, Any] = {
+        "id": view.id,
+        "fqn": view.fqn,
+        "members": list(view.members),
+        "color": view.fill,
+        "stroke": view.stroke,
+        "border": view.border,
+        "padding": view.padding,
+    }
+    if view.label:
+        payload["label"] = view.label
+    if view.box is not None:
+        payload["layout"] = _annotation_geometry(
+            view.box.x, view.box.y, view.box.width, view.box.height
+        )
+    return payload
+
+
+def _legend(view: LegendView) -> dict[str, Any]:
+    """One key, with ``auto: layers`` already resolved into its swatches."""
+    payload: dict[str, Any] = {
+        "id": view.id,
+        "fqn": view.fqn,
+        "corner": view.corner,
+        "color": view.fill,
+        "stroke": view.stroke,
+        "entries": [
+            {
+                "label": entry.label,
+                "color": entry.color,
+                "shape": entry.shape,
+                **({"description": entry.description} if entry.description else {}),
+            }
+            for entry in view.entries
+        ],
+    }
+    if view.title:
+        payload["title"] = view.title
+    return payload
+
+
+def _annotation_geometry(
+    x: float | None, y: float | None, width: float | None, height: float | None
+) -> dict[str, Any]:
+    """An annotation's pinned position and size, in the §18 coordinate system.
+
+    Shaped like every other ``layout`` object in this document — a ``position``
+    and a ``size``, points, ``y`` upwards, the position being the centre — so a
+    client reads one geometry, not two.
+    """
+    payload: dict[str, Any] = {}
+    if x is not None and y is not None:
+        payload["position"] = {"x": x, "y": y}
+    if width is not None and height is not None:
+        payload["size"] = {"width": width, "height": height}
     return payload
 
 

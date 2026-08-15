@@ -11,10 +11,14 @@ from netgraph.models.metadata import Metadata
 from netgraph.models.scalars import API_VERSION, ApiVersion
 
 __all__ = [
+    "ANNOTATION_DOCUMENT_KINDS",
+    "AREA_KIND",
     "DEFAULT_API_VERSION",
     "DOCUMENT_KINDS",
     "KINDS",
     "LAYOUT_KIND",
+    "LEGEND_KIND",
+    "NOTE_KIND",
     "TEMPLATE_KIND",
     "TEST_SUITE_KIND",
     "ElementBase",
@@ -56,8 +60,27 @@ LAYOUT_KIND: str = "layout"
 #: ``netgraph test``. See :mod:`netgraph.models.testsuite`.
 TEST_SUITE_KIND: str = "testsuite"
 
-#: Every ``kind`` a document may declare: elements, templates, layouts and suites.
-DOCUMENT_KINDS: tuple[str, ...] = (*KINDS, TEMPLATE_KIND, LAYOUT_KIND, TEST_SUITE_KIND)
+#: The sixteenth, seventeenth and eighteenth kinds (§21). Diagram annotations: a
+#: callout, a zone, a key. Like a layout they declare no element and carry no
+#: network fact — they are what the picture says *about* the network, and they
+#: are barred from affecting anything the tool concludes. See
+#: :mod:`netgraph.models.annotation`.
+NOTE_KIND: str = "note"
+AREA_KIND: str = "area"
+LEGEND_KIND: str = "legend"
+
+#: The three annotation kinds, in the order §21 introduces them.
+ANNOTATION_DOCUMENT_KINDS: tuple[str, ...] = (NOTE_KIND, AREA_KIND, LEGEND_KIND)
+
+#: Every ``kind`` a document may declare: elements, templates, layouts, suites
+#: and annotations.
+DOCUMENT_KINDS: tuple[str, ...] = (
+    *KINDS,
+    TEMPLATE_KIND,
+    LAYOUT_KIND,
+    TEST_SUITE_KIND,
+    *ANNOTATION_DOCUMENT_KINDS,
+)
 
 
 class ElementBase(NetgraphModel):

@@ -9,6 +9,7 @@ of its own.
 ```text
 campus/
 ├── netgraph.toml                       # per-inventory configuration (all defaults)
+├── annotations.yaml                    # the notes, areas and legends of §21
 ├── backbone/cables.yaml                # the three inter-site fibres
 ├── templates/access-switch.yaml        # a 48-port access switch, declared once
 └── sites/
@@ -189,6 +190,41 @@ validation output. Read the merge either way round:
 ```bash
 netgraph -i examples/campus show sw-north-acc-03 --raw   # as written
 netgraph -i examples/campus show sw-north-acc-03         # as merged
+```
+
+## What is said *about* the diagram
+
+[`annotations.yaml`](annotations.yaml) is the §21 layer: three notes, three
+areas and two legends, one of each shape the schema allows, in the file a reader
+looking for "how do I write one of these" should be sent to.
+
+| Document | Kind | What it demonstrates | Views |
+|---|---|---|---|
+| `why-fibre` | `note` | Anchored to a **link**, so the leader follows the cable. | every one |
+| `mgmt-is-not-routed` | `note` | Anchored to an **element** *and* placed at a point — what dragging an anchored note produces. | `l3` |
+| `voice-rollout` | `note` | Free-floating: pinned by `geometry.x`/`y` with no anchor, because it is about the inventory rather than about any one element. | `l2` |
+| `backbone-ring` | `area` | Explicit `members`, because "the three cores" is a list and not a query. | `l3` |
+| `site-north` | `area` | A `selector` over a namespace — the declarative form of `--collapse sites/north`, boxed rather than folded. | `l2` |
+| `on-the-generator` | `area` | An explicit `geometry` rectangle: a region of the *paper*, which encloses whatever the arrangement puts in it. | `l1` |
+| `key` | `legend` | `auto: layers`, so its rows are whatever the drawing actually drew and cannot go stale. | `l3` |
+| `media` | `legend` | Written-out `entries`, for what the colours mean to *this* campus. | `physical` |
+
+`spec.views` is why no two of them crowd one drawing: an annotation with no
+`views` appears in every picture, and one that lists them appears only in those.
+
+**None of the eight changes what netgraph concludes.** They add no node and no
+edge at any layer, move no hop in `netgraph path`, write no line of generated
+configuration and raise no finding — `netgraph -i examples/campus validate`
+still prints `no problems found`. That is asserted separately in
+`tests/test_annotations.py`; §21 of `docs/schema.md` says why it has to be.
+
+Render any layer to see them, or turn them off to see the network without its
+commentary:
+
+<!-- norun: writes an SVG into the reader's directory -->
+```bash
+netgraph -i examples/campus render --layer l3 -f svg -o campus-l3.svg
+netgraph -i examples/campus render --layer l3 --no-annotations -f svg -o plain.svg
 ```
 
 ## Details worth copying

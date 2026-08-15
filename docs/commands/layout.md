@@ -177,6 +177,7 @@ a list of what moved.
 | `--file` | `PATH` | — | File to write a new layout document to, relative to the inventory root. Chosen by the layout conventions when absent. |
 | `--show-ips`, `--no-show-ips` | — | `--show-ips` | Print configured IP addresses on the nodes. |
 | `--show-vlans`, `--no-show-vlans` | — | `--show-vlans` | Annotate nodes and links with VLAN membership. |
+| `--annotations`, `--no-annotations` | — | `--annotations` | Draw the notes, areas and legends the inventory declares for this view. Turn them off for a diagram that should carry the topology and nothing written about it — a printed page for an audit — and leave them on for one that is being read rather than checked, where the callout is the reason the screenshot is worth attaching to the ticket. |
 | `--group-by-namespace` | — | off | Draw each namespace as a visual group. |
 | `--icons` | `THEME\|DIR` | — | Draw each element as an icon instead of a plain shape. Built in: cisco, none. A directory of images named after element kinds (router.svg, switch.png, ...) also works. Graphviz formats only. |
 | `--tooltips`, `--no-tooltips` | — | `--tooltips` | Carry the full detail of each element — interfaces, addresses, VLANs, cabling — as hover text. Reaches a reader in svg output; png and pdf have nowhere to put it. |

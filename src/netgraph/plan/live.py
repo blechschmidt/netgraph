@@ -484,6 +484,16 @@ class _Adoption:
                 namespace=namespace_of(fqn),
                 source=self.inventory.layout_sources[fqn],
             )
+        # Annotations are carried over the same way, and for a stronger reason:
+        # no capture has a word for a note, an area or a legend, so a capture is
+        # never evidence about one. Dropping them here would make every plan
+        # built from a capture propose deleting every annotation in the tree.
+        for kind, fqn, annotation in self.inventory.annotations:
+            target.add_annotation(
+                annotation,
+                namespace=namespace_of(fqn),
+                source=self.inventory.annotation_sources[kind][fqn],
+            )
         return target
 
     def _element(self, fqn: str, element: Element) -> Element:

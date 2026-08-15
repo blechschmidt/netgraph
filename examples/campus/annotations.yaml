@@ -1,0 +1,153 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: note
+metadata:
+  name: why-fibre
+  description: |
+    A callout anchored to a link. The leader line follows the cable wherever
+    the diagram puts it, which is why an anchor is worth more than a pinned
+    coordinate.
+spec:
+  color: '#fef3c7'
+  text: |
+    The backbone is **single-mode fibre**: 4.2 km between sites, which is
+    past what copper does at any speed.
+
+    - `os2`, LC, 10Gbps
+    - the ring survives one break
+  anchor:
+    link: backbone/cbl-bb-north-south
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: note
+metadata:
+  name: mgmt-is-not-routed
+  description: |
+    Anchored *and* placed. The point decides where the note is drawn and the
+    anchor decides what the leader points at, which is exactly what dragging
+    an anchored note produces.
+spec:
+  views:
+    - l3
+  text: |
+    `Vlan99` lives in the *mgmt* VRF and its default route is a discard
+    route, so management does not leave the site.
+  anchor:
+    element: sites/north/distribution/sw-north-dist-01
+  geometry:
+    x: 640
+    y: 900
+    width: 240
+  leader: true
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: note
+metadata:
+  name: voice-rollout
+  description: |
+    A free-floating note: it is about the inventory rather than about any one
+    element, so it is pinned to the canvas instead of anchored.
+spec:
+  views:
+    - l2
+  color: '#e0f2fe'
+  text: |
+    VLAN 30 (*voice*) is trunked everywhere and has no access port yet — the
+    state a campus is in halfway through a telephony rollout.
+  geometry:
+    x: -420
+    y: 900
+    width: 240
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: area
+metadata:
+  name: backbone-ring
+  description: |
+    An area that names its members outright, because "the three cores" is a
+    list and not a query: no namespace, label or kind picks out exactly those
+    three routers and nothing else.
+spec:
+  views:
+    - l3
+  color: '#fee2e2'
+  label: Backbone ring
+  members:
+    - sites/north/core/rtr-north-core-01
+    - sites/south/core/rtr-south-core-01
+    - sites/west/core/rtr-west-core-01
+  border: solid
+  padding: 24.0
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: area
+metadata:
+  name: site-north
+  description: |
+    An area that says what it contains as a query. This is the declarative
+    form of `--collapse sites/north`: the same set of elements, boxed rather
+    than folded, on every render and for everybody.
+spec:
+  views:
+    - l2
+  color: '#ecfdf5'
+  label: Site North
+  selector:
+    namespace: sites/north
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: area
+metadata:
+  name: on-the-generator
+  description: |
+    An area that is a region of the *paper* rather than a set of devices. It
+    encloses whatever the arrangement puts inside it, which is why it is never
+    reported as enclosing nothing.
+spec:
+  views:
+    - l1
+  color: '#f1f5f9'
+  label: On the generator
+  geometry:
+    x: 0.0
+    y: -260.0
+    width: 1200.0
+    height: 420.0
+  border: dotted
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: legend
+metadata:
+  name: key
+  description: |
+    A generated key: its rows are whatever this drawing actually drew, so it
+    cannot go stale when somebody adds a switch or a fibre run.
+spec:
+  views:
+    - l3
+  title: Key
+  corner: bottom-right
+  auto: layers
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: legend
+metadata:
+  name: media
+  description: |
+    A written-out key, for the one thing a generated one cannot say: what the
+    colours mean to *this* campus rather than to the renderer.
+spec:
+  views:
+    - physical
+  title: Media
+  corner: top-left
+  entries:
+    - label: backbone fibre
+      color: '#f97316'
+      shape: line
+      description: 10Gbps, os2, between sites
+    - label: uplink fibre
+      color: '#fb923c'
+      shape: line
+    - label: desk copper
+      color: '#64748b'
+      shape: line

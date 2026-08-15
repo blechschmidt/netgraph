@@ -560,6 +560,82 @@ main {
 
 .canvas.panning svg .ng-handle { cursor: grabbing; }
 
+/* The commentary of §21: the overlay notes.js appends inside the drawing.
+ *
+ * An area in an arranged drawing is a rectangle painted into the graph's
+ * background with nothing to click, so this band is its hit area -- a stroke
+ * along its outline, the same trick the link band uses, so that the middle of a
+ * zone stays clickable for the devices inside it. */
+.viewport svg .ng-anno-band {
+  stroke: transparent;
+  fill: none;
+  pointer-events: stroke;
+  cursor: move;
+}
+
+/* One that follows its members has no box to move. Saying so with the cursor
+ * costs nothing and means the refusal is not the first anybody hears of it. */
+.viewport svg .ng-anno-band[data-follows] { cursor: not-allowed; }
+
+/* What the canvas is acting on. A long dash, like the element halo, because it
+ * means the same thing -- and no fill, because an area already has one. */
+.viewport svg .ng-anno-picked {
+  fill: none;
+  stroke: var(--selected);
+  stroke-width: 1.6;
+  stroke-dasharray: 10 4;
+  pointer-events: none;
+  rx: 3;
+}
+
+/* A grab handle on a note or a zone. Drawn like a bend's -- it means the same
+ * thing -- but under a class of its own, because links.js claims `.ng-handle`
+ * for itself the moment one is pressed. */
+.viewport svg .ng-anno-handle {
+  fill: var(--bg);
+  stroke: var(--selected);
+  stroke-width: 1.6;
+  cursor: nwse-resize;
+}
+
+.viewport svg .ng-anno-handle:hover { fill: var(--selected); }
+.canvas.panning svg .ng-anno-handle { cursor: grabbing; }
+
+/* Typing a note's text, over the note itself. In client pixels rather than
+ * inside the SVG: it is a text box, not part of the drawing, and it belongs to
+ * the same overlay stack the palette and the context menu are in -- so Escape
+ * leaves it and the page's own chords do not fire into it. */
+.note-edit {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--selected);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 28%);
+}
+
+.note-edit-text {
+  width: 24rem;
+  min-height: 5rem;
+  padding: 6px;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  resize: both;
+}
+
+.note-edit-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: .78rem;
+}
+
 .viewport svg g.hot { filter: drop-shadow(0 0 3px currentColor); }
 .viewport svg g.hot > * { stroke-width: 2.4; }
 .viewport svg g.faded { opacity: .28; }

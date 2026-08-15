@@ -159,12 +159,13 @@ class Menu:
 
 
 #: What a right-click can land on. ``node`` and ``link`` are the two kinds of
-#: shape the diagram draws; ``canvas`` is the paper between them, which is where
-#: "make a new one" belongs because it is the one place nothing else is meant.
-#: ``selection`` outranks all three: right-clicking inside a multi-selection is
+#: shape the diagram draws and ``annotation`` is the commentary drawn over them
+#: (§21); ``canvas`` is the paper between them all, which is where "make a new
+#: one" belongs because it is the one place nothing else is meant.
+#: ``selection`` outranks the rest: right-clicking inside a multi-selection is
 #: asking about the *set*, and offering "Rename it…" there would be offering to
 #: rename whichever of the eleven happened to be under the pointer.
-MENU_TARGETS: Final[tuple[str, ...]] = ("selection", "node", "link", "canvas")
+MENU_TARGETS: Final[tuple[str, ...]] = ("selection", "node", "link", "annotation", "canvas")
 
 
 #: The order the reference and the palette group commands in. A reader looking
@@ -520,6 +521,40 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         ),
         needs="write",
     ),
+    # -- Annotating the diagram --------------------------------------------
+    #
+    # A note, an area and a legend are not elements (§21): they declare no
+    # network fact, and nothing in the inventory refers to them. So they have
+    # their own commands rather than sharing the element ones — Enter inspects
+    # an element and F2 renames one, and neither question can be asked of a
+    # callout without the answer meaning something else.
+    Binding(
+        id="annotation.create",
+        title="Add a note to the diagram…",
+        section="Editing the inventory",
+        keys=("Shift-N",),
+        detail=(
+            "Drops a note where the pointer is — or in the middle of the view when the "
+            "keyboard asks — and opens it for typing. Right-clicking an element or a "
+            "link anchors the note to it instead, so it follows what it is about. "
+            "'netgraph edit create-annotation'."
+        ),
+        where="canvas",
+        needs="write",
+    ),
+    Binding(
+        id="annotation.edit",
+        title="Edit the note's text…",
+        section="Editing the inventory",
+        keys=("Shift-E",),
+        detail=(
+            "A text box over the note itself, in the markdown subset §21 defines. "
+            "Ctrl-Enter or clicking away writes 'spec.text'; Escape abandons it and "
+            "writes nothing. Double-clicking the note does the same."
+        ),
+        where="canvas",
+        needs="write",
+    ),
     Binding(
         id="interface.add",
         title="Add an interface…",
@@ -668,6 +703,17 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         section="The view",
         keys=("Alt-G",),
         detail="Collapse each namespace into one box.",
+    ),
+    Binding(
+        id="view.annotations",
+        title="Toggle annotations",
+        section="The view",
+        keys=("Alt-N",),
+        detail=(
+            "Whether the notes, areas and legends of §21 are drawn. They are "
+            "commentary, never topology, so hiding them changes nothing the tool "
+            "concludes — only how much of the picture is somebody's explanation."
+        ),
     ),
     Binding(
         id="view.strict",
@@ -847,6 +893,10 @@ MENUS: Final[tuple[Menu, ...]] = (
             (
                 MenuItem("element.connect", "Cable it to…"),
                 MenuItem("interface.add", "Add an interface…"),
+                # Here rather than only on the canvas because *this* is where a
+                # note gets an anchor: one created over an element is about that
+                # element and follows it when the diagram is laid out again.
+                MenuItem("annotation.create", "Note about it…"),
             ),
             (
                 MenuItem("element.rename", "Rename it…"),
@@ -866,6 +916,7 @@ MENUS: Final[tuple[Menu, ...]] = (
                 MenuItem("link.straighten", "Straighten it"),
                 MenuItem("link.route", "Route it…"),
                 MenuItem("link.label.reset", "Put the label back on the line"),
+                MenuItem("annotation.create", "Note about it…"),
             ),
             (
                 MenuItem("element.set", "Set a field…"),
@@ -873,10 +924,24 @@ MENUS: Final[tuple[Menu, ...]] = (
             ),
         ),
     ),
+    # A note, an area and a legend all answer here. The rows that only make
+    # sense for one of the three are drawn greyed with the reason on them —
+    # "an area has no text" is worth more than a menu that silently differs
+    # depending on which piece of commentary was clicked.
+    Menu(
+        target="annotation",
+        groups=(
+            (MenuItem("annotation.edit", "Edit the text…"),),
+            (MenuItem("element.delete", "Delete it"),),
+        ),
+    ),
     Menu(
         target="canvas",
         groups=(
-            (MenuItem("element.create", "New", submenu="kinds"),),
+            (
+                MenuItem("element.create", "New", submenu="kinds"),
+                MenuItem("annotation.create", "New note"),
+            ),
             (
                 MenuItem("view.layer", "Show another layer…"),
                 MenuItem("view.fit", "Fit the diagram"),
@@ -958,6 +1023,7 @@ _TARGETS: Final[dict[str, str]] = {
     "selection": "a multi-selection",
     "node": "an element",
     "link": "a link",
+    "annotation": "a note, an area or a legend",
     "canvas": "the canvas",
 }
 

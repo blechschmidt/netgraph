@@ -14,12 +14,12 @@ graph netgraph {
   node [fontname="Helvetica,Arial,sans-serif", fontsize=10, style=filled, penwidth=1.2];
   edge [fontname="Helvetica,Arial,sans-serif", fontsize=8];
 
-  subgraph cluster_0 {
-    label="sites/north/access";
-    tooltip="namespace sites/north/access\n3 elements: 3 switches\nvlans: 1,10,20,30,99";
-    style=rounded;
-    color="#9ca3af";
-    fontcolor="#4b5563";
+  subgraph cluster_area_0 {
+    label="Site North";
+    style="rounded,filled,dashed";
+    color="#818b86";
+    fillcolor="#ecfdf5";
+    fontcolor="#818b86";
     fontsize=11;
     labeljust=l;
     margin=12;
@@ -59,17 +59,6 @@ graph netgraph {
         <TR><TD COLSPAN="3" ALIGN="CENTER">(+42 more interfaces)</TD></TR>
       </TABLE>
     >];
-  }
-
-  subgraph cluster_1 {
-    label="sites/north/core";
-    tooltip="namespace sites/north/core\n1 element: 1 router";
-    style=rounded;
-    color="#9ca3af";
-    fontcolor="#4b5563";
-    fontsize=11;
-    labeljust=l;
-    margin=12;
     "sites/north/core/rtr-north-core-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-north-core-01 [router]\nnamespace: sites/north/core\nLayer-3 core router for the North campus. It routes between the campus VLANs (whose gateways sit on sw-north-dist-01) and carries the two backbone fibres of the inter-site ring.\nlabels: env=prod, role=core, site=north\ninterfaces (4):\n  lo0  loopback  192.0.2.1/32, 2001:db8::1/128\n  xe-0/0/0  ethernet  10.1.0.1/30, 2001:db8:1::1/64  00:05:86:01:c0:00\n  xe-0/0/1  ethernet  198.51.100.1/30, 2001:db8:ff:1::1/64  00:05:86:01:c0:01\n  xe-0/0/2  ethernet  198.51.100.10/30, 2001:db8:ff:3::2/64  00:05:86:01:c0:02\nlinks (3):\n  xe-0/0/1 — sites/south/core/rtr-south-core-01:xe-0/0/2  (cable, fiber, 10Gbps)\n  xe-0/0/2 — sites/west/core/rtr-west-core-01:xe-0/0/1  (cable, fiber, 10Gbps)\n  xe-0/0/0 — sites/north/distribution/sw-north-dist-01:Ethernet52/1  (cable, fiber, 10Gbps)", label=<
       <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
         <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-north-core-01</B></TD></TR>
@@ -80,17 +69,6 @@ graph netgraph {
         <TR><TD ALIGN="LEFT">xe-0/0/2</TD><TD ALIGN="LEFT">198.51.100.10/30, 2001:db8:ff:3::2/64</TD><TD ALIGN="LEFT"></TD></TR>
       </TABLE>
     >];
-  }
-
-  subgraph cluster_2 {
-    label="sites/north/distribution";
-    tooltip="namespace sites/north/distribution\n1 element: 1 switch\nvlans: 1,10,20,30,99";
-    style=rounded;
-    color="#9ca3af";
-    fontcolor="#4b5563";
-    fontsize=11;
-    labeljust=l;
-    margin=12;
     "sites/north/distribution/sw-north-dist-01" [shape=box3d, fillcolor="#dcf0dc", color="#16a34a", tooltip="sw-north-dist-01 [switch]\nnamespace: sites/north/distribution\nDistribution switch for the North campus. It aggregates the access-layer trunks, hosts the SVI gateway for every campus VLAN, and reaches the core router over a routed (untagged) fibre uplink.\nlabels: env=prod, role=distribution, site=north\nvlans: 1,10,20,30,99\ninterfaces (8):\n  br0  bridge\n  Vlan10  vlan  10.1.10.1/24, 2001:db8:1:10::1/64  vlan 10 (access)\n  Vlan20  vlan  10.1.20.1/24, 2001:db8:1:20::1/64  vlan 20 (access)\n  Vlan99  vlan  10.1.99.1/24  vlan 99 (access)\n  Ethernet49/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1c:73:01:d0:01\n  Ethernet50/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1c:73:01:d0:02\n  Ethernet51/1  ethernet  vlan 1,10,20,30,99 (trunk)  00:1c:73:01:d0:03\n  Ethernet52/1  ethernet  10.1.0.2/30, 2001:db8:1::2/64  00:1c:73:01:d0:04\nlinks (4):\n  Ethernet52/1 — sites/north/core/rtr-north-core-01:xe-0/0/0  (cable, fiber, 10Gbps)\n  Ethernet49/1 — sites/north/access/sw-north-acc-01:TenGigabitEthernet1/1/1  (cable, fiber, 10Gbps)  vlan 1,10,20,30,99\n  Ethernet50/1 — sites/north/access/sw-north-acc-02:TenGigabitEthernet1/1/1  (cable, fiber, 10Gbps)  vlan 1,10,20,30,99\n  Ethernet51/1 — sites/north/access/… (+83 more characters)", label=<
       <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
         <TR><TD COLSPAN="3" ALIGN="CENTER"><B>sw-north-dist-01</B></TD></TR>
@@ -104,17 +82,6 @@ graph netgraph {
         <TR><TD ALIGN="LEFT">Ethernet52/1</TD><TD ALIGN="LEFT">10.1.0.2/30, 2001:db8:1::2/64</TD><TD ALIGN="LEFT"></TD></TR>
       </TABLE>
     >];
-  }
-
-  subgraph cluster_3 {
-    label="sites/north/hosts";
-    tooltip="namespace sites/north/hosts\n3 elements: 2 computers, 1 server\nvlans: 10,20";
-    style=rounded;
-    color="#9ca3af";
-    fontcolor="#4b5563";
-    fontsize=11;
-    labeljust=l;
-    margin=12;
     "sites/north/hosts/pc-north-01" [shape=rectangle, fillcolor="#f5f5f5", color="#6b7280", tooltip="pc-north-01 [computer]\nnamespace: sites/north/hosts\nStaff workstation, North campus floor 1\nlabels: env=prod, role=workstation, site=north\nvlans: 10\ninterfaces (2):\n  lo  loopback  127.0.0.1/8, ::1/128\n  eno1  ethernet  10.1.10.51/24, 2001:db8:1:10::51/64  b4:96:91:01:10:01\nlinks (1):\n  eno1 — sites/north/access/sw-north-acc-01:GigabitEthernet1/0/1  (cable, copper, 1Gbps)  vlan 10", label=<
       <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
         <TR><TD COLSPAN="3" ALIGN="CENTER"><B>pc-north-01</B></TD></TR>
@@ -353,6 +320,19 @@ graph netgraph {
       </TABLE>
     >];
   }
+
+  "annotation:note-why-fibre" [shape=note, style=filled, fillcolor="#fef3c7", color="#8b856d", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">The backbone is <B>single-mode fibre</B>: 4.2 km between sites, which is past what copper does at any speed.</TD></TR>
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">&#8226; <FONT FACE="monospace">os2</FONT>, LC, 10Gbps</TD></TR>
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">&#8226; the ring survives one break</TD></TR>
+    </TABLE>
+  >];
+  "annotation:note-voice-rollout" [shape=note, style=filled, fillcolor="#e0f2fe", color="#7b858b", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">VLAN 30 (<I>voice</I>) is trunked everywhere and has no access port yet — the state a campus is in halfway through a telephony rollout.</TD></TR>
+    </TABLE>
+  >];
 
   "sites/north/core/rtr-north-core-01" -- "sites/south/core/rtr-south-core-01" [color="#d97706", style=bold, penwidth=2.5, label="xe-0/0/1 -- xe-0/0/2", tooltip="cable backbone/cbl-bb-north-south\nsites/north/core/rtr-north-core-01:xe-0/0/1 — sites/south/core/rtr-south-core-01:xe-0/0/2\nmedium: fiber, speed: 10Gbps, length: 4200 m, label: BB-NS"];
   "sites/south/core/rtr-south-core-01" -- "sites/west/core/rtr-west-core-01" [color="#d97706", style=bold, penwidth=2.5, label="xe-0/0/1 -- xe-0/0/2", tooltip="cable backbone/cbl-bb-south-west\nsites/south/core/rtr-south-core-01:xe-0/0/1 — sites/west/core/rtr-west-core-01:xe-0/0/2\nmedium: fiber, speed: 10Gbps, length: 4200 m, label: BB-SW"];

@@ -394,7 +394,7 @@ nothing else.
 <!-- run: -->
 ```console
 $ netgraph fmt --check examples/campus
-0 file(s) would be reformatted, 18 already formatted
+0 file(s) would be reformatted, 19 already formatted
 ```
 
 **Let your editor check it.** `netgraph schema` writes a JSON Schema, and a

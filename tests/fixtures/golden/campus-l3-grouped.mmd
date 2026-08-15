@@ -2,15 +2,17 @@
 title: "Campus, layer 3"
 ---
 flowchart TB
+    subgraph area0["Backbone ring"]
+        direction TB
+        n3(["rtr-north-core-01<br/>[router]"])
+        n10(["rtr-south-core-01<br/>[router]"])
+        n17(["rtr-west-core-01<br/>[router]"])
+    end
     subgraph ns0["sites/north/access"]
         direction TB
         n0["sw-north-acc-01<br/>[switch]<br/>vlans: 1,10,20,30,99"]
         n1["sw-north-acc-02<br/>[switch]<br/>vlans: 1,10,20,30,99"]
         n2["sw-north-acc-03<br/>[switch]<br/>vlans: 1,10,20,30,99"]
-    end
-    subgraph ns1["sites/north/core"]
-        direction TB
-        n3(["rtr-north-core-01<br/>[router]"])
     end
     subgraph ns2["sites/north/distribution"]
         direction TB
@@ -27,10 +29,6 @@ flowchart TB
         n8["sw-south-acc-01<br/>[switch]<br/>vlans: 1,10,20,30,99"]
         n9["sw-south-acc-02<br/>[switch]<br/>vlans: 1,10,20,30,99"]
     end
-    subgraph ns5["sites/south/core"]
-        direction TB
-        n10(["rtr-south-core-01<br/>[router]"])
-    end
     subgraph ns6["sites/south/distribution"]
         direction TB
         n11["sw-south-dist-01<br/>[switch]<br/>vlans: 1,10,20,30,99"]
@@ -45,10 +43,6 @@ flowchart TB
         direction TB
         n15["sw-west-acc-01<br/>[switch]<br/>vlans: 1,10,20,30,99"]
         n16["sw-west-acc-02<br/>[switch]<br/>vlans: 1,10,20,30,99"]
-    end
-    subgraph ns9["sites/west/core"]
-        direction TB
-        n17(["rtr-west-core-01<br/>[router]"])
     end
     subgraph ns10["sites/west/distribution"]
         direction TB
@@ -93,6 +87,8 @@ flowchart TB
     n52("10.1.99.0/24<br/>[ipv4 subnet, vrf mgmt]<br/>vlans: 99")
     n53("10.2.99.0/24<br/>[ipv4 subnet, vrf mgmt]<br/>vlans: 99")
     n54("10.3.99.0/24<br/>[ipv4 subnet, vrf mgmt]<br/>vlans: 99")
+    note0["The backbone is single-mode fibre: 4.2 km between sites, which is past what copper does at any speed.<br/>• os2, LC, 10Gbps<br/>• the ring survives one break"]
+    note1["Vlan99 lives in the mgmt VRF and its default route is a discard route, so management does not leave the site."]
 
     n0 -- "Vlan99 · 10.1.99.11/24" --- n52
     n1 -- "Vlan99 · 10.1.99.12/24" --- n52
@@ -164,6 +160,7 @@ flowchart TB
     n20 -- "eth0 · 2001:db8:3:20::11/64" --- n48
     n21 -- "eno1 · 10.3.10.52/24" --- n29
     n21 -- "eno1 · 2001:db8:3:10::52/64" --- n47
+    note1 -.- n4
 
     classDef computer fill:#f5f5f5,stroke:#6b7280,stroke-width:1px
     classDef router fill:#dbe9f6,stroke:#2563eb,stroke-width:1px
@@ -175,3 +172,7 @@ flowchart TB
     class n6,n13,n20 server
     class n22,n23,n24,n25,n26,n27,n28,n29,n30,n31,n32,n33,n34,n35,n36,n37,n38,n39,n40,n41,n42,n43,n44,n45,n46,n47,n48,n49,n50,n51,n52,n53,n54 subnet
     class n0,n1,n2,n4,n8,n9,n11,n15,n16,n18 switch
+    classDef netgraphNote fill:#fef3c7,stroke:#8b856d,stroke-width:1px,stroke-dasharray:3 2
+    class note0,note1 netgraphNote
+%% areas are drawn as subgraphs: their colour, border style and padding are not expressible in mermaid
+%% legend 'key' (6 entries) is not drawn: mermaid has no construct for a key that is not part of the graph

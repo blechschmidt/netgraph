@@ -40,6 +40,7 @@ from typing import Any, ClassVar, Final
 
 from netgraph.edit.errors import OperationError
 from netgraph.edit.paths import format_field_path, parse_field_path
+from netgraph.models.element import ANNOTATION_DOCUMENT_KINDS
 from netgraph.models.layout import LAYOUT_VIEWS, ROUTING_STYLES
 
 __all__ = [
@@ -47,7 +48,9 @@ __all__ = [
     "AddInterface",
     "AppendItem",
     "Connect",
+    "CreateAnnotation",
     "CreateElement",
+    "DeleteAnnotation",
     "DeleteElement",
     "Disconnect",
     "MoveElement",
@@ -55,6 +58,7 @@ __all__ = [
     "RemoveFile",
     "RemoveInterface",
     "RenameElement",
+    "SetAnnotation",
     "SetField",
     "SetGeometry",
     "SetLinkGeometry",
@@ -610,6 +614,174 @@ class SetLinkGeometry(Operation):
 
 
 # --------------------------------------------------------------------------- #
+# Annotations
+# --------------------------------------------------------------------------- #
+
+
+@dataclass(frozen=True)
+class CreateAnnotation(Operation):
+    """Write a new ``note``, ``area`` or ``legend`` document (§21).
+
+    Not :class:`CreateElement` with a different ``kind``, and the reason is the
+    name space rather than the shape of the document. An annotation is a
+    sidecar: a note called ``core`` may sit beside a switch called ``core``, so
+    a create that only carried a name could not say which of the two it meant,
+    and — worse — a create that went through the element path would refuse the
+    note because the switch already has the name.
+    """
+
+    op: ClassVar[str] = "create-annotation"
+
+    #: One of :data:`~netgraph.models.ANNOTATION_DOCUMENT_KINDS`.
+    kind: str
+    name: str
+    namespace: str = ""
+    spec: Mapping[str, Any] = field(default_factory=dict)
+    #: Everything in ``metadata`` besides the name.
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+    #: Relative POSIX path to write into, or ``None`` to let placement decide.
+    file: str | None = None
+
+    def __post_init__(self) -> None:
+        _check_annotation_kind(self.kind)
+        if not self.name:
+            raise OperationError("an annotation must be named")
+
+    @property
+    def address(self) -> str:
+        """The annotation's fully-qualified name."""
+        return f"{self.namespace}/{self.name}" if self.namespace else self.name
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "op": self.op,
+            "kind": self.kind,
+            "name": self.name,
+            "namespace": self.namespace,
+            "spec": dict(self.spec),
+        }
+        if self.metadata:
+            payload["metadata"] = dict(self.metadata)
+        if self.file is not None:
+            payload["file"] = self.file
+        return payload
+
+    def describe(self) -> str:
+        where = f" in {self.namespace}" if self.namespace else ""
+        return f"create {self.kind} {self.name}{where}"
+
+
+@dataclass(frozen=True)
+class DeleteAnnotation(Operation):
+    """Remove an annotation's document, and its file if it was the last one.
+
+    No ``cascade``, and there never will be one: nothing in an inventory refers
+    to an annotation, so nothing can be orphaned by removing it. That asymmetry
+    with :class:`DeleteElement` is the point of §21 rather than an omission.
+    """
+
+    op: ClassVar[str] = "delete-annotation"
+
+    kind: str
+    name: str
+    namespace: str = ""
+
+    def __post_init__(self) -> None:
+        _check_annotation_kind(self.kind)
+        if not self.name:
+            raise OperationError("an annotation must be named")
+
+    @property
+    def address(self) -> str:
+        return f"{self.namespace}/{self.name}" if self.namespace else self.name
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {"op": self.op, "kind": self.kind, "name": self.name}
+        if self.namespace:
+            payload["namespace"] = self.namespace
+        return payload
+
+    def describe(self) -> str:
+        return f"delete {self.kind} {self.address}"
+
+
+@dataclass(frozen=True)
+class SetAnnotation(Operation):
+    """Set — or remove — one field of an annotation.
+
+    This is the operation a dragged note is made of: ``spec.geometry.x``, then
+    ``spec.geometry.y``. The mappings on the way are created, so the first drag
+    of a note that has never been placed writes a whole ``geometry`` block
+    rather than refusing; that is the difference between an annotation and an
+    element, whose ``spec`` shape is fixed by its kind.
+
+    ``unset`` removes the key rather than writing null, which is
+    :class:`UnsetField`'s distinction and is here for the same reason: a note
+    with ``color: null`` is not a note with no colour.
+    """
+
+    op: ClassVar[str] = "set-annotation"
+
+    kind: str
+    name: str
+    namespace: str = ""
+    #: The field path, in the notation :func:`~netgraph.edit.paths.parse_field_path`
+    #: reads — ``spec.geometry.x``, ``spec.members[0]``.
+    path: str = ""
+    value: Any = None
+    unset: bool = False
+
+    def __post_init__(self) -> None:
+        _check_annotation_kind(self.kind)
+        if not self.name:
+            raise OperationError("an annotation must be named")
+        if not self.path:
+            raise OperationError("a set-annotation must name the field it changes")
+        parse_field_path(self.path)
+        if self.unset and self.value is not None:
+            raise OperationError("an unset removes the key; it cannot also carry a value")
+
+    @property
+    def address(self) -> str:
+        return f"{self.namespace}/{self.name}" if self.namespace else self.name
+
+    @property
+    def parsed_path(self) -> tuple[str | int, ...]:
+        """The field path, split."""
+        return parse_field_path(self.path)
+
+    def to_dict(self) -> dict[str, Any]:
+        payload: dict[str, Any] = {
+            "op": self.op,
+            "kind": self.kind,
+            "name": self.name,
+            "path": self.path,
+        }
+        if self.namespace:
+            payload["namespace"] = self.namespace
+        if self.unset:
+            payload["unset"] = True
+        else:
+            payload["value"] = self.value
+        return payload
+
+    def describe(self) -> str:
+        what = f"{self.kind} {self.address}"
+        if self.unset:
+            return f"unset {self.path} of {what}"
+        return f"set {self.path} of {what} to {json.dumps(self.value, default=str)}"
+
+
+def _check_annotation_kind(kind: str) -> None:
+    """Refuse anything that is not one of the three annotation kinds."""
+    if kind not in ANNOTATION_DOCUMENT_KINDS:
+        raise OperationError(
+            f"unknown annotation kind {kind!r}; "
+            f"expected one of {', '.join(ANNOTATION_DOCUMENT_KINDS)}"
+        )
+
+
+# --------------------------------------------------------------------------- #
 # Primitives
 # --------------------------------------------------------------------------- #
 
@@ -668,6 +840,9 @@ OPERATIONS: Final[dict[str, type[Operation]]] = {
         Disconnect,
         SetGeometry,
         SetLinkGeometry,
+        CreateAnnotation,
+        DeleteAnnotation,
+        SetAnnotation,
         WriteFile,
         RemoveFile,
     )
@@ -698,6 +873,9 @@ _FIELDS: Final[dict[str, tuple[tuple[str, ...], tuple[str, ...]]]] = {
         ("view", "link"),
         ("waypoints", "routing", "label", "layout", "namespace", "file"),
     ),
+    "create-annotation": (("kind", "name"), ("namespace", "spec", "metadata", "file")),
+    "delete-annotation": (("kind", "name"), ("namespace",)),
+    "set-annotation": (("kind", "name", "path"), ("namespace", "value", "unset")),
     "write-file": (("path", "text"), ()),
     "remove-file": (("path",), ()),
 }

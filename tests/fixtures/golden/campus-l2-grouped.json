@@ -2594,5 +2594,106 @@
       ]
     }
   ],
+  "annotations": {
+    "notes": [
+      {
+        "id": "note-why-fibre",
+        "fqn": "why-fibre",
+        "text": "The backbone is **single-mode fibre**: 4.2 km between sites, which is\npast what copper does at any speed.\n\n- `os2`, LC, 10Gbps\n- the ring survives one break\n",
+        "blocks": [
+          {
+            "kind": "paragraph",
+            "spans": [
+              {
+                "text": "The backbone is "
+              },
+              {
+                "style": "bold",
+                "text": "single-mode fibre"
+              },
+              {
+                "text": ": 4.2 km between sites, which is past what copper does at any speed."
+              }
+            ]
+          },
+          {
+            "kind": "bullet",
+            "spans": [
+              {
+                "style": "code",
+                "text": "os2"
+              },
+              {
+                "text": ", LC, 10Gbps"
+              }
+            ]
+          },
+          {
+            "kind": "bullet",
+            "spans": [
+              {
+                "text": "the ring survives one break"
+              }
+            ]
+          }
+        ],
+        "color": "#fef3c7",
+        "stroke": "#8b856d",
+        "leader": false
+      },
+      {
+        "id": "note-voice-rollout",
+        "fqn": "voice-rollout",
+        "text": "VLAN 30 (*voice*) is trunked everywhere and has no access port yet — the\nstate a campus is in halfway through a telephony rollout.\n",
+        "blocks": [
+          {
+            "kind": "paragraph",
+            "spans": [
+              {
+                "text": "VLAN 30 ("
+              },
+              {
+                "style": "italic",
+                "text": "voice"
+              },
+              {
+                "text": ") is trunked everywhere and has no access port yet — the state a campus is in halfway through a telephony rollout."
+              }
+            ]
+          }
+        ],
+        "color": "#e0f2fe",
+        "stroke": "#7b858b",
+        "leader": false,
+        "layout": {
+          "position": {
+            "x": -420.0,
+            "y": 900.0
+          }
+        }
+      }
+    ],
+    "areas": [
+      {
+        "id": "area-site-north",
+        "fqn": "site-north",
+        "members": [
+          "sites/north/access/sw-north-acc-01",
+          "sites/north/access/sw-north-acc-02",
+          "sites/north/access/sw-north-acc-03",
+          "sites/north/core/rtr-north-core-01",
+          "sites/north/distribution/sw-north-dist-01",
+          "sites/north/hosts/pc-north-01",
+          "sites/north/hosts/srv-north-01",
+          "sites/north/hosts/pc-north-02"
+        ],
+        "color": "#ecfdf5",
+        "stroke": "#818b86",
+        "border": "dashed",
+        "padding": 16.0,
+        "label": "Site North"
+      }
+    ]
+  },
   "title": "Campus"
 }

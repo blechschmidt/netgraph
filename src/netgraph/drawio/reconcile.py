@@ -17,6 +17,21 @@ A cell deleted             ``delete``, cascading to what cannot survive it
 Two cells newly joined     ``connect``, on the first free port at each end
 =========================  ================================================
 
+An annotation cell (§21) answers the same four questions and writes them into
+its own document rather than into the tree: a dragged note is
+``set-annotation spec.geometry.x``, a resized one is ``spec.geometry.width``, a
+retyped one is ``spec.text`` — converted back out of the HTML draw.io left
+behind, as faithfully as :mod:`netgraph.drawio.markup` can — and one that is
+gone is ``delete-annotation``. An area answers with ``spec.geometry`` and
+``spec.label``.
+
+**A legend is not reconciled at all, and never will be.** It is *generated*: its
+entries come from what the drawing turned out to contain, so a corrected swatch
+label has nowhere in the inventory to go and writing one back would be inventing
+a hand-written key from a generated one. Its cells carry identity for exactly one
+purpose — so that this module can recognise them and do nothing, rather than
+reporting three hundred unmapped rectangles or, worse, proposing to delete them.
+
 And one rule about what is *not* done. A cell that is simply missing is only a
 deletion when the exported file said it held the whole view
 (:attr:`~netgraph.drawio.identity.Scope.COMPLETE`). Export a diagram narrowed by
@@ -45,13 +60,17 @@ from typing import Any, Final
 from netgraph.drawio.build import element_of
 from netgraph.drawio.identity import (
     ATTR_HASH,
+    ATTR_HEIGHT,
     ATTR_KIND,
+    ATTR_LABEL,
     ATTR_LINK,
     ATTR_NAME,
     ATTR_NODE,
     ATTR_PLACED,
     ATTR_ROUTING,
+    ATTR_TEXT,
     ATTR_WAYPOINTS,
+    ATTR_WIDTH,
     ATTR_X,
     ATTR_Y,
     MODEL_VERSION,
@@ -61,13 +80,18 @@ from netgraph.drawio.identity import (
     content_hash,
     parse_points,
 )
+from netgraph.drawio.markup import html_to_markup, markup_html, plain_text
 from netgraph.drawio.model import Cell, Diagram, absolute_geometry
 from netgraph.drawio.notes import Level, Note
+from netgraph.drawio.styles import NOTE_SHAPE
 from netgraph.edit.operations import (
     Connect,
+    CreateAnnotation,
+    DeleteAnnotation,
     DeleteElement,
     Operation,
     RenameElement,
+    SetAnnotation,
     SetGeometry,
     SetLinkGeometry,
 )
@@ -76,9 +100,11 @@ from netgraph.layout.geometry import COORDINATE_PLACES, round_coordinate
 from netgraph.layout.resolve import resolve_key
 from netgraph.layout.seed import DEFAULT_LAYOUT_NAME
 from netgraph.loader.inventory import Inventory, namespace_of, short_name
+from netgraph.models.annotation import AREA_KIND, NOTE_KIND, Annotation
 from netgraph.models.element import KINDS
 from netgraph.models.interface import CABLEABLE_TYPES
 from netgraph.plan.document import body_of
+from netgraph.render.annotations import annotation_views, parse_markup
 from netgraph.render.graph import Graph, Node
 
 __all__ = [
@@ -104,6 +130,13 @@ _ELEMENT_NAME: Final = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9]|[-_.][A-Za-z0-9])
 #: Longest label accepted as a rename. §4.1 bounds a name; a label past this is
 #: a caption somebody typed on the canvas, not a new name.
 _MAX_NAME = 253
+
+#: Anything that cannot appear in a name, for making one out of a note's text.
+_NAME_UNSAFE: Final = re.compile(r"[^a-z0-9]+")
+
+#: How much of a new note's text is kept as its name. Long enough to tell two
+#: callouts apart in a file listing, short enough to be a filename.
+_NEW_NOTE_NAME_LIMIT: Final = 40
 
 #: Words in a draw.io shape style or label that name an element kind. Read in
 #: this order, so ``switch`` beats ``computer`` in a style that mentions both —
@@ -155,6 +188,14 @@ class ReconcileOptions:
     geometry: bool = True
     #: Act on edges the draw.io user drew.
     connections: bool = True
+    #: Act on the annotation cells of §21 at all. Off leaves every note and area
+    #: exactly as the inventory has it — and, importantly, still does not report
+    #: their cells as unmapped: they are netgraph's own, whether or not this
+    #: import is interested in what happened to them. What happens *to* an
+    #: annotation is then decided by the same three switches above, because a
+    #: dragged note is a move, a retyped one is a label, and a deleted one is a
+    #: deletion.
+    annotations: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,6 +212,11 @@ class Reconciliation:
     renamed: int = 0
     deleted: int = 0
     connected: int = 0
+    #: Operations against a note or an area (§21). Counted apart from the rest
+    #: because they change the *picture* and nothing else: a reader deciding
+    #: whether an import is worth reviewing carefully wants to know that six of
+    #: the seven changes are callouts.
+    annotated: int = 0
     #: Cells netgraph could not map onto anything.
     unmapped: int = 0
 
@@ -190,6 +236,7 @@ class Reconciliation:
             (self.renamed, "renamed"),
             (self.deleted, "deleted"),
             (self.connected, "newly connected"),
+            (self.annotated, "annotation change(s)"),
             (self.unmapped, "unmapped"),
         ]
         said = [f"{count} {label}" for count, label in counted if count]
@@ -260,6 +307,8 @@ class _State:
     deletions: list[Operation] = field(default_factory=list)
     connections: list[Operation] = field(default_factory=list)
     links: list[Operation] = field(default_factory=list)
+    #: Everything asked of a note or an area, in the order the cells were read.
+    annotations: list[Operation] = field(default_factory=list)
     unmapped: int = 0
 
     def note(self, level: Level, subject: str, message: str) -> None:
@@ -270,15 +319,23 @@ def _reconcile_authored(state: _State) -> Reconciliation:
     cells = state.diagram.by_id()
     seen_elements: set[str] = set()
     seen_links: set[str] = set()
+    seen_annotations: set[tuple[str, str]] = set()
 
     for cell in state.diagram.of_role(CellRole.NODE):
         _node_cell(state, cell, cells, seen_elements)
     for cell in state.diagram.of_role(CellRole.LINK):
         _link_cell(state, cell, cells, seen_links)
+    for cell in state.diagram.of_role(CellRole.NOTE):
+        _annotation_cell(state, cell, cells, NOTE_KIND, seen_annotations)
+    for cell in state.diagram.of_role(CellRole.AREA):
+        _annotation_cell(state, cell, cells, AREA_KIND, seen_annotations)
+    # A legend cell and a leader are read and left: see the module docstring on
+    # why generated presentation has nothing to say to the inventory.
     for cell in state.diagram.foreign:
         _foreign_cell(state, cell, cells)
 
     _deletions(state, seen_elements, seen_links)
+    _annotation_deletions(state, seen_annotations)
     geometry = _geometry_operations(state)
 
     operations = (
@@ -287,6 +344,7 @@ def _reconcile_authored(state: _State) -> Reconciliation:
         *state.connections,
         *state.links,
         *geometry,
+        *state.annotations,
     )
     return Reconciliation(
         operations=operations,
@@ -295,6 +353,7 @@ def _reconcile_authored(state: _State) -> Reconciliation:
         renamed=len(state.renames),
         deleted=len(state.deletions),
         connected=len(state.connections),
+        annotated=len(state.annotations),
         unmapped=state.unmapped,
     )
 
@@ -343,15 +402,20 @@ def _check_hash(state: _State, cell: Cell, address: str) -> None:
     not do is pass unmentioned — the geometry and the rename are still applied,
     and the operator has to know they are being applied to a moved target.
     """
-    expected = cell.attribute(ATTR_HASH)
     element = state.inventory.get(address)
-    if not expected or element is None:
+    if element is not None:
+        _compare_hash(state, cell, address, body_of(element))
+
+
+def _compare_hash(state: _State, cell: Cell, subject: str, body: Any) -> None:
+    """The half of :func:`_check_hash` that does not care what sort of document it is."""
+    expected = cell.attribute(ATTR_HASH)
+    if not expected:
         return
-    actual = content_hash(body_of(element))
-    if actual != expected:
+    if content_hash(body) != expected:
         state.note(
             Level.INFO,
-            address,
+            subject,
             "has changed in the inventory since the diagram was exported; the diagram's "
             "geometry and label are still applied, but re-export before making more edits",
         )
@@ -489,14 +553,17 @@ def _reroute(state: _State, cell: Cell, key: str) -> None:
 def _foreign_cell(state: _State, cell: Cell, cells: Mapping[str, Cell]) -> None:
     """A cell netgraph did not write, inside a file netgraph did.
 
-    An edge drawn between two known nodes is the one thing a draw.io user can
-    add that netgraph can act on with confidence, and it is the interesting
-    one: joining two boxes is how anybody says "and these are patched
-    together". Everything else — a note, an arrow, a legend, a box somebody
-    typed a name into — is reported and left where it is. Inventing a device
-    from a rectangle would put hardware in the inventory that nobody owns.
+    Two things a draw.io user can add are acted on, and both are unambiguous:
+    an edge between two known nodes — joining two boxes is how anybody says "and
+    these are patched together" — and a sticky note, which becomes a ``kind:
+    note`` document (:func:`_new_note`). Everything else — an arrow, a legend
+    somebody drew by hand, a box they typed a name into — is reported and left
+    where it is. Inventing a device from a rectangle would put hardware in the
+    inventory that nobody owns.
     """
     if not cell.edge:
+        if _new_note(state, cell, cells):
+            return
         state.unmapped += 1
         state.note(
             Level.INFO,
@@ -592,6 +659,325 @@ def _free_port(state: _State, address: str) -> str | None:
             if port.type in CABLEABLE_TYPES and port.enabled and port.name not in taken
         ),
         None,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Annotations (§21)
+# --------------------------------------------------------------------------- #
+
+
+def _annotation_cell(
+    state: _State, cell: Cell, cells: Mapping[str, Cell], kind: str, seen: set[tuple[str, str]]
+) -> None:
+    """One note or area netgraph wrote: what the canvas now says about it.
+
+    Reading the cell is unconditional — a note that is *present* has not been
+    deleted, whatever this import is willing to act on — and everything after
+    that is gated, so ``--no-geometry`` on a diagram full of callouts still
+    reports nothing and changes nothing.
+    """
+    fqn = cell.attribute(ATTR_NAME)
+    if not fqn:
+        state.unmapped += 1
+        state.note(
+            Level.WARNING,
+            cell.id,
+            f"is a {kind} cell with no name on it, so netgraph cannot tell which document it "
+            "stands for; it was left alone",
+        )
+        return
+    seen.add((kind, fqn))
+    if not state.options.annotations:
+        return
+
+    document = state.inventory.annotations_of(kind).get(fqn)
+    if document is None:
+        state.note(
+            Level.WARNING,
+            fqn,
+            f"is drawn as a {kind} but is not in the inventory any more; the diagram was "
+            "exported from an older state of the tree",
+        )
+        return
+    _compare_hash(state, cell, fqn, body_of(document))
+    _annotation_geometry(state, cell, cells, kind, fqn, document)
+    if kind == NOTE_KIND:
+        _note_text(state, cell, fqn)
+    else:
+        _area_label(state, cell, fqn)
+
+
+def _annotation_geometry(
+    state: _State,
+    cell: Cell,
+    cells: Mapping[str, Cell],
+    kind: str,
+    fqn: str,
+    document: Annotation,
+) -> None:
+    """A dragged or resized annotation, as writes to ``spec.geometry``.
+
+    Compared against the box netgraph stamped into the cell, exactly as a node
+    is: an annotation whose box netgraph *computed* — a zone following its
+    members, a note beside its anchor — must come home unchanged without pinning
+    anything, or every round trip would freeze the layout it was drawn with.
+    """
+    if not state.options.geometry:
+        return
+    x, y, width, height = absolute_geometry(cell, cells)
+    centre = state.diagram.frame.box_to_netgraph(x, y, width, height)
+    exported = _exported_position(cell)
+    if exported is None:
+        state.note(
+            Level.WARNING,
+            fqn,
+            "netgraph did not stamp a position on this cell, so there is nothing to compare "
+            "the current one against; its geometry was left alone",
+        )
+        return
+    size = _exported_size(cell)
+    updates: dict[str, float] = {}
+    if not _within(centre, exported):
+        updates["x"] = round_coordinate(centre[0])
+        updates["y"] = round_coordinate(centre[1])
+        if cell.attribute(ATTR_PLACED) == Placedness.AUTO.value:
+            state.note(
+                Level.INFO,
+                fqn,
+                f"followed the diagram before; moving it in draw.io is what pins the {kind} at "
+                "a position of its own",
+            )
+    if size is not None and not _within((width, height), size):
+        updates["width"] = round_coordinate(width)
+        updates["height"] = round_coordinate(height)
+    if updates:
+        _write_geometry(state, kind, fqn, document, updates, extent=(width, height))
+
+
+def _write_geometry(
+    state: _State,
+    kind: str,
+    fqn: str,
+    document: Annotation,
+    updates: dict[str, float],
+    *,
+    extent: tuple[float, float],
+) -> None:
+    """The changed numbers, as the fewest writes that are each *individually* valid.
+
+    One operation per field is what a reviewer wants to read — ``spec.geometry.x``
+    says what happened — but every write is checked against §21 the moment it
+    lands, and ``x`` without ``y`` is a position that places nothing. So an
+    annotation that has never been placed gets its whole ``geometry`` block in
+    one write, which is exactly what
+    :class:`~netgraph.edit.operations.SetAnnotation` documents as the first drag
+    of an unplaced note; one that is already placed gets a field at a time.
+
+    An **area** is a further case: a zone with a position and no size is ignored
+    by the renderer, which draws it round its members again — so dragging one
+    would silently do nothing. Its extent therefore goes with it, and a dragged
+    zone stays where it was put.
+    """
+    geometry = getattr(document.spec, "geometry", None)
+    if kind == AREA_KIND and (geometry is None or not geometry.sized):
+        updates.setdefault("width", round_coordinate(extent[0]))
+        updates.setdefault("height", round_coordinate(extent[1]))
+    if geometry is not None and geometry.placed:
+        for field_name, value in updates.items():
+            _set(state, kind, fqn, f"spec.geometry.{field_name}", value)
+        return
+    merged: dict[str, float] = {} if geometry is None else geometry.model_dump(exclude_none=True)
+    merged.update(updates)
+    _set(state, kind, fqn, "spec.geometry", merged)
+
+
+def _exported_size(cell: Cell) -> tuple[float, float] | None:
+    width, height = cell.attribute(ATTR_WIDTH), cell.attribute(ATTR_HEIGHT)
+    if not width or not height:
+        return None
+    try:
+        return (float(width), float(height))
+    except ValueError:
+        return None
+
+
+def _note_text(state: _State, cell: Cell, fqn: str) -> None:
+    """A retyped note, converted back out of draw.io's HTML.
+
+    "Was it retyped?" is asked by rendering the *stamped source* again and
+    comparing that with the label, rather than by converting the label back and
+    comparing texts: the forward direction is exact and the backward one is best
+    effort, so asking the question the other way round would make an untouched
+    note look edited whenever the conversion lost a nuance.
+    """
+    if not state.options.renames:
+        return
+    stamped = cell.attribute(ATTR_TEXT)
+    if not stamped:
+        state.note(
+            Level.WARNING,
+            fqn,
+            "netgraph did not stamp this note's source on the cell, so an edit to its text "
+            "cannot be told from a re-rendering of it; the text was left alone",
+        )
+        return
+    if markup_html(parse_markup(stamped)) == cell.label:
+        return
+    text = html_to_markup(cell.label)
+    if not text.strip():
+        state.note(
+            Level.WARNING,
+            fqn,
+            "the note's text was emptied on the canvas, and a note with no text is not a "
+            "note; delete the cell to remove it, or type something into it",
+        )
+        return
+    _set(state, NOTE_KIND, fqn, "spec.text", text)
+
+
+def _area_label(state: _State, cell: Cell, fqn: str) -> None:
+    """A retyped zone caption. Plain text, so anything else about it is dropped."""
+    if not state.options.renames:
+        return
+    label = plain_text(cell.label)
+    if label == cell.attribute(ATTR_LABEL):
+        return
+    if label:
+        _set(state, AREA_KIND, fqn, "spec.label", label)
+        return
+    _set(state, AREA_KIND, fqn, "spec.label", unset=True)
+
+
+def _set(
+    state: _State, kind: str, fqn: str, path: str, value: Any = None, *, unset: bool = False
+) -> None:
+    state.annotations.append(
+        SetAnnotation(
+            kind=kind,
+            name=short_name(fqn),
+            namespace=namespace_of(fqn),
+            path=path,
+            value=value,
+            unset=unset,
+        )
+    )
+
+
+def _new_note(state: _State, cell: Cell, cells: Mapping[str, Cell]) -> bool:
+    """A sticky note somebody added to the diagram, as a new ``kind: note``.
+
+    The one thing a draw.io user can *add* to a vertex that netgraph is willing
+    to write into the tree, and it is safe for the reason the same reasoning
+    refuses everything else: reaching for the note shape is an unambiguous
+    statement of intent, and the worst case is a callout nobody wanted rather
+    than hardware nobody owns. Any other new rectangle is still reported and
+    left where it is.
+
+    Returns:
+        Was the cell claimed? ``False`` leaves it to the ordinary foreign-cell
+        path, which reports it.
+    """
+    if not (state.options.annotations and _is_note_shape(cell.style)):
+        return False
+    text = html_to_markup(cell.label).strip()
+    if not text:
+        return False
+    x, y, width, height = absolute_geometry(cell, cells)
+    centre = state.diagram.frame.box_to_netgraph(x, y, width, height)
+    name = _fresh_note_name(state, text)
+    state.annotations.append(
+        CreateAnnotation(
+            kind=NOTE_KIND,
+            name=name,
+            spec={
+                "text": text,
+                "geometry": {
+                    "x": round_coordinate(centre[0]),
+                    "y": round_coordinate(centre[1]),
+                    "width": round_coordinate(width),
+                    "height": round_coordinate(height),
+                },
+            },
+        )
+    )
+    state.note(
+        Level.INFO,
+        cell.id,
+        f"is a note somebody added to the diagram; it becomes 'kind: note' {name}. Nothing "
+        "else a draw.io user draws becomes an inventory document",
+    )
+    return True
+
+
+def _is_note_shape(style: str) -> bool:
+    """Is this draw.io's sticky-note shape, under any of the names it has?
+
+    ``shape=note`` is the built-in one; a stencil from a shape library spells
+    the same picture ``mxgraph.something.note``. Both mean a person picked a
+    sticky note out of a palette.
+    """
+    shape = _shape_of(style)
+    return shape == NOTE_SHAPE or shape.endswith(f".{NOTE_SHAPE}")
+
+
+def _fresh_note_name(state: _State, text: str) -> str:
+    """A name for a note nobody named: its first few words, made into a slug.
+
+    Derived from the text so that the document is findable by what it says —
+    ``notes/check-the-uplink.yaml`` — and disambiguated against both the
+    inventory and the notes this same import is already creating, because two
+    new callouts starting with the same three words is not a rare accident.
+    """
+    words = _NAME_UNSAFE.sub("-", text.lower()).strip("-")
+    candidate = words[:_NEW_NOTE_NAME_LIMIT].strip("-") or "note"
+    if not _ELEMENT_NAME.match(candidate):
+        candidate = "note"
+    taken = set(state.inventory.annotations_of(NOTE_KIND)) | {
+        operation.address
+        for operation in state.annotations
+        if isinstance(operation, CreateAnnotation)
+    }
+    chosen, counter = candidate, 2
+    while chosen in taken:
+        chosen = f"{candidate}-{counter}"
+        counter += 1
+    return chosen
+
+
+def _annotation_deletions(state: _State, seen: set[tuple[str, str]]) -> None:
+    """Every note and area this view draws that the diagram no longer holds.
+
+    Guarded three times over, because the failure mode is deleting somebody's
+    documentation: only for a diagram that says it held the whole view, only for
+    one written by an exporter that draws annotations at all — a file from
+    before §21 holds no note cells because none were ever written — and only for
+    the annotations that this view would actually have drawn, since an area
+    whose members were all filtered out was never in the file to begin with.
+    """
+    if not (state.options.deletions and state.options.annotations):
+        return
+    if state.diagram.scope is not Scope.COMPLETE or not state.diagram.annotated:
+        return
+    for kind, fqn in _drawn_annotations(state.graph):
+        if (kind, fqn) not in seen:
+            state.annotations.append(
+                DeleteAnnotation(kind=kind, name=short_name(fqn), namespace=namespace_of(fqn))
+            )
+
+
+def _drawn_annotations(graph: Graph) -> tuple[tuple[str, str], ...]:
+    """The notes and areas this view draws, as ``(kind, fqn)``, in draw order.
+
+    Resolved through :func:`~netgraph.render.annotations.annotation_views` — the
+    same function the exporter draws from — so that "was it in the file?" is
+    answered by the code that decided, rather than by a second rule that would
+    drift from it. Legends are left out: they are never reconciled.
+    """
+    views = annotation_views(graph)
+    return (
+        *((AREA_KIND, area.fqn) for area in views.areas),
+        *((NOTE_KIND, note.fqn) for note in views.notes),
     )
 
 

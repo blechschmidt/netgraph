@@ -34,6 +34,12 @@ labelled links](images/home-lab.svg)
 - [Stored arrangements](#stored-arrangements)
   - [Links are geometry too](#links-are-geometry-too)
   - [A worked example: an orthogonal, waypointed diagram](#a-worked-example-an-orthogonal-waypointed-diagram)
+- [Annotations: notes, areas and legends](#annotations-notes-areas-and-legends)
+  - [Graphviz: a cluster, a background rectangle, and where a key lands](#graphviz-a-cluster-a-background-rectangle-and-where-a-key-lands)
+  - [Mermaid: what it cannot say, said in the source](#mermaid-what-it-cannot-say-said-in-the-source)
+  - [The JSON export and the HTML page](#the-json-export-and-the-html-page)
+  - [draw.io: shapes that survive a round trip](#drawio-shapes-that-survive-a-round-trip)
+  - [Turning them off](#turning-them-off)
 - [Interactive SVG: tooltips, links and ids](#interactive-svg-tooltips-links-and-ids)
 - [Output formats](#output-formats)
   - [The interactive HTML page](#the-interactive-html-page)
@@ -869,6 +875,223 @@ same visible line out of *two* cubics. That is the difference a per-link style
 makes, and
 expressing it is exactly why a fully arranged drawing carries a computed `pos`
 instead of a graph-wide `splines`.
+
+<a id="annotations-notes-areas-and-legends"></a>
+
+## Annotations: notes, areas and legends
+
+An arrangement says where the network is drawn. An **annotation** says something
+*about* the drawing: a callout explaining why one link is orange, a dashed box
+round the DMZ, a key for the colours. Those are the three sidecar kinds of
+[`docs/schema.md` §21](schema.md#21-diagram-annotations-notes-areas-and-legends),
+and like a stored arrangement they are a fact about the inventory rather than an
+option of the render — every backend draws whatever the view declares, with no
+flag to turn on.
+
+What they never do is change the picture's *content*. An annotation adds no node
+and no edge at any layer, so a diagram with three of them holds exactly what the
+same diagram without them holds. A filter narrows what they say rather than what
+they mean: an area is drawn round the members this drawing actually kept, an
+area left with nothing to enclose is dropped rather than drawn as an empty
+frame, and a note whose anchor was filtered away keeps its text and loses its
+leader line. A `--vlan 20` diagram must not gain a dashed box round nothing.
+
+Where the backends differ is vocabulary, because a zone, a callout and a key ask
+for constructs that a DOT document, a Mermaid flowchart, a JSON object and an
+mxGraph file have to very different degrees:
+
+| Format | `area` | `note` | `legend` |
+|---|---|---|---|
+| `dot`, `svg`, `png`, `pdf`, `html` | a cluster under an automatic layout; a filled rectangle in the `_background` with a caption node under a stored arrangement | a `shape=note` node, with a dotted leader to what it is about | a cluster holding one table of swatches; the `corner` is exact only in a stored arrangement |
+| `mermaid` | a `subgraph`, and its label only | an ordinary node, plus a dotted link when it is anchored | not drawn, and said so in a comment |
+| `json` | `annotations.areas` | `annotations.notes` | `annotations.legends` |
+| `drawio` | a `container` rectangle behind the nodes | draw.io's own `shape=note` | a frame of swatch rows |
+
+The last row is not a `-f` of `render`: it is
+[`netgraph export drawio`](drawio.md), listed here because it is the fourth
+vocabulary the same three kinds have to be said in.
+
+What is *not* per backend is the resolution behind them. Which members survive a
+filter, what a generated legend says and how the markdown subset of §21.1 parses
+are decided once, for all four, so a note reads the same in an SVG, in a Mermaid
+block, in the JSON and in the editor.
+
+### Graphviz: a cluster, a background rectangle, and where a key lands
+
+**An area is a cluster when Graphviz is laying the graph out.** A node can be
+drawn inside at most one box — that is all a DOT document can express — so the
+three things that want to box one are put in an order:
+
+1. an explicit `kind: area` that names the node. It is the most specific thing
+   anybody wrote down about this diagram, and the only one of the three somebody
+   stated on purpose;
+2. between two areas that both name it, the one declared **first**. Declaration
+   order is the only tie-break that does not depend on the graph, so the same
+   inventory always draws the same picture;
+3. whatever is left: the layer's own clustering — the VRF boxes of the `routing`
+   view — and then `--group-by-namespace`. Each loses the nodes an area took,
+   and is omitted entirely when it has none left.
+
+An area with an explicit rectangle but no drawn members is not a cluster under
+an automatic layout: there is nothing to put in it, and Graphviz has nowhere to
+put a rectangle that is not around something.
+
+**In a fixed arrangement it is a background rectangle instead**, exactly as a
+namespace frame is and for the same reason: `neato -n2` draws no clusters, so
+netgraph draws the zone itself, into the graph's `_background`. The rectangle is
+`spec.geometry` when the area pins one and otherwise the box enclosing wherever
+the members were actually drawn, grown by the area's `padding` — which is the
+whole difference between naming members and pinning a box: the first follows the
+devices when the arrangement moves them.
+
+The caption is *not* in the background. It is an ordinary `plaintext` node with
+a `pos`, because a `T` operation inside a `_background` **segfaults Graphviz
+2.43** — the version Debian 12 and Ubuntu 22.04/24.04 ship — and does it
+conditionally, so a diagram would render for months and crash the week a device
+was deleted. [`docs/follow-ups.md` §17](follow-ups.md) has the measurement and
+the variants that were tried; the short version is that only the polygon
+operations survive, so text is never put there, for an area's label any more
+than for a namespace's.
+
+**A note is a node.** `shape=note` is the shape Graphviz has for exactly this,
+and making it a real node means it is laid out *with* the graph rather than
+floated over it, and can be hovered, linked and deep-linked like anything else.
+Its leader is an edge with `constraint=false`, which is the attribute that
+matters: a callout must not be able to move what it is commenting on. In a fixed
+arrangement a note uses its own pinned position, or is placed beside its anchor
+when it has none of its own; a note that has neither — its anchor is on another
+layer, or a filter removed it — is the one case an arranged drawing leaves out,
+because a missing `pos` reads to the no-op engine as the origin and puts the
+callout on top of whatever the arrangement left in the corner.
+
+**A legend is a cluster holding one `plaintext` table**, so the key gets a frame
+and a grid of swatches without netgraph measuring any text. The title goes
+inside the table rather than on the cluster, because a fixed drawing has no
+cluster to put it on and a caption that vanished from the arranged diagram would
+be a caption that vanished from the drawing somebody had taken most care over.
+
+A legend's `corner` is honoured when the drawing has a stored arrangement (§18):
+the key is placed just outside the bounding box of everything else, on the side
+the corner names. Under an automatic layout **Graphviz decides where it goes**,
+and it will generally set the key beside the drawing rather than in the corner
+asked for. Nothing in Graphviz pins a cluster to a corner, and the tricks that
+come close — a rank constraint, an invisible edge — move the key by distorting
+the topology, which is a worse trade than a key in the wrong corner. Run
+`netgraph layout --write` to pin the arrangement, after which the corner is
+exact.
+
+### Mermaid: what it cannot say, said in the source
+
+Mermaid has no vocabulary for most of §21, so the three kinds are drawn as
+closely as a flowchart allows and every gap is stated in the output rather than
+left for a reader to notice. An **area** with members becomes a `subgraph`,
+which is Mermaid's only container: it keeps the area's label and loses its
+colour, its border style and its padding, because a Mermaid subgraph has no
+style of its own. An area that is a *rectangle of canvas* rather than a set of
+elements has nothing to become — Mermaid places nothing — and is dropped. A
+**note** becomes an ordinary node with a note-like `classDef` and, when it is
+anchored, a dotted link to what it is about; Mermaid has no note shape and no
+free-floating text, so it is a box among the boxes, and the emphasis of §21.1 is
+flattened to its text. A **legend** is not expressible at all: there is no
+construct for a keyed table that is not part of the graph. Everything dropped is
+named in a `%%` comment at the foot of the diagram — invisible in the rendered
+picture, plain in the source, which is the right side of that trade: the reader
+of the *diagram* cannot act on the limitation, and the reader of the *document*
+is usually the person wondering where their legend went.
+
+The foot of a `-f mermaid` render of an annotated inventory, with the topology
+elided:
+
+```
+    subgraph area0["DMZ"]
+        direction TB
+        n0["sw-core<br/>[switch]<br/>10.0.0.1/24"]
+        n1[("srv-proxy<br/>[server]<br/>10.0.0.2/24")]
+    end
+    note0["Orange links are fibre. The run to the annexe is 180 m, which is past what copper does."]
+    ...
+    note0 -.- n0
+
+    classDef netgraphNote fill:#fef3c7,stroke:#8b856d,stroke-width:1px,stroke-dasharray:3 2
+    class note0 netgraphNote
+%% areas are drawn as subgraphs: their colour, border style and padding are not expressible in mermaid
+%% legend 'key' (3 entries) is not drawn: mermaid has no construct for a key that is not part of the graph
+```
+
+The note is a box among the boxes and its `**Orange**` is gone; the area kept
+its caption and lost the `#fee2e2` it asked for; the key is two comments and no
+table.
+
+### The JSON export and the HTML page
+
+[`-f json`](#the-json-export) carries a top-level `annotations` object with
+`notes`, `areas` and `legends`, present only when the view declares any — a
+document from an inventory with no annotations in it is unchanged, byte for
+byte, by this feature existing.
+
+Each entry is the *resolved* annotation rather than a copy of the document. An
+area's `members` are already narrowed to what this drawing holds, so a consumer
+never gets a reference the `nodes` array does not contain. A note carries both
+its text and the parsed blocks and spans, so a client draws the same paragraphs,
+bullets and emphasis without owning a markdown implementation of its own — and
+without two implementations drifting apart. A generated legend carries the
+swatches it generated, not the `auto: layers` that asked for them: `auto` is an
+instruction, and an instruction is not something a consumer of a *drawing*
+should have to execute.
+
+[`-f html`](#the-interactive-html-page) needs no separate story for the picture:
+a note, an area and a legend are drawn by Graphviz, so they arrive in the
+embedded SVG like everything else, with the same `--element-ids` ids the JSON
+publishes. Each layer of the page also carries that identical `annotations`
+object beside its records, so a panel showing what a note says, or which
+elements an area encloses, has the data without a second request and without
+parsing the markdown subset again in the browser.
+
+<a id="drawio-shapes-that-survive-a-round-trip"></a>
+
+### draw.io: shapes that survive a round trip
+
+[`netgraph export drawio`](drawio.md) is the one format that is *edited and
+handed back*, so an annotation has to arrive there as **what it is** rather than
+as a picture of it: a note is draw.io's own `shape=note` with an HTML label, an
+area is a `container` rectangle behind the nodes, and a legend is a frame
+holding a swatch and a caption per row. None of the three is an image, a group
+of paths or a text blob — which is the whole difference between a diagram
+somebody can edit and one they can only look at. A stakeholder retypes a note in
+place, drags the DMZ and carries the DMZ, and corrects a colour with a click.
+
+Because the cells are native they survive the round trip. Every one carries the
+same identity block a device cell carries, so `netgraph import drawio`
+reconciles a dragged note by the machinery that reconciles a dragged switch: a
+move comes back as `spec.geometry` on the note's own document, a retyped label
+as its `spec.text`, a deleted cell as the annotation being deleted. A generated
+legend is the deliberate exception — it carries identity so that it can be
+recognised and *ignored*, because writing back a key that was derived from the
+drawing would be writing back the drawing.
+
+Placement happens in netgraph's coordinates before the page frame is computed,
+so a note pinned above the topmost switch and a legend outside its corner
+enlarge the page instead of being clipped at the margin. Areas are written
+before the nodes, because z-order in mxGraph is document order and a zone
+written after its members would cover them.
+
+### Turning them off
+
+Two scopes, and they answer different questions. `spec.views` on the annotation
+decides which *drawings* it belongs to — empty means every one of them, which is
+what a remark about a site wants, while `views: [l3]` is for a remark that only
+makes sense once the picture is prefixes rather than cables. That one is per
+annotation and lives in the inventory.
+
+The other is per render: `RenderOptions.annotations`, the display option every
+backend consults. It is on by default, because an annotation is something
+somebody wrote down *about this diagram* and leaving it out has to be asked for.
+Turned off, no backend emits any of them and the output is byte-identical to the
+same inventory with no annotation documents in it — which is what makes it a
+display option and not a filter. It is a rendering-pipeline option today rather
+than a flag on [`netgraph render`](commands/render.md), so the way to draw the
+network without its commentary from the command line is to render an inventory
+that does not carry it.
 
 ## Interactive SVG: tooltips, links and ids
 

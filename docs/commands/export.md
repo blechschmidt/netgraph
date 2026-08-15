@@ -308,6 +308,7 @@ host variables are set are [Groups](../export.md#groups),
 | `--icons` | `THEME\|DIR` | `cisco` | Icon theme inlined into the drawio file as data URIs, so the file needs nothing beside it. Built in: cisco, none. 'none' draws coloured boxes. |
 | `--compress`, `--no-compress` | — | `--no-compress` | Write the deflate+base64 encoding draw.io writes by default. Off here: a plain diagram is one that reviews and diffs, and draw.io opens both. |
 | `--frames`, `--no-frames` | — | `--frames` | Draw a container frame per namespace, so dragging a site carries its devices. |
+| `--annotations`, `--no-annotations` | — | `--annotations` | Draw the notes, areas and legends the inventory declares for this view as native draw.io shapes, which the reader can edit and 'netgraph import drawio' reads back. Turn them off for a file that should carry the topology alone. |
 | `--strict` | — | off | Treat warnings as errors. |
 | `--force` | — | off | Proceed even when validation failed. The result may not match the files. |
 <!-- /generated -->

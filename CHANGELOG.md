@@ -18,6 +18,30 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **Annotations in the editor.** The notes, areas and legends of
+  [§21](docs/schema.md#21-diagram-annotations-notes-areas-and-legends) could be written in
+  YAML and drawn by every backend, and were the one part of an inventory the canvas could
+  not touch. Now: <kbd>Shift-N</kbd> — or **New note** in the canvas menu — drops a note
+  where the pointer is and opens it for typing; right-clicking an element or a link and
+  choosing **Note about it…** anchors the note to that instead, so it follows the device
+  when the diagram is laid out again. A note is retyped by double-clicking it
+  (<kbd>Ctrl-Enter</kbd> writes, <kbd>Esc</kbd> abandons), moved by dragging it and resized
+  by its corner; a zone pinned to a rectangle is dragged by its outline and resized by its
+  corners; <kbd>Delete</kbd> removes whichever is selected. A zone drawn round its
+  *members* has no box to move, so dragging one is refused with that sentence rather than
+  quietly turned into a rectangle.
+
+  Every gesture is one `create-annotation`, `set-annotation` or `delete-annotation` batch
+  through the same write path a rename takes — one entry in the changes drawer, one
+  <kbd>Ctrl-Z</kbd>, comments and key order intact. An annotation that has never been
+  placed gets its whole `spec.geometry` block in a single write, because an `x` with no `y`
+  is a position that places nothing.
+
+  <kbd>Alt-N</kbd>, and a **notes** checkbox beside **IPs** and **VLANs**, hides the lot —
+  a per-view switch that writes nothing, because commentary is never topology. The
+  `/api/graph` answer carries an `annotations` payload beside its `geometry`, in the form
+  `netgraph render -f json` publishes, and `&annotations=0` leaves it out.
+
 - **Multi-select, bulk edit and alignment in the editor.** The canvas could only ever act
   on one focused element, which was the largest remaining gap against draw.io. It now has
   a real selection: drag on the paper for a rubber band, <kbd>Shift</kbd>- or

@@ -22,6 +22,12 @@ The pieces, in the order a diagram passes through them:
     inlined as data URIs so an exported file needs nothing beside it.
 :mod:`~netgraph.drawio.build`
     Graph in, mxGraph model out. Used by ``netgraph export drawio``.
+:mod:`~netgraph.drawio.annotations`
+    The notes, areas and legends of §21 as native mxGraph shapes — a sticky
+    note, a container, a key — rather than as a picture of them.
+:mod:`~netgraph.drawio.markup`
+    The markdown subset a note is written in, as the HTML an mxGraph label
+    holds, and back again.
 :mod:`~netgraph.drawio.reconcile`
     Edited model in, :mod:`netgraph.edit` operations out. Used by ``netgraph
     import drawio``, which shows them as a :mod:`netgraph.plan` changeset before
@@ -33,8 +39,10 @@ needs: what a draw.io user may and may not safely change.
 
 from __future__ import annotations
 
+from netgraph.drawio.annotations import AnnotationCells, annotation_cells, place_annotations
 from netgraph.drawio.build import BuildOptions, build_diagram, cell_id, element_of
 from netgraph.drawio.identity import (
+    ANNOTATION_ROLES,
     ATTRIBUTES,
     MODEL_VERSION,
     NAMESPACE_PREFIX,
@@ -45,6 +53,7 @@ from netgraph.drawio.identity import (
     content_hash,
     qualified,
 )
+from netgraph.drawio.markup import html_to_markup, markup_html, plain_text
 from netgraph.drawio.model import Cell, Diagram, Frame, absolute_geometry
 from netgraph.drawio.mxfile import (
     DrawioFormatError,
@@ -64,10 +73,12 @@ from netgraph.drawio.reconcile import (
 from netgraph.drawio.styles import data_uri, edge_style, group_style, node_style
 
 __all__ = [
+    "ANNOTATION_ROLES",
     "ATTRIBUTES",
     "MODEL_VERSION",
     "NAMESPACE_PREFIX",
     "NAMESPACE_URI",
+    "AnnotationCells",
     "BuildOptions",
     "Cell",
     "CellRole",
@@ -81,6 +92,7 @@ __all__ = [
     "Reconciliation",
     "Scope",
     "absolute_geometry",
+    "annotation_cells",
     "build_diagram",
     "cell_id",
     "content_hash",
@@ -90,9 +102,13 @@ __all__ = [
     "element_of",
     "encode_diagram",
     "group_style",
+    "html_to_markup",
     "infer_kind",
+    "markup_html",
     "node_style",
     "parse_mxfile",
+    "place_annotations",
+    "plain_text",
     "qualified",
     "reconcile",
     "write_mxfile",

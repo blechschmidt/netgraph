@@ -422,7 +422,9 @@ class Editor:
 #: The query the page sends for its first render, and therefore the one to ask
 #: for when comparing what is on screen against the server's own answer. The
 #: layer is whichever ``<option>`` comes first in ``index.html``.
-PAGE_QUERY: Final = "view=physical&show_ips=1&show_vlans=1&group_by_namespace=0&strict=0"
+PAGE_QUERY: Final = (
+    "view=physical&show_ips=1&show_vlans=1&annotations=1&group_by_namespace=0&strict=0"
+)
 
 #: A cable naming two devices nobody declared: two ``E001`` findings, in a file
 #: whose document does not start on line 1, so "jumps to its location" is a claim
@@ -1181,6 +1183,331 @@ def test_the_canvas_and_the_renderer_route_a_link_identically(
 
 def _anchor(anchor: Anchor) -> dict[str, float]:
     return {"x": anchor.x, "y": anchor.y, "width": anchor.width, "height": anchor.height}
+
+
+# --------------------------------------------------------------------------- #
+# Annotating the diagram (§21)
+# --------------------------------------------------------------------------- #
+#
+# A note, an area and a legend are commentary rather than topology, and the
+# canvas treats them accordingly: they are dragged, retyped and deleted, and
+# none of it can change what the tool concludes. Every gesture below ends in one
+# of the three annotation operations through /api/ops, so what is asserted is
+# always what reached the file -- never what the browser drew.
+
+#: Something written on the arranged home lab: a note pinned below the diagram,
+#: a zone pinned beside it, and a zone that follows two of its devices. The
+#: coordinates keep all three clear of the nodes, whose ``y`` runs 0..440.
+ANNOTATIONS: Final = """\
+apiVersion: netgraph.dev/v1alpha1
+kind: note
+metadata:
+  name: why-here
+spec:
+  text: |
+    The **switch** is in the cupboard.
+  geometry: {x: 900, y: -300}
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: area
+metadata:
+  name: on-the-ups
+spec:
+  label: On the UPS
+  geometry: {x: 300, y: -300, width: 400, height: 200}
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: area
+metadata:
+  name: the-desk
+spec:
+  label: The desk
+  members: [switches/sw-home, hosts/pc-desk]
+"""
+
+#: The SVG id the renderer gives that note; see netgraph.render.annotations.
+A_NOTE: Final = "note-why-here"
+
+
+def annotated(open_editor: OpenEditor, *, writable: bool = True) -> Editor:
+    """An arranged diagram with something written on it, drawn at that layer."""
+    editor = open_editor(
+        writable=writable, extra={"layout.yaml": ARRANGED_LAYOUT, "annotations.yaml": ANNOTATIONS}
+    )
+    editor.page.select_option("#layer", ARRANGED_LAYER)
+    # The band, not the note: a note is drawn at every layer, the unarranged one
+    # the page opens on included, so waiting for the note would race the render
+    # that puts the *arranged* view -- and with it the overlay -- on screen.
+    expect(editor.page.locator(".ng-anno-band").first).to_be_attached(timeout=TIMEOUT_MS)
+    return editor
+
+
+def note_shape(editor: Editor) -> Locator:
+    return editor.page.locator(f'#viewport [id="{A_NOTE}"]')
+
+
+def pinned(editor: Editor, kind: str, fqn: str) -> dict[str, Any]:
+    """What the *server* says one annotation's geometry is, not the screen."""
+    payload = editor.api(f"/api/graph?view={ARRANGED_LAYER}")["annotations"] or {}
+    for entry in payload.get(kind + "s", []):
+        if entry["fqn"] == fqn:
+            found = entry.get("layout") or {}
+            assert isinstance(found, dict)
+            return found
+    raise AssertionError(f"the drawing holds no {kind} {fqn!r}")
+
+
+def test_the_graph_answer_says_where_every_annotation_is(open_editor: OpenEditor) -> None:
+    """The payload the canvas hit-tests against, before any gesture uses it.
+
+    An area in an arranged drawing is painted into the graph's background with
+    no id on it, so this is the *only* way the page can know it is there -- which
+    is why it is asserted separately from the gestures that consume it.
+    """
+    editor = annotated(open_editor)
+    payload = editor.api(f"/api/graph?view={ARRANGED_LAYER}")["annotations"]
+    assert [note["id"] for note in payload["notes"]] == [A_NOTE]
+    boxed = pinned(editor, "area", "on-the-ups")
+    assert boxed["size"] == {"width": 400.0, "height": 200.0}
+    # The one that follows its members pins nothing, and that absence is what
+    # tells the canvas to refuse to drag it.
+    assert pinned(editor, "area", "the-desk") == {}
+
+
+def test_dragging_a_note_writes_its_position(open_editor: OpenEditor) -> None:
+    """The gesture the payload exists for: a note moved on screen stays moved."""
+    editor = annotated(open_editor)
+    assert editor.session is not None
+    before = editor.session.revision
+    assert pinned(editor, "note", "why-here")["position"] == {"x": 900.0, "y": -300.0}
+
+    start = _centre(note_shape(editor))
+    mouse = editor.page.mouse
+    mouse.move(*start)
+    mouse.down()
+    mouse.move(start[0] + 40, start[1] + 20)
+    mouse.move(start[0] + 90, start[1] + 40)
+    mouse.up()
+
+    assert editor.settles(
+        lambda: editor.session is not None and editor.session.revision != before,
+        timeout=TIMEOUT_MS / 1000,
+    ), "dragging a note has to reach a file"
+    moved = pinned(editor, "note", "why-here")["position"]
+    assert moved["x"] > 900.0, "the note did not move right"
+    assert moved["y"] < -300.0, "the note did not move down"
+    # Through the mutation layer, into the document that declares it, and one
+    # gesture is one entry in the undo stack.
+    assert "kind: note" in editor.read("annotations.yaml")
+    editor.page.locator("#undo").click()
+    assert editor.settles(
+        lambda: pinned(editor, "note", "why-here")["position"] == {"x": 900.0, "y": -300.0},
+        timeout=TIMEOUT_MS / 1000,
+    ), "one drag has to be one undo"
+
+
+def test_double_clicking_a_note_retypes_it(open_editor: OpenEditor) -> None:
+    """A note is text, so editing it is typing over it — not a form about it."""
+    editor = annotated(open_editor)
+    box = note_shape(editor).bounding_box()
+    assert box is not None
+    editor.page.mouse.dblclick(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+
+    field = editor.page.locator(".note-edit-text")
+    expect(field).to_be_visible()
+    assert "cupboard" in field.input_value(), "the box opens on what the note says"
+    field.fill("Rewritten **here**.")
+    editor.press("Control+Enter")
+
+    assert editor.settles(
+        lambda: "Rewritten" in editor.read("annotations.yaml"), timeout=TIMEOUT_MS / 1000
+    ), "committing the text box has to reach the file"
+    assert "cupboard" not in editor.read("annotations.yaml")
+    # Only the text: a retype is not a move.
+    assert pinned(editor, "note", "why-here")["position"] == {"x": 900.0, "y": -300.0}
+
+
+def test_escape_leaves_a_note_exactly_as_it_was(open_editor: OpenEditor) -> None:
+    """The half that has to be free: abandoning an edit writes nothing at all."""
+    editor = annotated(open_editor)
+    assert editor.session is not None
+    before = editor.session.revision
+    original = editor.read("annotations.yaml")
+
+    box = note_shape(editor).bounding_box()
+    assert box is not None
+    editor.page.mouse.dblclick(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    expect(editor.page.locator(".note-edit-text")).to_be_visible()
+    editor.page.locator(".note-edit-text").fill("never mind")
+    editor.press("Escape")
+
+    expect(editor.page.locator(".note-edit-text")).to_have_count(0)
+    editor.page.wait_for_timeout(300)
+    assert editor.read("annotations.yaml") == original
+    assert editor.session.revision == before
+
+
+def test_the_canvas_menu_drops_a_note_and_opens_it_for_typing(
+    open_editor: OpenEditor,
+) -> None:
+    """Two doors, one command: the menu row runs what Shift-N runs."""
+    editor = annotated(open_editor)
+    open_menu_on_canvas(editor)
+    expect(menu_row(editor, "annotation.create")).to_be_visible()
+    menu_row(editor, "annotation.create").click()
+
+    assert editor.settles(
+        lambda: "name: note-1" in editor.read("annotations.yaml"), timeout=TIMEOUT_MS / 1000
+    ), "the menu's New note never reached a file"
+    # The name is generated past what is already there, and the box opens on it
+    # so that the placeholder is the first thing typed over.
+    expect(editor.page.locator(".note-edit-text")).to_be_visible(timeout=TIMEOUT_MS)
+    assert editor.page.locator(".note-edit-text").input_value() == "New note"
+
+
+def test_the_first_note_in_an_inventory_lands_where_the_keyboard_asked(
+    open_editor: OpenEditor,
+) -> None:
+    """The gesture has to work on a tree that has never had a note in it.
+
+    Which is the case it would be easiest to get wrong: with nothing written on
+    the diagram there is no annotation payload, and a canvas that only built its
+    overlay when there was one would have no coordinate frame to place the first
+    note in — and would drop it at the origin.
+    """
+    editor = arranged(open_editor)
+    editor.page.locator("#canvas").focus()
+    editor.press("Shift+N")
+
+    assert editor.settles(
+        lambda: (editor.root / "annotations.yaml").exists(), timeout=TIMEOUT_MS / 1000
+    ), "Shift-N has to write a document"
+    written = editor.read("annotations.yaml")
+    assert "kind: note" in written and "name: note-1" in written
+    placed = editor.api(f"/api/graph?view={ARRANGED_LAYER}")["annotations"]["notes"][0]
+    # In the middle of what is on screen, which is the middle of the drawing --
+    # emphatically not the origin.
+    assert placed["layout"]["position"]["x"] > 100.0
+
+
+def test_a_note_made_over_an_element_is_anchored_to_it(open_editor: OpenEditor) -> None:
+    """Which is the difference between a note about a switch and a note at x: 400."""
+    editor = annotated(open_editor)
+    open_menu_on(editor, "switches/sw-home")
+    menu_row(editor, "annotation.create").click()
+
+    assert editor.settles(
+        lambda: "element: switches/sw-home" in editor.read("annotations.yaml"),
+        timeout=TIMEOUT_MS / 1000,
+    ), "a note dropped on a device has to be anchored to it"
+    assert "geometry" not in editor.read("annotations.yaml").split("name: note-1")[-1]
+
+
+def test_an_area_pinned_to_a_rectangle_is_resized_by_its_corner(
+    open_editor: OpenEditor,
+) -> None:
+    editor = annotated(open_editor)
+    band_ = editor.page.locator(".ng-anno-band:not([data-follows])").first
+    box = band_.bounding_box()
+    assert box is not None
+    # On the outline rather than in the middle: the band is a stroke, so that the
+    # inside of a zone stays clickable for the devices in it.
+    editor.page.mouse.click(box["x"] + box["width"] / 2, box["y"] + 1)
+
+    handle = editor.page.locator(".ng-anno-handle-corner").first
+    expect(handle).to_be_attached()
+    start = _centre(handle)
+    mouse = editor.page.mouse
+    mouse.move(*start)
+    mouse.down()
+    mouse.move(start[0] - 30, start[1] - 20)
+    mouse.move(start[0] - 60, start[1] - 40)
+    mouse.up()
+
+    assert editor.settles(
+        lambda: (
+            pinned(editor, "area", "on-the-ups").get("size") != {"width": 400.0, "height": 200.0}
+        ),
+        timeout=TIMEOUT_MS / 1000,
+    ), "dragging a corner has to write the rectangle"
+    assert "width:" in editor.read("annotations.yaml")
+
+
+def test_an_area_drawn_round_its_members_says_why_it_will_not_move(
+    open_editor: OpenEditor,
+) -> None:
+    """The choice made here, stated: refused with a reason rather than converted.
+
+    Turning a zone that means "wherever these two devices are" into one that
+    means "this rectangle" is a change of meaning, and a change of meaning must
+    not be a side effect of a drag. So the gesture is refused, and the refusal
+    names both ways out.
+    """
+    editor = annotated(open_editor)
+    assert editor.session is not None
+    before = editor.session.revision
+    band_ = editor.page.locator(".ng-anno-band[data-follows]").first
+    box = band_.bounding_box()
+    assert box is not None
+
+    mouse = editor.page.mouse
+    mouse.move(box["x"] + box["width"] / 2, box["y"] + 1)
+    mouse.down()
+    mouse.move(box["x"] + box["width"] / 2 + 60, box["y"] + 40)
+    mouse.up()
+
+    expect(editor.page.locator("#toast")).to_contain_text("drawn round its members")
+    editor.page.wait_for_timeout(300)
+    assert editor.session.revision == before, "a refused drag must write nothing"
+
+
+def test_deleting_a_selected_note_removes_its_document(open_editor: OpenEditor) -> None:
+    """The ordinary Delete gesture, on something that is not an element."""
+    editor = annotated(open_editor)
+    note_shape(editor).click()
+    editor.page.locator("#canvas").focus()
+    editor.press("Delete")
+
+    prompt = editor.page.locator(".prompt")
+    expect(prompt).to_be_visible()
+    # Named by kind as well as by name, because a note and a switch may share one.
+    assert prompt.locator("input").first.input_value() == "note/why-here"
+    prompt.locator('button[type="submit"]').click()
+
+    assert editor.settles(
+        lambda: "name: why-here" not in editor.read("annotations.yaml"), timeout=TIMEOUT_MS / 1000
+    ), "deleting a note has to remove its document"
+    # And nothing else: no cable dies with a callout.
+    assert "name: the-desk" in editor.read("annotations.yaml")
+    assert (editor.root / "switches" / "sw-home.yaml").exists()
+
+
+def test_the_annotation_toggle_takes_the_commentary_off_the_canvas(
+    open_editor: OpenEditor,
+) -> None:
+    """A per-view switch, reachable from the keyboard like every other one."""
+    editor = annotated(open_editor)
+    editor.page.locator("#canvas").focus()
+    editor.press("Alt+n")
+
+    expect(note_shape(editor)).to_have_count(0)
+    assert editor.page.locator(".ng-anno-band").count() == 0
+    assert "annotations off" in editor.announced()
+    # Nothing was written: hiding commentary is a way of looking at the diagram.
+    assert "name: why-here" in editor.read("annotations.yaml")
+
+
+def test_a_read_only_session_shows_the_commentary_and_offers_no_handle(
+    open_editor: OpenEditor,
+) -> None:
+    editor = annotated(open_editor, writable=False)
+    note_shape(editor).click()
+    editor.page.wait_for_timeout(300)
+    assert editor.page.locator(".ng-anno-handle").count() == 0
+    box = note_shape(editor).bounding_box()
+    assert box is not None
+    editor.page.mouse.dblclick(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    assert editor.page.locator(".note-edit-text").count() == 0
 
 
 # --------------------------------------------------------------------------- #
@@ -2342,6 +2669,30 @@ def test_the_context_menu_has_no_accessibility_violations(open_editor: OpenEdito
     with_submenu = _violations(editor)
     assert not with_submenu, "the canvas menu and its submenu:\n" + _explain(with_submenu)
     editor.press("Escape", "Escape")
+
+
+@pytest.mark.skipif(not HAVE_AXE, reason=NO_AXE)
+def test_annotating_the_diagram_has_no_accessibility_violations(
+    open_editor: OpenEditor,
+) -> None:
+    """The overlay and the text box a note is retyped in.
+
+    The overlay is furniture — bands and handles say nothing a screen reader can
+    use, and are marked ``aria-hidden`` so the diagram is not a field of them —
+    but the text box is a real control, so it is audited with the label it
+    carries and the keyboard it takes.
+    """
+    editor = annotated(open_editor)
+    canvas = _violations(editor)
+    assert not canvas, "the annotation overlay:\n" + _explain(canvas)
+
+    box = note_shape(editor).bounding_box()
+    assert box is not None
+    editor.page.mouse.dblclick(box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+    expect(editor.page.locator(".note-edit-text")).to_be_visible()
+    editing = _violations(editor)
+    assert not editing, "the note's text box:\n" + _explain(editing)
+    editor.press("Escape")
 
 
 @pytest.mark.skipif(not HAVE_AXE, reason=NO_AXE)

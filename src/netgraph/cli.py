@@ -2961,6 +2961,18 @@ _DISPLAY_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
         help="Annotate nodes and links with VLAN membership.",
     ),
     click.option(
+        "--annotations/--no-annotations",
+        default=True,
+        show_default=True,
+        help=(
+            "Draw the notes, areas and legends the inventory declares for this view. "
+            "Turn them off for a diagram that should carry the topology and nothing "
+            "written about it — a printed page for an audit — and leave them on for "
+            "one that is being read rather than checked, where the callout is the "
+            "reason the screenshot is worth attaching to the ticket."
+        ),
+    ),
+    click.option(
         "--group-by-namespace",
         is_flag=True,
         default=False,
@@ -3254,6 +3266,7 @@ def _render_options(
         show_ips=params["show_ips"],
         show_vlans=params["show_vlans"],
         group_by_namespace=params["group_by_namespace"],
+        annotations=params["annotations"],
         title=params["title"],
         max_addresses=params["max_addresses"],
         icons=params["icons"],
@@ -6140,6 +6153,7 @@ _EXPORT_OPTION_SCOPE: Final[dict[str, tuple[str, tuple[str, ...]]]] = {
     "icon_theme_option": ("--icons", ("drawio",)),
     "compress": ("--compress", ("drawio",)),
     "frames": ("--frames", ("drawio",)),
+    "annotations": ("--annotations", ("drawio",)),
 }
 
 #: What ``export drawio`` draws nodes as when nobody says. The shipped theme
@@ -6387,6 +6401,17 @@ _DRAWIO_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
         default=True,
         show_default=True,
         help="Draw a container frame per namespace, so dragging a site carries its devices.",
+    ),
+    click.option(
+        "--annotations/--no-annotations",
+        "annotations",
+        default=True,
+        show_default=True,
+        help=(
+            "Draw the notes, areas and legends the inventory declares for this view as "
+            "native draw.io shapes, which the reader can edit and 'netgraph import drawio' "
+            "reads back. Turn them off for a file that should carry the topology alone."
+        ),
     ),
 )
 
@@ -6646,6 +6671,7 @@ def _export_options(params: Mapping[str, Any], export_format: str) -> ExportOpti
         icons=params["icon_theme_option"],
         compress=bool(params["compress"]),
         frames=bool(params["frames"]),
+        annotations=bool(params["annotations"]),
         complete=not _is_narrowed(params),
     )
 

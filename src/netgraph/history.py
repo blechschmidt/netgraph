@@ -71,7 +71,14 @@ from netgraph.errors import LoaderError, NetgraphError
 from netgraph.loader import DocumentCache, Inventory, load_tree
 from netgraph.plan import Plan
 from netgraph.plan import diff as diff_states
-from netgraph.plan.address import ADDRESS_TYPES, DEVICE_TYPE, LAYOUT_TYPE
+from netgraph.plan.address import (
+    ADDRESS_TYPES,
+    AREA_TYPE,
+    DEVICE_TYPE,
+    LAYOUT_TYPE,
+    LEGEND_TYPE,
+    NOTE_TYPE,
+)
 from netgraph.plan.model import Action, Change, StateRef
 from netgraph.plan.sources import (
     MissingInventory,
@@ -290,6 +297,9 @@ _NOUNS: Final[dict[str, tuple[str, str]]] = {
     "user": ("user", "users"),
     "group": ("group", "groups"),
     LAYOUT_TYPE: ("arrangement", "arrangements"),
+    NOTE_TYPE: ("note", "notes"),
+    AREA_TYPE: ("area", "areas"),
+    LEGEND_TYPE: ("legend", "legends"),
 }
 
 #: What each action did, as a summary spells it.

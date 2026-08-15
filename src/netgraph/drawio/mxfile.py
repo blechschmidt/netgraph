@@ -41,7 +41,9 @@ from typing import Final
 from urllib.parse import quote, unquote
 from xml.etree import ElementTree
 
+from netgraph import __version__
 from netgraph.drawio.identity import (
+    ATTR_ANNOTATED,
     ATTR_ORIGIN_X,
     ATTR_ORIGIN_Y,
     ATTR_ROLE,
@@ -56,9 +58,9 @@ from netgraph.drawio.identity import (
 )
 from netgraph.drawio.model import ROOT_ID, Cell, Diagram, Frame
 from netgraph.errors import NetgraphError, clip_text
-from netgraph.export.header import GENERATOR
 
 __all__ = [
+    "AGENT",
     "MAX_DOCUMENT_BYTES",
     "MAX_INFLATED_BYTES",
     "DrawioFormatError",
@@ -67,6 +69,19 @@ __all__ = [
     "parse_mxfile",
     "write_mxfile",
 ]
+
+#: What goes in ``<mxfile agent="…">``: which netgraph wrote the file, which is
+#: the first question when a stale diagram turns up.
+#:
+#: Spelled here rather than imported from
+#: :data:`netgraph.export.header.GENERATOR`, which says the same words, because
+#: the dependency has to run one way: the export package knows about the wire
+#: format, and the wire format must not know about the export package —
+#: otherwise importing either one imports both, which is a cycle, and a test
+#: module that reaches for :mod:`netgraph.drawio` first cannot import it at all.
+#: ``tests/test_drawio.py`` asserts the two strings are equal, so they cannot
+#: drift apart in silence.
+AGENT: Final = f"netgraph {__version__}"
 
 
 class DrawioFormatError(NetgraphError):
@@ -160,6 +175,13 @@ _ATTRIBUTE_ORDER: Final[tuple[str, ...]] = (
     "routing",
     "originX",
     "originY",
+    "annotated",
+    # The three an annotation carries and nothing else does, last so that adding
+    # them left every cell that predates §21 byte-identical.
+    "label",
+    "text",
+    "width",
+    "height",
 )
 
 
@@ -190,7 +212,7 @@ def write_mxfile(diagram: Diagram, *, compress: bool = False) -> str:
         + _attributes(
             (
                 ("host", "netgraph"),
-                ("agent", GENERATOR),
+                ("agent", AGENT),
                 ("type", "device"),
                 (f"xmlns:{NAMESPACE_PREFIX}", NAMESPACE_URI),
             )
@@ -470,6 +492,7 @@ def _diagram_of(model: ElementTree.Element, *, name: str) -> Diagram:
         scope=_scope(metadata.attribute(ATTR_SCOPE)),
         version=metadata.attribute(ATTR_VERSION) or MODEL_VERSION,
         generator=metadata.attribute("generator"),
+        annotated=metadata.attribute(ATTR_ANNOTATED) == "1",
     )
 
 

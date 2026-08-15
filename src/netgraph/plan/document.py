@@ -24,11 +24,16 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping, Sequence
 from typing import Any, Final
 
-from netgraph.models import ElementBase, Layout
+from netgraph.models import AnnotationBase, ElementBase, Layout
 from netgraph.plan.model import FieldChange
 from netgraph.plan.paths import MISSING, Selector, Step
 
-__all__ = ["KEYED_LISTS", "body_of", "diff_documents", "document_of"]
+__all__ = ["KEYED_LISTS", "Diffable", "body_of", "diff_documents", "document_of"]
+
+#: Everything a plan can be about: the elements, and the sidecars that describe
+#: how they are drawn. All three are ordinary documents with an envelope and a
+#: ``spec``, so one normalisation and one diff serve all of them.
+Diffable = ElementBase | Layout | AnnotationBase
 
 #: Lists whose entries are matched by an identifier of their own rather than by
 #: position, and the field that identifies one.
@@ -50,7 +55,7 @@ _IDENTITY_PATHS: Final[frozenset[tuple[str, ...]]] = frozenset(
 )
 
 
-def document_of(element: ElementBase | Layout) -> dict[str, Any]:
+def document_of(element: Diffable) -> dict[str, Any]:
     """The element as plain data, in the shape its YAML document has.
 
     Empty mappings and lists are dropped. Pydantic materialises every optional
@@ -63,7 +68,7 @@ def document_of(element: ElementBase | Layout) -> dict[str, Any]:
     return pruned if isinstance(pruned, dict) else {}
 
 
-def body_of(element: ElementBase | Layout) -> dict[str, Any]:
+def body_of(element: Diffable) -> dict[str, Any]:
     """:func:`document_of` without the keys that make it *this* document.
 
     What is left is everything a diff may speak about. ``kind`` stays: a switch

@@ -64,10 +64,11 @@ from netgraph.drawio import (
 )
 from netgraph.drawio.build import HALF_SELECTED, NOT_ARRANGED, NOT_REPRESENTABLE
 from netgraph.drawio.identity import format_points, parse_points
-from netgraph.drawio.mxfile import MAX_DOCUMENT_BYTES
+from netgraph.drawio.mxfile import AGENT, MAX_DOCUMENT_BYTES
 from netgraph.drawio.styles import data_uri, icon_data_uri
 from netgraph.edit import EditSession, RenameElement, SetGeometry
 from netgraph.export import EXPORTERS, ExportContext, ExportOptions, export, layers_for
+from netgraph.export.header import GENERATOR
 from netgraph.export.manifest import Reason
 from netgraph.fsio import write_text
 from netgraph.loader import Inventory, load_tree
@@ -190,6 +191,17 @@ def test_the_builders_reason_tokens_are_real_manifest_reasons(token: str) -> Non
     what stops the two copies drifting apart in silence.
     """
     assert Reason(token).value == token
+
+
+def test_the_agent_string_is_the_one_every_other_export_writes() -> None:
+    """Restated in the wire format for the same reason, and pinned for the same one.
+
+    :mod:`netgraph.drawio.mxfile` cannot import :mod:`netgraph.export.header`
+    without making the two packages import each other, so it spells the agent
+    string itself. Two spellings of "which netgraph wrote this" that disagree
+    would be worse than none.
+    """
+    assert AGENT == GENERATOR
 
 
 # --------------------------------------------------------------------------- #

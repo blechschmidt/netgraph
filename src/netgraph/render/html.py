@@ -89,6 +89,23 @@ layer, the first time that layer is shown. Nothing about a record itself
 changed — it is still the ``-f json`` export plus an element id — so
 ``detail.js`` and ``netgraph web`` are untouched by this.
 
+Annotations
+-----------
+
+A note, an area and a legend (§21) are *drawn*, so they reach the page the way
+everything else does: inside the SVG that :func:`~netgraph.render.dot.to_image`
+lays out, with the same stable ids the JSON export publishes. Each layer entry
+also carries an ``annotations`` object — byte-for-byte the one
+``netgraph render -f json`` writes — so that a panel showing what a note says,
+or which elements an area encloses, has the data without a second request and
+without a second parse of the markdown subset.
+
+They are deliberately *not* in ``records``: that pool is keyed by element id and
+is the ``-f json`` node and edge export, and an annotation is neither a node nor
+an edge. Selecting one in the page is therefore a no-op today — ``page.js``
+looks a record up and finds nothing, which is the branch it already handles for
+an unknown id.
+
 Determinism
 -----------
 
@@ -119,6 +136,7 @@ from netgraph.render.dot import to_image
 from netgraph.render.fragment import IconLibrary, fragment
 from netgraph.render.graph import Graph, Layer
 from netgraph.render.ids import element_ids
+from netgraph.render.jsonexport import annotations_payload
 from netgraph.render.options import RenderOptions
 
 __all__ = ["PAGE_KIND", "asset_text", "html_document", "policy", "to_html"]
@@ -199,6 +217,13 @@ def html_document(graphs: Sequence[Graph], options: RenderOptions | None = None)
             # Only reachable behind --force; a reader must be able to tell that
             # the picture is missing links rather than that the links do not exist.
             entry["dangling"] = [printable(text) for text in graph.dangling]
+        annotations = annotations_payload(graph, opts)
+        if annotations is not None:
+            # The notes, areas and legends are *drawn* by Graphviz and arrive in
+            # the SVG like everything else; this is the same records-beside-the
+            # -picture bargain the elements have. It is the identical object the
+            # JSON export publishes, so a panel built on one is built on both.
+            entry["annotations"] = _clean(annotations)
         for show_ips, show_vlans in _variants(opts):
             payload = to_image(
                 graph,

@@ -56,7 +56,17 @@ window.netgraphMenu = (function () {
    */
   function openAt(event) {
     if (!host) { return false; }
-    return show(host.recordAt(event.target), { x: event.clientX, y: event.clientY });
+    var at = { x: event.clientX, y: event.clientY };
+    // The commentary is asked first, because it is drawn over the diagram: a
+    // note sitting on a cable is the thing the pointer was aimed at. Selecting
+    // it here is the same bargain the element branch makes below -- the rows
+    // act on "the selected annotation", so the pointer has to say which.
+    var annotation = window.netgraphNotes.at(event.target);
+    if (annotation) {
+      window.netgraphNotes.select(annotation.id);
+      return show({ annotation: annotation }, at);
+    }
+    return show(host.recordAt(event.target), at);
   }
 
   /** Open on whatever the keyboard has focused, anchored under its shape.
@@ -68,22 +78,33 @@ window.netgraphMenu = (function () {
    */
   function openFocused() {
     if (!host) { return false; }
+    var canvasBox = host.el.canvas.getBoundingClientRect();
+    // An annotation is not in the diagram's focus order -- it is not an element
+    // and a screen reader is told to skip it -- so what stands in for "focused"
+    // here is what the canvas has selected.
+    var annotation = window.netgraphNotes.selection();
+    if (annotation) {
+      return show({ annotation: annotation }, {
+        x: canvasBox.left + canvasBox.width / 2,
+        y: canvasBox.top + canvasBox.height / 3
+      });
+    }
     var here = window.netgraphA11y.focused();
     var box = here ? host.boxOf(here.element) : null;
-    var canvas = host.el.canvas.getBoundingClientRect();
     // A shape scrolled out of the drawn window has a box, and it is the empty
     // one. Anchoring on that would put the menu in the corner of the screen.
     if (box && !box.width && !box.height) { box = null; }
     return show(here ? { record: here.record } : null, box
       ? { x: box.left + Math.min(box.width / 2, 80), y: box.bottom }
-      : { x: canvas.left + canvas.width / 2, y: canvas.top + canvas.height / 3 });
+      : { x: canvasBox.left + canvasBox.width / 2, y: canvasBox.top + canvasBox.height / 3 });
   }
 
   /** Draw the menu for one target at one point. */
   function show(hit, at) {
     close();
     var record = hit ? hit.record : null;
-    var target = targetFor(record);
+    var annotation = hit ? hit.annotation : null;
+    var target = annotation ? "annotation" : targetFor(record);
     var groups = rowsFor(target);
     if (!groups.length) { return false; }
 
@@ -110,7 +131,7 @@ window.netgraphMenu = (function () {
       close();
     });
 
-    var root = panel(groups, caption(record, target), target);
+    var root = panel(groups, caption(record, annotation, target), target);
     layer.appendChild(root);
 
     var entry = window.netgraphKeys.overlay(layer, {
@@ -118,7 +139,10 @@ window.netgraphMenu = (function () {
       close: close,
       onKey: onKey
     });
-    open = { entry: entry, layer: layer, root: root, sub: null };
+    // `at` and `on` travel with the menu because one command needs them: a note
+    // is created where the pointer was, on the thing the pointer was over. Every
+    // other row acts on the focus or the selection, which are already aimed.
+    open = { entry: entry, layer: layer, root: root, sub: null, at: at, on: record };
     place(root, at);
     return true;
   }
@@ -182,11 +206,15 @@ window.netgraphMenu = (function () {
    * switches indistinguishable at the moment it matters most. For a set, the
    * count: naming one of eleven would be worse than naming none.
    */
-  function caption(record, target) {
+  function caption(record, annotation, target) {
     if (target === "selection") {
       var count = window.netgraphSelect.size();
       return count + " selected element" + (count === 1 ? "" : "s");
     }
+    // An annotation is named by its kind as well as its name: a note called
+    // `core` may sit beside a switch called `core`, which is the whole reason
+    // §21 has its own operations.
+    if (annotation) { return annotation.kind + " " + annotation.fqn; }
     if (!record) { return "the diagram"; }
     var address = String(record.id || "");
     if (!address) { return target === "link" ? "this link" : "this element"; }
@@ -295,8 +323,21 @@ window.netgraphMenu = (function () {
       return;
     }
     if (spec.submenu) { toggleSub(button, spec); return; }
+    var context = aimed(spec);
     close();
-    window.netgraphKeys.run(spec.id, spec.context || { from: "menu" });
+    window.netgraphKeys.run(spec.id, context);
+  }
+
+  /** What a row tells the command about the click that opened the menu.
+   *
+   * Read before `close`, which clears it: the pointer's position and what it
+   * was over are the menu's to remember, and a command that wanted them would
+   * otherwise have to guess from wherever the mouse ended up.
+   */
+  function aimed(spec) {
+    var context = { from: "menu", at: open ? open.at : null, on: open ? open.on : null };
+    if (spec.context && spec.context.kind) { context.kind = spec.context.kind; }
+    return context;
   }
 
   /* --------------------------------------------------------- the submenu */

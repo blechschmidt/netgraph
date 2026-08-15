@@ -40,13 +40,19 @@ from netgraph.render.icons import VECTOR_FIRST, IconTheme
 
 __all__ = [
     "MAX_ICON_BYTES",
+    "NOTE_SHAPE",
+    "area_style",
     "data_uri",
     "edge_style",
     "group_style",
     "icon_data_uri",
+    "leader_style",
+    "legend_style",
     "node_style",
     "palette_for",
     "style_of",
+    "swatch_style",
+    "text_style",
 ]
 
 #: Ceiling on one icon inlined into a diagram. The shipped set is a few
@@ -186,6 +192,116 @@ def group_style() -> str:
     """The style of a namespace frame."""
     stroke, label = CLUSTER_PALETTE
     return _GROUP_BASE + style_of((("strokeColor", stroke), ("fontColor", label)))
+
+
+# --------------------------------------------------------------------------- #
+# Annotations (§21)
+# --------------------------------------------------------------------------- #
+
+#: draw.io's own sticky-note shape: a rectangle with the corner turned down.
+#: Named here because the *importer* looks for it too — a cell somebody drew
+#: with this shape is the one foreign vertex netgraph is willing to read as a
+#: new note, on the reasoning that reaching for the note shape is as clear a
+#: statement of intent as a draw.io user can make.
+NOTE_SHAPE: Final = "note"
+
+#: A callout. ``size`` is the turned-down corner in points; ``align=left`` and
+#: ``verticalAlign=top`` because a note is prose and prose starts at the top
+#: left, whatever a device label does.
+_NOTE_BASE: Final = (
+    f"shape={NOTE_SHAPE};whiteSpace=wrap;html=1;size=14;backgroundOutline=1;darkOpacity=0.05;"
+    "align=left;verticalAlign=top;spacing=6;fontSize=11;"
+)
+
+#: A zone. A container like a namespace frame, and for the same reason: a
+#: draw.io user who drags the DMZ box expects the DMZ to come with it. What it
+#: is *not* is collapsible — folding a zone away would hide devices that are
+#: still cabled to everything outside it.
+_AREA_BASE: Final = (
+    "rounded=0;whiteSpace=wrap;html=1;container=1;collapsible=0;expand=0;recursiveResize=0;"
+    "verticalAlign=top;align=left;spacingLeft=8;spacingTop=4;fontSize=11;"
+)
+
+#: A key. A container so the swatches inside it move with it, and no more.
+_LEGEND_BASE: Final = (
+    "rounded=0;whiteSpace=wrap;html=1;container=1;collapsible=0;expand=0;recursiveResize=0;"
+    "verticalAlign=top;align=center;fontStyle=1;fontSize=11;spacingTop=2;"
+)
+
+#: The line from a note to what it is about. Dotted, thin, and without an
+#: arrowhead at either end: a leader points, it does not carry traffic, and an
+#: arrow on it would read as a link that netgraph is not claiming exists.
+_LEADER_BASE: Final = (
+    "html=1;endArrow=none;startArrow=none;dashed=1;dashPattern=1 4;strokeWidth=1;"
+    "edgeStyle=none;curved=0;rounded=0;endFill=0;"
+)
+
+#: A label with no box round it, for a legend's rows.
+_TEXT_BASE: Final = (
+    "text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;"
+    "verticalAlign=middle;fontSize=10;"
+)
+
+#: How each swatch shape is drawn. A ``line`` swatch is a filled bar rather than
+#: an edge cell: three cells per row would treble the size of a key for a
+#: difference nobody can see at 12 points.
+_SWATCH_SHAPES: Final[Mapping[str, str]] = {
+    "box": "rounded=0;html=1;",
+    "ellipse": "ellipse;html=1;",
+    "line": "rounded=0;html=1;dashed=0;",
+    "dashed": "rounded=0;html=1;dashed=1;dashPattern=4 4;",
+    "dotted": "rounded=0;html=1;dashed=1;dashPattern=1 3;",
+}
+
+
+def note_style(*, fill: str, stroke: str) -> str:
+    """The style of one callout."""
+    return _NOTE_BASE + style_of(
+        (("fillColor", fill), ("strokeColor", stroke), ("fontColor", "#111827"))
+    )
+
+
+def area_style(*, fill: str, stroke: str, border: str) -> str:
+    """The style of one zone.
+
+    ``border: none`` keeps the fill and loses the outline by drawing the edge in
+    the fill colour: mxGraph has ``strokeColor=none``, but a container with no
+    stroke at all cannot be grabbed in draw.io, and a zone nobody can select is
+    a zone nobody can move.
+    """
+    dash = {
+        "dashed": "dashed=1;dashPattern=8 8;",
+        "dotted": "dashed=1;dashPattern=1 4;",
+    }.get(border, "dashed=0;")
+    outline = fill if border == "none" else stroke
+    return (
+        _AREA_BASE
+        + dash
+        + style_of((("fillColor", fill), ("strokeColor", outline), ("fontColor", stroke)))
+    )
+
+
+def legend_style(*, fill: str, stroke: str) -> str:
+    """The style of a key's frame."""
+    return _LEGEND_BASE + style_of(
+        (("fillColor", fill), ("strokeColor", stroke), ("fontColor", "#111827"))
+    )
+
+
+def swatch_style(shape: str, *, color: str) -> str:
+    """The style of one swatch in a key."""
+    base = _SWATCH_SHAPES.get(shape, _SWATCH_SHAPES["box"])
+    return base + style_of((("fillColor", color), ("strokeColor", color)))
+
+
+def text_style() -> str:
+    """The style of a bare caption: a label, no box, no fill."""
+    return _TEXT_BASE + style_of((("fontColor", "#111827"),))
+
+
+def leader_style(*, stroke: str) -> str:
+    """The style of the line from a note to what it is about."""
+    return _LEADER_BASE + style_of((("strokeColor", stroke),))
 
 
 def data_uri(media_type: str, payload: bytes) -> str:

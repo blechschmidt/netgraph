@@ -14,6 +14,35 @@ graph netgraph {
   node [fontname="Helvetica,Arial,sans-serif", fontsize=10, style=filled, penwidth=1.2];
   edge [fontname="Helvetica,Arial,sans-serif", fontsize=8];
 
+  subgraph cluster_area_0 {
+    label="Backbone ring";
+    style="rounded,filled";
+    color="#8b7c7c";
+    fillcolor="#fee2e2";
+    fontcolor="#8b7c7c";
+    fontsize=11;
+    labeljust=l;
+    margin=12;
+    "sites/north/core/rtr-north-core-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-north-core-01 [router]\nnamespace: sites/north/core\nLayer-3 core router for the North campus. It routes between the campus VLANs (whose gateways sit on sw-north-dist-01) and carries the two backbone fibres of the inter-site ring.\nlabels: env=prod, role=core, site=north\ninterfaces (4):\n  lo0  loopback  192.0.2.1/32, 2001:db8::1/128\n  xe-0/0/0  ethernet  10.1.0.1/30, 2001:db8:1::1/64  00:05:86:01:c0:00\n  xe-0/0/1  ethernet  198.51.100.1/30, 2001:db8:ff:1::1/64  00:05:86:01:c0:01\n  xe-0/0/2  ethernet  198.51.100.10/30, 2001:db8:ff:3::2/64  00:05:86:01:c0:02\nlinks (8):\n  lo0 — subnet:192.0.2.1/32  (subnet)\n  lo0 — subnet:2001:db8::1/128  (subnet)\n  xe-0/0/0 — subnet:10.1.0.0/30  (subnet)\n  xe-0/0/0 — subnet:2001:db8:1::/64  (subnet)\n  xe-0/0/1 — subnet:198.51.100.0/30  (subnet)\n  xe-0/0/1 — subnet:2001:db8:ff:1::/64  (subnet)\n  xe-0/0/2 — subnet:198.51.100.8/30  (subnet)\n  xe-0/0/2 — subnet:2001:db8:ff:3::/64  (subnet)", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-north-core-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
+      </TABLE>
+    >];
+    "sites/south/core/rtr-south-core-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-south-core-01 [router]\nnamespace: sites/south/core\nLayer-3 core router for the South campus. It routes between the campus VLANs (whose gateways sit on sw-south-dist-01) and carries the two backbone fibres of the inter-site ring.\nlabels: env=prod, role=core, site=south\ninterfaces (4):\n  lo0  loopback  192.0.2.2/32, 2001:db8::2/128\n  xe-0/0/0  ethernet  10.2.0.1/30, 2001:db8:2::1/64  00:05:86:02:c0:00\n  xe-0/0/1  ethernet  198.51.100.5/30, 2001:db8:ff:2::1/64  00:05:86:02:c0:01\n  xe-0/0/2  ethernet  198.51.100.2/30, 2001:db8:ff:1::2/64  00:05:86:02:c0:02\nlinks (8):\n  lo0 — subnet:192.0.2.2/32  (subnet)\n  lo0 — subnet:2001:db8::2/128  (subnet)\n  xe-0/0/0 — subnet:10.2.0.0/30  (subnet)\n  xe-0/0/0 — subnet:2001:db8:2::/64  (subnet)\n  xe-0/0/1 — subnet:198.51.100.4/30  (subnet)\n  xe-0/0/1 — subnet:2001:db8:ff:2::/64  (subnet)\n  xe-0/0/2 — subnet:198.51.100.0/30  (subnet)\n  xe-0/0/2 — subnet:2001:db8:ff:1::/64  (subnet)", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-south-core-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
+      </TABLE>
+    >];
+    "sites/west/core/rtr-west-core-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-west-core-01 [router]\nnamespace: sites/west/core\nLayer-3 core router for the West annexe. It routes between the campus VLANs (whose gateways sit on sw-west-dist-01) and carries the two backbone fibres of the inter-site ring.\nlabels: env=prod, role=core, site=west\ninterfaces (4):\n  lo0  loopback  192.0.2.3/32, 2001:db8::3/128\n  xe-0/0/0  ethernet  10.3.0.1/30, 2001:db8:3::1/64  00:05:86:03:c0:00\n  xe-0/0/1  ethernet  198.51.100.9/30, 2001:db8:ff:3::1/64  00:05:86:03:c0:01\n  xe-0/0/2  ethernet  198.51.100.6/30, 2001:db8:ff:2::2/64  00:05:86:03:c0:02\nlinks (8):\n  lo0 — subnet:192.0.2.3/32  (subnet)\n  lo0 — subnet:2001:db8::3/128  (subnet)\n  xe-0/0/0 — subnet:10.3.0.0/30  (subnet)\n  xe-0/0/0 — subnet:2001:db8:3::/64  (subnet)\n  xe-0/0/1 — subnet:198.51.100.8/30  (subnet)\n  xe-0/0/1 — subnet:2001:db8:ff:3::/64  (subnet)\n  xe-0/0/2 — subnet:198.51.100.4/30  (subnet)\n  xe-0/0/2 — subnet:2001:db8:ff:2::/64  (subnet)", label=<
+      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-west-core-01</B></TD></TR>
+        <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
+      </TABLE>
+    >];
+  }
+
   subgraph cluster_0 {
     label="sites/north/access";
     tooltip="namespace sites/north/access\n3 elements: 3 switches\nvlans: 1,10,20,30,99";
@@ -57,23 +86,6 @@ graph netgraph {
         <TR><TD ALIGN="LEFT">GigabitEthernet1/0/6</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
         <TR><TD ALIGN="LEFT">GigabitEthernet1/0/7</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
         <TR><TD COLSPAN="3" ALIGN="CENTER">(+42 more interfaces)</TD></TR>
-      </TABLE>
-    >];
-  }
-
-  subgraph cluster_1 {
-    label="sites/north/core";
-    tooltip="namespace sites/north/core\n1 element: 1 router";
-    style=rounded;
-    color="#9ca3af";
-    fontcolor="#4b5563";
-    fontsize=11;
-    labeljust=l;
-    margin=12;
-    "sites/north/core/rtr-north-core-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-north-core-01 [router]\nnamespace: sites/north/core\nLayer-3 core router for the North campus. It routes between the campus VLANs (whose gateways sit on sw-north-dist-01) and carries the two backbone fibres of the inter-site ring.\nlabels: env=prod, role=core, site=north\ninterfaces (4):\n  lo0  loopback  192.0.2.1/32, 2001:db8::1/128\n  xe-0/0/0  ethernet  10.1.0.1/30, 2001:db8:1::1/64  00:05:86:01:c0:00\n  xe-0/0/1  ethernet  198.51.100.1/30, 2001:db8:ff:1::1/64  00:05:86:01:c0:01\n  xe-0/0/2  ethernet  198.51.100.10/30, 2001:db8:ff:3::2/64  00:05:86:01:c0:02\nlinks (8):\n  lo0 — subnet:192.0.2.1/32  (subnet)\n  lo0 — subnet:2001:db8::1/128  (subnet)\n  xe-0/0/0 — subnet:10.1.0.0/30  (subnet)\n  xe-0/0/0 — subnet:2001:db8:1::/64  (subnet)\n  xe-0/0/1 — subnet:198.51.100.0/30  (subnet)\n  xe-0/0/1 — subnet:2001:db8:ff:1::/64  (subnet)\n  xe-0/0/2 — subnet:198.51.100.8/30  (subnet)\n  xe-0/0/2 — subnet:2001:db8:ff:3::/64  (subnet)", label=<
-      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
-        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-north-core-01</B></TD></TR>
-        <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
       </TABLE>
     >];
   }
@@ -162,23 +174,6 @@ graph netgraph {
     >];
   }
 
-  subgraph cluster_5 {
-    label="sites/south/core";
-    tooltip="namespace sites/south/core\n1 element: 1 router";
-    style=rounded;
-    color="#9ca3af";
-    fontcolor="#4b5563";
-    fontsize=11;
-    labeljust=l;
-    margin=12;
-    "sites/south/core/rtr-south-core-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-south-core-01 [router]\nnamespace: sites/south/core\nLayer-3 core router for the South campus. It routes between the campus VLANs (whose gateways sit on sw-south-dist-01) and carries the two backbone fibres of the inter-site ring.\nlabels: env=prod, role=core, site=south\ninterfaces (4):\n  lo0  loopback  192.0.2.2/32, 2001:db8::2/128\n  xe-0/0/0  ethernet  10.2.0.1/30, 2001:db8:2::1/64  00:05:86:02:c0:00\n  xe-0/0/1  ethernet  198.51.100.5/30, 2001:db8:ff:2::1/64  00:05:86:02:c0:01\n  xe-0/0/2  ethernet  198.51.100.2/30, 2001:db8:ff:1::2/64  00:05:86:02:c0:02\nlinks (8):\n  lo0 — subnet:192.0.2.2/32  (subnet)\n  lo0 — subnet:2001:db8::2/128  (subnet)\n  xe-0/0/0 — subnet:10.2.0.0/30  (subnet)\n  xe-0/0/0 — subnet:2001:db8:2::/64  (subnet)\n  xe-0/0/1 — subnet:198.51.100.4/30  (subnet)\n  xe-0/0/1 — subnet:2001:db8:ff:2::/64  (subnet)\n  xe-0/0/2 — subnet:198.51.100.0/30  (subnet)\n  xe-0/0/2 — subnet:2001:db8:ff:1::/64  (subnet)", label=<
-      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
-        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-south-core-01</B></TD></TR>
-        <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
-      </TABLE>
-    >];
-  }
-
   subgraph cluster_6 {
     label="sites/south/distribution";
     tooltip="namespace sites/south/distribution\n1 element: 1 switch\nvlans: 1,10,20,30,99";
@@ -258,23 +253,6 @@ graph netgraph {
         <TR><TD ALIGN="LEFT">GigabitEthernet1/0/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 10</TD></TR>
         <TR><TD ALIGN="LEFT">GigabitEthernet1/0/2</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 20</TD></TR>
         <TR><TD ALIGN="LEFT">TenGigabitEthernet1/1/1</TD><TD ALIGN="LEFT"></TD><TD ALIGN="LEFT">vlan 1,10,20,30,99</TD></TR>
-      </TABLE>
-    >];
-  }
-
-  subgraph cluster_9 {
-    label="sites/west/core";
-    tooltip="namespace sites/west/core\n1 element: 1 router";
-    style=rounded;
-    color="#9ca3af";
-    fontcolor="#4b5563";
-    fontsize=11;
-    labeljust=l;
-    margin=12;
-    "sites/west/core/rtr-west-core-01" [shape=diamond, fillcolor="#dbe9f6", color="#2563eb", tooltip="rtr-west-core-01 [router]\nnamespace: sites/west/core\nLayer-3 core router for the West annexe. It routes between the campus VLANs (whose gateways sit on sw-west-dist-01) and carries the two backbone fibres of the inter-site ring.\nlabels: env=prod, role=core, site=west\ninterfaces (4):\n  lo0  loopback  192.0.2.3/32, 2001:db8::3/128\n  xe-0/0/0  ethernet  10.3.0.1/30, 2001:db8:3::1/64  00:05:86:03:c0:00\n  xe-0/0/1  ethernet  198.51.100.9/30, 2001:db8:ff:3::1/64  00:05:86:03:c0:01\n  xe-0/0/2  ethernet  198.51.100.6/30, 2001:db8:ff:2::2/64  00:05:86:03:c0:02\nlinks (8):\n  lo0 — subnet:192.0.2.3/32  (subnet)\n  lo0 — subnet:2001:db8::3/128  (subnet)\n  xe-0/0/0 — subnet:10.3.0.0/30  (subnet)\n  xe-0/0/0 — subnet:2001:db8:3::/64  (subnet)\n  xe-0/0/1 — subnet:198.51.100.8/30  (subnet)\n  xe-0/0/1 — subnet:2001:db8:ff:3::/64  (subnet)\n  xe-0/0/2 — subnet:198.51.100.4/30  (subnet)\n  xe-0/0/2 — subnet:2001:db8:ff:2::/64  (subnet)", label=<
-      <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
-        <TR><TD COLSPAN="3" ALIGN="CENTER"><B>rtr-west-core-01</B></TD></TR>
-        <TR><TD COLSPAN="3" ALIGN="CENTER">[router]</TD></TR>
       </TABLE>
     >];
   }
@@ -544,6 +522,39 @@ graph netgraph {
     </TABLE>
   >];
 
+  "annotation:note-why-fibre" [shape=note, style=filled, fillcolor="#fef3c7", color="#8b856d", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">The backbone is <B>single-mode fibre</B>: 4.2 km between sites, which is past what copper does at any speed.</TD></TR>
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">&#8226; <FONT FACE="monospace">os2</FONT>, LC, 10Gbps</TD></TR>
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT">&#8226; the ring survives one break</TD></TR>
+    </TABLE>
+  >];
+  "annotation:note-mgmt-is-not-routed" [shape=note, style=filled, fillcolor="#fef3c7", color="#8b856d", label=<
+    <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="1">
+    <TR><TD ALIGN="LEFT" BALIGN="LEFT"><FONT FACE="monospace">Vlan99</FONT> lives in the <I>mgmt</I> VRF and its default route is a discard route, so management does not leave the site.</TD></TR>
+    </TABLE>
+  >];
+
+  subgraph cluster_legend_0 {
+    style=rounded;
+    color="#8c8c8c";
+    fontcolor="#8c8c8c";
+    fontsize=11;
+    labeljust=l;
+    margin=8;
+    "annotation:legend-key" [shape=plaintext, style="", fillcolor="none", label=<
+      <TABLE BORDER="0" COLOR="#8c8c8c" CELLBORDER="0" CELLSPACING="0" CELLPADDING="2" BGCOLOR="#ffffff">
+      <TR><TD COLSPAN="2" ALIGN="LEFT"><B>Key</B></TD></TR>
+      <TR><TD FIXEDSIZE="TRUE" WIDTH="20" HEIGHT="12" BGCOLOR="#dcf0dc"></TD><TD ALIGN="LEFT">switch</TD></TR>
+      <TR><TD FIXEDSIZE="TRUE" WIDTH="20" HEIGHT="12" BGCOLOR="#dbe9f6"></TD><TD ALIGN="LEFT">router</TD></TR>
+      <TR><TD FIXEDSIZE="TRUE" WIDTH="20" HEIGHT="12" BGCOLOR="#f5f5f5"></TD><TD ALIGN="LEFT">computer</TD></TR>
+      <TR><TD FIXEDSIZE="TRUE" WIDTH="20" HEIGHT="12" BGCOLOR="#eae2f5"></TD><TD ALIGN="LEFT">server</TD></TR>
+      <TR><TD FIXEDSIZE="TRUE" WIDTH="20" HEIGHT="12" BGCOLOR="#e0f2f1"></TD><TD ALIGN="LEFT">subnet</TD></TR>
+      <TR><TD FIXEDSIZE="TRUE" WIDTH="20" HEIGHT="4" BGCOLOR="#0f766e"></TD><TD ALIGN="LEFT">subnet membership</TD></TR>
+      </TABLE>
+    >];
+  }
+
   "sites/north/access/sw-north-acc-01" -- "subnet:mgmt/10.1.99.0/24" [color="#0f766e", style=solid, label="Vlan99\n10.1.99.11/24\nvlan 99", tooltip="subnet sites/north/access/sw-north-acc-01:Vlan99#10.1.99.0/24\nsites/north/access/sw-north-acc-01:Vlan99 — subnet:mgmt/10.1.99.0/24\naddresses: 10.1.99.11/24\nvlans: 99"];
   "sites/north/access/sw-north-acc-02" -- "subnet:mgmt/10.1.99.0/24" [color="#0f766e", style=solid, label="Vlan99\n10.1.99.12/24\nvlan 99", tooltip="subnet sites/north/access/sw-north-acc-02:Vlan99#10.1.99.0/24\nsites/north/access/sw-north-acc-02:Vlan99 — subnet:mgmt/10.1.99.0/24\naddresses: 10.1.99.12/24\nvlans: 99"];
   "sites/north/access/sw-north-acc-03" -- "subnet:mgmt/10.1.99.0/24" [color="#0f766e", style=solid, label="Vlan99\n10.1.99.13/24\nvlan 99", tooltip="subnet sites/north/access/sw-north-acc-03:Vlan99#10.1.99.0/24\nsites/north/access/sw-north-acc-03:Vlan99 — subnet:mgmt/10.1.99.0/24\naddresses: 10.1.99.13/24\nvlans: 99"];
@@ -614,4 +625,5 @@ graph netgraph {
   "sites/west/hosts/srv-west-01" -- "subnet:2001:db8:3:20::/64" [color="#0f766e", style=solid, label="eth0\n2001:db8:3:20::11/64", tooltip="subnet sites/west/hosts/srv-west-01:eth0#2001:db8:3:20::/64\nsites/west/hosts/srv-west-01:eth0 — subnet:2001:db8:3:20::/64\naddresses: 2001:db8:3:20::11/64"];
   "sites/west/hosts/pc-west-02" -- "subnet:10.3.10.0/24" [color="#0f766e", style=solid, label="eno1\n10.3.10.52/24", tooltip="subnet sites/west/hosts/pc-west-02:eno1#10.3.10.0/24\nsites/west/hosts/pc-west-02:eno1 — subnet:10.3.10.0/24\naddresses: 10.3.10.52/24"];
   "sites/west/hosts/pc-west-02" -- "subnet:2001:db8:3:10::/64" [color="#0f766e", style=solid, label="eno1\n2001:db8:3:10::52/64", tooltip="subnet sites/west/hosts/pc-west-02:eno1#2001:db8:3:10::/64\nsites/west/hosts/pc-west-02:eno1 — subnet:2001:db8:3:10::/64\naddresses: 2001:db8:3:10::52/64"];
+  "annotation:note-mgmt-is-not-routed" -- "sites/north/distribution/sw-north-dist-01" [color="#8b856d", style=dotted, arrowhead=none, constraint=false];
 }

@@ -265,6 +265,7 @@ title               Q3 review   flag --title
 | `bundle-links` | boolean | unset (fold declared LAGs only) | `--bundle-links/--no-bundle-links` |
 | `show-ips` | boolean | `true` | `--show-ips/--no-show-ips` |
 | `show-vlans` | boolean | `true` | `--show-vlans/--no-show-vlans` |
+| `annotations` | boolean | `true` | `--annotations/--no-annotations` |
 | `group-by-namespace` | boolean | `false` | `--group-by-namespace` |
 | `icons` | string | unset | `--icons` |
 | `tooltips` | boolean | `true` | `--tooltips/--no-tooltips` |
