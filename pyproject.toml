@@ -203,6 +203,21 @@ ignore_missing_imports = true
 module = ["playwright.*", "axe_core_python.*"]
 ignore_missing_imports = true
 
+# ``netgraph.loader.documents`` subclasses PyYAML's loaders and calls two methods
+# -- ``add_implicit_resolver`` and ``construct_yaml_str`` -- whose annotations
+# differ between releases of ``types-PyYAML``. Under one resolution they are
+# untyped and the calls need ``# type: ignore[no-untyped-call]``; under another
+# they are typed and the same comments are *unused*, which
+# ``warn_unused_ignores`` then reports as an error. The module has to type-check
+# under both, and neither the comments nor their absence can satisfy both, so
+# this is the only setting that does. It is scoped to the one module rather than
+# set globally: an unused ignore anywhere else is still a mistake worth hearing
+# about, and this narrows the blind spot to three lines whose reason is written
+# above them.
+[[tool.mypy.overrides]]
+module = ["netgraph.loader.documents"]
+warn_unused_ignores = false
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
