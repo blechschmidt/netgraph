@@ -17,9 +17,11 @@ inputs:
   base:
     description: >-
       The state before the change, as a git ref or a folder. On a pull_request
-      run this is the base commit -- ${{ github.event.pull_request.base.sha }} --
-      which the workflow has to have fetched: actions/checkout with
-      fetch-depth: 0, or an explicit 'git fetch origin <sha>'. There is no
+      run this is the base commit, github.event.pull_request.base.sha -- written
+      without the expression braces on purpose, because a description holding
+      them is read as an expression and the action then fails to load at all.
+      The commit has to be in the clone; this action fetches it when it is not.
+      There is no
       default: a review is a comparison, and guessing the other side of one is
       worse than refusing.
     required: true

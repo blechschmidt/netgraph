@@ -965,6 +965,26 @@ def test_the_review_action_reads_the_summary_rather_than_the_prose(
         assert f'"{key}"' in script, f"{key} is never derived from the summary document"
 
 
+@pytest.mark.parametrize(
+    "path",
+    [ACTION_FILE, RENDER_ACTION_FILE, REVIEW_ACTION_FILE],
+    ids=lambda path: path.parent.name,
+)
+def test_no_input_description_holds_an_expression(path: Path) -> None:
+    """``${{ ... }}`` in a description is evaluated, and fails the whole action.
+
+    An action file's descriptions go through the same template evaluator as its
+    steps, and ``github`` is not a context an action may read — so a description
+    that quotes ``github.event.pull_request.base.sha`` the way a workflow would
+    write it stops the action loading, with an error naming a line nobody
+    thought was code. Found on a real runner; kept here so it is found here.
+    """
+    action = load_yaml(path)
+    for section in ("inputs", "outputs"):
+        for name, spec in action.get(section, {}).items():
+            assert "${{" not in spec["description"], f"{path.parent.name}: {section}.{name}"
+
+
 def test_the_review_action_readme_documents_every_input_and_output(
     review_action: dict[str, Any],
 ) -> None:
