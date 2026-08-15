@@ -1102,6 +1102,9 @@ MENUS: Final[tuple[Menu, ...]] = (
             (
                 MenuItem("container.fold", "Fold or unfold it"),
                 MenuItem("element.create", "New in it", submenu="kinds"),
+                # A paste is a drop: the copies land in this namespace, the same
+                # way dragging something into the box would put it there.
+                MenuItem("clipboard.paste", "Paste into it"),
             ),
             (
                 MenuItem("container.move", "Move the selection into it…"),

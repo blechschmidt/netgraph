@@ -572,6 +572,7 @@ that is already there or gets a file of its own — the same answer
 | Drop on empty canvas | a `move` into the root namespace |
 | Drop where it already was | nothing; the status line says so |
 | **New namespace…** in the canvas or container menu | a `create` in the new folder, or the selection moved into it |
+| **Paste into it** on a container | the [paste](#copying-cutting-and-pasting), into that namespace |
 | Drag a container's corner | `set-geometry`, into that view's `groups` |
 | The triangle on a header, or `f` | nothing: folding is a view |
 

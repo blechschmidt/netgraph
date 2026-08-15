@@ -398,6 +398,7 @@ The frames are editable, and every gesture on one lands in the file system:
 | Drag a selection into one | all of them, as one change and one `Ctrl-Z` |
 | Drag a frame into another frame | the whole subtree, keeping its own shape |
 | Drop on empty canvas | the document moves to the inventory root |
+| **Paste into a frame** | the copies are written into that directory |
 | **New namespace…** | the directory, made by putting something in it |
 
 So `sites/north/access/sw-north-acc-01` dropped into the `sites/north/racks/r1`

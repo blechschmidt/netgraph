@@ -176,7 +176,10 @@ var netgraphClipboard = (function () {
       // it -- and the server places in the diagram's own coordinates, so the
       // transform happens here and exactly once. The keyboard supplies no
       // point, and a keyboard paste is offset from the originals instead.
-      run: function (context) { paste(anchor(context && context.at)); }
+      run: function (context) {
+        var at = context && context.at;
+        paste(anchor(at), namespaceAt(at));
+      }
     });
   }
 
@@ -250,8 +253,22 @@ var netgraphClipboard = (function () {
       .catch(function () {});
   }
 
-  /** Paste whatever is on the clipboard, at `at` when the pointer named one. */
-  function paste(at) {
+  /** Which namespace the pointer was inside, or "" for the root.
+   *
+   * A paste is a drop: **Paste into it** on a rack's frame puts the copies in
+   * the rack, the same way dragging one in would. Empty whenever the pointer
+   * was over no container — including every drawing that has none — which is
+   * what leaves a keyboard paste landing where it always did, beside the
+   * originals and in their own namespaces.
+   */
+  function namespaceAt(at) {
+    if (!at || !window.netgraphContainers) { return ""; }
+    return netgraphContainers.namespaceAt(at);
+  }
+
+  /** Paste whatever is on the clipboard: at `at` when the pointer named a
+   *  point, and into `namespace` when it named a container. */
+  function paste(at, namespace) {
     read().then(function (fragment) {
       if (!fragment) {
         host.refuse("the clipboard holds no netgraph elements");
@@ -259,6 +276,7 @@ var netgraphClipboard = (function () {
       }
       var body = { payload: fragment, view: host.layer() };
       if (at) { body.at = { x: at.x, y: at.y }; }
+      if (namespace) { body.namespace = namespace; }
       host.post("/api/paste", body)
         .then(function (result) {
           host.applied(result, "pasted " + count(size(fragment), "element"));

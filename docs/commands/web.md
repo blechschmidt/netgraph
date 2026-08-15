@@ -396,6 +396,7 @@ menu, untouched.
 |---|---|---|
 | Fold or unfold it | Fold or unfold this namespace — `f` | — |
 | New in it ▸ *(one row per element kind)* | Create an element… — `n` | `--write` |
+| Paste into it | Paste — `Ctrl-V` | `--write` |
 | Move the selection into it… | Move into a namespace… — *palette only* | `--write` |
 | New namespace inside it… | New namespace… — *palette only* | `--write` |
 

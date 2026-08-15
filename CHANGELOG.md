@@ -39,6 +39,8 @@ publish a version whose section is missing or empty — see
   boxes, because anywhere else the engine sizes the cluster on every run and a written box
   would be a number nothing reads.
 
+  Right-clicking a frame offers the container's own rows: fold it, create an element in it,
+  paste into it — a paste being a drop, so the copies land in that namespace.
   **New namespace…** in the canvas and container menus makes a folder by putting the first
   document in it; there is deliberately no operation that makes an empty one, because a
   folder netgraph reads is one holding a document. `f` folds the container under the pointer

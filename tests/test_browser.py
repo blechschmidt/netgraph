@@ -1815,6 +1815,21 @@ spec:
 """
 
 
+#: A device nothing is cabled to, for the paste below. Uncabled on purpose: a
+#: copy of a *cabled* device into another namespace makes the bare name its
+#: cable writes ambiguous, which the validation gate rightly refuses — that is a
+#: property of copying, tested where copying is, and not what this is about.
+A_SPARE: Final = """\
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: spare-pc
+spec:
+  interfaces:
+    - name: eno1
+      type: ethernet
+"""
+
 #: A second ``pc-desk``, already in the rack. Legal on its own — two racks may
 #: each hold a ``pc-01`` — and exactly what makes dropping the first one in
 #: illegal, which is the refusal the drop has to make before it writes.
@@ -1931,6 +1946,31 @@ def test_a_drop_that_would_collide_is_refused_with_the_reason(
     expect(editor.page.locator("#toast")).to_contain_text("pc-desk", timeout=TIMEOUT_MS)
     assert editor.session.revision == before
     assert (editor.root / "hosts" / "pc-desk.yaml").exists()
+
+
+def test_pasting_inside_a_container_lands_in_that_namespace(
+    open_editor: OpenEditor,
+) -> None:
+    """A paste is a drop: **Paste here** in the rack puts the copy in the rack."""
+    editor = grouped(open_editor, extra={"hosts/spare.yaml": A_SPARE})
+    assert editor.session is not None
+    editor.shape("hosts/spare-pc").click()
+    editor.page.locator("#canvas").focus()
+    editor.press("Control+c")
+    editor.page.wait_for_timeout(300)
+
+    # On the header rather than in the middle of the frame: the middle of a
+    # one-element container is the element, and a right-click there is about the
+    # element. The header is the part that is unambiguously the container.
+    press_on(editor, container_header(editor, "racks/r1"), button="right")
+    menu(editor).get_by_text("Paste into it").click()
+
+    assert editor.settles(
+        lambda: any((editor.root / "racks" / "r1").glob("*spare*")),
+        timeout=TIMEOUT_MS / 1000,
+    ), "the copy has to land in the namespace the pointer was in"
+    # The original stays where it was: this is a paste, not a move.
+    assert (editor.root / "hosts" / "spare.yaml").exists()
 
 
 def test_folding_a_container_redraws_it_as_one_node_and_writes_nothing(
