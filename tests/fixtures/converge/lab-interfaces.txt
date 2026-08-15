@@ -1,0 +1,63 @@
+converge plan for tests/fixtures/converge/lab from 1 input(s) (iproute), written as interfaces commands
+
+srv-lab (server) [batch 0]
+  +    create VLAN 20 (lab) in the device's VLAN database
+        from srv-lab:port9: declared as ethernet, but the capture lists every interface of srv-lab and this is not among them
+        $ create vlan 20 name lab
+  +    create VLAN 30 (storage) in the device's VLAN database
+        from srv-lab:bond0.30.vlan.access_vlan: declared in VLAN 30; the capture reports VLAN 31
+        $ create vlan 30 name storage
+  +    create port9 as an ethernet interface
+        from srv-lab:port9: declared as ethernet, but the capture lists every interface of srv-lab and this is not among them
+        $ create interface port9 type ethernet
+  ~    set mtu on mgmt0 to 1500
+        from srv-lab:mgmt0.mtu: declared as 1500; the capture reports 1400
+        $ set interface mgmt0 mtu 1500
+  ~    set mtu on port9 to 1500
+        from srv-lab:port9: declared as ethernet, but the capture lists every interface of srv-lab and this is not among them
+        after interface.create/port9
+        $ set interface port9 mtu 1500
+  +    enslave eno2 to bond0
+        from srv-lab:bond0.members: 'eno2' is declared as a member; the capture reports what this aggregate holds and that is not one of them
+        $ add interface bond0 member eno2
+  ~    make port9 an access port
+        from srv-lab:port9: declared as ethernet, but the capture lists every interface of srv-lab and this is not among them
+        after interface.create/port9, vlan.create/20
+        $ set interface port9 vlan-mode access
+  ~    put port9 in VLAN 20
+        from srv-lab:port9: declared as ethernet, but the capture lists every interface of srv-lab and this is not among them
+        after interface.create/port9, vlan.create/20
+        $ set interface port9 vlan-access 20
+  ~    put bond0.30 in VLAN 30
+        from srv-lab:bond0.30.vlan.access_vlan: declared in VLAN 30; the capture reports VLAN 31
+        after vlan.create/30
+        $ set interface bond0.30 vlan-access 30
+  +    add 10.0.30.5/24 to bond0.30
+        from srv-lab:bond0.30.ipv4: 10.0.30.5/24 is declared here; the capture reports this host's addresses and that is not one of them
+        $ add interface bond0.30 ipv4-address 10.0.30.5/24
+  ~    bring eno2 up
+        from srv-lab:eno2.enabled: declared as true; the capture reports false
+        $ set interface eno2 enabled true
+  ~    bring port9 up
+        from srv-lab:port9: declared as ethernet, but the capture lists every interface of srv-lab and this is not among them
+        after interface.create/port9
+        $ set interface port9 enabled true
+  - !! remove 10.9.0.250/24 from mgmt0
+        from srv-lab:mgmt0.ipv4: the capture reports 10.9.0.250/24 here; the inventory does not declare it
+        disruptive: takes 10.9.0.250/24 off mgmt0; mgmt0 carries the management address 10.9.0.5/24
+        $ remove interface mgmt0 ipv4-address 10.9.0.250/24
+  -    stop carrying VLAN 31 on bond0
+        from srv-lab:bond0.vlan: VLAN 31 is carried on this port; the inventory declares VLAN 20, 30 here
+        $ remove interface bond0 vlan-tagged 31
+  -    release eno3 from bond0
+        from srv-lab:bond0.members: 'eno3' is enslaved here on the device; the inventory does not list it as a member
+        $ remove interface bond0 member eno3
+  !    by hand: eno3 is a physical port the inventory does not declare
+        from srv-lab:eno3: the capture reports this interface as ethernet; the inventory does not declare it
+        note: the capture reports an ethernet interface 'eno3' that the inventory does not declare. netgraph will not shut or remove a physical port it knows nothing about; declare it, or take it out of service by hand
+
+maintenance batches
+  batch 0: srv-lab
+      nothing loses reachability while this batch is worked
+
+16 change(s) across 1 element(s) (5 create, 7 update, 3 delete, 1 needing hands), 1 disruptive; 1 maintenance batch(es)

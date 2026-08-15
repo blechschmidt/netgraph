@@ -1,0 +1,55 @@
+converge plan for examples/home-lab from 4 input(s) (csv, iproute, lldp), written as interfaces commands
+
+cables/cbl-sw-ap (cable)
+  !    by hand: medium of cbl-sw-ap differs
+        from cables/cbl-sw-ap:medium: medium is declared as copper; the capture reports fiber
+        note: a declared cable's physical properties disagree with the capture. No command changes a cable; correct the inventory, or replace the run
+
+cables/cbl-sw-nas (cable)
+  !    by hand: the cable cbl-sw-nas is not where it is declared
+        from cables/cbl-sw-nas: the inventory cables hosts/srv-nas:eth0 to switches/sw-home:port3; the capture shows hosts/srv-nas:eth0 connected to something else
+        note: the inventory declares a link the capture contradicts. Move the cable back, or update the inventory to where it now is
+
+cbl-prn-hall-sw-home (cable)
+  !    by hand: an undeclared link is patched at cbl-prn-hall-sw-home
+        from cbl-prn-hall-sw-home: sw-home.lldp.json shows prn-hall:eth0 connected to switches/sw-home:port6; no cable declares that link
+        note: the capture found a link the inventory does not declare. Cabling is not configuration: declare the cable, or unplug it
+
+cbl-srv-nas-sw-home (cable)
+  !    by hand: an undeclared link is patched at cbl-srv-nas-sw-home
+        from cbl-srv-nas-sw-home: patch.csv shows hosts/srv-nas:eth0 connected to switches/sw-home:port6; no cable declares that link
+        note: the capture found a link the inventory does not declare. Cabling is not configuration: declare the cable, or unplug it
+
+hosts/pc-desk (computer) [batch 0]
+  ~ !! set mac on eno1 to 3c:97:0e:20:01:01
+        from hosts/pc-desk:eno1.mac: declared as 3c:97:0e:20:01:01; the capture reports 3c:97:0e:20:01:ff
+        disruptive: changes mac on eno1, which bounces the interface; eno1 carries the management address 192.168.10.20/24
+        $ set interface eno1 mac 3c:97:0e:20:01:01
+  -    stop carrying VLAN 30 on eno1
+        from hosts/pc-desk:eno1.vlan: VLAN 30 is carried on this port; the inventory declares no VLAN here
+        $ remove interface eno1 vlan-tagged 30
+  - !! remove the vlan interface eno1.30
+        from hosts/pc-desk:eno1.30: the capture reports this interface as vlan; the inventory does not declare it
+        disruptive: removes the interface eno1.30; anything configured on it goes with it
+        $ delete interface eno1.30
+
+hosts/srv-nas (server) [batch 0]
+  ~    set mtu on eth0 to 1500
+        from hosts/srv-nas:eth0.mtu: declared as 1500; the capture reports 9000
+        $ set interface eth0 mtu 1500
+
+prn-hall
+  !    by hand: prn-hall is on the network and not in the tree
+        from prn-hall: sw-home.lldp.json observed a device called 'prn-hall'; the inventory declares no element of that name
+        note: the capture found a device the inventory does not declare, so there is no declared state to converge it on. Run 'netgraph import' to adopt it, or take it off the network
+
+switches/sw-home (switch)
+  !    by hand: port6 is a physical port the inventory does not declare
+        from switches/sw-home:port6: the capture reports this interface as ethernet; the inventory does not declare it
+        note: the capture reports an ethernet interface 'port6' that the inventory does not declare. netgraph will not shut or remove a physical port it knows nothing about; declare it, or take it out of service by hand
+
+maintenance batches
+  batch 0: pc-desk, srv-nas
+      nothing loses reachability while this batch is worked
+
+10 change(s) across 8 element(s) (0 create, 2 update, 2 delete, 6 needing hands), 2 disruptive; 1 maintenance batch(es)

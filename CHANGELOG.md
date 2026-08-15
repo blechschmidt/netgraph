@@ -18,6 +18,42 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **`netgraph converge plan`: drift, joined to the configuration emitters, as an ordered
+  per-device remediation.** `netgraph drift` said how the live network differs from the
+  inventory and `netgraph export config` said what a device would run if it agreed; nothing
+  joined them. This does. It takes the same captures `drift` takes and produces, per device,
+  the minimal ordered set of changes that would move it from what the capture found to what
+  the inventory declares — each one carrying the drift finding that asked for it, a `safe`
+  or `disruptive` classification, its prerequisites, the commands that perform it and the
+  commands that undo it.
+
+  **netgraph never applies any of it, and there is no flag that adds a transport.** The
+  command reads capture files and writes a plan and per-device `.txt` scripts; a person runs
+  them. The security surface stays "reads files, writes files". The plan type is shaped so a
+  transport *could* consume it later — every change has a stable id, prerequisites, a risk
+  and an inverse — but that would be a separate program.
+
+  A plan touching the path a device is managed on, or shutting or deleting any interface, is
+  **refused whole** unless `--allow-disruptive`, and the refusal names every offending change
+  rather than the first. The management interface is the one `netgraph export` already picks
+  for `ansible_host` and a scrape target, plus everything it is stacked on and the VLAN it
+  lives in.
+
+  Changes come out in a dependency order — VLANs before the ports that carry them, parents
+  before what is stacked on them, addresses before routing, every addition before every
+  removal and removals in the mirror order — and are grouped into maintenance batches by the
+  existing `netgraph impact` engine, so two devices share a window only when neither is in
+  the other's blast radius.
+
+  `--dialect` picks `interfaces` (netgraph's own imperative grammar, one line per change, and
+  the default) or one of `netplan`, `networkd`, `ifupdown`, `frr` and `wireguard`, whose
+  remediation is genuinely the generated file plus a reload — computed by running the
+  existing emitters over both the declared and the observed state and keeping only the files
+  that differ. `--format text|json|markdown`, `-o DIR` for the scripts, `--rollback` for the
+  inverse ones, and an exit-code contract mirroring `netgraph plan`: **0** converged, **2**
+  changes pending, **4** refused. See
+  [`docs/commands/converge.md`](docs/commands/converge.md).
+
 - **Namespaces are containers you can drag things into.** The editor draws a frame per
   namespace level whenever the diagram is grouped by namespace, captioned with the namespace
   and how many elements are under it, with a triangle that folds it into the single node

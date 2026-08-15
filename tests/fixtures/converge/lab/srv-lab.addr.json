@@ -1,0 +1,67 @@
+[
+  {
+    "ifindex": 2,
+    "ifname": "mgmt0",
+    "flags": ["BROADCAST", "MULTICAST", "UP", "LOWER_UP"],
+    "mtu": 1400,
+    "link_type": "ether",
+    "address": "52:54:00:aa:00:01",
+    "addr_info": [
+      {"family": "inet", "local": "10.9.0.5", "prefixlen": 24, "scope": "global"},
+      {"family": "inet", "local": "10.9.0.250", "prefixlen": 24, "scope": "global"}
+    ]
+  },
+  {
+    "ifindex": 3,
+    "ifname": "eno1",
+    "flags": ["BROADCAST", "MULTICAST", "UP", "LOWER_UP", "SLAVE"],
+    "mtu": 9000,
+    "master": "bond0",
+    "link_type": "ether",
+    "address": "52:54:00:aa:00:02",
+    "addr_info": []
+  },
+  {
+    "ifindex": 4,
+    "ifname": "eno2",
+    "flags": ["BROADCAST", "MULTICAST"],
+    "mtu": 9000,
+    "link_type": "ether",
+    "address": "52:54:00:aa:00:03",
+    "addr_info": []
+  },
+  {
+    "ifindex": 5,
+    "ifname": "eno3",
+    "flags": ["BROADCAST", "MULTICAST", "UP", "LOWER_UP", "SLAVE"],
+    "mtu": 9000,
+    "master": "bond0",
+    "link_type": "ether",
+    "address": "52:54:00:aa:00:04",
+    "addr_info": []
+  },
+  {
+    "ifindex": 6,
+    "ifname": "bond0",
+    "flags": ["BROADCAST", "MULTICAST", "MASTER", "UP", "LOWER_UP"],
+    "mtu": 9000,
+    "link_type": "ether",
+    "address": "52:54:00:aa:00:02",
+    "linkinfo": {"info_kind": "bond"},
+    "addr_info": []
+  },
+  {
+    "ifindex": 7,
+    "ifname": "bond0.30",
+    "flags": ["BROADCAST", "MULTICAST", "UP", "LOWER_UP"],
+    "mtu": 1500,
+    "link": "bond0",
+    "link_type": "ether",
+    "address": "52:54:00:aa:00:02",
+    "linkinfo": {
+      "info_kind": "vlan",
+      "info_data": {"protocol": "802.1Q", "id": 31, "flags": ["REORDER_HDR"]}
+    },
+    "addr_info": []
+  }
+]

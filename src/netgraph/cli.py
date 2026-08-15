@@ -115,6 +115,15 @@ from netgraph.config import (
     load_config,
 )
 from netgraph.console import Align, Console
+from netgraph.converge import (
+    CONVERGE_DIALECTS,
+    ConvergePlan,
+    DisruptiveChangeError,
+    render_converge,
+)
+from netgraph.converge import REPORT_FORMATS as CONVERGE_FORMATS
+from netgraph.converge import converge as converge_network
+from netgraph.converge import write_scripts as write_converge_scripts
 from netgraph.diagnostics import FORMATS as DIAGNOSTIC_FORMATS
 from netgraph.diagnostics import Diagnostic, dump_json
 from netgraph.diagnostics import build_report as build_diagnostics
@@ -370,6 +379,12 @@ CONTEXT_SETTINGS = {
 #: Exit status when an inventory is rejected. The task of every command that
 #: checks an inventory is to answer "is this usable?", so they share one answer.
 EXIT_INVALID: Final = 1
+
+#: Exit status when a plan is not empty: 'netgraph converge plan' exits 0 when
+#: the network already matches the inventory and 2 when changes are pending.
+#: Distinct from :data:`EXIT_INVALID` on purpose — a pipeline has to be able to
+#: tell "there is work to do" from "the inputs were wrong".
+EXIT_CONVERGE_PENDING: Final = 2
 
 #: Report formats ``impact`` accepts only with ``--redundancy``: both describe
 #: problems in files, and an analysis of a network is not one.
@@ -3032,6 +3047,202 @@ def _confirm(console: Console, plan: Plan) -> bool:
         )
     except click.Abort:
         return False
+
+
+# --------------------------------------------------------------------------- #
+# converge
+# --------------------------------------------------------------------------- #
+
+
+@cli.group("converge")
+def converge_group() -> None:
+    """Turn drift into an ordered, reviewable remediation plan.
+
+    'netgraph drift' says how the live network differs from the inventory and
+    'netgraph export config' says what a device would run if it agreed. This
+    joins them: per device, the minimal set of changes that would close every
+    difference, in dependency order, each carrying the drift finding that asked
+    for it and a risk classification.
+
+    netgraph never applies any of it. There is no transport here and no flag
+    that adds one: the command writes a plan and a set of scripts, and a person
+    runs them. See docs/commands/converge.md.
+    """
+
+
+@converge_group.command("plan")
+@click.argument("inputs", nargs=-1, metavar="[NAME=]INPUT...")
+@click.option(
+    "--from",
+    "capture_dialect",
+    type=click.Choice(DIALECTS),
+    default="auto",
+    show_default=True,
+    help="Input dialect, exactly as 'netgraph drift --from' takes it.",
+)
+@click.option(
+    "--host",
+    metavar="NAME",
+    default=None,
+    help="Device every input was captured on, when the input does not name it.",
+)
+@click.option(
+    "--dialect",
+    type=click.Choice(CONVERGE_DIALECTS),
+    default="interfaces",
+    show_default=True,
+    help=(
+        "Which configuration dialect the commands are written in. 'interfaces' is "
+        "netgraph's own imperative grammar and covers every device kind; the other five "
+        "are declarative, so their remediation is the generated file plus a reload."
+    ),
+)
+@click.option(
+    "--only",
+    multiple=True,
+    metavar="GLOB",
+    shell_complete=complete_element,
+    help="Converge only elements whose name matches this glob. Repeatable.",
+)
+@click.option(
+    "--exclude",
+    "excluded",
+    multiple=True,
+    metavar="GLOB",
+    shell_complete=complete_element,
+    help="Leave elements whose name matches this glob out of the plan. Repeatable.",
+)
+@click.option(
+    "--exclude-interface",
+    "excluded_interfaces",
+    multiple=True,
+    metavar="GLOB",
+    help="Leave interfaces whose name matches this glob out, as 'drift' takes it. Repeatable.",
+)
+@click.option(
+    "--allow-disruptive",
+    is_flag=True,
+    default=False,
+    help=(
+        "Emit a plan even when a change touches the path a device is managed on. Without "
+        "this the whole plan is refused and nothing is written."
+    ),
+)
+@click.option(
+    "--rollback",
+    is_flag=True,
+    default=False,
+    help=(
+        "Emit the inverse of every change: the commands that put each device back the way "
+        "the capture found it. Affects the scripts written by --out."
+    ),
+)
+@click.option(
+    "-F",
+    "--format",
+    "output_format",
+    type=click.Choice(CONVERGE_FORMATS),
+    default="text",
+    show_default=True,
+    help="text is for reading, json for a script or a transport, markdown for a ticket.",
+)
+@click.option(
+    "-o",
+    "--out",
+    "out_dir",
+    metavar="DIR",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help="Write one .txt script per device under DIR, laid out like the inventory tree.",
+)
+@click.pass_obj
+def converge_plan_command(
+    app: AppContext,
+    inputs: tuple[str, ...],
+    capture_dialect: str,
+    host: str | None,
+    dialect: str,
+    only: tuple[str, ...],
+    excluded: tuple[str, ...],
+    excluded_interfaces: tuple[str, ...],
+    allow_disruptive: bool,
+    rollback: bool,
+    output_format: str,
+    out_dir: Path | None,
+) -> None:
+    """Plan the changes that would bring the live network back to the inventory.
+
+    Reads the same captures 'netgraph drift' does — no host is contacted and no
+    credential is read — and writes, per device, the ordered commands that close
+    every difference, with the drift finding behind each one.
+
+    Exits 0 when the network already matches the inventory and 2 when changes
+    are pending, mirroring 'netgraph plan'.
+
+    \b
+    netgraph -i net converge plan caps/*.json
+    netgraph -i net converge plan --dialect netplan -o scripts/ caps/*.json
+    netgraph -i net converge plan --rollback -o rollback/ caps/*.json
+    """
+    inventory = app.load()
+    console = app.console()
+    commentary = console.to_stderr() if output_format != "text" else console
+
+    if inventory.errors:
+        _report_problems(console.to_stderr(), inventory.errors, ())
+        console.to_stderr().error(
+            "refusing to plan against an inventory that does not load; a document that was "
+            "rejected is absent from the comparison, which would read as drift to converge"
+        )
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+    try:
+        plan = converge_network(
+            inventory,
+            list(inputs),
+            dialect=dialect,
+            capture_dialect=capture_dialect,
+            host=host,
+            spec=CompareSpec(only=only, exclude=excluded, ignore_interfaces=excluded_interfaces),
+            allow_disruptive=allow_disruptive,
+        )
+    except DisruptiveChangeError as exc:
+        console.to_stderr().error(str(exc))
+        raise click.exceptions.Exit(exc.exit_code) from exc
+
+    if output_format == "text":
+        console.print(render_converge(plan, output_format).rstrip("\n"))
+    else:
+        console.print(render_converge(plan, output_format).rstrip("\n"))
+        commentary.info(_converge_summary(plan))
+
+    if out_dir is not None:
+        written = write_converge_scripts(plan, out_dir, rollback=rollback)
+        commentary.info(
+            f"{len(written)} script(s) written under {out_dir}"
+            if written
+            else f"no script written under {out_dir}: every change needs a person, not a command"
+        )
+    elif rollback:
+        commentary.warn(
+            "--rollback affects the scripts '--out DIR' writes; without it the plan already "
+            "carries every inverse command, and 'netgraph converge plan -F json' shows them"
+        )
+
+    if not plan.converged:
+        raise click.exceptions.Exit(EXIT_CONVERGE_PENDING)
+
+
+def _converge_summary(plan: ConvergePlan) -> str:
+    """The one-line commentary printed beside a structured document."""
+    if plan.converged:
+        return "converged: the network already matches the inventory"
+    disruptive = len(plan.disruptive)
+    risk = f", {disruptive} disruptive" if disruptive else ""
+    return (
+        f"{_plural(len(plan.changes), 'change')} pending across "
+        f"{_plural(len(plan.devices), 'element')}{risk}"
+    )
 
 
 # --------------------------------------------------------------------------- #

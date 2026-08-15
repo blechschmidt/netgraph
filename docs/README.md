@@ -30,6 +30,7 @@ This whole documentation set is also published, with those demos beside it, at
 | get completion, inline errors and rename in your editor | [lsp.md](lsp.md) |
 | diff two inventory states, review the change, and apply it | [commands/plan.md](commands/plan.md), [commands/apply.md](commands/apply.md) |
 | adopt what a live network reports into the declared inventory | [commands/drift.md](commands/drift.md), [commands/plan.md](commands/plan.md) |
+| turn drift into an ordered, per-device remediation script | [commands/converge.md](commands/converge.md) |
 | gate a pull request on the inventory validating | [ci.md](ci.md) |
 | publish a live diagram of your own network, rebuilt on every push | [ci.md](ci.md#workflow-publish-the-diagram-to-github-pages) |
 | write down what the network is *for*, and fail CI when it stops being true | [commands/test.md](commands/test.md) |
@@ -81,6 +82,11 @@ This whole documentation set is also published, with those demos beside it, at
   rename detection, the order a changeset has to run in, plan files and the state hash,
   and how a capture becomes a proposal. [commands/apply.md](commands/apply.md) executes
   the result against the files.
+* **[commands/converge.md](commands/converge.md)** — the other half of the loop: drift
+  joined to the configuration emitters, as a per-device plan. What a change is, the
+  dependency order, how the management path is worked out and what makes a change
+  disruptive, the maintenance batches, and the boundary netgraph does not cross — it
+  writes scripts and never opens a session to a device.
 * **[ipam.md](ipam.md)** — utilisation, free space, the next free block, aggregation and
   conflicts, with the arithmetic spelled out.
 * **[paths.md](paths.md)** — how the trace works, what counts as a hop, several paths and

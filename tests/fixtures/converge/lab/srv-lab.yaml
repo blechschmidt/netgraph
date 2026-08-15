@@ -1,0 +1,59 @@
+# A host shaped to exercise every remediation netgraph can derive: an interface
+# the capture will not find, an aggregate whose membership disagrees, an access
+# port in the wrong VLAN, and an address that is declared and not configured.
+#
+# 'mgmt0' is deliberately the management interface -- an explicitly named
+# management port outranks everything else -- so a change to anything else on
+# this host is safe and a change to mgmt0 is not. That is what makes the risk
+# classification testable without needing a second inventory.
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-lab
+spec:
+  vlans:
+    - id: 20
+      name: lab
+    - id: 30
+      name: storage
+  interfaces:
+    - name: mgmt0
+      type: ethernet
+      description: Out-of-band management
+      mtu: 1500
+      ipv4:
+        addresses: [10.9.0.5/24]
+
+    - name: eno1
+      type: ethernet
+      mtu: 9000
+
+    - name: eno2
+      type: ethernet
+      mtu: 9000
+
+    - name: port9
+      type: ethernet
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 20
+
+    - name: bond0
+      type: lag
+      members: [eno1, eno2]
+      mtu: 9000
+      vlan:
+        mode: trunk
+        native_vlan: 20
+        trunk_vlans: [30]
+
+    - name: bond0.30
+      type: vlan
+      parent: bond0
+      mtu: 1500
+      vlan:
+        mode: access
+        access_vlan: 30
+      ipv4:
+        addresses: [10.0.30.5/24]
