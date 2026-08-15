@@ -74,6 +74,7 @@ __all__ = [
     "as_sarif",
     "build_report",
     "dump_json",
+    "fingerprint",
     "render_report",
 ]
 
@@ -216,6 +217,41 @@ class Diagnostic:
     # -- construction ----------------------------------------------------
 
     @classmethod
+    def from_record(cls, record: Mapping[str, Any]) -> Diagnostic:
+        """The inverse of :meth:`as_record`, for reading a report back in.
+
+        A saved ``-F json`` document is how one run reaches another — the
+        pull-request bot of :mod:`netgraph.review` subtracts the base branch's
+        report from the head's, and the two were produced by different processes
+        against different trees. ``help`` is derived from the rule, so it is
+        read past rather than stored twice.
+
+        Raises:
+            ValueError: A required field is missing, or ``severity`` is not one
+                of the three.
+        """
+        try:
+            rule = str(record["rule"])
+            severity = Severity(str(record["severity"]))
+            message = str(record["message"])
+        except KeyError as error:
+            raise ValueError(f"a finding record needs {error}") from error
+        return cls(
+            rule=rule,
+            severity=severity,
+            message=message,
+            alias=_optional_text(record.get("alias")),
+            element=_optional_text(record.get("element")),
+            namespace=_optional_text(record.get("namespace")),
+            kind=_optional_text(record.get("kind")),
+            file=_optional_text(record.get("file")),
+            index=_optional_int(record.get("document")),
+            line=_optional_int(record.get("line")),
+            column=_optional_int(record.get("column")),
+            pointer=_optional_text(record.get("pointer")),
+        )
+
+    @classmethod
     def from_load_error(cls, error: LoadError) -> Diagnostic:
         """A loader or schema problem.
 
@@ -272,6 +308,20 @@ class Diagnostic:
             column=mark[1] if mark is not None else None,
             pointer=_pointer(finding.field_path),
         )
+
+
+def _optional_text(value: Any) -> str | None:
+    """``value`` as a string, or ``None`` — which is what the envelope writes."""
+    return None if value is None else str(value)
+
+
+def _optional_int(value: Any) -> int | None:
+    """``value`` as an integer, or ``None`` for anything that is not one.
+
+    A record whose ``line`` is a string is a record some other tool wrote; the
+    position is decoration here, so it is dropped rather than made fatal.
+    """
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
 def _pointer(field_path: Sequence[str | int]) -> str | None:
@@ -488,7 +538,7 @@ def _sarif_result(
         result["ruleIndex"] = position
     result["level"] = _SARIF_LEVELS[diagnostic.severity]
     result["message"] = {"text": diagnostic.message}
-    result["partialFingerprints"] = {"netgraphFinding/v1": _fingerprint(diagnostic)}
+    result["partialFingerprints"] = {"netgraphFinding/v1": fingerprint(diagnostic)}
     path = report.path_of(diagnostic)
     if path is not None:
         region: dict[str, Any] = {}
@@ -509,12 +559,17 @@ def _sarif_result(
     return result
 
 
-def _fingerprint(diagnostic: Diagnostic) -> str:
+def fingerprint(diagnostic: Diagnostic) -> str:
     """A stable identity for one problem, for code scanning's alert tracking.
 
     Deliberately built from the rule, the file, the element and the pointer, and
     **not** from the line: inserting a document above a broken one must not
     close the old alert and open an identical new one.
+
+    Public because a second reader needs the *same* notion of identity:
+    :mod:`netgraph.review` subtracts a base branch's diagnostics from a head's
+    to find what a change introduced, and a pull-request bot that disagreed with
+    code scanning about which alert is which would be worse than no bot.
     """
     material = "\x1f".join(
         (

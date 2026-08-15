@@ -34,6 +34,7 @@ a flag that is documented exists. The prose around them is written by hand.
 | [`netgraph edit apply`](edit.md) | Apply operations given as JSON; the programmatic face. | [edit.md](edit.md) |
 | [`netgraph plan`](plan.md) | Diff two inventory states into a reviewable changeset. | [plan.md](plan.md) |
 | [`netgraph diff`](diff.md) | Draw the difference between two inventory states as one diagram. | [diff.md](diff.md) |
+| [`netgraph review`](review.md) | Write a change up as one pull-request review: changeset, diagram, new findings. | [review.md](review.md) |
 | [`netgraph apply`](apply.md) | Execute a plan against the inventory files. | [apply.md](apply.md) |
 | [`netgraph converge plan`](converge.md) | Turn drift into an ordered, per-device remediation plan. | [converge.md](converge.md) |
 | [`netgraph log`](log.md) | List the commits that changed the inventory, and what each one changed. | [log.md](log.md) |

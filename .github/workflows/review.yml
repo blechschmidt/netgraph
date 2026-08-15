@@ -1,0 +1,103 @@
+name: review
+
+# netgraph reviewing its own inventories. Every example under examples/ is a
+# real inventory, so a pull request that touches one gets exactly what an
+# inventory repository gets from this workflow: the changeset, the diff drawn,
+# and the findings the change introduced -- in one comment per inventory, edited
+# in place rather than added to.
+#
+# This is the dogfooding of .github/workflows/netgraph-review.yml. It is written
+# the way a caller would write it, one `uses:` and a `with:` block, so that the
+# reusable workflow cannot grow a requirement nobody outside this repository
+# could meet without this file noticing.
+#
+# The path filter is deliberate. Most pull requests here change code, not
+# inventories, and a bot that commented "no change to the network" on every one
+# of them would be trained out of existence within a week. It runs when an
+# example changes, or when the review machinery itself does.
+
+on:
+  pull_request:
+    paths:
+      - examples/**
+      - src/netgraph/review/**
+      - .github/actions/netgraph-review/**
+      - .github/workflows/netgraph-review.yml
+      - .github/workflows/review.yml
+
+# One review per inventory per pull request. A second push supersedes the first,
+# and the comment it edits is the same comment either way -- but a cancelled run
+# is still cheaper than a run whose comment is already stale when it lands.
+concurrency:
+  group: review-${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    name: discover examples
+    runs-on: ubuntu-24.04
+    outputs:
+      inventories: ${{ steps.list.outputs.inventories }}
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: List the example inventories
+        id: list
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          names=()
+          for inventory in examples/*/; do
+            names+=("$(basename "$inventory")")
+          done
+
+          # A glob that quietly matched nothing would produce an empty matrix,
+          # and an empty matrix is a job that succeeds having reviewed nothing.
+          if [ "${#names[@]}" -lt 2 ]; then
+            echo "::error::expected at least 2 example inventories under examples/, found ${#names[@]}"
+            exit 1
+          fi
+
+          printf 'inventories=%s\n' \
+            "$(printf '%s\n' "${names[@]}" | jq --raw-input --slurp --compact-output 'split("\n") | map(select(. != ""))')" \
+            >>"$GITHUB_OUTPUT"
+
+  review:
+    name: review
+    needs: discover
+
+    strategy:
+      fail-fast: false
+      matrix:
+        inventory: ${{ fromJSON(needs.discover.outputs.inventories) }}
+
+    # The floor the reusable workflow asks for. ``pull-requests: write`` posts
+    # the comment and ``security-events: write`` uploads the findings; a fork's
+    # pull request is granted neither by GitHub whatever is written here, and
+    # the workflow degrades to the job summary rather than failing.
+    permissions:
+      contents: read
+      pull-requests: write
+      security-events: write
+
+    uses: ./.github/workflows/netgraph-review.yml
+    with:
+      inventory: examples/${{ matrix.inventory }}
+      title: netgraph (examples/${{ matrix.inventory }})
+      # One category per inventory: uploads that share a category replace each
+      # other, so five inventories under one category would leave one review's
+      # findings and lose the other four.
+      sarif-category: netgraph-review-${{ matrix.inventory }}
+      artifact-name: netgraph-review-${{ matrix.inventory }}
+      layer: l2
+      # The examples are the documentation, so they are held to the standard the
+      # documentation recommends: no warnings either.
+      strict: true
+      # This repository's own examples validate clean, so a new error here is a
+      # regression in the example or in a rule, and either is worth a red check.
+      fail-on-new-errors: true

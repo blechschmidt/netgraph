@@ -218,6 +218,7 @@ report.txt` both do what they look like they do.
 | [`netgraph edit apply`](docs/commands/edit.md) | Apply operations given as JSON; the programmatic face. | [edit.md](docs/commands/edit.md) |
 | [`netgraph plan`](docs/commands/plan.md) | Diff two inventory states into a reviewable changeset. | [plan.md](docs/commands/plan.md) |
 | [`netgraph diff`](docs/commands/diff.md) | Draw the difference between two inventory states as one diagram. | [diff.md](docs/commands/diff.md) |
+| [`netgraph review`](docs/commands/review.md) | Write a change up as one pull-request review: changeset, diagram, new findings. | [review.md](docs/commands/review.md) |
 | [`netgraph apply`](docs/commands/apply.md) | Execute a plan against the inventory files. | [apply.md](docs/commands/apply.md) |
 | [`netgraph converge plan`](docs/commands/converge.md) | Turn drift into an ordered, per-device remediation plan. | [converge.md](docs/commands/converge.md) |
 | [`netgraph log`](docs/commands/log.md) | List the commits that changed the inventory, and what each one changed. | [log.md](docs/commands/log.md) |

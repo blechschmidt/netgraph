@@ -1,7 +1,7 @@
 """The CI integrations this repository ships to other repositories.
 
-``.pre-commit-hooks.yaml``, the two composite actions under ``.github/actions/``
-and the reusable workflow ``.github/workflows/netgraph-pages.yml`` are consumed
+``.pre-commit-hooks.yaml``, the three composite actions under ``.github/actions/``
+and the reusable workflows under ``.github/workflows/`` are consumed
 by *other people's* repositories, at a tag, through machinery this test suite
 never runs. Nothing else in the project would notice an option renamed out from
 under them, a hook whose ``entry`` no longer resolves, or a documented input the
@@ -15,6 +15,7 @@ and the suffix it derives are not things a schema check can see.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -31,7 +32,8 @@ from click.testing import CliRunner
 from netgraph.cli import cli
 from netgraph.diagnostics import FORMATS
 from netgraph.render import FORMATS as RENDER_FORMATS
-from netgraph.render import TEXT_FORMATS, suffix_for
+from netgraph.render import TEXT_FORMATS, diff_formats, suffix_for, supports_diff
+from netgraph.review import MARKER_PREFIX
 
 from platform_marks import (  # isort: skip -- tests/ is on sys.path, not a package
     ON_WINDOWS,
@@ -47,7 +49,12 @@ ACTION_README = ACTION_DIR / "README.md"
 RENDER_ACTION_DIR = REPO_ROOT / ".github" / "actions" / "netgraph-render"
 RENDER_ACTION_FILE = RENDER_ACTION_DIR / "action.yml"
 RENDER_ACTION_README = RENDER_ACTION_DIR / "README.md"
+REVIEW_ACTION_DIR = REPO_ROOT / ".github" / "actions" / "netgraph-review"
+REVIEW_ACTION_FILE = REVIEW_ACTION_DIR / "action.yml"
+REVIEW_ACTION_README = REVIEW_ACTION_DIR / "README.md"
 PAGES_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "netgraph-pages.yml"
+REVIEW_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "netgraph-review.yml"
+DOGFOOD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "review.yml"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 CI_DOC = REPO_ROOT / "docs" / "ci.md"
 HOME_LAB = REPO_ROOT / "examples" / "home-lab"
@@ -845,3 +852,490 @@ def test_the_ci_documentation_covers_every_input_of_the_reusable_workflow(
         assert f"`{name}`" in text, f"docs/ci.md never mentions the {name} input"
     for name in RENDER_FORMATS:
         assert f"`{name}`" in text
+
+
+# --------------------------------------------------------------------------- #
+# The review action
+# --------------------------------------------------------------------------- #
+
+
+#: The third promise: what the README and ``docs/ci.md`` say a workflow may set
+#: on ``netgraph-review``.
+EXPECTED_REVIEW_INPUTS = {
+    "inventory",
+    "base",
+    "head",
+    "head-sha",
+    "title",
+    "layer",
+    "theme",
+    "diagram-args",
+    "strict",
+    "disable",
+    "formats",
+    "artifact-name",
+    "artifact-url",
+    "diagram-url",
+    "output-directory",
+    "fail-on-new-errors",
+    "graphviz",
+    "install",
+    "version",
+}
+EXPECTED_REVIEW_OUTPUTS = {
+    "comment",
+    "plan",
+    "sarif",
+    "directory",
+    "diagrams",
+    "verdict",
+    "changed",
+    "new-errors",
+    "new-findings",
+    "failed",
+}
+
+
+@pytest.fixture(scope="module")
+def review_action() -> dict[str, Any]:
+    parsed = load_yaml(REVIEW_ACTION_FILE)
+    assert isinstance(parsed, dict)
+    return parsed
+
+
+def test_the_review_action_is_a_composite_action(review_action: dict[str, Any]) -> None:
+    assert review_action["runs"]["using"] == "composite"
+    assert review_action["name"] and review_action["description"]
+    for step in review_action["runs"]["steps"]:
+        assert step["shell"] == "bash" or "uses" in step
+
+
+def test_the_review_action_declares_the_documented_inputs_and_outputs(
+    review_action: dict[str, Any],
+) -> None:
+    assert set(review_action["inputs"]) == EXPECTED_REVIEW_INPUTS
+    assert set(review_action["outputs"]) == EXPECTED_REVIEW_OUTPUTS
+    for name, spec in review_action["inputs"].items():
+        assert spec["description"].strip(), f"input {name} is undocumented"
+        assert "default" in spec, f"input {name} has no default, so the harness cannot build one"
+    assert review_action["inputs"]["base"]["required"] is True, "a review has no default baseline"
+
+
+def test_the_review_action_defaults_agree_with_the_cli(review_action: dict[str, Any]) -> None:
+    inputs = review_action["inputs"]
+    assert inputs["inventory"]["default"] == "."
+    # Booleans are strings in the Actions expression language; anything else
+    # would silently compare unequal to 'true' in the step's shell.
+    for name in ("strict", "install", "fail-on-new-errors"):
+        assert inputs[name]["default"] in {"true", "false"}, name
+    assert inputs["graphviz"]["default"] == "auto"
+    # The default drawing is what a review wants, and both formats must exist.
+    for name in str(inputs["formats"]["default"]).split(","):
+        assert name in RENDER_FORMATS, name
+        assert supports_diff(name), f"{name} cannot say what changed"
+
+
+def test_the_review_action_offers_only_formats_that_can_draw_a_diff(
+    review_action: dict[str, Any],
+) -> None:
+    """A format with no overlay would produce a picture that says nothing changed."""
+    script = step_of(review_action, "review")["run"]
+    guard = re.search(r"^\s*([\w|]+)\) ;;", script, re.MULTILINE)
+    assert guard is not None, "the format guard is no longer a single case arm"
+    assert set(guard.group(1).split("|")) == set(diff_formats())
+
+
+def test_the_review_action_never_fails_before_it_has_written_the_review(
+    review_action: dict[str, Any],
+) -> None:
+    """The one run with something to report must not be the one that reports nothing."""
+    script = step_of(review_action, "review")["run"]
+    assert "--fail-on never" in script, "netgraph must not exit before the outputs are set"
+    assert script.index("GITHUB_OUTPUT") < script.index('NETGRAPH_FAIL}" = "true"')
+
+
+def test_the_review_action_reads_the_summary_rather_than_the_prose(
+    review_action: dict[str, Any],
+) -> None:
+    """A step that grepped the comment would break on the first rewording."""
+    script = step_of(review_action, "review")["run"]
+    assert "--summary-out" in script
+    assert "summary.json" in script
+    for key in ("verdict", "changed", "new-errors", "new-findings", "failed"):
+        assert f'"{key}"' in script, f"{key} is never derived from the summary document"
+
+
+def test_the_review_action_readme_documents_every_input_and_output(
+    review_action: dict[str, Any],
+) -> None:
+    readme = REVIEW_ACTION_README.read_text(encoding="utf-8")
+    for name in review_action["inputs"]:
+        assert f"`{name}`" in readme, f"input {name} is not in the action README"
+    for name in review_action["outputs"]:
+        assert f"`{name}`" in readme, f"output {name} is not in the action README"
+
+
+def test_the_review_action_readme_shows_a_usable_snippet() -> None:
+    readme = REVIEW_ACTION_README.read_text(encoding="utf-8")
+    assert "uses: blechschmidt/netgraph/.github/actions/netgraph-review@" in readme
+    assert "actions/setup-python" in readme, "the action deliberately installs no interpreter"
+    assert "github/codeql-action/upload-sarif" in readme
+    assert "pull_request_target" in readme, "the trigger it must not be run under goes unsaid"
+
+
+def build_repository(root: Path) -> None:
+    """A one-commit repository with the home lab in ``inventory/``."""
+    root.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(HOME_LAB, root / "inventory", dirs_exist_ok=True)
+    for arguments in (
+        ("init", "-q", "."),
+        ("config", "user.email", "t@example.invalid"),
+        ("config", "user.name", "Tester"),
+        ("config", "commit.gpgsign", "false"),
+        ("add", "-A"),
+        ("commit", "-qm", "Bring the home lab under description"),
+    ):
+        subprocess.run(["git", *arguments], cwd=root, check=True, capture_output=True)
+
+
+def fetch_step(action: dict[str, Any], values: dict[str, str], tmp_path: Path) -> Any:
+    """The step that makes sure the base commit is in this clone."""
+    return run_step(action, "fetch", values, tmp_path)
+
+
+@requires_bash
+def test_a_review_with_no_base_is_refused_before_anything_is_loaded(
+    review_action: dict[str, Any], tmp_path: Path
+) -> None:
+    """Guessing the other side of a comparison is worse than refusing."""
+    result = fetch_step(review_action, {"base": ""}, tmp_path)
+    assert result.returncode == 2
+    assert "base is required" in result.stdout
+
+
+@requires_bash
+def test_a_base_that_is_a_folder_needs_no_git_at_all(
+    review_action: dict[str, Any], tmp_path: Path
+) -> None:
+    (tmp_path / "yesterday").mkdir()
+    result = fetch_step(review_action, {"base": "yesterday"}, tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "nothing to fetch" in result.stdout
+
+
+@requires_bash
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
+def test_a_base_already_in_the_clone_is_not_fetched_again(
+    review_action: dict[str, Any], tmp_path: Path
+) -> None:
+    build_repository(tmp_path)
+    result = fetch_step(review_action, {"base": "HEAD"}, tmp_path)
+    assert result.returncode == 0, result.stderr
+    assert "already in this clone" in result.stdout
+
+
+@requires_bash
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
+def test_the_review_step_writes_the_bundle_and_reports_the_verdict(
+    review_action: dict[str, Any], tmp_path: Path
+) -> None:
+    """Run the shell, not read it: quoting and word splitting are not schema.
+
+    ``dot`` rather than ``svg`` so the step needs no Graphviz — the format is
+    the one thing being held constant here; what is under test is the plumbing.
+    """
+    build_repository(tmp_path)
+    (tmp_path / "inventory" / "hosts" / "extra.yaml").write_text(
+        "apiVersion: netgraph.dev/v1alpha1\n"
+        "kind: computer\n"
+        "metadata:\n  name: pc-extra\n"
+        "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n      enabled: false\n",
+        encoding="utf-8",
+    )
+
+    result = run_step(
+        review_action,
+        "review",
+        {
+            "inventory": "inventory",
+            "base": "HEAD",
+            "formats": "dot",
+            "fail-on-new-errors": "false",
+        },
+        tmp_path,
+    )
+    assert result.returncode == 0, result.stderr
+
+    outputs = outputs_of(tmp_path)
+    assert outputs["changed"] == "true"
+    assert outputs["verdict"] in {"passed", "warned"}
+    assert outputs["new-errors"] == "0"
+    assert outputs["failed"] == "false"
+
+    directory = Path(outputs["directory"])
+    assert (
+        (directory / "comment.md").read_text(encoding="utf-8").startswith("<!-- netgraph-review:")
+    )
+    assert json.loads((directory / "summary.json").read_text(encoding="utf-8"))["changed"] is True
+    assert (
+        json.loads((directory / "plan.json").read_text(encoding="utf-8"))["summary"]["total"] == 1
+    )
+    assert (directory / "netgraph.sarif").is_file()
+    assert outputs["diagrams"].endswith("diff.dot")
+
+
+@requires_bash
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
+def test_the_review_step_fails_only_when_the_caller_asked_and_a_new_error_exists(
+    review_action: dict[str, Any], tmp_path: Path
+) -> None:
+    build_repository(tmp_path)
+    (tmp_path / "inventory" / "cables" / "extra.yaml").write_text(
+        "apiVersion: netgraph.dev/v1alpha1\n"
+        "kind: cable\n"
+        "metadata:\n  name: cbl-nowhere\n"
+        "spec:\n  endpoints:\n    - rtr-home:lan0\n    - nowhere:eth0\n  medium: copper\n",
+        encoding="utf-8",
+    )
+    values = {"inventory": "inventory", "base": "HEAD", "formats": ""}
+
+    tolerant = run_step(
+        review_action, "review", {**values, "fail-on-new-errors": "false"}, tmp_path
+    )
+    assert tolerant.returncode == 0, tolerant.stderr
+    assert outputs_of(tmp_path)["failed"] == "true"
+
+    (tmp_path / "github-output").write_text("", encoding="utf-8")
+    strictly = run_step(review_action, "review", {**values, "fail-on-new-errors": "true"}, tmp_path)
+    assert strictly.returncode == 1
+    assert "errors the base did not have" in strictly.stdout
+
+
+# --------------------------------------------------------------------------- #
+# The review workflow
+# --------------------------------------------------------------------------- #
+
+
+#: What a caller may set. Each one is in the table in ``docs/ci.md``.
+EXPECTED_REVIEW_WORKFLOW_INPUTS = {
+    "runs-on",
+    "inventory",
+    "base",
+    "title",
+    "layer",
+    "theme",
+    "args",
+    "formats",
+    "strict",
+    "disable",
+    "comment",
+    "upload-sarif",
+    "sarif-category",
+    "fail-on-new-errors",
+    "artifact-name",
+    "artifact-retention-days",
+    "python-version",
+    "version",
+    "graphviz",
+}
+
+
+@pytest.fixture(scope="module")
+def review_workflow() -> dict[str, Any]:
+    parsed = load_yaml(REVIEW_WORKFLOW)
+    assert isinstance(parsed, dict)
+    return parsed
+
+
+def steps_of(workflow: dict[str, Any], job: str = "review") -> list[dict[str, Any]]:
+    return workflow["jobs"][job]["steps"]
+
+
+def test_the_review_workflow_is_reusable_and_only_reusable(
+    review_workflow: dict[str, Any],
+) -> None:
+    """It posts comments; it does so when a caller asks and not on its own schedule."""
+    assert list(triggers_of(review_workflow)) == ["workflow_call"]
+
+
+def test_the_review_workflow_declares_the_documented_inputs(
+    review_workflow: dict[str, Any],
+) -> None:
+    call = triggers_of(review_workflow)["workflow_call"]
+    assert set(call["inputs"]) == EXPECTED_REVIEW_WORKFLOW_INPUTS
+    for name, spec in call["inputs"].items():
+        assert spec["description"].strip(), f"input {name} is undocumented"
+        assert "default" in spec, f"input {name} has no default, so it is effectively required"
+        assert spec["type"] in {"string", "boolean", "number"}, name
+    assert set(call["outputs"]) == {"verdict", "changed", "new-errors", "comment-url"}
+
+
+def test_the_review_workflow_defaults_match_the_action(
+    review_workflow: dict[str, Any], review_action: dict[str, Any]
+) -> None:
+    """The two files describe the same knobs; a default in only one of them drifts."""
+    call = triggers_of(review_workflow)["workflow_call"]["inputs"]
+    shared = set(call) & set(review_action["inputs"])
+    assert shared >= {"inventory", "title", "layer", "theme", "formats", "strict", "graphviz"}
+    for name in shared:
+        if name == "fail-on-new-errors":
+            # Deliberately different: the action reports and the workflow gates,
+            # so that the comment is published before anything goes red.
+            continue
+        expected = review_action["inputs"][name]["default"]
+        assert str(call[name]["default"]).lower() == str(expected).lower(), name
+
+
+def test_the_review_job_honours_the_runs_on_input(review_workflow: dict[str, Any]) -> None:
+    runs_on = review_workflow["jobs"]["review"]["runs-on"]
+    assert "inputs['runs-on']" in runs_on
+    assert "fromJSON" in runs_on, "a JSON array of labels has to survive as one"
+
+
+def test_the_review_workflow_asks_for_exactly_the_three_permissions(
+    review_workflow: dict[str, Any],
+) -> None:
+    """``docs/ci.md`` names these three; a fourth would be a new thing to justify."""
+    assert review_workflow["permissions"] == {"contents": "read"}
+    assert review_workflow["jobs"]["review"]["permissions"] == {
+        "contents": "read",
+        "pull-requests": "write",
+        "security-events": "write",
+    }
+
+
+def test_the_review_workflow_reviews_with_the_action_that_belongs_to_it(
+    review_workflow: dict[str, Any],
+) -> None:
+    """Pinned in fact and not only in name; the same reasoning as the pages workflow."""
+    steps = steps_of(review_workflow)
+    checkout = next(
+        step for step in steps if step.get("with", {}).get("repository") == "blechschmidt/netgraph"
+    )
+    assert checkout["with"]["ref"] == "${{ github.job_workflow_sha }}"
+    assert checkout["with"]["persist-credentials"] is False
+
+    review = next(step for step in steps if "netgraph-review" in step.get("uses", ""))
+    inside = REVIEW_ACTION_DIR.relative_to(REPO_ROOT).as_posix()
+    assert review["uses"] == f"./{checkout['with']['path']}/{inside}"
+    assert steps.index(checkout) < steps.index(review)
+
+
+def test_every_input_of_the_review_workflow_reaches_the_action_or_a_step(
+    review_workflow: dict[str, Any],
+) -> None:
+    """An input nothing reads is a promise the workflow does not keep."""
+    body = REVIEW_WORKFLOW.read_text(encoding="utf-8")
+    for name in triggers_of(review_workflow)["workflow_call"]["inputs"]:
+        assert body.count(f"inputs.{name}") + body.count(f"inputs['{name}']") >= 1, (
+            f"the {name} input is declared and never used"
+        )
+
+
+def test_the_review_workflow_publishes_before_it_fails(review_workflow: dict[str, Any]) -> None:
+    """Every artefact is out before anything goes red, and the gate is last."""
+    steps = steps_of(review_workflow)
+    names = [step.get("name", "") for step in steps]
+    review = next(step for step in steps if "netgraph-review" in step.get("uses", ""))
+    assert review["with"]["fail-on-new-errors"] == "false", "the action must only report"
+
+    gate = names.index("Fail on errors this change introduced")
+    assert gate == len(steps) - 1, "the gate is not the last step"
+    for published in ("Upload the review bundle", "Write the review to the job summary"):
+        assert names.index(published) < gate
+    assert steps[gate]["if"] == (
+        "inputs.fail-on-new-errors && steps.review.outputs.failed == 'true'"
+    )
+
+
+def test_the_job_summary_is_written_unconditionally(review_workflow: dict[str, Any]) -> None:
+    """It needs no permission, so it is the one place a fork's review appears."""
+    step = next(
+        entry
+        for entry in steps_of(review_workflow)
+        if entry.get("name", "").endswith("job summary")
+    )
+    assert "if" not in step
+    assert "GITHUB_STEP_SUMMARY" in step["run"]
+
+
+@pytest.mark.parametrize("name", ["Upload the SARIF report", "Post the review comment"])
+def test_the_writing_steps_are_skipped_on_a_fork(
+    review_workflow: dict[str, Any], name: str
+) -> None:
+    """A fork's ``pull_request`` token is read-only whatever ``permissions`` says."""
+    step = next(entry for entry in steps_of(review_workflow) if entry.get("name") == name)
+    condition = " ".join(step["if"].split())
+    assert "github.event.pull_request.head.repo.full_name == github.repository" in condition
+
+
+def test_the_comment_is_sticky_and_finds_itself_by_the_marker(
+    review_workflow: dict[str, Any],
+) -> None:
+    """One comment per pull request per title, edited rather than appended to."""
+    step = next(
+        entry
+        for entry in steps_of(review_workflow)
+        if entry.get("name") == "Post the review comment"
+    )
+    script = step["run"]
+    assert MARKER_PREFIX in script, "the marker the body carries is not the one searched for"
+    assert "--method PATCH" in script and "--method POST" in script
+    assert script.index("--method PATCH") < script.index("--method POST"), (
+        "editing has to be tried before posting, or every push adds a comment"
+    )
+
+
+def test_the_review_workflow_documents_the_trigger_it_must_not_be_run_under() -> None:
+    """The one thing a reader has to be told before copying this file."""
+    body = REVIEW_WORKFLOW.read_text(encoding="utf-8")
+    assert "pull_request_target" in body
+    assert "read-only" in body
+
+
+# --------------------------------------------------------------------------- #
+# This repository reviews its own inventories
+# --------------------------------------------------------------------------- #
+
+
+def test_the_dogfood_workflow_calls_the_reusable_one(review_workflow: dict[str, Any]) -> None:
+    workflow = load_yaml(DOGFOOD_WORKFLOW)
+    job = workflow["jobs"]["review"]
+    assert job["uses"] == f"./{REVIEW_WORKFLOW.relative_to(REPO_ROOT).as_posix()}"
+    assert job["permissions"] == {
+        "contents": "read",
+        "pull-requests": "write",
+        "security-events": "write",
+    }
+    for name in job["with"]:
+        assert name in triggers_of(review_workflow)["workflow_call"]["inputs"], name
+
+
+def test_the_dogfood_workflow_reviews_every_example() -> None:
+    """Discovered, not listed, so a new example cannot be forgotten."""
+    workflow = load_yaml(DOGFOOD_WORKFLOW)
+    matrix = workflow["jobs"]["review"]["strategy"]["matrix"]["inventory"]
+    assert "needs.discover.outputs.inventories" in matrix
+
+    triggers = triggers_of(workflow)
+    assert list(triggers) == ["pull_request"]
+    assert "examples/**" in triggers["pull_request"]["paths"]
+
+
+def test_each_reviewed_inventory_keeps_its_own_comment_and_alerts() -> None:
+    """Two inventories sharing a title or a category would overwrite each other."""
+    settings = load_yaml(DOGFOOD_WORKFLOW)["jobs"]["review"]["with"]
+    for name in ("title", "sarif-category", "artifact-name"):
+        assert "matrix.inventory" in str(settings[name]), f"{name} is not per inventory"
+
+
+def test_the_ci_documentation_covers_every_input_of_the_review_workflow(
+    review_workflow: dict[str, Any],
+) -> None:
+    """The workflow has no README of its own; this page is where a caller looks."""
+    text = CI_DOC.read_text(encoding="utf-8")
+    for name in triggers_of(review_workflow)["workflow_call"]["inputs"]:
+        assert f"`{name}`" in text, f"docs/ci.md never mentions the {name} input"
+    for section in ("The review action", "Workflow: review a pull request"):
+        assert section in text
+    assert "pull_request_target" in text, "the trigger the workflow refuses goes unexplained"

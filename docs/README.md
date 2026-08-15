@@ -32,6 +32,7 @@ This whole documentation set is also published, with those demos beside it, at
 | adopt what a live network reports into the declared inventory | [commands/drift.md](commands/drift.md), [commands/plan.md](commands/plan.md) |
 | turn drift into an ordered, per-device remediation script | [commands/converge.md](commands/converge.md) |
 | gate a pull request on the inventory validating | [ci.md](ci.md) |
+| get the change drawn and reviewed on every pull request | [commands/review.md](commands/review.md), [ci.md](ci.md#workflow-review-a-pull-request) |
 | publish a live diagram of your own network, rebuilt on every push | [ci.md](ci.md#workflow-publish-the-diagram-to-github-pages) |
 | write down what the network is *for*, and fail CI when it stops being true | [commands/test.md](commands/test.md) |
 | bootstrap an inventory from a network that already exists | [importing.md](importing.md) |
@@ -82,6 +83,9 @@ This whole documentation set is also published, with those demos beside it, at
   rename detection, the order a changeset has to run in, plan files and the state hash,
   and how a capture becomes a proposal. [commands/apply.md](commands/apply.md) executes
   the result against the files.
+* **[commands/review.md](commands/review.md)** — the change written up for a reviewer:
+  what it does to the network, what it broke that was not already broken, and the drawing.
+  [ci.md](ci.md#workflow-review-a-pull-request) is the bot built on it.
 * **[commands/converge.md](commands/converge.md)** — the other half of the loop: drift
   joined to the configuration emitters, as a per-device plan. What a change is, the
   dependency order, how the management path is worked out and what makes a change

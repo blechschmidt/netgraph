@@ -14,9 +14,10 @@ no problems found
 `netgraph test` is the second gate, and it answers a different question — see
 [below](#netgraph-test-assertions-as-a-gate).
 
-This page covers the rest: the machine-readable output formats, the two composite
-GitHub Actions, the reusable workflow that publishes a diagram, the pre-commit
-hook, and complete workflows for the ways findings can reach a pull request.
+This page covers the rest: the machine-readable output formats, the three
+composite GitHub Actions, the reusable workflows that publish a diagram and
+review a pull request, the pre-commit hook, and complete workflows for the ways
+findings can reach a pull request.
 
 * [Output formats](#output-formats)
 * [Exit codes](#exit-codes)
@@ -28,6 +29,8 @@ hook, and complete workflows for the ways findings can reach a pull request.
 * [Workflow: annotate the diff](#workflow-annotate-the-diff)
 * [The render action](#the-render-action)
 * [Workflow: publish the diagram to GitHub Pages](#workflow-publish-the-diagram-to-github-pages)
+* [The review action](#the-review-action)
+* [Workflow: review a pull request](#workflow-review-a-pull-request)
 * [`netgraph test`: assertions as a gate](#netgraph-test-assertions-as-a-gate)
 * [Workflow: a scheduled drift check](#workflow-a-scheduled-drift-check)
 * [pre-commit](#pre-commit)
@@ -429,6 +432,187 @@ not validating.
 inventory, each writing a different `page:` — but Pages publishes one artifact
 per deployment, so that shape wants a job of your own that renders each with the
 action above, assembles the site, and deploys it once.
+
+## The review action
+
+Everything above is about one state of the inventory: does it load, does it
+cohere, what does it look like. A pull request asks a different question, and it
+is the one a reviewer actually has — **what does this change do?** A green check
+on a branch that rewires the core answers it no better than a green check on a
+typo fix.
+
+[`.github/actions/netgraph-review`](../.github/actions/netgraph-review/) answers
+it. Given a base and a head it produces four things from machinery that already
+exists — [`netgraph plan`](commands/plan.md),
+[`netgraph diff`](commands/diff.md) and
+[`netgraph validate`](commands/validate.md) — and one that is new,
+[`netgraph review`](commands/review.md), which is the three of them written up as
+one Markdown document:
+
+| File | What it is |
+|---|---|
+| `comment.md` | The review, as a comment body. Its first line is the sticky marker. |
+| `plan.json` | The typed changeset, exactly as `netgraph plan --json` writes it. |
+| `netgraph.sarif` | The head's findings, for `github/codeql-action/upload-sarif`. |
+| `summary.json` | The verdict and the counts, for a step that gates on them. |
+| `diff.svg`, `diff.png` | The visual diff — additions green, removals red and dashed but still in place, changes amber. |
+
+`netgraph review` is a command like any other, so the same review can be read
+before anything is pushed:
+
+<!-- norun: needs a repository with two states to compare, which the docs build has no fixture for -->
+```console
+$ netgraph --inventory inventory review --from origin/main
+```
+
+## Workflow: review a pull request
+
+[`netgraph-review.yml`](../.github/workflows/netgraph-review.yml) is the
+reusable workflow around it. It runs the action, uploads the bundle, uploads the
+SARIF, and posts **one** comment that it edits in place on every push:
+
+```yaml
+name: review
+
+on:
+  pull_request:
+
+jobs:
+  review:
+    permissions:
+      contents: read
+      pull-requests: write
+      security-events: write
+    uses: blechschmidt/netgraph/.github/workflows/netgraph-review.yml@main
+    with:
+      inventory: inventory
+```
+
+### What the comment says
+
+A verdict line first, so that a reader who reads nothing else has still been
+told whether to look: *3 elements change, 1 new error introduced*. Then a table
+of what is added, changed, renamed and removed, **grouped by kind** — three
+cables and a switch is the shape of a change; the same list sorted by action
+buries the one switch among the thirty cables. The elements themselves are one
+`<details>` below it, bounded, saying how many it left out.
+
+Then the findings this change *introduced*, each linked to the line it is
+anchored at in the head commit, with the pre-existing ones counted in a sentence
+and no more. Then the drawing.
+
+**The drawing appears three ways**, in descending order of availability, because
+GitHub sanitises the HTML in a comment: an inline `<svg>` element is stripped and
+an `<img src="data:...">` is refused by the image proxy, so neither of the two
+obvious ways of embedding a rendered diagram works at all.
+
+1. A **Mermaid** summary of the changeset — the changed elements, boxed by
+   namespace and coloured by action. GitHub renders Mermaid in a comment
+   natively, so this one always appears, needs nothing hosted, and costs no
+   Graphviz.
+2. Any **published** rendering, embedded as an `<img>`. Pass `diagram-url` when
+   the SVG is somewhere a browser can fetch it — a Pages site, an object store.
+3. The **full diagram**, linked. The SVG and the PNG are uploaded as a run
+   artifact, which is a zip behind an authenticated endpoint and so can only ever
+   be linked, never embedded.
+
+### Only new problems fail the check
+
+The check compares the head's diagnostics with the **base's**, and fails on the
+difference. An inventory carrying three legacy warnings goes green on the first
+pull request that touches it; the fourth warning, added by that pull request,
+goes red.
+
+This is the whole reason the bot is adoptable. A gate that failed on the
+absolute count would be turned off within a day by the first team whose network
+has grown a wart nobody has time to fix this quarter — and a gate that is off
+catches nothing at all.
+
+Identity is [`netgraph.diagnostics.fingerprint`](../src/netgraph/diagnostics.py):
+the rule, the file, the element, the pointer and the message, and deliberately
+**not** the line. Inserting a document above a broken one does not report
+everything below it as newly introduced. It is the same fingerprint code
+scanning tracks alerts by, so the comment and the alert list cannot disagree
+about which problem is new.
+
+Two states that are graded differently would produce nonsense, so `strict:` and
+`disable:` are applied to **both** sides: a rule silenced in this very pull
+request reads as nothing changing rather than as a wave of fixes.
+
+### `pull_request`, never `pull_request_target`
+
+The workflow is written for the `pull_request` trigger. That trigger checks out
+the merge result and hands the job a token that is **read-only** whenever the
+pull request comes from a fork — and that is the whole of the defence, because
+everything the job does is read YAML the pull request wrote.
+
+`pull_request_target` would run the base branch's workflow with a *writable*
+token while the untrusted head is one `git checkout` away. Every published escape
+from that pattern has the same shape: a step reads a file the pull request
+controls, and the token it is holding can push to the default branch. netgraph
+parses the head's YAML by design, so that is exactly the trigger it must not be
+run under.
+
+**A fork's pull request therefore cannot be commented on.** The workflow
+degrades rather than failing:
+
+| | Same-repository branch | Fork |
+|---|---|---|
+| The review is produced | ✅ | ✅ |
+| Written to the job summary | ✅ | ✅ |
+| Posted as a comment | ✅ | skipped, with a note in the log |
+| Uploaded to code scanning | ✅ | skipped, with a note in the log |
+| Fails on a new error | ✅ | ✅ |
+
+The job summary needs no permission at all, so a maintainer reading the run of a
+fork's pull request sees exactly what a comment would have carried. The check
+still goes red on a new error, which is what a branch protection rule is
+watching.
+
+### The comment is sticky
+
+The first line of the body is an HTML comment — `<!-- netgraph-review: TITLE -->`
+— and the workflow looks for it among the pull request's comments before it
+decides whether to post or to edit. A branch pushed twenty times has one review
+comment, showing the twentieth state.
+
+`title:` keys that marker, which is what lets one repository review two
+inventories: give each its own title, and each keeps its own comment. Give them
+the same title and the second job will overwrite the first job's comment.
+
+### The inputs
+
+| Input | Default | Meaning |
+|---|---|---|
+| `runs-on` | `ubuntu-latest` | Where the job runs: a label, a JSON array of labels, or a runner group. |
+| `inventory` | `.` | Root folder of the YAML tree, or a single YAML file. |
+| `base` | *(empty)* | What to compare against. Empty is the pull request's base commit. |
+| `title` | `netgraph` | Heading of the comment, and the key of its sticky marker. |
+| `layer` | *(empty)* | Which layer the diff is drawn at. One only — a diff compares one view. |
+| `theme` | *(empty)* | `blueprint`, `mono`, `none`, or a path to a `kind: theme` document. |
+| `args` | *(empty)* | Further `netgraph diff` flags, split on whitespace. |
+| `formats` | `svg,png` | Image formats to draw. Empty draws none and needs no Graphviz. |
+| `strict` | `false` | Promote every warning to an error, on both sides. |
+| `disable` | *(empty)* | Rule ids to silence on both sides. |
+| `comment` | `true` | Post the review. `false` writes it to the job summary only. |
+| `upload-sarif` | `true` | Upload the head's findings to code scanning. |
+| `sarif-category` | `netgraph` | One per inventory: uploads sharing a category replace each other. |
+| `fail-on-new-errors` | `true` | Fail on an error the base did not have. Pre-existing errors never fail it. |
+| `artifact-name` | `netgraph-review` | Name of the uploaded bundle. |
+| `artifact-retention-days` | `0` | How long to keep it. `0` leaves the repository default. |
+| `python-version` | `3.12` | Interpreter to set up. Empty uses the runner's own. |
+| `version` | *(empty)* | netgraph to install, as a pip requirement. |
+| `graphviz` | `auto` | Install `dot`: `auto`, `true` or `false`. |
+
+The outputs — `verdict`, `changed`, `new-errors` and `comment-url` — are there
+for a caller that wants to do something else with the answer: label the pull
+request, gate a deployment, fan out to a chat channel.
+
+**Several inventories** is a matrix in the caller, one call per inventory, each
+with its own `title`, `sarif-category` and `artifact-name`. That is how this
+repository reviews its own examples — see
+[`.github/workflows/review.yml`](../.github/workflows/review.yml), which is the
+dogfooding of everything above.
 
 ## `netgraph test`: assertions as a gate
 

@@ -1,0 +1,459 @@
+name: netgraph review
+description: >-
+  Review a change to a netgraph inventory: the typed changeset between two refs,
+  the visual diff drawn to SVG and PNG, the validation findings the change
+  introduced, and a Markdown comment body saying all three.
+author: netgraph contributors
+
+branding:
+  icon: git-pull-request
+  color: blue
+
+inputs:
+  inventory:
+    description: Root folder of the YAML inventory tree, or a single YAML file.
+    required: false
+    default: "."
+  base:
+    description: >-
+      The state before the change, as a git ref or a folder. On a pull_request
+      run this is the base commit -- ${{ github.event.pull_request.base.sha }} --
+      which the workflow has to have fetched: actions/checkout with
+      fetch-depth: 0, or an explicit 'git fetch origin <sha>'. There is no
+      default: a review is a comparison, and guessing the other side of one is
+      worse than refusing.
+    required: true
+    default: ""
+  head:
+    description: >-
+      The state after it. Empty means the working tree, which is what a
+      pull_request checkout already holds and what makes the review reflect the
+      merge result rather than the branch tip.
+    required: false
+    default: ""
+  head-sha:
+    description: >-
+      Commit the head state is, so that every finding links to the line it is
+      anchored at. Empty leaves the findings unlinked rather than pointing them
+      at a branch that will have moved by the time anyone clicks.
+    required: false
+    default: ""
+  title:
+    description: >-
+      Heading of the comment, and the key of its sticky marker. Two inventories
+      reviewed in one repository need two titles or they overwrite each other.
+    required: false
+    default: netgraph
+  layer:
+    description: >-
+      Which layer the visual diff is drawn at -- l1, l2, l3, physical, overlay,
+      routing, rack, power, identity. One only: a diff compares one view.
+    required: false
+    default: ""
+  theme:
+    description: Stylesheet for the diagram, a built-in name or a path.
+    required: false
+    default: ""
+  diagram-args:
+    description: >-
+      Further 'netgraph diff' flags, split on whitespace -- '--icons cisco
+      --no-show-ips'. They apply to both renderings.
+    required: false
+    default: ""
+  strict:
+    description: Promote every warning to an error, on both sides of the comparison.
+    required: false
+    default: "false"
+  disable:
+    description: >-
+      Rule ids to silence, separated by commas or whitespace. Applied to both
+      sides, so a rule disabled in this very pull request does not read as a
+      wave of fixes.
+    required: false
+    default: ""
+  formats:
+    description: >-
+      Which image formats to draw the diff in, separated by commas or
+      whitespace. svg and png are what a review wants: one to zoom, one that
+      renders in every viewer. Empty draws none, which is faster and needs no
+      Graphviz.
+    required: false
+    default: svg,png
+  artifact-name:
+    description: >-
+      Name of the artifact the workflow will upload the bundle as. Only used in
+      the link text; this action does not upload anything itself.
+    required: false
+    default: netgraph-review
+  artifact-url:
+    description: >-
+      Where that artifact can be downloaded. Defaults to the run page, whose
+      artifact list is the one URL that is known before the upload happens.
+    required: false
+    default: ""
+  diagram-url:
+    description: >-
+      Where the SVG is published, if it is somewhere a browser can fetch it --
+      a GitHub Pages site, an object store. Only such a URL can be *embedded*:
+      an artifact is a zip behind an authenticated endpoint. Repeat with
+      'LABEL=URL' on separate lines for more than one.
+    required: false
+    default: ""
+  output-directory:
+    description: >-
+      Where the comment body, the changeset, the SARIF and the diagrams are
+      written. Defaults to ${RUNNER_TEMP}/netgraph-review, which is what the
+      'directory' output points at for actions/upload-artifact.
+    required: false
+    default: ""
+  fail-on-new-errors:
+    description: >-
+      Fail this step when the change introduces an error the base did not have.
+      Pre-existing errors never fail it, whatever this is set to -- see
+      docs/ci.md on why the delta and not the absolute count.
+    required: false
+    default: "false"
+  graphviz:
+    description: >-
+      Install the Graphviz 'dot' binary, which the image formats are laid out
+      by. 'auto' installs it only when a chosen format needs it and the runner
+      does not already have it. 'true' always installs, 'false' never does.
+    required: false
+    default: auto
+  install:
+    description: >-
+      Install netgraph before running it. Set to false when an earlier step has
+      already installed the version you want.
+    required: false
+    default: "true"
+  version:
+    description: >-
+      What to install, as a pip requirement (netgraph==0.1.0, a URL, a local
+      path). Empty installs the checkout this action came from, which is what
+      pins the tool to the `rev`/`@ref` the workflow already chose.
+    required: false
+    default: ""
+
+outputs:
+  comment:
+    description: Path of the Markdown comment body.
+    value: ${{ steps.review.outputs.comment }}
+  plan:
+    description: Path of the changeset, as 'netgraph plan --json' writes it.
+    value: ${{ steps.review.outputs.plan }}
+  sarif:
+    description: Path of the head state's SARIF, for github/codeql-action/upload-sarif.
+    value: ${{ steps.review.outputs.sarif }}
+  directory:
+    description: Directory holding all of the above, for actions/upload-artifact.
+    value: ${{ steps.review.outputs.directory }}
+  diagrams:
+    description: The diagrams that were drawn, as a comma-separated list of paths.
+    value: ${{ steps.review.outputs.diagrams }}
+  verdict:
+    description: "One of: passed, warned, failed, broken."
+    value: ${{ steps.review.outputs.verdict }}
+  changed:
+    description: "'true' when the change touches the network at all."
+    value: ${{ steps.review.outputs.changed }}
+  new-errors:
+    description: How many errors this change introduced that the base did not have.
+    value: ${{ steps.review.outputs.new-errors }}
+  new-findings:
+    description: The same for findings of every severity.
+    value: ${{ steps.review.outputs.new-findings }}
+  failed:
+    description: "'true' when the change introduced at least one error."
+    value: ${{ steps.review.outputs.failed }}
+
+runs:
+  using: composite
+  steps:
+    # Graphviz is not a Python dependency: netgraph runs the ``dot`` binary. A
+    # missing one is reported clearly by the CLI, but by then the job has
+    # already installed everything else to find out.
+    - name: Install Graphviz
+      if: inputs.graphviz != 'false' && inputs.formats != ''
+      shell: bash
+      env:
+        NETGRAPH_GRAPHVIZ: ${{ inputs.graphviz }}
+      run: |
+        set -euo pipefail
+
+        if [ "${NETGRAPH_GRAPHVIZ}" = "auto" ] && command -v dot >/dev/null 2>&1; then
+          dot -V
+          exit 0
+        fi
+
+        # ``runs-on`` is the caller's choice, so this has to cope with whatever
+        # it chose rather than assume the Ubuntu image.
+        case "${RUNNER_OS:-Linux}" in
+          Linux)
+            if command -v apt-get >/dev/null 2>&1; then
+              sudo apt-get update
+              sudo apt-get install --no-install-recommends --yes graphviz
+            elif command -v dnf >/dev/null 2>&1; then
+              sudo dnf install --assumeyes graphviz
+            elif command -v apk >/dev/null 2>&1; then
+              apk add --no-cache graphviz
+            else
+              echo "::error::no supported package manager found; install Graphviz on this runner, or set graphviz: false"
+              exit 1
+            fi
+            ;;
+          macOS)
+            brew install graphviz
+            ;;
+          Windows)
+            choco install graphviz --no-progress --yes
+            # choco puts it on the *machine* PATH, which this shell was started
+            # before; without this the very next step cannot find dot.exe.
+            echo "C:\\Program Files\\Graphviz\\bin" >>"${GITHUB_PATH}"
+            export PATH="/c/Program Files/Graphviz/bin:${PATH}"
+            ;;
+          *)
+            echo "::error::unknown runner OS '${RUNNER_OS}'; install Graphviz yourself, or set graphviz: false"
+            exit 1
+            ;;
+        esac
+        dot -V
+
+    - name: Install netgraph
+      if: inputs.install == 'true'
+      shell: bash
+      env:
+        NETGRAPH_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+        python -m pip install --disable-pip-version-check --upgrade pip
+        if [ -n "${NETGRAPH_VERSION}" ]; then
+          python -m pip install --disable-pip-version-check "${NETGRAPH_VERSION}"
+        else
+          # $GITHUB_ACTION_PATH is .github/actions/netgraph-review inside the
+          # checkout of the repository this action was resolved from, so three
+          # levels up is netgraph itself -- at exactly the ref the workflow
+          # asked for. Installing from PyPI here would silently ignore that.
+          python -m pip install --disable-pip-version-check "${GITHUB_ACTION_PATH}/../../.."
+        fi
+        netgraph --version
+
+    # The base has to be an object this clone holds. A pull_request checkout at
+    # the default fetch-depth holds the merge commit and nothing else, so this
+    # fetches the one commit rather than making every caller remember
+    # fetch-depth: 0 -- and says so plainly when it cannot.
+    - name: Fetch the base
+      id: fetch
+      shell: bash
+      env:
+        NETGRAPH_BASE: ${{ inputs.base }}
+      run: |
+        set -euo pipefail
+        if [ -z "${NETGRAPH_BASE}" ]; then
+          echo "::error::base is required: a review compares two states and there is no default for the first"
+          exit 2
+        fi
+        # A folder is checked for first: comparing two directories is a whole
+        # use of this action, and it has no more business needing a repository
+        # than 'netgraph plan --from ../yesterday' does.
+        if [ -d "${NETGRAPH_BASE}" ]; then
+          echo "base is the folder ${NETGRAPH_BASE}; nothing to fetch"
+          exit 0
+        fi
+        if [ ! -d .git ] && ! git rev-parse --git-dir >/dev/null 2>&1; then
+          echo "::error::not a git repository; the review compares two refs, so check out first"
+          exit 1
+        fi
+        if git rev-parse --verify --quiet "${NETGRAPH_BASE}^{commit}" >/dev/null; then
+          echo "base ${NETGRAPH_BASE} is already in this clone"
+          exit 0
+        fi
+        echo "fetching ${NETGRAPH_BASE}"
+        # --depth 1 is enough: the review reads one tree out of it, never a
+        # history. A ref that is not a commit-ish fails here, which is the
+        # right place -- before two inventories have been loaded.
+        git fetch --no-tags --depth 1 origin "${NETGRAPH_BASE}" \
+          || git fetch --no-tags origin "${NETGRAPH_BASE}" \
+          || {
+            echo "::error::cannot fetch base '${NETGRAPH_BASE}'; check it out with fetch-depth: 0"
+            exit 1
+          }
+
+    - name: Run netgraph review
+      id: review
+      shell: bash
+      env:
+        NETGRAPH_INVENTORY: ${{ inputs.inventory }}
+        NETGRAPH_BASE: ${{ inputs.base }}
+        NETGRAPH_HEAD: ${{ inputs.head }}
+        NETGRAPH_HEAD_SHA: ${{ inputs.head-sha }}
+        NETGRAPH_TITLE: ${{ inputs.title }}
+        NETGRAPH_LAYER: ${{ inputs.layer }}
+        NETGRAPH_THEME: ${{ inputs.theme }}
+        NETGRAPH_DIAGRAM_ARGS: ${{ inputs.diagram-args }}
+        NETGRAPH_STRICT: ${{ inputs.strict }}
+        NETGRAPH_DISABLE: ${{ inputs.disable }}
+        NETGRAPH_FORMATS: ${{ inputs.formats }}
+        NETGRAPH_ARTIFACT_NAME: ${{ inputs.artifact-name }}
+        NETGRAPH_ARTIFACT_URL: ${{ inputs.artifact-url }}
+        NETGRAPH_DIAGRAM_URL: ${{ inputs.diagram-url }}
+        NETGRAPH_OUTPUT: ${{ inputs.output-directory }}
+        NETGRAPH_FAIL: ${{ inputs.fail-on-new-errors }}
+      run: |
+        set -uo pipefail
+
+        directory="${NETGRAPH_OUTPUT:-${RUNNER_TEMP}/netgraph-review}"
+        # Normalise the separators once, here: on Windows this step is Git Bash
+        # and ``$RUNNER_TEMP`` is ``D:\a\_temp``, which ``dirname`` and the
+        # output lines below both read as a single odd filename. Python takes
+        # either spelling, so netgraph itself is unaffected.
+        directory="$(printf '%s' "${directory}" | tr '\\' '/')"
+        mkdir -p "${directory}"
+
+        common=(--inventory "${NETGRAPH_INVENTORY}")
+        sides=(--from "${NETGRAPH_BASE}")
+        if [ -n "${NETGRAPH_HEAD}" ]; then
+          sides+=(--to "${NETGRAPH_HEAD}")
+        fi
+
+        # -- the diagrams ------------------------------------------------
+        #
+        # Drawn first, and each one is allowed to fail: a Graphviz that is not
+        # there, or a layer that holds none of the change, must not cost the
+        # review its changeset and its findings. What was drawn is what the
+        # comment links.
+        diagrams=()
+        drawn=()
+        set -f
+        for format in $(printf '%s' "${NETGRAPH_FORMATS}" | tr ',' ' '); do
+          case "${format}" in
+            svg|png|pdf|dot|html|json) ;;
+            *)
+              echo "::error::formats must be drawn from svg, png, pdf, dot, html, json, not '${format}'"
+              exit 2
+              ;;
+          esac
+          target="${directory}/diff.${format}"
+          args=("${common[@]}" diff "${sides[@]}" --format "${format}" --output "${target}")
+          if [ -n "${NETGRAPH_LAYER}" ]; then
+            args+=(--layer "${NETGRAPH_LAYER}")
+          fi
+          if [ -n "${NETGRAPH_THEME}" ]; then
+            args+=(--theme "${NETGRAPH_THEME}")
+          fi
+          # Deliberately word-split, with globbing already off, so a '*' in a
+          # --name filter reaches netgraph instead of matching files here.
+          for word in ${NETGRAPH_DIAGRAM_ARGS}; do
+            args+=("${word}")
+          done
+          echo "netgraph ${args[*]}"
+          if netgraph "${args[@]}" && [ -s "${target}" ]; then
+            diagrams+=("--diagram" "$(printf '%s' "${format}" | tr '[:lower:]' '[:upper:]')=${target}")
+            drawn+=("${target}")
+          else
+            echo "::warning::could not draw the ${format} diff; the review carries on without it"
+            rm -f "${target}"
+          fi
+        done
+        set +f
+
+        # -- the review --------------------------------------------------
+        comment="${directory}/comment.md"
+        plan="${directory}/plan.json"
+        sarif="${directory}/netgraph.sarif"
+        summary="${directory}/summary.json"
+
+        args=("${common[@]}" review "${sides[@]}")
+        args+=(--output "${comment}" --plan-out "${plan}" --sarif-out "${sarif}")
+        args+=(--summary-out "${summary}" --title "${NETGRAPH_TITLE}")
+        args+=("${diagrams[@]+"${diagrams[@]}"}")
+        if [ -n "${NETGRAPH_HEAD_SHA}" ]; then
+          args+=(--head-sha "${NETGRAPH_HEAD_SHA}")
+        fi
+        if [ -n "${GITHUB_SERVER_URL:-}" ] && [ -n "${GITHUB_REPOSITORY:-}" ]; then
+          args+=(--repository-url "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}")
+        fi
+        artifact_url="${NETGRAPH_ARTIFACT_URL}"
+        if [ -z "${artifact_url}" ] && [ -n "${GITHUB_RUN_ID:-}" ]; then
+          # The artifact's own URL is only known after the upload, which happens
+          # in the workflow *after* this action. The run page lists every
+          # artifact it produced and is known now, so that is what is linked.
+          artifact_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}#artifacts"
+        fi
+        if [ -n "${artifact_url}" ] && [ ${#drawn[@]} -gt 0 ]; then
+          args+=(--artifact-url "${artifact_url}" --artifact-name "${NETGRAPH_ARTIFACT_NAME}")
+        fi
+        set -f
+        for url in ${NETGRAPH_DIAGRAM_URL}; do
+          args+=(--diagram-url "${url}")
+        done
+        set +f
+        if [ "${NETGRAPH_STRICT}" = "true" ]; then
+          args+=(--strict)
+        fi
+        # Split on whitespace and commas, so the list can be written as
+        # "E001,W103", as a YAML block scalar, or as one id per line.
+        set -f
+        for rule in $(printf '%s' "${NETGRAPH_DISABLE}" | tr ',' ' '); do
+          args+=(--disable "${rule}")
+        done
+        set +f
+        # Never here: the step's own failure is decided below, from the counts,
+        # so that the comment is written and uploaded before anything exits.
+        args+=(--fail-on never)
+
+        echo "netgraph ${args[*]}"
+        netgraph "${args[@]}"
+        rc=$?
+        if [ "${rc}" -ne 0 ] || [ ! -s "${comment}" ]; then
+          echo "::error::netgraph review exited ${rc} without writing a comment body"
+          exit 1
+        fi
+
+        # -- what the workflow needs to know -----------------------------
+        #
+        # Out of --summary-out, the document netgraph writes for exactly this:
+        # a step that grepped the comment's prose would break the first time a
+        # sentence was reworded, and the check a repository is gated on must not
+        # be that fragile. No jq -- python is already a prerequisite of this
+        # action, and jq is not on every self-hosted runner.
+        outputs="${directory}/outputs.txt"
+        NETGRAPH_SUMMARY="${summary}" python - >"${outputs}" <<'PYTHON'
+        import json
+        import os
+
+        with open(os.environ["NETGRAPH_SUMMARY"], encoding="utf-8") as handle:
+            summary = json.load(handle)
+
+        new = summary["new"]
+        for key, value in (
+            ("verdict", summary["verdict"]),
+            ("changed", "true" if summary["changed"] else "false"),
+            ("new-errors", str(new["error"])),
+            ("new-findings", str(new["total"])),
+            ("failed", "true" if summary["verdict"] in ("failed", "broken") else "false"),
+        ):
+            print(f"{key}={value}")
+        PYTHON
+        if [ ! -s "${outputs}" ]; then
+          echo "::error::could not read ${summary}"
+          exit 1
+        fi
+        cat "${outputs}"
+
+        {
+          cat "${outputs}"
+          echo "comment=${comment}"
+          echo "plan=${plan}"
+          echo "sarif=${sarif}"
+          echo "directory=${directory}"
+          echo "diagrams=$(IFS=,; printf '%s' "${drawn[*]+${drawn[*]}}")"
+        } >>"${GITHUB_OUTPUT}"
+
+        # Only *new* errors, and only when the caller asked. A repository with a
+        # legacy error still gets its comment, its SARIF and its diagram; what
+        # it does not get is a red check for something this change did not do.
+        if [ "${NETGRAPH_FAIL}" = "true" ] && grep -qx 'failed=true' "${outputs}"; then
+          echo "::error::this change introduces errors the base did not have; see the review comment"
+          exit 1
+        fi
+        exit 0

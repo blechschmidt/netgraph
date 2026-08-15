@@ -323,6 +323,8 @@ from netgraph.report import FORMATS as REPORT_FORMATS
 from netgraph.report import JSON_FILE as REPORT_JSON_FILE
 from netgraph.report import Options as ReportOptions
 from netgraph.report import generate as generate_report
+from netgraph.review import Diagram as ReviewDiagram
+from netgraph.review import Review, Verdict, build_review, render_comment, summarise
 from netgraph.rules import RULES, Severity, resolve_rule_id, rule_for
 from netgraph.scaffold import SCHEMA_FILE_NAME, build_scaffold, write_scaffold
 from netgraph.schema import build_schema
@@ -4558,6 +4560,331 @@ def _is_a_terminal(stream: Any) -> bool:
 
 # --------------------------------------------------------------------------- #
 # path
+
+
+# --------------------------------------------------------------------------- #
+# netgraph review
+# --------------------------------------------------------------------------- #
+
+
+@cli.command("review")
+@click.option(
+    "--from",
+    "source",
+    metavar="REF|DIR",
+    required=True,
+    help=(
+        "The state before the change: a git ref (origin/main) or a folder. This is the "
+        "baseline every finding is measured against, so a problem it already had is not "
+        "reported as one this change introduced."
+    ),
+)
+@click.option(
+    "--to",
+    "target",
+    metavar="REF|DIR",
+    default=None,
+    help="The state after the change. Defaults to the inventory as it is on disk.",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
+    default=None,
+    help="Write the comment body here instead of to stdout.",
+)
+@click.option(
+    "--plan-out",
+    metavar="FILE",
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
+    default=None,
+    help="Also write the changeset as JSON, the document 'netgraph plan --json' writes.",
+)
+@click.option(
+    "--summary-out",
+    metavar="FILE",
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
+    default=None,
+    help=(
+        "Also write the verdict and the counts as a small JSON document, so a workflow "
+        "can gate on them without reading the comment's prose."
+    ),
+)
+@click.option(
+    "--sarif-out",
+    metavar="FILE",
+    type=click.Path(dir_okay=False, writable=True, path_type=Path),
+    default=None,
+    help=(
+        "Also write the head state's diagnostics as SARIF, for a code-scanning upload. It "
+        "is the same validation the comment reports, so the two cannot disagree."
+    ),
+)
+@click.option(
+    "--diagram",
+    "diagram_paths",
+    multiple=True,
+    metavar="[LABEL=]PATH",
+    help=(
+        "A rendering of the visual diff to link, as 'netgraph diff -o' wrote it. The label "
+        "defaults to the suffix, upper-cased. Repeatable."
+    ),
+)
+@click.option(
+    "--diagram-url",
+    "diagram_urls",
+    multiple=True,
+    metavar="[LABEL=]URL",
+    help=(
+        "Where a rendering is published, if it is somewhere a browser can fetch it. Those "
+        "are embedded in the comment; a --diagram with no URL is only linked. Repeatable."
+    ),
+)
+@click.option(
+    "--artifact-url",
+    metavar="URL",
+    default=None,
+    help="Where the whole bundle can be downloaded -- in CI, the run that produced it.",
+)
+@click.option(
+    "--artifact-name",
+    metavar="NAME",
+    default=None,
+    help="What that bundle is called, for the link text.",
+)
+@click.option(
+    "--repository-url",
+    metavar="URL",
+    default=None,
+    help=(
+        "Base URL of the repository, https://github.com/owner/repo. With --head-sha it "
+        "turns every finding into a permalink to the line it is anchored at."
+    ),
+)
+@click.option(
+    "--head-sha",
+    metavar="SHA",
+    default=None,
+    help="Commit the head state is, so the links are permalinks rather than branch links.",
+)
+@click.option(
+    "--title",
+    default="netgraph",
+    show_default=True,
+    metavar="TEXT",
+    help=(
+        "Heading of the comment, and the key of its sticky marker. Two inventories reviewed "
+        "in one repository need two titles, or they will overwrite each other's comment."
+    ),
+)
+@click.option(
+    "--strict",
+    is_flag=True,
+    default=False,
+    help="Promote every warning to an error, on both sides of the comparison.",
+)
+@click.option(
+    "--disable",
+    "disabled",
+    multiple=True,
+    metavar="RULE",
+    shell_complete=complete_rule,
+    help="Silence a rule by id, on both sides. Repeatable.",
+)
+@click.option(
+    "--no-renames",
+    is_flag=True,
+    default=False,
+    help="Report every rename as a deletion beside a creation rather than as one move.",
+)
+@click.option(
+    "--max-changes",
+    type=click.IntRange(1),
+    default=40,
+    show_default=True,
+    metavar="N",
+    help="How many elements the changeset table names before it says how many are left.",
+)
+@click.option(
+    "--max-findings",
+    type=click.IntRange(1),
+    default=25,
+    show_default=True,
+    metavar="N",
+    help="The same, for the table of new findings.",
+)
+@click.option(
+    "--fail-on",
+    type=click.Choice(("new-errors", "new-findings", "changes", "never")),
+    default="new-errors",
+    show_default=True,
+    help=(
+        "What exits 1. 'new-errors' is the one a pull-request check should use: an error "
+        "the base already had is not this change's to fix, and gating on it would mean no "
+        "repository with a legacy finding could ever adopt the check."
+    ),
+)
+@click.pass_obj
+def review_command(
+    app: AppContext,
+    source: str,
+    target: str | None,
+    output: Path | None,
+    plan_out: Path | None,
+    summary_out: Path | None,
+    sarif_out: Path | None,
+    diagram_paths: tuple[str, ...],
+    diagram_urls: tuple[str, ...],
+    artifact_url: str | None,
+    artifact_name: str | None,
+    repository_url: str | None,
+    head_sha: str | None,
+    title: str,
+    strict: bool,
+    disabled: tuple[str, ...],
+    no_renames: bool,
+    max_changes: int,
+    max_findings: int,
+    fail_on: str,
+) -> None:
+    """Write up what a change does to the network, as one review comment.
+
+    The Markdown body on stdout is what the pull-request bot posts: a verdict, a
+    table of what is added, changed and removed grouped by kind, the validation
+    findings this change *introduced* -- measured against --from, so a legacy
+    warning is not reported as new -- and the diff drawn.
+
+    Only new problems fail it. Run it locally before you push, or from the
+    composite action in .github/actions/netgraph-review; see docs/ci.md.
+
+    \b
+    netgraph -i net review --from origin/main
+    netgraph -i net review --from HEAD --diagram diff.svg -o comment.md
+    netgraph -i net review --from origin/main --sarif-out head.sarif --fail-on never
+    """
+    console = app.console()
+    stream = console.to_stderr() if output is None else console
+    root = app.inventory if app.inventory.is_dir() else app.inventory.parent
+
+    diagrams = _review_diagrams(diagram_paths, diagram_urls)
+    settings = app.config().validation.with_overrides(
+        strict=True if strict else None, ignore=disabled
+    )
+    # Provenance is what turns a finding into a line number, and a review whose
+    # findings pointed at whole documents would be markedly less useful than the
+    # SARIF it is written beside.
+    inventory = app.load(keep_provenance=True) if target is None else None
+
+    try:
+        result = build_review(
+            root=root,
+            base=source,
+            head=target,
+            head_inventory=inventory,
+            config=settings,
+            renames=not no_renames,
+            diagrams=diagrams,
+            artifact_url=artifact_url,
+            artifact_name=artifact_name,
+            repository_url=repository_url,
+            head_sha=head_sha,
+            title=title,
+            strict=strict,
+            max_changes=max_changes,
+            max_findings=max_findings,
+        )
+    except (PlanSourceError, LoaderError) as exc:
+        stream.error(str(exc))
+        raise click.exceptions.Exit(EXIT_INVALID) from exc
+
+    # Written before anything is printed, and before the exit below: the file a
+    # workflow uploads must exist whatever the verdict was, or the one run that
+    # had something to report is the one that reports nothing.
+    if plan_out is not None and result.plan is not None:
+        write_text(plan_out, render_plan(result.plan, "json") + "\n")
+    if sarif_out is not None:
+        write_text(sarif_out, render_diagnostics(result.head, "sarif") + "\n")
+    if summary_out is not None:
+        write_text(summary_out, dump_json(summarise(result.review)) + "\n")
+
+    body = render_comment(result.review)
+    if output is not None:
+        write_text(output, body)
+        stream.info(f"review written to {display_path(output)}")
+    else:
+        console.print(body.rstrip("\n"))
+
+    stream.info(_review_summary(result.review))
+    if _review_fails(result.review, fail_on):
+        raise click.exceptions.Exit(EXIT_INVALID)
+
+
+def _review_diagrams(paths: Sequence[str], urls: Sequence[str]) -> tuple[ReviewDiagram, ...]:
+    """Merge ``--diagram`` and ``--diagram-url`` into one list, keyed by label.
+
+    Both spellings take an optional ``LABEL=`` so that the same drawing given as
+    a path and as a URL is one entry: without a key they would be two, and the
+    comment would link a PNG it had already embedded.
+
+    Raises:
+        click.UsageError: A value is empty, which is always a quoting mistake.
+    """
+    order: list[str] = []
+    found: dict[str, tuple[str | None, str | None]] = {}
+
+    def record(value: str, *, is_url: bool, flag: str) -> None:
+        label, separator, rest = value.partition("=")
+        # A Windows path is ``C:\...`` and a URL is ``https://...``; neither is
+        # a label, so a one-character key and a key holding a scheme are read as
+        # part of the value rather than as a name for it.
+        if not separator or len(label) < 2 or "/" in label or "\\" in label:
+            label, rest = "", value
+        if not rest:
+            raise click.UsageError(f"{flag} was given an empty value")
+        name = label or _diagram_label(rest)
+        if name not in found:
+            order.append(name)
+            found[name] = (None, None)
+        path, url = found[name]
+        found[name] = (rest if not is_url else path, rest if is_url else url)
+
+    for value in paths:
+        record(value, is_url=False, flag="--diagram")
+    for value in urls:
+        record(value, is_url=True, flag="--diagram-url")
+    return tuple(
+        ReviewDiagram(label=name, path=found[name][0], url=found[name][1]) for name in order
+    )
+
+
+def _diagram_label(value: str) -> str:
+    """``diff.svg`` -> ``SVG``; anything with no suffix keeps its own name."""
+    suffix = PurePosixPath(value.replace("\\", "/")).suffix.lstrip(".")
+    return suffix.upper() if suffix else "diagram"
+
+
+def _review_summary(review: Review) -> str:
+    """The line printed to stderr beside the body, for whoever is watching."""
+    delta = review.delta
+    if review.plan is None:
+        return f"review: the head state does not load; {count_text(len(delta.new), 'new finding')}"
+    changed = count_text(len(review.plan), "change") if review.changed else "no change"
+    if not delta.new:
+        return f"review: {changed}, nothing newly wrong"
+    return f"review: {changed}, {count_text(len(delta.new), 'new finding')}"
+
+
+def _review_fails(review: Review, fail_on: str) -> bool:
+    """Does ``--fail-on`` say this review exits 1?"""
+    if fail_on == "never":
+        return False
+    if review.verdict is Verdict.BROKEN:
+        return True
+    if fail_on == "changes":
+        return review.changed
+    if fail_on == "new-findings":
+        return bool(review.delta.new)
+    return bool(review.delta.new_errors)
 
 
 # --------------------------------------------------------------------------- #

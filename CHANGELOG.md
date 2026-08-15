@@ -18,6 +18,45 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **`netgraph review`, and a pull-request bot built on it.** A green check answers "does this
+  branch validate?" A reviewer wants "what does this change do, and what did it break that was
+  not already broken?" — and neither half of that is in a check mark. `netgraph review --from
+  origin/main` writes both, as one Markdown document: a verdict line, a table of what is added,
+  changed, renamed and removed grouped by element kind, the findings the change *introduced*,
+  and the change drawn.
+
+  **Only new problems fail it.** The head's diagnostics are measured against the base's by the
+  same fingerprint `-F sarif` puts on each result — the rule, the file, the element, the
+  pointer and the message, deliberately not the line — so a repository carrying a legacy
+  warning adopts the check green and the next warning turns it red. `--strict` and `--disable`
+  apply to *both* sides, so a rule silenced in the change itself reads as nothing changing
+  rather than as a wave of fixes.
+
+  Three side documents come out of the same load and the same validation, so nothing downstream
+  can disagree with the comment: `--plan-out` (the changeset `netgraph plan --json` writes),
+  `--sarif-out` (for a code-scanning upload) and `--summary-out` (the verdict and the counts,
+  for a workflow step that gates on them without parsing prose).
+
+  A base that has no inventory at all, and a base that does not load, are both reviewed rather
+  than refused: the first pull request a repository ever sees, and a `main` that is already
+  broken, are exactly the cases a bot has to survive to be adopted.
+
+- **`.github/actions/netgraph-review` and `.github/workflows/netgraph-review.yml`.** The action
+  draws the diff to SVG and PNG, produces the changeset and the SARIF, and writes the comment
+  body. The reusable workflow posts it as **one sticky comment**, edited in place on every push
+  rather than added to, uploads the bundle as an artifact and the findings to code scanning,
+  and fails only on an error the base did not have. `docs/ci.md` has the input tables, the
+  shape of the comment, and why the workflow uses `pull_request` and never
+  `pull_request_target` — on a fork's pull request it degrades to the job summary rather than
+  asking for a token that cannot safely exist.
+
+  The diagram appears three ways because a GitHub comment is sanitised and neither an inline
+  `<svg>` nor a `data:` image survives it: a Mermaid summary of the changeset that always
+  renders, an `<img>` for anything the caller published to a URL, and a link to the uploaded
+  artifact.
+
+  This repository reviews its own `examples/` with it — `.github/workflows/review.yml`.
+
 - **`netgraph converge plan`: drift, joined to the configuration emitters, as an ordered
   per-device remediation.** `netgraph drift` said how the live network differs from the
   inventory and `netgraph export config` said what a device would run if it agreed; nothing
