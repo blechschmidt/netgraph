@@ -1311,6 +1311,19 @@ def test_the_dogfood_workflow_calls_the_reusable_one(review_workflow: dict[str, 
         assert name in triggers_of(review_workflow)["workflow_call"]["inputs"], name
 
 
+def test_the_dogfood_workflow_can_be_run_without_a_pull_request() -> None:
+    """The path a fork's pull request takes, exercised deliberately.
+
+    A manual run has no pull request to take a base from and none to comment
+    on, so it names its own base and lands in the job summary — which is the
+    same code path, and the same output, a fork gets.
+    """
+    workflow = load_yaml(DOGFOOD_WORKFLOW)
+    dispatch = triggers_of(workflow)["workflow_dispatch"]
+    assert "base" in dispatch["inputs"]
+    assert "inputs.base" in str(workflow["jobs"]["review"]["with"]["base"])
+
+
 def test_the_dogfood_workflow_reviews_every_example() -> None:
     """Discovered, not listed, so a new example cannot be forgotten."""
     workflow = load_yaml(DOGFOOD_WORKFLOW)
@@ -1318,7 +1331,7 @@ def test_the_dogfood_workflow_reviews_every_example() -> None:
     assert "needs.discover.outputs.inventories" in matrix
 
     triggers = triggers_of(workflow)
-    assert list(triggers) == ["pull_request"]
+    assert set(triggers) == {"pull_request", "workflow_dispatch"}
     assert "examples/**" in triggers["pull_request"]["paths"]
 
 
