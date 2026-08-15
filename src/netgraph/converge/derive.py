@@ -40,14 +40,27 @@ from netgraph.drift.model import Change, Direction, DriftReport
 from netgraph.importer.draft import Draft, DraftDevice, DraftInterface
 from netgraph.loader.inventory import Inventory, short_name
 from netgraph.models import Device
-from netgraph.models.interface import Interface
+from netgraph.models.interface import Interface, InterfaceType
 
 __all__ = ["derive", "observed_devices"]
 
 #: Interface types netgraph creates, and may therefore remove. Everything else
 #: is a hole in a chassis: the capture found it because it is physically there,
 #: and the remedy for an undeclared one is a document, not a command.
-_VIRTUAL_TYPES: Final[frozenset[str]] = frozenset({"vlan", "bridge", "bond", "tunnel"})
+#:
+#: Spelled as :class:`~netgraph.models.interface.InterfaceType` spells them --
+#: an aggregate is ``lag``, not ``bond``, which is what ``ip`` calls it and what
+#: :mod:`netgraph.importer.iproute` translates it *from*. Derived from the enum
+#: rather than written out, so a type added there cannot leave this set claiming
+#: the old one.
+_VIRTUAL_TYPES: Final[frozenset[str]] = frozenset(
+    {
+        InterfaceType.VLAN.value,
+        InterfaceType.BRIDGE.value,
+        InterfaceType.LAG.value,
+        InterfaceType.TUNNEL.value,
+    }
+)
 
 #: Interface scalars a plan can set. ``type`` is absent on purpose: an interface
 #: whose type disagrees is not a field to correct but a thing that is not what

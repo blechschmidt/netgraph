@@ -134,6 +134,14 @@ def _change_text(change: ConvergeChange) -> Iterator[str]:
     if change.note and change.note != change.summary:
         yield f"        note: {change.note}"
     for command in change.commands:
+        if command.kind == "write":
+            # Not '$ ...': this step is a file, and prefixing it with a prompt
+            # would read as a command a reader could paste. The bytes are in the
+            # script and in the JSON; what belongs here is the size, which is
+            # what somebody scanning a plan wants to know about a file.
+            lines = (command.content or "").count("\n")
+            yield f"        > {command.path} ({lines} line(s))"
+            continue
         yield f"        $ {command.text}"
 
 

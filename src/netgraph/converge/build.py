@@ -212,7 +212,14 @@ def build_plan(
             DeviceConverge(
                 element=element,
                 kind=_kind_of(inventory, element, element_intents),
-                changes=tuple(sorted(changes, key=lambda change: change.order)),
+                # Stable, and by rank *alone*. ``element_intents`` already comes
+                # out of order_intents in full dependency order -- including the
+                # part a rank cannot express, which is that a stacked interface
+                # is deleted before the one underneath it -- so re-sorting by any
+                # richer key would throw that away and put the parent first. The
+                # file writes are appended and carry a rank above every intent's,
+                # which is where they belong: they realise what is above them.
+                changes=tuple(sorted(changes, key=lambda change: change.rank)),
             )
         )
 
@@ -295,10 +302,30 @@ def _change(
         risk=risk,
         risk_reason=reason,
         provenance=intent.provenance,
-        prerequisites=prerequisites_of(intent, siblings),
+        prerequisites=_prerequisites(intent, siblings),
         commands=() if inert else render(intent),
         rollback=() if inert else revert(intent),
         note=note,
+    )
+
+
+def _prerequisites(intent: Intent, siblings: Sequence[Intent]) -> tuple[str, ...]:
+    """``prerequisites_of``, minus any edge the emitted order does not honour.
+
+    The plan's promise is that a prerequisite appears *above* the change that
+    needs it, and every consumer -- the text report, the script, a transport --
+    relies on it. Ordering settles all the real edges; the only thing that can
+    survive to here is a cycle, which the loader does not reject (``a0 parent:
+    b0`` beside ``b0 parent: a0``) and which no device could have. Dropping the
+    edge rather than emitting it keeps the promise, and the ordering above is
+    what a reader is then following.
+    """
+    position = {sibling.id: index for index, sibling in enumerate(siblings)}
+    mine = position.get(intent.id, len(siblings))
+    return tuple(
+        required
+        for required in prerequisites_of(intent, siblings)
+        if position.get(required, -1) < mine
     )
 
 

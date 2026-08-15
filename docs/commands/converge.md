@@ -215,6 +215,10 @@ Four rules produced that table:
 
 Within a rank, stacked interfaces are ordered by depth: `eno1` before `eno1.30`
 when both are being made, and `eno1.30` before `eno1` when both are going away.
+Depth follows the declared `parent`, not the name — a sub-interface is usually
+called after what it sits on, but nothing makes `adm0 parent: wan0` illegal, and
+reading the name would put a child first in exactly the inventories that do not
+follow the convention.
 
 The `prerequisites` list adds the *specific* edges the table cannot know — this
 sub-interface needs that parent, this port needs that VLAN — so a transport
@@ -255,6 +259,13 @@ Touching any of those with a change that *takes something away* — shut, delete
 remove an address, release a member, untag a VLAN, change the VLAN mode or the
 access VLAN — is disruptive. So is changing `mac` or `parent` on it, because
 both bounce the link.
+
+Membership is the one relation that names two interfaces, and both are checked:
+`ip link set mgmt0 master br0` takes the management address off `mgmt0` just as
+finally as releasing it would, so **enslaving** the management port is disruptive
+as well as releasing it. And removing the management *address* is disruptive
+wherever the capture found it, even on an interface the declaration does not put
+it on.
 
 Deliberately **not** disruptive: setting an MTU, correcting a MAC on an
 interface that is not the management one, adding an address, creating a VLAN,
@@ -380,9 +391,10 @@ they carry no commands, so nothing can pretend otherwise.
   Configuration does not move fibre.
 * **A physical port the inventory does not declare.** The capture found it
   because it is physically there; the thing that is wrong is the document.
-  netgraph only ever deletes interfaces it could have *created* — VLAN
-  sub-interfaces, bridges, bonds, tunnels — which keeps the rule symmetric:
-  netgraph removes what netgraph makes.
+  netgraph only ever deletes interfaces it could have *created* — an interface
+  whose `type` is `vlan`, `bridge`, `lag` or `tunnel` — which keeps the rule
+  symmetric: netgraph removes what netgraph makes. An `ethernet`, `wifi` or
+  `loopback` interface is never removed or shut.
 * **A device the inventory does not declare, or one that is a different kind
   than declared.** There is no declared state to converge on to. Run
   [`netgraph import`](import.md) to adopt it, or take it off the network.

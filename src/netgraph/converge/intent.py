@@ -27,9 +27,17 @@ networks work, not by the particular network:
   script that is interrupted has brought things up and not yet taken anything
   down.
 
-Within a rank, order is by target name, which is stable and readable. Across
-ranks, :func:`prerequisites_of` adds the *specific* edges the table cannot know:
-this sub-interface needs that parent, this port needs that VLAN to exist.
+Within a rank, order is by how deep an interface sits in the stack -- shallow
+first when it is being built, deep first when it is being taken apart -- and
+then by name, which is stable and readable. Depth follows the declared
+``parent``, not the name: a sub-interface is usually called after the thing it
+sits on (``eno1.30``), but nothing makes ``adm0 parent: wan0`` illegal, and
+reading the name would put a child first in exactly the inventories that do not
+follow the convention.
+
+Across ranks, :func:`prerequisites_of` adds the *specific* edges the table
+cannot know: this sub-interface needs that parent, this port needs that VLAN to
+exist.
 
 Nothing here knows about the management path either; that is
 :mod:`netgraph.converge.risk`. An intent is a statement of what would close a
@@ -39,7 +47,7 @@ answer.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Final
@@ -244,40 +252,77 @@ def article(word: str) -> str:
     Interface types, VLAN modes and element kinds are all ASCII words from a
     closed set, so the naive rule is exactly right here and a linguistics library
     would be four dependencies to get ``an ethernet`` instead of ``a ethernet``.
+
+    The empty string gets ``a``. ``"" in "aeiou"`` is true, so the obvious
+    spelling of this returns ``an`` for a word that is not there -- and a capture
+    that reported no interface type at all would produce "create eno1 as an
+    interface", with two spaces and no noun.
     """
-    return "an" if word[:1].lower() in "aeiou" else "a"
+    first = word[:1].lower()
+    return "an" if first and first in "aeiou" else "a"
 
 
 def order_intents(intents: Iterable[Intent]) -> tuple[Intent, ...]:
     """``intents`` in dependency order.
 
-    A stable sort by :attr:`Intent.order` is enough, and it is enough for a
-    reason worth stating: :data:`RANKS` already encodes every dependency between
-    *kinds*, and the only dependencies left within a kind are between stacked
-    interfaces -- a sub-interface and its parent, a bond and its members. Those
-    are handled by name depth rather than by a topological sort, because a
-    stacked interface in every dialect netgraph writes is named after the thing
-    it sits on (``eno1.30``, ``br0``), and because a cycle in a device's
-    interface stack is not a thing that can exist.
+    :data:`RANKS` encodes every dependency between *kinds*; the only ones left
+    inside a kind are between stacked interfaces, and those are settled by how
+    deep an interface sits in the stack -- shallow first when it is being built,
+    deep first when it is being taken apart. Applied to a run that stops halfway,
+    that leaves a device whose interfaces all still have something under them.
+
+    Depth follows the declared ``parent``, not the name. A sub-interface is
+    *usually* named after what it sits on (``eno1.30``), but ``parent`` is a free
+    interface name and nothing makes ``adm0 parent: wan0`` illegal -- so reading
+    the name would put a child before its parent in exactly the inventories that
+    do not follow the convention, which is where a plan is least likely to be
+    read closely.
     """
+    ordered = list(intents)
+    depths = _stack_depths(ordered)
     return tuple(
         sorted(
-            intents,
-            key=lambda intent: (intent.rank, intent.object, _depth(intent), intent.target),
+            ordered,
+            key=lambda intent: (
+                intent.rank,
+                intent.object,
+                _depth(intent, depths),
+                intent.target,
+            ),
         )
     )
 
 
-def _depth(intent: Intent) -> tuple[int, str]:
-    """Shallow interfaces before deep ones for a create; the reverse for a delete.
+def _stack_depths(intents: Sequence[Intent]) -> dict[tuple[str, str], int]:
+    """How far up the interface stack each ``(element, interface)`` sits.
 
-    ``eno1`` before ``eno1.30`` when both are being made, and ``eno1.30`` before
-    ``eno1`` when both are going away. Depth is the number of dot-separated
-    segments in the name, which is how every Linux dialect and every vendor CLI
-    netgraph writes spells a sub-interface.
+    Built from the ``parent`` links the intents carry, falling back to the dotted
+    name for an interface no intent states a parent for. Walking is bounded by
+    the number of interfaces and guarded against a cycle, because the loader does
+    not reject ``a0 parent: b0`` beside ``b0 parent: a0`` -- an inventory nobody
+    would write, but not one this function may hang on.
     """
+    parents: dict[tuple[str, str], str] = {}
+    for intent in intents:
+        if intent.interface and intent.parent:
+            parents[(intent.element, intent.interface)] = intent.parent
+
+    depths: dict[tuple[str, str], int] = {}
+    for key in parents:
+        seen: set[tuple[str, str]] = set()
+        walk, depth = key, 0
+        while walk in parents and walk not in seen:
+            seen.add(walk)
+            walk = (walk[0], parents[walk])
+            depth += 1
+        depths[key] = depth
+    return depths
+
+
+def _depth(intent: Intent, depths: Mapping[tuple[str, str], int]) -> tuple[int, str]:
+    """Shallow interfaces before deep ones for a create; the reverse for a delete."""
     name = intent.interface or intent.target
-    segments = name.count(".")
+    segments = depths.get((intent.element, name), name.count("."))
     if intent.kind in REMOVES:
         return (-segments, name)
     return (segments, name)

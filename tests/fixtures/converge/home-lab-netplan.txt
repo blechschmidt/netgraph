@@ -37,7 +37,7 @@ hosts/pc-desk (computer) [batch 0]
         from hosts/pc-desk:eno1.vlan: VLAN 30 is carried on this port; the inventory declares no VLAN here
         from hosts/pc-desk:eno1.30: the capture reports this interface as vlan; the inventory does not declare it
         disruptive: applying this file changes mac on eno1, which bounces the interface; eno1 carries the management address 192.168.10.20/24
-        $ write /etc/netplan/10-netgraph.yaml
+        > /etc/netplan/10-netgraph.yaml (17 line(s))
         $ netplan apply
 
 hosts/srv-nas (server) [batch 0]
@@ -46,7 +46,7 @@ hosts/srv-nas (server) [batch 0]
         note: realised by the netplan file(s) below: a declarative dialect has no command for one field
   +    install /etc/netplan/10-netgraph.yaml and reload netplan
         from hosts/srv-nas:eth0.mtu: declared as 1500; the capture reports 9000
-        $ write /etc/netplan/10-netgraph.yaml
+        > /etc/netplan/10-netgraph.yaml (17 line(s))
         $ netplan apply
 
 prn-hall

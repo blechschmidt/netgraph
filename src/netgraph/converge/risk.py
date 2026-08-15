@@ -56,6 +56,12 @@ __all__ = ["ManagementPath", "classify", "management_path"]
 #: Anything on the management path that is one of these is disruptive; anything
 #: on the management path that is *not* only changes a value, which the box
 #: survives.
+#:
+#: :data:`IntentKind.MEMBER_ADD` is absent here and handled separately in
+#: :func:`_against_management`, because membership is the one relation that names
+#: two interfaces: enslaving the management port moves its address just as
+#: finally as releasing it does, and which of the two is "taking away" depends on
+#: which end you look from.
 _TAKES_AWAY: Final[frozenset[IntentKind]] = frozenset(
     {
         IntentKind.INTERFACE_DISABLE,
@@ -196,6 +202,28 @@ def _against_management(intent: Intent, path: ManagementPath) -> str | None:
     where = f"{path.interface} carries the management address {path.address}"
     if intent.kind is IntentKind.VLAN_DELETE and intent.target in path.vlans:
         return f"deletes VLAN {intent.target}, which {where} depends on"
+
+    # Membership names two interfaces, and the *member* is the one that moves:
+    # 'ip link set mgmt0 master br0' takes the management address off mgmt0
+    # whichever way round the intent reads. Both are checked, and enslaving is
+    # as final as releasing -- the address stops answering either way.
+    if intent.kind in (IntentKind.MEMBER_ADD, IntentKind.MEMBER_REMOVE) and path.holds(
+        intent.target
+    ):
+        verb = "enslaves" if intent.kind is IntentKind.MEMBER_ADD else "releases"
+        return (
+            f"{verb} {intent.target} {'to' if verb == 'enslaves' else 'from'} "
+            f"{intent.interface}, which moves the address off it; {where}"
+        )
+
+    # An address the capture found on the wrong interface is still *the*
+    # management address, and taking it off is a lock-out wherever it is.
+    if intent.kind is IntentKind.ADDRESS_REMOVE and intent.target == path.address:
+        return (
+            f"removes {intent.target} from {intent.interface}, and that is the address the "
+            f"device is reached on"
+        )
+
     if not path.holds(intent.interface):
         return None
     stacked = "" if intent.interface == path.interface else f" that {path.interface} is built on"

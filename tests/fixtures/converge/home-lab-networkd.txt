@@ -37,14 +37,14 @@ hosts/pc-desk (computer) [batch 0]
         from hosts/pc-desk:eno1.vlan: VLAN 30 is carried on this port; the inventory declares no VLAN here
         from hosts/pc-desk:eno1.30: the capture reports this interface as vlan; the inventory does not declare it
         disruptive: applying this file changes mac on eno1, which bounces the interface; eno1 carries the management address 192.168.10.20/24
-        $ write /etc/systemd/network/10-eno1.network
+        > /etc/systemd/network/10-eno1.network (20 line(s))
         $ networkctl reload
   ~ !! update /etc/systemd/network/10-wlp1s0.network and reload networkd
         from hosts/pc-desk:eno1.mac: declared as 3c:97:0e:20:01:01; the capture reports 3c:97:0e:20:01:ff
         from hosts/pc-desk:eno1.vlan: VLAN 30 is carried on this port; the inventory declares no VLAN here
         from hosts/pc-desk:eno1.30: the capture reports this interface as vlan; the inventory does not declare it
         disruptive: applying this file changes mac on eno1, which bounces the interface; eno1 carries the management address 192.168.10.20/24
-        $ write /etc/systemd/network/10-wlp1s0.network
+        > /etc/systemd/network/10-wlp1s0.network (16 line(s))
         $ networkctl reload
   - !! remove /etc/systemd/network/20-eno1.30.netdev and reload networkd
         from hosts/pc-desk:eno1.mac: declared as 3c:97:0e:20:01:01; the capture reports 3c:97:0e:20:01:ff
@@ -67,7 +67,7 @@ hosts/srv-nas (server) [batch 0]
         note: realised by the networkd file(s) below: a declarative dialect has no command for one field
   ~    update /etc/systemd/network/10-eth0.network and reload networkd
         from hosts/srv-nas:eth0.mtu: declared as 1500; the capture reports 9000
-        $ write /etc/systemd/network/10-eth0.network
+        > /etc/systemd/network/10-eth0.network (20 line(s))
         $ networkctl reload
 
 prn-hall

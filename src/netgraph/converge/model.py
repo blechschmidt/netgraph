@@ -191,6 +191,21 @@ class Command:
         body: a generated configuration may legitimately contain ``$``, and a
         WireGuard placeholder key certainly contains characters that are not a
         shell's business.
+
+        The delimiter is *checked* against the body rather than assumed unique.
+        Half the content of a converge script comes from the capture by way of
+        :func:`netgraph.plan.live.adopt` -- a description, an SSID, a chassis
+        string -- so "no generated file would ever hold that line" is a claim
+        about somebody else's network. A body holding the delimiter would end the
+        here-document early and hand the rest of the file to the shell as
+        commands, which is the one failure here that is worse than a wrong
+        configuration.
+
+        The body is split on ``\n`` alone. ``str.splitlines`` also breaks on
+        ``\x0b``, ``\x0c`` and ``\u2028``, so a file holding one would be
+        written back with a real newline where it had something else -- and the
+        contract of this command is that the file the script writes is the file
+        ``netgraph export config`` would write, byte for byte.
         """
         if self.kind == "exec":
             yield self.text
@@ -199,9 +214,13 @@ class Command:
         parent = self.path.rsplit("/", 1)[0]
         if parent:
             yield f"install -d -m 0755 {parent}"
-        yield f"cat > {self.path} <<'{_HEREDOC}'"
-        yield from self.content.splitlines()
-        yield _HEREDOC
+        body = self.content.split("\n")
+        if body and body[-1] == "":
+            body.pop()
+        delimiter = _delimiter_for(body)
+        yield f"cat > {self.path} <<'{delimiter}'"
+        yield from body
+        yield delimiter
 
     def as_record(self) -> dict[str, Any]:
         record: dict[str, Any] = {"kind": self.kind, "text": self.text}
@@ -212,8 +231,24 @@ class Command:
 
 
 #: Here-document delimiter for a generated file. Long and namespaced because a
-#: configuration file is arbitrary text and a short delimiter could occur in it.
+#: configuration file is arbitrary text and a short delimiter could occur in it;
+#: :func:`_delimiter_for` still checks, because "unlikely" is not "cannot".
 _HEREDOC: Final = "NETGRAPH_EOF"
+
+
+def _delimiter_for(body: Sequence[str]) -> str:
+    """:data:`_HEREDOC`, suffixed until no line of ``body`` is equal to it.
+
+    A here-document ends at the first line that *is* the delimiter, so a body
+    holding one would end early and the rest of the file would reach the shell as
+    commands. Suffixing terminates: each attempt is longer than every line it
+    collided with, so at worst it grows past the longest line in the file.
+    """
+    delimiter = _HEREDOC
+    lines = set(body)
+    while delimiter in lines:
+        delimiter += "_"
+    return delimiter
 
 
 @dataclass(frozen=True, slots=True)

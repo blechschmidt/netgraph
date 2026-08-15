@@ -51,6 +51,7 @@ from netgraph.converge import (
     batches_for,
     blast_radius,
     build_plan,
+    classify,
     converge,
     derive,
     management_path,
@@ -62,14 +63,16 @@ from netgraph.converge import (
 )
 from netgraph.converge.commands import describe, render, revert
 from netgraph.converge.files import strip_banner
-from netgraph.converge.intent import RANKS, prerequisites_of
+from netgraph.converge.intent import RANKS, article, prerequisites_of
 from netgraph.converge.model import Provenance
+from netgraph.converge.risk import ManagementPath
 from netgraph.drift import Change, Direction, DriftReport, compare, coverage_of
 from netgraph.export.config import UnsupportedConfigError
 from netgraph.fsio import write_text
 from netgraph.importer.draft import Draft, DraftDevice, DraftInterface, DraftVlan
 from netgraph.loader import load_tree
 from netgraph.loader.inventory import Inventory
+from netgraph.models.interface import InterfaceType
 from netgraph.render.graph import Layer, build_graph
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -183,6 +186,56 @@ def test_deleting_an_interface_is_disruptive_wherever_it_is(plan: ConvergePlan) 
     change = _change(plan, "hosts/pc-desk", "eno1.30")
     assert change.action is Action.DELETE
     assert change.risk is Risk.DISRUPTIVE
+
+
+def test_enslaving_the_management_interface_is_disruptive() -> None:
+    """The worst hole this module could have: membership names two interfaces.
+
+    ``ip link set mgmt0 master br0`` takes the management address off ``mgmt0``
+    just as finally as ``ip addr del`` would, and the intent's ``interface`` is
+    the aggregate rather than the port that moves -- so classifying on
+    ``interface`` alone called it safe and emitted it with no flag.
+    """
+    path = ManagementPath(
+        element="net/srv",
+        interface="mgmt0",
+        address="10.9.0.5/24",
+        interfaces=frozenset({"mgmt0"}),
+    )
+    for kind in (IntentKind.MEMBER_ADD, IntentKind.MEMBER_REMOVE):
+        risk, reason = classify(_intent(kind, interface="br0", target="mgmt0", value="mgmt0"), path)
+        assert risk is Risk.DISRUPTIVE, kind
+        assert "mgmt0" in reason and "10.9.0.5/24" in reason
+
+
+def test_a_member_that_is_not_the_management_port_is_safe() -> None:
+    """The fix must not make every membership change need the flag."""
+    path = ManagementPath(
+        element="net/srv",
+        interface="mgmt0",
+        address="10.9.0.5/24",
+        interfaces=frozenset({"mgmt0"}),
+    )
+    risk, _reason = classify(
+        _intent(IntentKind.MEMBER_ADD, interface="br0", target="eno9", value="eno9"), path
+    )
+    assert risk is Risk.SAFE
+
+
+def test_removing_the_management_address_from_the_wrong_port_is_disruptive() -> None:
+    """The capture can find the address somewhere the declaration does not put it."""
+    path = ManagementPath(
+        element="net/srv",
+        interface="mgmt0",
+        address="10.9.0.5/24",
+        interfaces=frozenset({"mgmt0"}),
+    )
+    risk, reason = classify(
+        _intent(IntentKind.ADDRESS_REMOVE, interface="eno7", target="10.9.0.5/24", value="ipv4"),
+        path,
+    )
+    assert risk is Risk.DISRUPTIVE
+    assert "the address the device is reached on" in reason
 
 
 # --------------------------------------------------------------------------- #
@@ -327,6 +380,37 @@ def test_a_stacked_interface_is_deleted_before_the_one_underneath_it() -> None:
     assert [intent.interface for intent in ordered] == ["br0.10", "br0"]
 
 
+def test_depth_follows_the_declared_parent_and_not_the_name() -> None:
+    """``adm0 parent: wan0`` is legal, and the name says nothing about the stack."""
+    ordered = order_intents(
+        [
+            _intent(
+                IntentKind.INTERFACE_CREATE,
+                interface="adm0",
+                interface_type="vlan",
+                parent="wan0",
+            ),
+            _intent(IntentKind.INTERFACE_CREATE, interface="wan0", interface_type="ethernet"),
+        ]
+    )
+    assert [intent.interface for intent in ordered] == ["wan0", "adm0"]
+
+
+def test_an_interface_stack_that_loops_does_not_hang_the_ordering() -> None:
+    """The loader accepts it. Nothing here may spin on it."""
+    ordered = order_intents(
+        [
+            _intent(
+                IntentKind.INTERFACE_CREATE, interface="a0", interface_type="vlan", parent="b0"
+            ),
+            _intent(
+                IntentKind.INTERFACE_CREATE, interface="b0", interface_type="vlan", parent="a0"
+            ),
+        ]
+    )
+    assert {intent.interface for intent in ordered} == {"a0", "b0"}
+
+
 def test_a_prerequisite_names_the_change_it_depends_on() -> None:
     create = _intent(IntentKind.VLAN_CREATE, target="20", value="Guest")
     assign = _intent(IntentKind.VLAN_ACCESS, interface="port1", target="20", value="20")
@@ -348,6 +432,73 @@ def test_the_plan_is_emitted_in_rank_order(plan: ConvergePlan) -> None:
     for device in plan.devices:
         ranks = [change.rank for change in device.changes]
         assert ranks == sorted(ranks)
+
+
+def test_the_plan_deletes_a_stacked_interface_before_the_one_underneath_it(
+    tmp_path: Path,
+) -> None:
+    """The property has to hold in the *plan*, not only in ``order_intents``.
+
+    It did not: the builder re-sorted each device's changes by a key with no
+    depth in it, which put ``eno1.10`` first and made the deletion of
+    ``eno1.10.20`` a no-op against an interface the previous line had already
+    taken with it.
+    """
+    tree = tmp_path / "inv"
+    tree.mkdir()
+    write_text(
+        tree / "srv-x.yaml",
+        "apiVersion: netgraph.dev/v1alpha1\nkind: server\nmetadata:\n  name: srv-x\n"
+        "spec:\n  interfaces:\n    - name: eno1\n      type: ethernet\n      mtu: 1500\n"
+        "      ipv4:\n        addresses: [10.0.0.5/24]\n",
+    )
+    capture = tmp_path / "cap.json"
+    write_text(
+        capture,
+        json.dumps(
+            [
+                {
+                    "ifindex": 2,
+                    "ifname": "eno1",
+                    "flags": ["UP"],
+                    "mtu": 1500,
+                    "link_type": "ether",
+                    "addr_info": [
+                        {"family": "inet", "local": "10.0.0.5", "prefixlen": 24, "scope": "global"}
+                    ],
+                },
+                {
+                    "ifindex": 3,
+                    "ifname": "eno1.10",
+                    "flags": ["UP"],
+                    "mtu": 1500,
+                    "link": "eno1",
+                    "link_type": "ether",
+                    "linkinfo": {"info_kind": "vlan", "info_data": {"id": 10}},
+                    "addr_info": [],
+                },
+                {
+                    "ifindex": 4,
+                    "ifname": "eno1.10.20",
+                    "flags": ["UP"],
+                    "mtu": 1500,
+                    "link": "eno1.10",
+                    "link_type": "ether",
+                    "linkinfo": {"info_kind": "vlan", "info_data": {"id": 20}},
+                    "addr_info": [],
+                },
+            ]
+        ),
+    )
+    result = converge(load_tree(tree), [str(capture)], host="srv-x", allow_disruptive=True)
+    device = result.device("srv-x")
+    assert device is not None
+    deletions = [
+        change.interface
+        for change in device.changes
+        if change.id.partition("#")[2].startswith("interface.delete/")
+    ]
+    assert deletions == ["eno1.10.20", "eno1.10"]
 
 
 def test_a_prerequisite_always_comes_earlier_in_the_device_order(plan: ConvergePlan) -> None:
@@ -377,6 +528,13 @@ def test_every_intent_kind_renders_a_command_and_an_inverse(kind: IntentKind) ->
     assert render(intent), f"{kind} renders no command"
     assert revert(intent), f"{kind} renders no inverse"
     assert describe(intent), f"{kind} has no summary"
+
+
+def test_a_missing_interface_type_does_not_produce_an_article_with_no_noun() -> None:
+    """``"" in "aeiou"`` is true, which made an absent type read as "an  interface"."""
+    assert article("") == "a"
+    assert article("ethernet") == "an"
+    assert article("vlan") == "a"
 
 
 def test_a_manual_intent_renders_nothing() -> None:
@@ -773,6 +931,35 @@ def test_a_written_file_becomes_a_quoted_heredoc() -> None:
     ]
 
 
+def test_a_body_holding_the_delimiter_gets_a_longer_one() -> None:
+    """Otherwise the here-document ends early and the rest of the file is shell.
+
+    Half the content of a converge script comes from the capture by way of
+    ``adopt`` -- a description, an SSID, a chassis string -- so "no generated
+    file would ever hold that line" is a claim about somebody else's network.
+    """
+    content = "a\nNETGRAPH_EOF\nrm -rf /\n"
+    lines = list(Command(text="w", kind="write", path="/etc/x", content=content).script_lines())
+    delimiter = lines[-1]
+    assert delimiter.startswith("NETGRAPH_EOF_")
+    assert delimiter not in content.splitlines()
+    assert lines[1] == f"cat > /etc/x <<'{delimiter}'"
+    # The body is intact and every line of it is inside the document.
+    assert lines[2:-1] == ["a", "NETGRAPH_EOF", "rm -rf /"]
+
+
+def test_a_written_body_is_split_on_newlines_and_nothing_else() -> None:
+    """``splitlines`` also breaks on \x0b, \x0c and \u2028.
+
+    The contract of this command is that the file the script writes is the file
+    ``netgraph export config`` would write, byte for byte, so a form feed in a
+    description must stay a form feed rather than becoming a line break.
+    """
+    content = "first\x0bstill first\nsecond\n"
+    lines = list(Command(text="w", kind="write", path="/etc/x", content=content).script_lines())
+    assert lines[2:-1] == ["first\x0bstill first", "second"]
+
+
 @pytest.mark.parametrize(
     ("kwargs", "why"),
     [
@@ -1046,6 +1233,51 @@ def test_a_virtual_interface_the_inventory_does_not_declare_is_deleted_and_recre
     assert [intent.kind for intent in intents] == [IntentKind.INTERFACE_DELETE]
     assert render(intents[0])[0].text == "delete interface br9"
     assert revert(intents[0])[0].text == "create interface br9 type bridge"
+
+
+@pytest.mark.parametrize(
+    ("observed_type", "removable"),
+    [
+        ("vlan", True),
+        ("bridge", True),
+        ("lag", True),
+        ("tunnel", True),
+        ("ethernet", False),
+        ("wifi", False),
+        ("loopback", False),
+    ],
+)
+def test_only_an_interface_netgraph_could_have_made_is_ever_removed(
+    inventory: Inventory, observed_type: str, removable: bool
+) -> None:
+    """ "netgraph removes what netgraph makes" -- spelled as the model spells it.
+
+    The list is parametrised over every :class:`InterfaceType` on purpose: it was
+    written as ``bond``, which is what ``ip`` calls an aggregate and not what the
+    model does, so ``lag`` fell through to "a physical port netgraph will not
+    touch" -- a sentence that is false about a thing netgraph creates.
+    """
+    intents = _derive_one(
+        inventory,
+        Change(
+            direction=Direction.UNDECLARED,
+            scope="interface",
+            element="hosts/pc-desk",
+            kind="computer",
+            path="x9",
+            observed=observed_type,
+            message=f"the capture reports this interface as {observed_type}",
+        ),
+    )
+    expected = IntentKind.INTERFACE_DELETE if removable else IntentKind.MANUAL
+    assert [intent.kind for intent in intents] == [expected]
+
+
+def test_every_interface_type_is_accounted_for_by_the_removal_rule() -> None:
+    """A type added to the model must be decided about, not silently physical."""
+    from netgraph.converge.derive import _VIRTUAL_TYPES
+
+    assert {member.value for member in InterfaceType} >= _VIRTUAL_TYPES
 
 
 def test_two_findings_asking_for_one_change_are_merged(inventory: Inventory) -> None:
