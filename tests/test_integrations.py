@@ -1056,6 +1056,48 @@ def test_a_base_already_in_the_clone_is_not_fetched_again(
 
 @requires_bash
 @pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
+def test_a_base_that_is_not_in_the_clone_is_fetched_and_made_resolvable(
+    review_action: dict[str, Any], tmp_path: Path
+) -> None:
+    """The shape of a pull-request checkout: one branch, one commit deep.
+
+    A fetch by *name* leaves ``FETCH_HEAD`` and no ref called ``main``, so a
+    step that stopped at "the fetch succeeded" would hand netgraph a ref git
+    cannot read. This is that case, and it failed on a real runner before the
+    step gave the commit the name it was asked for.
+    """
+    origin = tmp_path / "origin"
+    build_repository(origin)
+    # Named here rather than left to init.defaultBranch, which differs between
+    # machines and would make this test pass or fail by accident.
+    subprocess.run(["git", "branch", "-qM", "main"], cwd=origin, check=True)
+    subprocess.run(["git", "branch", "-q", "topic"], cwd=origin, check=True)
+    (origin / "inventory" / "README.md").write_text("changed on main\n", encoding="utf-8")
+    subprocess.run(["git", "commit", "-qam", "Move main on"], cwd=origin, check=True)
+
+    clone = tmp_path / "clone"
+    subprocess.run(
+        ["git", "clone", "-q", "--depth", "1", "--branch", "topic", str(origin), str(clone)],
+        check=True,
+        capture_output=True,
+    )
+    assert (
+        subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", "main"], cwd=clone, capture_output=True
+        ).returncode
+        != 0
+    ), "the clone is meant to start without the base"
+
+    result = run_step(review_action, "fetch", {"base": "main"}, clone)
+    assert result.returncode == 0, result.stderr
+    resolved = subprocess.run(
+        ["git", "rev-parse", "main^{commit}"], cwd=clone, capture_output=True, text=True
+    )
+    assert resolved.returncode == 0, "the base was fetched and still names no commit"
+
+
+@requires_bash
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
 def test_the_review_step_writes_the_bundle_and_reports_the_verdict(
     review_action: dict[str, Any], tmp_path: Path
 ) -> None:

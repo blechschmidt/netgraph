@@ -280,6 +280,25 @@ runs:
             exit 1
           }
 
+        # A fetch *by name* leaves FETCH_HEAD and nothing else: the objects are
+        # here, and 'main' still resolves to nothing, so the review would fail
+        # later with git saying 'not a valid object name'. Give the commit the
+        # name it was asked for. (A fetch by sha needs none of this -- the
+        # object resolves on its own once it is present.)
+        if ! git rev-parse --verify --quiet "${NETGRAPH_BASE}^{commit}" >/dev/null; then
+          git update-ref "refs/heads/${NETGRAPH_BASE}" "$(git rev-parse FETCH_HEAD^{commit})"
+        fi
+
+        # And check, here, that it worked. The first version of this step
+        # reported success on a fetch that left the base unresolvable, and the
+        # failure surfaced two commands later inside netgraph -- in a message
+        # about an inventory, for a problem about a ref.
+        if ! git rev-parse --verify --quiet "${NETGRAPH_BASE}^{commit}" >/dev/null; then
+          echo "::error::fetched '${NETGRAPH_BASE}' but it still names no commit here"
+          exit 1
+        fi
+        echo "base ${NETGRAPH_BASE} is $(git rev-parse --short "${NETGRAPH_BASE}^{commit}")"
+
     - name: Run netgraph review
       id: review
       shell: bash
