@@ -129,6 +129,30 @@ That last test completes an element name out of an inventory whose path contains
 space, which is the case that would break if the words travelled to Python
 whitespace-separated instead of newline-separated.
 
+### The Graphviz is not the same Graphviz
+
+The three runners install whatever their package manager has, and as of
+2026-08-15 that is **2.43 on `ubuntu-24.04`** — Ubuntu has shipped it since
+22.04 — against **15.x on `macos-14` and `windows-latest`**. Twelve years apart,
+and the newer one spells the same layout more verbosely and prints a pinned
+coordinate to one decimal rather than two.
+
+Nothing netgraph *writes* depends on that: the DOT and Mermaid goldens are
+netgraph's own output, and the SVG tests assert structure rather than bytes. Two
+guards do, because their subject is a drawing:
+
+* `tests/test_html.py`'s size budget, where 96 % of what a view costs is the
+  `<svg>` Graphviz produced. Its threshold is calibrated to the fattest runner
+  in the matrix, and the table above it records the figure on each.
+* `tests/test_properties.py`'s `RIGID`, how far a rendered coordinate may sit
+  from the one that was pinned — a tenth of a point, which is the precision the
+  newer Graphviz round-trips one at.
+
+Both carry the measurement and the date in a comment. A guard whose number came
+from one runner is a guard that fails on the other two, so when one of these
+moves the fix is to re-measure everywhere rather than to relax it until the red
+job goes green.
+
 ## The browser layer
 
 `netgraph web` is about fourteen hundred lines of CSS and JavaScript, and until

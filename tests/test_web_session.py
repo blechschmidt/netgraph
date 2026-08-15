@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 import shutil
 import subprocess
 import urllib.error
@@ -884,9 +885,14 @@ def test_an_entry_names_the_element_it_is_about(session: EditingSession) -> None
 
 def test_an_entry_carries_the_command_that_would_replay_it(session: EditingSession) -> None:
     session.apply([{"op": "delete", "address": "srv-nas", "cascade": True}])
-    assert session.journal()[0].commands == (
-        f"netgraph -i {session.root} edit delete srv-nas --cascade",
+    # Quoted the way the renderer quotes -- POSIX, by design -- rather than
+    # interpolated: a temporary directory on Windows is ``C:\Users\...``, whose
+    # backslashes shlex.quote wraps, and pinning the unquoted spelling would
+    # assert the renderer is broken on the one platform it says it is not.
+    expected = shlex.join(
+        ["netgraph", "-i", str(session.root), "edit", "delete", "srv-nas", "--cascade"]
     )
+    assert session.journal()[0].commands == (expected,)
 
 
 def test_the_handover_is_the_whole_session_in_order(session: EditingSession) -> None:

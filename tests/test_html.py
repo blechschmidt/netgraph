@@ -519,20 +519,30 @@ def test_a_record_is_stored_once_however_many_layers_draw_it(home_lab: Inventory
 #   | page / drawing bytes       | 1.03  | 1.03  | 1.02  | 1.61    | 1.41 | 1.10 |
 #   | …with --icons cisco        | 1.04  | 1.02  | 1.02  | 1.78    | 1.28 | 1.10 |
 #   | record block, 2 layers / 1 | 1.04  | 1.04  | 1.04  | 2.00    | 2.00 | 1.15 |
-#   | bytes per element per view | 543   | 543   | 806   | 848     | 1110 | 650  |
-#   | …with --icons cisco        | 428   | 893   | 690   | 732     | 1459 | 650  |
+#   | bytes per element per view | 543   | 543   | 806   | 848     | 1110 | 780  |
+#   | …with --icons cisco        | 428   | 893   | 690   | 732     | 1459 | 780  |
 #
 # Every column is caught by at least one row: the pooled records by the first
 # three, the two hoists by the last two — which is why the last two exist, since
 # a payload that grows inside a drawing inflates the denominator of a ratio
 # taken from the drawings and hides itself there.
 #
-# The headroom above today's worst figure is 20 %. That is tighter than a timing
-# guard would dare be and it can afford to be: these are byte counts of a
-# deterministic renderer, with no run-to-run spread at all. What can move them
-# is a Graphviz release that lays a diagram out differently — and if one ever
-# does, raise the threshold here and record the new number in entry 8 rather
-# than deleting the test.
+# The last two rows are byte counts of a drawing, and a drawing is Graphviz's
+# output: 96 % of what an added view costs is the SVG itself (595 bytes per
+# element, of which 569 are inside an ``<svg>``, measured on campus). So that
+# figure moves with the Graphviz release, and on 2026-08-15 it moved enough to
+# fail the job — 543 → 595 on 2.43 as the drawings themselves grew, and 704 on
+# the 15.x that macOS and Windows now install, where the same layout is spelled
+# more verbosely. The ratios above did not move at all, which is what says the
+# growth is Graphviz's and not the page's.
+#
+# 780 is therefore what the threshold is calibrated to: above the fattest figure
+# any runner in the matrix produces today (704, with 11 % headroom), and still
+# below every "reverted" column in *both* Graphviz generations — the smallest of
+# them is 806 on 2.43, and each is a good fifth larger on 15.x. Raising it
+# further would start letting a real regression through, so the next release
+# that moves these numbers wants a re-measurement rather than another bump; the
+# figures to re-take are the ones in this table.
 
 #: What an extra view may cost beyond the drawings it adds.
 MARGINAL_VIEW_BUDGET = 1.10
@@ -540,8 +550,9 @@ MARGINAL_VIEW_BUDGET = 1.10
 #: What a second layer of the same elements may cost in records.
 MARGINAL_RECORD_BUDGET = 1.15
 
-#: What one view of one element may cost, in bytes of page.
-MARGINAL_BYTES_PER_ELEMENT = 650
+#: What one view of one element may cost, in bytes of page. Mostly a figure
+#: about the Graphviz that drew it; see the table above for how it is set.
+MARGINAL_BYTES_PER_ELEMENT = 780
 
 
 def page_and_drawings(source: str) -> tuple[int, int, int]:

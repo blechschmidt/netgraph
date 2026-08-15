@@ -7,7 +7,7 @@ So the checks that stand in front of it are asserted here rather than only in th
 workflow -- a guard exercised solely by the release it guards is not a guard, it
 is a hope.
 
-Four things are checked:
+Five things are checked:
 
 * ``tools/release.py`` refuses a tag that disagrees with ``pyproject.toml``, a
   missing changelog section, an empty one and an undated heading, and extracts
@@ -21,24 +21,32 @@ Four things are checked:
 * ``netgraph --version`` and ``netgraph version --json`` report the package, the
   Python and the Graphviz actually in use, in the shapes the workflow and
   ``docs/commands/version.md`` promise.
+* The package still imports on the interpreters ``requires-python`` and the
+  classifiers claim -- which is not the one this suite runs on, and is a claim
+  a release makes to everybody who installs it.
 """
 
 from __future__ import annotations
 
+import dataclasses
+import importlib
 import importlib.util
 import json
+import pkgutil
 import re
 import subprocess
 import sys
+from collections.abc import Iterable
 from importlib import metadata
 from pathlib import Path
-from types import ModuleType
+from types import MappingProxyType, ModuleType
 from typing import Any
 
 import pytest
 import yaml
 from click.testing import CliRunner
 
+import netgraph
 from netgraph import __version__
 from netgraph.cli import cli
 from netgraph.version import (
@@ -320,6 +328,70 @@ def test_the_changelog_is_linked_from_the_documentation_index() -> None:
     index = (REPO_ROOT / "docs" / "README.md").read_text(encoding="utf-8")
     assert "CHANGELOG.md" in index
     assert "releasing.md" in index
+
+
+# --------------------------------------------------------------------------- #
+# The interpreters the package claims
+# --------------------------------------------------------------------------- #
+
+
+def netgraph_modules() -> list[ModuleType]:
+    """Every module of the installed package, imported."""
+    modules = [netgraph]
+    for info in pkgutil.walk_packages(netgraph.__path__, prefix="netgraph."):
+        modules.append(importlib.import_module(info.name))
+    return modules
+
+
+def test_the_whole_package_imports() -> None:
+    """A module nothing imports is a module nothing has checked syntax of."""
+    assert len(netgraph_modules()) > 100
+
+
+def test_no_dataclass_default_is_a_mapping_proxy() -> None:
+    """``MappingProxyType({})`` as a default is an import error on 3.10 and 3.11.
+
+    ``dataclasses`` refuses a default whose class is unhashable, and
+    ``mappingproxy`` only became hashable in 3.12 — so a field written as
+    ``origin: Mapping[str, str] = MappingProxyType({})`` imports on the
+    interpreter most of us have and raises ``ValueError`` at *import time* on
+    the oldest one ``requires-python`` claims. Nothing else notices: ruff's
+    RUF009 has ``MappingProxyType`` on its known-immutable list, and mypy's
+    ``--python-version 3.11`` does not model the check.
+
+    It has now happened twice: ``netgraph lsp`` in July, and
+    ``netgraph.render.styles`` on 2026-08-15, which took the whole 3.11 job with
+    it before a single test ran — and, on a 3.11 anybody had installed netgraph
+    on, every command that draws anything. The first time it was answered with
+    ``test_a_cursor_context_can_be_built_on_every_supported_python``, which
+    covers one module; this is the one that covers the package. The spelling
+    that works everywhere is the one the rest of the package uses: a
+    module-level constant behind a ``field(default_factory=lambda: _EMPTY)``.
+    """
+    offenders = [
+        f"{cls.__module__}.{cls.__qualname__}.{entry.name}"
+        for cls in dataclasses_of(netgraph_modules())
+        for entry in dataclasses.fields(cls)
+        if isinstance(entry.default, MappingProxyType)
+    ]
+    assert not offenders, (
+        "these dataclass fields default to a mappingproxy, which Python 3.10 and "
+        f"3.11 refuse at import time; use field(default_factory=...): {offenders}"
+    )
+
+
+def dataclasses_of(modules: Iterable[ModuleType]) -> list[type]:
+    """Every dataclass netgraph defines, once each."""
+    found: dict[str, type] = {}
+    for module in modules:
+        for value in vars(module).values():
+            if (
+                isinstance(value, type)
+                and dataclasses.is_dataclass(value)
+                and value.__module__.startswith("netgraph")
+            ):
+                found[f"{value.__module__}.{value.__qualname__}"] = value
+    return list(found.values())
 
 
 # --------------------------------------------------------------------------- #

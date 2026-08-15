@@ -1012,17 +1012,32 @@ inflates any denominator taken from the drawings and hides itself there.
 | page / drawing bytes | 1.03 | 1.03 | 1.02 | 1.61 | 1.41 | 1.10 |
 | …with `--icons cisco` | 1.04 | 1.02 | 1.02 | 1.78 | 1.28 | 1.10 |
 | record block, 2 layers / 1 | 1.04 | 1.04 | 1.04 | 2.00 | 2.00 | 1.15 |
-| bytes per element per view | 543 | 543 | 806 | 848 | 1110 | 650 |
-| …with `--icons cisco` | 428 | 893 | 690 | 732 | 1459 | 650 |
+| bytes per element per view | 543 | 543 | 806 | 848 | 1110 | 780 |
+| …with `--icons cisco` | 428 | 893 | 690 | 732 | 1459 | 780 |
 
 The middle columns are each change disabled on its own, so the table says which
 row catches which revert: every one of the three is over a threshold in at least
-one row, and a full revert is over four of the five. The headroom above today's
-worst figure is 20 %, which is tighter than any of the timing guards in entries
-5 and 7 would dare be and can afford to be — these are byte counts of a
-deterministic renderer with no run-to-run spread at all. What can move them is a
-Graphviz release that lays a diagram out differently; if one ever does, raise
-the threshold there and record the new number here, do not delete the test.
+one row, and a full revert is over four of the five. These are byte counts of a
+deterministic renderer with no run-to-run spread at all, so the thresholds can
+be — and the two ratios are — far tighter than any of the timing guards in
+entries 5 and 7 would dare be.
+
+The last two rows are the exception, and 2026-08-15 is when that showed. They
+are byte counts of a *drawing*, and a drawing is Graphviz's output: 96 % of what
+an added view costs is the SVG itself (595 bytes per element on `campus`, of
+which 569 are inside an `<svg>`). So the figure moves with the Graphviz release
+and not with anything in this repository — 543 → 595 on the 2.43 that
+`ubuntu-24.04` ships, and 704 on the 15.x that `macos-14` and `windows-latest`
+now install, where the same layout is spelled more verbosely. The two ratios did
+not move at all, which is what says the growth is Graphviz's and not the page's.
+
+The threshold was raised from 650 to **780** for that: above the fattest figure
+any runner in the matrix produces today, with 11 % headroom, and still below
+every reverted column in both Graphviz generations — the smallest of those is
+806 on 2.43, and each is a good fifth larger on 15.x. That is the whole of the
+room there is. Raising it further would start letting a real regression through,
+so the next release that moves these numbers wants the table re-measured rather
+than another bump.
 
 Two sharper guards sit next to it, because a ratio is a blunt instrument for a
 property that can be stated exactly.

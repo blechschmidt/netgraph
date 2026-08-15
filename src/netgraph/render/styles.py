@@ -44,7 +44,7 @@ this diagram odd because of the network or because of the stylesheet?".
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Final
 
@@ -119,6 +119,16 @@ _DOT_SHAPES: Final[Mapping[str, str]] = MappingProxyType(
 #: The shape a name netgraph does not know falls back to.
 _FALLBACK_SHAPE: Final = "box"
 
+#: The empty mappings the dataclasses below default to. Shared constants behind
+#: a ``default_factory`` rather than written inline as the default, because a
+#: ``mappingproxy`` *is* the default a dataclass refuses: 3.11 rejects any
+#: default whose class is unhashable, and ``mappingproxy`` only became hashable
+#: in 3.12 -- so an inline one imports fine on the interpreter you have and
+#: raises ``ValueError`` at import time on the oldest one this package supports.
+#: The same shape as :data:`netgraph.config._EMPTY_SEVERITIES`.
+_NO_ORIGIN: Final[Mapping[str, str]] = MappingProxyType({})
+_NO_NODE_STYLES: Final[Mapping[str, ResolvedStyle]] = MappingProxyType({})
+
 
 def dot_shape(name: str | None) -> str:
     """The Graphviz spelling of a resolved shape, defaulted for an unknown one."""
@@ -173,7 +183,7 @@ class ResolvedStyle:
     opacity: float | None = None
     #: Which rung of the ladder supplied each field, keyed as a document spells
     #: the field. Only the fields that were set appear.
-    origin: Mapping[str, str] = MappingProxyType({})
+    origin: Mapping[str, str] = field(default_factory=lambda: _NO_ORIGIN)
 
     @property
     def faded_fill(self) -> str | None:
@@ -340,7 +350,7 @@ class StyleMap:
     second parallel sequence through every function it has.
     """
 
-    nodes: Mapping[str, ResolvedStyle] = MappingProxyType({})
+    nodes: Mapping[str, ResolvedStyle] = field(default_factory=lambda: _NO_NODE_STYLES)
     edges: tuple[ResolvedStyle, ...] = ()
     #: Was the ladder walked at all? ``False`` under ``--no-style``.
     enabled: bool = True

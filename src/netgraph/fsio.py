@@ -1,6 +1,6 @@
 """Writing files the same way on every platform netgraph runs on.
 
-Three questions have one answer each here, rather than one answer per caller.
+Four questions have one answer each here, rather than one answer per caller.
 
 **What is a line ending?** ``\\n``, everywhere. Every artefact netgraph emits is
 defined in bytes — a golden file compared byte for byte, a canonical YAML form
@@ -29,6 +29,12 @@ file to inspect it, a viewer that has not closed the old one — so
 :func:`replace_atomically` retries briefly rather than turning a transient
 sharing violation into a failed render.
 
+**How is a path shown?** Relative to the working directory and with forward
+slashes, by :func:`display_path`, wherever netgraph prints one for a person to
+read — a diff header, a report, a transcript in ``docs/``. The separator on disk
+is the platform's; the separator in a document netgraph produces is ``/``, so the
+same tree produces the same output whoever ran the command.
+
 **What may a generated file be called?** :func:`safe_file_stem` answers for the
 one command that derives file names from data it did not write,
 ``netgraph import``. Windows reserves a handful of device names (``NUL``,
@@ -47,6 +53,7 @@ from typing import Final
 __all__ = [
     "LINE_ENDING",
     "RESERVED_FILE_STEMS",
+    "display_path",
     "is_reserved_file_stem",
     "replace_atomically",
     "safe_file_stem",
@@ -75,6 +82,28 @@ RESERVED_FILE_STEMS: Final[frozenset[str]] = frozenset(
     | {f"com{digit}" for digit in range(10)}
     | {f"lpt{digit}" for digit in range(10)}
 )
+
+
+def display_path(path: Path) -> str:
+    """``path`` as a document should quote it: relative to here, forward slashes.
+
+    ``-i`` resolves its argument, so nearly every path netgraph holds is
+    absolute — which makes for a noisy file list and, worse, for output that
+    differs between two machines looking at the same tree. Relative to the
+    working directory is what a person typed and what a patch wants; a path
+    outside it stays absolute, since a ``../../..`` chain is not an improvement.
+
+    The separator is always ``/``, including on Windows, and that is the reason
+    this is one function rather than four spellings of it. These strings end up
+    in a unified diff header, in a JUnit ``<property>``, in the first line of a
+    report and in a documented transcript — a ``+++ b/examples\\home-lab\\sw.yaml``
+    is a patch nothing can apply, and an ``examples\\home-lab`` in the rest is a
+    document that would need a second copy of every page quoting it.
+    """
+    try:
+        return path.relative_to(Path.cwd()).as_posix()
+    except (OSError, ValueError):
+        return path.as_posix()
 
 
 def is_reserved_file_stem(stem: str) -> bool:

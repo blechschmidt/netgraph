@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -1662,10 +1663,27 @@ _SCRIPTS: Final = str(Path(sys.executable).parent)
 
 
 def _replay(root: Path, command: str) -> subprocess.CompletedProcess[str]:
-    """Run one rendered command line against ``root``, as a shell would."""
+    """Run one rendered command line against ``root``, as a POSIX shell would.
+
+    Through the real shell where there is one, because a rendering is a claim
+    about what a shell does with it and ``/bin/sh`` is the authority on that.
+    Not on Windows: :mod:`netgraph.edit.commands` quotes with
+    :func:`shlex.quote` by design and says so, and the shell ``shell=True``
+    reaches for there is ``cmd.exe``, which reads ``'OptiPlex 7020'`` as two
+    arguments and a stray quote. :func:`shlex.split` is that same grammar
+    without a shell, so what this test asks -- does the rendered line do what
+    the operation did -- is asked on every platform, and only the second opinion
+    from ``sh`` is missing on the one that has no ``sh``.
+    """
     environment = {**os.environ, "PATH": _SCRIPTS + os.pathsep + os.environ.get("PATH", "")}
+    through_a_shell = os.name == "posix"
     return subprocess.run(
-        command, cwd=root.parent, shell=True, capture_output=True, text=True, env=environment
+        command if through_a_shell else shlex.split(command),
+        cwd=root.parent,
+        shell=through_a_shell,
+        capture_output=True,
+        text=True,
+        env=environment,
     )
 
 

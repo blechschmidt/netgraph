@@ -247,6 +247,12 @@ _ANNOTATION_ID_PREFIX: Final = "annotation:"
 #: label printed under the node.
 _NOTE_OFFSET: Final[tuple[float, float]] = (140.0, 70.0)
 
+#: The empty icon table :class:`_Look` defaults to. A shared constant behind a
+#: ``default_factory``, because a ``mappingproxy`` written inline as a dataclass
+#: default raises ``ValueError`` at import time on 3.11, where it is still
+#: unhashable; see :data:`netgraph.render.styles._NO_ORIGIN`.
+_NO_ICONS: Final[Mapping[str, str]] = MappingProxyType({})
+
 #: How far outside the drawing a legend is placed in a fixed arrangement. Enough
 #: that a key never lands on a device; see :func:`_legend_pos`.
 _LEGEND_MARGIN: Final = 90.0
@@ -1046,7 +1052,7 @@ class _Look:
     #: Icon *name* -> file name inside the theme directory. Keyed by name
     #: rather than by kind: ``spec.style.icon`` lets one element borrow
     #: another glyph, so the kind is only the default name.
-    icons: Mapping[str, str] = MappingProxyType({})
+    icons: Mapping[str, str] = field(default_factory=lambda: _NO_ICONS)
 
     def image(self, style: ResolvedStyle) -> str | None:
         """The file to draw this node as, or ``None`` for a plain shape."""

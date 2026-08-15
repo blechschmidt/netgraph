@@ -28,7 +28,7 @@ from typing import Final
 
 from netgraph.fmt.canonical import FormatSyntaxError, format_stream
 from netgraph.fmt.verify import verify
-from netgraph.fsio import write_text_atomically
+from netgraph.fsio import display_path, write_text_atomically
 from netgraph.loader.inventory import LoadError
 from netgraph.loader.tree import iter_inventory_files
 
@@ -132,26 +132,6 @@ class Summary:
         if self.failures:
             return True
         return bool(self.changed) and mode is not Mode.WRITE
-
-
-def display_path(path: Path) -> str:
-    """``path`` relative to the working directory, if it is below it.
-
-    ``-i`` resolves its argument, so every path here is absolute — which makes
-    for a noisy file list and, worse, a diff header of ``a//home/you/net/x.yaml``
-    that ``git apply -p1`` cannot strip. Relative is what a person typed and
-    what a patch wants.
-
-    The separator is always ``/``, including on Windows: this string ends up in
-    a unified diff header, and every tool that reads one — ``git apply``,
-    ``patch``, a review UI — spells a path that way whatever produced it. A
-    Windows-native ``examples\\home-lab\\sw.yaml`` in a ``+++ b/`` line is a
-    patch nothing can apply.
-    """
-    try:
-        return path.relative_to(Path.cwd()).as_posix()
-    except ValueError:
-        return path.as_posix()
 
 
 def format_source(text: str, *, name: str) -> str:

@@ -39,6 +39,7 @@ from netgraph.drift.model import (
     ElementDrift,
     Unobserved,
 )
+from netgraph.fsio import display_path
 
 __all__ = ["FORMATS", "as_json", "as_junit_report", "render_drift", "write_text"]
 
@@ -103,16 +104,10 @@ def _root_text(root: Path) -> str:
     JSON envelope keeps the absolute form, because a consumer of that is not
     reading, it is resolving.
 
-    Written with forward slashes, as every other path netgraph prints is
-    (``netgraph fmt``, every diagnostic, every namespaced element name): the
-    separator is the platform's, but the report is a document, and one that
-    changed shape on Windows would need a second copy of every transcript that
-    quotes it.
+    :func:`~netgraph.fsio.display_path` is where that rule and the forward
+    slashes it prints live; this is a name for what one means here.
     """
-    try:
-        return root.relative_to(Path.cwd()).as_posix()
-    except (OSError, ValueError):
-        return root.as_posix()
+    return display_path(root)
 
 
 def _write_group(console: Console, group: ElementDrift) -> None:

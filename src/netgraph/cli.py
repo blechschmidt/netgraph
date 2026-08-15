@@ -174,7 +174,7 @@ from netgraph.export import (
 from netgraph.export import FORMATS as EXPORT_FORMATS
 from netgraph.export.config.write import stale_files, write_config
 from netgraph.fixes import FIXES, FixReport, repair, spec_for
-from netgraph.fsio import write_text
+from netgraph.fsio import display_path, write_text
 from netgraph.history import Commit, Frame, HistoryError, Timeline
 from netgraph.impact import DEFAULT_LIMIT, ImpactError, render_impact
 from netgraph.impact import LAYERS as IMPACT_LAYERS
@@ -637,13 +637,18 @@ def init_command(
 
     console.info(f"created {_plural(len(written), 'file')} in {path}:")
     for file in written:
-        console.info(f"  {_display_path(file, path)}")
+        console.info(f"  {_path_inside(file, path)}")
     for line in _next_steps(path, with_schema=with_schema, minimal=minimal):
         console.info(line)
 
 
-def _display_path(file: Path, root: Path) -> str:
-    """``file`` as written inside ``root``, falling back to the path as given."""
+def _path_inside(file: Path, root: Path) -> str:
+    """``file`` as written inside ``root``, falling back to the path as given.
+
+    Relative to the tree that was just created rather than to the working
+    directory, which is what :func:`~netgraph.fsio.display_path` answers; the
+    listing under "created 6 files in net/" reads as the file names it made.
+    """
     try:
         return file.relative_to(root).as_posix()
     except ValueError:  # pragma: no cover - every written file is under the root
@@ -846,7 +851,7 @@ def import_captures_command(
         written = write_files(files, output, force=force)
         report.info(f"wrote {_plural(len(written), 'file')} to {output}:")
         for file in written:
-            report.info(f"  {_display_path(file, output)}")
+            report.info(f"  {_path_inside(file, output)}")
         inventory = load_tree(output)
 
     report.info("")
@@ -2592,9 +2597,16 @@ def _load_state(
     folder = Path(spec)
     if folder.is_dir():
         inventory = load_tree(folder)
+        # ``display_path`` and not ``str``: this description is the first line
+        # the plan prints and a field of the plan file, so a folder named
+        # ``examples/home-lab`` has to read back that way on Windows too --
+        # otherwise the same command against the same tree produces a different
+        # document depending on who ran it.
         return _State(
             inventory=inventory,
-            ref=StateRef(kind="folder", description=str(folder), digest=state_digest(inventory)),
+            ref=StateRef(
+                kind="folder", description=display_path(folder), digest=state_digest(inventory)
+            ),
         )
     exported = stack.enter_context(git_ref(root, spec))
     inventory = load_tree(exported)

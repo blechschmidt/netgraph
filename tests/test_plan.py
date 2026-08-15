@@ -121,11 +121,20 @@ def plan_of(before: Path, after: Path, **kwargs: Any) -> Plan:
 
 
 def text_of(plan: Plan) -> str:
-    """The plan as ``netgraph plan`` prints it, without colour."""
+    """The plan as ``netgraph plan`` prints it, without colour.
+
+    The line endings are folded to ``\\n``, which is what Click's own
+    ``Result.output`` does with the same buffer and for the same reason: the
+    stream ``isolation()`` installs is a text wrapper in the default newline
+    mode, so on Windows every ``\\n`` written through it arrives in the buffer
+    as ``\\r\\n``. A golden read back with :meth:`~pathlib.Path.read_text` has
+    already been folded the other way, so without this the goldens below differ
+    from what they pin in every single line -- on one platform only.
+    """
     runner = CliRunner()
     with runner.isolation() as (out, _error, _):
         write_plan(Console(color=False), plan)
-    return out.getvalue().decode("utf-8")
+    return out.getvalue().decode("utf-8").replace("\r\n", "\n")
 
 
 def addresses(plan: Plan) -> list[str]:

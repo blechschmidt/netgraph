@@ -78,12 +78,15 @@ import strategies as ng  # isort: skip -- tests/ is on sys.path, not a package
 
 
 #: How far a rendered coordinate may sit from its stored one, once the drawing's
-#: single translation is taken off. Graphviz reports positions rounded to a
-#: hundredth of a point and netgraph stores them the same way, so the two can
-#: disagree in the last place they both print; a twentieth of a point is a
-#: five-hundredth of a millimetre on paper and several hundred times smaller than
-#: any drift a broken arrangement produces.
-RIGID: Final = 0.05
+#: single translation is taken off. netgraph stores a position to a hundredth of
+#: a point; Graphviz takes it in points, keeps it in inches and prints it in
+#: points again, so what comes back is the same coordinate to within the last
+#: place *it* prints -- which is a hundredth of a point on Graphviz 2.43 and a
+#: tenth on 15.x (191.29 pinned, 191.3 drawn: macOS and Windows CI, 2026-08-15).
+#: A tenth of a point is a thirty-fifth of a millimetre on paper and several
+#: hundred times smaller than any drift a broken arrangement produces, which is
+#: measured in whole nodes.
+RIGID: Final = 0.1
 
 #: Layers a topology can be drawn at. Every one of them has to survive every
 #: inventory, including the ones where the layer is empty.
@@ -1140,7 +1143,7 @@ def test_a_hand_edited_arrangement_survives_a_render_and_a_reload(
         again = _drawn(replace(graph, geometry=settled), options)
         for fqn, stored in settled.nodes.items():
             placed = again.nodes[fqn]
-            assert (placed.x, placed.y) == pytest.approx((stored.x, stored.y), abs=0.01), fqn
+            assert (placed.x, placed.y) == pytest.approx((stored.x, stored.y), abs=RIGID), fqn
 
         # Reloading the *written* form must reproduce the same arrangement.
         reloaded = _reloaded(root, edited)

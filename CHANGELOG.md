@@ -797,6 +797,21 @@ publish a version whose section is missing or empty — see
 
 ### Fixed
 
+- **Nothing could be drawn on Python 3.11: importing `netgraph.render` raised `ValueError`.**
+  Two fields of the style resolver defaulted to a `mappingproxy`, which `dataclasses`
+  refuses before 3.12 and refuses at *import* time — so on the 3.11 the package claims to
+  support, `netgraph render`, `watch`, `web`, `export` and everything else that reaches the
+  renderer failed on the import, not on the work. This is the second time the same shape of
+  bug has shipped (`netgraph lsp`, above), so the guard is now the package rather than the
+  module: `tests/test_release.py::test_no_dataclass_default_is_a_mapping_proxy` imports
+  every netgraph module and inspects every dataclass field, on whatever interpreter you run
+  it with.
+- **`netgraph plan` named a folder with backslashes on Windows.** The header of a plan, and
+  the `description` recorded in a plan file, spelled `--to examples/home-lab` back as
+  `examples\home-lab` — so the same command against the same two trees produced a different
+  document depending on who ran it. Every path netgraph prints for a person to read now goes
+  through one function, `netgraph.fsio.display_path`, which is where the "relative to here,
+  forward slashes" rule that `netgraph fmt`, `drift` and `test` already followed now lives.
 - **Orthogonal links were drawn straight across the devices they passed.** An arranged
   diagram with `routing: orthogonal` routed each leg locally and avoided nothing, so a
   cable between two switches with a third between them was drawn across the third one's

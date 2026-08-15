@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any, Final
 
 from netgraph.diagnostics import JUnitCase, as_junit, dump_json
+from netgraph.fsio import display_path
 from netgraph.loader.inventory import short_name
 from netgraph.testing.model import FAILED, PASSED, SKIPPED, SuiteResult, TestReport, Verdict
 
@@ -216,15 +217,10 @@ def _root_text(root: Path) -> str:
     JSON envelope keeps the absolute form, because a consumer of that is not
     reading it, it is resolving it.
 
-    The same rule and the same helper's reasoning as
-    :func:`netgraph.drift.report._root_text`; forward slashes for the same
-    reason, that a document changing shape on Windows would need a second copy
-    of every transcript quoting it.
+    The same rule, and the same function behind it, as
+    :func:`netgraph.drift.report._root_text`: :func:`~netgraph.fsio.display_path`.
     """
-    try:
-        return root.relative_to(Path.cwd()).as_posix()
-    except (OSError, ValueError):
-        return root.as_posix()
+    return display_path(root)
 
 
 def _cases(report: TestReport) -> Iterator[JUnitCase]:
