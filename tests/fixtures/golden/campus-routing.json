@@ -107,7 +107,17 @@
             ]
           }
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/north/access/sw-north-acc-02",
@@ -200,7 +210,17 @@
             ]
           }
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/north/access/sw-north-acc-03",
@@ -891,7 +911,17 @@
             ]
           }
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/north/core/rtr-north-core-01",
@@ -964,7 +994,17 @@
             "2001:db8:ff:3::2/64"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/north/distribution/sw-north-dist-01",
@@ -1117,7 +1157,17 @@
             "2001:db8:1::2/64"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/south/access/sw-south-acc-01",
@@ -1223,7 +1273,17 @@
             ]
           }
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/south/access/sw-south-acc-02",
@@ -1316,7 +1376,17 @@
             ]
           }
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/south/core/rtr-south-core-01",
@@ -1389,7 +1459,17 @@
             "2001:db8:ff:1::2/64"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/south/distribution/sw-south-dist-01",
@@ -1525,7 +1605,17 @@
             "2001:db8:2::2/64"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/west/access/sw-west-acc-01",
@@ -1631,7 +1721,17 @@
             ]
           }
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/west/access/sw-west-acc-02",
@@ -1724,7 +1824,17 @@
             ]
           }
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/west/core/rtr-west-core-01",
@@ -1797,7 +1907,17 @@
             "2001:db8:ff:2::2/64"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/west/distribution/sw-west-dist-01",
@@ -1933,7 +2053,17 @@
             "2001:db8:3::2/64"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     }
   ],
   "edges": [
@@ -1960,7 +2090,15 @@
         "description": "iBGP to rtr-south-core-01"
       },
       "label": "iBGP 65001",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#0369a1",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/north/core/rtr-north-core-01#bgp#192.0.2.3",
@@ -1985,7 +2123,15 @@
         "description": "iBGP to rtr-west-core-01"
       },
       "label": "iBGP 65001",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#0369a1",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/south/core/rtr-south-core-01#bgp#192.0.2.3",
@@ -2010,7 +2156,15 @@
         "description": "iBGP to rtr-west-core-01"
       },
       "label": "iBGP 65001",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#0369a1",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/north/core/rtr-north-core-01#ospf#sites/north/distribution/sw-north-dist-01",
@@ -2030,7 +2184,15 @@
         "area": "0.0.0.0"
       },
       "label": "area 0.0.0.0",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "dotted",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/south/core/rtr-south-core-01#ospf#sites/south/distribution/sw-south-dist-01",
@@ -2050,7 +2212,15 @@
         "area": "0.0.0.0"
       },
       "label": "area 0.0.0.0",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "dotted",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/west/core/rtr-west-core-01#ospf#sites/west/distribution/sw-west-dist-01",
@@ -2070,7 +2240,15 @@
         "area": "0.0.0.0"
       },
       "label": "area 0.0.0.0",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "dotted",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/north/core/rtr-north-core-01#ospf#sites/south/core/rtr-south-core-01",
@@ -2090,7 +2268,15 @@
         "area": "0.0.0.0"
       },
       "label": "area 0.0.0.0",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "dotted",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/south/core/rtr-south-core-01#ospf#sites/west/core/rtr-west-core-01",
@@ -2110,7 +2296,15 @@
         "area": "0.0.0.0"
       },
       "label": "area 0.0.0.0",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "dotted",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/north/core/rtr-north-core-01#ospf#sites/west/core/rtr-west-core-01",
@@ -2130,7 +2324,15 @@
         "area": "0.0.0.0"
       },
       "label": "area 0.0.0.0",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "dotted",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     }
   ],
   "annotations": {

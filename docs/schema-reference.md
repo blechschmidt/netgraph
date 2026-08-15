@@ -102,6 +102,7 @@ The five device kinds share one spec shape. They differ in which fields they per
 | `routes` | [StaticRoute](#specroutes) list | no | `[]` | Configured static routes, in the order the device holds them. | `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rt:static-routes` |
 | `routing` | [RoutingConfig](#specrouting) | no | *unset* | The dynamic routing protocols the device takes part in: an OSPF area, a BGP autonomous system, or both. | `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol` |
 | `power` | [PowerConfig](#specpower) | no | *unset* | What the device draws, which PDU outlets feed it, and how much PoE it hands out (§17.2). Absent means the inventory records nothing about its power. | `/eo-mib:eoPowerTable/eoPowerEntry` |
+| `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 | `from` | element reference | no | *unset* | Names a `kind: template` document whose partial spec is merged underneath this one. Consumed by the loader: it is gone before validation, the graph or any renderer sees the device. `interfaces` is required only when `from` is absent. | — |
 
 * `from` merges a template underneath the device: the device's own keys win, `interfaces` merge by `name`, and every other list the device declares replaces the template's outright. See §6.6 of [`schema.md`](schema.md).
@@ -345,6 +346,7 @@ A cable is an undirected physical link between exactly two interfaces, and a fir
 | `category` | string | no | *unset* | Cable category, free text (`cat6`, `cat6a`, `om4`). | — |
 | `connector` | string | no | *unset* | Connector type, free text (`rj45`, `lc`, `sc`). | — |
 | `label` | string | no | *unset* | The identifier printed on the cable or the patch panel. Drawn on the edge. | — |
+| `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
 ## `spec.endpoints[]`
 
@@ -370,6 +372,7 @@ An adapter presents network interfaces over a non-network host port: USB dongles
 | `ports` | integer, ≥ 1 | no | *unset* | How many downstream ports the hardware physically has. Declaring it lets the validator catch an inventory that outgrew the device (`E006`). | — |
 | `upstream` | [UpstreamPort](#specupstream) | **yes** | — | The host-facing port: the bus the adapter plugs into. | — |
 | `interfaces` | [Interface](#specinterfaces) list, ≥ 1 entry | **yes** | — | The network ports the adapter presents downstream. Only `ethernet`, `wifi` and `lag` are allowed (`NG-X003`). | `/if:interfaces/if:interface` |
+| `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
 ## `spec.upstream`
 
@@ -401,6 +404,7 @@ A tunnel is an undirected logical link between two or more interfaces of `type: 
 | `cipher` | string | no | *unset* | Negotiated cipher suite, free text (`chacha20-poly1305`, `aes-256-gcm`). Only on a tunnel that encrypts (`NG-T009`). | — |
 | `auth` | `psk` \| `certificate` \| `public-key` \| `password` | no | *unset* | How the endpoints authenticate each other: `psk`, `certificate`, `public-key` or `password`. The *method*, never the material — netgraph stores no secrets (`NG-T010`). | — |
 | `label` | string | no | *unset* | Free-text identifier printed on the edge, as a cable's `label` is. | — |
+| `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
 * `endpoints` uses the same `device:interface` form a cable does, and each one must name an interface of `type: tunnel` (`NG-T003`) — the virtual interface the tunnel presents, not the physical port its outer packets leave by.
 * `over` nests one tunnel inside another: `vxlan` over `ipsec` is written by naming the IPsec tunnel there. The chain must not loop (`NG-T005`).
@@ -419,6 +423,7 @@ A patch panel is a passive cross-connect: numbered positions on the front, the s
 | `form_factor` | string | no | *unset* | Descriptive: `keystone`, `fibre-lc`, `coupler`. Documentation only. | — |
 | `ports` | string, ≥ 1 character | **yes** | — | The positions the panel has, as a count (`24`) or as spans (`1-12,17-24`). Each one becomes a `front/<n>` and a `rear/<n>` interface (`NG-P006`). | `/if:interfaces/if:interface` |
 | `couplers` | map string → string | no | *unset* | Front position to rear position, for a panel that is not wired straight through. Absent means the identity mapping (`NG-P007`). | — |
+| `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
 * `ports` is the only required key. Each position it names becomes two interfaces, `front/<n>` and `rear/<n>`, which a cable terminates on exactly as it terminates on a device port (`NG-P001`).
 * A panel is not a hop. `netgraph render --layer physical` draws it and both cable segments; every other layer splices the run into the single edge it electrically is, between the two active ports.
@@ -437,6 +442,7 @@ A power distribution unit: numbered outlets, a rated capacity, and the supply th
 | `outlets` | string, ≥ 1 character | **yes** | — | The outlets the unit has, as a count (`24`) or as spans (`1-12,17-24`). Referred to by number from a device's `power.inputs`; at most 512, no repeats (`NG-E001`). | `/entity-mib:entPhysicalTable/entPhysicalEntry` |
 | `capacity_watts` | number, > 0.0, ≤ 1000000.0 | no | *unset* | How many watts may be drawn through the unit in total. `NG-E012` sums the declared loads against it; absent means the rating is not recorded, and nothing is graded. | `/eo-mib:eoPowerTable/eoPowerEntry/eoPowerNameplate` |
 | `input_feed` | string, ≤ 64 characters | no | *unset* | Which supply feeds the unit — `A`, `B`, `ups-1`, `utility`. Free text, compared only for equality: two PDUs on one feed do not make a device redundant (`NG-E015`). | `/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry` |
+| `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
 * `outlets` is the only required key, and takes the same count-or-range shorthand `ports` does. An outlet is **not** an interface: a power cord is not a `cable`, so nothing is cabled to a PDU — a device names an outlet in `power.inputs` instead.
 * A PDU is placed on a rack elevation through `metadata.location`, exactly as a switch is, and `netgraph render --layer rack` annotates it with its utilisation.
@@ -504,6 +510,7 @@ One identity: a person, a service account or a shared login. Owns no interfaces 
 | `type` | `person` \| `service` \| `shared` | no | `person` | `person`, `service` or `shared`. Decides whether `NG-S015` and `NG-S016` have anything to say: only a person can depart, and only a person is expected in a group. | — |
 | `status` | `active` \| `suspended` \| `departed` | no | `active` | `active`, `suspended` or `departed`. A departed account is kept rather than deleted so the memberships still to be revoked stay visible (`NG-S015`). | — |
 | `ssh_keys` | string, ≥ 1 character list, ≤ 32 entries | no | `[]` | Public keys the account authenticates with, `<algorithm> <base64> [comment]`. Normalised to single spaces; a private key is refused (`NG-S002`). | `/ietf-system:system/authentication/user/authorized-key` |
+| `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
 * `login` is optional because `metadata.name` is usually the account name already. Absent means the two are the same; everything downstream reads the materialised value, so nothing has to re-apply the default.
 * A `departed` account is *kept*, not deleted: the group memberships still to be revoked are what `NG-S015` reports, and deleting the document would delete them too.
@@ -518,6 +525,7 @@ A named set of identities. `members` may name a `user` or another `group`, which
 | `members` | element reference list, ≤ 4096 entries | no | `[]` | The users and nested groups in this group, as element references resolved outwards from the group's own namespace. Must resolve (`NG-S010`), must be an identity (`NG-S011`), and the nesting must not loop (`NG-S012`). | — |
 | `gid` | integer, 0–4294967294 | no | *unset* | POSIX group id, when the estate assigns one. 0 to 4294967294; two groups claiming one is `NG-S013`. | — |
 | `email` | string, 3–254 characters | no | *unset* | Where mail to the whole group goes, when the group is also a distribution list. | — |
+| `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
 * Membership is written on the group and nowhere else. A `user` does not list its groups: two spellings of one fact are how an inventory starts disagreeing with itself.
 * A member is an ordinary element reference (§4.1), resolved outwards from the group's own namespace. It must resolve (`NG-S010`) and must be an identity (`NG-S011`).
@@ -740,6 +748,25 @@ One row of the key: a swatch, and what it means.
 | `color` | string | no | *unset* | Colour of the swatch. Absent takes the renderer's colour for whatever the row is about. | — |
 | `shape` | `box` \| `line` \| `dashed` \| `dotted` \| `ellipse` | no | `box` | What the swatch is drawn as. A line style says the row is about links; a box says it is about nodes. | — |
 | `description` | string | no | *unset* | A second line, for the row that needs one. | — |
+
+## `spec.style`
+
+How one element is drawn. Optional on every drawable kind and on cables and tunnels; every field is optional in turn, and an absent one inherits from the theme, then the icon set, then the built-in palette.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `fill` | string | no | *unset* | Interior colour: a named colour or `#rrggbb`. `none` draws an unfilled shape. | — |
+| `stroke` | string | no | *unset* | Outline colour, and — on a cable or a tunnel — the colour of the line itself. | — |
+| `strokeWidth` | number, > 0, ≤ 20.0 | no | *unset* | Outline width in points, greater than 0 and at most 20. | — |
+| `dash` | string | no | *unset* | Line pattern: `solid`, `dashed`, `dotted` or `bold`. `bold` is a width rather than a pattern, spelled as Graphviz spells it because the built-in palette already is. | — |
+| `fontColor` | string | no | *unset* | Label colour. | — |
+| `fontSize` | integer, 6–96 | no | *unset* | Label size in points, between 6 and 96. | — |
+| `shape` | string | no | *unset* | The glyph the node is drawn as. Ignored on a cable or a tunnel, which has no shape. | — |
+| `icon` | string | no | *unset* | Picture to draw this one element as, overriding what the `--icons` theme picks for its kind. A bare name resolved inside the theme directory; `none` draws the plain shape. | — |
+| `opacity` | number, 0.0–1.0 | no | *unset* | How opaque the element is drawn, from 0 (invisible) to 1. | — |
+
+* The vocabulary is closed. A colour is a hex literal or one of the named colours, and every other field is a small enum or a bounded number, because these values end up inside Graphviz attributes and mxGraph style strings and a free-form pass-through would be an injection (`NG-Z001`).
+* `shape` is ignored on a cable and a tunnel, which have no shape to set. `icon` names a picture inside the `--icons` theme and is ignored when no theme is in use; `icon: none` draws this one element as a plain shape.
 
 ## Enumerations
 

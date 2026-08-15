@@ -1,0 +1,47 @@
+# W145 (NG-Z005) - a label drawn in the colour of the box behind it.
+#
+# Navy on navy. The shape is drawn, the cable to it is drawn, and the name of
+# the device is not - which reads as an unlabelled box rather than as a styling
+# mistake, so it is exactly the kind of thing nobody notices until a diagram is
+# in a document somebody else is reading.
+#
+# Reported only because *both* colours are written on the same element. A theme
+# setting one and an element the other is a legitimate combination whose result
+# the author can see, and a warning about a pair the element does not fully
+# control would be one nobody can act on without editing somebody else's file.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  style:
+    fill: '#1e3a8a'
+    fontColor: '#1e3a8a'
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        - 10.0.0.1/24
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-b
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        - 10.0.0.2/24
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - sw-a:port1
+    - sw-b:port1
+  medium: copper

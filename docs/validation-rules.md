@@ -2147,6 +2147,100 @@ Otherwise the fix is in the selector — check the `namespace` prefix, the label
 key and its value, and the `kinds` — or turn it into a `members` list, which
 says which elements were meant and reports each one that is missing.
 
+#### `W144` — element styled invisible
+
+*Alias: `NG-Z003`. Severity: warning.*
+
+An element's [`spec.style`](schema-reference.md#specstyle) sets `opacity: 0`.
+The element is drawn fully transparent, so nothing appears where it is — while
+every cable that lands on it is still drawn to the empty space it occupies.
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-annexe
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+  style:
+    opacity: 0          # drawn, and invisible — W144
+```
+
+Zero is legal on its own: it is the bottom of the range `opacity` accepts, and
+an editor dragging the slider to one end passes through it on its way somewhere
+else. That is why the value is not a schema error — `NG-Z001` judges each style
+value as it is written — and is reported here instead, where a combination the
+document has settled on is judged as a whole.
+
+**Why it matters.** An element nobody can see is also an element nobody can
+click, and the links to it do not vanish with it: they are drawn to a bare patch
+of canvas, which reads as a cable to nothing rather than as a cable to a switch
+somebody hid. That is a diagram that lies, and it is almost always a slider left
+at the wrong end rather than a decision.
+
+Leaving an element *out* is what the render filters are for. `--kind`, `--name`,
+`--namespace` and the rest take it out of the topology as well as out of the
+picture, so nothing is left pointing at where it used to be.
+
+**Suppress with** `W144` / `NG-Z003`, or an annotation on the element. The
+legitimate case is the one no filter expresses: an element that has to stay in
+the graph — so a path still traces through it and a link still lands on it — and
+has to be absent from the drawing. Otherwise the fix is to raise the opacity, or
+to filter the element out of the render.
+
+#### `W145` — unreadable label colour
+
+*Alias: `NG-Z005`. Severity: warning.*
+
+An element's `spec.style` gives `fill` and `fontColor` the same colour, so the
+label is drawn in the colour of the box behind it and cannot be read. The two
+are compared after the names are resolved, so `navy` and `#1e3a8a` are one
+colour written two ways and are reported as such.
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-core
+spec:
+  style:
+    fill: navy
+    fontColor: '#1e3a8a'    # the same navy — W145
+```
+
+Both colours have to be written on the **same element**. A theme that sets one
+and an element that sets the other is never reported: it is a legitimate pairing,
+the reader can see what it produced, and a warning about a combination this
+document does not fully control is one nobody can act on without editing
+somebody else's file.
+
+A transparent fill is exempt, because it is not really a fill. `fill: none` —
+and its synonym `transparent` — means "whatever is behind this", so the label
+sits on the canvas rather than on a box, and the pair says nothing about whether
+it can be read.
+
+**Why it matters.** An unreadable label is worse than a missing one. The element
+keeps its shape, its icon, its position and its links, so the diagram looks
+complete and one box is simply anonymous — and the reader who cannot name it has
+no way to tell whether the label failed or the element never had one. Nothing
+downstream repairs it, either: netgraph draws the colours the document asks for
+and never picks a contrasting one on your behalf, so the mistake survives every
+render until somebody looks at the picture.
+
+A warning rather than an error because each colour is legal on its own — a value
+that is not a colour is `NG-Z001`, refused the moment it is written — and only
+the pair is a mistake. An editor that changes the fill first and the font colour
+a keystroke later is briefly in exactly this state, and a rule that failed the
+build in between would make writing a style one field at a time impossible.
+
+**Suppress with** `W145` / `NG-Z005`, or an annotation on the element. The
+legitimate case is a shape whose label is meant not to show: a backdrop drawn in
+one flat colour, named by a `note` (§21) beside it rather than by its own text.
+Otherwise the fix is in `fontColor` — give it something that contrasts with
+`fill`.
+
 ### Info
 
 #### `I001` — locally administered MAC address
@@ -2315,7 +2409,7 @@ schema rule is a usage error:
 <!-- run: rc=2 -->
 ```console
 $ netgraph validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, I001, I002, I003, I004, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, I001, I002, I003, I004, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 Every mechanism accepts both spellings of an id — `W102` and `NG-C010` select

@@ -118,6 +118,10 @@ from netgraph.render.registry import (
     supports_interaction,
     supports_layers,
 )
+from netgraph.render.styles import ResolvedStyle, StyleMap, resolve_style
+from netgraph.render.theme import BUNDLED_THEMES as STYLE_THEMES
+from netgraph.render.theme import NO_THEME, StyleTarget, Theme, load_theme, resolve_theme
+from netgraph.render.theme import theme_choices as style_theme_choices
 
 __all__ = [
     "AGGREGATE_ID_PREFIX",
@@ -132,6 +136,7 @@ __all__ = [
     "LINK_FIELDS",
     "MERMAID_MAX_EDGES",
     "NODE_KINDS",
+    "NO_THEME",
     "PAGE_CSP",
     "PAGE_KIND",
     "PATCHPANEL_KIND",
@@ -139,6 +144,7 @@ __all__ = [
     "RACK_KIND",
     "RANKDIRS",
     "RENDERERS",
+    "STYLE_THEMES",
     "SUBNET_ID_PREFIX",
     "SUBNET_KIND",
     "TEXT_FORMATS",
@@ -170,7 +176,11 @@ __all__ = [
     "RackView",
     "RenderOptions",
     "Renderer",
+    "ResolvedStyle",
+    "StyleMap",
+    "StyleTarget",
     "Subnet",
+    "Theme",
     "TunnelEnd",
     "TunnelView",
     "UnknownElementError",
@@ -195,6 +205,7 @@ __all__ = [
     "icon_theme",
     "is_binary_format",
     "is_routable_address",
+    "load_theme",
     "media_type_for",
     "mermaid_advisories",
     "namespace_text",
@@ -210,8 +221,11 @@ __all__ = [
     "render_mermaid",
     "render_text",
     "renderer_for",
+    "resolve_style",
+    "resolve_theme",
     "resolve_tunnels",
     "splice_patch_panels",
+    "style_theme_choices",
     "suffix_for",
     "supports_diff",
     "supports_highlight",

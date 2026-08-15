@@ -68,6 +68,8 @@ def emit(context: ExportContext) -> str:
             scope=Scope.COMPLETE if options.complete else Scope.PARTIAL,
             groups=options.frames,
             annotations=options.annotations,
+            theme=options.theme,
+            styling=options.styling,
         ),
         notes=notes,
     )

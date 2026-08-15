@@ -138,6 +138,8 @@ W140  warning   NG-S015           A group still lists a user who has departed.
 W141  warning   -                 A redundancy expectation names something the tool does not understand.
 W142  warning   NG-G001           A diagram annotation names an element the inventory does not declare.
 W143  warning   NG-G004           An area's selector matches no element of the inventory.
+W144  warning   NG-Z003           A style fades an element to nothing, so it is drawn invisibly.
+W145  warning   NG-Z005           A style draws an element's label in the colour of the box behind it.
 I001  info      NG-I010           A MAC address is locally administered rather than vendor-assigned.
 I002  info      NG-C015           An interface is enabled but terminates no cable.
 I003  info      NG-T015           A tunnel listens on a port other than the registered one for its type.

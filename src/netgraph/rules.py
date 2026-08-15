@@ -813,6 +813,20 @@ RULES: Final[tuple[Rule, ...]] = (
         title="area that encloses nothing",
     ),
     Rule(
+        "W144",
+        Severity.WARNING,
+        "A style fades an element to nothing, so it is drawn invisibly.",
+        ("NG-Z003",),
+        title="element styled invisible",
+    ),
+    Rule(
+        "W145",
+        Severity.WARNING,
+        "A style draws an element's label in the colour of the box behind it.",
+        ("NG-Z005",),
+        title="unreadable label colour",
+    ),
+    Rule(
         "I001",
         Severity.INFO,
         "A MAC address is locally administered rather than vendor-assigned.",

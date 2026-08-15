@@ -36,6 +36,16 @@
           "y": 271.0
         }
       },
+      "style": {
+        "fill": "#fdf0e3",
+        "stroke": "#ea580c",
+        "shape": "ellipse",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -76,6 +86,16 @@
         "position": {
           "x": 1176.0,
           "y": 439.0
+        }
+      },
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
         }
       },
       "diff": {
@@ -131,6 +151,16 @@
           "y": 271.0
         }
       },
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -165,6 +195,16 @@
         "position": {
           "x": 1485.0,
           "y": 56.0
+        }
+      },
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
         }
       },
       "diff": {
@@ -228,6 +268,16 @@
         "position": {
           "x": 474.0,
           "y": 271.0
+        }
+      },
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
         }
       },
       "diff": {
@@ -342,6 +392,16 @@
           "y": 56.0
         }
       },
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -409,6 +469,16 @@
           "y": 271.0
         }
       },
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -456,6 +526,16 @@
         "size": {
           "width": 206.0,
           "height": 64.63
+        }
+      },
+      "style": {
+        "fill": "#eae2f5",
+        "stroke": "#7c3aed",
+        "shape": "cylinder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
         }
       },
       "diff": {
@@ -598,6 +678,14 @@
         ],
         "drawnAs": "spline"
       },
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -736,6 +824,14 @@
         ],
         "drawnAs": "spline"
       },
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -873,6 +969,14 @@
           }
         ],
         "drawnAs": "spline"
+      },
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
       },
       "diff": {
         "mark": "unchanged"
@@ -1073,6 +1177,14 @@
         ],
         "drawnAs": "spline"
       },
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -1214,6 +1326,14 @@
         ],
         "drawnAs": "spline"
       },
+      "style": {
+        "stroke": "#2563eb",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -1331,6 +1451,14 @@
           }
         ],
         "drawnAs": "spline"
+      },
+      "style": {
+        "stroke": "#9ca3af",
+        "dash": "dotted",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
       },
       "diff": {
         "mark": "unchanged"
@@ -1489,6 +1617,14 @@
           }
         ],
         "drawnAs": "spline"
+      },
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
       },
       "diff": {
         "mark": "removed"

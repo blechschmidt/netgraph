@@ -28,6 +28,7 @@ from netgraph.models.patchpanel import PatchPanel
 from netgraph.models.pdu import Pdu
 from netgraph.models.template import Template
 from netgraph.models.testsuite import TestSuite
+from netgraph.models.theme import Theme
 from netgraph.models.tunnel import Tunnel
 
 __all__ = [
@@ -41,6 +42,7 @@ __all__ = [
     "parse_layout",
     "parse_template",
     "parse_test_suite",
+    "parse_theme",
 ]
 
 #: Every concrete element model, in the order kinds are listed in §3.
@@ -91,6 +93,7 @@ _TEMPLATE_ADAPTER: Final[TypeAdapter[Template]] = TypeAdapter(Template)
 _LAYOUT_ADAPTER: Final[TypeAdapter[Layout]] = TypeAdapter(Layout)
 _TEST_SUITE_ADAPTER: Final[TypeAdapter[TestSuite]] = TypeAdapter(TestSuite)
 _ANNOTATION_ADAPTER: Final[TypeAdapter[Annotation]] = TypeAdapter(_AnnotationUnion)
+_THEME_ADAPTER: Final[TypeAdapter[Theme]] = TypeAdapter(Theme)
 
 #: pydantic error types that map onto a schema rule of §10.
 _RULE_BY_ERROR_TYPE: Final[dict[str, str]] = {
@@ -184,6 +187,28 @@ def parse_layout(document: Any, *, source: str | None = None) -> Layout:
         raise SchemaError(issues=[_not_a_mapping(document)], source=source)
     try:
         return _LAYOUT_ADAPTER.validate_python(dict(document))
+    except PydanticValidationError as exc:
+        raise SchemaError(issues=_issues_from(exc), source=source) from exc
+
+
+def parse_theme(document: Any, *, source: str | None = None) -> Theme:
+    """Parse one ``kind: theme`` document (§22.3).
+
+    A theme is not part of an inventory — see :mod:`netgraph.models.theme` — so
+    this is reached from :mod:`netgraph.render.theme` with a file the user named
+    rather than from the tree walk. Everything a theme says is checkable from
+    the one document: a selector is a set of globs and labels, and a style is a
+    closed vocabulary, so there is nothing here for the semantic validator to
+    finish later.
+
+    Raises:
+        SchemaError: The document is not a mapping, or does not match the theme
+            envelope.
+    """
+    if not isinstance(document, Mapping):
+        raise SchemaError(issues=[_not_a_mapping(document)], source=source)
+    try:
+        return _THEME_ADAPTER.validate_python(dict(document))
     except PydanticValidationError as exc:
         raise SchemaError(issues=_issues_from(exc), source=source) from exc
 

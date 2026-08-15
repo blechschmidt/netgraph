@@ -1,0 +1,47 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: layout
+metadata:
+  name: layout
+  description: >
+    Hand-typed, round numbers, and arranged on purpose so that every orthogonal
+    route the local rule draws runs across a box it is not attached to. See
+    README.md for which crossing each device is there to cause.
+spec:
+  routing: orthogonal
+  views:
+    l1:
+      nodes:
+        # The top row: two switches with a third exactly between them.
+        sw-a:
+          position: {x: 0, y: 0}
+          size: {width: 160, height: 60}
+        sw-mid:
+          position: {x: 450, y: 0}
+          size: {width: 200, height: 80}
+        sw-b:
+          position: {x: 900, y: 0}
+          size: {width: 160, height: 60}
+        # The bottom row: the same shape, three cables wide.
+        sw-c:
+          position: {x: 0, y: -300}
+          size: {width: 160, height: 80}
+        sw-blocker:
+          position: {x: 450, y: -300}
+          size: {width: 200, height: 90}
+        sw-d:
+          position: {x: 900, y: -300}
+          size: {width: 160, height: 80}
+        # Below it, a wall across the corridor and a router behind the wall.
+        sw-wall:
+          position: {x: 0, y: -460}
+          size: {width: 400, height: 60}
+        rtr:
+          position: {x: 450, y: -620}
+          size: {width: 160, height: 60}
+      edges:
+        # One bend, placed by a person, on the leg that runs east out of the
+        # router. Routing has to keep it exactly where it is and fill the leg on
+        # the far side of it, which is the one that runs into sw-wall.
+        cbl-rtr-c:
+          waypoints:
+            - {x: 700, y: -620}

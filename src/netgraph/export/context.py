@@ -37,6 +37,7 @@ from netgraph.export.names import MAX_DNS_NAME, dns_name_parts
 from netgraph.loader.inventory import Inventory
 from netgraph.render.graph import Graph, Layer, Node, PortView
 from netgraph.render.icons import IconTheme
+from netgraph.render.theme import Theme
 from netgraph.subnets import IPNetwork
 
 __all__ = [
@@ -173,6 +174,12 @@ class ExportOptions:
     view: str = Layer.L1.value
     #: The icon theme inlined into the file, or ``None`` for coloured boxes.
     icons: IconTheme | None = None
+    #: The stylesheet applied to the diagram (§22), or ``None``. mxGraph and
+    #: netgraph's style vocabulary line up almost one for one, so a colour a
+    #: manifest or a theme chooses opens in draw.io as the same colour.
+    theme: Theme | None = None
+    #: Walk the style ladder at all; ``False`` is ``--no-style``.
+    styling: bool = True
     #: Write the deflate+base64 encoding draw.io's desktop app writes by
     #: default. Off by default here: a plain diagram is one that reviews.
     compress: bool = False

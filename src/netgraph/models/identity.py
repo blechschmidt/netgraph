@@ -60,6 +60,7 @@ from netgraph.models.base import NetgraphModel
 from netgraph.models.diagnostics import field_error
 from netgraph.models.element import ElementBase
 from netgraph.models.scalars import ElementRef
+from netgraph.models.style import Style
 
 __all__ = [
     "EMAIL_PATTERN",
@@ -312,6 +313,11 @@ class UserSpec(NetgraphModel):
     #: between the algorithm, the material and the comment. Public halves only
     #: (``NG-S002``).
     ssh_keys: list[SshPublicKey] = Field(default_factory=list, max_length=MAX_SSH_KEYS)
+    #: How this element is drawn (§22): a ``fill``, a ``stroke``, a ``shape``
+    #: and six more, each optional and each inheriting from the theme, then the
+    #: icon set, then the built-in palette when absent. See
+    #: :mod:`netgraph.models.style`.
+    style: Style | None = None
 
     @model_validator(mode="after")
     def _check_shape(self) -> UserSpec:
@@ -414,6 +420,11 @@ class GroupSpec(NetgraphModel):
     gid: PosixId | None = None
     #: Where mail to the whole group goes, when the group is also a list.
     email: EmailAddress | None = None
+    #: How this element is drawn (§22): a ``fill``, a ``stroke``, a ``shape``
+    #: and six more, each optional and each inheriting from the theme, then the
+    #: icon set, then the built-in palette when absent. See
+    #: :mod:`netgraph.models.style`.
+    style: Style | None = None
 
     @model_validator(mode="after")
     def _check_members(self) -> GroupSpec:

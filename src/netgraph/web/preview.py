@@ -52,7 +52,9 @@ from netgraph.render import (
 )
 from netgraph.render.dot import to_dot, to_image
 from netgraph.render.jsonexport import annotations_payload
-from netgraph.render.routes import anchors_of, default_routing, fans_of, route_table
+from netgraph.render.routes import RouteCache, anchors_of, default_routing, fans_of, route_plan
+from netgraph.render.styles import StyleMap
+from netgraph.render.theme import Theme
 from netgraph.rules import Severity
 from netgraph.validate import Finding
 from netgraph.validate import validate as run_validation
@@ -140,10 +142,22 @@ class ViewOptions:
     #: Icon theme, chosen once on the command line rather than by the browser:
     #: it names a directory, and a request must not be able to.
     icons: IconTheme | None = field(default=None, compare=False)
+    #: The stylesheet in force (§22), chosen on the command line for the same
+    #: reason as :attr:`icons`: it names a file on this machine.
+    theme: Theme | None = field(default=None, compare=False)
+    #: Honour the styles the inventory and the theme declare. Unlike the
+    #: theme itself this *is* the browser's to set — it names nothing and
+    #: changes nothing on disk, and "show me the plain diagram" is exactly
+    #: the kind of question somebody asks while reading one.
+    styling: bool = True
 
     @classmethod
     def from_request(
-        cls, payload: Mapping[str, Any], *, icons: IconTheme | None = None
+        cls,
+        payload: Mapping[str, Any],
+        *,
+        icons: IconTheme | None = None,
+        theme: Theme | None = None,
     ) -> ViewOptions:
         """Build options from a decoded JSON request body.
 
@@ -153,7 +167,7 @@ class ViewOptions:
         Raises:
             RequestError: A field is of the wrong type or out of range.
         """
-        values: dict[str, Any] = {"icons": icons}
+        values: dict[str, Any] = {"icons": icons, "theme": theme}
         for name in _BOOLEAN_FIELDS:
             if name in payload:
                 values[name] = _boolean(payload[name], name)
@@ -169,7 +183,11 @@ class ViewOptions:
 
     @classmethod
     def from_query(
-        cls, query: Mapping[str, Sequence[str]], *, icons: IconTheme | None = None
+        cls,
+        query: Mapping[str, Sequence[str]],
+        *,
+        icons: IconTheme | None = None,
+        theme: Theme | None = None,
     ) -> ViewOptions:
         """Build options from a parsed query string.
 
@@ -201,7 +219,7 @@ class ViewOptions:
             payload["kinds"] = [
                 item for value in query["kinds"] for item in value.split(",") if item
             ]
-        return cls.from_request(payload, icons=icons)
+        return cls.from_request(payload, icons=icons, theme=theme)
 
     @property
     def filter_spec(self) -> FilterSpec:
@@ -224,6 +242,8 @@ class ViewOptions:
             annotations=self.annotations,
             title=self.title,
             icons=self.icons,
+            theme=self.theme,
+            styling=self.styling,
             tooltips=False,
             element_ids=True,
         )
@@ -260,6 +280,16 @@ class Preview:
     #: and what it says — none of which can be read off the SVG, because an area
     #: in an arranged drawing is a rectangle in the background with no id at all.
     annotations: Mapping[str, Any] | None = None
+    #: The resolved appearance of everything this pass drew (§22), keyed by
+    #: address: ``{"nodes": {fqn: style}, "edges": {id: style}}``, each style
+    #: in the form ``netgraph render -f json`` publishes it, provenance
+    #: included. ``None`` when the pass produced no picture.
+    #:
+    #: The style inspector needs all three of what the value *is*, which rung
+    #: it came from, and what it would fall back to — none of which can be
+    #: read off the SVG, where every rung has already collapsed into one hex
+    #: literal on one attribute.
+    styles: Mapping[str, Any] | None = None
     #: Wall-clock duration of the pass, in seconds.
     duration: float = 0.0
     #: What changed between two states, when this pass drew a *diff* — the marks
@@ -311,6 +341,7 @@ class Preview:
             "dangling": list(self.dangling),
             "geometry": dict(self.geometry) if self.geometry is not None else None,
             "annotations": dict(self.annotations) if self.annotations is not None else None,
+            "styles": dict(self.styles) if self.styles is not None else None,
             "counts": {
                 "nodes": self.nodes,
                 "edges": self.edges,
@@ -391,6 +422,7 @@ def render_inventory(
     known: str | None = None,
     findings: Sequence[Finding] | None = None,
     fixes: Mapping[tuple[str, str], Sequence[tuple[str, str]]] | None = None,
+    routes: RouteCache | None = None,
 ) -> Preview:
     """Validate and draw an inventory somebody else has already loaded.
 
@@ -425,6 +457,14 @@ def render_inventory(
             one list, fed from *both* this answer and the file list's, and a
             **Fix** button that appeared or vanished depending on which of the
             two landed second would be a race the user could see.
+        routes: A :class:`~netgraph.render.routes.RouteCache` to draw orthogonal
+            links through, normally the editing session's. Dragging one device
+            changes the obstacle set for every link in the drawing, and
+            re-searching all of them because of it is what would put a full
+            render inside a drag; the cache re-searches only the links whose
+            line the move actually broke. ``None`` — every other caller —
+            routes from cold, which is what a command-line render must do to be
+            reproducible.
 
     Returns:
         The diagram, its info-box records, and every problem found on the way.
@@ -475,11 +515,35 @@ def render_inventory(
         nodes=len(graph.nodes),
         edges=len(graph.edges),
         dangling=tuple(graph.dangling),
-        geometry=_geometry(graph, options.render_options),
+        geometry=_geometry(graph, options.render_options, cache=routes),
         annotations=annotations_payload(graph, options.render_options),
+        styles=_styles(graph, options.render_options),
         duration=time.monotonic() - started,
         graph_hash=digest,
     )
+
+
+def _styles(graph: Graph, options: RenderOptions) -> Mapping[str, Any]:
+    """The resolved appearance of one drawing, keyed by address.
+
+    Resolved a second time rather than read back out of the renderer: the
+    resolution is a pure function of the graph and the options, and threading a
+    :class:`~netgraph.render.styles.StyleMap` back out of ``to_image`` — which
+    goes through Graphviz and returns bytes — would be a channel that exists
+    only for this. The cost is one pass over the nodes and links, next to a
+    subprocess.
+    """
+    resolved = StyleMap.build(
+        graph, theme=options.theme, icons=options.icons, output="svg", styling=options.styling
+    )
+    return {
+        "nodes": {fqn: style.to_dict() for fqn, style in resolved.nodes.items()},
+        "edges": {
+            edge.id: resolved.edge(index).to_dict() for index, edge in enumerate(graph.edges)
+        },
+        "theme": resolved.theme.name if resolved.theme is not None else None,
+        "enabled": resolved.enabled,
+    }
 
 
 def render_diff(
@@ -589,7 +653,9 @@ def _diff_summary(drawing: Drawing, *, rejected: bool) -> str:
     return f"{counted} (drawn despite the problems below)" if rejected else counted
 
 
-def _geometry(graph: Graph, options: RenderOptions | None = None) -> dict[str, Any] | None:
+def _geometry(
+    graph: Graph, options: RenderOptions | None = None, *, cache: RouteCache | None = None
+) -> dict[str, Any] | None:
     """The graph's stored arrangement, or ``None`` when it stores none.
 
     The same coordinate system, units and ``mode`` as
@@ -628,7 +694,7 @@ def _geometry(graph: Graph, options: RenderOptions | None = None) -> dict[str, A
             key: {"x": box.x, "y": box.y, "width": box.width, "height": box.height}
             for key, box in sorted(geometry.groups.items())
         }
-    links = _links(graph, options)
+    links = _links(graph, options, cache=cache)
     if links:
         payload["links"] = links
         payload["anchors"] = {
@@ -638,22 +704,37 @@ def _geometry(graph: Graph, options: RenderOptions | None = None) -> dict[str, A
     return payload
 
 
-def _links(graph: Graph, options: RenderOptions | None) -> dict[str, Any]:
+def _links(
+    graph: Graph, options: RenderOptions | None, *, cache: RouteCache | None = None
+) -> dict[str, Any]:
     """Per link: what is pinned, what was drawn, and which nodes it joins.
 
     Only for a drawing every node of which is placed. Anywhere else Graphviz is
     routing, there is no line for the canvas to put handles on, and offering one
     would let somebody drag a bend that the next render would throw away.
+
+    ``waypoints`` and ``routed`` are the two halves of where a line goes, and
+    the canvas must not confuse them. ``waypoints`` is what the *inventory*
+    says: the bends a person dragged, each of which gets a grab handle and any
+    of which can be moved or deleted. ``routed`` is what
+    :mod:`netgraph.layout.avoid` worked out on top of them so the line misses
+    the boxes it is not attached to; it carries no handle, is recomputed on
+    every render and is never written to a document unless somebody asks for it
+    by name. Publishing it rather than making the page derive it is what keeps
+    the JavaScript mirror of :mod:`netgraph.layout.routing` exact: the canvas
+    still draws the line from anchors and waypoints, and the waypoints it draws
+    from are the ones the renderer used.
     """
-    routes = route_table(graph, options)
+    plan = route_plan(graph, options, cache=cache)
     links: dict[str, Any] = {}
-    for edge, line in zip(graph.edges, routes, strict=True):
+    for edge, line, computed in zip(graph.edges, plan.routes, plan.computed, strict=True):
         if line is None:
             continue
         pinned = graph.geometry.link(edge.id)
         links[edge.id] = {
             "endpoints": [edge.source, edge.target],
             "waypoints": [{"x": x, "y": y} for x, y in pinned.waypoints],
+            "routed": [{"x": x, "y": y} for x, y in computed],
             "routing": None if pinned.routing is None else str(pinned.routing),
             "drawnAs": str(line.routing),
             "route": [{"x": x, "y": y} for x, y in line.corners],

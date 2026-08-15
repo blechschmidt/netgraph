@@ -1,0 +1,66 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+  description: Straight across sw-mid, before routing had anything to say about it
+spec:
+  endpoints: [sw-a:e1, sw-b:e1]
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-c-d-1
+  description: First of three parallel cables past sw-blocker
+spec:
+  endpoints: [sw-c:e1, sw-d:e1]
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-c-d-2
+  description: Second of three; a lane beside the first, not its own detour
+spec:
+  endpoints: [sw-c:e2, sw-d:e2]
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-c-d-3
+  description: Third of three
+spec:
+  endpoints: [sw-c:e3, sw-d:e3]
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-c
+  description: >
+    Clean: nothing stands between the two, so routing must leave this line
+    exactly where it was.
+spec:
+  endpoints: [sw-a:e2, sw-c:e4]
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-b-d
+  description: Clean, the other side
+spec:
+  endpoints: [sw-b:e2, sw-d:e4]
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-rtr-c
+  description: >
+    Carries one bend a person placed. Routing fills the leg on the far side of
+    it, around sw-wall, and does not touch the bend itself.
+spec:
+  endpoints: [rtr:lan0, sw-c:e5]
+  medium: fiber

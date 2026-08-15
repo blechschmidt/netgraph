@@ -1854,47 +1854,147 @@ in `tests/test_web_events.py` are written against those, not against the badge.
 
 ---
 
-## 19. Orthogonal routes go through nodes, not around them
+## 19. ~~Orthogonal routes go through nodes, not around them~~ — fixed, and every crossing is gone
 
-`spec.routing: orthogonal` (§18, [`docs/rendering.md`](rendering.md#links-are-geometry-too))
-breaks each leg of a link into horizontal and vertical runs. It does **not**
-avoid obstacles: a Z route between two devices with a third sitting between them
-draws a line straight across the third one's box.
+**Status:** closed 2026-08-15. `netgraph.layout.avoid` is the router,
+`tools/route_crossings.py` the measurement, `tests/fixtures/obstructed` the
+reproduction, `tests/test_avoid.py` the guard.
 
-That is a deliberate stopping point rather than an oversight, and the reasoning
-is worth recording because "add obstacle avoidance" looks like a small
-follow-up and is not.
+`spec.routing: orthogonal` broke each leg of a link into horizontal and vertical
+runs and avoided nothing: a Z route between two devices with a third sitting
+between them drew a line straight across the third one's box. On a hand-arranged
+diagram that is the most visible thing wrong with the picture, and it is now
+gone.
 
-**What the rule is.** Two points with nothing pinned between them get a Z —
-half way along the dominant axis, across, and on — and a leg between two pinned
-points gets an L, turning along that leg's own dominant axis first. Both are
-*local*: they look at one leg and at nothing else in the diagram. That locality
-is what makes dragging a bend feel right. The line follows the cursor exactly,
-the leg on the far side of the route does not re-shape itself, and the browser
-can compute the same answer the renderer will
-(`web/assets/links.js` mirrors `netgraph.layout.routing`) without holding a
-model of the whole drawing.
+### The reproduction, and the number
 
-**What avoidance would cost.** A router that goes *around* obstacles is global:
-every node's box is an input, so moving one device can re-shape a cable on the
-other side of the diagram, and a bend the user placed becomes a hint rather than
-a decision. It is also expensive enough that the mirrored implementation would
-stop being a faithful port — and a canvas that drew one line under the cursor and
-a different one after the round trip is worse than one that draws a line through
-a box.
+The original entry had no number, which is why it survived four releases: a
+defect measured only by looking at a picture cannot be shown to be fixed.
+`tools/route_crossings.py` counts **(link, box) pairs** — one drawn polyline
+passing through the rectangle of a node it is not an endpoint of — for any
+inventory, with and without avoidance, and prints the wall clock beside it.
 
-**What to do instead, today.** Drop a bend. That is what the gesture is for, it
-takes one double-click, and the result is recorded as the decision it was.
-Graphviz's own `splines=ortho` does avoid nodes and is what an *unarranged*
-orthogonal diagram already gets — so the case where nobody has arranged anything
-is handled, and the case where somebody has is the case where they can say where
-the cable goes.
+`tests/fixtures/obstructed` (new) is eight devices arranged on purpose so that
+every kind of crossing happens: a switch exactly between two others, a wide box
+across a corridor, three parallel cables that have to get past one obstacle
+together, one link with a bend somebody placed, and two links with nothing in
+their way at all.
 
-If this is revisited, the shape to reach for is an A* over a visibility grid
-built from the node boxes, run **once per link at write time** and stored as
-waypoints, rather than at render time. That keeps the renderer local and the
-stored route a decision, and it makes "route this link around things" a command
-somebody invokes rather than a behaviour that changes under them.
+| | Crossings | Links cut | Re-routed | Median ms |
+|---|---|---|---|---|
+| `tests/fixtures/obstructed`, `--no-avoid` | **5** | 5 | 0 | 0.1 |
+| `tests/fixtures/obstructed`, `--avoid` | **0** | 0 | 3 | 3.0 |
+| `tests/fixtures/routed`, `--no-avoid` | **3** | 3 | 0 | 0.1 |
+| `tests/fixtures/routed`, `--avoid` | **0** | 0 | 3 | 4.0 |
+
+`tests/fixtures/routed` is the worked example in
+[`docs/rendering.md`](rendering.md#a-worked-example-an-orthogonal-waypointed-diagram)
+and has been committed since task 87. Nobody had noticed that three of its seven
+cables were drawn across devices, which is the entry's own point about
+unmeasured defects made twice over.
+
+### What was built
+
+**`netgraph/layout/avoid.py`.** Every placed node is inflated by a clearance
+into an obstacle; so is a free-standing `kind: area` and a placed `kind: note`
+(an area that names *members* is not — it is a zone drawn behind the devices it
+encloses, and treating it as solid would make every cable terminating inside it
+unroutable). Their edges and centre-lines are the *Hanan grid*, and an A\* over
+`(x index, y index, arrival axis)` finds the cheapest path. Cost is length, plus
+a penalty per bend, per crossing of a line already drawn, and per already-occupied
+channel. The arrival axis is in the state because without it the search finds the
+shortest *staircase* rather than the shortest route.
+
+**The output is a waypoint list** — the same list `SetLinkGeometry` stores and
+the same list a person produces by dragging a bend — so `netgraph.layout.routing`
+is untouched. It still draws the line, locally, one leg at a time, and
+`web/assets/links.js` still mirrors it exactly. The original entry's objection
+that a global router would break the mirror is answered by not putting the router
+in the mirrored layer: the canvas is *told* the waypoints rather than deriving
+them, and `tests/test_browser.py`'s route-parity test is unchanged and still
+passes.
+
+**Three promises, and each is a test.** A bend somebody placed is never moved —
+routing fills the legs *between* pinned points — and never dropped either, even
+when the detour leaves it collinear with its neighbours and the simplifier would
+have taken it out (that one was a real bug, found by the `routed` fixture). A
+link that already keeps clear of everything is left byte-identical. And nothing
+is written to anybody's files: a computed route is recomputed every render, is
+published beside the authored bends as `layout.routed` in `-f json` and to the
+editor canvas, and becomes permanent only when somebody presses `Shift-R`
+(**Pin the computed route**), at which point it is an authored route like any
+other.
+
+**Bundles route as bundles.** Three cables between one pair of switches share one
+searched route and are drawn as lanes beside it, one `FAN_GAP` apart, on
+whichever side is clear — rather than three independent searches that fan out,
+take different ways round the same box and re-converge. The side is chosen by
+trying both and counting what each runs into, because the routed line is normally
+hugging an obstacle at exactly the clearance and half a centred bundle would be
+pushed back into it.
+
+### The cost, on 784 devices
+
+`tools/bench_editor.py --no-browser` measures the routing layer against a
+generated tree, arranged by Graphviz first. 238 files, 1554 elements, 770 links:
+
+| | Median ms | What happened |
+|---|---|---|
+| route every link, cold | **78** | 84 searches, 84 links moved, 1428 states popped |
+| route every link, nothing moved | **28** | 0 searches, 770 routes reused |
+| **re-route after one node moves** | **40** | **4 of 770 links searched**, 763 reused |
+
+Four searches, not seven hundred and seventy. That is the whole point of the
+`RouteCache`: a link is re-searched only when one of the three things it actually
+depended on changed — an endpoint moved or was resized, a bend was added or
+removed, or the line it was drawn as now crosses a box it did not before. Which
+is exactly "somebody dragged a switch onto my cable", and nothing else.
+
+Two things were measured and fixed on the way, both of which had made routing
+cost `O(links × nodes)` rather than `O(links)`:
+
+* `Router.blocked` — the question "does this link need routing at all?", asked
+  once per link per render — scanned every obstacle. Through the spatial index
+  instead: **67 ms → 17 ms** cold on a 216-link drawing, **68 ms → 7 ms** warm.
+* The clean-link pass re-derived every untouched line on every render, which on
+  that drawing was the entire cost of routing while the searches it exists to
+  avoid were a twentieth of it. Cached routes are now handed back whole.
+
+### Where the ceiling is
+
+**Three cut-offs, all reported, none silent.** A window with more than
+`Budget.max_cells` grid points is not searched; a search that pops more than
+`Budget.max_expansions` states is abandoned; a link with no clear orthogonal
+route at all (two devices drawn on top of each other, a corridor narrower than
+the clearance) has none to find. Each falls back to the local Z or L — the
+diagram is never worse than it was — and each produces a `Detour` naming the link
+and the number that was hit. Neither fixture reaches any of them; a diagram that
+does will say so rather than quietly stop avoiding things half way through.
+
+**The remaining ceiling is the drag preview.** While a bend is being dragged the
+canvas draws the *local* line, because that is what its mirror of
+`netgraph.layout.routing` computes and the router does not run in the browser.
+On release the server answers with the avoided route and the line snaps to it.
+For the gesture avoidance exists for — dragging a device, not a bend — there is
+no preview to be wrong, since the whole drawing is refetched. Closing it properly
+means either porting the search to JavaScript, which is the faithfulness problem
+the original entry raised, or routing the one dragged link on the server inside
+the drag, which is a round trip per pointer move. Neither is obviously right, so
+neither was guessed at.
+
+**Determinism has a small asterisk.** The congestion term depends on what was
+routed *before*, and a route served from the cache was computed against a
+slightly different drawing. The shape is the same and the crossing count is the
+same; the exact channel a detour picks may not be. Every command-line render
+starts cold, so nothing committed to a file is affected, and
+`RouteCache.invalidate()` is the blunt instrument for a session that wants the
+cold answer.
+
+**Bundles are not re-lane-assigned incrementally.** If any member of a parallel
+group has to move, the whole group is searched again. That is deliberate —
+re-deriving one lane while its neighbours came out of the cache is how four
+parallel cables stop being parallel — but it means a bundle is the coarsest unit
+the cache has.
 
 ---
 

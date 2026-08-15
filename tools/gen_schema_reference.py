@@ -93,6 +93,7 @@ from netgraph.models import (  # noqa: E402
     RoutingConfig,
     Size,
     StaticRoute,
+    Style,
     TestSuiteSpec,
     TunnelAuth,
     TunnelMode,
@@ -698,6 +699,22 @@ SECTIONS: Final[tuple[Section, ...]] = (
         LegendEntry,
         "`spec.entries[]`",
         "One row of the key: a swatch, and what it means.",
+    ),
+    Section(
+        Style,
+        "`spec.style`",
+        "How one element is drawn. Optional on every drawable kind and on cables and tunnels; "
+        "every field is optional in turn, and an absent one inherits from the theme, then the "
+        "icon set, then the built-in palette.",
+        notes=(
+            "The vocabulary is closed. A colour is a hex literal or one of the named colours, "
+            "and every other field is a small enum or a bounded number, because these values "
+            "end up inside Graphviz attributes and mxGraph style strings and a free-form "
+            "pass-through would be an injection (`NG-Z001`).",
+            "`shape` is ignored on a cable and a tunnel, which have no shape to set. `icon` "
+            "names a picture inside the `--icons` theme and is ignored when no theme is in "
+            "use; `icon: none` draws this one element as a plain shape.",
+        ),
     ),
 )
 

@@ -1,0 +1,31 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-edge
+spec:
+  # One field only: a style is merged field by field, so everything else here
+  # still comes from the theme.
+  style:
+    shape: diamond
+  interfaces:
+    - name: eth0
+      type: ethernet
+      ipv4: [10.0.1.2/24]
+    - name: eth1
+      type: ethernet
+      ipv4: [10.0.2.1/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-branch
+  labels:
+    tier: access
+spec:
+  interfaces:
+    - name: uplink
+      type: ethernet
+      ipv4: [10.0.2.2/24]
+    - name: port1
+      enabled: false
+      type: ethernet

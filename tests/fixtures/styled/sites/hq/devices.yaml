@@ -1,0 +1,69 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr-core
+  labels:
+    role: core
+spec:
+  # Every field at once: what the element rung looks like when it wins outright.
+  style:
+    fill: navy
+    stroke: white
+    strokeWidth: 4
+    dash: solid
+    fontColor: white
+    fontSize: 14
+    shape: hexagon
+    opacity: 1
+  interfaces:
+    - name: eth0
+      type: ethernet
+      ipv4: [10.0.0.1/24]
+    - name: eth1
+      type: ethernet
+      ipv4: [10.0.1.1/24]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-hq-a
+  labels:
+    role: core
+spec:
+  interfaces:
+    - name: uplink
+      type: ethernet
+      ipv4: [10.0.0.2/24]
+    - name: port1
+      enabled: false
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-hq-b
+  labels:
+    role: access
+    tier: access
+spec:
+  interfaces:
+    - name: uplink
+      type: ethernet
+      ipv4: [10.0.0.3/24]
+    - name: port1
+      enabled: false
+      type: ethernet
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: computer
+metadata:
+  name: pc-desk
+spec:
+  # The one field that reaches the output as an alpha pair on a colour rather
+  # than as an attribute of its own.
+  style:
+    opacity: 0.4
+  interfaces:
+    - name: eno1
+      type: ethernet
+      ipv4: [10.0.0.20/24]

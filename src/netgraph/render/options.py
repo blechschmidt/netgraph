@@ -16,6 +16,7 @@ from netgraph.render.diffview import DiffOverlay
 from netgraph.render.highlight import Highlight
 from netgraph.render.icons import IconTheme
 from netgraph.render.links import Linker
+from netgraph.render.theme import Theme
 
 __all__ = ["DEFAULT_RANKDIR", "RANKDIRS", "RenderOptions"]
 
@@ -65,10 +66,33 @@ class RenderOptions:
     #: not. Honoured by the Graphviz backends, by the JSON export and by the
     #: editor canvas; Mermaid has one edge shape and ignores it.
     routing: Routing | None = None
+    #: Route orthogonal links *around* the boxes they are not attached to
+    #: (:mod:`netgraph.layout.avoid`) rather than straight across them.
+    #: ``False`` is ``--no-avoid``: every link takes the local Z or L it took
+    #: before obstacle avoidance existed, which is faster, entirely predictable,
+    #: and occasionally what a reader of a deliberately schematic diagram wants.
+    #: Only ever consulted for an *arranged* drawing whose links are orthogonal:
+    #: a spline has nothing to route around, and an unarranged one is routed by
+    #: Graphviz's own ``splines=ortho``, which already avoids nodes.
+    avoid: bool = True
     #: Draw each node as its kind's icon instead of a plain Graphviz shape.
     #: ``None`` keeps the shapes. Honoured by the Graphviz backends; Mermaid and
     #: JSON have no picture to put an icon in, and ignore it.
     icons: IconTheme | None = None
+    #: The stylesheet in force (§22): named selectors mapping onto style
+    #: blocks, applied to whatever they match. ``None`` — the default — draws
+    #: with the built-in palette and whatever the elements say about themselves.
+    #: Honoured by the Graphviz backends, by the draw.io export and by JSON,
+    #: which publishes the resolved style and its provenance beside each node;
+    #: Mermaid restates the palette as ``classDef`` rules and has nowhere to put
+    #: a per-element one.
+    theme: Theme | None = None
+    #: Walk the style ladder at all. ``False`` is ``--no-style``: every declared
+    #: style, on an element and in a theme, is ignored, and the rendering is the
+    #: plain one the built-in palette and the icon set produce. The escape hatch
+    #: for reading a diagram whose stylesheet is in the way, and the reason a
+    #: themed and an unthemed golden of one inventory are both worth keeping.
+    styling: bool = True
     #: Carry the per-element detail into the drawing as hover text
     #: (:mod:`netgraph.render.details`). Emitted as Graphviz ``tooltip``
     #: attributes, which reach a reader in SVG and are dropped by every raster

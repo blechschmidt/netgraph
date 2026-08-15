@@ -57,6 +57,7 @@ expands §9 with the reasoning and with what is deliberately left uncovered.
 19. [Identity: users and groups](#19-identity-users-and-groups)
 20. [Test suites: executable assertions](#20-test-suites-executable-assertions)
 21. [Diagram annotations: notes, areas and legends](#21-diagram-annotations-notes-areas-and-legends)
+22. [Per-element styling and themes](#22-per-element-styling-and-themes)
 
 ---
 
@@ -69,7 +70,9 @@ expands §9 with the reasoning and with what is deliberately left uncovered.
   `prefix_length`, `phys-address` → `mac` (renamed for readability, see §9).
   The three envelope keys `apiVersion`, `kind` and `metadata` keep their
   Kubernetes-style spelling because they are envelope, not model, fields.
-  `apiVersion` is the **only** camelCase key in the whole schema.
+  `apiVersion` is the **only** camelCase key outside a `spec.style` block, whose
+  three compound names keep the spelling SVG and mxGraph give them for the
+  reason §22.1 records.
 * **Unknown keys are rejected** (`NG-D005`). Silently ignoring a misspelt
   `trunk_vlan` would produce a diagram that disagrees with the file, which is
   the exact failure mode this tool exists to prevent.
@@ -1481,6 +1484,21 @@ The `NG-E*` group — PDU outlets, device power and PoE — is tabulated beside 
 model it constrains, in [§17.8](#178-rules), because half of what each rule says
 is a sentence about watts that only makes sense next to the class table. The
 severities and the schema/semantic split are stated there.
+
+### 10.17 Styling
+
+| ID | Sev. | Rule |
+|---|---|---|
+| `NG-Z001` | error | Every value in a `style` block is inside the vocabulary of §22.1: a colour is `#rgb`, `#rrggbb` or a named colour; `dash` and `shape` are listed spellings; `icon` is a bare name or `none`; `strokeWidth`, `fontSize` and `opacity` are within their bounds. The message names the nearest legal spelling. |
+| `NG-Z002` | error | A `style` block declares at least one of the nine fields. An empty one renders identically to no block at all. |
+| `NG-Z003` | warning | No element is faded to nothing (`opacity: 0`), which draws it invisibly while its links are still drawn to it. Reported as `W144`. |
+| `NG-Z004` | error | A `theme` document is usable: between 1 and 1000 rules, every selector clause a string or a list of strings, every `style` it carries satisfying `NG-Z001`. |
+| `NG-Z005` | warning | An element does not draw its label in the colour of its own fill. Reported as `W145`. |
+
+`NG-Z001`, `NG-Z002` and `NG-Z004` are schema rules, reported while the document
+is parsed and not suppressible; `NG-Z003` and `NG-Z005` are semantic and carry
+the short ids above. [§22.7](#227-rules) states them in context, with why each
+one is graded the way it is.
 
 ---
 
@@ -4597,3 +4615,513 @@ suppressible per rule and per document (§10.11), and both are **warnings**. Tha
 is not a close call: an annotation is barred from failing a build, and a rule
 about one that could fail a build would be exactly the leak the bar exists to
 prevent.
+
+---
+
+## 22. Per-element styling and themes
+
+A diagram somebody has to read has a colour scheme, and until this revision
+netgraph had nowhere to write one down. The core switches were navy because a
+person remembered to pass a flag, or because somebody edited the exported SVG
+afterwards, and neither of those survives the next render. That is the hole §21
+closed for callouts, seen from the other side: what an element *looks like* is a
+decision about the network's documentation, and a tool whose argument is that
+the diagram and the description are one artefact has to be able to keep the
+decision in the artefact.
+
+Two things close it. Every element may say how it is drawn, in a `spec.style`
+block; and a rendering may be given a stylesheet — a `kind: theme` document —
+that says how a whole *class* of them is drawn:
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-core-01
+  labels:
+    role: core
+spec:
+  style:
+    fill: navy
+    fontColor: white
+    strokeWidth: 3
+  interfaces:
+    - name: GigabitEthernet1/0/1
+      type: ethernet
+```
+
+Together they are what makes the visual editor's "select a shape, change how it
+looks" loop expressible without breaking the single-source-of-truth rule. The
+editor writes `spec.style.fill`, the YAML is the record, and the next person to
+render the inventory — from a laptop, from CI, from a hook — gets the same
+picture without being told anything.
+
+**A style is presentational, but it is not a sidecar.** `layout` (§18) and the
+three annotation kinds (§21) are separate documents *about* elements; a style is
+part of the element, inside the `spec` of the document that declares the
+hardware. That is deliberate. Appearance is a property of the thing rather than
+a second object to keep in step with it, there is no key to go stale when the
+switch is renamed, and a `git mv` of the file moves the colour with it. The
+price is real and worth stating plainly: repainting a switch **is** an edit to
+that switch's document, so `netgraph plan` will show it and a reviewer will see
+it in the diff. Unlike an annotation, a style is not invisible to the
+changeset — it is only invisible to the network.
+
+What it cannot do, and these are properties of the schema rather than of the
+current implementation:
+
+* **the graph** — a view drawn with a stylesheet has exactly the nodes and the
+  edges of the same view drawn without one, at every layer;
+* **`netgraph path`** — no colour moves a hop, adds one, or changes which route
+  is shortest;
+* **generated device configuration** — nothing `netgraph export` writes for a
+  device (`netplan`, `networkd`, `ifupdown`, `frr`, `wireguard`) knows that a
+  fill exists;
+* **failing a build over the *network*** — the two semantic rules §22.7 defines
+  about a style are both warnings. The errors in that table are all about a
+  document that could not be read at all, which is a different complaint.
+
+### 22.1 `spec.style` — the appearance of one element
+
+Optional on every one of the twelve element kinds of §3: the five device kinds,
+`adapter`, `patchpanel`, `pdu`, `user`, `group`, `cable` and `tunnel`. A node
+gets a shape and a label; a link gets a line and a label; the block is the same
+either way, because a user who has just recoloured a switch should not have to
+learn a second vocabulary to recolour the cable leaving it.
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `fill` | colour | O | *unset* | Interior colour. `none` draws an unfilled shape. |
+| `stroke` | colour | O | *unset* | Outline colour and — on a cable or a tunnel — the colour of the line itself. |
+| `strokeWidth` | number | O | *unset* | Outline width in points, greater than `0` and at most `20`. |
+| `dash` | enum | O | *unset* | Line pattern: `solid`, `dashed`, `dotted`, `bold`. |
+| `fontColor` | colour | O | *unset* | Label colour. |
+| `fontSize` | integer | O | *unset* | Label size in points, `6`–`96`. |
+| `shape` | enum | O | *unset* | The glyph a node is drawn as. Ignored on a cable and a tunnel, which have no shape to set. |
+| `icon` | name | O | *unset* | A picture from the `--icons` theme, overriding its pick for this element's kind. `none` draws the plain shape. |
+| `opacity` | number | O | *unset* | How opaque the element is drawn, `0` (invisible) to `1`. |
+
+**Colours** are a hex literal — `#rgb` or `#rrggbb` — or one of twenty-four
+names:
+
+| Family | Names |
+|---|---|
+| neutral | `none` (also spelled `transparent`), `white`, `black`, `grey` (also `gray`), `silver`, `slate` |
+| warm | `red`, `maroon`, `orange`, `amber`, `yellow`, `brown` |
+| green | `olive`, `lime`, `green`, `teal` |
+| blue | `cyan`, `blue`, `navy`, `indigo` |
+| violet | `violet`, `purple`, `magenta`, `pink` |
+
+A curated set rather than the CSS list, for two reasons. Every name here has to
+read the same in a Graphviz SVG, on a draw.io canvas and in a browser; and the
+CSS names include several pairs no reader can tell apart — `gray`, `grey`,
+`darkgray` — plus a long tail nobody reaches for. Twenty-four cover a diagram's
+palette, and anything more particular is spelled as hex, which is always
+accepted. The hues are the ones the built-in palette already draws with, so
+`fill: green` is the green a switch has by default rather than a second,
+slightly different one. The spelling is *kept*: `navy` is what the user wrote
+and what `netgraph fmt` leaves in the file, and the resolution to `#1e3a8a`
+happens once, on the way to a renderer.
+
+**Shapes** are `box`, `rounded`, `ellipse`, `circle`, `diamond`, `hexagon`,
+`triangle`, `cylinder`, `box3d`, `folder`, `note`, `parallelogram`, `trapezium`
+and `plaintext` — the intersection of what Graphviz draws and what draw.io can
+be told to draw, so a shape survives an export and a re-import. Anything
+Graphviz alone knows would be lost on the way back, which is a worse outcome
+than not being able to ask for it.
+
+**Line patterns** are spelled the way Graphviz spells them, and `bold` is in the
+list although it is a width rather than a pattern. The built-in palette already
+draws a fibre run with it, and a theme that wants to restate a default it agrees
+with must be able to say what the default *is*.
+
+**`icon`** is a bare lower-case name matching
+`[a-z0-9]([a-z0-9_-]*[a-z0-9])?`, resolved inside the `--icons` theme's
+directory exactly as an element kind is — or `none`, which draws this one
+element as a plain shape while the rest of the diagram keeps its pictures. It is
+a name and never a path, deliberately: an icon is *chosen from the theme*, not
+read from a location the inventory names, which is what stops a manifest shared
+across a team from reaching outside the directory it was rendered with. With no
+icon theme in use there is nothing to choose from, and the field is inert.
+
+**The bounds are not arbitrary.** Below six points nobody reads a label and
+above ninety-six one node is the whole page; a twenty-point outline is already
+thicker than most nodes are tall. `opacity` is folded into the alpha channel of
+the colours it applies to, which is the only way a per-element transparency
+survives into a PNG.
+
+**Every field is optional, and an absent one means *inherit*** — from the theme,
+then the icon set, then the built-in palette (§22.4). Nothing in the block has a
+non-`null` default, and that is load-bearing rather than an oversight: a default
+written into the document would pin the value to the element and defeat the
+inheritance it is meant to fall through, and *unsetting* a field is how the
+editor's "reset to theme" works.
+
+An empty `style: {}` is an error (`NG-Z002`). It would otherwise validate, render
+identically to no block at all, and give the writer no signal that what they
+typed did nothing; in practice it is a half-finished edit or a key indented one
+level too far.
+
+Three keys — `strokeWidth`, `fontColor`, `fontSize` — are camelCase, which is
+the one exception to §1's rule and is called out here rather than left for a
+reader to trip over. They are the spellings SVG, mxGraph and netgraph's own JSON
+export already use, and a style block is the one part of a document that is read
+and written by *drawing* tools rather than by network ones. Spelling them
+`stroke_width` in YAML and `strokeWidth` everywhere else would mean the same
+nine names in two forms across a single round-trip, which is how a field ends up
+being set twice and read once.
+
+A link is styled the same way:
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-annexe
+spec:
+  endpoints:
+    - sw-core-01:GigabitEthernet1/0/1
+    - sw-annexe-01:GigabitEthernet1/0/24
+  medium: fiber
+  style:
+    stroke: orange
+    dash: bold
+```
+
+The nodes a *view* derives rather than reads — a subnet (§16.6), a rack (§18.3),
+a namespace collapsed by `--collapse` — have no document, so there is nothing to
+hang a `spec.style` on. They are not unstyleable: a theme reaches them by kind,
+which is the next section.
+
+### 22.2 Why the vocabulary is closed
+
+Every value above ends up inside a Graphviz attribute, an mxGraph style string
+or an SVG attribute, and all three are text formats that netgraph *generates*. A
+free-form pass-through would mean a fill of `red", shape="none` reaching a DOT
+file, or `#fff;shape=image;image=data:...` reaching a draw.io style. Both are
+injection, and an inventory — pulled from a branch, merged from a contributor,
+emitted by somebody's importer — is exactly the wrong place to be able to do it.
+
+So the vocabulary is closed at both ends. A colour is a hex literal or a name
+from the table; everything else is a small enum or a bounded number; and the
+closure is enforced twice, once when the document is read (`NG-Z001`) and once
+on the way out, where a shape the renderer does not recognise falls back to a
+box rather than being written through. Nothing typed into a manifest reaches an
+output format unvalidated.
+
+The cost is that netgraph cannot express everything Graphviz can, and that is
+accepted rather than regretted: a diagram whose appearance is portable across
+four backends is worth more than one that can set `peripheries=3` in exactly one
+of them. What the closure buys back, beyond the safety, is a diagnostic worth
+reading. A typo in a colour name is the single most likely mistake in this
+block, so it is answered with the nearest legal spelling — `fill: navvy` is met
+with *did you mean 'navy'?* rather than with a broken diagram three steps later.
+
+### 22.3 `kind: theme` — a stylesheet
+
+An element's own block says how *that* element is drawn. A theme says how a
+class of them is: every router navy, everything under `sites/dc-*` on a slate
+background, everything labelled `tier: core` two points heavier. It is the layer
+that keeps a consistent diagram from being forty copies of the same four lines.
+
+**A theme is not an inventory kind.** It is absent from §3's list on purpose:
+the loader never walks a tree for one, and a `theme.yaml` dropped into an
+inventory directory styles nothing at all. A theme describes a *rendering*
+rather than a network, and one inventory is legitimately drawn several ways — an
+operations diagram, a black-and-white one for the wall, a simplified one for a
+slide. Keeping it out of the tree is what makes `--theme` a switch rather than
+an edit, and what stops a file somebody added to a shared folder from silently
+restyling everybody else's diagrams. The envelope is netgraph's regardless,
+because a file with `apiVersion` and `kind` at the top is what a reader of this
+project already knows how to look at, and it is read by the same strict loader
+the manifests are — no custom tags, no duplicate keys. One document per file.
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: theme
+metadata:
+  name: house
+  description: The blue the drawings have always been.
+spec:
+  rules:
+    - style:
+        fill: white
+        stroke: navy
+        fontColor: navy
+        shape: box
+    - select:
+        kind: [router]
+      style:
+        fill: "#dbe9f6"
+        shape: diamond
+    - select:
+        kind: [switch, hub]
+      style:
+        fill: "#e0eaf8"
+        shape: box3d
+    - select:
+        namespace: sites/dc-**
+        role: [core]
+      style:
+        strokeWidth: 3
+        fontSize: 12
+    - select:
+        kind: [cable]
+        label: {medium: fibre}
+      style:
+        stroke: orange
+        dash: bold
+```
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `rules` | list | M | — | The rules, in declaration order. Between 1 and 1000; an empty list is `NG-Z004`. |
+| `rules[].select` | mapping | O | *matches everything* | Which elements this rule is about. |
+| `rules[].style` | mapping | M | — | What to draw them as: exactly the block of §22.1. |
+
+**The selector clauses.**
+
+| Clause | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `kind` | string or list | O | *unset* | What the diagram calls this thing. |
+| `name` | glob or list | O | *unset* | Matched against `metadata.name`. |
+| `namespace` | glob or list | O | *unset* | Matched against the directory the declaring document was found in. `*` does not cross a `/`; `**` does. |
+| `role` | string or list | O | *unset* | Values of the `role` label. |
+| `label` | map[string, string] | O | `{}` | Every entry must be present with this value; `"*"` matches any value. |
+
+Every clause is a set of alternatives, any one of which matches, and a bare
+string is accepted for the common single-value case — `kind: router` and
+`kind: [router]` are the same rule, the same shorthand `netgraph.toml` takes for
+its repeatable options. Clauses are **conjunctive**: every clause a selector
+states must hold. An omitted clause is not a wildcard so much as an absent
+condition, and a rule with *no* clauses matches everything — which is how a
+theme states the background the rest of it adjusts. Both bundled themes open
+with exactly that rule.
+
+`kind` is the word the *diagram* uses, not only the word §3 uses. For anything
+an inventory declares the two agree (`router`, `switch`, `cable`, `tunnel`,
+`user`, …); for the nodes a view computes it is `subnet`, `rack`, or `namespace`
+for a collapsed namespace, which is how the derived nodes of §22.1 are reachable
+at all. Those carry no labels and belong to no document, so `kind`, `name` and
+`namespace` are the clauses that can find them. A tunnel is `tunnel` whichever
+way a layer draws it — as a node or as an edge — because that is the word the
+inventory uses for it; an adapter's attachment line is `adapter`, the same word
+as the adapter node, so a rule about one is a rule about both.
+
+`role` is shorthand for the `role` label: `role: [core]` and
+`label: {role: core}` select identically. It exists because `role` is the one
+label every inventory grows, and because the shorthand is what people write.
+`label` with a value of `"*"` is the other half of that idea — it keys off the
+*presence* of a label, for the estate where `tier` is set on everything that has
+one and absent elsewhere.
+
+A thousand rules is the ceiling (`NG-Z004`). Every rule is tested against every
+drawn element, so a theme costs rules × elements; well before the bound it has
+stopped being a file anybody can predict the effect of.
+
+**Two themes ship**, and they are chosen to be two different *arguments* rather
+than two palettes. `blueprint` is engineering-drawing blue on white: one hue for
+the data path, amber for power, rose for people, and line weight rather than
+colour for the tiers, so it survives a black-and-white print. `mono` takes the
+colour away entirely — shape carries the kind and the line pattern carries the
+medium — which is the rule the built-in palette already follows and which `mono`
+makes literal, for a photocopier or a colour-blind reader. Both are worth
+reading as worked examples; they live in `netgraph/render/themes/`.
+
+### 22.4 Precedence: the ladder
+
+Four rungs, most specific first. The first rung that sets a **field** wins that
+field, and the rest of the block keeps falling through — so a theme that sets
+only a fill does not wipe out a shape, and an element that sets only a fill
+still takes the theme's shape.
+
+1. **The element's own `spec.style`.** Somebody wrote it about this one thing.
+2. **The theme's rules**, most specific first. Specificity is the number of
+   conditions a selector states, so `{kind: router, role: core}` (two) beats
+   `{kind: router}` (one), which beats a rule with no clauses at all. Equal
+   specificity is broken by declaration order and **later wins**.
+3. **The icon theme**, which supplies `icon` and nothing else.
+4. **The built-in palette**, which has a fill, a stroke and a shape for every
+   kind, so the ladder always terminates and every drawn thing has a complete
+   answer.
+
+Later-wins on a tie is the rule every stylesheet language settled on, and the
+one a reader guesses right without being told. It is also what makes themes
+*compose*: appending rules to a theme is how it is extended (§22.5), and an
+appended rule that states as many conditions as the one it disagrees with wins
+without having to say so.
+
+Take the theme of §22.3 replaced with this one, and a switch `sw-core-01` in
+`sites/hq`, labelled `role: core`, whose own block sets `fontSize: 14`:
+
+```yaml
+spec:
+  rules:
+    - style: {fill: silver}                                  # rule 0 — no clauses
+    - select: {kind: [switch]}
+      style: {fill: teal, shape: hexagon}                    # rule 1 — one clause
+    - select: {kind: [switch], role: [core]}
+      style: {fill: navy, strokeWidth: 3}                    # rule 2 — two clauses
+    - select: {namespace: sites/**}
+      style: {fill: white, fontColor: slate}                 # rule 3 — one clause
+```
+
+| Field | Resolved | From | Why |
+|---|---|---|---|
+| `fontSize` | `14` | the element | The top rung. No theme rule is consulted for a field the element sets. |
+| `fill` | `navy` | rule 2 | Every rule sets a fill, and rule 2 states two conditions where the others state one and none. |
+| `strokeWidth` | `3` | rule 2 | The only rule that sets it. |
+| `shape` | `hexagon` | rule 1 | Rule 2 is more specific but says nothing about the shape, so the field keeps falling. |
+| `fontColor` | `slate` | rule 3 | Likewise the only rule that sets it. |
+| `stroke` | `#16a34a` | the palette | Nothing above the bottom rung set it, so a switch keeps its default outline. |
+
+Change one thing — an *access* switch in the same namespace — and rule 2 stops
+matching. `fill` is then contested by rule 1 and rule 3, both of which state one
+condition, and rule 3 wins because it was declared later: the switch is white,
+not teal. That is the whole of the tie-break, and it is why the bundled
+`blueprint` puts its tier rules at the bottom of the file.
+
+Every resolved value carries **which rung it came from** — `element`,
+`theme:<name>#<index>`, `icons` or `default`, where the index is the winning
+rule's 0-based position in the theme file so a reader can go and look at the
+lines that did it. This is not diagnostics for its own sake: the editor's style
+inspector has to be able to say "this navy is the theme's, not yours" for its
+"reset to theme" action to be honest about what it will do, and the JSON export
+publishes it (§22.6) so a consumer drawing the graph itself gets the same
+colours for the same reasons.
+
+What the ladder does **not** decide is emphasis. A `--highlight` and a
+`netgraph diff` overlay are applied on top of a resolved style and win over it,
+because a removed device drawn in the user's chosen navy instead of red would
+make the diff unreadable. The point of an overlay is that it is louder than the
+drawing underneath it.
+
+### 22.5 Where a theme comes from, and how to turn it off
+
+Three places, and they compose rather than compete:
+
+* **`--theme NAME|PATH`** on `netgraph render` and `netgraph export`. A bundled
+  name (`blueprint`, `mono`), a path to a `kind: theme` file (`.yaml` or
+  `.yml`), or `none` to turn one off — the same three spellings `--icons` takes,
+  for the same reason. A theme that does not exist, or whose colours do not
+  parse, is reported as a usage error naming the option before the inventory is
+  loaded.
+* **`[render] theme`** in `netgraph.toml`: the default for this inventory, so
+  the colours do not depend on somebody's shell history. A relative path
+  resolves against the *configuration file* rather than the working directory —
+  the file lives with the inventory, and a colleague who runs `netgraph` from a
+  parent folder must get the same picture.
+* **a `[theme]` table** in the same file, declaring rules inline, for the
+  inventory that wants three lines of house style and not a second file to keep
+  beside the manifests:
+
+```toml
+[render]
+theme = "blueprint"
+
+[[theme.rules]]
+select = {role = ["core"]}
+style = {strokeWidth = 3}
+
+[[theme.rules]]
+select = {namespace = ["sites/hq/**"]}
+style = {fill = "#f8fafc"}
+```
+
+The entries under `[[theme.rules]]` are exactly the `spec.rules` of a theme
+document and are validated by the same models, so a mistyped colour in
+`netgraph.toml` is refused with the same wording, and under the same `NG-Z001`,
+that it would get in a `theme.yaml`.
+
+The inline rules are **appended** to the named theme's rather than merged into
+them, and that is the whole mechanism: given later-wins on a tie (§22.4),
+appending is what lets an inventory's own file adjust a bundled theme without
+restating the rules it agrees with. It does not let it override a *more
+specific* rule, because specificity is still read first — an inline rule that
+must beat one states at least as many conditions as it does.
+
+**`--no-style`** (or `style = false` under `[render]`) renders with the bottom
+two rungs only: the icon set and the built-in palette. Every declared style,
+element and theme alike, is ignored, and the output is byte-identical to what
+the same inventory produced before styling existed. That byte-identity is the
+point of the flag — it is the answer to "is this diagram odd because of the
+network, or because of the stylesheet?", and an escape hatch that produced a
+*nearly* plain diagram would not answer it. Icons are a separate ladder rung and
+are unaffected; `--icons none` is the switch for those.
+
+### 22.6 What each backend does with a style
+
+The ladder is walked once, centrally, and each backend translates the answer
+rather than re-deriving it. That is why a switch somebody painted navy is navy
+in the SVG, in the draw.io file and in the JSON, and is navy for the same
+reason: three implementations of an inheritance rule would drift on the first
+field anybody added, and the drift would surface as a diagram that looks
+different depending on how it was exported.
+
+| Output | What it does with a style |
+|---|---|
+| Graphviz — `dot`, `svg`, `png`, `pdf` | Honours all nine fields. `opacity` is folded into the alpha channel of the fill, the outline and the label, which is how it survives into a raster format. |
+| draw.io | Honours all nine. mxGraph spells this vocabulary almost one for one, which is why `shape` is the intersection it is (§22.1) and why a colour chosen here opens in the app as that colour and survives a round-trip. |
+| JSON | Publishes the *resolved* style plus its provenance: every node and every edge carries a `style` object with a `from` map naming the rung each value came from. Always present, because the ladder always terminates; under `--no-style` every entry says `default`. |
+| Mermaid | Ignores it. |
+
+Mermaid is the one that needs a sentence. A flowchart has exactly one styling
+construct, `classDef`, and it is per *class* rather than per node — netgraph
+already spends it restating the built-in palette, one `classDef` per node kind
+present, so that a diagram embedded in a pull request is coloured like the
+diagrams beside it. There is nowhere left to put a per-element style, and no
+honest way to fake one. Unlike §21's annotations, whose degradation is written
+into the output as a `%%` comment, a per-node loss would be one comment per node
+and would be noise rather than information. A Mermaid diagram is the palette's
+diagram; where the styling is the point, export a format that can carry it.
+
+### 22.7 Rules
+
+The group is lettered `Z`. `NG-S` was spent on identity (§19.4) and `NG-T` on
+tunnels, so neither initial of "style" nor of "theme" was available; `Z` is the
+end of the alphabet, which suits the last thing that happens to an element
+before it is drawn. The same table appears in [§10.17](#1017-styling).
+
+| ID | Sev. | Rule |
+|---|---|---|
+| `NG-Z001` | error | Every value in a `style` block is inside the vocabulary of §22.1: a colour is `#rgb`, `#rrggbb` or a named colour; `dash` and `shape` are listed spellings; `icon` is a bare name or `none`; `strokeWidth`, `fontSize` and `opacity` are within their bounds. The message names the nearest legal spelling. |
+| `NG-Z002` | error | A `style` block declares at least one of the nine fields. An empty one renders identically to no block at all, so it is always a mistake. |
+| `NG-Z003` | warning | No element is faded to nothing. Reported as `W144`; the element is still drawn, invisibly, and its links are still drawn to it. |
+| `NG-Z004` | error | A `theme` document is usable: it holds between 1 and 1000 rules, every selector clause is a string or a list of strings, and every `style` it carries satisfies `NG-Z001`. |
+| `NG-Z005` | warning | An element does not draw its label in the colour of its own fill. Reported as `W145`; the label is drawn where a reader cannot see it. |
+
+`NG-Z001`, `NG-Z002` and `NG-Z004` are reported while the document is **read**,
+by the schema rather than by the semantic validator, and are therefore
+deliberately absent from the suppressible catalogue in
+[`validation-rules.md`](validation-rules.md), exactly as `NG-G003` and `NG-G005`
+are (§21.4). There is nothing to suppress: an element whose style does not parse
+is an element that did not load, and a theme that does not parse was not applied
+to anything. `NG-Z001` is also what `netgraph edit` refuses a write against the
+moment it is made, on the reasoning §21.4 sets out — a bad value is wrong when
+it is typed and wrong afterwards, so there is no half-finished gesture to
+protect.
+
+`NG-Z003` and `NG-Z005` are the other kind of finding: every value involved is
+legal on its own and only the combination is a mistake, which is precisely what
+an editor passes through on its way somewhere else. Dragging an opacity slider
+from one end to the other visits `opacity: 0`. So both are **warnings** from the
+semantic validator, both carry short ids —
+[`W144`](validation-rules.md#w144--element-styled-invisible) and
+[`W145`](validation-rules.md#w145--unreadable-label-colour), whose pages say
+when it is right to suppress them — and both are suppressible per rule and per
+document (§10.11).
+
+`W144` fires on `opacity: 0` because an element nobody can see is one nobody can
+click either, while every link to it is still drawn into the empty space where
+it was: a diagram that lies. It is almost always a slider left at the wrong end
+rather than a decision — hiding an element is what `--kind`, `--name` and the
+other filters are for, and they take it out of the topology as well as out of
+the picture.
+
+`W145` fires only when **both** colours are written on the same element. It
+never fires on an inherited pair: a theme setting the fill and an element the
+font colour is a legitimate combination whose result the person who wrote it can
+see, and a warning about a pair the element does not fully control is a warning
+nobody can act on without editing somebody else's file. `fill: none` is exempt
+for the same reason — it means "whatever is behind this", and dark text on it is
+the ordinary way to draw an unfilled shape.

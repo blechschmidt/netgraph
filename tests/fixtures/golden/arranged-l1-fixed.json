@@ -39,6 +39,16 @@
           "width": 376.18,
           "height": 66.47
         }
+      },
+      "style": {
+        "fill": "#fdf0e3",
+        "stroke": "#ea580c",
+        "shape": "ellipse",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
       }
     },
     {
@@ -81,6 +91,16 @@
         "size": {
           "width": 65.0,
           "height": 36.0
+        }
+      },
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
         }
       }
     },
@@ -136,6 +156,16 @@
           "width": 209.0,
           "height": 47.0
         }
+      },
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
       }
     },
     {
@@ -172,6 +202,16 @@
         "size": {
           "width": 203.0,
           "height": 47.0
+        }
+      },
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
         }
       }
     },
@@ -218,6 +258,16 @@
         "size": {
           "width": 206.0,
           "height": 64.63
+        }
+      },
+      "style": {
+        "fill": "#eae2f5",
+        "stroke": "#7c3aed",
+        "shape": "cylinder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
         }
       }
     },
@@ -282,6 +332,16 @@
         "size": {
           "width": 464.0,
           "height": 146.0
+        }
+      },
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
         }
       }
     },
@@ -396,6 +456,16 @@
           "width": 169.0,
           "height": 112.0
         }
+      },
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
       }
     },
     {
@@ -463,6 +533,16 @@
         "size": {
           "width": 169.0,
           "height": 60.0
+        }
+      },
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
         }
       }
     }
@@ -561,6 +641,14 @@
           }
         ],
         "drawnAs": "spline"
+      },
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
       }
     },
     {
@@ -656,6 +744,14 @@
           }
         ],
         "drawnAs": "spline"
+      },
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
       }
     },
     {
@@ -811,6 +907,14 @@
           }
         ],
         "drawnAs": "spline"
+      },
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
       }
     },
     {
@@ -906,6 +1010,14 @@
           }
         ],
         "drawnAs": "spline"
+      },
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
       }
     },
     {
@@ -1062,6 +1174,14 @@
           }
         ],
         "drawnAs": "spline"
+      },
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
       }
     },
     {
@@ -1160,6 +1280,14 @@
           }
         ],
         "drawnAs": "spline"
+      },
+      "style": {
+        "stroke": "#2563eb",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
       }
     },
     {
@@ -1251,6 +1379,14 @@
           }
         ],
         "drawnAs": "spline"
+      },
+      "style": {
+        "stroke": "#9ca3af",
+        "dash": "dotted",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
       }
     }
   ],

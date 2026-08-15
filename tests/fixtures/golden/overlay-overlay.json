@@ -43,7 +43,17 @@
             "10.255.0.2/24"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/branch-b/pc-branch-b",
@@ -74,7 +84,17 @@
             "10.253.0.10/24"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/branch-b/rtr-branch-b",
@@ -148,7 +168,17 @@
             "10.252.0.2/30"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/hq/rtr-hq",
@@ -231,7 +261,17 @@
             "10.253.0.1/24"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "tunnel:tunnels/wg-mesh",
@@ -275,7 +315,17 @@
         "mtu": 1420
       },
       "vlans": [],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#ede9fe",
+        "stroke": "#6d28d9",
+        "shape": "hexagon",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "tunnel:tunnels/ipsec-hq-b",
@@ -315,7 +365,17 @@
         "mtu": 1427
       },
       "vlans": [],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#ede9fe",
+        "stroke": "#6d28d9",
+        "shape": "hexagon",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "tunnel:tunnels/vx-100",
@@ -354,7 +414,17 @@
         "mtu": 1377
       },
       "vlans": [],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#ede9fe",
+        "stroke": "#6d28d9",
+        "shape": "hexagon",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "tunnel:tunnels/gre-mgmt",
@@ -391,7 +461,17 @@
         "mtu": 1403
       },
       "vlans": [],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#ede9fe",
+        "stroke": "#6d28d9",
+        "shape": "hexagon",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "tunnel:tunnels/ovpn-admin",
@@ -428,7 +508,17 @@
         "mtu": 1431
       },
       "vlans": [],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#ede9fe",
+        "stroke": "#6d28d9",
+        "shape": "hexagon",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     }
   ],
   "edges": [
@@ -475,7 +565,15 @@
         "auth": "public-key",
         "mtu": 1420
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/wg-mesh#sites/branch-b/rtr-branch-b:wg0",
@@ -520,7 +618,15 @@
         "auth": "public-key",
         "mtu": 1420
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/wg-mesh#sites/hq/rtr-hq:wg0",
@@ -565,7 +671,15 @@
         "auth": "public-key",
         "mtu": 1420
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/ipsec-hq-b#sites/branch-b/rtr-branch-b:ipsec0",
@@ -606,7 +720,15 @@
         "auth": "certificate",
         "mtu": 1427
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/ipsec-hq-b#sites/hq/rtr-hq:ipsec0",
@@ -647,7 +769,15 @@
         "auth": "certificate",
         "mtu": 1427
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/vx-100#sites/branch-b/rtr-branch-b:vxlan100",
@@ -690,7 +820,15 @@
         "vni": 100,
         "mtu": 1377
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/vx-100#sites/hq/rtr-hq:vxlan100",
@@ -733,7 +871,15 @@
         "vni": 100,
         "mtu": 1377
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/vx-100#over",
@@ -776,7 +922,15 @@
         "mtu": 1377
       },
       "label": "vxlan",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#8b5cf6",
+        "dash": "dotted",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/gre-mgmt#sites/branch-b/rtr-branch-b:gre1",
@@ -817,7 +971,15 @@
         "encryptedBy": "tunnels/ipsec-hq-b",
         "mtu": 1403
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/gre-mgmt#sites/hq/rtr-hq:gre1",
@@ -858,7 +1020,15 @@
         "encryptedBy": "tunnels/ipsec-hq-b",
         "mtu": 1403
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/gre-mgmt#over",
@@ -899,7 +1069,15 @@
         "mtu": 1403
       },
       "label": "gre",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#8b5cf6",
+        "dash": "dotted",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/ovpn-admin#sites/branch-b/pc-branch-b:tun0",
@@ -940,7 +1118,15 @@
         "auth": "certificate",
         "mtu": 1431
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/ovpn-admin#sites/hq/rtr-hq:ovpn0",
@@ -981,7 +1167,15 @@
         "auth": "certificate",
         "mtu": 1431
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     }
   ],
   "title": "Overlay, encapsulation"

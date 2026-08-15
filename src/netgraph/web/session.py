@@ -116,6 +116,7 @@ from netgraph.plan import PlanSourceError
 from netgraph.plan import diff as diff_states
 from netgraph.plan.sources import git_ref
 from netgraph.render import IconTheme
+from netgraph.render.routes import RouteCache
 from netgraph.validate import Finding, validate
 from netgraph.watch.pipeline import Problem, Status, flatten_problems
 from netgraph.web.events import EVENT_NAMES, EVENTS_PATH, HEARTBEAT_SECONDS, EventBus
@@ -526,6 +527,15 @@ class EditingSession:
     _frames: FrameCache[tuple[dict[str, Any], Preview]] = field(
         default_factory=lambda: FrameCache(FRAME_CACHE_SIZE), init=False, repr=False
     )
+    #: Orthogonal routes kept between renders. Moving one device changes the
+    #: obstacle set for the whole drawing, and re-searching every link because
+    #: of it is what would put a full render inside a drag; the cache re-searches
+    #: only the links whose line the move actually broke. Kept for the life of
+    #: the session and never invalidated wholesale: an entry validates itself
+    #: against the arrangement it is asked about, so a stale one cannot survive
+    #: the thing that made it stale. See
+    #: :class:`~netgraph.render.routes.RouteCache`.
+    _routes: RouteCache = field(default_factory=RouteCache, init=False, repr=False)
 
     def __post_init__(self) -> None:
         self.root = Path(self.root)
@@ -777,6 +787,7 @@ class EditingSession:
                 known=known,
                 findings=self.findings(inventory, settings),
                 fixes=self.repairs(inventory, settings),
+                routes=self._routes,
             ),
             revision,
         )

@@ -61,7 +61,17 @@
           "mac": "00:1b:0d:01:a1:11",
           "mtu": 9000
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/north/access/sw-north-acc-02",
@@ -114,7 +124,17 @@
           "mac": "00:1b:0d:01:a2:11",
           "mtu": 9000
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/north/access/sw-north-acc-03",
@@ -489,7 +509,17 @@
           "mac": "00:1b:0d:01:a3:11",
           "mtu": 9000
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/north/core/rtr-north-core-01",
@@ -531,7 +561,17 @@
           "mac": "00:05:86:01:c0:02",
           "mtu": 9000
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/north/distribution/sw-north-dist-01",
@@ -601,7 +641,17 @@
           "mac": "00:1c:73:01:d0:04",
           "mtu": 9000
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/north/hosts/pc-north-01",
@@ -629,7 +679,17 @@
           "mac": "b4:96:91:01:10:01",
           "mtu": 1500
         }
-      ]
+      ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/north/hosts/srv-north-01",
@@ -657,7 +717,17 @@
           "mac": "3c:d9:2b:01:20:01",
           "mtu": 1500
         }
-      ]
+      ],
+      "style": {
+        "fill": "#eae2f5",
+        "stroke": "#7c3aed",
+        "shape": "cylinder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/north/hosts/pc-north-02",
@@ -685,7 +755,17 @@
           "mac": "e8:6a:64:01:11:01",
           "mtu": 1500
         }
-      ]
+      ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/south/access/sw-south-acc-01",
@@ -745,7 +825,17 @@
           "mac": "00:1b:0d:02:a1:11",
           "mtu": 9000
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/south/access/sw-south-acc-02",
@@ -798,7 +888,17 @@
           "mac": "00:1b:0d:02:a2:11",
           "mtu": 9000
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/south/core/rtr-south-core-01",
@@ -840,7 +940,17 @@
           "mac": "00:05:86:02:c0:02",
           "mtu": 9000
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/south/distribution/sw-south-dist-01",
@@ -903,7 +1013,17 @@
           "mac": "00:1c:73:02:d0:04",
           "mtu": 9000
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/south/hosts/pc-south-01",
@@ -931,7 +1051,17 @@
           "mac": "b4:96:91:02:10:01",
           "mtu": 1500
         }
-      ]
+      ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/south/hosts/srv-south-01",
@@ -959,7 +1089,17 @@
           "mac": "3c:d9:2b:02:20:01",
           "mtu": 1500
         }
-      ]
+      ],
+      "style": {
+        "fill": "#eae2f5",
+        "stroke": "#7c3aed",
+        "shape": "cylinder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/south/hosts/pc-south-02",
@@ -987,7 +1127,17 @@
           "mac": "e8:6a:64:02:11:01",
           "mtu": 1500
         }
-      ]
+      ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/west/access/sw-west-acc-01",
@@ -1047,7 +1197,17 @@
           "mac": "00:1b:0d:03:a1:11",
           "mtu": 9000
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/west/access/sw-west-acc-02",
@@ -1100,7 +1260,17 @@
           "mac": "00:1b:0d:03:a2:11",
           "mtu": 9000
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/west/core/rtr-west-core-01",
@@ -1142,7 +1312,17 @@
           "mac": "00:05:86:03:c0:02",
           "mtu": 9000
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/west/distribution/sw-west-dist-01",
@@ -1205,7 +1385,17 @@
           "mac": "00:1c:73:03:d0:04",
           "mtu": 9000
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/west/hosts/pc-west-01",
@@ -1233,7 +1423,17 @@
           "mac": "b4:96:91:03:10:01",
           "mtu": 1500
         }
-      ]
+      ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/west/hosts/srv-west-01",
@@ -1261,7 +1461,17 @@
           "mac": "3c:d9:2b:03:20:01",
           "mtu": 1500
         }
-      ]
+      ],
+      "style": {
+        "fill": "#eae2f5",
+        "stroke": "#7c3aed",
+        "shape": "cylinder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/west/hosts/pc-west-02",
@@ -1289,7 +1499,17 @@
           "mac": "e8:6a:64:03:11:01",
           "mtu": 1500
         }
-      ]
+      ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     }
   ],
   "edges": [
@@ -1311,7 +1531,15 @@
       "speedText": "10Gbps",
       "label": "BB-NS",
       "lengthM": 4200.0,
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "backbone/cbl-bb-south-west",
@@ -1331,7 +1559,15 @@
       "speedText": "10Gbps",
       "label": "BB-SW",
       "lengthM": 4200.0,
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "backbone/cbl-bb-west-north",
@@ -1351,7 +1587,15 @@
       "speedText": "10Gbps",
       "label": "BB-WN",
       "lengthM": 4200.0,
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/north/cables/cbl-north-core-dist",
@@ -1371,7 +1615,15 @@
       "speedText": "10Gbps",
       "label": "F-101",
       "lengthM": 12.0,
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/north/cables/cbl-north-dist-acc01",
@@ -1397,7 +1649,15 @@
         20,
         30,
         99
-      ]
+      ],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/north/cables/cbl-north-dist-acc02",
@@ -1423,7 +1683,15 @@
         20,
         30,
         99
-      ]
+      ],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/north/cables/cbl-north-dist-acc03",
@@ -1449,7 +1717,15 @@
         20,
         30,
         99
-      ]
+      ],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/north/cables/cbl-north-acc01-pc01",
@@ -1471,7 +1747,15 @@
       "lengthM": 22.0,
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/north/cables/cbl-north-acc01-srv01",
@@ -1493,7 +1777,15 @@
       "lengthM": 6.0,
       "vlans": [
         20
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/north/cables/cbl-north-acc02-pc02",
@@ -1515,7 +1807,15 @@
       "lengthM": 18.0,
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/south/cables/cbl-south-core-dist",
@@ -1535,7 +1835,15 @@
       "speedText": "10Gbps",
       "label": "F-201",
       "lengthM": 12.0,
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/south/cables/cbl-south-dist-acc01",
@@ -1561,7 +1869,15 @@
         20,
         30,
         99
-      ]
+      ],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/south/cables/cbl-south-dist-acc02",
@@ -1587,7 +1903,15 @@
         20,
         30,
         99
-      ]
+      ],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/south/cables/cbl-south-acc01-pc01",
@@ -1609,7 +1933,15 @@
       "lengthM": 22.0,
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/south/cables/cbl-south-acc01-srv01",
@@ -1631,7 +1963,15 @@
       "lengthM": 6.0,
       "vlans": [
         20
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/south/cables/cbl-south-acc02-pc02",
@@ -1653,7 +1993,15 @@
       "lengthM": 18.0,
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/west/cables/cbl-west-core-dist",
@@ -1673,7 +2021,15 @@
       "speedText": "10Gbps",
       "label": "F-301",
       "lengthM": 12.0,
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/west/cables/cbl-west-dist-acc01",
@@ -1699,7 +2055,15 @@
         20,
         30,
         99
-      ]
+      ],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/west/cables/cbl-west-dist-acc02",
@@ -1725,7 +2089,15 @@
         20,
         30,
         99
-      ]
+      ],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/west/cables/cbl-west-acc01-pc01",
@@ -1747,7 +2119,15 @@
       "lengthM": 22.0,
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/west/cables/cbl-west-acc01-srv01",
@@ -1769,7 +2149,15 @@
       "lengthM": 6.0,
       "vlans": [
         20
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "sites/west/cables/cbl-west-acc02-pc02",
@@ -1791,7 +2179,15 @@
       "lengthM": 18.0,
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     }
   ],
   "annotations": {

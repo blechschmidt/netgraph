@@ -225,6 +225,28 @@ def _icons(value: Any, where: _Where) -> Any:
         where.fail(f"is not usable: {exc}")
 
 
+def _theme(value: Any, where: _Where) -> Any:
+    """``theme``: a bundled theme name, ``none``, or a path to a theme file.
+
+    A relative path is resolved against the *configuration file* for the same
+    reason ``icons`` is: the file lives with the inventory, and a team member
+    who runs ``netgraph`` from a parent folder must get the same colours.
+    """
+    from netgraph.errors import RenderError  # local: keeps this module import-cheap
+    from netgraph.render.theme import BUNDLED_THEMES, NO_THEME, load_theme
+
+    text = _text(value, where).strip()
+    spec = text
+    if text and text != NO_THEME and text not in BUNDLED_THEMES and where.base is not None:
+        candidate = Path(text)
+        if not candidate.is_absolute():
+            spec = str(where.base / candidate)
+    try:
+        return load_theme(spec)
+    except RenderError as exc:
+        where.fail(f"is not usable: {exc}")
+
+
 def _link_template(value: Any, where: _Where) -> Any:
     from netgraph.errors import RenderError
     from netgraph.render.links import LinkTemplate
@@ -360,6 +382,13 @@ SETTINGS: Final[tuple[Setting, ...]] = (
         "Draw each namespace as a visual group.",
     ),
     _setting("icons", "icons", _icons, "Theme name or directory to draw elements as icons."),
+    _setting("theme", "theme", _theme, "Stylesheet name or path applied to every element."),
+    _setting(
+        "style",
+        "styling",
+        _boolean,
+        "Honour the styles the inventory and the theme declare.",
+    ),
     _setting(
         "tooltips", "tooltips", _boolean, "Carry the full detail of each element as hover text."
     ),
@@ -389,6 +418,12 @@ SETTINGS: Final[tuple[Setting, ...]] = (
         "routing",
         _choice(_routing_styles, fold_case=True),
         "How links are drawn: spline, orthogonal or straight.",
+    ),
+    _setting(
+        "avoid",
+        "avoid",
+        _boolean,
+        "Route orthogonal links around the boxes they are not attached to.",
     ),
     _setting("title", "title", _text, "Caption for the diagram."),
 )

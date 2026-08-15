@@ -19,6 +19,7 @@ This whole documentation set is also published, with those demos beside it, at
 | know exactly what a field means or what values it accepts | [schema-reference.md](schema-reference.md) |
 | know why the schema is shaped the way it is, normatively | [schema.md](schema.md) |
 | control what a diagram shows — layers, filters, icons, formats | [rendering.md](rendering.md) |
+| give the diagram your own colours, shapes and house style | [styling.md](styling.md) |
 | arrange the diagram by hand and have it stay arranged | [commands/layout.md](commands/layout.md) |
 | understand a finding, or silence one | [validation.md](validation.md) |
 | look up one validation rule by its id | [validation-rules.md](validation-rules.md) |
@@ -59,6 +60,9 @@ This whole documentation set is also published, with those demos beside it, at
 * **[rendering.md](rendering.md)** — the nine layers, the filters, namespace collapsing and
   link bundling, icon themes, labelling, stored arrangements, interactivity, and what each
   output format is good for.
+* **[styling.md](styling.md)** — `spec.style` and `kind: theme`: the colour and shape
+  vocabulary, the selectors, the four-rung precedence ladder, the two bundled themes, and
+  how to make it the inventory's default rather than a flag you have to remember.
 * **[validation.md](validation.md)** — the three passes, severities, `--strict`, the four
   ways to suppress a rule, and how to read a finding.
 * **[ci.md](ci.md)** — `netgraph validate` and `netgraph test` as gates: the JSON

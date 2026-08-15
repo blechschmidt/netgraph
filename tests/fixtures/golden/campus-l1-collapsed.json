@@ -73,7 +73,17 @@
         30,
         99
       ],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#e2e8f0",
+        "stroke": "#475569",
+        "shape": "folder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "ns:sites/south",
@@ -143,7 +153,17 @@
         30,
         99
       ],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#e2e8f0",
+        "stroke": "#475569",
+        "shape": "folder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "ns:sites/west",
@@ -213,7 +233,17 @@
         30,
         99
       ],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#e2e8f0",
+        "stroke": "#475569",
+        "shape": "folder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     }
   ],
   "edges": [
@@ -235,7 +265,15 @@
       "speedText": "10Gbps",
       "label": "BB-NS",
       "lengthM": 4200.0,
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "backbone/cbl-bb-south-west",
@@ -255,7 +293,15 @@
       "speedText": "10Gbps",
       "label": "BB-SW",
       "lengthM": 4200.0,
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "backbone/cbl-bb-west-north",
@@ -275,7 +321,15 @@
       "speedText": "10Gbps",
       "label": "BB-WN",
       "lengthM": 4200.0,
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     }
   ],
   "annotations": {

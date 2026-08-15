@@ -94,6 +94,7 @@ from netgraph.models import (
     RoutingConfig,
     Server,
     StaticRoute,
+    Style,
     Switch,
     Tunnel,
     UserStatus,
@@ -107,6 +108,7 @@ from netgraph.models import (
 from netgraph.models.metadata import Location
 from netgraph.models.power import format_watts
 from netgraph.models.scalars import MAX_VLAN_ID, MIN_VLAN_ID, format_bitrate
+from netgraph.models.style import hex_colour
 from netgraph.power import FeedKind, PowerPlan, UnresolvedReason, Uplink, power_plan
 from netgraph.rules import RULES, WILDCARD, Rule, Severity, resolve_rule_id
 from netgraph.subnets import (
@@ -4217,6 +4219,65 @@ def _check_empty_area(ctx: _Context) -> Iterator[_Draft]:
 # --------------------------------------------------------------------------- #
 
 
+def _styled(ctx: _Context) -> Iterator[tuple[str, Style]]:
+    """Every element carrying a ``spec.style`` block (§22), with its fqn."""
+    for fqn, element in ctx.inventory.elements.items():
+        style = getattr(element.spec, "style", None)
+        if style is not None:
+            yield fqn, style
+
+
+def _check_invisible_style(ctx: _Context) -> Iterator[_Draft]:
+    """W144 — a style fades an element to nothing (``NG-Z003``).
+
+    ``opacity: 0`` is legal on its own — it is the bottom of a legal range, and
+    an editor dragging a slider passes through it — but an element drawn fully
+    transparent is one a reader cannot see and cannot click, while every link to
+    it is still drawn to the empty space where it was. That is a diagram that
+    lies, and it is almost always a slider left at the wrong end rather than a
+    decision. Hiding an element is what ``--kind``, ``--name`` and the other
+    filters are for; they take it out of the topology as well as out of the
+    picture.
+    """
+    for fqn, style in _styled(ctx):
+        if style.opacity is not None and style.opacity <= 0:
+            yield _Draft(
+                f"{_q(fqn)} is styled with opacity 0, so it is drawn invisibly while its "
+                f"links are still drawn to it. Use a filter to leave an element out.",
+                (fqn,),
+                ("spec", "style", "opacity"),
+            )
+
+
+def _check_unreadable_label(ctx: _Context) -> Iterator[_Draft]:
+    """W145 — a label the same colour as the box behind it (``NG-Z005``).
+
+    Reported only when *both* colours are written on the same element, so this
+    never fires on an inherited value: a theme setting one and an element the
+    other is a legitimate combination that the reader can see the result of, and
+    a warning about a pair the element does not fully control would be a warning
+    nobody can act on without editing somebody else's file.
+
+    A transparent fill is exempt. ``fill: none`` means "whatever is behind
+    this", and black text on it is the normal way to draw an unfilled shape.
+    """
+    for fqn, style in _styled(ctx):
+        fill, font = style.fill, style.font_color
+        if fill is None or font is None:
+            continue
+        if hex_colour(fill) != hex_colour(font) or hex_colour(fill) == "none":
+            continue
+        yield _Draft(
+            f"{_q(fqn)} draws its label in {font!r} on a {fill!r} fill, so the label is "
+            f"invisible. Give 'fontColor' a colour that contrasts with 'fill'.",
+            (fqn,),
+            ("spec", "style", "fontColor"),
+        )
+
+
+# --------------------------------------------------------------------------- #
+
+
 def _check_outlet_claimed_twice(ctx: _Context) -> Iterator[_Draft]:
     """E037 — one PDU outlet feeds two power supplies (``NG-E010``).
 
@@ -5036,6 +5097,8 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("W141", _check_unknown_expectation),
     ("W142", _check_stale_annotation),
     ("W143", _check_empty_area),
+    ("W144", _check_invisible_style),
+    ("W145", _check_unreadable_label),
     ("I001", _check_local_mac),
     ("I002", _check_uncabled_interface),
     ("I003", _check_nonstandard_port),

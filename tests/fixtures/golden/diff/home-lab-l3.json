@@ -30,6 +30,16 @@
           ]
         }
       ],
+      "style": {
+        "fill": "#fdf0e3",
+        "stroke": "#ea580c",
+        "shape": "ellipse",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -77,6 +87,16 @@
           "mac": "3c:97:0e:20:01:02"
         }
       ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "changed",
         "fields": [
@@ -109,6 +129,16 @@
           ]
         }
       ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "added"
       }
@@ -139,6 +169,16 @@
           ]
         }
       ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -196,6 +236,16 @@
           }
         }
       ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -302,6 +352,16 @@
           }
         }
       ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -363,6 +423,16 @@
           "mtu": 1500
         }
       ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "changed",
         "renamedFrom": "wireless/ap-home"
@@ -386,6 +456,16 @@
       },
       "vlans": [],
       "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -422,6 +502,16 @@
         10
       ],
       "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -444,6 +534,16 @@
       },
       "vlans": [],
       "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -466,6 +566,16 @@
       },
       "vlans": [],
       "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -496,6 +606,16 @@
         10
       ],
       "interfaces": [],
+      "style": {
+        "fill": "#e0f2f1",
+        "stroke": "#0f766e",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -535,6 +655,16 @@
           ]
         }
       ],
+      "style": {
+        "fill": "#eae2f5",
+        "stroke": "#7c3aed",
+        "shape": "cylinder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "removed"
       }
@@ -557,6 +687,14 @@
         "192.168.10.30/24"
       ],
       "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -577,6 +715,14 @@
         "2001:db8:10::30/64"
       ],
       "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -597,6 +743,14 @@
         "192.168.10.20/24"
       ],
       "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -617,6 +771,14 @@
         "2001:db8:10::20/64"
       ],
       "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -637,6 +799,14 @@
         "192.168.10.31/24"
       ],
       "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "added"
       }
@@ -657,6 +827,14 @@
         "192.168.10.40/24"
       ],
       "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -677,6 +855,14 @@
         "2001:db8:10::40/64"
       ],
       "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -697,6 +883,14 @@
         "192.0.2.1/32"
       ],
       "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -717,6 +911,14 @@
         "2001:db8::1/128"
       ],
       "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -737,6 +939,14 @@
         "203.0.113.2/30"
       ],
       "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -759,6 +969,14 @@
       "vlans": [
         10
       ],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -781,6 +999,14 @@
       "vlans": [
         10
       ],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -803,6 +1029,14 @@
       "vlans": [
         10
       ],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -825,6 +1059,14 @@
       "vlans": [
         10
       ],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -845,6 +1087,14 @@
         "192.168.10.10/24"
       ],
       "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "removed"
       }
@@ -865,6 +1115,14 @@
         "2001:db8:10::10/64"
       ],
       "vlans": [],
+      "style": {
+        "stroke": "#0f766e",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "removed"
       }

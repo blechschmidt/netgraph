@@ -57,7 +57,7 @@ from netgraph.drawio.identity import (
 )
 from netgraph.drawio.model import MARGIN, ROOT_ID, Cell, Diagram, Frame, cell_id
 from netgraph.drawio.notes import Level, Notes
-from netgraph.drawio.styles import edge_style, group_style, icon_data_uri, node_style, palette_key
+from netgraph.drawio.styles import edge_style, group_style, icon_data_uri, node_style
 from netgraph.layout.geometry import Box, Placement
 from netgraph.loader.inventory import Inventory
 from netgraph.plan.document import body_of
@@ -65,6 +65,8 @@ from netgraph.render.annotations import annotation_views
 from netgraph.render.graph import Edge, Graph, Node
 from netgraph.render.icons import IconTheme
 from netgraph.render.options import RenderOptions
+from netgraph.render.styles import StyleMap
+from netgraph.render.theme import Theme
 
 __all__ = [
     "AUTO_COLUMNS",
@@ -136,6 +138,12 @@ class BuildOptions:
     #: a caller that wants the topology alone — the annotations are part of the
     #: picture the inventory describes, not decoration added to it.
     annotations: bool = True
+    #: The stylesheet in force (§22). mxGraph's style vocabulary lines up with
+    #: netgraph's almost one for one, so a colour chosen in a manifest reaches
+    #: draw.io as the same hex the SVG carries and survives the round-trip.
+    theme: Theme | None = None
+    #: Walk the style ladder at all; ``False`` is ``--no-style``.
+    styling: bool = True
 
 
 def build_diagram(
@@ -161,6 +169,17 @@ def build_diagram(
         byte-identical, and so the z-order draws each layer where it belongs.
     """
     record = notes if notes is not None else Notes()
+    # One resolution for the whole export, exactly as the Graphviz backend
+    # does it (§22), so a node cannot be one colour here and another there.
+    # ``svg`` because a ``.drawio`` file is opened in a vector editor, which
+    # is the case a raster icon loses.
+    styles = StyleMap.build(
+        graph,
+        theme=options.theme,
+        icons=options.icons,
+        output="svg",
+        styling=options.styling,
+    )
     nodes = _ordered_nodes(graph)
     placements = _placements(graph, nodes, record)
     boxes = _group_boxes(graph, nodes, placements) if options.groups else {}
@@ -174,12 +193,21 @@ def build_diagram(
 
     node_cells = tuple(
         _node_cell(
-            node, placements[node.fqn], graph, inventory, options, frame, parents, origins, record
+            node,
+            placements[node.fqn],
+            graph,
+            inventory,
+            options,
+            frame,
+            parents,
+            origins,
+            record,
+            styles,
         )
         for node in nodes
     )
     ids = {node.fqn: cell.id for node, cell in zip(nodes, node_cells, strict=True)}
-    link_cells = tuple(_link_cells(graph, inventory, frame, ids, record))
+    link_cells = tuple(_link_cells(graph, inventory, frame, ids, record, styles))
     annotations = annotation_cells(placed, frame, inventory, ids)
 
     diagram = Diagram(
@@ -543,14 +571,21 @@ def _node_cell(
     parents: Mapping[str, str],
     origins: Mapping[str, tuple[float, float]],
     record: Notes,
+    styles: StyleMap,
 ) -> Cell:
     """One vertex, positioned relative to the frame it sits in."""
-    icon = icon_data_uri(options.icons, node.kind) if options.icons is not None else None
+    style = styles.node(node.fqn)
+    icon = (
+        icon_data_uri(options.icons, style.icon)
+        if options.icons is not None and style.icon is not None
+        else None
+    )
     if options.icons is not None and icon is None:
+        wanted = style.icon or node.kind
         record.add(
             Level.INFO,
             node.fqn,
-            f"the icon theme has no picture for kind {node.kind!r}, so the node is drawn as a "
+            f"the icon theme has no picture called {wanted!r}, so the node is drawn as a "
             "coloured box; the diagram is complete, only plainer",
             reason=NOT_REPRESENTABLE,
         )
@@ -562,7 +597,7 @@ def _node_cell(
         id=cell_id("n", node.fqn),
         role=CellRole.NODE,
         label=node.name,
-        style=node_style(node.kind, icon=icon),
+        style=node_style(style, icon=icon),
         parent=parent,
         vertex=True,
         x=x - offset_x,
@@ -600,8 +635,12 @@ def _link_cells(
     frame: Frame,
     ids: Mapping[str, str],
     record: Notes,
+    styles: StyleMap,
 ) -> Iterator[Cell]:
     """One edge cell per link whose two ends both reached the diagram."""
+    # The cells are emitted in id order so two exports agree byte for byte,
+    # while a resolved style is keyed by the link's position in the graph.
+    order = {edge.id: index for index, edge in enumerate(graph.edges)}
     for edge in sorted(graph.edges, key=lambda entry: (entry.id, entry.source, entry.target)):
         source, target = ids.get(edge.source), ids.get(edge.target)
         if source is None or target is None:
@@ -619,7 +658,7 @@ def _link_cells(
             id=cell_id("e", edge.id),
             role=CellRole.LINK,
             label=_link_label(edge, inventory),
-            style=edge_style(palette=palette_key(edge.kind, edge.medium), routing=routing),
+            style=edge_style(styles.edge(order[edge.id]), routing=routing),
             parent=ROOT_ID,
             edge=True,
             source=source,

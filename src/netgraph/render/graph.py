@@ -116,6 +116,7 @@ from netgraph.models import (
     Medium,
     PatchPanel,
     Pdu,
+    Style,
     Tunnel,
     TunnelType,
     User,
@@ -954,6 +955,18 @@ class Node:
         return document.metadata.labels if document is not None else {}
 
     @property
+    def style(self) -> Style | None:
+        """What the declaring document says this node should look like (§22).
+
+        ``None`` for a node nobody declared — a subnet, a rack, a collapsed
+        namespace — which is not the same as "no style": those are drawn by the
+        theme and the palette, and there is no document to hang a ``spec.style``
+        on. See :mod:`netgraph.render.styles` for the rest of the ladder.
+        """
+        document = self._document
+        return getattr(document.spec, "style", None) if document is not None else None
+
+    @property
     def description(self) -> str | None:
         document = self._document
         return document.metadata.description if document is not None else None
@@ -1036,6 +1049,44 @@ class Edge:
         if self.tunnel is not None:
             return self.tunnel.name
         return short_name(self.id.partition("#")[0])
+
+    @property
+    def document(self) -> Cable | Tunnel | Adapter | None:
+        """The declared element this edge came from, whichever kind it is.
+
+        A cable first, then a tunnel, then the adapter an attachment stands for:
+        the order they are drawn in, and the order in which at most one of them
+        is ever set.
+        """
+        if self.cable is not None:
+            return self.cable
+        if self.tunnel is not None:
+            return self.tunnel.tunnel
+        return self.adapter
+
+    @property
+    def namespace(self) -> str:
+        """The directory the declaring document was found in; ``""`` for none.
+
+        A derived link — a subnet membership, a protocol adjacency, a power feed
+        — has no document and therefore no namespace, which is the honest answer
+        rather than borrowing one of its endpoints'.
+        """
+        if self.tunnel is not None:
+            return self.tunnel.namespace
+        document = self.document
+        return namespace_of(self.id.partition("#")[0]) if document is not None else ""
+
+    @property
+    def labels(self) -> Mapping[str, str]:
+        document = self.document
+        return document.metadata.labels if document is not None else {}
+
+    @property
+    def style(self) -> Style | None:
+        """What the declaring document says this link should look like (§22)."""
+        document = self.document
+        return getattr(document.spec, "style", None) if document is not None else None
 
     @property
     def is_logical(self) -> bool:

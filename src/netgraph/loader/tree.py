@@ -58,12 +58,14 @@ from netgraph.models import (
     LAYOUT_KIND,
     TEMPLATE_KIND,
     TEST_SUITE_KIND,
+    THEME_KIND,
     Element,
     parse_annotation,
     parse_document,
     parse_layout,
     parse_template,
     parse_test_suite,
+    parse_theme,
 )
 
 __all__ = [
@@ -691,6 +693,8 @@ class _Builder:
     _suites_seen: int = 0
     #: The same count for the three annotation kinds of §21; see :meth:`harvest`.
     _annotations_seen: int = 0
+    #: The same count for ``kind: theme``; see :meth:`harvest`.
+    _themes_seen: int = 0
 
     # -- phase one: the walk ---------------------------------------------
 
@@ -710,6 +714,9 @@ class _Builder:
             return
         if kind in ANNOTATION_DOCUMENT_KINDS:
             self._add_annotation(document, entry)
+            return
+        if kind == THEME_KIND:
+            self._add_theme(document, entry)
             return
 
         reference = _inherit_reference(document.data)
@@ -832,6 +839,45 @@ class _Builder:
                     index=source.index,
                     field_path=("metadata", "name"),
                     rule="NG-K001",
+                )
+            )
+
+    def _add_theme(self, document: RawDocument, entry: InventoryFile) -> None:
+        """Register a ``kind: theme`` document (§22.3), or record why it is unusable.
+
+        A theme is not applied by being here — a rendering styles itself with the
+        one ``--theme`` names — but it is *checked* here, because the obvious
+        place to keep a stylesheet is beside the manifests it styles, and a
+        colour nobody can spell should be a finding from ``netgraph validate``
+        rather than a surprise from the first render that names the file.
+        """
+        self._themes_seen += 1
+        try:
+            theme = parse_theme(document.data, source=document.source)
+        except SchemaError as exc:
+            for error in _schema_errors(exc, document):
+                self.inventory.record(error)
+            return
+        source = SourceLocation(
+            path=entry.path,
+            relative=entry.relative.as_posix(),
+            index=document.index,
+            line=document.line,
+            provenance=Provenance(base=document),
+        )
+        if self.inventory.add_theme(theme, namespace=entry.namespace, source=source) is None:
+            fqn = qualify(entry.namespace, theme.metadata.name)
+            first = self.inventory.theme_sources.get(fqn)
+            where = f" (first declared at {first})" if first is not None else ""
+            self.inventory.record(
+                LoadError(
+                    message=f"duplicate theme name {fqn!r}{where}; this document is ignored",
+                    path=source.path,
+                    relative=source.relative,
+                    line=source.line,
+                    index=source.index,
+                    field_path=("metadata", "name"),
+                    rule="NG-Z004",
                 )
             )
 

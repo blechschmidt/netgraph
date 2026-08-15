@@ -89,6 +89,7 @@ from netgraph.httpserve import (
     is_loopback,
 )
 from netgraph.render import IconTheme
+from netgraph.render.theme import Theme
 from netgraph.web.bindings import payload as bindings_payload
 from netgraph.web.events import (
     EVENTS_PATH,
@@ -194,6 +195,7 @@ ASSETS: Final[dict[str, tuple[str, str]]] = {
     "/menu.js": ("menu.js", "text/javascript; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/select.js": ("select.js", "text/javascript; charset=utf-8"),
+    "/style.js": ("style.js", "text/javascript; charset=utf-8"),
     "/session.js": ("session.js", "text/javascript; charset=utf-8"),
     "/tour.js": ("tour.js", "text/javascript; charset=utf-8"),
 }
@@ -245,6 +247,7 @@ class _Handler(LocalHandler):
     # Bound onto a subclass by :meth:`WebServer.create`.
     source: str
     icons: IconTheme | None
+    theme: Theme | None
     session: EditingSession | None
     #: The scratch copies the guided tour edits; see :mod:`netgraph.web.tour`.
     tours: Tours
@@ -335,12 +338,12 @@ class _Handler(LocalHandler):
         elif path == EVENTS_PATH:
             self._events(session, body=body)
         elif path == GRAPH_PATH:
-            view = ViewOptions.from_query(query, icons=self.icons)
+            view = ViewOptions.from_query(query, icons=self.icons, theme=self.theme)
             preview, revision = session.graph(view, known=_known(query))
             self.on_render(preview)
             self._json(HTTPStatus.OK, {"revision": revision} | preview.to_dict(), body=body)
         elif path == DIFF_PATH:
-            view = ViewOptions.from_query(query, icons=self.icons)
+            view = ViewOptions.from_query(query, icons=self.icons, theme=self.theme)
             against = query.get("against", [SESSION_BASELINE])[-1]
             preview, revision = session.diff(view, against=against, known=_known(query))
             self.on_render(preview)
@@ -365,7 +368,7 @@ class _Handler(LocalHandler):
                 body=body,
             )
         elif path == FRAME_PATH:
-            view = ViewOptions.from_query(query, icons=self.icons)
+            view = ViewOptions.from_query(query, icons=self.icons, theme=self.theme)
             rev = query.get("rev", [""])[-1]
             if not rev:
                 raise SessionError("a frame is of one revision; give '?rev=<commit>'")
@@ -560,7 +563,7 @@ class _Handler(LocalHandler):
             source = payload.get("source", "")
             if not isinstance(source, str):
                 raise RequestError("'source' must be the YAML document stream, as a string")
-            view = ViewOptions.from_request(payload, icons=self.icons)
+            view = ViewOptions.from_request(payload, icons=self.icons, theme=self.theme)
         except RequestError as exc:
             self._refuse(exc)
             return
@@ -998,6 +1001,7 @@ class WebServer(BackgroundServer):
         source: str = "",
         session: EditingSession | None = None,
         icons: IconTheme | None = None,
+        theme: Theme | None = None,
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
         log: Callable[[str], None] = lambda message: None,
@@ -1010,6 +1014,8 @@ class WebServer(BackgroundServer):
                 given, because then the files are the source.
             session: The inventory this interface edits. ``None`` serves the
                 document-stream scratchpad instead.
+            theme: Stylesheet for the diagram (§22). Chosen here for the same
+                reason as ``icons``: it names a file on this machine.
             icons: Icon theme for the diagram. Chosen here rather than by the
                 browser, because it names a directory on this machine.
             host: Address to bind. Loopback unless the caller says otherwise.
@@ -1030,6 +1036,7 @@ class WebServer(BackgroundServer):
                 "session": session,
                 "tours": tours,
                 "icons": icons,
+                "theme": theme,
                 "on_render": staticmethod(on_render),
                 "loopback_only": is_loopback(host),
                 "log": staticmethod(log),

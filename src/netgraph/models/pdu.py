@@ -54,6 +54,7 @@ from netgraph.models.positions import (
 )
 from netgraph.models.power import format_watts
 from netgraph.models.scalars import Watts
+from netgraph.models.style import Style
 
 __all__ = [
     "MAX_PDU_OUTLETS",
@@ -135,6 +136,11 @@ class PduSpec(NetgraphModel):
     #: Which supply feeds the unit — ``A``, ``B``, ``ups-1``, ``utility``. Free
     #: text; ``NG-E015`` compares two of them for equality and nothing more.
     input_feed: str | None = Field(default=None, max_length=64)
+    #: How this element is drawn (§22): a ``fill``, a ``stroke``, a ``shape``
+    #: and six more, each optional and each inheriting from the theme, then the
+    #: icon set, then the built-in palette when absent. See
+    #: :mod:`netgraph.models.style`.
+    style: Style | None = None
 
     @cached_property
     def outlet_numbers(self) -> tuple[str, ...]:

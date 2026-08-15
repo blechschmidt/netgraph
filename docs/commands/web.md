@@ -355,6 +355,7 @@ menu, untouched.
 | Add an interface… | Add an interface… — `i` | `--write` |
 | Note about it… | Add a note to the diagram… — `Shift-N` | `--write` |
 | Rename it… | Rename the focused element… — `F2` | `--write` |
+| Change how it looks… | Restyle the selection — *palette only* | `--write` |
 | Set a field… | Set a field… — `e` | `--write` |
 | Remove a field… | Remove a field… — *palette only* | `--write` |
 | Move its document… | Move to another file… — *palette only* | `--write` |
@@ -368,8 +369,10 @@ menu, untouched.
 | Add a bend | Add a bend to the focused link — `b` | `--write` |
 | Straighten it | Straighten the focused link — `Shift-B` | `--write` |
 | Route it… | Change how the link is routed… — `r` | `--write` |
+| Pin the computed route | Pin the route the renderer worked out — `Shift-R` | `--write` |
 | Put the label back on the line | Put the link's label back on the line — *palette only* | `--write` |
 | Note about it… | Add a note to the diagram… — `Shift-N` | `--write` |
+| Change how it looks… | Restyle the selection — *palette only* | `--write` |
 | Set a field… | Set a field… — `e` | `--write` |
 | Disconnect it | Delete the selection — `Delete` | `--write` |
 
@@ -632,11 +635,14 @@ cable it, undo both — without dispatching a single mouse event.
 | `b` | Add a bend to the focused link | the diagram | `--write` | Drops a waypoint half way along the link, which the route then passes through. Double-clicking the line does the same at the point clicked. |
 | `Shift-B` | Straighten the focused link | the diagram | `--write` | Clears every bend, leaving the link to run directly between its two devices. The routing style and the label position are kept. |
 | `r` | Change how the link is routed… | the diagram | `--write` | Spline, orthogonal or straight, on this link alone. Clearing it takes the view's default back. Honoured by 'netgraph render' as well as here. |
+| `Shift-R` | Pin the route the renderer worked out | the diagram | `--write` | Writes the bends netgraph computed to keep this link clear of the boxes it passes into the layout document, so they become bends you placed: they stop being recomputed, they get a grab handle each, and moving a device no longer moves them. Refuses on a link that needed no detour, since there would be nothing to pin. |
 | *palette only* | Put the link's label back on the line | anywhere | `--write` | Undoes a nudged label, leaving it half way along the route where the renderer puts one nobody has moved. |
 | `Shift-N` | Add a note to the diagram… | the diagram | `--write` | Drops a note where the pointer is — or in the middle of the view when the keyboard asks — and opens it for typing. Right-clicking an element or a link anchors the note to it instead, so it follows what it is about. 'netgraph edit create-annotation'. |
 | `Shift-E` | Edit the note's text… | the diagram | `--write` | A text box over the note itself, in the markdown subset §21 defines. Ctrl-Enter or clicking away writes 'spec.text'; Escape abandons it and writes nothing. Double-clicking the note does the same. |
 | `i` | Add an interface… | the diagram | `--write` | 'netgraph edit add-interface'. |
 | *palette only* | Remove an interface… | anywhere | `--write` | 'netgraph edit remove-interface'. |
+| `Ctrl-Shift-Y` | Style inspector | anywhere | a folder | How the selection is drawn (§22), which layer each value came from, and the controls to change it. A change is written to spec.style, so the picture and the YAML stay one thing. |
+| *palette only* | Restyle the selection | anywhere | `--write` | Open the style inspector on what is selected. |
 
 **Arranging the diagram**
 
@@ -818,6 +824,7 @@ browser alone, which is what you want over SSH.
 | `--port` | `INTEGER, 0-65535` | `8081` | Port to bind. 0 lets the operating system choose one. |
 | `--open`, `--no-open` | — | `--open` | Open the interface in the default browser once it is listening. |
 | `--icons` | `THEME\|DIR` | — | Draw each element as an icon instead of a plain shape. Built in: cisco, none. Chosen here rather than in the browser, because it names a directory on this machine. |
+| `--theme` | `NAME\|PATH` | — | Apply a stylesheet to the diagram (§22). The style inspector shows the resolved appearance and which layer each value came from. Built in: blueprint, mono, none. Chosen here rather than in the browser, because it names a file on this machine. |
 | `--write`, `--read-only` | — | --read-only | Let the browser change the inventory. Only for a SOURCE folder, only on a loopback bind, and never by default: an editor that can write is a decision. |
 | `--profile` | `NAME` | — | Apply the [profile.NAME] block of netgraph.toml on top of its [render] table. Explicit flags still win over both. |
 | `--show-config` | — | off | Print the settings this invocation resolves to, and where each one came from, then exit without doing any work. |

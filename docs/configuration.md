@@ -41,6 +41,7 @@ declared the defaults, and `netgraph init` scaffolds a fully commented copy.
 - [Precedence](#precedence)
 - [Seeing what resolved, and why](#seeing-what-resolved-and-why)
 - [Every render setting](#every-render-setting)
+- [`[theme]` — this inventory's own styling rules](#theme--this-inventorys-own-styling-rules)
 - [`[cache]` — remembering parsed files](#cache--remembering-parsed-files)
 - [`[history]` — how far back a timeline goes](#history--how-far-back-a-timeline-goes)
 - [`[editor]` — the visual editor's grid](#editor--the-visual-editors-grid)
@@ -268,12 +269,15 @@ title               Q3 review   flag --title
 | `annotations` | boolean | `true` | `--annotations/--no-annotations` |
 | `group-by-namespace` | boolean | `false` | `--group-by-namespace` |
 | `icons` | string | unset | `--icons` |
+| `theme` | string | unset | `--theme` |
+| `style` | boolean | `true` | `--style/--no-style` |
 | `tooltips` | boolean | `true` | `--tooltips/--no-tooltips` |
 | `link-template` | string | unset | `--link-template` |
 | `element-ids` | boolean | `false` | `--element-ids` |
 | `max-addresses` | integer ≥ 0 | `4` | `--max-addresses` |
 | `rankdir` | `"TB"`, `"LR"`, `"BT"` or `"RL"` | `"TB"` | `--rankdir` |
 | `routing` | `"spline"`, `"orthogonal"` or `"straight"` | what the layout documents say, else `"spline"` | `--routing` |
+| `avoid` | boolean | `true` | `--avoid/--no-avoid` |
 | `title` | string | unset | `--title` |
 
 Values are validated when the file is read, against the same registries the
@@ -282,7 +286,7 @@ flags use: `format` accepts exactly what `-f` accepts, `layer` exactly what
 before an inventory is loaded rather than after four hundred broken links have
 been written to an SVG.
 
-Two keys are worth a note:
+Four keys are worth a note:
 
 **`icons`** takes a bundled theme name (`cisco`), `none`, or a directory of
 images named after element kinds. A **relative** directory resolves against the
@@ -290,9 +294,96 @@ configuration file, not the working directory — the file lives with the
 inventory, so a colleague who runs `netgraph` from a parent folder gets the same
 icons.
 
+**`theme`** is the same idea for the *stylesheet* rather than the pictures: a
+bundled name (`blueprint`, `mono`), `none`, or a path to a `kind: theme` YAML
+file, and a relative path resolves against the configuration file for exactly
+the reason `icons` does. It is the default for every diagram of this inventory,
+so the colours stop depending on somebody's shell history; `--theme` on the
+command line overrides it and `--theme none` turns it off.
+[`docs/styling.md`](styling.md) is the guide.
+
+**`style`** is the escape hatch, and `style = false` is `--no-style`: draw from
+the built-in palette alone, ignoring every style the inventory and the theme
+declare. Setting it in the file is for an inventory that carries styles it does
+not want in its *default* rendering; most of the time it belongs on the command
+line, where it answers "is this diagram odd because of the network or because of
+the stylesheet?" for one run. Icons are a separate ladder rung and are
+unaffected — `icons = "none"` is the switch for those.
+
 **`bundle-links`** is genuinely three-valued. Unset means "fold only what the
 inventory itself calls one link" — the members of a declared `lag` interface —
 which is neither `true` nor `false`. Setting it to `false` turns even that off.
+
+**`avoid`** only ever does anything to an *arranged* diagram whose links are
+`orthogonal`: it routes them around the boxes they are not attached to instead
+of straight across them ([`docs/rendering.md`](rendering.md#routing-around-things)).
+A bend somebody placed is never moved by it, and a link whose line already
+crosses nothing is left exactly where it was. `avoid = false` is the local
+Z-and-L every orthogonal diagram was drawn with before it existed, which is
+faster and entirely predictable — worth having for a deliberately schematic
+drawing, and worth reaching for if a route ever detours somewhere surprising.
+
+## `[theme]` — this inventory's own styling rules
+
+`[render] theme` *names* a stylesheet. This table *is* one: the rules written
+inline, for the inventory that wants three lines of house style and not a second
+file to keep beside the manifests.
+
+```toml
+[render]
+theme = "blueprint"          # the base, by name or by path — optional
+
+[[theme.rules]]
+select = {role = ["core"]}
+style = {strokeWidth = 3}
+
+[[theme.rules]]
+select = {namespace = ["sites/hq/**"]}
+style = {fill = "#f8fafc", fontColor = "slate"}
+```
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `rules` | array of tables | `[]` | The rules, in declaration order. Each is a `select` table and a `style` table, exactly the `spec.rules` of a `kind: theme` document ([`docs/schema.md` §22.3](schema.md#223-kind-theme--a-stylesheet)). |
+
+`select` takes the five clauses — `kind`, `name`, `namespace`, `role`, `label` —
+and `style` the nine fields of a style block. They are not a second dialect:
+the entries go through the very same models a theme file does, so a mistyped
+colour here is refused with the same wording, and under the same rule id, that
+it would get in a `theme.yaml`. A table declaring no rules at all is an error
+for the same reason an empty theme file is — it would parse, change nothing, and
+tell you nothing.
+
+**The rules are appended after whatever `--theme` or `[render] theme` named**,
+rather than merged into it, and that is the whole mechanism. Precedence reads
+equally specific rules back to front ([§22.4](schema.md#224-precedence-the-ladder)),
+so an appended rule **wins a tie** against the named theme without having to
+restate the rules it agrees with — which is exactly what an inventory adjusting
+a bundled theme wants. It does not let it beat a *more specific* rule, because
+specificity is still read first: a rule that must beat one states at least as
+many conditions as it does.
+
+Appending is also why the two are still tellable apart afterwards. The composed
+stylesheet calls itself `blueprint+theme`, and the inline rules keep their
+positions at the end of the list, so a `from` entry of `theme:blueprint+theme#16`
+in [`-f json`](rendering.md#the-json-export) — one past the last of the sixteen
+rules `blueprint` itself declares — names your file rather than netgraph's.
+
+Three consequences worth knowing:
+
+* With no named theme, the table is the whole theme. `[theme]` alone is a
+  perfectly good house style.
+* A `[profile.<name>]` may name a different `theme`; the inline rules are
+  appended to whichever one won, because they are this inventory's own rather
+  than a default somebody picked.
+* `--no-style` ignores them along with everything else declared, since it draws
+  from the bottom two rungs of the ladder only.
+
+It is a **top-level table, not a render setting**: it is not one value with one
+source, so it does not appear in `netgraph config show` beside `theme` and it
+cannot be overridden from the command line. Turn it off by turning styling off.
+[`docs/styling.md`](styling.md#a-default-for-the-inventory) works the interaction
+of the two through with a rendered example.
 
 ## `[cache]` — remembering parsed files
 

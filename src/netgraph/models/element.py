@@ -21,6 +21,7 @@ __all__ = [
     "NOTE_KIND",
     "TEMPLATE_KIND",
     "TEST_SUITE_KIND",
+    "THEME_KIND",
     "ElementBase",
 ]
 
@@ -55,6 +56,14 @@ TEMPLATE_KIND: str = "template"
 #: versioned on its own. See :mod:`netgraph.models.layout`.
 LAYOUT_KIND: str = "layout"
 
+#: The eighteenth kind (§22.3). A theme declares no element and no network fact:
+#: it is a stylesheet, naming classes of element and how each is drawn. Unlike
+#: every other kind here it is not *used* by being in the tree — a rendering
+#: applies the one ``--theme`` names and no other — but it is recognised here so
+#: that keeping ``theme.yaml`` beside the manifests it styles, which is the
+#: obvious place for it, is not an error. See :mod:`netgraph.models.theme`.
+THEME_KIND: str = "theme"
+
 #: The fifteenth kind (§20). A test suite declares no element either: it is a list
 #: of named assertions about the network the other documents describe, graded by
 #: ``netgraph test``. See :mod:`netgraph.models.testsuite`.
@@ -80,6 +89,7 @@ DOCUMENT_KINDS: tuple[str, ...] = (
     LAYOUT_KIND,
     TEST_SUITE_KIND,
     *ANNOTATION_DOCUMENT_KINDS,
+    THEME_KIND,
 )
 
 

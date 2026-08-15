@@ -893,6 +893,85 @@ main {
 }
 .info .note { color: var(--muted); }
 
+/* --------------------------------------------------------- style inspector */
+
+/* One row per field of §22: the name, a control, where the value came from, and
+ * a reset. A four-column grid rather than a flex row so that every provenance
+ * line starts at the same x -- the column is meant to be *scanned* ("which of
+ * these did I set?"), and a ragged left edge is the one thing that would stop
+ * it being scannable. */
+.style-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: .5rem .7rem 1rem;
+  font-size: 12px;
+}
+
+.style-row {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) auto auto;
+  gap: .45rem;
+  align-items: center;
+  padding: .3rem 0;
+  border-bottom: 1px solid var(--edge);
+}
+
+.style-label {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.style-input {
+  min-width: 0;
+  font: inherit;
+  padding: .2rem .3rem;
+}
+
+/* A colour well is a fixed square. Left to the grid it would stretch to the
+ * whole column and read as a filled bar rather than as a swatch. */
+.style-color {
+  width: 2.4rem;
+  height: 1.5rem;
+  padding: 0;
+  justify-self: start;
+  cursor: pointer;
+}
+
+/* Where the value came from. Small and grey: it is what you look at *after*
+ * deciding something is the wrong colour, never before. */
+.style-from {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.style-reset {
+  padding: 0 .35rem;
+  line-height: 1.4;
+}
+
+/* Disabled rather than hidden: the column keeps its width, so rows do not jump
+ * sideways as a selection changes what is and is not resettable. */
+.style-reset:disabled { opacity: .3; cursor: default; }
+
+.style-note {
+  margin: .6rem 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+#style-subject {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* -------------------------------------------------------- changes drawer */
 
 /* Over the diagram rather than beside it: the drawer is opened to *read* the

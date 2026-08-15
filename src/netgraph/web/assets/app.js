@@ -99,6 +99,11 @@
     changesCopy: document.getElementById("changes-copy"),
     changesCount: document.getElementById("changes-count"),
     changesAgainst: document.getElementById("changes-against"),
+    style: document.getElementById("style"),
+    styleBody: document.getElementById("style-body"),
+    styleToggle: document.getElementById("style-toggle"),
+    styleClose: document.getElementById("style-close"),
+    styleSubject: document.getElementById("style-subject"),
     timeline: document.getElementById("timeline"),
     timelineToggle: document.getElementById("timeline-toggle"),
     timelineClose: document.getElementById("timeline-close"),
@@ -374,6 +379,11 @@
     // before, so that a note dropped on top of a cable is the thing a click
     // lands on -- the annotation is the newer object and the one in front.
     netgraphNotes.annotate(el.viewport.firstElementChild, geometry, annotations, details);
+    // And the resolved appearance of everything just drawn (§22), which is the
+    // one thing the inspector cannot read off the SVG: by the time a colour is
+    // an attribute, the element, the theme, the icon set and the palette have
+    // all collapsed into one hex literal.
+    netgraphStyle.annotate(result.styles);
     // A frame of the history carries facts the canvas has nowhere to put: which
     // commit it is, and what that commit did. The scrubber puts them beside
     // itself; app.js only has to say that a drawing arrived.
@@ -1133,6 +1143,7 @@
         // Before the inspector: a selection is the thing most likely to be in
         // the way, and Escape is what every diagram editor drops one with.
         if (netgraphSelect.size() && netgraphSelect.clear()) { return; }
+        if (netgraphStyle.isOpen()) { netgraphStyle.show(false); return; }
         if (!el.info.hidden) { hideInfo(true); netgraphA11y.select(null); return; }
         if (failure.on) { showFailure(false); return; }
         if (mode === "session" && netgraphSession.isScrubbing()) {
@@ -1213,6 +1224,9 @@
         });
         return true;
       }
+    });
+    K.define("link.pin-route", {
+      run: function () { pickLink(); return netgraphLinks.pinRoute(); }
     });
     K.define("link.label.reset", {
       run: function () { pickLink(); return netgraphLinks.resetLabel(); }
@@ -1427,6 +1441,7 @@
       // Everybody else's page draws what this one has picked, which used to be
       // one address and is now the set.
       if (mode === "session") { netgraphSession.select(addresses); }
+      netgraphStyle.refresh();
     }
   });
   // A resized canvas is a different viewport, so a different part of the
@@ -1434,6 +1449,13 @@
   window.addEventListener("resize", function () { netgraphCull.schedule(); });
   defineCommands();
   netgraphSelect.defineCommands();
+  netgraphStyle.attach({
+    el: el,
+    writable: function () { return mode === "session" && netgraphSession.isWritable(); },
+    ops: function (operations, said) { return netgraphSession.ops(operations, said); },
+    refuse: function (why) { toast(why, "error"); }
+  });
+  netgraphStyle.defineCommands(netgraphKeys);
   netgraphSession.defineCommands(bridge);
   netgraphTour.defineCommands(bridge);
   netgraphKeys.attach(keyHost);

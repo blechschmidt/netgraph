@@ -73,6 +73,7 @@ if str(REPO_ROOT / "tools") not in sys.path:  # pragma: no cover - importing the
 
 from bench_pipeline import Shape, generate, yaml_files  # noqa: E402
 
+from netgraph.errors import NetgraphError  # noqa: E402
 from netgraph.loader.cache import DocumentCache  # noqa: E402
 from netgraph.render import DETAIL_OPTIONS, build_details, build_graph, filter_graph  # noqa: E402
 from netgraph.render.dot import find_dot, layout_plan, to_image  # noqa: E402
@@ -519,6 +520,148 @@ def layer_cycle(tab: Tab, report: Report) -> None:
     )
 
 
+def routing_stages(session: EditingSession, report: Report) -> None:
+    """What obstacle avoidance costs a repaint, cold and after one node moves.
+
+    The claim task 100 has to prove is not "routing is fast" but "routing is
+    *incremental*": dragging one device out of a thousand changes the obstacle
+    set for the whole drawing, and a router that re-searched every link because
+    of it would put a full render inside every drag. So three numbers, and it is
+    the ratio between the second and the third that matters:
+
+    ``cold``
+        Every link routed from nothing, which is what a command-line render
+        does and what an editing session pays once.
+    ``unchanged``
+        The same drawing again through the same cache. Nothing moved, so
+        nothing should be searched at all.
+    ``one node moved``
+        One device dropped on top of a cable. Only the links whose line that
+        actually broke may be searched again.
+    """
+    from dataclasses import replace as _replace
+
+    from netgraph.layout.geometry import Placement, Routing
+    from netgraph.layout.seed import seed_geometry
+    from netgraph.render.routes import RouteCache, route_plan
+
+    options = ViewOptions()
+    graph = filter_graph(build_graph(session.inventory(), layer=options.layer), options.filter_spec)
+    render_options = _replace(options.render_options, routing=Routing.ORTHOGONAL)
+    if len(graph.geometry.nodes) < len(graph.nodes):
+        # Routing only happens for a *fully arranged* drawing, and a generated
+        # tree is not one. Lay it out with Graphviz first and route against
+        # that: an engine's own arrangement is a harsher input than a person's
+        # anyway — nothing has been nudged out of anything's way.
+        if find_dot() is None:
+            report.fact("routingSkipped", "Graphviz is not on PATH, so nothing can be arranged")
+            return
+        started = time.perf_counter()
+        try:
+            graph = _replace(graph, geometry=seed_geometry(graph, render_options))
+        except NetgraphError as exc:
+            # Graphviz's spline code has a fixed-size trapezoid table and falls
+            # over on a large enough graph ("Trapezoid-table overflow"). That is
+            # a limit of the *auto* layout, not of routing — which is only ever
+            # asked about a drawing somebody has already arranged — so it drops
+            # these rows rather than the bench. Point --inventory at an arranged
+            # tree to measure it at that size.
+            print(f"cannot arrange this tree, so routing is not measured: {exc}")
+            report.fact("routingSkipped", str(exc))
+            return
+        report.fact("routingSeedMs", round((time.perf_counter() - started) * 1000, 1))
+
+    report.heading("what routing around obstacles costs")
+
+    def timed(label: str, call: Callable[[], Any], rounds: int = 3) -> Any:
+        timings = []
+        outcome: Any = None
+        for _ in range(rounds):
+            started = time.perf_counter()
+            outcome = call()
+            timings.append((time.perf_counter() - started) * 1000)
+        row = report.add(Measurement(label, timings))
+        return row, outcome
+
+    cold, plan = timed("route every link (cold)", lambda: route_plan(graph, render_options))
+    cold.note = (
+        f"{plan.searched} searches, {plan.avoided} links moved, "
+        f"{plan.expansions} states popped"
+        + (f", {len(plan.detours)} gave up" if plan.detours else "")
+    )
+    report.print(cold)
+
+    cache = RouteCache()
+    route_plan(graph, render_options, cache=cache)
+    warm, again = timed(
+        "route every link (nothing moved)", lambda: route_plan(graph, render_options, cache=cache)
+    )
+    warm.note = f"{again.searched} searches, {again.reused} reused, {again.clear} needed nothing"
+    report.print(warm)
+
+    # Drop one device squarely on top of a cable it has nothing to do with,
+    # which is the gesture this whole mechanism exists for. Nudging a node a few
+    # points sideways would measure the case where the answer is "nothing moved"
+    # and prove only that the cache can say so.
+    victim, landing = _somewhere_in_the_way(graph, plan)
+    moved = dict(graph.geometry.nodes)
+    where = moved[victim]
+    moved[victim] = Placement(x=landing[0], y=landing[1], width=where.width, height=where.height)
+    nudged = _replace(graph, geometry=_replace(graph.geometry, nodes=moved))
+    # A fresh cache, warmed on the *old* arrangement, per round. Reusing one
+    # would measure the second render after the drag rather than the first: the
+    # first repopulates the cache with the answers the drag needs, and every
+    # round after it reuses them and searches for nothing.
+    dragged = report.add(Measurement("re-route after one node moves"))
+    after: Any = None
+    for _ in range(3):
+        drag = RouteCache()
+        route_plan(graph, render_options, cache=drag)
+        started = time.perf_counter()
+        after = route_plan(nudged, render_options, cache=drag)
+        dragged.samples.append((time.perf_counter() - started) * 1000)
+    dragged.note = (
+        f"{after.searched} of {len(nudged.edges)} links searched, "
+        f"{after.reused} reused, {after.clear} needed nothing"
+    )
+    report.print(dragged)
+    report.fact("routeLinks", len(graph.edges))
+    report.fact("routeSearchesCold", plan.searched)
+    report.fact("routeSearchesAfterDrag", after.searched)
+    report.fact("routeDetours", len(plan.detours))
+    print(
+        f"{'':<34} dropped {victim} on {len(graph.edges)} links: "
+        f"{after.searched} searched, against {plan.searched} from cold"
+    )
+    for detour in plan.detours[:5]:
+        print(f"{'':<34} gave up: {detour.describe()}")
+    if len(plan.detours) > 5:
+        print(f"{'':<34} ... and {len(plan.detours) - 5} more")
+
+
+def _somewhere_in_the_way(graph: Any, plan: Any) -> tuple[str, tuple[float, float]]:
+    """A node to drag, and a point on somebody else's cable to drop it on.
+
+    The middle of the longest straight run in the drawing, and a node that is
+    neither end of the link it belongs to — so the move is guaranteed to break
+    exactly the interaction this measures, rather than to be a nudge the cache
+    can dismiss.
+    """
+    best: tuple[float, tuple[float, float], set[str]] = (0.0, (0.0, 0.0), set())
+    for edge, line in zip(graph.edges, plan.routes, strict=True):
+        if line is None:
+            continue
+        for (x1, y1), (x2, y2) in zip(line.corners, line.corners[1:], strict=False):
+            length = abs(x2 - x1) + abs(y2 - y1)
+            if length > best[0]:
+                best = (length, ((x1 + x2) / 2, (y1 + y2) / 2), {edge.source, edge.target})
+    _, landing, ends = best
+    for name in sorted(graph.geometry.nodes):
+        if name not in ends:
+            return name, landing
+    return sorted(graph.geometry.nodes)[0], landing
+
+
 def server_stages(session: EditingSession, report: Report) -> None:
     """What the server spends a repaint on, so the browser rows have a floor."""
     options = ViewOptions()
@@ -607,14 +750,20 @@ def a_selection(session: EditingSession, count: int) -> list[str]:
 
 
 def run(args: argparse.Namespace) -> int:
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError:
-        print(f"playwright is not installed; {INSTALL}")
-        return 0
-    if find_dot() is None:
-        print("Graphviz 'dot' is not on PATH; the editor cannot draw and this bench cannot run")
-        return 0
+    # The server-side rows -- what a repaint costs, and what routing costs --
+    # need neither a browser nor Graphviz, and they are the floor the browser
+    # rows sit on. So a missing Chromium drops the tab measurements rather than
+    # the whole bench: "we could not measure any of it" is the least useful
+    # thing a bench can say when half of it was measurable.
+    sync_playwright = None
+    if not args.no_browser:
+        try:
+            from playwright.sync_api import sync_playwright
+        except ImportError:
+            print(f"playwright is not installed, so only the server rows are measured; {INSTALL}")
+    if find_dot() is None and sync_playwright is not None:
+        print("Graphviz 'dot' is not on PATH; the editor cannot draw, so only the server rows run")
+        sync_playwright = None
 
     report = Report()
     with ExitStack() as stack:
@@ -633,6 +782,11 @@ def run(args: argparse.Namespace) -> int:
         print(f"inventory: {root}")
         print(f"           {len(files)} files, {len(inventory.elements)} elements")
         print(f"server:    {server.url}")
+
+        if sync_playwright is None:
+            routing_stages(session, report)
+            server_stages(session, report)
+            return _write(args, report)
 
         playwright = stack.enter_context(sync_playwright())
         try:
@@ -686,8 +840,13 @@ def run(args: argparse.Namespace) -> int:
         print(f"  whole diagram on screen: {report.facts.get('wholeDiagram', '—')}")
         print(f"  zoomed in:               {report.facts.get('zoomedIn', '—')}")
 
+        routing_stages(session, report)
         server_stages(session, report)
 
+    return _write(args, report)
+
+
+def _write(args: argparse.Namespace, report: Report) -> int:
     if args.json:
         Path(args.json).write_text(json.dumps(report.to_dict(), indent=2) + "\n", encoding="utf-8")
         print()
@@ -705,6 +864,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--keep", help="leave the generated tree at this path")
     parser.add_argument("--selection", type=int, default=SELECTION)
     parser.add_argument("--json", help="also write the table here, for a guard to read")
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="measure only the server rows, which need neither Chromium nor Graphviz",
+    )
     return run(parser.parse_args(argv))
 
 

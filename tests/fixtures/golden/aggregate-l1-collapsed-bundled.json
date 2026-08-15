@@ -38,7 +38,17 @@
       "vlans": [
         10
       ],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#e2e8f0",
+        "stroke": "#475569",
+        "shape": "folder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "ns:sites/west",
@@ -69,7 +79,17 @@
       "vlans": [
         10
       ],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#e2e8f0",
+        "stroke": "#475569",
+        "shape": "folder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     }
   ],
   "edges": [
@@ -110,7 +130,10 @@
             "lengthM": 2.0,
             "vlans": [
               10
-            ]
+            ],
+            "style": {
+              "from": {}
+            }
           },
           {
             "id": "cables/cbl-east-west-2",
@@ -132,13 +155,24 @@
             "lengthM": 2.0,
             "vlans": [
               10
-            ]
+            ],
+            "style": {
+              "from": {}
+            }
           }
         ]
       },
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     }
   ],
   "title": "Collapsed and bundled"

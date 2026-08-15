@@ -274,6 +274,7 @@ from netgraph.render import (
     Layer,
     LinkTemplate,
     RenderOptions,
+    Theme,
     UnknownElementError,
     advisories_for,
     aggregate_graph,
@@ -284,9 +285,12 @@ from netgraph.render import (
     filter_graph,
     icon_theme,
     is_binary_format,
+    load_theme,
     rack_formats,
     render,
     render_layers,
+    resolve_theme,
+    style_theme_choices,
     supports_diff,
     supports_highlight,
     supports_icons,
@@ -2832,6 +2836,19 @@ def _resolve_icons(
         raise click.BadParameter(str(exc), ctx=ctx, param=param) from exc
 
 
+def _resolve_theme(ctx: click.Context, param: click.Parameter, value: str | None) -> Theme | None:
+    """``--theme``: a built-in theme name, ``none``, or a path to a theme file.
+
+    Resolved in a callback for the same reason ``--icons`` is: a theme that does
+    not exist, or one whose colours do not parse, is reported as a usage error
+    with the option named, before an inventory is loaded.
+    """
+    try:
+        return load_theme(value)
+    except RenderError as exc:
+        raise click.BadParameter(str(exc), ctx=ctx, param=param) from exc
+
+
 def _resolve_link_template(
     ctx: click.Context, param: click.Parameter, value: str | None
 ) -> LinkTemplate | None:
@@ -2990,6 +3007,28 @@ _DISPLAY_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
         ),
     ),
     click.option(
+        "--theme",
+        callback=_resolve_theme,
+        default=None,
+        metavar="NAME|PATH",
+        help=(
+            "Apply a stylesheet: selectors by kind, name, namespace, role or label, each "
+            f"mapping onto a style block. Built in: {', '.join(style_theme_choices())}. A path "
+            "to a 'kind: theme' YAML file also works. An element's own spec.style still wins."
+        ),
+    ),
+    click.option(
+        "--style/--no-style",
+        "styling",
+        default=True,
+        show_default=True,
+        help=(
+            "Honour the styles the inventory and the theme declare. --no-style draws the "
+            "plain diagram from the built-in palette alone, which is the way to read a "
+            "topology whose stylesheet is in the way. Icons are unaffected: use --icons none."
+        ),
+    ),
+    click.option(
         "--tooltips/--no-tooltips",
         default=True,
         show_default=True,
@@ -3051,6 +3090,20 @@ _DISPLAY_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
             "by the Graphviz backends, the JSON export and the editor. 'netgraph layout "
             "--write' records it in the view it arranges, so the choice is the "
             "inventory's rather than the command line's from then on."
+        ),
+    ),
+    click.option(
+        "--avoid/--no-avoid",
+        default=True,
+        show_default="avoid",
+        help=(
+            "Route orthogonal links around the boxes they are not attached to instead of "
+            "straight across them. Only applies to an arranged diagram drawn with "
+            "'--routing orthogonal': a spline has nothing to route around, and an "
+            "unarranged one is routed by Graphviz, which already avoids nodes. A bend you "
+            "placed yourself is never moved — routing fills the segments between them. "
+            "'--no-avoid' is the local Z-and-L every orthogonal diagram was drawn with "
+            "before this existed."
         ),
     ),
     click.option("--title", default=None, metavar="TEXT", help="Caption for the diagram."),
@@ -3270,11 +3323,14 @@ def _render_options(
         title=params["title"],
         max_addresses=params["max_addresses"],
         icons=params["icons"],
+        theme=params.get("theme"),
+        styling=params.get("styling", True),
         tooltips=params["tooltips"],
         link_template=params["link_template"],
         element_ids=params["element_ids"],
         rankdir=params["rankdir"],
         routing=None if params.get("routing") is None else Routing(params["routing"].lower()),
+        avoid=params.get("avoid", True),
         highlight=highlight,
     )
 
@@ -3330,6 +3386,12 @@ def _apply_settings(ctx: click.Context) -> tuple[Resolution, ...]:
     )
     for resolution in resolutions:
         ctx.params[resolution.setting.param] = resolution.value
+    if "theme" in ctx.params:
+        # The ``[theme]`` table is not a *setting* — it is not one value with
+        # a flag above it — so it is composed here, after the ladder has
+        # picked which named theme is in force. Appending means it wins a tie
+        # against that theme without having to restate what it agrees with.
+        ctx.params["theme"] = resolve_theme(ctx.params["theme"], inline=config.theme)
     configured = [item for item in resolutions if item.origin in (Origin.FILE, Origin.PROFILE)]
     if configured:
         app.log(
@@ -5365,6 +5427,18 @@ _STATUS_COLOUR: Final[dict[Status, str]] = {
     ),
 )
 @click.option(
+    "--theme",
+    callback=_resolve_theme,
+    default=None,
+    metavar="NAME|PATH",
+    help=(
+        "Apply a stylesheet to the diagram (§22). The style inspector shows the resolved "
+        f"appearance and which layer each value came from. Built in: "
+        f"{', '.join(style_theme_choices())}. Chosen here rather than in the browser, "
+        "because it names a file on this machine."
+    ),
+)
+@click.option(
     "--write/--read-only",
     "write",
     default=False,
@@ -5384,6 +5458,7 @@ def web_command(
     port: int,
     open_browser: bool,
     icons: IconTheme | None,
+    theme: Theme | None,
     write: bool,
     profile: str | None,
     show_config: bool,
@@ -5426,6 +5501,7 @@ def web_command(
         _print_settings(app.console(), resolutions, config=app.config(), command="web")
         return
     icons = ctx.params["icons"]
+    theme = resolve_theme(ctx.params["theme"], inline=app.config().theme)
 
     session = _web_session(app, source, write=write, host=host, icons=icons)
     text = "" if session is not None else _web_source(console, source)
@@ -5443,6 +5519,7 @@ def web_command(
         source=text,
         session=session,
         icons=icons,
+        theme=theme,
         host=host,
         port=port,
         log=lambda message: app.log(f"web: {message}", level=2),
@@ -6386,6 +6463,24 @@ _DRAWIO_OPTIONS: Final[tuple[Callable[[Any], Any], ...]] = (
         ),
     ),
     click.option(
+        "--theme",
+        callback=_resolve_theme,
+        default=None,
+        metavar="NAME|PATH",
+        help=(
+            "Apply a stylesheet to the exported diagram (§22). mxGraph spells netgraph's "
+            "style vocabulary almost one for one, so a colour chosen here opens in draw.io "
+            f"as that colour and survives a round-trip. Built in: {', '.join(style_theme_choices())}."
+        ),
+    ),
+    click.option(
+        "--style/--no-style",
+        "styling",
+        default=True,
+        show_default=True,
+        help="Honour the styles the inventory and the theme declare. --no-style exports plain.",
+    ),
+    click.option(
         "--compress/--no-compress",
         "compress",
         default=False,
@@ -6669,6 +6764,8 @@ def _export_options(params: Mapping[str, Any], export_format: str) -> ExportOpti
         schedule_format=params["schedule_format"],
         view=params["view"],
         icons=params["icon_theme_option"],
+        theme=params.get("theme"),
+        styling=params.get("styling", True),
         compress=bool(params["compress"]),
         frames=bool(params["frames"]),
         annotations=bool(params["annotations"]),

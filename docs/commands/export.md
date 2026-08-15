@@ -306,6 +306,8 @@ host variables are set are [Groups](../export.md#groups),
 | `--schedule-format` | `[csv\|json]` | `csv` | How the power load schedule is laid out. json adds the per-PDU and per-PSE totals; the feed rows are the same either way. |
 | `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity]` | `l1` | Which view the drawio diagram draws. Unlike the other formats this one is a picture, and the arrangement it opens with is the one stored for that view. |
 | `--icons` | `THEME\|DIR` | `cisco` | Icon theme inlined into the drawio file as data URIs, so the file needs nothing beside it. Built in: cisco, none. 'none' draws coloured boxes. |
+| `--theme` | `NAME\|PATH` | — | Apply a stylesheet to the exported diagram (§22). mxGraph spells netgraph's style vocabulary almost one for one, so a colour chosen here opens in draw.io as that colour and survives a round-trip. Built in: blueprint, mono, none. |
+| `--style`, `--no-style` | — | `--style` | Honour the styles the inventory and the theme declare. --no-style exports plain. |
 | `--compress`, `--no-compress` | — | `--no-compress` | Write the deflate+base64 encoding draw.io writes by default. Off here: a plain diagram is one that reviews and diffs, and draw.io opens both. |
 | `--frames`, `--no-frames` | — | `--frames` | Draw a container frame per namespace, so dragging a site carries its devices. |
 | `--annotations`, `--no-annotations` | — | `--annotations` | Draw the notes, areas and legends the inventory declares for this view as native draw.io shapes, which the reader can edit and 'netgraph import drawio' reads back. Turn them off for a file that should carry the topology alone. |

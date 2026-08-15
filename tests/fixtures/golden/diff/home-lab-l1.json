@@ -30,6 +30,16 @@
           ]
         }
       ],
+      "style": {
+        "fill": "#fdf0e3",
+        "stroke": "#ea580c",
+        "shape": "ellipse",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -66,6 +76,16 @@
           "mac": "8c:8c:aa:30:01:01"
         }
       ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -113,6 +133,16 @@
           "mac": "3c:97:0e:20:01:02"
         }
       ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "changed",
         "fields": [
@@ -145,6 +175,16 @@
           ]
         }
       ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "added"
       }
@@ -175,6 +215,16 @@
           ]
         }
       ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -232,6 +282,16 @@
           }
         }
       ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -338,6 +398,16 @@
           }
         }
       ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -399,6 +469,16 @@
           "mtu": 1500
         }
       ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "changed",
         "renamedFrom": "wireless/ap-home"
@@ -439,6 +519,16 @@
           ]
         }
       ],
+      "style": {
+        "fill": "#eae2f5",
+        "stroke": "#7c3aed",
+        "shape": "cylinder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      },
       "diff": {
         "mark": "removed"
       }
@@ -466,6 +556,14 @@
       "vlans": [
         10
       ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -491,6 +589,14 @@
       "vlans": [
         10
       ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -516,6 +622,14 @@
       "vlans": [
         10
       ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -542,6 +656,14 @@
         10,
         20
       ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "changed",
         "fields": [
@@ -573,6 +695,14 @@
         "accessPoint": "wireless/ap-attic:wlan0"
       },
       "vlans": [],
+      "style": {
+        "stroke": "#2563eb",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "changed",
         "fields": [
@@ -600,6 +730,14 @@
       "vlans": [
         10
       ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "added"
       }
@@ -621,6 +759,14 @@
       "speedText": "5Gbps",
       "label": "usb",
       "vlans": [],
+      "style": {
+        "stroke": "#9ca3af",
+        "dash": "dotted",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "unchanged"
       }
@@ -646,6 +792,14 @@
       "vlans": [
         10
       ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      },
       "diff": {
         "mark": "removed"
       }

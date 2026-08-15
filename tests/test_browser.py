@@ -68,10 +68,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final
 
 import pytest
+import yaml
 
 from netgraph.layout.geometry import Routing
 from netgraph.layout.routing import Anchor, route
 from netgraph.models import KINDS
+from netgraph.render.theme import load_theme
 from netgraph.web.server import WebServer
 from netgraph.web.session import EditingSession, TreeWatcher
 
@@ -544,6 +546,7 @@ def open_editor(
             extra: Mapping[str, str] | None = None,
             beside: Editor | None = None,
             first_run: bool = False,
+            theme: str | None = None,
         ) -> Editor:
             root = tmp_path / "inventory"
             if not root.exists():
@@ -566,7 +569,13 @@ def open_editor(
                     if watch:
                         stack.enter_context(TreeWatcher(session, debounce_ms=50))
                 server = stack.enter_context(
-                    WebServer.create(source=source or "", session=session, host="127.0.0.1", port=0)
+                    WebServer.create(
+                        source=source or "",
+                        session=session,
+                        theme=load_theme(theme),
+                        host="127.0.0.1",
+                        port=0,
+                    )
                 )
 
             console = Console()
@@ -1104,6 +1113,60 @@ def test_straightening_a_link_clears_every_bend_from_the_keyboard(
     # "forget everything about this cable".
     geometry = editor.api(f"/api/graph?view={ARRANGED_LAYER}")["geometry"]
     assert A_CABLE in geometry["links"]
+
+
+#: A layout that is arranged, orthogonal, and puts a device squarely between the
+#: two ends of one cable, so that the route netgraph computes to get past it is
+#: something ``link.pin-route`` has to have to pin. Built from the arranged
+#: fixture rather than hand-typed so the coordinates cannot drift from it.
+def _obstructed_layout() -> str:
+    return ARRANGED_LAYOUT.replace("spec:\n", "spec:\n  routing: orthogonal\n", 1)
+
+
+def test_pinning_the_computed_route_writes_it_as_bends(open_editor: OpenEditor) -> None:
+    """A computed route is a suggestion until somebody says it is the answer.
+
+    Routing keeps ``cables/cbl-sw-nas`` clear of the router it would otherwise
+    be drawn across, and publishes that as ``routed`` -- recomputed on every
+    render, in no document, with no grab handle. ``Shift-R`` turns it into
+    waypoints, at which point it is an authored route like any other and the
+    handles appear.
+    """
+    editor = open_editor(writable=True, extra={"layout.yaml": _obstructed_layout()})
+    editor.page.select_option("#layer", ARRANGED_LAYER)
+    expect(editor.page.locator(".ng-link-hit").first).to_be_attached(timeout=TIMEOUT_MS)
+
+    link = "cables/cbl-sw-nas"
+    published = editor.api(f"/api/graph?view={ARRANGED_LAYER}")["geometry"]["links"][link]
+    assert published["routed"], "this cable is routed round the router; that is the fixture"
+    assert len(published["routed"]) > len(published["waypoints"]), (
+        "the computed route has to say more than the document already does, "
+        "or pinning it would be a no-op and this test would prove nothing"
+    )
+
+    # Selected through the layer's own API rather than by clicking the band: a
+    # route that turns twice to get round a router has a bounding box whose
+    # centre is nowhere near the line, so a click at it would land on the canvas
+    # behind. Which key reaches which command is settled by test_web.py; what
+    # this test is here for is what the command does once it is reached.
+    editor.page.evaluate("id => window.netgraphLinks.select(id)", link)
+    editor.page.locator("#canvas").focus()
+    editor.press("Shift+R")
+
+    assert editor.settles(
+        lambda: (
+            bends(editor, link)
+            == [{"x": point["x"], "y": point["y"]} for point in published["routed"]]
+        ),
+        timeout=TIMEOUT_MS / 1000,
+    ), f"link.pin-route has to write the computed route as waypoints: {bends(editor, link)}"
+
+    # And it is an authored route now: nothing left for routing to add on top of
+    # it, and a grab handle on every bend.
+    after = editor.api(f"/api/graph?view={ARRANGED_LAYER}")["geometry"]["links"][link]
+    assert after["routed"] == [], "a pinned route must not be recomputed on top of itself"
+    editor.page.evaluate("id => window.netgraphLinks.select(id)", link)
+    expect(editor.page.locator(".ng-handle-bend")).to_have_count(len(published["routed"]))
 
 
 def test_a_read_only_session_shows_a_route_and_offers_no_handle(
@@ -3607,3 +3670,234 @@ def test_a_selection_of_a_thousand_devices_stays_workable(open_editor: OpenEdito
 
     editor.press("Escape")
     assert selected(editor) == []
+
+
+# --------------------------------------------------------------------------- #
+# The style inspector (§22)
+# --------------------------------------------------------------------------- #
+
+
+def expect_eventually(predicate: Callable[[], bool], *, what: str = "") -> None:
+    """Wait for something that lands on *disk* rather than in the DOM.
+
+    Playwright's ``expect`` retries assertions about the page; a write reaches
+    the tree through a request the page made, so the file is a step behind what
+    is on screen and there is no locator to wait on. Same budget, same idea.
+    """
+    deadline = time.monotonic() + TIMEOUT_MS / 1000
+    while time.monotonic() < deadline:
+        if predicate():
+            return
+        time.sleep(0.05)
+    raise AssertionError(what or "the tree never reached the expected state")
+
+
+def style_panel(editor: Editor) -> Locator:
+    return editor.page.locator("#style")
+
+
+def style_row(editor: Editor, field: str) -> Locator:
+    """The row of the inspector for one style field."""
+    return editor.page.locator(f".style-row:has(#style-{field})")
+
+
+def style_from(editor: Editor, field: str) -> Locator:
+    """What the inspector says the field's value came from.
+
+    A locator rather than the text, so every assertion about provenance
+    retries: the panel is repainted by the render that *follows* a write, so
+    reading it the instant a control changes is a race with the round trip.
+    """
+    return style_row(editor, field).locator(".style-from")
+
+
+def set_style(editor: Editor, field: str, value: str) -> None:
+    """Type a value into one row, exactly as a person does.
+
+    ``fill()`` dispatches ``change`` itself. Dispatching a second one would
+    be a second write against the revision the first has already moved, and
+    the server is right to answer that with a conflict.
+    """
+    editor.page.locator("#style-" + field).fill(value)
+
+
+def open_style(editor: Editor) -> None:
+    """Open the inspector the way a person does, and wait for it to draw."""
+    editor.page.locator("#style-toggle").click()
+    expect(style_panel(editor)).to_be_visible()
+
+
+def declared_style(editor: Editor, address: str) -> dict[str, Any]:
+    """What the *file* says about one element's appearance, read off disk.
+
+    The whole tree is searched rather than ``<address>.yaml`` opened: several
+    documents share a file in this inventory (every cable is in
+    ``cables/links.yaml``), and the property under test is that the write landed
+    in the document, not that it landed in a file named after it.
+    """
+    name = address.rpartition("/")[2]
+    namespace = address.rpartition("/")[0]
+    for path in sorted(editor.root.rglob("*.yaml")):
+        prefix = path.parent.relative_to(editor.root).as_posix()
+        if prefix == ".":
+            prefix = ""
+        if prefix != namespace:
+            continue
+        for document in yaml.safe_load_all(path.read_text(encoding="utf-8")):
+            if not isinstance(document, dict):
+                continue
+            if (document.get("metadata") or {}).get("name") != name:
+                continue
+            style = (document.get("spec") or {}).get("style")
+            assert style is None or isinstance(style, dict)
+            return dict(style or {})
+    raise AssertionError(f"no document declares {address}")
+
+
+def expect_style(editor: Editor, address: str, expected: dict[str, Any]) -> None:
+    """Wait for the tree to say ``expected`` about ``address``.
+
+    A write reaches disk through a request the page made, so it lands a moment
+    after the control that caused it; see :func:`expect_eventually`.
+    """
+    expect_eventually(
+        lambda: declared_style(editor, address) == expected,
+        what=(f"{address} settled at {declared_style(editor, address)!r}, not at {expected!r}"),
+    )
+
+
+def test_the_style_inspector_shows_where_each_value_came_from(
+    open_editor: OpenEditor,
+) -> None:
+    """The point of the panel: not the colour, but which layer chose it."""
+    editor = arranged(open_editor)
+    press_on(editor, editor.shape("switches/sw-home"))
+    open_style(editor)
+
+    expect(editor.page.locator("#style-subject")).to_have_text("switches/sw-home")
+    # Nothing has been styled and no theme is in force, so every value on screen
+    # is the built-in palette's — which is exactly what the row must say.
+    expect(style_from(editor, "fill")).to_have_text("the built-in palette")
+    expect(style_from(editor, "shape")).to_have_text("the built-in palette")
+    # A field nobody has set anywhere reads as unset rather than as inherited
+    # from something: there is no rung below the palette that mentions opacity.
+    expect(style_from(editor, "opacity")).to_have_text("not set")
+    # And with nothing declared there is nothing to reset.
+    expect(style_row(editor, "fill").locator(".style-reset")).to_be_disabled()
+
+
+def test_setting_a_colour_writes_it_to_the_manifest(open_editor: OpenEditor) -> None:
+    """The single-source-of-truth rule, at the level of one colour."""
+    editor = arranged(open_editor)
+    expect_style(editor, "switches/sw-home", {})
+
+    press_on(editor, editor.shape("switches/sw-home"))
+    open_style(editor)
+    set_style(editor, "fill", "#123456")
+
+    # The YAML is the record, so that is what is asserted — the picture follows
+    # from it and not the other way round.
+    expect(editor.page.locator("#style-fill")).to_have_value("#123456")
+    expect_style(editor, "switches/sw-home", {"fill": "#123456"})
+    # ...and the drawing that comes back is drawn with it.
+    expect(
+        editor.shape("switches/sw-home").locator("polygon, path, ellipse").first
+    ).to_have_attribute("fill", "#123456")
+    # The provenance moves with the value: it is the element's now, not the
+    # palette's, which is what makes the reset button meaningful.
+    expect(style_from(editor, "fill")).to_have_text("this element")
+    expect(style_row(editor, "fill").locator(".style-reset")).to_be_enabled()
+
+
+def test_reset_unsets_the_field_rather_than_writing_the_inherited_value(
+    open_editor: OpenEditor,
+) -> None:
+    """A 'reset to theme' that wrote the theme's colour would pin today's theme."""
+    editor = arranged(open_editor)
+    press_on(editor, editor.shape("switches/sw-home"))
+    open_style(editor)
+    set_style(editor, "fill", "#123456")
+    expect_style(editor, "switches/sw-home", {"fill": "#123456"})
+
+    style_row(editor, "fill").locator(".style-reset").click()
+
+    expect(editor.page.locator("#style-toggle")).to_have_attribute("aria-expanded", "true")
+    # The whole block goes with its last field: an empty `style:` mapping is
+    # NG-Z002, so the write path cannot leave one behind.
+    expect_style(editor, "switches/sw-home", {})
+    expect(style_from(editor, "fill")).to_have_text("the built-in palette")
+
+
+def test_a_multi_selection_is_one_batch_and_one_undo(open_editor: OpenEditor) -> None:
+    """Task 96's rule, applied to appearance: several elements, one changeset."""
+    editor = arranged(open_editor)
+    sweep(editor, over=["hosts/srv-nas", "routers/rtr-home"])
+    picked = [address for address in selected(editor) if not address.startswith("cables/")]
+    assert len(picked) >= 2
+    # The panel acts on the whole selection, so the band's cables are painted
+    # too; the assertions below are about the elements, which are the ones
+    # with a document named after them.
+
+    open_style(editor)
+    expect(editor.page.locator("#style-subject")).to_contain_text("selected")
+    set_style(editor, "fill", "#abcdef")
+
+    for address in picked:
+        expect_style(editor, address, {"fill": "#abcdef"})
+
+    # One Ctrl-Z, not one per element. That is the property being asserted.
+    editor.page.locator("#canvas").focus()
+    editor.press("Control+z")
+    for address in picked:
+        expect_eventually(
+            lambda a=address: declared_style(editor, a) == {},
+            what=f"{address} still carries a style after one undo",
+        )
+
+
+def test_a_theme_is_shown_as_the_theme_and_can_be_overridden(
+    open_editor: OpenEditor, tmp_path: Path
+) -> None:
+    """The ladder, end to end: a theme paints, and the element wins over it."""
+    editor = open_editor(writable=True, theme="blueprint")
+    press_on(editor, editor.shape("switches/sw-home"))
+    open_style(editor)
+
+    # blueprint's rule 2 is `kind: [switch]`, which is what has to be named.
+    expect(style_from(editor, "fill")).to_have_text(re.compile(r"^rule \d+ of theme blueprint$"))
+
+    set_style(editor, "fill", "#00ff00")
+    expect(style_from(editor, "fill")).to_have_text("this element")
+    # The fields the element did *not* set still come from the theme: a style is
+    # merged field by field, not adopted whole.
+    expect(style_from(editor, "stroke")).to_contain_text("blueprint")
+
+
+def test_a_read_only_session_shows_the_style_but_will_not_change_it(
+    open_editor: OpenEditor,
+) -> None:
+    """Reading a diagram must never become repainting it."""
+    editor = arranged(open_editor, writable=False)
+    press_on(editor, editor.shape("switches/sw-home"))
+    open_style(editor)
+
+    expect(style_row(editor, "fill").locator(".style-input")).to_be_disabled()
+    expect(style_row(editor, "fill").locator(".style-reset")).to_be_disabled()
+
+
+def test_a_link_is_offered_no_shape_and_no_icon(open_editor: OpenEditor) -> None:
+    """A cable is a line. Offering it a shape would validate and draw nothing."""
+    editor = arranged(open_editor)
+    editor.page.keyboard.down("Shift")
+    press_on(editor, band(editor))
+    editor.page.keyboard.up("Shift")
+    assert selected(editor) == [A_CABLE]
+    open_style(editor)
+
+    expect(style_row(editor, "stroke")).to_have_count(1)
+    expect(style_row(editor, "dash")).to_have_count(1)
+    expect(style_row(editor, "shape")).to_have_count(0)
+    expect(style_row(editor, "icon")).to_have_count(0)
+
+    set_style(editor, "stroke", "#ff0000")
+    expect_style(editor, A_CABLE, {"stroke": "#ff0000"})

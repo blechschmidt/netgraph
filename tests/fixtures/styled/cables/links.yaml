@@ -1,0 +1,59 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-core-hq
+spec:
+  # A cable has a colour and a line, and no shape at all to set.
+  style:
+    stroke: red
+    strokeWidth: 3
+    dash: dotted
+  medium: copper
+  speed: 10Gbps
+  endpoints:
+    - sites/hq/rtr-core:eth0
+    - sites/hq/sw-hq-a:uplink
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-hq-b
+spec:
+  medium: copper
+  speed: 1Gbps
+  endpoints:
+    - sites/hq/sw-hq-a:port1
+    - sites/hq/sw-hq-b:uplink
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-core-edge
+spec:
+  medium: fiber
+  speed: 10Gbps
+  endpoints:
+    - sites/hq/rtr-core:eth1
+    - sites/branch/rtr-edge:eth0
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-edge-branch
+spec:
+  medium: copper
+  speed: 1Gbps
+  endpoints:
+    - sites/branch/rtr-edge:eth1
+    - sites/branch/sw-branch:uplink
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-desk
+spec:
+  medium: copper
+  speed: 1Gbps
+  endpoints:
+    - sites/hq/sw-hq-b:port1
+    - sites/hq/pc-desk:eno1

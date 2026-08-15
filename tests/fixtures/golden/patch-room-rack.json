@@ -288,7 +288,17 @@
         ]
       },
       "vlans": [],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#f8fafc",
+        "stroke": "#334155",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "rack:hq/mdf/r1",
@@ -517,7 +527,17 @@
         ]
       },
       "vlans": [],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#f8fafc",
+        "stroke": "#334155",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     }
   ],
   "edges": [],

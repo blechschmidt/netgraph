@@ -511,6 +511,21 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         needs="write",
     ),
     Binding(
+        id="link.pin-route",
+        title="Pin the route the renderer worked out",
+        section="Editing the inventory",
+        keys=("Shift-R",),
+        detail=(
+            "Writes the bends netgraph computed to keep this link clear of the boxes it "
+            "passes into the layout document, so they become bends you placed: they stop "
+            "being recomputed, they get a grab handle each, and moving a device no longer "
+            "moves them. Refuses on a link that needed no detour, since there would be "
+            "nothing to pin."
+        ),
+        where="canvas",
+        needs="write",
+    ),
+    Binding(
         id="link.label.reset",
         title="Put the link's label back on the line",
         section="Editing the inventory",
@@ -796,6 +811,26 @@ BINDINGS: Final[tuple[Binding, ...]] = (
         needs="session",
     ),
     Binding(
+        id="style.toggle",
+        title="Style inspector",
+        section="Editing the inventory",
+        keys=("Ctrl-Shift-Y",),
+        detail=(
+            "How the selection is drawn (§22), which layer each value came from, and the "
+            "controls to change it. A change is written to spec.style, so the picture and "
+            "the YAML stay one thing."
+        ),
+        needs="session",
+    ),
+    Binding(
+        id="style.inspect",
+        title="Restyle the selection",
+        section="Editing the inventory",
+        keys=(),
+        detail="Open the style inspector on what is selected.",
+        needs="write",
+    ),
+    Binding(
         id="changes.copy",
         title="Copy the equivalent commands",
         section="Files and history",
@@ -900,6 +935,7 @@ MENUS: Final[tuple[Menu, ...]] = (
             ),
             (
                 MenuItem("element.rename", "Rename it…"),
+                MenuItem("style.inspect", "Change how it looks…"),
                 MenuItem("element.set", "Set a field…"),
                 MenuItem("element.unset", "Remove a field…"),
                 MenuItem("element.move", "Move its document…"),
@@ -915,10 +951,12 @@ MENUS: Final[tuple[Menu, ...]] = (
                 MenuItem("link.bend", "Add a bend"),
                 MenuItem("link.straighten", "Straighten it"),
                 MenuItem("link.route", "Route it…"),
+                MenuItem("link.pin-route", "Pin the computed route"),
                 MenuItem("link.label.reset", "Put the label back on the line"),
                 MenuItem("annotation.create", "Note about it…"),
             ),
             (
+                MenuItem("style.inspect", "Change how it looks…"),
                 MenuItem("element.set", "Set a field…"),
                 MenuItem("element.delete", "Disconnect it"),
             ),

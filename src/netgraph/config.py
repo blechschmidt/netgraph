@@ -42,7 +42,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from types import MappingProxyType
-from typing import Any, Final
+from typing import TYPE_CHECKING, Any, Final
 
 from netgraph.errors import ConfigurationError
 from netgraph.layout.geometry import DEFAULT_GRID
@@ -56,6 +56,11 @@ from netgraph.settings import (
     parse_render,
 )
 
+if TYPE_CHECKING:  # pragma: no cover - imported for typing only
+    # The theme models pull in pydantic; reading a configuration file must
+    # not, so the only reference to them at run time is inside the parser.
+    from netgraph.render.theme import Theme
+
 if sys.version_info >= (3, 11):  # pragma: no cover - trivial version fork
     import tomllib
 else:  # pragma: no cover - trivial version fork
@@ -67,6 +72,7 @@ __all__ = [
     "DEFAULT_MAX_REVISIONS",
     "EDITOR_TABLE",
     "HISTORY_TABLE",
+    "THEME_TABLE",
     "CacheConfig",
     "Config",
     "EditorConfig",
@@ -77,6 +83,7 @@ __all__ = [
     "parse_config",
     "parse_editor",
     "parse_history",
+    "parse_theme_table",
 ]
 
 #: Name of the per-inventory configuration file.
@@ -103,6 +110,15 @@ _HISTORY_KEYS: Final[frozenset[str]] = frozenset({"max-revisions"})
 
 #: The table configuring the visual editor's own behaviour.
 EDITOR_TABLE: Final = "editor"
+
+#: The table holding this inventory's own styling rules (§22.3). Distinct
+#: from ``[render] theme``, which *names* a theme file: this one declares the
+#: rules inline, for the common case of an inventory that wants three lines of
+#: house style and not a second file to keep beside the manifests.
+THEME_TABLE: Final = "theme"
+
+#: Keys accepted inside ``[theme]``.
+_THEME_KEYS: Final[frozenset[str]] = frozenset({"rules"})
 
 #: Keys accepted inside ``[editor]``.
 _EDITOR_KEYS: Final[frozenset[str]] = frozenset({"grid"})
@@ -261,6 +277,10 @@ class Config:
     history: HistoryConfig = field(default_factory=HistoryConfig)
     #: The ``[editor]`` table.
     editor: EditorConfig = field(default_factory=EditorConfig)
+    #: The ``[theme]`` table: this inventory's own styling rules, appended
+    #: after whatever ``--theme`` named so they win a tie (§22.4). ``None``
+    #: when the file declares none, which is not the same as an empty theme.
+    theme: Theme | None = None
 
     @property
     def is_default(self) -> bool:
@@ -362,7 +382,48 @@ def parse_config(data: Mapping[str, Any], *, path: Path | None = None) -> Config
         cache=parse_cache(data.get(CACHE_TABLE, {}), where=where, base=base),
         history=parse_history(data.get(HISTORY_TABLE, {}), where=where),
         editor=parse_editor(data.get(EDITOR_TABLE, {}), where=where),
+        theme=parse_theme_table(data.get(THEME_TABLE), where=where),
     )
+
+
+def parse_theme_table(value: Any, *, where: str = "") -> Theme | None:
+    """Parse the ``[theme]`` table into a :class:`~netgraph.render.theme.Theme`.
+
+    ``[[theme.rules]]`` entries are exactly the ``spec.rules`` of a theme
+    *document*, so the same models validate them and a mistyped colour is
+    reported here with the same message it would get in a ``theme.yaml``.
+
+    Returns ``None`` when the table is absent — distinct from a table declaring
+    no rules, which is an error for the same reason an empty theme file is.
+
+    Raises:
+        ConfigurationError: The table holds an unknown key or a bad rule.
+    """
+    if value is None:
+        return None
+    # Local import: the theme models pull in pydantic, and reading a config file
+    # is on the path of every command whether or not it draws anything.
+    from netgraph.errors import SchemaError
+    from netgraph.render.theme import rules_from
+
+    if not isinstance(value, Mapping):
+        raise ConfigurationError(f"{where}'{THEME_TABLE}' must be a table, got {_kind(value)}")
+    unknown = sorted(set(value) - _THEME_KEYS)
+    if unknown:
+        known = ", ".join(sorted(_THEME_KEYS))
+        raise ConfigurationError(
+            f"{where}unknown key(s) in [{THEME_TABLE}]: {', '.join(unknown)}; "
+            f"expected one of {known}"
+        )
+    rules = value.get("rules", [])
+    if not isinstance(rules, list):
+        raise ConfigurationError(
+            f"{where}{THEME_TABLE}.rules must be an array of tables, got {_kind(rules)}"
+        )
+    try:
+        return rules_from(rules, name=THEME_TABLE)
+    except SchemaError as exc:
+        raise ConfigurationError(f"{where}[{THEME_TABLE}] is not usable: {exc}") from exc
 
 
 def parse_editor(value: Any, *, where: str = "") -> EditorConfig:

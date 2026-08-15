@@ -17,6 +17,7 @@ from netgraph.models.base import NetgraphModel
 from netgraph.models.diagnostics import field_error
 from netgraph.models.element import ElementBase
 from netgraph.models.scalars import BitRate, ElementRef, IfName, LengthMetres
+from netgraph.models.style import Style
 
 __all__ = ["Cable", "CableSpec", "Duplex", "InterfaceRef", "Medium", "sort_endpoints"]
 
@@ -138,6 +139,11 @@ class CableSpec(NetgraphModel):
     connector: str | None = None
     #: Physical cable-label / patch-panel identifier printed on the edge.
     label: str | None = None
+    #: How this element is drawn (§22): a ``fill``, a ``stroke``, a ``shape``
+    #: and six more, each optional and each inheriting from the theme, then the
+    #: icon set, then the built-in palette when absent. See
+    #: :mod:`netgraph.models.style`.
+    style: Style | None = None
 
     @model_validator(mode="after")
     def _normalise(self) -> CableSpec:

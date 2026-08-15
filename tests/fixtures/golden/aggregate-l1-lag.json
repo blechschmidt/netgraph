@@ -26,7 +26,17 @@
             "10.20.0.11/24"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/east/sw-east-01",
@@ -169,7 +179,17 @@
             ]
           }
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/east/sw-east-02",
@@ -300,7 +320,17 @@
             ]
           }
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/west/sw-west-01",
@@ -359,7 +389,17 @@
             ]
           }
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     }
   ],
   "edges": [
@@ -402,7 +442,10 @@
             "lengthM": 2.0,
             "vlans": [
               10
-            ]
+            ],
+            "style": {
+              "from": {}
+            }
           },
           {
             "id": "cables/cbl-lag-2",
@@ -424,7 +467,10 @@
             "lengthM": 2.0,
             "vlans": [
               10
-            ]
+            ],
+            "style": {
+              "from": {}
+            }
           },
           {
             "id": "cables/cbl-lag-3",
@@ -446,7 +492,10 @@
             "lengthM": 2.0,
             "vlans": [
               10
-            ]
+            ],
+            "style": {
+              "from": {}
+            }
           },
           {
             "id": "cables/cbl-lag-4",
@@ -468,7 +517,10 @@
             "lengthM": 2.0,
             "vlans": [
               10
-            ]
+            ],
+            "style": {
+              "from": {}
+            }
           }
         ],
         "aggregate": [
@@ -484,7 +536,15 @@
       },
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "cables/cbl-spare-1",
@@ -506,7 +566,15 @@
       "lengthM": 2.0,
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "cables/cbl-spare-2",
@@ -528,7 +596,15 @@
       "lengthM": 2.0,
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "cables/cbl-desk-1",
@@ -550,7 +626,15 @@
       "lengthM": 2.0,
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "cables/cbl-east-west",
@@ -572,7 +656,15 @@
       "lengthM": 2.0,
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "cables/cbl-east-west-2",
@@ -594,7 +686,15 @@
       "lengthM": 2.0,
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     }
   ],
   "title": "LAG bundled by default"

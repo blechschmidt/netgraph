@@ -70,6 +70,7 @@ from netgraph.models.routing import (
     StaticRoute,
     VrfDefinition,
 )
+from netgraph.models.style import Style
 from netgraph.models.testsuite import Assertion, TestSuiteSpec
 from netgraph.models.tunnel import TunnelSpec
 
@@ -151,6 +152,7 @@ DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
     AreaSelector,
     LegendSpec,
     LegendEntry,
+    Style,
 )
 
 #: What distinguishes one ``kind`` from the next, one sentence each.
@@ -188,6 +190,9 @@ KIND_NOTES: Final[dict[str, str]] = {
     "rather than folded.",
     "legend": "A key: what the colours and line styles of the drawing mean, placed by corner "
     "rather than by coordinate. `auto: layers` derives the entries from what the view drew.",
+    "theme": "A stylesheet: selectors — by kind, name, namespace, role or label — each mapping "
+    "onto a `style` block. Unlike every other kind it is not applied by being in the tree: a "
+    "rendering styles itself with the one `--theme` names, and this is only checked here.",
 }
 
 #: One entry per ``(model name, field name)``. Checked for exact coverage.
@@ -1145,6 +1150,52 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
         "is about nodes."
     ),
     ("LegendEntry", "description"): Doc("A second line, for the row that needs one."),
+    # --- §22 Per-element styling -------------------------------------------
+    ("Style", "fill"): Doc(
+        "Interior colour: a named colour or `#rrggbb`. `none` draws an unfilled shape."
+    ),
+    ("Style", "stroke"): Doc(
+        "Outline colour, and — on a cable or a tunnel — the colour of the line itself."
+    ),
+    ("Style", "stroke_width"): Doc("Outline width in points, greater than 0 and at most 20."),
+    ("Style", "dash"): Doc(
+        "Line pattern: `solid`, `dashed`, `dotted` or `bold`. `bold` is a width rather than a "
+        "pattern, spelled as Graphviz spells it because the built-in palette already is."
+    ),
+    ("Style", "font_color"): Doc("Label colour."),
+    ("Style", "font_size"): Doc("Label size in points, between 6 and 96."),
+    ("Style", "shape"): Doc(
+        "The glyph the node is drawn as. Ignored on a cable or a tunnel, which has no shape."
+    ),
+    ("Style", "icon"): Doc(
+        "Picture to draw this one element as, overriding what the `--icons` theme picks for its "
+        "kind. A bare name resolved inside the theme directory; `none` draws the plain shape."
+    ),
+    ("Style", "opacity"): Doc("How opaque the element is drawn, from 0 (invisible) to 1."),
+    ("DeviceSpec", "style"): Doc(
+        "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
+    ),
+    ("CableSpec", "style"): Doc(
+        "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
+    ),
+    ("AdapterSpec", "style"): Doc(
+        "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
+    ),
+    ("TunnelSpec", "style"): Doc(
+        "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
+    ),
+    ("PatchPanelSpec", "style"): Doc(
+        "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
+    ),
+    ("PduSpec", "style"): Doc(
+        "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
+    ),
+    ("UserSpec", "style"): Doc(
+        "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
+    ),
+    ("GroupSpec", "style"): Doc(
+        "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
+    ),
 }
 
 

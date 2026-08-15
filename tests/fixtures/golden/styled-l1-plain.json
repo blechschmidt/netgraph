@@ -1,0 +1,344 @@
+{
+  "apiVersion": "netgraph.dev/v1alpha1",
+  "kind": "NetworkGraph",
+  "layer": "l1",
+  "nodes": [
+    {
+      "id": "sites/branch/rtr-edge",
+      "type": "element",
+      "name": "rtr-edge",
+      "kind": "router",
+      "namespace": "sites/branch",
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "eth0",
+          "type": "ethernet",
+          "addresses": [
+            "10.0.1.2/24"
+          ]
+        },
+        {
+          "name": "eth1",
+          "type": "ethernet",
+          "addresses": [
+            "10.0.2.1/24"
+          ]
+        }
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "sites/branch/sw-branch",
+      "type": "element",
+      "name": "sw-branch",
+      "kind": "switch",
+      "namespace": "sites/branch",
+      "labels": {
+        "tier": "access"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "uplink",
+          "type": "ethernet",
+          "addresses": [
+            "10.0.2.2/24"
+          ]
+        },
+        {
+          "name": "port1",
+          "type": "ethernet",
+          "enabled": false
+        }
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "sites/hq/rtr-core",
+      "type": "element",
+      "name": "rtr-core",
+      "kind": "router",
+      "namespace": "sites/hq",
+      "labels": {
+        "role": "core"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "eth0",
+          "type": "ethernet",
+          "addresses": [
+            "10.0.0.1/24"
+          ]
+        },
+        {
+          "name": "eth1",
+          "type": "ethernet",
+          "addresses": [
+            "10.0.1.1/24"
+          ]
+        }
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "sites/hq/sw-hq-a",
+      "type": "element",
+      "name": "sw-hq-a",
+      "kind": "switch",
+      "namespace": "sites/hq",
+      "labels": {
+        "role": "core"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "uplink",
+          "type": "ethernet",
+          "addresses": [
+            "10.0.0.2/24"
+          ]
+        },
+        {
+          "name": "port1",
+          "type": "ethernet",
+          "enabled": false
+        }
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "sites/hq/sw-hq-b",
+      "type": "element",
+      "name": "sw-hq-b",
+      "kind": "switch",
+      "namespace": "sites/hq",
+      "labels": {
+        "role": "access",
+        "tier": "access"
+      },
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "uplink",
+          "type": "ethernet",
+          "addresses": [
+            "10.0.0.3/24"
+          ]
+        },
+        {
+          "name": "port1",
+          "type": "ethernet",
+          "enabled": false
+        }
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    },
+    {
+      "id": "sites/hq/pc-desk",
+      "type": "element",
+      "name": "pc-desk",
+      "kind": "computer",
+      "namespace": "sites/hq",
+      "vlans": [],
+      "interfaces": [
+        {
+          "name": "eno1",
+          "type": "ethernet",
+          "addresses": [
+            "10.0.0.20/24"
+          ]
+        }
+      ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "cables/cbl-core-hq",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/hq/rtr-core",
+          "interface": "eth0"
+        },
+        {
+          "node": "sites/hq/sw-hq-a",
+          "interface": "uplink"
+        }
+      ],
+      "medium": "copper",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "vlans": [],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
+    },
+    {
+      "id": "cables/cbl-hq-b",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/hq/sw-hq-a",
+          "interface": "port1"
+        },
+        {
+          "node": "sites/hq/sw-hq-b",
+          "interface": "uplink"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "vlans": [],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
+    },
+    {
+      "id": "cables/cbl-core-edge",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/branch/rtr-edge",
+          "interface": "eth0"
+        },
+        {
+          "node": "sites/hq/rtr-core",
+          "interface": "eth1"
+        }
+      ],
+      "medium": "fiber",
+      "speed": 10000000000,
+      "speedText": "10Gbps",
+      "vlans": [],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
+    },
+    {
+      "id": "cables/cbl-edge-branch",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/branch/rtr-edge",
+          "interface": "eth1"
+        },
+        {
+          "node": "sites/branch/sw-branch",
+          "interface": "uplink"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "vlans": [],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
+    },
+    {
+      "id": "cables/cbl-desk",
+      "kind": "cable",
+      "endpoints": [
+        {
+          "node": "sites/hq/pc-desk",
+          "interface": "eno1"
+        },
+        {
+          "node": "sites/hq/sw-hq-b",
+          "interface": "port1"
+        }
+      ],
+      "medium": "copper",
+      "speed": 1000000000,
+      "speedText": "1Gbps",
+      "vlans": [],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
+    }
+  ],
+  "title": "Styled, unstyled"
+}

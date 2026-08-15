@@ -82,6 +82,7 @@ from netgraph.models.document import (
     parse_layout,
     parse_template,
     parse_test_suite,
+    parse_theme,
 )
 from netgraph.models.element import (
     ANNOTATION_DOCUMENT_KINDS,
@@ -93,6 +94,7 @@ from netgraph.models.element import (
     NOTE_KIND,
     TEMPLATE_KIND,
     TEST_SUITE_KIND,
+    THEME_KIND,
     ElementBase,
 )
 from netgraph.models.identity import (
@@ -198,6 +200,19 @@ from netgraph.models.scalars import (
     normalise_mac,
     parse_bitrate,
 )
+from netgraph.models.style import COLOUR_PATTERN as STYLE_COLOUR_PATTERN
+from netgraph.models.style import (
+    DASHES,
+    ICON_NAME_PATTERN,
+    NAMED_COLOURS,
+    NO_ICON,
+    SHAPES,
+    STYLE_FIELDS,
+    STYLE_RULE,
+    STYLE_VALUE_RULE,
+    Style,
+    hex_colour,
+)
 from netgraph.models.template import INHERIT_KEY, TEMPLATE_SPEC_KEYS, Template
 from netgraph.models.testsuite import (
     MAX_ASSERTIONS,
@@ -209,6 +224,15 @@ from netgraph.models.testsuite import (
     TestSuite,
     TestSuiteSpec,
 )
+from netgraph.models.theme import (
+    LABEL_PRESENT,
+    MAX_THEME_RULES,
+    THEME_RULE,
+    ThemeRule,
+    ThemeSelector,
+    ThemeSpec,
+)
+from netgraph.models.theme import Theme as ThemeDocument
 from netgraph.models.tunnel import (
     MAX_VNI,
     Tunnel,
@@ -234,6 +258,7 @@ __all__ = [
     "COHERENCE_RULE",
     "COLOUR_PATTERN",
     "CORNERS",
+    "DASHES",
     "DEVICE_KINDS",
     "DOCUMENT_KINDS",
     "ELEMENT_MODELS",
@@ -241,9 +266,11 @@ __all__ = [
     "FRONT",
     "GLOBAL_VRF",
     "GROUP_KIND",
+    "ICON_NAME_PATTERN",
     "IDENTITY_KINDS",
     "INHERIT_KEY",
     "KINDS",
+    "LABEL_PRESENT",
     "LAYOUT_KIND",
     "LAYOUT_VIEWS",
     "LEGEND_KIND",
@@ -260,8 +287,11 @@ __all__ = [
     "MAX_POWER_INPUTS",
     "MAX_SSH_KEYS",
     "MAX_TEXT_LENGTH",
+    "MAX_THEME_RULES",
     "MAX_VNI",
+    "NAMED_COLOURS",
     "NOTE_KIND",
+    "NO_ICON",
     "PATCHPANEL_KIND",
     "PDU_KIND",
     "POE_CLASS_MAX",
@@ -271,10 +301,17 @@ __all__ = [
     "REAR",
     "RESERVED_LABEL_PREFIX",
     "SELECTOR_ASSERTIONS",
+    "SHAPES",
+    "STYLE_COLOUR_PATTERN",
+    "STYLE_FIELDS",
+    "STYLE_RULE",
+    "STYLE_VALUE_RULE",
     "SWATCH_SHAPES",
     "TEMPLATE_KIND",
     "TEMPLATE_SPEC_KEYS",
     "TEST_SUITE_KIND",
+    "THEME_KIND",
+    "THEME_RULE",
     "USER_KIND",
     "VALUE_RULE",
     "AcceptableFrames",
@@ -358,10 +395,15 @@ __all__ = [
     "Size",
     "SshPublicKey",
     "StaticRoute",
+    "Style",
     "Switch",
     "Template",
     "TestSuite",
     "TestSuiteSpec",
+    "ThemeDocument",
+    "ThemeRule",
+    "ThemeSelector",
+    "ThemeSpec",
     "Tunnel",
     "TunnelAuth",
     "TunnelMode",
@@ -385,6 +427,7 @@ __all__ = [
     "element_model_for",
     "format_bitrate",
     "format_watts",
+    "hex_colour",
     "normalise_mac",
     "panel_port",
     "parse_annotation",
@@ -395,5 +438,6 @@ __all__ = [
     "parse_port_range",
     "parse_template",
     "parse_test_suite",
+    "parse_theme",
     "split_panel_port",
 ]

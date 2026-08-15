@@ -56,6 +56,7 @@ from netgraph.models.positions import (
     expand_positions,
     normalise_positions,
 )
+from netgraph.models.style import Style
 
 __all__ = [
     "FRONT",
@@ -161,6 +162,11 @@ class PatchPanelSpec(NetgraphModel):
     #: through. Absent means the identity mapping, which is what the numbering
     #: printed on a real panel promises.
     couplers: Annotated[dict[str, str] | None, BeforeValidator(_normalise_couplers)] = None
+    #: How this element is drawn (§22): a ``fill``, a ``stroke``, a ``shape``
+    #: and six more, each optional and each inheriting from the theme, then the
+    #: icon set, then the built-in palette when absent. See
+    #: :mod:`netgraph.models.style`.
+    style: Style | None = None
 
     @cached_property
     def port_numbers(self) -> tuple[str, ...]:

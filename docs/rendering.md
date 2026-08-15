@@ -33,6 +33,7 @@ labelled links](images/home-lab.svg)
 - [Labelling and layout](#labelling-and-layout)
 - [Stored arrangements](#stored-arrangements)
   - [Links are geometry too](#links-are-geometry-too)
+  - [Routing around things](#routing-around-things)
   - [A worked example: an orthogonal, waypointed diagram](#a-worked-example-an-orthogonal-waypointed-diagram)
 - [Annotations: notes, areas and legends](#annotations-notes-areas-and-legends)
   - [Graphviz: a cluster, a background rectangle, and where a key lands](#graphviz-a-cluster-a-background-rectangle-and-where-a-key-lands)
@@ -599,6 +600,17 @@ a picture to put an icon in.
 documents the bundled themes from the other side — the naming rule, why each
 kind is present twice, and how to regenerate a PNG after editing its SVG.
 
+**Icons decide what a node is a picture *of*; a style decides everything else
+about how it is drawn.** `--icons` is one rung of a ladder: an element may carry
+its own `spec.style` — a fill, an outline, a shape, a label colour, an icon of
+its own — and `--theme NAME|PATH` applies a stylesheet that says the same things
+about a whole class of elements at once, selected by kind, name, namespace,
+`role` or label. Two themes ship, `blueprint` and `mono`; `--no-style` renders
+from the built-in palette alone, which is how to read a topology whose
+stylesheet is in the way. [`docs/styling.md`](styling.md) is the guide, and
+[`docs/schema.md` §22](schema.md#22-per-element-styling-and-themes) the
+specification.
+
 ## Labelling and layout
 
 These options change what a node says and where the diagram puts it. None of
@@ -794,6 +806,66 @@ points) and `drawnAs` (the style it came out in) are the line netgraph actually
 drew. The second group appears only for a fully arranged drawing, because
 anywhere else Graphviz decides it and the export does not know the answer.
 
+### Routing around things
+
+An orthogonal link runs at right angles between the points it is pinned
+through. Left at that it will happily run *across* a switch it is not connected
+to, which is the single most visible thing wrong with a hand-arranged diagram —
+and for a while it was exactly what netgraph did
+([`docs/follow-ups.md` §19](follow-ups.md)). It no longer does. For a fully
+arranged, orthogonal drawing, netgraph routes each link **around** the boxes it
+is not attached to.
+
+Three promises, and they are what make this safe to have on by default:
+
+* **A bend you placed is never moved.** Routing fills the segments *between*
+  pinned waypoints; a waypoint itself is a decision, and it is left alone even
+  when the route ends up running straight through it.
+* **A link that already keeps clear is left exactly where it was**, to the last
+  decimal place. Avoidance is a repair, not a redraw, so a clean diagram renders
+  byte-identically to the way it did before this existed. "Clear" means clear by
+  the clearance, not merely not-quite-touching: a cable drawn two points from a
+  switch reads as a cable *on* the switch, and moving it is the repair.
+* **Nothing is written to your files.** A computed route is recomputed on every
+  render. It is published beside the authored bends — as `layout.routed` in
+  `-f json`, and to the editor canvas — but it stays computed until you say
+  otherwise. In [`netgraph web`](commands/web.md), `Shift-R` (**Pin the computed
+  route**) writes it into the layout document as waypoints, at which point it is
+  an authored route like any other: handles on every bend, never recomputed.
+
+How it decides. Every placed node is grown by a clearance and becomes an
+obstacle; so does a free-standing `kind: area` and a placed `kind: note`. (An
+area that names *members* is not: it is a zone drawn behind the devices it
+encloses, and treating it as solid would make every cable that terminates inside
+it unroutable — its members are obstacles instead, which is the same thing said
+correctly.) The corners and centre-lines of those rectangles form a grid, and an
+A\* search over it finds the cheapest route, where the cost is length plus a
+penalty per turn, per crossing of a line already drawn, and per channel already
+occupied. That last pair is what turns three cables between one pair of switches
+into three parallel lanes past the obstacle rather than three separate detours
+that fan out and re-converge.
+
+What it costs. The grid is built once per render and shared by every link — on a
+thousand-device diagram it is not rebuilt a thousand times — and a link whose
+line is already clear never searches at all, which is most links in most
+diagrams. A search is bounded by a window around the link's two ends rather than
+by the size of the drawing, so a short cable costs the same on a large diagram
+as on a small one.
+
+Where it stops, it says so. Three cut-offs — a window with too many grid points
+to search, a search that has taken too many steps, and a link with no clear
+route at all (two devices drawn on top of each other, a corridor narrower than
+the clearance) — each make the link fall back to the local Z or L and each are
+*reported* rather than silently applied. The diagram is never worse than it was
+before, and you are told which link and why.
+
+`--no-avoid`, or `avoid = false` in the `[render]` table of
+[`netgraph.toml`](configuration.md#every-render-setting), turns the whole thing
+off and gives back the local rule: faster, entirely predictable, and the right
+answer for a deliberately schematic drawing. `tools/route_crossings.py` prints
+the number of crossings in any inventory with and without it, which is how the
+claim above is checked rather than admired.
+
 ### A worked example: an orthogonal, waypointed diagram
 
 [`tests/fixtures/routed`](../tests/fixtures/routed) is the `home-lab` example
@@ -844,7 +916,7 @@ elided:
 ```console
 $ netgraph -i tests/fixtures/routed render -f dot
 ...
-  "routers/rtr-home" -- "switches/sw-home" [..., pos="640,345 640,356.67 640,368.33 640,380 726.67,380 813.33,380 900,380 900,291 900,202 900,113", lp="773.6,394", label="lan0 -- port1\nH-001\n1Gbps\nvlan 10", ...];
+  "routers/rtr-home" -- "switches/sw-home" [..., pos="640,345 640,356.67 640,368.33 640,380 726.67,380 813.33,380 900,380 920.5,380 941,380 961.5,380 961.5,272 961.5,164 961.5,56 951.83,56 942.17,56 932.5,56", lp="817.85,394", label="lan0 -- port1\nH-001\n1Gbps\nvlan 10", ...];
 ...
   "wireless/ap-home" -- "hosts/phone" [..., pos="1485,240 1485,186.83 1485,133.67 1485,80.5", label="wlan0 -- en0\nwireless", ...];
 ```
@@ -856,15 +928,25 @@ re-shape the leg on the far side of the route. Then both ends are clipped
 against the boxes the arrangement recorded, a point clear of each: the router is
 146 points tall and centred at `y: 271`, so the route starts at `640,345` above
 it rather than inside it, and the switch is 112 tall and centred at `y: 56`, so
-it stops at `900,113`. What is left is the polyline `640,345 → 640,380 → 900,380 →
-900,113` — the four corners visible in the `pos`, each straight leg written as a
+it stops at `932.5,56`.
+
+The leg *after* the second bend is where [obstacle
+avoidance](#routing-around-things) shows: `pc-desk` sits between `900,380` and
+the switch, and the L that leg would otherwise take runs straight across it. So
+the route carries on east to `961.5` — a clearance clear of the desk's right
+edge — before turning down. Both pinned bends are still in the polyline, and the
+first two legs are the same points they were before anything was routed: what
+avoidance filled in is the segment between the last bend somebody placed and the
+switch. What is left is `640,345 → 640,380 → 900,380 → 961.5,380 → 961.5,56 →
+932.5,56` — the six corners visible in the `pos`, each straight leg written as a
 cubic whose control points are its own thirds, which is the `3n + 1` form a
 Graphviz `pos` is.
 
-The `lp` is the label. The route is 562 points long; `at: 0.3` is 168.6 points
-along it, which lands on the horizontal leg at `773.6,380`, and `offset: {x: 0,
-y: 14}` lifts it to `773.6,394`. None of the other links carries an `lp`,
-because none of them has been moved.
+The `lp` is the label. `at: 0.3` is 30 % of the way along the route by arc
+length, which lands on the horizontal leg at `817.85,380`, and `offset: {x: 0,
+y: 14}` lifts it to `817.85,394`. Note that it moved when the route did — that
+is the point of pinning a label *to the link* rather than to the canvas. None of
+the other links carries an `lp`, because none of them has been moved.
 
 **The radio association.** `routing: straight` on that one link beats
 `spec.routing: orthogonal`, so it is drawn as a single clipped segment from
@@ -1417,6 +1499,8 @@ schedule, a power load schedule, a DNS zone, an SVG rack elevation — see
 
 * [`netgraph render`](commands/render.md) — the command reference: synopsis,
   every flag, exit codes.
+* [`docs/styling.md`](styling.md) — `spec.style` and `--theme`: the colour and
+  shape vocabulary, the selectors, and which rule wins when two of them disagree.
 * [`netgraph.toml`](configuration.md#render--how-the-inventory-is-drawn) — give
   any of these options a default, and collect variations into
   [named profiles](configuration.md#profilename--named-variations).

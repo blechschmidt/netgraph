@@ -66,7 +66,17 @@
           "mac": "70:69:5a:0c:00:10",
           "mtu": 1500
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "hosts/cam-lobby-01",
@@ -107,7 +117,17 @@
             ]
           }
         }
-      ]
+      ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "hosts/srv-app-01",
@@ -148,7 +168,17 @@
             "10.10.0.11/24"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#eae2f5",
+        "stroke": "#7c3aed",
+        "shape": "cylinder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "hosts/srv-db-01",
@@ -189,7 +219,17 @@
             "10.10.0.12/24"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#eae2f5",
+        "stroke": "#7c3aed",
+        "shape": "cylinder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "network/rtr-edge-01",
@@ -232,7 +272,17 @@
             "10.0.0.1/30"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "network/sw-access-01",
@@ -321,7 +371,17 @@
             ]
           }
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "network/sw-core-01",
@@ -416,7 +476,17 @@
             ]
           }
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "power/pdu-r1-a",
@@ -443,7 +513,17 @@
         "utilisation": 0.011277
       },
       "vlans": [],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#fef3c7",
+        "stroke": "#b45309",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "power/pdu-r1-b",
@@ -470,7 +550,17 @@
         "utilisation": 0.011277
       },
       "vlans": [],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#fef3c7",
+        "stroke": "#b45309",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "power/pdu-r2-a",
@@ -497,7 +587,17 @@
         "utilisation": 0.267663
       },
       "vlans": [],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#fef3c7",
+        "stroke": "#b45309",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "power/pdu-r2-b",
@@ -524,7 +624,17 @@
         "utilisation": 0.267663
       },
       "vlans": [],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#fef3c7",
+        "stroke": "#b45309",
+        "shape": "box",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     }
   ],
   "edges": [
@@ -551,7 +661,15 @@
         "inputFeed": "utility-a"
       },
       "label": "psu1",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#b45309",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "power/pdu-r2-b:1#power:hosts/srv-app-01",
@@ -576,7 +694,15 @@
         "inputFeed": "ups-1"
       },
       "label": "psu2",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#b45309",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "power/pdu-r2-a:2#power:hosts/srv-db-01",
@@ -601,7 +727,15 @@
         "inputFeed": "utility-a"
       },
       "label": "psu1",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#b45309",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "power/pdu-r2-b:2#power:hosts/srv-db-01",
@@ -626,7 +760,15 @@
         "inputFeed": "ups-1"
       },
       "label": "psu2",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#b45309",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "power/pdu-r1-a:2#power:network/rtr-edge-01",
@@ -651,7 +793,15 @@
         "inputFeed": "utility-a"
       },
       "label": "psu1",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#b45309",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "power/pdu-r1-b:2#power:network/rtr-edge-01",
@@ -676,7 +826,15 @@
         "inputFeed": "ups-1"
       },
       "label": "psu2",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#b45309",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "power/pdu-r2-a:3#power:network/sw-access-01",
@@ -701,7 +859,15 @@
         "inputFeed": "utility-a"
       },
       "label": "psu1",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#b45309",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "power/pdu-r2-b:3#power:network/sw-access-01",
@@ -726,7 +892,15 @@
         "inputFeed": "ups-1"
       },
       "label": "psu2",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#b45309",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "power/pdu-r1-a:1#power:network/sw-core-01",
@@ -751,7 +925,15 @@
         "inputFeed": "utility-a"
       },
       "label": "psu1",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#b45309",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "power/pdu-r1-b:1#power:network/sw-core-01",
@@ -776,7 +958,15 @@
         "inputFeed": "ups-1"
       },
       "label": "psu2",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#b45309",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "network/sw-access-01:GigabitEthernet1/0/1#poe:hosts/ap-ceiling-01",
@@ -802,7 +992,15 @@
         "reservedWatts": 30.0,
         "elementWatts": 22.0
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#ca8a04",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "network/sw-access-01:GigabitEthernet1/0/2#poe:hosts/cam-lobby-01",
@@ -825,7 +1023,15 @@
         "reservedWatts": 7.0,
         "elementWatts": 5.0
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#ca8a04",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     }
   ],
   "title": "Patch room, power"

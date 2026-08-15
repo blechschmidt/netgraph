@@ -1,0 +1,152 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+  description: West end of the top row
+spec:
+  interfaces:
+    - name: e1
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+    - name: e2
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+    - name: e3
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+  vlans:
+    - id: 10
+      name: lab
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-b
+  description: East end of the top row
+spec:
+  interfaces:
+    - name: e1
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+    - name: e2
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+    - name: e3
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+  vlans:
+    - id: 10
+      name: lab
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-mid
+  description: >
+    Sits exactly between sw-a and sw-b and is cabled to neither. The link
+    between them used to be drawn straight across this box.
+spec:
+  interfaces:
+    - name: e1
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+  vlans:
+    - id: 10
+      name: lab
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-c
+  description: West end of the bottom row
+spec:
+  interfaces:
+    - name: e1
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+    - name: e2
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+    - name: e3
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+    - name: e4
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+    - name: e5
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+  vlans:
+    - id: 10
+      name: lab
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-d
+  description: East end of the bottom row
+spec:
+  interfaces:
+    - name: e1
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+    - name: e2
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+    - name: e3
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+    - name: e4
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+  vlans:
+    - id: 10
+      name: lab
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-blocker
+  description: >
+    The obstacle in the bottom row. The three cables between sw-c and sw-d have
+    to get past it together, as lanes, rather than one at a time.
+spec:
+  interfaces:
+    - name: e1
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+  vlans:
+    - id: 10
+      name: lab
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: router
+metadata:
+  name: rtr
+  description: >
+    Below the bottom row, behind a wall. Its cable to sw-c carries a bend
+    somebody dragged, which routing has to keep and fill around.
+spec:
+  interfaces:
+    - name: lan0
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+  vlans:
+    - id: 10
+      name: lab
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-wall
+  description: >
+    A wide box across the corridor between rtr and the bottom row, cabled to
+    nothing. It is what makes the rtr cable's remaining leg need a detour.
+spec:
+  interfaces:
+    - name: e1
+      type: ethernet
+      vlan: {mode: access, access_vlan: 10}
+  vlans:
+    - id: 10
+      name: lab

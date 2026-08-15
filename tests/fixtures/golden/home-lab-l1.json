@@ -29,7 +29,17 @@
             "2001:db8:10::30/64"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#fdf0e3",
+        "stroke": "#ea580c",
+        "shape": "ellipse",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "hosts/laptop",
@@ -62,7 +72,17 @@
           "description": "Disabled while docked",
           "mac": "8c:8c:aa:30:01:01"
         }
-      ]
+      ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "hosts/pc-desk",
@@ -106,7 +126,17 @@
           "description": "Disabled - the desk is wired",
           "mac": "3c:97:0e:20:01:02"
         }
-      ]
+      ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "hosts/phone",
@@ -133,7 +163,17 @@
             "2001:db8:10::40/64"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "hosts/srv-nas",
@@ -169,7 +209,17 @@
             "2001:db8:10::10/64"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#eae2f5",
+        "stroke": "#7c3aed",
+        "shape": "cylinder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "routers/rtr-home",
@@ -223,7 +273,17 @@
             ]
           }
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "switches/sw-home",
@@ -326,7 +386,17 @@
             ]
           }
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "wireless/ap-home",
@@ -384,7 +454,17 @@
           "mac": "78:8a:20:aa:00:10",
           "mtu": 1500
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dcf0dc",
+        "stroke": "#16a34a",
+        "shape": "box3d",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     }
   ],
   "edges": [
@@ -408,7 +488,15 @@
       "lengthM": 0.5,
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "cables/cbl-sw-desk",
@@ -430,7 +518,15 @@
       "lengthM": 8.0,
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "cables/cbl-sw-nas",
@@ -452,7 +548,15 @@
       "lengthM": 0.5,
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "cables/cbl-sw-dongle",
@@ -474,7 +578,15 @@
       "lengthM": 10.0,
       "vlans": [
         10
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "cables/cbl-sw-ap",
@@ -497,7 +609,15 @@
       "vlans": [
         10,
         20
-      ]
+      ],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "cables/wl-ap-phone",
@@ -522,7 +642,15 @@
         "widthMhz": 80,
         "accessPoint": "wireless/ap-home:wlan0"
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#2563eb",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "hosts/adp-usb-eth#upstream",
@@ -540,7 +668,15 @@
       "speed": 5000000000,
       "speedText": "5Gbps",
       "label": "usb",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#9ca3af",
+        "dash": "dotted",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     }
   ]
 }

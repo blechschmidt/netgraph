@@ -18,6 +18,7 @@ from netgraph.models.diagnostics import field_error
 from netgraph.models.element import ElementBase
 from netgraph.models.interface import Interface, InterfaceList, InterfaceType
 from netgraph.models.scalars import BitRate, Boolean, ElementRef, IfName, PortCount
+from netgraph.models.style import Style
 
 __all__ = ["Adapter", "AdapterSpec", "UpstreamPort", "UpstreamType"]
 
@@ -75,6 +76,11 @@ class AdapterSpec(NetgraphModel):
     ports: PortCount | None = None
     upstream: UpstreamPort
     interfaces: InterfaceList
+    #: How this element is drawn (§22): a ``fill``, a ``stroke``, a ``shape``
+    #: and six more, each optional and each inheriting from the theme, then the
+    #: icon set, then the built-in palette when absent. See
+    #: :mod:`netgraph.models.style`.
+    style: Style | None = None
 
     @model_validator(mode="after")
     def _check_interfaces(self) -> AdapterSpec:

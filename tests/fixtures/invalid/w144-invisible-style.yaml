@@ -1,0 +1,47 @@
+# W144 (NG-Z003) - a style fades an element to nothing.
+#
+# `opacity: 0` is legal on its own: it is the bottom of a legal range, and an
+# editor dragging a slider passes through it on the way to something visible.
+# What it produces here is a switch nobody can see and nobody can click, while
+# the cable to it is still drawn to the empty space it used to occupy - a
+# diagram that says a link goes somewhere and then declines to say where.
+#
+# A warning rather than an error, because the value is legal and the fix is a
+# decision: an element that genuinely should not appear belongs behind a filter
+# (`--kind`, `--name`), which takes it out of the topology as well as out of
+# the picture, rather than behind a transparent fill.
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-a
+spec:
+  style:
+    opacity: 0
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        - 10.0.0.1/24
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-b
+spec:
+  interfaces:
+    - name: port1
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        - 10.0.0.2/24
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - sw-a:port1
+    - sw-b:port1
+  medium: copper

@@ -1,0 +1,44 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: theme
+metadata:
+  name: house
+  description: The house style of the styled fixture; see README.md.
+spec:
+  rules:
+    # No clauses: the background every other rule adjusts.
+    - style:
+        fill: white
+        stroke: slate
+        fontColor: black
+
+    - select:
+        kind: [router]
+      style:
+        fill: "#dbe9f6"
+        stroke: blue
+    - select:
+        kind: [switch]
+      style:
+        fill: "#dcf0dc"
+        stroke: green
+    - select:
+        kind: [cable]
+      style:
+        stroke: slate
+
+    # One clause each, like the kind rules above, so these win their ties by
+    # being declared last (§22.4).
+    - select:
+        role: [core]
+      style:
+        strokeWidth: 3
+        fontSize: 12
+    - select:
+        namespace: ["sites/branch"]
+      style:
+        dash: dashed
+    - select:
+        label:
+          tier: access
+      style:
+        shape: rounded

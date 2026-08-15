@@ -46,6 +46,7 @@ from netgraph.models import (
     Tunnel,
     User,
 )
+from netgraph.models.theme import Theme as ThemeDocument
 
 __all__ = [
     "Inventory",
@@ -238,6 +239,13 @@ class Inventory:
     #: Assertions about the network (§20), keyed by fully-qualified name. Not
     #: elements either, and indexed apart for the same reason as :attr:`layouts`.
     test_suites: dict[str, TestSuite] = field(default_factory=dict)
+    #: Stylesheets (§22.3), keyed by fully-qualified name. Not elements either,
+    #: and *not applied* by being here: a rendering styles itself with the one
+    #: ``--theme`` names and no other. They are indexed so that a theme kept
+    #: beside the manifests it styles — the obvious place for it — is checked by
+    #: ``netgraph validate`` rather than only discovered to be broken by the
+    #: render that first names it.
+    themes: dict[str, ThemeDocument] = field(default_factory=dict)
     #: Diagram callouts (§21), keyed by fully-qualified name. Purely
     #: presentational: nothing here may reach the graph, the validator's verdict,
     #: a traced path or a generated configuration.
@@ -254,6 +262,8 @@ class Inventory:
     #: field-level redirect table, whatever ``keep_provenance`` says: a failing
     #: assertion has to name its own line, and there are never many suites.
     test_suite_sources: dict[str, SourceLocation] = field(default_factory=dict)
+    #: Provenance of each theme document, keyed the same way.
+    theme_sources: dict[str, SourceLocation] = field(default_factory=dict)
     #: Provenance of each annotation document, keyed by ``kind`` then by
     #: fully-qualified name. One table rather than three, because every consumer
     #: that wants it — the validator, the editor, ``plan`` — is already holding
@@ -342,6 +352,27 @@ class Inventory:
             return None
         self.test_suites[fqn] = suite
         self.test_suite_sources[fqn] = source
+        return fqn
+
+    def add_theme(
+        self, theme: ThemeDocument, *, namespace: str, source: SourceLocation
+    ) -> str | None:
+        """Index one ``kind: theme`` document (§22.3).
+
+        Its own name space, for the same reason a layout and a suite have one:
+        a theme called ``core`` beside a switch called ``core`` is not a clash,
+        because nothing ever resolves one where the other is meant.
+
+        Returns:
+            The fully-qualified name, or ``None`` when a theme of that name is
+            already indexed. The caller reports the clash and the first
+            declaration wins, which keeps loading deterministic.
+        """
+        fqn = qualify(namespace, theme.metadata.name)
+        if fqn in self.themes:
+            return None
+        self.themes[fqn] = theme
+        self.theme_sources[fqn] = source
         return fqn
 
     def annotations_of(self, kind: str) -> dict[str, Annotation]:

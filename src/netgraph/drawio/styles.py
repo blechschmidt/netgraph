@@ -32,14 +32,14 @@ from netgraph.render.dot import (
     CLUSTER_PALETTE,
     DEFAULT_EDGE_PALETTE,
     DEFAULT_NODE_PALETTE,
-    EDGE_PALETTE,
     NODE_PALETTE,
 )
-from netgraph.render.graph import EdgeKind
 from netgraph.render.icons import VECTOR_FIRST, IconTheme
+from netgraph.render.styles import ResolvedStyle
 
 __all__ = [
     "MAX_ICON_BYTES",
+    "MX_SHAPES",
     "NOTE_SHAPE",
     "area_style",
     "data_uri",
@@ -49,7 +49,6 @@ __all__ = [
     "leader_style",
     "legend_style",
     "node_style",
-    "palette_for",
     "style_of",
     "swatch_style",
     "text_style",
@@ -117,20 +116,6 @@ _ROUTING_STYLES: Final[Mapping[str, str]] = {
     "straight": "edgeStyle=none;curved=0;",
 }
 
-#: Which palette entry each non-cable edge kind takes. The cable kinds are
-#: keyed by medium instead, which is why this maps only the rest.
-_EDGE_KIND_PALETTE: Final[Mapping[EdgeKind, str]] = {
-    EdgeKind.ATTACHMENT: "attachment",
-    EdgeKind.SUBNET: "subnet",
-    EdgeKind.TUNNEL: "tunnel",
-    EdgeKind.ENCAPSULATION: "encapsulation",
-    EdgeKind.MEMBERSHIP: "membership",
-    EdgeKind.BGP: "bgp",
-    EdgeKind.OSPF: "ospf",
-    EdgeKind.OUTLET: "outlet",
-    EdgeKind.POE: "poe",
-}
-
 
 def style_of(pairs: Iterable[tuple[str, str]]) -> str:
     """``[("fillColor", "#fff")]`` → ``"fillColor=#fff;"``.
@@ -146,46 +131,100 @@ def palette_for(kind: str) -> tuple[str, str]:
     return NODE_PALETTE.get(kind, DEFAULT_NODE_PALETTE)
 
 
-def node_style(kind: str, *, icon: str | None = None) -> str:
-    """The style of one vertex.
+def node_style(style: ResolvedStyle, *, icon: str | None = None) -> str:
+    """The style of one vertex, from its resolved appearance (§22).
+
+    Every value has already been through
+    :func:`~netgraph.render.styles.resolve_style`, so the ladder — the element,
+    the theme, the icon set, the palette — has been walked once for the whole
+    export and this function only translates. A colour somebody chose therefore
+    reaches draw.io as the same hex the SVG carries, which is what makes the
+    round-trip preserve it.
 
     Args:
-        kind: The element kind, which picks the colours.
+        style: The resolved appearance of the node.
         icon: A data URI to draw the node as, or ``None`` for a coloured box.
             An icon replaces the shape entirely — that is what ``shape=image``
             means — so the fill is dropped with it and the outline is kept as
             the label's colour.
     """
-    fill, stroke = palette_for(kind)
     if icon is not None:
-        return _IMAGE_BASE + style_of((("image", icon), ("fontColor", stroke)))
-    return _VERTEX_BASE + style_of(
-        (("fillColor", fill), ("strokeColor", stroke), ("fontColor", "#111827"))
+        pairs = [("image", icon), ("fontColor", style.font_color or style.stroke or "#111827")]
+        return _IMAGE_BASE + style_of((*pairs, *_text_pairs(style), *_opacity(style)))
+    return (
+        _VERTEX_BASE
+        + MX_SHAPES.get(style.shape or "box", "")
+        + style_of(
+            (
+                ("fillColor", style.fill or DEFAULT_NODE_PALETTE[0]),
+                ("strokeColor", style.stroke or DEFAULT_NODE_PALETTE[1]),
+                ("fontColor", style.font_color or "#111827"),
+                *_stroke_width(style),
+                *_dash(style),
+                *_text_pairs(style),
+                *_opacity(style),
+            )
+        )
     )
 
 
-def edge_style(*, palette: str, routing: str = "spline") -> str:
-    """The style of one edge.
+def edge_style(style: ResolvedStyle, *, routing: str = "spline") -> str:
+    """The style of one edge, from its resolved appearance (§22).
 
     Args:
-        palette: The :data:`~netgraph.render.dot.EDGE_PALETTE` key — a cable
-            medium, or the name of an edge kind that is not a cable.
+        style: The resolved appearance of the link. Its ``dash`` is the palette
+            entry's line style unless something overrode it.
         routing: One of :data:`~netgraph.models.layout.ROUTING_STYLES`.
     """
-    colour, line = EDGE_PALETTE.get(palette, DEFAULT_EDGE_PALETTE)
+    colour = style.faded_stroke or DEFAULT_EDGE_PALETTE[0]
+    line = style.dash or DEFAULT_EDGE_PALETTE[1]
+    # A declared width wins over the one the line style implies, which is why
+    # the pattern is emitted first and the width after it.
     return (
         _ROUTING_STYLES.get(routing, _ROUTING_STYLES["spline"])
         + _EDGE_BASE
         + _LINE_STYLES.get(line, _LINE_STYLES["solid"])
-        + style_of((("strokeColor", colour), ("fontColor", colour), ("fontSize", "10")))
+        + style_of(
+            (
+                ("strokeColor", colour),
+                ("fontColor", style.faded_font_color or colour),
+                ("fontSize", str(style.font_size or 10)),
+                *_stroke_width(style),
+                *_opacity(style),
+            )
+        )
     )
 
 
-def palette_key(kind: EdgeKind, medium: str) -> str:
-    """Which palette entry a link takes: its medium, or its kind."""
-    if kind is EdgeKind.CABLE:
-        return medium or "copper"
-    return _EDGE_KIND_PALETTE.get(kind, "copper")
+def _stroke_width(style: ResolvedStyle) -> tuple[tuple[str, str], ...]:
+    """``strokeWidth``, when one was asked for."""
+    if style.stroke_width is None:
+        return ()
+    return (("strokeWidth", f"{style.stroke_width:g}"),)
+
+
+def _dash(style: ResolvedStyle) -> tuple[tuple[str, str], ...]:
+    """A node's line pattern. Links get theirs from :data:`_LINE_STYLES`."""
+    if style.dash is None:
+        return ()
+    fragment = _LINE_STYLES.get(style.dash, "")
+    return tuple(
+        (key, value)
+        for key, _, value in (part.partition("=") for part in fragment.split(";") if part)
+    )
+
+
+def _text_pairs(style: ResolvedStyle) -> tuple[tuple[str, str], ...]:
+    if style.font_size is None:
+        return ()
+    return (("fontSize", str(style.font_size)),)
+
+
+def _opacity(style: ResolvedStyle) -> tuple[tuple[str, str], ...]:
+    """mxGraph spells opacity as a percentage, not a fraction."""
+    if style.opacity is None:
+        return ()
+    return (("opacity", str(round(style.opacity * 100))),)
 
 
 def group_style() -> str:
@@ -204,6 +243,36 @@ def group_style() -> str:
 #: new note, on the reasoning that reaching for the note shape is as clear a
 #: statement of intent as a draw.io user can make.
 NOTE_SHAPE: Final = "note"
+
+
+#: How each shape of the styling vocabulary (§22) is spelled in mxGraph, on
+#: top of :data:`_VERTEX_BASE`. draw.io reads a style left to right and the last
+#: declaration of a key wins, so a fragment here may override what the base set
+#: — which is how ``rounded`` turns ``rounded=0`` back on.
+#:
+#: The two Graphviz synonyms the built-in palette uses (``rectangle``, ``oval``)
+#: are here too, so a node nobody styled still resolves. Anything absent draws
+#: as the plain rectangle every draw.io diagram is made of, which is what a
+#: reader who does not know netgraph's vocabulary expects anyway.
+MX_SHAPES: Final[Mapping[str, str]] = {
+    "box": "",
+    "rectangle": "",
+    "rounded": "rounded=1;arcSize=12;",
+    "ellipse": "ellipse;",
+    "oval": "ellipse;",
+    "circle": "ellipse;aspect=fixed;",
+    "diamond": "rhombus;",
+    "hexagon": "shape=hexagon;perimeter=hexagonPerimeter2;",
+    "triangle": "triangle;",
+    "cylinder": "shape=cylinder3;boundedLbl=1;backgroundOutline=1;",
+    "box3d": "shape=cube;boundedLbl=1;darkOpacity=0.05;darkOpacity2=0.1;",
+    "folder": "shape=folder;tabWidth=40;tabHeight=14;tabPosition=left;",
+    "note": f"shape={NOTE_SHAPE};size=14;",
+    "parallelogram": "shape=parallelogram;perimeter=parallelogramPerimeter;",
+    "trapezium": "shape=trapezoid;perimeter=trapezoidPerimeter;",
+    "plaintext": "text;strokeColor=none;fillColor=none;",
+}
+
 
 #: A callout. ``size`` is the turned-down corner in points; ``align=left`` and
 #: ``verticalAlign=top`` because a note is prose and prose starts at the top

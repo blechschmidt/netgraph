@@ -34,6 +34,7 @@ from netgraph.models.cable import InterfaceRef, sort_endpoints
 from netgraph.models.diagnostics import field_error
 from netgraph.models.element import ElementBase
 from netgraph.models.scalars import ElementRef, InterfaceMtu
+from netgraph.models.style import Style
 
 __all__ = [
     "MAX_VNI",
@@ -268,6 +269,11 @@ class TunnelSpec(NetgraphModel):
     auth: TunnelAuth | None = None
     #: Free-text identifier printed on the edge, as a cable's ``label`` is.
     label: str | None = None
+    #: How this element is drawn (§22): a ``fill``, a ``stroke``, a ``shape``
+    #: and six more, each optional and each inheriting from the theme, then the
+    #: icon set, then the built-in palette when absent. See
+    #: :mod:`netgraph.models.style`.
+    style: Style | None = None
 
     @model_validator(mode="after")
     def _normalise(self) -> TunnelSpec:

@@ -23,7 +23,17 @@
             "10.20.0.10/24"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/branch-a/rtr-branch-a",
@@ -65,7 +75,17 @@
             "10.255.0.2/24"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/branch-b/pc-branch-b",
@@ -96,7 +116,17 @@
             "10.253.0.10/24"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#f5f5f5",
+        "stroke": "#6b7280",
+        "shape": "rectangle",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/branch-b/rtr-branch-b",
@@ -170,7 +200,17 @@
             "10.252.0.2/30"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/hq/rtr-hq",
@@ -253,7 +293,17 @@
             "10.253.0.1/24"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "sites/hq/srv-hq",
@@ -275,7 +325,17 @@
             "10.10.0.10/24"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#eae2f5",
+        "stroke": "#7c3aed",
+        "shape": "cylinder",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "wan/wan-core",
@@ -316,7 +376,17 @@
             "198.51.100.9/30"
           ]
         }
-      ]
+      ],
+      "style": {
+        "fill": "#dbe9f6",
+        "stroke": "#2563eb",
+        "shape": "diamond",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     },
     {
       "id": "tunnel:tunnels/wg-mesh",
@@ -360,7 +430,17 @@
         "mtu": 1420
       },
       "vlans": [],
-      "interfaces": []
+      "interfaces": [],
+      "style": {
+        "fill": "#ede9fe",
+        "stroke": "#6d28d9",
+        "shape": "hexagon",
+        "from": {
+          "fill": "default",
+          "stroke": "default",
+          "shape": "default"
+        }
+      }
     }
   ],
   "edges": [
@@ -380,7 +460,15 @@
       "medium": "copper",
       "speed": 1000000000,
       "speedText": "1Gbps",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "cables/cbl-branch-a-pc",
@@ -398,7 +486,15 @@
       "medium": "copper",
       "speed": 1000000000,
       "speedText": "1Gbps",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "cables/cbl-branch-b-pc",
@@ -416,7 +512,15 @@
       "medium": "copper",
       "speed": 1000000000,
       "speedText": "1Gbps",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#4a4a4a",
+        "dash": "solid",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "cables/cbl-wan-hq",
@@ -435,7 +539,15 @@
       "speed": 1000000000,
       "speedText": "1Gbps",
       "label": "PE-01",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "cables/cbl-wan-branch-a",
@@ -454,7 +566,15 @@
       "speed": 1000000000,
       "speedText": "1Gbps",
       "label": "PE-02",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "cables/cbl-wan-branch-b",
@@ -473,7 +593,15 @@
       "speed": 1000000000,
       "speedText": "1Gbps",
       "label": "PE-03",
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#d97706",
+        "dash": "bold",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/wg-mesh#sites/branch-a/rtr-branch-a:wg0",
@@ -518,7 +646,15 @@
         "auth": "public-key",
         "mtu": 1420
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/wg-mesh#sites/branch-b/rtr-branch-b:wg0",
@@ -563,7 +699,15 @@
         "auth": "public-key",
         "mtu": 1420
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/wg-mesh#sites/hq/rtr-hq:wg0",
@@ -608,7 +752,15 @@
         "auth": "public-key",
         "mtu": 1420
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/ipsec-hq-b",
@@ -650,7 +802,15 @@
         "auth": "certificate",
         "mtu": 1427
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/vx-100",
@@ -696,7 +856,15 @@
       },
       "vlans": [
         100
-      ]
+      ],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/gre-mgmt",
@@ -738,7 +906,15 @@
         "encryptedBy": "tunnels/ipsec-hq-b",
         "mtu": 1403
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     },
     {
       "id": "tunnels/ovpn-admin",
@@ -780,7 +956,15 @@
         "auth": "certificate",
         "mtu": 1431
       },
-      "vlans": []
+      "vlans": [],
+      "style": {
+        "stroke": "#6d28d9",
+        "dash": "dashed",
+        "from": {
+          "stroke": "default",
+          "dash": "default"
+        }
+      }
     }
   ],
   "title": "Overlay, layer 2"

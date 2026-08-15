@@ -60,6 +60,20 @@ network rather than merely about the picture:
   record of each member link, exported by the same code that exports an
   unbundled one — so nothing is lost by asking for the summary.
 
+Style
+-----
+
+Every node and every edge carries a ``style`` object: the *resolved* appearance
+(§22), with a ``from`` map saying which rung of the ladder supplied each value —
+``element``, ``theme:<name>#<rule>``, ``icons`` or ``default``. It is what lets
+a consumer that draws the graph itself, rather than reading a picture netgraph
+drew, produce the same colours; and it is what the editor's style inspector
+reads to say "this navy is the theme's, not yours" before offering to reset it.
+
+The object is always present, because the ladder always terminates in the
+built-in palette. Under ``--no-style`` it is the palette's answer alone, and
+every entry in ``from`` says ``default``.
+
 Annotations
 -----------
 
@@ -107,12 +121,17 @@ from netgraph.render.graph import (
     WirelessView,
 )
 from netgraph.render.options import RenderOptions
-from netgraph.render.routes import default_routing, route_table
+from netgraph.render.routes import default_routing, route_plan
+from netgraph.render.styles import PLAIN, ResolvedStyle, StyleMap
 
 __all__ = ["GRAPH_KIND", "annotations_payload", "graph_to_dict", "render_json", "to_json"]
 
 #: ``kind`` of the exported document, mirroring the element envelope of §3.
 GRAPH_KIND: Final = "NetworkGraph"
+
+#: What a helper called without one resolves against: nothing was styled, so
+#: every field is absent and ``from`` is empty.
+_NO_STYLES: Final = StyleMap()
 
 
 def to_json(graph: Graph, options: RenderOptions | None = None, *, indent: int = 2) -> str:
@@ -158,14 +177,25 @@ def graph_to_dict(graph: Graph, options: RenderOptions | None = None) -> dict[st
     would otherwise have to recompute it.
     """
     opts = options or RenderOptions()
+    # The resolved appearance travels *with* the graph: a consumer drawing
+    # this document itself — the editor's canvas, a dashboard — must be able
+    # to draw what netgraph drew without reimplementing the ladder of §22,
+    # and the provenance is what lets the editor's inspector say which rung
+    # each value came from.
+    styles = StyleMap.build(
+        graph, theme=opts.theme, icons=opts.icons, output="svg", styling=opts.styling
+    )
+    plan = route_plan(graph, opts)
     document: dict[str, Any] = {
         "apiVersion": API_VERSION,
         "kind": GRAPH_KIND,
         "layer": graph.layer.value,
-        "nodes": [_node(node, opts, graph.geometry) for node in graph.nodes.values()],
+        "nodes": [_node(node, opts, graph.geometry, styles) for node in graph.nodes.values()],
         "edges": [
-            _edge(edge, graph.geometry, opts.diff, line)
-            for edge, line in zip(graph.edges, route_table(graph, opts), strict=True)
+            _edge(edge, graph.geometry, opts.diff, line, styles.edge(index), computed)
+            for index, (edge, line, computed) in enumerate(
+                zip(graph.edges, plan.routes, plan.computed, strict=True)
+            )
         ],
     }
     if opts.diff is not None:
@@ -349,7 +379,12 @@ def _placement(placement: Placement) -> dict[str, Any]:
     return payload
 
 
-def _node(node: Node, options: RenderOptions, geometry: Geometry) -> dict[str, Any]:
+def _node(
+    node: Node,
+    options: RenderOptions,
+    geometry: Geometry,
+    styles: StyleMap = _NO_STYLES,
+) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "id": node.fqn,
         "type": node.type.value,
@@ -380,6 +415,7 @@ def _node(node: Node, options: RenderOptions, geometry: Geometry) -> dict[str, A
     placement = geometry.nodes.get(node.fqn)
     if placement is not None:
         payload["layout"] = _placement(placement)
+    payload["style"] = styles.node(node.fqn).to_dict()
     diff = _diff_mark(options.diff, node.fqn)
     if diff is not None:
         payload["diff"] = diff
@@ -646,21 +682,32 @@ def _port(port: PortView, options: RenderOptions) -> dict[str, Any]:
 _NO_GEOMETRY: Final[Geometry] = Geometry()
 
 
-def _link_layout(edge: Edge, geometry: Geometry, line: Route | None) -> dict[str, Any]:
+def _link_layout(
+    edge: Edge,
+    geometry: Geometry,
+    line: Route | None,
+    computed: tuple[tuple[float, float], ...] = (),
+) -> dict[str, Any]:
     """What this document says about how one link is drawn.
 
-    Two different things, and a consumer wants both. ``waypoints``, ``routing``
-    and ``label`` are what the *inventory pins* — the decisions somebody made,
-    which is what an editor round-trips. ``route`` is the line netgraph
+    Three different things, and a consumer wants all three. ``waypoints``,
+    ``routing`` and ``label`` are what the *inventory pins* — the decisions
+    somebody made, which is what an editor round-trips. ``routed`` is what
+    :mod:`netgraph.layout.avoid` added on top of them so the line misses the
+    boxes it passes; it is recomputed on every render, is written to no
+    document, and is published so that a client can tell a computed bend from a
+    chosen one rather than having to guess. ``route`` is the line netgraph
     actually draws, in the same coordinates as the node positions beside it, so
-    a client can reproduce the picture without reimplementing the routing. The
-    second is only present for a fully-arranged drawing, because anywhere else
-    Graphviz decides it and this document does not know the answer.
+    a client can reproduce the picture without reimplementing any of this. The
+    last two are only present for a fully-arranged drawing, because anywhere
+    else Graphviz decides the line and this document does not know the answer.
     """
     link = geometry.link(edge.id)
     payload: dict[str, Any] = {}
     if link.waypoints:
         payload["waypoints"] = [{"x": x, "y": y} for x, y in link.waypoints]
+    if computed:
+        payload["routed"] = [{"x": x, "y": y} for x, y in computed]
     if link.routing is not None:
         payload["routing"] = str(link.routing)
     if link.label is not None:
@@ -677,6 +724,8 @@ def _edge(
     geometry: Geometry = _NO_GEOMETRY,
     overlay: DiffOverlay | None = None,
     route: Route | None = None,
+    style: ResolvedStyle | None = None,
+    computed: tuple[tuple[float, float], ...] = (),
 ) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "id": edge.id,
@@ -715,9 +764,10 @@ def _edge(
     if edge.bundle is not None:
         payload["bundle"] = _bundle(edge.bundle)
     payload["vlans"] = sorted(edge.vlans)
-    layout = _link_layout(edge, geometry, route)
+    layout = _link_layout(edge, geometry, route, computed)
     if layout:
         payload["layout"] = layout
+    payload["style"] = (style if style is not None else PLAIN).to_dict()
     diff = _diff_mark(overlay, edge.id)
     if diff is not None:
         payload["diff"] = diff

@@ -28,6 +28,7 @@
       "switch": "#/$defs/Switch",
       "template": "#/$defs/Template",
       "testsuite": "#/$defs/TestSuite",
+      "theme": "#/$defs/Theme",
       "tunnel": "#/$defs/Tunnel",
       "user": "#/$defs/User"
     },
@@ -87,6 +88,9 @@
     },
     {
       "$ref": "#/$defs/Legend"
+    },
+    {
+      "$ref": "#/$defs/Theme"
     }
   ],
   "$defs": {
@@ -238,6 +242,19 @@
           "title": "interfaces",
           "type": "array",
           "description": "The network ports the adapter presents downstream. Only `ethernet`, `wifi` and `lag` are allowed (`NG-X003`).\n\nYANG: `/if:interfaces/if:interface`"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Style"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "style",
+          "description": "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
         }
       },
       "required": [
@@ -1087,6 +1104,19 @@
           "default": null,
           "title": "label",
           "description": "The identifier printed on the cable or the patch panel. Drawn on the edge."
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Style"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "style",
+          "description": "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
         }
       },
       "required": [
@@ -1272,6 +1302,19 @@
           "default": null,
           "title": "power",
           "description": "What the device draws, which PDU outlets feed it, and how much PoE it hands out (§17.2). Absent means the inventory records nothing about its power.\n\nYANG: `/eo-mib:eoPowerTable/eoPowerEntry`"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Style"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "style",
+          "description": "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
         },
         "from": {
           "type": "string",
@@ -1494,6 +1537,19 @@
           "default": null,
           "title": "email",
           "description": "Where mail to the whole group goes, when the group is also a distribution list."
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Style"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "style",
+          "description": "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
         }
       },
       "title": "GroupSpec",
@@ -2838,6 +2894,19 @@
           "default": null,
           "title": "couplers",
           "description": "Front position to rear position, for a panel that is not wired straight through. Absent means the identity mapping (`NG-P007`)."
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Style"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "style",
+          "description": "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
         }
       },
       "required": [
@@ -2980,6 +3049,19 @@
           "default": null,
           "title": "input_feed",
           "description": "Which supply feeds the unit — `A`, `B`, `ups-1`, `utility`. Free text, compared only for equality: two PDUs on one feed do not make a device redundant (`NG-E015`).\n\nYANG: `/eo-ctx-mib:eoPowerRelationTable/eoPowerRelationEntry`"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Style"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "style",
+          "description": "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
         }
       },
       "required": [
@@ -3463,6 +3545,275 @@
       "title": "StaticRoute",
       "type": "object"
     },
+    "Style": {
+      "additionalProperties": false,
+      "description": "`spec.style` — the appearance of one element (§22).\n\nEvery field is optional and an absent one inherits; see the module\ndocstring for the ladder and `docs/styling.md` for the worked examples.",
+      "properties": {
+        "fill": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$",
+                  "description": "A hex colour, `#rgb` or `#rrggbb`."
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "amber",
+                    "black",
+                    "blue",
+                    "brown",
+                    "cyan",
+                    "gray",
+                    "green",
+                    "grey",
+                    "indigo",
+                    "lime",
+                    "magenta",
+                    "maroon",
+                    "navy",
+                    "none",
+                    "olive",
+                    "orange",
+                    "pink",
+                    "purple",
+                    "red",
+                    "silver",
+                    "slate",
+                    "teal",
+                    "transparent",
+                    "violet",
+                    "white",
+                    "yellow"
+                  ],
+                  "description": "A named colour (§22.1)."
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "fill",
+          "description": "Interior colour: a named colour or `#rrggbb`. `none` draws an unfilled shape."
+        },
+        "stroke": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$",
+                  "description": "A hex colour, `#rgb` or `#rrggbb`."
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "amber",
+                    "black",
+                    "blue",
+                    "brown",
+                    "cyan",
+                    "gray",
+                    "green",
+                    "grey",
+                    "indigo",
+                    "lime",
+                    "magenta",
+                    "maroon",
+                    "navy",
+                    "none",
+                    "olive",
+                    "orange",
+                    "pink",
+                    "purple",
+                    "red",
+                    "silver",
+                    "slate",
+                    "teal",
+                    "transparent",
+                    "violet",
+                    "white",
+                    "yellow"
+                  ],
+                  "description": "A named colour (§22.1)."
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "stroke",
+          "description": "Outline colour, and — on a cable or a tunnel — the colour of the line itself."
+        },
+        "strokeWidth": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 20.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "strokeWidth",
+          "description": "Outline width in points, greater than 0 and at most 20."
+        },
+        "dash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "solid",
+                "dashed",
+                "dotted",
+                "bold"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "dash",
+          "description": "Line pattern: `solid`, `dashed`, `dotted` or `bold`. `bold` is a width rather than a pattern, spelled as Graphviz spells it because the built-in palette already is."
+        },
+        "fontColor": {
+          "anyOf": [
+            {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$",
+                  "description": "A hex colour, `#rgb` or `#rrggbb`."
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "amber",
+                    "black",
+                    "blue",
+                    "brown",
+                    "cyan",
+                    "gray",
+                    "green",
+                    "grey",
+                    "indigo",
+                    "lime",
+                    "magenta",
+                    "maroon",
+                    "navy",
+                    "none",
+                    "olive",
+                    "orange",
+                    "pink",
+                    "purple",
+                    "red",
+                    "silver",
+                    "slate",
+                    "teal",
+                    "transparent",
+                    "violet",
+                    "white",
+                    "yellow"
+                  ],
+                  "description": "A named colour (§22.1)."
+                }
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "fontColor",
+          "description": "Label colour."
+        },
+        "fontSize": {
+          "anyOf": [
+            {
+              "maximum": 96,
+              "minimum": 6,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "fontSize",
+          "description": "Label size in points, between 6 and 96."
+        },
+        "shape": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "box",
+                "rounded",
+                "ellipse",
+                "circle",
+                "diamond",
+                "hexagon",
+                "triangle",
+                "cylinder",
+                "box3d",
+                "folder",
+                "note",
+                "parallelogram",
+                "trapezium",
+                "plaintext"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "shape",
+          "description": "The glyph the node is drawn as. Ignored on a cable or a tunnel, which has no shape."
+        },
+        "icon": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$",
+              "description": "A picture in the icon theme, or 'none' for a plain shape."
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "icon",
+          "description": "Picture to draw this one element as, overriding what the `--icons` theme picks for its kind. A bare name resolved inside the theme directory; `none` draws the plain shape."
+        },
+        "opacity": {
+          "anyOf": [
+            {
+              "maximum": 1.0,
+              "minimum": 0.0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "opacity",
+          "description": "How opaque the element is drawn, from 0 (invisible) to 1."
+        }
+      },
+      "title": "Style",
+      "type": "object"
+    },
     "Switch": {
       "additionalProperties": false,
       "description": "A VLAN-aware layer-2 bridge.",
@@ -3676,6 +4027,19 @@
           "title": "power",
           "description": "What the device draws, which PDU outlets feed it, and how much PoE it hands out (§17.2). Absent means the inventory records nothing about its power.\n\nYANG: `/eo-mib:eoPowerTable/eoPowerEntry`"
         },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Style"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "style",
+          "description": "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
+        },
         "from": {
           "type": "string",
           "title": "from",
@@ -3754,6 +4118,130 @@
         "assertions"
       ],
       "title": "TestSuiteSpec",
+      "type": "object"
+    },
+    "Theme": {
+      "additionalProperties": false,
+      "description": "A ``kind: theme`` document.",
+      "properties": {
+        "apiVersion": {
+          "const": "netgraph.dev/v1alpha1",
+          "title": "apiVersion",
+          "type": "string",
+          "description": "Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`."
+        },
+        "kind": {
+          "const": "theme",
+          "title": "kind",
+          "type": "string",
+          "description": "Selects the shape of `spec`. A stylesheet: selectors — by kind, name, namespace, role or label — each mapping onto a `style` block. Unlike every other kind it is not applied by being in the tree: a rendering styles itself with the one `--theme` names, and this is only checked here."
+        },
+        "metadata": {
+          "$ref": "#/$defs/Metadata",
+          "title": "metadata",
+          "description": "Identity, description, labels and annotations."
+        },
+        "spec": {
+          "$ref": "#/$defs/ThemeSpec",
+          "title": "spec",
+          "description": "The body of a `theme` document: the styling rules, in declaration order. A theme is not applied by being in the tree — a rendering styles itself with the one `--theme` names — so this is checked here and used there."
+        }
+      },
+      "required": [
+        "apiVersion",
+        "kind",
+        "metadata",
+        "spec"
+      ],
+      "title": "Theme",
+      "type": "object"
+    },
+    "ThemeRule": {
+      "additionalProperties": false,
+      "description": "One ``select`` / ``style`` pair.",
+      "properties": {
+        "select": {
+          "$ref": "#/$defs/ThemeSelector"
+        },
+        "style": {
+          "$ref": "#/$defs/Style"
+        }
+      },
+      "required": [
+        "style"
+      ],
+      "title": "ThemeRule",
+      "type": "object"
+    },
+    "ThemeSelector": {
+      "additionalProperties": false,
+      "description": "Which elements one theme rule applies to (§22.3).\n\nEvery declared clause must hold. An empty selector matches everything.",
+      "properties": {
+        "kind": {
+          "default": [],
+          "items": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Kind",
+          "type": "array"
+        },
+        "name": {
+          "default": [],
+          "items": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Name",
+          "type": "array"
+        },
+        "namespace": {
+          "default": [],
+          "items": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Namespace",
+          "type": "array"
+        },
+        "role": {
+          "default": [],
+          "items": {
+            "maxLength": 253,
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Role",
+          "type": "array"
+        },
+        "label": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Label",
+          "type": "object"
+        }
+      },
+      "title": "ThemeSelector",
+      "type": "object"
+    },
+    "ThemeSpec": {
+      "additionalProperties": false,
+      "description": "``spec`` of a ``theme`` document: the rules, in declaration order.",
+      "properties": {
+        "rules": {
+          "items": {
+            "$ref": "#/$defs/ThemeRule"
+          },
+          "maxItems": 1000,
+          "title": "Rules",
+          "type": "array"
+        }
+      },
+      "title": "ThemeSpec",
       "type": "object"
     },
     "Tunnel": {
@@ -3954,6 +4442,19 @@
           "default": null,
           "title": "label",
           "description": "Free-text identifier printed on the edge, as a cable's `label` is."
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Style"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "style",
+          "description": "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
         }
       },
       "required": [
@@ -4176,6 +4677,19 @@
           "title": "ssh_keys",
           "type": "array",
           "description": "Public keys the account authenticates with, `<algorithm> <base64> [comment]`. Normalised to single spaces; a private key is refused (`NG-S002`).\n\nYANG: `/ietf-system:system/authentication/user/authorized-key`"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Style"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "style",
+          "description": "How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette."
         }
       },
       "title": "UserSpec",

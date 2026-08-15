@@ -51,6 +51,7 @@ from netgraph.models.element import (
     NOTE_KIND,
     TEMPLATE_KIND,
     TEST_SUITE_KIND,
+    THEME_KIND,
     ElementBase,
 )
 from netgraph.models.fielddocs import (
@@ -74,8 +75,10 @@ from netgraph.models.scalars import (
     MIN_VLAN_ID,
     VLAN_SET_PATTERN,
 )
+from netgraph.models.style import DASHES, ICON_NAME_PATTERN, NAMED_COLOURS, SHAPES
 from netgraph.models.template import INHERIT_KEY
 from netgraph.models.testsuite import TestSuite
+from netgraph.models.theme import Theme as ThemeDocument
 
 __all__ = [
     "SCHEMA_DIALECT",
@@ -116,6 +119,9 @@ _LAYOUT_DEF: Final = "Layout"
 #: Name of the ``$defs`` entry holding the ``kind: testsuite`` envelope (§20).
 _TEST_SUITE_DEF: Final = "TestSuite"
 
+#: Name of the ``$defs`` entry holding the ``kind: theme`` envelope (§22.3).
+_THEME_DEF: Final = "Theme"
+
 #: Names of the ``$defs`` entries holding the three annotation envelopes (§21).
 _NOTE_DEF: Final = "Note"
 _AREA_DEF: Final = "Area"
@@ -131,6 +137,7 @@ _SIDECAR_MODELS: Final[dict[str, type[NetgraphModel]]] = {
     NOTE_KIND: Note,
     AREA_KIND: Area,
     LEGEND_KIND: Legend,
+    THEME_KIND: ThemeDocument,
 }
 
 #: Where each sidecar's envelope lands in ``$defs``.
@@ -140,6 +147,7 @@ _SIDECAR_DEFS: Final[dict[str, str]] = {
     NOTE_KIND: _NOTE_DEF,
     AREA_KIND: _AREA_DEF,
     LEGEND_KIND: _LEGEND_DEF,
+    THEME_KIND: _THEME_DEF,
 }
 
 #: What each sidecar's ``spec`` holds, for the hover text on the key itself.
@@ -158,6 +166,11 @@ _SIDECAR_SPEC_NOTES: Final[dict[str, str]] = {
         "round them is drawn."
     ),
     LEGEND_KIND: "The body of a `legend` document: the key, and which corner it sits in.",
+    THEME_KIND: (
+        "The body of a `theme` document: the styling rules, in declaration order. A theme "
+        "is not applied by being in the tree — a rendering styles itself with the one "
+        "`--theme` names — so this is checked here and used there."
+    ),
 }
 _TEMPLATE_SPEC_DEF: Final = "TemplateSpec"
 
@@ -397,6 +410,33 @@ _SHORTHANDS: Final[dict[str, Any]] = {
 #: ``(definition, property)`` → the schema to use instead of what pydantic
 #: inferred. These are scalars behind a ``BeforeValidator``, which pydantic can
 #: only describe as "a string" or "an integer".
+#: A style colour (§22.1): a hex literal, or a name from the closed vocabulary.
+#: Spelled as a union rather than as one pattern so an editor offers the names
+#: as *completions* — which is the whole reason the vocabulary is closed and
+#: small, and is invisible to a reader given a regular expression instead.
+_STYLE_COLOUR_SCHEMA: Final[dict[str, Any]] = {
+    "anyOf": [
+        {
+            "type": "string",
+            "pattern": "^#(?:[0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$",
+            "description": "A hex colour, `#rgb` or `#rrggbb`.",
+        },
+        {
+            "type": "string",
+            "enum": sorted(NAMED_COLOURS),
+            "description": "A named colour (§22.1).",
+        },
+    ]
+}
+
+#: The icon-name grammar. A bare name inside the ``--icons`` theme; never a
+#: path, which is what keeps a shared manifest from reaching outside it.
+_ICON_NAME_SCHEMA: Final[dict[str, Any]] = {
+    "type": "string",
+    "pattern": ICON_NAME_PATTERN,
+    "description": "A picture in the icon theme, or 'none' for a plain shape.",
+}
+
 _SCALAR_PROPERTIES: Final[dict[tuple[str, str], dict[str, Any]]] = {
     ("Interface", "mac"): _MAC_SCHEMA,
     ("BridgeConfig", "address"): _MAC_SCHEMA,
@@ -405,6 +445,14 @@ _SCALAR_PROPERTIES: Final[dict[tuple[str, str], dict[str, Any]]] = {
     ("PatchPanelSpec", "ports"): _PORT_RANGE_SCHEMA,
     ("PatchPanelSpec", "couplers"): _COUPLERS_SCHEMA,
     ("PduSpec", "outlets"): _OUTLET_RANGE_SCHEMA,
+    # §22: the four fields behind a ``BeforeValidator``, so that the LSP and
+    # the editor offer the vocabulary rather than accepting any string.
+    ("Style", "fill"): _STYLE_COLOUR_SCHEMA,
+    ("Style", "stroke"): _STYLE_COLOUR_SCHEMA,
+    ("Style", "fontColor"): _STYLE_COLOUR_SCHEMA,
+    ("Style", "dash"): {"type": "string", "enum": list(DASHES)},
+    ("Style", "shape"): {"type": "string", "enum": list(SHAPES)},
+    ("Style", "icon"): _ICON_NAME_SCHEMA,
 }
 
 

@@ -39,6 +39,7 @@ from netgraph.render import (
     RenderOptions,
     aggregate_graph,
     build_graph,
+    load_theme,
     render_text,
     suffix_for,
 )
@@ -51,6 +52,11 @@ GOLDEN_DIR = FIXTURES / "golden"
 
 #: The text formats a golden is kept for.
 FORMATS = ("dot", "mermaid", "json")
+
+#: The stylesheet the ``styled`` fixture is drawn with (§22). Loaded from the
+#: tree it styles rather than declared here, so the golden pins down the file a
+#: reader can open beside it.
+STYLED_THEME = load_theme(str(FIXTURES / "styled" / "theme.yaml"))
 
 
 @dataclass(frozen=True)
@@ -212,6 +218,28 @@ CASES = (
         options=RenderOptions(show_ips=False, show_vlans=False),
         aggregate=AggregateSpec(collapse=("sites/north",)),
         formats=("dot", "json"),
+    ),
+    Case(
+        # Appearance, with nothing to say about it: the same tree the themed case
+        # below draws, with every style block in it ignored. The two goldens
+        # differ by exactly what §22 does, which is what makes the pair worth
+        # keeping rather than either one alone.
+        name="styled-l1-plain",
+        example="styled",
+        layer=Layer.L1,
+        options=RenderOptions(title="Styled, unstyled", styling=False),
+        fixture=True,
+    ),
+    Case(
+        # Every rung of the ladder at once: an element that wins outright, one
+        # that sets a single field and inherits the rest, two switches told apart
+        # only by a role, a namespace rule, a label rule, a styled cable, and an
+        # opacity that reaches the output as an alpha pair on a colour.
+        name="styled-l1-themed",
+        example="styled",
+        layer=Layer.L1,
+        options=RenderOptions(title="Styled, themed", theme=STYLED_THEME),
+        fixture=True,
     ),
     Case(
         # The default: a declared four-member LAG drawn as one edge, the two

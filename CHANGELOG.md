@@ -18,6 +18,44 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **Per-element styling, with a theme layer and an editor style panel.** Every diagram
+  looked identical, because appearance was entirely implicit. Now it is inventory data:
+  an optional `style` block ([§22](docs/schema.md#22-per-element-styling-and-themes)) on
+  every drawable kind and on cables and tunnels, carrying `fill`, `stroke`, `strokeWidth`,
+  `dash`, `fontColor`, `fontSize`, `shape`, `icon` and `opacity`. The vocabulary is closed
+  — a hex literal or one of twenty-six named colours, and a small enum or a bounded number
+  for everything else — because these values end up inside Graphviz attributes and mxGraph
+  style strings, and a free-form pass-through would be an injection. A typo is answered
+  with the nearest legal spelling (`'navvy' is not a colour … did you mean 'navy'?`),
+  under `NG-Z001`.
+
+  **Themes.** A `kind: theme` document maps selectors — by kind, name, namespace glob,
+  role or label — onto style blocks. `netgraph render --theme NAME|PATH` applies one; two
+  ship (`blueprint`, `mono`); `[render] theme` in `netgraph.toml` sets the default and a
+  `[theme]` table declares an inventory's own rules inline. Precedence is documented and
+  resolved field by field: an element's own `style`, then the theme's rules (most clauses
+  first, a tie broken by the later declaration), then the icon set, then the built-in
+  palette — so a theme that sets a fill does not take a shape away.
+
+  **Everywhere it is drawn.** The Graphviz backends and the draw.io export honour all nine
+  fields; a colour chosen in a manifest opens in draw.io as that colour. `-f json` publishes
+  the resolved style beside each node and edge with a `from` map naming which layer chose
+  each value. Mermaid restates the palette as `classDef` rules and has nowhere to put a
+  per-element one, so it ignores them.
+
+  **In the editor.** <kbd>Ctrl-Shift-Y</kbd> — or **Change how it looks…** in the context
+  menu — opens a docked inspector showing the resolved style of the selection, which layer
+  each value came from, and the controls to change it. A change is a batched `Set` on
+  `spec.style.*` over the whole selection: one entry in the changes drawer, one
+  <kbd>Ctrl-Z</kbd>. **Reset to theme** *unsets* the field rather than writing the
+  inherited value, because writing it would pin today's theme into the document and break
+  the inheritance the button is named after.
+
+  `--no-style` renders the plain diagram from the built-in palette alone — the answer to
+  "is this odd because of the network or because of the stylesheet?" — and `W144`/`W145`
+  catch a style that defeats itself: an element faded to nothing, a label the colour of the
+  box behind it. See [`docs/styling.md`](docs/styling.md).
+
 - **Annotations in the editor.** The notes, areas and legends of
   [§21](docs/schema.md#21-diagram-annotations-notes-areas-and-legends) could be written in
   YAML and drawn by every backend, and were the one part of an inventory the canvas could
@@ -734,6 +772,28 @@ publish a version whose section is missing or empty — see
 
 ### Fixed
 
+- **Orthogonal links were drawn straight across the devices they passed.** An arranged
+  diagram with `routing: orthogonal` routed each leg locally and avoided nothing, so a
+  cable between two switches with a third between them was drawn across the third one's
+  box — the most visible thing wrong with a hand-arranged picture, recorded as
+  [`docs/follow-ups.md` §19](docs/follow-ups.md) and left there for four releases because
+  nobody had a number for it. There is one now: `tools/route_crossings.py` counts the
+  links whose line runs across a box they are not attached to, and on the committed
+  fixtures it goes from five and three to **zero**.
+
+  Routes now go **around**. Every placed node — and every free-standing `area` and placed
+  `note` — becomes an obstacle, and an A\* over their Hanan grid finds the cheapest way
+  past, charging for bends, for crossing a line already drawn and for crowding a channel.
+  Several links between the same two devices route as one bundle in parallel lanes rather
+  than as separate detours that fan out and re-converge.
+
+  **Nothing you placed is moved, and nothing is written to your files.** A bend you
+  dragged is authoritative — routing fills the segments between bends and never touches
+  one — and a link whose line already keeps clear renders byte-identically to before. A
+  computed route is recomputed every render; `-f json` publishes it as `layout.routed`
+  beside the bends the inventory pins, and in `netgraph web` `Shift-R` (**Pin the computed
+  route**) is what makes one permanent. `--no-avoid`, or `avoid = false` in `[render]`,
+  turns it off. See [`docs/rendering.md`](docs/rendering.md#routing-around-things).
 - **netgraph could not be imported on Python 3.11, and the timeline crashed on 3.10.** Two
   separate instances of the same shape of problem, both found by the CI matrix and neither
   reachable from the version the work was done on. `netgraph lsp` declared a `mappingproxy`

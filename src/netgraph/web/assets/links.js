@@ -609,6 +609,35 @@ window.netgraphLinks = (function () {
     return true;
   }
 
+  /** Turn the bends netgraph computed into bends this document declares.
+   *
+   * `routed` is what netgraph.layout.avoid worked out so the line misses the
+   * boxes it passes; it is recomputed on every render and carries no handle.
+   * This writes it into the layout document, at which point it is an authored
+   * route like any other -- handles on every bend, never recomputed, and left
+   * exactly where it is when somebody drags a device past it. The one-way door
+   * is the point: a computed route is a suggestion until a person says it is
+   * the answer.
+   */
+  function pinRoute() {
+    var id = picked;
+    if (!id || !frame.links[id]) { return refuse(); }
+    var link = frame.links[id];
+    var computed = link.routed || [];
+    if (!computed.length) {
+      if (ctx) {
+        ctx.refuse(id + " needed no detour, so there is no computed route to pin");
+      }
+      return false;
+    }
+    link.waypoints = computed.map(function (point) {
+      return { x: round(point.x), y: round(point.y) };
+    });
+    paint();
+    commit(id, "pinned the computed route of " + id);
+    return true;
+  }
+
   /** Put a nudged label back on the line. */
   function resetLabel() {
     var id = picked;
@@ -648,6 +677,7 @@ window.netgraphLinks = (function () {
     bend: bend,
     straighten: straighten,
     route: route,
+    pinRoute: pinRoute,
     resetLabel: resetLabel,
     hasLink: hasLink,
     dragging: function () { return !!drag; },

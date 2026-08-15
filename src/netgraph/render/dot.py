@@ -108,6 +108,7 @@ from collections.abc import Container, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from pathlib import Path
+from types import MappingProxyType
 from typing import Final
 
 from jinja2 import Environment, PackageLoader, StrictUndefined
@@ -176,10 +177,9 @@ from netgraph.render.palette import (
     DEFAULT_NODE_PALETTE,
     EDGE_PALETTE,
     NODE_PALETTE,
-    edge_style_for,
-    node_style_for,
 )
-from netgraph.render.routes import anchors_of, default_routing, route_table
+from netgraph.render.routes import anchors_of, default_routing, route_plan, route_table
+from netgraph.render.styles import ResolvedStyle, StyleMap, dot_shape
 
 __all__ = [
     "CLUSTER_PALETTE",
@@ -497,10 +497,13 @@ class _NodeView:
     #: ``URL`` attribute to emit; see :mod:`netgraph.render.links`.
     url: str | None = None
     #: Outline width, and the colour of every label the node's HTML table does
-    #: not colour itself. Both are ``None`` unless a highlight is in force, so a
-    #: rendering without one is byte-identical to what it always was.
+    #: not colour itself. ``None`` unless a highlight, a diff or a resolved
+    #: style (§22) asks for one, so a rendering with none of the three is
+    #: byte-identical to what it always was.
     penwidth: str | None = None
     fontcolor: str | None = None
+    #: Label size in points; set only by a resolved style.
+    fontsize: str | None = None
     #: ``pos`` attribute: the stored centre of the node, in points, with a
     #: trailing ``!`` when the node is pinned inside an otherwise free layout.
     #: ``None`` when the arrangement does not place this node.
@@ -520,9 +523,11 @@ class _EdgeView:
     element_id: str | None = None
     #: ``URL`` attribute to emit; see :mod:`netgraph.render.links`.
     url: str | None = None
-    #: Label colour; set only under a highlight, for the same reason as
-    #: :attr:`_NodeView.fontcolor`.
+    #: Label colour; set under a highlight or by a resolved style, for the
+    #: same reason as :attr:`_NodeView.fontcolor`.
     fontcolor: str | None = None
+    #: Label size in points; set only by a resolved style.
+    fontsize: str | None = None
     #: Graphviz layout weight. Set only on a bundled edge, where it is the
     #: number of links folded in: four cables between two switches should pull
     #: them together four times as hard as one, which is what keeps a LAG short
@@ -753,6 +758,7 @@ def routing_advisories(graph: Graph, options: RenderOptions | None = None) -> tu
                 "and may stop short of the shape. Re-run 'netgraph layout --write' to "
                 "record the sizes"
             )
+        said.extend(_detour_advisories(graph, opts))
         return tuple(said)
 
     default = default_routing(graph, opts)
@@ -777,6 +783,46 @@ def routing_advisories(graph: Graph, options: RenderOptions | None = None) -> tu
             "with 'netgraph layout --write' to place them exactly"
         )
     return tuple(said)
+
+
+def _detour_advisories(graph: Graph, options: RenderOptions) -> Iterator[str]:
+    """Links obstacle avoidance gave up on, grouped by the reason it gave up.
+
+    The cut-offs in :mod:`netgraph.layout.avoid` exist so that a large, dense
+    diagram does not spend a minute routing itself, and a cut-off that is not
+    reported is indistinguishable from a router that does not work: the reader
+    sees a line through a box either way. So each one comes out here, in the
+    vocabulary of the knob that lifts it, and grouped — a drawing that hit the
+    window bound will normally have hit it a hundred times, and a hundred lines
+    saying the same thing is a wall nobody reads.
+    """
+    if not options.avoid:
+        return
+    plan = route_plan(graph, options)
+    if not plan.detours:
+        return
+    grouped: dict[str, list[str]] = {}
+    for detour in plan.detours:
+        grouped.setdefault(detour.reason, []).append(detour.link)
+    fixes = {
+        "window": (
+            "run across too crowded a part of the diagram to search; they are drawn "
+            "without avoiding obstacles. Spread the devices out, draw less of the "
+            "network with '--name' or '--namespace', or accept it with '--no-avoid'"
+        ),
+        "budget": (
+            "took more steps to route than the search is allowed; they are drawn "
+            "without avoiding obstacles. Usually a device boxed in by its neighbours: "
+            "move one, or drop a bend of your own to say which way the cable goes"
+        ),
+        "unreachable": (
+            "have no clear orthogonal route at all, so they are drawn straight through. "
+            "Two shapes drawn on top of each other, or a corridor narrower than the "
+            "clearance: re-run 'netgraph layout --write' or move one of them"
+        ),
+    }
+    for reason, links in grouped.items():
+        yield (f"{count_text(len(links), 'link')} ({_names(sorted(set(links)))}) {fixes[reason]}")
 
 
 def _has_edge_labels(graph: Graph, options: RenderOptions) -> bool:
@@ -936,7 +982,7 @@ def to_dot(
             one routes everything.
     """
     opts = options or RenderOptions()
-    icons = _icon_files(graph, opts.icons, target=target)
+    look = _look(graph, opts, target=target)
     # The ids are computed whether or not they are *emitted*: they are how a
     # detail record is keyed, so the tooltips need them even when the document
     # itself stays anonymous. A rendering that wants neither pays for neither.
@@ -948,7 +994,7 @@ def to_dot(
     # An area is a cluster when the engine is laying the graph out and a
     # background rectangle when it is not, so exactly one of the two lists is
     # ever non-empty and a node is never boxed twice.
-    areas = () if fixed else _area_groups(graph, annotations, opts, icons, identity, details, plan)
+    areas = () if fixed else _area_groups(graph, annotations, opts, look, identity, details, plan)
     frames = (*_frames(graph, opts, plan), *_area_frames(annotations, plan)) if fixed else ()
     template = _environment().get_template(_TEMPLATE_NAME)
     return template.render(
@@ -965,14 +1011,14 @@ def to_dot(
         # ``route_edges``.
         splines=(_SPLINES_ATTRIBUTE[default_routing(graph, opts)] if route_edges else "false"),
         areas=areas,
-        groups=_groups(graph, opts, icons, identity, details, plan, skip=frozenset(_boxed(areas))),
+        groups=_groups(graph, opts, look, identity, details, plan, skip=frozenset(_boxed(areas))),
         notes=_note_views(annotations, opts, plan),
         legends=_legend_views(graph, annotations, opts, plan),
         edges=(
-            *_edge_views(graph, opts, identity, details, plan),
+            *_edge_views(graph, opts, look, identity, details, plan),
             *_leader_views(annotations),
         ),
-        imagepath=str(opts.icons.directory) if icons and opts.icons is not None else None,
+        imagepath=(str(opts.icons.directory) if look.icons and opts.icons is not None else None),
         icon_width=_ICON_BOX[0],
         icon_height=_ICON_BOX[1],
         # ``inputscale`` tells neato that a pinned ``pos`` is in points rather
@@ -986,17 +1032,49 @@ def to_dot(
     )
 
 
-def _icon_files(graph: Graph, theme: IconTheme | None, *, target: str) -> Mapping[str, str]:
-    """The icon file name to draw each kind in ``graph`` with.
+@dataclass(frozen=True, slots=True)
+class _Look:
+    """What a rendering draws with: the resolved styles and the pictures.
 
-    Only the kinds actually present are resolved, so a theme is never asked for
+    One value threaded through the view builders instead of two, because the
+    two are asked about together every time — a node's icon is a *field* of
+    its resolved style (§22), so a builder holding one and not the other could
+    not draw a node at all.
+    """
+
+    styles: StyleMap
+    #: Icon *name* -> file name inside the theme directory. Keyed by name
+    #: rather than by kind: ``spec.style.icon`` lets one element borrow
+    #: another glyph, so the kind is only the default name.
+    icons: Mapping[str, str] = MappingProxyType({})
+
+    def image(self, style: ResolvedStyle) -> str | None:
+        """The file to draw this node as, or ``None`` for a plain shape."""
+        return self.icons.get(style.icon) if style.icon else None
+
+
+def _look(graph: Graph, options: RenderOptions, *, target: str) -> _Look:
+    """Resolve every style in ``graph``, and find the pictures they ask for."""
+    styles = StyleMap.build(
+        graph,
+        theme=options.theme,
+        icons=options.icons,
+        output=target,
+        styling=options.styling,
+    )
+    return _Look(styles=styles, icons=_icon_files(styles, options.icons, target=target))
+
+
+def _icon_files(styles: StyleMap, theme: IconTheme | None, *, target: str) -> Mapping[str, str]:
+    """The icon file name behind each icon *name* this drawing asks for.
+
+    Only the names actually wanted are resolved, so a theme is never asked for
     a picture the diagram has no use for, and a diagram of nothing but computers
     does not carry an ``imagepath`` for icons it never draws.
     """
     if theme is None:
         return {}
-    kinds = sorted({node.kind for node in graph.nodes.values()})
-    return theme.files(kinds, prefer=suffix_order(target))
+    return theme.files(styles.kinds_with_icons(), prefer=suffix_order(target))
 
 
 def run_graphviz(
@@ -1099,7 +1177,7 @@ def to_image(graph: Graph, options: RenderOptions | None = None, *, format: str)
     plan = layout_plan(graph)
     source = to_dot(graph, opts, target=format)
     theme = opts.icons
-    icons = _icon_files(graph, theme, target=format)
+    icons = _look(graph, opts, target=format).icons
     payload, stderr = run_graphviz(source, format=format, plan=plan)
     if icons:
         # An unreadable icon is the one warning worth escalating: Graphviz
@@ -1350,7 +1428,7 @@ def _dot_string(value: object) -> Markup:
 def _groups(
     graph: Graph,
     options: RenderOptions,
-    icons: Mapping[str, str],
+    look: _Look,
     identity: ElementIds,
     details: Mapping[str, Mapping[str, object]],
     plan: LayoutPlan,
@@ -1375,17 +1453,17 @@ def _groups(
             cannot both hold it; see :func:`_area_groups` for the precedence.
     """
     if graph.clusters:
-        return _cluster_groups(graph, options, icons, identity, details, plan, skip=skip)
+        return _cluster_groups(graph, options, look, identity, details, plan, skip=skip)
 
     if not options.group_by_namespace:
         loose = [node for node in graph.nodes.values() if node.fqn not in skip]
-        nodes = _node_views(graph, loose, options, icons, identity, details, plan)
+        nodes = _node_views(graph, loose, options, look, identity, details, plan)
         return (_GroupView(nodes=tuple(nodes)),)
 
     groups: list[_GroupView] = []
     for index, namespace in enumerate(graph.namespaces):
         members = [node for node in graph.nodes_in(namespace) if node.fqn not in skip]
-        views = tuple(_node_views(graph, members, options, icons, identity, details, plan))
+        views = tuple(_node_views(graph, members, options, look, identity, details, plan))
         if not namespace:
             groups.append(_GroupView(nodes=views))
             continue
@@ -1412,7 +1490,7 @@ def _groups(
 def _cluster_groups(
     graph: Graph,
     options: RenderOptions,
-    icons: Mapping[str, str],
+    look: _Look,
     identity: ElementIds,
     details: Mapping[str, Mapping[str, object]],
     plan: LayoutPlan,
@@ -1430,7 +1508,7 @@ def _cluster_groups(
             graph,
             [node for node in graph.nodes.values() if not node.cluster and node.fqn not in skip],
             options,
-            icons,
+            look,
             identity,
             details,
             plan,
@@ -1443,7 +1521,7 @@ def _cluster_groups(
             continue
         groups.append(
             _GroupView(
-                nodes=tuple(_node_views(graph, members, options, icons, identity, details, plan)),
+                nodes=tuple(_node_views(graph, members, options, look, identity, details, plan)),
                 # Offset past the namespace clusters' numbering space so the two
                 # groupings can never mint the same subgraph name.
                 id=f"cluster_vrf_{index}",
@@ -1480,14 +1558,21 @@ def _node_views(
     graph: Graph,
     nodes: Iterable[Node],
     options: RenderOptions,
-    icons: Mapping[str, str],
+    look: _Look,
     identity: ElementIds,
     details: Mapping[str, Mapping[str, object]],
     plan: LayoutPlan,
 ) -> Iterator[_NodeView]:
     for node in nodes:
         placement = plan.geometry.nodes.get(node.fqn)
-        shape, fill, stroke = node_style_for(node.kind)
+        # The resolved style is the *baseline*: the element's own block, the
+        # theme's, the icon set's and finally the palette's (§22). A highlight
+        # and a diff are overlays and are applied over the top of it, because
+        # a deleted device drawn in the colour somebody chose for it would
+        # make the diff unreadable.
+        style = look.styles.node(node.fqn)
+        fill, stroke = style.faded_fill or "", style.faded_stroke or ""
+        fontcolor, penwidth = style.faded_font_color, style.penwidth
         emphasis = _node_emphasis(node, options.highlight)
         if emphasis is not None:
             fill, stroke = emphasis.fill or fill, emphasis.stroke
@@ -1498,7 +1583,9 @@ def _node_views(
         if options.diff is not None:
             emphasis = _diff_emphasis(mark)
             fill, stroke = emphasis.fill or fill, emphasis.stroke
-        image = icons.get(node.kind)
+        if emphasis is not None:
+            fontcolor, penwidth = emphasis.fontcolor, emphasis.penwidth
+        image = look.image(style)
         element = identity.node(node.fqn)
         record = details.get(element) if element is not None else None
         yield _NodeView(
@@ -1509,10 +1596,10 @@ def _node_views(
             # away rather than drawn around it. The palette stays on the view
             # because the icon carries the same colours: a theme without a
             # picture for this kind falls back to the shape, in one diagram.
-            shape="none" if image else shape,
+            shape="none" if image else dot_shape(style.shape),
             fill=fill,
             stroke=stroke,
-            style="" if image else _diff_style(_node_style(node), mark),
+            style="" if image else _diff_style(_node_style(node, style), mark),
             # A tooltip is a DOT string, not HTML, so its line breaks are
             # meaningful and are kept.
             tooltip=detail_text(record) if record is not None else None,
@@ -1524,8 +1611,9 @@ def _node_views(
             image=image,
             element_id=element if options.element_ids else None,
             url=_node_url(graph, node, options.link_template),
-            penwidth=emphasis.penwidth if emphasis is not None else None,
-            fontcolor=emphasis.fontcolor if emphasis is not None else None,
+            penwidth=penwidth,
+            fontcolor=fontcolor,
+            fontsize=None if style.font_size is None else str(style.font_size),
             # A stored *size* is deliberately not emitted. Graphviz derives the
             # same box from the same label, so pinning it would buy nothing and
             # a rounded value would clip a label by a hundredth of a point. The
@@ -1693,8 +1781,38 @@ def _subtitle(node: Node) -> str:
     return f"[{node.kind}]"
 
 
-def _node_style(node: Node) -> str | None:
-    """The ``style`` override for a node, or ``None`` to inherit ``filled``."""
+def _node_style(node: Node, style: ResolvedStyle) -> str | None:
+    """The ``style`` override for a node, or ``None`` to inherit ``filled``.
+
+    Two things end up in this one Graphviz attribute: what the *node type* is
+    drawn as — derived things rounded, non-physical ones dashed — and what a
+    resolved style asks for. They are combined rather than one replacing the
+    other, so painting a subnet node navy does not also square its corners.
+    """
+    return _combine_style(_kind_style(node), style)
+
+
+def _combine_style(base: str | None, style: ResolvedStyle) -> str | None:
+    """``base`` with the resolved shape and dash folded in.
+
+    ``None`` in and nothing to add gives ``None`` out, which leaves the
+    attribute off the node entirely and the graph-wide ``style=filled``
+    inherited — the bytes an unstyled rendering has always produced.
+    """
+    extra = []
+    if style.shape == "rounded":
+        extra.append("rounded")
+    if style.dash is not None and style.dash != "solid":
+        extra.append(style.dash)
+    if not extra:
+        return base
+    parts = [part for part in (base or "filled").split(",") if part]
+    parts.extend(part for part in extra if part not in parts)
+    return ",".join(parts)
+
+
+def _kind_style(node: Node) -> str | None:
+    """What the *node type* alone is drawn as, before any style is applied."""
     if node.is_subnet:
         # Rounded, for something derived rather than declared: the reader should
         # not go looking for a device with this name.
@@ -1880,7 +1998,7 @@ def _area_groups(
     graph: Graph,
     views: AnnotationViews,
     options: RenderOptions,
-    icons: Mapping[str, str],
+    look: _Look,
     identity: ElementIds,
     details: Mapping[str, Mapping[str, object]],
     plan: LayoutPlan,
@@ -1920,7 +2038,7 @@ def _area_groups(
             _AreaGroupView(
                 id=f"cluster_area_{index}",
                 label=area.label,
-                nodes=tuple(_node_views(graph, members, options, icons, identity, details, plan)),
+                nodes=tuple(_node_views(graph, members, options, look, identity, details, plan)),
                 fill=area.fill,
                 stroke=area.stroke,
                 style=_area_style(area.border),
@@ -2211,6 +2329,7 @@ def _legend_pos(legend: LegendView, bounds: Box) -> str:
 def _edge_views(
     graph: Graph,
     options: RenderOptions,
+    look: _Look,
     identity: ElementIds,
     details: Mapping[str, Mapping[str, object]],
     plan: LayoutPlan,
@@ -2224,10 +2343,15 @@ def _edge_views(
     # diagram whose annotations have silently moved.
     floating = plan.mode is not LayoutMode.FIXED and default_style is Routing.ORTHOGONAL
     for index, edge in enumerate(graph.edges):
-        # Why the link is drawn decides how it looks, and the answer comes from
-        # the one table an ``auto: layers`` legend reads too (§21), so a swatch
-        # can never name a colour this drawing does not use.
-        colour, style = edge_style_for(edge)
+        # Why the link is drawn decides how it looks, and the default comes
+        # from the one table an ``auto: layers`` legend reads too (§21), so a
+        # swatch can never name a colour this drawing does not use. A link
+        # that says something about itself, or that a theme says something
+        # about, has already had it folded in by the resolver (§22).
+        resolved = look.styles.edge(index)
+        colour = resolved.faded_stroke or ""
+        style = resolved.dash or "solid"
+        fontcolor = resolved.faded_font_color
         emphasis = _edge_emphasis(edge, options.highlight)
         if emphasis is not None:
             colour = emphasis.stroke
@@ -2239,6 +2363,8 @@ def _edge_views(
             # question a reader has is not "copper or fibre" but "will it be
             # there". The medium is still on the label and in the tooltip.
             style = "dashed" if mark is Mark.REMOVED else style
+        if emphasis is not None:
+            fontcolor = emphasis.fontcolor
         element = identity.edge(index)
         record = details.get(element) if element is not None else None
         line = routes[index]
@@ -2260,13 +2386,21 @@ def _edge_views(
             # Under a highlight the width says "on the path" instead of "this
             # fast", because a reader looking at a traced route is asking the
             # first question; the rate is still on the label and in the tooltip.
-            penwidth=emphasis.penwidth if emphasis is not None else _penwidth(edge.speed),
+            penwidth=(
+                emphasis.penwidth
+                if emphasis is not None
+                # A declared width is a decision about *this link* and wins
+                # over the one the rate implies; with nothing declared the
+                # rate still speaks, as it always has.
+                else resolved.penwidth or _penwidth(edge.speed)
+            ),
             label=None if floating else label,
             xlabel=label if floating else None,
             tooltip=detail_text(record) if record is not None else None,
             element_id=element if options.element_ids else None,
             url=_edge_url(graph, edge, options.link_template),
-            fontcolor=emphasis.fontcolor if emphasis is not None else None,
+            fontcolor=fontcolor,
+            fontsize=None if resolved.font_size is None else str(resolved.font_size),
             weight=str(edge.bundle.size) if edge.bundle is not None else None,
             pos=None if line is None else _spline(line.controls),
             lp=_label_pos(line, plan.geometry.link(edge.id).label) if label else None,
