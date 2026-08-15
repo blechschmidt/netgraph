@@ -6,7 +6,7 @@ runs everywhere — a test skipped on Windows is a behaviour nothing checks ther
 so each mark below has to name a *capability the platform does not have*, not a
 platform netgraph has not been made to work on.
 
-That distinction is why these are five narrow marks rather than one
+That distinction is why these are six narrow marks rather than one
 ``skip_on_windows``. ``chmod(0o000)`` cannot make a directory unreadable on
 Windows because there are no permission bits to set; ``os.mkfifo`` does not exist
 there; a symlink needs a privilege an unelevated process does not hold. Those are
@@ -49,6 +49,7 @@ __all__ = [
     "requires_posix_shell",
     "requires_pwsh",
     "requires_symlinks",
+    "requires_unexpanded_globs",
 ]
 
 #: Windows, spelled once. ``os.name`` rather than ``sys.platform`` because the
@@ -112,6 +113,17 @@ requires_mkfifo = pytest.mark.skipif(
 requires_posix_shell = pytest.mark.skipif(
     shutil.which("sh") is None,
     reason="POSIX-only: no 'sh' to syntax-check the generated shell script with",
+)
+
+#: A wildcard that reaches the program it was typed for. On Windows it does not:
+#: the MSYS runtime Git Bash is built on expands wildcards in the arguments it
+#: hands to a *native* program, after the shell has finished with them — so
+#: ``set -f`` in the script cannot keep a glob a glob, and only ``MSYS=noglob``
+#: in the environment can. For the test that asserts the shell's half of that.
+requires_unexpanded_globs = pytest.mark.skipif(
+    ON_WINDOWS,
+    reason="POSIX-only: the MSYS runtime expands wildcards in the arguments Git Bash "
+    "hands to a native program, which no 'set -f' in the script can prevent",
 )
 
 

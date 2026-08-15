@@ -36,6 +36,7 @@ from netgraph.render import TEXT_FORMATS, suffix_for
 from platform_marks import (  # isort: skip -- tests/ is on sys.path, not a package
     ON_WINDOWS,
     requires_dot,
+    requires_unexpanded_globs,
 )
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -570,14 +571,7 @@ def test_the_render_step_passes_extra_arguments_through(
 
 
 @requires_bash
-@pytest.mark.skipif(
-    ON_WINDOWS,
-    reason=(
-        "the MSYS runtime Git Bash is built on expands wildcards in the arguments it hands "
-        "to a native program, after the shell has finished with them; 'set -f' cannot reach "
-        "that, and the step sets MSYS=noglob instead"
-    ),
-)
+@requires_unexpanded_globs
 def test_the_render_step_does_not_expand_a_glob_in_its_arguments(
     render_action: dict[str, Any], tmp_path: Path
 ) -> None:
