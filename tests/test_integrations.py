@@ -318,12 +318,7 @@ def environment_for(action: dict[str, Any], step_id: str, values: dict[str, str]
     environment = {}
     for variable, expression in step_of(action, step_id)["env"].items():
         matched = _INPUT_EXPRESSION.match(expression)
-        if matched is None:
-            # A constant, such as MSYS=noglob. It has to be set here too, or the
-            # step is run in an environment GitHub would not have given it.
-            assert "${{" not in expression, f"{variable} is neither an input nor a constant"
-            environment[variable] = expression
-            continue
+        assert matched is not None, f"{variable} is not a plain input reference: {expression}"
         name = matched.group(1)
         environment[variable] = values.get(name, defaults[name])
     return environment

@@ -118,8 +118,9 @@ requires_posix_shell = pytest.mark.skipif(
 #: A wildcard that reaches the program it was typed for. On Windows it does not:
 #: the MSYS runtime Git Bash is built on expands wildcards in the arguments it
 #: hands to a *native* program, after the shell has finished with them — so
-#: ``set -f`` in the script cannot keep a glob a glob, and only ``MSYS=noglob``
-#: in the environment can. For the test that asserts the shell's half of that.
+#: ``set -f`` in the script cannot keep a glob a glob. ``MSYS=noglob`` would,
+#: and also changes how the command line is taken apart, which broke more than
+#: it fixed; the platform is documented instead.
 requires_unexpanded_globs = pytest.mark.skipif(
     ON_WINDOWS,
     reason="POSIX-only: the MSYS runtime expands wildcards in the arguments Git Bash "

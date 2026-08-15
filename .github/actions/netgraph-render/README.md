@@ -115,13 +115,21 @@ asked for — an `<svg>` element for `html` and `svg`, `graph netgraph` for `dot
 a `flowchart` header for `mermaid`, a `nodes` array for `json` — so an empty or
 truncated page fails here rather than being published.
 
-**On a Windows runner, `args` is protected from the shell twice.** Globbing is
-off while the value is split, and the step sets `MSYS=noglob` — because the MSYS
-runtime Git Bash is built on expands wildcards in the arguments it hands to a
-*native* program, after bash has finished with them. Without it a
-`--name 'sw*'` filter would arrive at `netgraph.exe` as whatever the workspace
-happened to be holding. Paths are normalised to forward slashes for the same
-family of reasons; the `file` and `directory` outputs are reported that way.
+**A wildcard in `args` does not survive a Windows runner.** Globbing is off
+while the value is split, which settles it on Linux and macOS — but the shell is
+not the last thing to see the argument there: the MSYS runtime Git Bash is built
+on expands wildcards again when it hands argv to a *native* program, so
+`args: --name sw*` reaches `netgraph.exe` as whatever the workspace happened to
+be holding. Put the filter in `netgraph.toml` instead, where no shell touches
+it:
+
+```toml
+[render]
+name = ["sw*"]
+```
+
+Paths are normalised to forward slashes on the way through for the same family
+of reasons; `file` and `directory` are reported that way.
 
 **Validation runs first, as it does on the command line.** An inventory with a
 dangling cable refuses to render, because a diagram drawn from it would

@@ -194,12 +194,6 @@ runs:
         NETGRAPH_ARGS: ${{ inputs.args }}
         NETGRAPH_STRICT: ${{ inputs.strict }}
         NETGRAPH_FORCE: ${{ inputs.force }}
-        # Windows only, and nothing to do with the shell: the MSYS runtime Git
-        # Bash is built on expands wildcards in the arguments it hands to a
-        # *native* program, after bash has finished with them -- so a '--name
-        # sw*' in `args` would arrive at netgraph.exe as whatever the workspace
-        # happens to be holding. This turns that off. Ignored everywhere else.
-        MSYS: noglob
       run: |
         set -euo pipefail
 
@@ -258,6 +252,14 @@ runs:
         fi
         # Deliberately word-split, and with globbing off so a '*' in a --name
         # filter reaches netgraph instead of matching files in the checkout.
+        #
+        # That holds everywhere except a Windows runner, where the shell is not
+        # the last thing to see the argument: the MSYS runtime Git Bash is built
+        # on expands wildcards again when it hands argv to a *native* program.
+        # ``MSYS=noglob`` turns that off and also changes how the command line
+        # is taken apart, which is a worse trade than the problem. A filter with
+        # a wildcard in it belongs in netgraph.toml on that platform -- see the
+        # action's README.
         set -f
         for word in ${NETGRAPH_ARGS}; do
           args+=("${word}")

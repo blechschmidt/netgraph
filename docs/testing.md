@@ -82,7 +82,7 @@ does not have**, never for a platform:
 | five symlink cases: escaping the root, a cycle, reached twice, followed, dangling | creating a symlink needs `SeCreateSymbolicLinkPrivilege`, which an unelevated CI process does not hold. *Measured*, not assumed, so these do run on a machine with Developer Mode on | `requires_symlinks` |
 | a FIFO is not loaded; a FIFO is not a valid root | `os.mkfifo` does not exist on Windows, and a Windows named pipe is not a filesystem entry the loader could walk into | `requires_mkfifo` |
 | the generated route script passes `sh -n` | no POSIX shell. The script's *content* is still asserted line by line there; only the second opinion from `sh` is missing | `requires_posix_shell` |
-| a glob in the render action's `args` reaches netgraph unexpanded | the MSYS runtime Git Bash is built on expands wildcards in the arguments it hands to a *native* program, after the shell has finished with them — so `set -f` in the step cannot keep a glob a glob, and the step sets `MSYS=noglob` instead. That the argument arrives at all is still asserted there | `requires_unexpanded_globs` |
+| a glob in the render action's `args` reaches netgraph unexpanded | the MSYS runtime Git Bash is built on expands wildcards in the arguments it hands to a *native* program, after the shell has finished with them, so `set -f` in the step cannot keep a glob a glob. The action's README says where to put the filter instead; that `args` arrives at all is still asserted there | `requires_unexpanded_globs` |
 
 One more is skipped on **macOS** rather than on Windows, and by the same rule.
 `docs/commands/completion.md` documents what `netgraph completion bash` prints;
