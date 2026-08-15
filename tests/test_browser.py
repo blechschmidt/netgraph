@@ -3140,12 +3140,26 @@ def test_the_links_of_an_element_are_a_cycle_of_their_own(open_editor: OpenEdito
 
 
 def _tree(root: Path) -> dict[str, bytes]:
-    """Every file under ``root``, by relative path. The evidence for "untouched"."""
-    return {
-        path.relative_to(root).as_posix(): path.read_bytes()
-        for path in sorted(root.rglob("*"))
-        if path.is_file()
-    }
+    """Every file under ``root``, by relative path. The evidence for "untouched".
+
+    Two things are deliberately tolerated, and both are the same thing: this is
+    read *while the server is writing*, because a test polls it to find out when
+    a write has landed. :func:`netgraph.fsio.write_bytes_atomically` writes a
+    hidden sibling and renames it, so a walk can catch that sibling in the act —
+    see it in the listing, and then find it gone by the time it is read. It is
+    not part of the tree either way, so it is skipped by name, and anything else
+    that vanishes under the walk is left out rather than raising.
+    """
+    found: dict[str, bytes] = {}
+    for path in sorted(root.rglob("*")):
+        if path.name.endswith(".netgraph.tmp"):
+            continue
+        try:
+            if path.is_file():
+                found[path.relative_to(root).as_posix()] = path.read_bytes()
+        except OSError:
+            continue
+    return found
 
 
 def _documents(root: Path) -> dict[str, bytes]:
