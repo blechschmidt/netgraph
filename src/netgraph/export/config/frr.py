@@ -56,7 +56,7 @@ from typing import Final
 
 from netgraph.export.config.header import config_header
 from netgraph.export.config.model import ConfigFile, Unsupported
-from netgraph.export.config.plan import DevicePlan, addresses_of
+from netgraph.export.config.plan import DevicePlan, addresses_of, netns_limits
 from netgraph.export.manifest import Reason, Recorder
 from netgraph.models import (
     BgpConfig,
@@ -121,17 +121,22 @@ def declines(plan: DevicePlan) -> str:
 
 
 def limits(plan: DevicePlan) -> tuple[Unsupported, ...]:
-    """Nothing: this dialect refuses no device.
+    """Only §23: everything else FRR's grammar can already say.
 
-    FRR's grammar is a superset of what an inventory can state about routing, so
-    there is no field within FRR's remit that it would have to invent or drop.
-    The two candidates are both refused earlier — a VRF reference that resolves
-    to nothing by ``NG-F002``/``NG-F005`` when the document is parsed, and an
-    OSPF interface the device has not got by ``E034`` — and everything else the
-    inventory holds is out of FRR's remit rather than beyond its syntax, which
-    makes it a manifest skip. See the module docstring.
+    FRR's grammar is otherwise a superset of what an inventory can state about
+    routing, so there is no field within its remit that it would have to invent
+    or drop. The two candidates are both refused earlier — a VRF reference that
+    resolves to nothing by ``NG-F002``/``NG-F005`` when the document is parsed,
+    and an OSPF interface the device has not got by ``E034`` — and everything
+    else the inventory holds is out of FRR's remit rather than beyond its
+    syntax, which makes it a manifest skip. See the module docstring.
+
+    A **network namespace** is the exception, and it is not a matter of grammar:
+    ``interface veth-blue`` in an ``frr.conf`` names an interface of the stack
+    the daemon runs in, and an interface in a namespace is not in that stack.
+    The file would configure OSPF on a port the daemon cannot see.
     """
-    return ()
+    return tuple(netns_limits(plan, "FRR"))
 
 
 # --------------------------------------------------------------------------- #

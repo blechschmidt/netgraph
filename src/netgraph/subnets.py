@@ -45,7 +45,7 @@ from dataclasses import dataclass
 from typing import Final, TypeAlias
 
 from netgraph.loader.inventory import Inventory
-from netgraph.models import GLOBAL_VRF, Adapter, Device, IPv4Address, IPv6Address
+from netgraph.models import GLOBAL_VRF, ROOT_NETNS, Adapter, Device, IPv4Address, IPv6Address
 
 __all__ = [
     "GLOBAL_VRF",
@@ -110,6 +110,26 @@ class AddressPlacement:
     #: The routing instance the interface is bound to (§16.1), or
     #: :data:`~netgraph.models.GLOBAL_VRF` for the global one.
     vrf: str = GLOBAL_VRF
+    #: The network namespace the interface is in (§23.1), or
+    #: :data:`~netgraph.models.ROOT_NETNS` for the machine's initial one. Not
+    #: part of the subnet's identity — three stacks of one machine bridged
+    #: together are one broadcast domain and one prefix — but part of *this
+    #: placement's*, because two of them may hold the same address without
+    #: colliding.
+    netns: str = ROOT_NETNS
+
+    @property
+    def stack(self) -> tuple[str, str]:
+        """Which network stack this address is in: ``(element, netns)`` (§23.1).
+
+        The initial namespace of every machine is its own stack, and so is each
+        declared namespace *of that machine*: a namespace called ``blue`` on one
+        host has nothing to do with a ``blue`` on another. This is what a rule
+        about "how many parties are in this subnet" has to count, because three
+        containers of one host bridged onto one prefix are three parties and one
+        element.
+        """
+        return (self.element, self.netns)
 
     @property
     def port(self) -> str:
@@ -183,6 +203,18 @@ class Subnet:
     def elements(self) -> tuple[str, ...]:
         """The elements holding an address here, without repeats, in member order."""
         return tuple(dict.fromkeys(member.element for member in self.members))
+
+    @property
+    def stacks(self) -> tuple[tuple[str, str], ...]:
+        """The network stacks addressed here, without repeats, in member order.
+
+        :attr:`elements` counts *machines*; this counts the independent network
+        stacks inside them (§23.1). The two differ exactly on a container host,
+        where a bridge in the initial namespace and the containers hanging off
+        it are one element and several parties — which is what a rule like
+        ``W105`` is actually asking about.
+        """
+        return tuple(dict.fromkeys(member.stack for member in self.members))
 
     @property
     def addresses(self) -> tuple[str, ...]:
@@ -278,6 +310,7 @@ def subnets_of(inventory: Inventory) -> tuple[Subnet, ...]:
             # An adapter has no VRF table (§16.1), so its addresses are always
             # in the global instance; ``Interface.vrf`` is ``None`` there.
             vrf = interface.vrf or GLOBAL_VRF
+            netns = interface.netns_name
             for address in interface.addresses():
                 if not is_routable_address(address):
                     continue
@@ -295,6 +328,7 @@ def subnets_of(inventory: Inventory) -> tuple[Subnet, ...]:
                         vlans=vlans,
                         scope=scope,
                         vrf=vrf,
+                        netns=netns,
                     )
                 )
 

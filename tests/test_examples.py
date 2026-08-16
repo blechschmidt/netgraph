@@ -38,6 +38,7 @@ EXAMPLE_SHAPES: dict[str, dict[str, int]] = {
     "home-lab": {"devices": 7, "cables": 6, "adapters": 1, "tunnels": 0, "users": 3, "groups": 2},
     "campus": {"devices": 22, "cables": 22, "adapters": 0, "tunnels": 0},
     "overlay": {"devices": 7, "cables": 6, "adapters": 0, "tunnels": 5},
+    "containers": {"devices": 3, "cables": 2, "adapters": 0, "tunnels": 0},
     "patch-room": {
         "devices": 8,
         "cables": 14,

@@ -18,6 +18,62 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
+- **A machine is no longer one network stack: `spec.netns`, `interfaces[].netns` and veth
+  pairs (§23).** Everywhere else in the schema a host has one set of interface names, one
+  address space and one routing table, and one box on a diagram holds all of it. That is
+  exactly right for a switch and a laptop, and it stops being right the moment the host is a
+  container host — a server running twelve containers has twelve of each, and an inventory
+  that records one of them has recorded one twelfth of the truth.
+
+  `spec.netns[]` declares the namespaces a machine runs; `interfaces[].netns` puts an
+  interface in one; an interface that names none is in the machine's **initial** namespace,
+  which no document declares because every machine has it. `parent` nests one namespace
+  inside another, **to any depth** — a namespace is created from inside exactly one other, so
+  the nesting is a tree and the chain always ends at the initial namespace.
+
+  **A namespace is not a VRF and the two compose.** A VRF partitions the routing table of one
+  stack; a namespace *is* a second stack, so it partitions the interface names, the
+  addresses, the sockets and the routes at once. An interface may name both.
+
+- **A veth pair is two `ethernet` interfaces naming each other, and deliberately not a new
+  interface type.** A veth end is `ianaift:ethernetCsmacd` in every respect the rest of the
+  schema cares about — it has a MAC, it carries 802.3 frames, it can be a bridge port, it can
+  carry a VLAN sub-interface — so a type of its own would mean restating §6.2 for a port that
+  behaves identically. What it does not have is a socket, and `interfaces[].peer` is what says
+  so: it names the other end, and the other end has to name it back (`NG-N023`), because a
+  veth pair is created as a pair and destroyed as a pair and a document describing half of one
+  describes something the kernel cannot be asked for.
+
+  Four rules follow. `E049` refuses a cable on a veth end — `E012` cannot catch it, since by
+  *type* a veth end is exactly a cabled port. `E050` refuses a bridge or lag that aggregates a
+  member in another namespace: one datapath belongs to one stack, and moving a port into a
+  namespace is precisely the operation that takes it out of the aggregate. `W146` reports a
+  declared namespace nothing is in. `I005` reports a pair with both ends in one namespace —
+  legal, and usually a `netns` written on one end and forgotten on the other. `I002` stops
+  reporting veth ends as spare ports, which it would otherwise do to every one of them.
+
+- **`--layer netns`, the one view that draws below the machine.** The element node stays and
+  stands for the initial namespace — it keeps its kind, its icon, its link to the document and
+  its place in a stored arrangement, because it is still the machine — and each declared
+  namespace becomes a rounded box beside it, every box of one machine framed together. Solid
+  cyan lines are veth pairs: the crossing itself, which no other layer can draw because at
+  layer 1 both ends are inside one box. Dotted lines are nesting. Cables are kept and
+  re-pointed at the namespace holding the interface they land on, which answers the question
+  the view exists for — how does the stack inside this container reach the wire? A machine
+  with one stack is drawn only as context for one that has more.
+
+- **`netgraph export interfaces` carries all of it, and the four dialects that cannot
+  refuse.** The neutral dialect grows a `netns` stanza and two interface attributes, so a
+  machine's namespaces and pairs survive a round trip through `netgraph import` and are
+  compared by `netgraph drift`. `netplan`, `networkd`, `ifupdown` and `frr` **write nothing**
+  for a device that declares either: those files configure the stack they are applied *in*,
+  and a netplan file listing a container's interface puts the container's address on the host.
+  The refusal names every field and points at `export interfaces`.
+
+- **`examples/containers/`**, the sixth example inventory: two container hosts running five
+  namespaces, one nested inside another, joined by four veth pairs — one set bridged onto a
+  host bridge, one set routed over a `/30`. It validates clean, like the other five.
+
 - **A delete now takes everything that cannot outlive it — and the editor stops asking for
   a flag it was always going to be given.** "Cascade" used to mean the cables. It now means
   the whole of what a deleted element leaves behind, in three layers:
@@ -968,6 +1024,14 @@ publish a version whose section is missing or empty — see
   needs to say where its cache goes on the machines it is used on.
 
 ### Fixed
+
+- **The address rules now know that a namespace partitions the address space.** Without this
+  a perfectly ordinary container host is reported once per container: `E004` on two containers
+  built from one image, `W111` on both ends of every routed veth pair, `W105` on the bridge
+  every container hangs off. `E004` now scopes a duplicate to the *stack* — and to the machine,
+  because unlike a VRF name a namespace name means nothing outside the host that runs it;
+  `W111` groups by namespace as well as by VRF; and `W105` counts stacks rather than machines,
+  so three containers on one bridge are three parties and not one lonely element.
 
 - **Deleting one of a server's two PDUs took the server with it.** Clearing a power input is
   right; leaving `redundant: true` behind on the one feed that is left is not, because that

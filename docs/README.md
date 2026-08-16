@@ -60,7 +60,7 @@ This whole documentation set is also published, with those demos beside it, at
   48-port switch without typing 48 interfaces.
 * **[importing.md](importing.md)** — bootstrap the first inventory from LLDP, `ip -j addr`
   or the cabling spreadsheet you already keep, then converge on it by hand.
-* **[rendering.md](rendering.md)** — the nine layers, the filters, namespace collapsing and
+* **[rendering.md](rendering.md)** — the ten layers, the filters, namespace collapsing and
   link bundling, icon themes, labelling, stored arrangements, interactivity, and what each
   output format is good for.
 * **[styling.md](styling.md)** — `spec.style` and `kind: theme`: the colour and shape

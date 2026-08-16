@@ -8,7 +8,7 @@ without importing the validator itself.
 Two identifier vocabularies exist and both are accepted everywhere a rule can be
 named (``netgraph.toml``, the ``netgraph/ignore`` annotation, ``--disable``):
 
-* The **short ids** ``E001``…``E046``, ``W101``…``W140`` and ``I001``…``I004``
+* The **short ids** ``E001``…``E050``, ``W101``…``W146`` and ``I001``…``I005``
   used by the validation engine and printed in diagnostics. The letter is the
   default severity — ``E`` error, ``W`` warning, ``I`` info — as first
   assigned; a rule keeps its id when an inventory re-grades it.
@@ -512,6 +512,20 @@ RULES: Final[tuple[Rule, ...]] = (
         title="declared power redundancy is not met",
     ),
     Rule(
+        "E049",
+        Severity.ERROR,
+        "A cable terminates on one end of a veth pair.",
+        ("NG-N024",),
+        title="cable on a virtual interface",
+    ),
+    Rule(
+        "E050",
+        Severity.ERROR,
+        "A bridge or lag aggregates a member in another network namespace.",
+        ("NG-N025",),
+        title="aggregate spans network namespaces",
+    ),
+    Rule(
         "W101",
         Severity.WARNING,
         "An interface has neither IPv4 nor IPv6 and is not a switchport.",
@@ -827,6 +841,13 @@ RULES: Final[tuple[Rule, ...]] = (
         title="unreadable label colour",
     ),
     Rule(
+        "W146",
+        Severity.WARNING,
+        "A declared network namespace holds no interface.",
+        ("NG-N026",),
+        title="network namespace with no interface",
+    ),
+    Rule(
         "I001",
         Severity.INFO,
         "A MAC address is locally administered rather than vendor-assigned.",
@@ -853,6 +874,13 @@ RULES: Final[tuple[Rule, ...]] = (
         "A person's account is a member of no group.",
         ("NG-S016",),
         title="person in no group",
+    ),
+    Rule(
+        "I005",
+        Severity.INFO,
+        "Both ends of a veth pair are in the same network namespace.",
+        ("NG-N027",),
+        title="veth pair crosses no boundary",
     ),
 )
 

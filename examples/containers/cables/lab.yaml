@@ -1,0 +1,19 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: sw-lab-to-srv-host-a
+spec:
+  endpoints: [sw-lab:ether1, srv-host-a:eno1]
+  medium: copper
+  speed: 1Gbps
+  category: cat6
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: sw-lab-to-srv-host-b
+spec:
+  endpoints: [sw-lab:ether2, srv-host-b:eno1]
+  medium: copper
+  speed: 1Gbps
+  category: cat6

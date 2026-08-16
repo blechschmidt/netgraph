@@ -110,6 +110,11 @@ class DraftInterface:
     vlan: DraftVlan | None = None
     parent: str | None = None
     members: list[str] = field(default_factory=list)
+    #: The network namespace the port is in (§23.1); ``None`` for the machine's
+    #: initial one, which is also what "not observed" looks like.
+    netns: str | None = None
+    #: The other end of the veth pair this port is one end of (§23.2).
+    peer: str | None = None
     #: Lines emitted above the entry, each already prefixed with its own
     #: ``inferred:`` marker where one applies.
     comments: list[str] = field(default_factory=list)
@@ -126,7 +131,7 @@ class DraftInterface:
         # neighbour that only named the port cannot know it is a bond.
         if self.type == "ethernet" and other.type != "ethernet":
             self.type = other.type
-        for attribute in ("description", "enabled", "mac", "mtu", "parent"):
+        for attribute in ("description", "enabled", "mac", "mtu", "parent", "netns", "peer"):
             if getattr(self, attribute) is None:
                 setattr(self, attribute, getattr(other, attribute))
         for attribute in ("ipv4", "ipv6"):
@@ -166,6 +171,11 @@ class DraftDevice:
     #: VLAN ids seen anywhere on this device, written out as ``spec.vlans`` so a
     #: port referencing one does not trip ``W113``.
     vlans: set[int] = field(default_factory=set)
+    #: The network namespaces observed on this device (§23.1), in the order they
+    #: were seen: ``name -> parent``, the empty string being the machine's
+    #: initial namespace. Written out as ``spec.netns`` so a port naming one does
+    #: not trip ``NG-N022``.
+    netns: dict[str, str] = field(default_factory=dict)
     #: Lines emitted above ``apiVersion``, under the generated header.
     comments: list[str] = field(default_factory=list)
     #: Input names this device was seen in, in the order they were read.

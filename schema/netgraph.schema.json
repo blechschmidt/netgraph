@@ -1261,6 +1261,14 @@
           "title": "forwarding",
           "description": "Device-wide default for per-interface IP forwarding. Defaults to true/true on a `router` and false/false on every other kind; a `hub` must not declare it."
         },
+        "netns": {
+          "items": {
+            "$ref": "#/$defs/NetnsDefinition"
+          },
+          "title": "netns",
+          "type": "array",
+          "description": "The network namespaces this machine runs (§23.1). Each is a whole second network stack — its own interfaces, addresses and routing table — and `parent` nests one inside another, arbitrarily deep. Not a VRF: a VRF partitions one stack's routing table, a namespace *is* a second stack."
+        },
         "vrfs": {
           "items": {
             "$ref": "#/$defs/VrfDefinition"
@@ -2342,6 +2350,54 @@
       "title": "Metadata",
       "type": "object"
     },
+    "NetnsDefinition": {
+      "additionalProperties": false,
+      "description": "One entry of `spec.netns` — a network namespace on the device (§23.1).\n\nThree fields and no configuration: everything a namespace *contains* is\ndeclared by the things that name it. Interfaces move into one with\n`interfaces[].netns`, and that is also what gives the namespace its\naddresses and its routes, because those hang off the interfaces.\n\n`NG-N020` (names are unique per device), `NG-N021` (`parent` resolves\nand does not loop) and `NG-N022` (`interfaces[].netns` resolves) are all\nchecked by the device spec, where the whole table is in view.",
+      "properties": {
+        "name": {
+          "maxLength": 253,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
+          "title": "name",
+          "type": "string",
+          "description": "Name of the namespace, as `ip netns` spells it. Unique within the device (`NG-N020`), and what `interfaces[].netns` and another entry's `parent` refer to."
+        },
+        "parent": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "parent",
+          "description": "The namespace this one was created inside (`NG-N021`). Unset means the machine's initial namespace. This is the whole of the hierarchy: a namespace has exactly one creator, so nesting is a tree."
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "description",
+          "description": "Free text: what the namespace is for — a tenant, a container, a test harness."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "NetnsDefinition",
+      "type": "object"
+    },
     "NodeGeometry": {
       "additionalProperties": false,
       "description": "Where one node is drawn, and optionally how big it is.",
@@ -2730,6 +2786,38 @@
           "default": null,
           "title": "members",
           "description": "The interfaces aggregated by this one. Required for `type: lag` and `type: bridge`, forbidden otherwise (`NG-I003`).\n\nYANG: `…/if:lower-layer-if`"
+        },
+        "netns": {
+          "anyOf": [
+            {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9]+(?:[-_.][A-Za-z0-9]+)*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "netns",
+          "description": "The network namespace this interface lives in (§23.1). Names an entry of the device's `spec.netns` (`NG-N022`); unset means the machine's initial namespace. Unlike `vrf`, which partitions one stack's routing table, this places the interface in a different stack entirely — its addresses do not collide with the same addresses elsewhere on the machine."
+        },
+        "peer": {
+          "anyOf": [
+            {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9._/-]+$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "peer",
+          "description": "The other end of the veth pair this interface is one end of (§23.2). Names another `type: ethernet` interface of the same element, which must name this one back (`NG-N023`). A veth end is `ianaift:ethernetCsmacd` like any other port; what it has instead of a socket is this peer, so a cable must not terminate on it (`NG-N024`).\n\nYANG: `…/if:lower-layer-if`"
         },
         "range": {
           "type": "string",
@@ -3984,6 +4072,14 @@
           "default": null,
           "title": "forwarding",
           "description": "Device-wide default for per-interface IP forwarding. Defaults to true/true on a `router` and false/false on every other kind; a `hub` must not declare it."
+        },
+        "netns": {
+          "items": {
+            "$ref": "#/$defs/NetnsDefinition"
+          },
+          "title": "netns",
+          "type": "array",
+          "description": "The network namespaces this machine runs (§23.1). Each is a whole second network stack — its own interfaces, addresses and routing table — and `parent` nests one inside another, arbitrarily deep. Not a VRF: a VRF partitions one stack's routing table, a namespace *is* a second stack."
         },
         "vrfs": {
           "items": {

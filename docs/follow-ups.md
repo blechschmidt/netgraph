@@ -2234,6 +2234,60 @@ being forgotten rather than an argument that it does not matter.
 
 ---
 
+## 22. The as-built report says nothing about network namespaces
+
+`netgraph report` writes a page per device, and that page is where an operator
+looks for "what is this machine". Since §23 a machine may run several network
+stacks, and the report shows none of them: the interface table has a `VRF`
+column and no `NETNS` one, and there is no section listing `spec.netns` the way
+the routing section lists `spec.vrfs`.
+
+Not fixed with §23 itself, deliberately. Every column in that table is drawn for
+every device of every inventory, so a `NETNS` column is a column of dashes on
+all 22 pages of `examples/campus`, and the report's golden fixtures under
+`docs/example-report/` would move for a feature none of those devices uses. The
+right shape is almost certainly a *conditional* section — drawn on a device that
+declares namespaces and absent on one that does not, as the wireless section
+already is — and that is a change to how a page is assembled rather than to what
+one row holds.
+
+Until then the namespaces are visible in `netgraph show`, in `render -f json`
+(every port carries `netns` and `peer`, at every layer), in the tooltips and the
+detail panel of a rendering, in `export interfaces`, and in `--layer netns`.
+
+## 23. `netgraph path` cannot trace out of a container, because layer 3 draws one node per machine
+
+<!-- norun: the transcript is elided; the command exits 1, which is the point -->
+```console
+$ netgraph -i examples/containers path 10.30.0.11 10.20.0.12
+no path from hosts/srv-host-a to hosts/srv-host-b within 16 hops.
+```
+
+There is a path, and it is obvious: the container's address is in
+`10.30.0.0/24`, the host's bridge is the gateway for that prefix, the host
+forwards, and its uplink is in `10.20.0.0/24` with `srv-host-b`. Written between
+two *different* machines — a router with a leg in each prefix — the same
+topology traces in one hop.
+
+The reason is not the trace. It is that the layer-3 graph puts **one node per
+element**, so the container and the machine hosting it are the same node, and a
+search that must pass *through* a node it started on finds a path of length zero
+and rejects it. §23 did not introduce this — a host routing between two of its
+own prefixes has always looked like this — but namespaces make it the ordinary
+case rather than an oddity, because a container's address is always behind the
+machine that runs it.
+
+The fix is to give the layer-3 graph one node per *stack* rather than per
+element, which is exactly what `--layer netns` already does for layer 1. It is
+not a small change: an element that splits into several nodes at one layer and
+not at others touches stored geometry (§18), the filters, what an annotation
+encloses, and what the editor lets you select. That decision wants making on its
+own rather than as a rider on the model.
+
+Until then, `--layer netns` shows the topology the trace cannot walk, and a
+trace between two addresses in the *same* prefix, or between two machines, is
+unaffected.
+
 ## Checked and found sound
 
 Recorded so a later reviewer knows these were examined rather than skipped.

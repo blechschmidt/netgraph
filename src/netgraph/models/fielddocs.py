@@ -59,6 +59,7 @@ from netgraph.models.layout import (
     ViewGeometry,
 )
 from netgraph.models.metadata import Location, Metadata
+from netgraph.models.netns import NetnsDefinition
 from netgraph.models.patchpanel import PatchPanelSpec
 from netgraph.models.pdu import PduSpec
 from netgraph.models.power import PoeConfig, PowerConfig, PowerDraw, PowerInput
@@ -116,6 +117,7 @@ DOCUMENTED_MODELS: Final[tuple[type[NetgraphModel], ...]] = (
     VlanConfig,
     WirelessConfig,
     Bss,
+    NetnsDefinition,
     VrfDefinition,
     StaticRoute,
     RoutingConfig,
@@ -262,6 +264,28 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("DeviceSpec", "vlans"): Doc(
         "The device VLAN database: which VLANs exist on this device, and what they are called.",
         "…/dot1q:bridge-vlan/dot1q:vlan",
+    ),
+    ("DeviceSpec", "netns"): Doc(
+        "The network namespaces this machine runs (§23.1). Each is a whole second network "
+        "stack — its own interfaces, addresses and routing table — and `parent` nests one "
+        "inside another, arbitrarily deep. Not a VRF: a VRF partitions one stack's routing "
+        "table, a namespace *is* a second stack.",
+        NONE,
+    ),
+    ("NetnsDefinition", "name"): Doc(
+        "Name of the namespace, as `ip netns` spells it. Unique within the device "
+        "(`NG-N020`), and what `interfaces[].netns` and another entry's `parent` refer to.",
+        NONE,
+    ),
+    ("NetnsDefinition", "parent"): Doc(
+        "The namespace this one was created inside (`NG-N021`). Unset means the machine's "
+        "initial namespace. This is the whole of the hierarchy: a namespace has exactly one "
+        "creator, so nesting is a tree.",
+        NONE,
+    ),
+    ("NetnsDefinition", "description"): Doc(
+        "Free text: what the namespace is for — a tenant, a container, a test harness.",
+        NONE,
     ),
     ("DeviceSpec", "vrfs"): Doc(
         "The routing instances (VRFs) this device implements. An interface binds to one with "
@@ -474,6 +498,22 @@ FIELD_DOCS: Final[dict[tuple[str, str], Doc]] = {
     ("Interface", "members"): Doc(
         "The interfaces aggregated by this one. Required for `type: lag` and `type: bridge`, "
         "forbidden otherwise (`NG-I003`).",
+        "…/if:lower-layer-if",
+    ),
+    ("Interface", "netns"): Doc(
+        "The network namespace this interface lives in (§23.1). Names an entry of the "
+        "device's `spec.netns` (`NG-N022`); unset means the machine's initial namespace. "
+        "Unlike `vrf`, which partitions one stack's routing table, this places the interface "
+        "in a different stack entirely — its addresses do not collide with the same "
+        "addresses elsewhere on the machine.",
+        NONE,
+    ),
+    ("Interface", "peer"): Doc(
+        "The other end of the veth pair this interface is one end of (§23.2). Names another "
+        "`type: ethernet` interface of the same element, which must name this one back "
+        "(`NG-N023`). A veth end is `ianaift:ethernetCsmacd` like any other port; what it "
+        "has instead of a socket is this peer, so a cable must not terminate on it "
+        "(`NG-N024`).",
         "…/if:lower-layer-if",
     ),
     # -- address families --------------------------------------------------

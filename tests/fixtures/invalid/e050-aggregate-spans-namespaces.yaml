@@ -1,0 +1,53 @@
+# E050 (NG-N025) - a bridge aggregates a port in another network namespace.
+#
+# One datapath belongs to one network stack: moving a port into a namespace is
+# precisely the operation that takes it out of the bridge.
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-a
+spec:
+  netns:
+    - name: blue
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+    - name: br0
+      type: bridge
+      members: [veth-a]
+      ipv4:
+        addresses: [10.1.0.1/30]
+    - name: veth-a
+      type: ethernet
+      netns: blue
+      peer: veth-b
+    - name: veth-b
+      type: ethernet
+      peer: veth-a
+      ipv4:
+        addresses: [10.2.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - srv-a:eth0
+    - srv-b:eth0
+  medium: copper

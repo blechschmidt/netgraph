@@ -18,7 +18,7 @@ labelled links](images/home-lab.svg)
 
 ## Contents
 
-- [Layers: one inventory, nine questions](#layers-one-inventory-nine-questions)
+- [Layers: one inventory, ten questions](#layers-one-inventory-ten-questions)
   - [`physical` and `l1`: the cabling record and the network](#physical-and-l1-the-cabling-record-and-the-network)
   - [`l2`: the same graph, annotated with VLANs](#l2-the-same-graph-annotated-with-vlans)
   - [`l3`: prefixes and who is addressed in them](#l3-prefixes-and-who-is-addressed-in-them)
@@ -27,6 +27,7 @@ labelled links](images/home-lab.svg)
   - [`rack`: a front elevation per cabinet](#rack-a-front-elevation-per-cabinet)
   - [`power`: the PDUs and what they feed](#power-the-pdus-and-what-they-feed)
   - [`identity`: who is in what](#identity-who-is-in-what)
+  - [`netns`: the stacks inside a machine](#netns-the-stacks-inside-a-machine)
 - [Filters: drawing less of the network](#filters-drawing-less-of-the-network)
 - [Aggregation: one node per site, one line per bundle](#aggregation-one-node-per-site-one-line-per-bundle)
 - [Icons](#icons)
@@ -48,11 +49,11 @@ labelled links](images/home-lab.svg)
 
 ---
 
-<a id="layers-one-inventory-nine-questions"></a>
+<a id="layers-one-inventory-ten-questions"></a>
 
-## Layers: one inventory, nine questions
+## Layers: one inventory, ten questions
 
-One inventory, nine questions. `--layer` picks which one the diagram answers.
+One inventory, ten questions. `--layer` picks which one the diagram answers.
 
 | Layer | Nodes | Edges | Annotations | Reach for it when |
 |---|---|---|---|---|
@@ -65,6 +66,7 @@ One inventory, nine questions. `--layer` picks which one the diagram answers.
 | `rack` | one node per rack named by a `metadata.location` | none — a cable says nothing about where either end is bolted | a front elevation: one row per unit, occupied and empty alike, each occupant annotated with what it draws | "How much room is left in that cabinet, and what is above the UPS?" |
 | `power` | the PDUs, **plus** every element the inventory records power for | one per feed: an `outlet` cord from a PDU (solid amber) and a `poe` feed from a PSE port (dashed) | outlets used, load against capacity and the `input_feed` on a PDU; draw, redundancy and PoE budget on everything else | "Is this rack fed from one strip, and is there capacity left?" A single-fed cabinet, an oversubscribed PoE budget, a box nobody wrote a power path for. |
 | `identity` | one node per `user` and per `group` — no hardware whatsoever | one per membership: the group ↔ what it holds, nested groups included | the account, the uid, the status and the key count on a user; the headcount and the gid on a group | "Who can get at this, and how did they get the access?" A group nobody emptied when somebody left, an account in nothing at all. |
+| `netns` | one node per **network stack**: the element itself for a machine's initial namespace, plus one per declared `spec.netns` entry, framed by machine | one per veth pair (solid cyan), one per nesting (dotted), and the cables, re-pointed at the stack holding the port they land on | the path of a nested namespace, the interfaces and addresses in each stack, the peer of every veth end | "What is *inside* this box?" A container host drawn as one node has hidden a dozen routing tables; this is the only view that opens it. |
 
 The default is `l1`. `-f html` accepts `--layer` more than once and puts a
 switcher over the results; every other format holds one layer, and asking for
@@ -373,6 +375,45 @@ rendered 5 node(s) and 3 edge(s) as mermaid at layer identity
 `household` holds `admins`, so `ana` is in it without being listed twice — which
 is what the nesting is for, and what
 [`netgraph list groups`](commands/list.md#the-subject-argument) puts a number on.
+
+### `netns`: the stacks inside a machine
+
+`netns` is the one layer that draws *below* the device
+([`docs/schema.md` §23.3](schema.md#233-the-netns-view)). Every other view — this
+one included, until you ask for it — treats a machine as one box, which is right
+for a switch and wrong the moment the machine is a container host: a server
+running twelve containers has twelve interface name spaces, twelve address
+spaces and twelve routing tables, and a diagram with one node has drawn one of
+them.
+
+**Nodes** are the network stacks. The element node stays and stands for the
+machine's *initial* namespace — it keeps its kind, its icon, its link to the
+document and its place in a stored arrangement, because it is still the machine —
+and every entry of `spec.netns` becomes a rounded cyan box beside it. All the
+boxes of one machine are drawn inside a frame named after it, so what a reader
+sees is "inside this host".
+
+**Edges** say three different things:
+
+* a **veth pair** (solid cyan) joins the two stacks its ends are in. That
+  crossing is invisible at every other layer, because both ends are interfaces of
+  one box;
+* a **nesting** edge (dotted slate) runs from a namespace to the one created
+  inside it. Nesting has no depth limit, and drawing it as an edge is what lets a
+  four-deep hierarchy stay readable without four sets of nested frames;
+* a **cable** is kept and re-pointed at the namespace holding the interface it
+  lands on. That is the question the view exists for: how does the stack inside
+  this container reach the wire?
+
+A machine that declares no namespace and no veth pair is drawn only when
+something it is cabled to *is* opened up, and anything further away is dropped.
+It has one stack, which every other layer already draws; it is here so the wire
+has somewhere to arrive.
+
+<!-- norun: writes containers.svg into the reader's directory -->
+```console
+$ netgraph -i examples/containers render --layer netns -o containers.svg
+```
 
 ## Filters: drawing less of the network
 

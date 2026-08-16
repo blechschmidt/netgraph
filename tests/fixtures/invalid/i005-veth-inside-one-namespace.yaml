@@ -1,0 +1,52 @@
+# I005 (NG-N027) - both ends of a veth pair are in one network namespace.
+#
+# Legal - it is how two bridges inside one stack are joined - but far more often
+# 'netns' was written on one end and forgotten on the other. Both ends here are
+# in the machine's initial namespace, which is exactly what that mistake looks
+# like.
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-a
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+    - name: br0
+      type: bridge
+      members: [veth-a]
+      ipv4:
+        addresses: [10.1.0.1/30]
+    - name: veth-a
+      type: ethernet
+      peer: veth-b
+    - name: veth-b
+      type: ethernet
+      peer: veth-a
+      ipv4:
+        addresses: [10.2.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - srv-a:eth0
+    - srv-b:eth0
+  medium: copper

@@ -171,12 +171,16 @@ _NOT_A_HOST_TYPES: Final = (Hub, Switch)
 #: owns it, the port as ``element:interface``, and the prefixes it is in.
 _HubPeer: TypeAlias = tuple[str, str, frozenset["IPNetwork"]]
 
-#: What ``E004`` groups an address by: the routing instance it is in, the
-#: address, its prefix and its broadcast domain — as the objects the model layer
-#: already built rather than their text. The VRF leads because it is the coarsest
-#: partition: two addresses in different instances are never in conflict (§16.1).
+#: What ``E004`` groups an address by: the network stack it is in, the routing
+#: instance, the address, its prefix and its broadcast domain — as the objects
+#: the model layer already built rather than their text. The two partitions lead
+#: because they are the coarsest: two addresses in different network namespaces
+#: (§23.1) or different VRFs (§16.1) are never in conflict. The stack is ``""``
+#: ``("", "")`` for a machine's initial namespace and ``(element, name)`` for a
+#: declared one, because a namespace name means nothing outside the machine that
+#: runs it while every machine's initial namespace is on the same wire.
 _AddressKey: TypeAlias = tuple[
-    str, "ipaddress.IPv4Address | ipaddress.IPv6Address", "IPNetwork", int | None
+    tuple[str, str], str, "ipaddress.IPv4Address | ipaddress.IPv6Address", "IPNetwork", int | None
 ]
 
 #: Either family's host address, as :mod:`ipaddress` models it. Spelled out here
@@ -1287,6 +1291,19 @@ def _check_duplicate_ip(ctx: _Context) -> Iterator[_Draft]:
     is the ordinary way to give two customers the same plan, and reporting it
     would report the feature. Two addresses only collide when they are in one
     instance, one prefix and one broadcast domain.
+
+    A **network namespace** partitions it more completely still (§23.1), and
+    differently: a VRF name is coordinated across an estate, so two devices
+    naming ``blue`` are taken to mean one instance, while a namespace belongs to
+    the machine that runs it and a ``blue`` on two hosts is two unrelated
+    stacks. So the scope here is the *stack*: an address in a declared namespace
+    is compared only against addresses in that namespace of that machine.
+
+    The cost of that is a container bridged onto the LAN with an address another
+    machine already holds, which this will not report. The alternative is a hard
+    error on every host running two containers out of one image, which is the
+    ordinary case — and a rule that fires on the ordinary case is a rule people
+    turn off.
     """
     # Grouped on the :mod:`ipaddress` objects rather than on their text: they
     # compare and hash exactly as their spellings do, so the groups are the
@@ -1297,6 +1314,11 @@ def _check_duplicate_ip(ctx: _Context) -> Iterator[_Draft]:
         for interface in owner.interfaces:
             scope = interface.vlan.pvid if interface.vlan is not None else None
             vrf = interface.vrf or GLOBAL_VRF
+            # The initial namespace of every machine keys as ``""`` so that two
+            # ordinary hosts on one wire collide exactly as they always have; a
+            # declared one is qualified by its machine, because that is the
+            # whole extent of what the name means.
+            stack = (fqn, interface.netns) if interface.netns else ("", "")
             for address in interface.addresses():
                 # A loopback address is scoped to the host that holds it
                 # (RFC 1122 §3.2.1.3, RFC 4291 §2.5.3) and never appears on a
@@ -1304,17 +1326,19 @@ def _check_duplicate_ip(ctx: _Context) -> Iterator[_Draft]:
                 # than in conflict.
                 if address.ip.is_loopback:
                     continue
-                groups.setdefault((vrf, address.ip, address.network, scope), []).append(
+                groups.setdefault((stack, vrf, address.ip, address.network, scope), []).append(
                     (fqn, interface)
                 )
 
-    for (vrf, ip, network, scope), entries in groups.items():
+    for (stack, vrf, ip, network, scope), entries in groups.items():
         if len(entries) < 2:
             continue
         ordered = _by_port(entries)
         ports = [f"{fqn}:{interface.name}" for fqn, interface in ordered]
         domain = _describe_scope(scope)
         instance = "" if not vrf else f" of VRF {_q(vrf)}"
+        if stack[1]:
+            instance += f" in {_netns_text(stack[1])}"
         yield _Draft(
             f"IP address {ip} in {network}{instance} is assigned to {len(ports)} interfaces "
             f"in {domain}: {_join(ports)}",
@@ -1763,7 +1787,10 @@ def _check_lonely_subnet(ctx: _Context) -> Iterator[_Draft]:
         # A host route holds one address by definition, and the far end of a
         # point-to-point link is routinely outside the inventory — an ISP
         # hand-off is not a device anybody here declares.
-        if subnet.is_point_to_point or len(subnet.elements) != 1:
+        # Stacks, not elements (§23.1): a bridge in a host's initial namespace
+        # and the two containers hanging off it are one element and three
+        # parties, and the prefix they share is exactly not lonely.
+        if subnet.is_point_to_point or len(subnet.stacks) != 1:
             continue
         first = subnet.members[0]
         ports = _join([member.port for member in subnet.members])
@@ -2288,20 +2315,27 @@ def _check_overlapping_prefixes(ctx: _Context) -> Iterator[_Draft]:
     two interfaces in **different VRFs** (§16.1): each instance has a routing
     table of its own, so there is no single egress to be ambiguous about — which
     is the entire reason to put two overlapping plans on one router.
+
+    And so are two interfaces in different **network namespaces** (§23.1), for
+    the same reason carried further: a namespace is a whole second stack, so the
+    two ports are not two ways out of one host at all. Without this a container
+    host would be reported once per container, which is the shape a `/30` on
+    both ends of a veth pair inevitably has.
     """
     for fqn, owner in ctx.owners.items():
         # Grouped by routing instance rather than compared pairwise inside the
         # loop below: an inventory with no VRF in it has exactly one group, so
         # the quadratic part is the same walk it was before instances existed.
-        by_instance: dict[str, list[tuple[str, IPNetwork]]] = {}
+        by_instance: dict[tuple[str, str], list[tuple[str, IPNetwork]]] = {}
         for interface in owner.interfaces:
             for address in interface.addresses():
                 if is_routable_address(address):
-                    key = interface.vrf or GLOBAL_VRF
+                    key = (interface.netns_name, interface.vrf or GLOBAL_VRF)
                     by_instance.setdefault(key, []).append((interface.name, address.network))
 
-        for vrf, placements in by_instance.items():
+        for (netns, vrf), placements in by_instance.items():
             instance = "" if not vrf else f" of VRF {_q(vrf)}"
+            instance += f" in namespace {_q(netns)}" if netns else ""
             for (left_port, left_net), (right_port, right_net) in _overlapping_pairs(placements):
                 yield _Draft(
                     f"element {_q(fqn)} has overlapping prefixes on two interfaces{instance}: "
@@ -2915,6 +2949,12 @@ def _check_uncabled_interface(ctx: _Context) -> Iterator[_Draft]:
             if not interface.enabled or not interface.type.is_cableable:
                 continue
             if interface.type is InterfaceType.LAG:
+                continue
+            # A veth end is ``ethernet`` and can never be cabled (``E049``), so
+            # the finding would be true of every one of them and actionable on
+            # none: the "spare port" reading does not apply to an interface that
+            # has no socket in the first place.
+            if interface.is_veth:
                 continue
             if (fqn, interface.name) in ctx.terminations:
                 continue
@@ -5004,6 +5044,140 @@ def _check_ungrouped_user(ctx: _Context) -> Iterator[_Draft]:
         )
 
 
+# --------------------------------------------------------------------------- #
+# Network namespaces and veth pairs (§23)
+# --------------------------------------------------------------------------- #
+
+
+def _check_cable_on_veth(ctx: _Context) -> Iterator[_Draft]:
+    """E049 — a cable terminates on one end of a veth pair (``NG-N024``).
+
+    A veth end is ``ethernet`` by type, so ``E012`` waves it through: the type
+    check cannot tell it apart from the port on the back of the machine, and
+    that is deliberate — everything a bridge or a VLAN sub-interface can be
+    stacked on a physical port, it can be stacked on a veth end. What a veth end
+    does not have is a socket. Its far side is already claimed, by the peer it
+    names, and a cable drawn to it describes a plug with nowhere to go while the
+    physical port somebody meant is left looking free.
+    """
+    for endpoint in ctx.endpoints:
+        interface = endpoint.interface
+        if interface is None or not interface.is_veth:
+            continue
+        physical = _join(
+            sorted(
+                candidate.name
+                for candidate in (endpoint.owner.interfaces if endpoint.owner else ())
+                if candidate.type.is_cableable and not candidate.is_veth
+            )
+        )
+        yield _Draft(
+            f"cable {_q(endpoint.cable_fqn)} terminates on {_q(endpoint.port)}, which is one "
+            f"end of the veth pair {_q(interface.name)}/{_q(interface.peer or '')}; a veth end "
+            f"has no socket, its far side is the peer it names"
+            + (f" — {_q(endpoint.owner_fqn or '')} declares {physical}" if physical else ""),
+            _cable_elements(endpoint.cable_fqn, endpoint),
+            endpoint.field_path,
+        )
+
+
+def _check_aggregate_spans_netns(ctx: _Context) -> Iterator[_Draft]:
+    """E050 — a bridge or lag aggregates a member in another namespace (``NG-N025``).
+
+    A bridge forwards frames between its ports and a bond schedules them across
+    its slaves; both are one datapath, and a datapath belongs to exactly one
+    network stack. Moving a port into a namespace is precisely the operation
+    that takes it *out* of that stack, so the kernel removes it from the
+    aggregate as it goes — the two lines cannot both be true afterwards.
+
+    This is the one place §23 constrains §6.2's stacking, and only there: a
+    ``vlan`` sub-interface is *not* checked, because moving one into another
+    namespace is a supported thing to do and the sub-interface keeps receiving
+    the frames its parent tags.
+    """
+    for fqn, owner in ctx.owners.items():
+        by_name = ctx.by_name[fqn]
+        for interface in owner.interfaces:
+            if interface.type not in AGGREGATE_TYPES:
+                continue
+            for name in interface.members or ():
+                member = by_name.get(name)
+                if member is None or member.netns_name == interface.netns_name:
+                    continue
+                yield _Draft(
+                    f"{_q(f'{fqn}:{interface.name}')} is a {interface.type.value} in "
+                    f"{_netns_text(interface.netns_name)} and aggregates "
+                    f"{_q(name)}, which is in {_netns_text(member.netns_name)}; one datapath "
+                    f"belongs to one network stack",
+                    (fqn,),
+                    _index_path(owner, name, "netns"),
+                )
+
+
+def _check_empty_netns(ctx: _Context) -> Iterator[_Draft]:
+    """W146 — a declared namespace holds no interface (``NG-N026``).
+
+    The same shape as ``W136`` and for the same reason: a namespace is a stack,
+    and a stack with no interface in it has no address, no route and no way in
+    or out. It is not an error — ``ip netns add`` makes exactly that, and a
+    document may be describing a sandbox before anything is moved into it — but
+    it is far more often a namespace whose interfaces were renamed out from
+    under it, and the isolation somebody declared does not exist.
+    """
+    for fqn, owner in ctx.owners.items():
+        if not isinstance(owner, Device):
+            continue
+        occupied = {interface.netns_name for interface in owner.spec.interfaces}
+        for index, entry in enumerate(owner.spec.netns):
+            if entry.name in occupied:
+                continue
+            # A namespace that holds only *other* namespaces is still empty —
+            # nothing in it has an address — but saying what it does hold is the
+            # difference between "delete this" and "the interfaces went into the
+            # one inside it".
+            inner = sorted(e.name for e in owner.spec.netns if e.parent == entry.name)
+            nested = (
+                f"; it holds {count_text(len(inner), 'namespace')} ({_join(inner)}) "
+                f"and nothing else"
+                if inner
+                else ""
+            )
+            yield _Draft(
+                f"element {_q(fqn)} declares network namespace {_q(entry.name)}, but no "
+                f"interface is in it, so it has no address and no way in or out{nested}",
+                (fqn,),
+                ("spec", "netns", index, "name"),
+            )
+
+
+def _check_veth_inside_one_netns(ctx: _Context) -> Iterator[_Draft]:
+    """I005 — both ends of a veth pair are in one namespace (``NG-N027``).
+
+    Legal, and occasionally meant: a veth pair is the standard way to join two
+    bridges inside one stack. Reported anyway, as information, because the far
+    more common reading is that ``netns`` was written on one end and forgotten
+    on the other — and that mistake produces a document that validates, draws a
+    link, and describes a namespace nothing reaches.
+    """
+    for fqn, owner in ctx.owners.items():
+        if not isinstance(owner, Device):
+            continue
+        for first, second in owner.spec.veth_pairs():
+            if first.netns_name != second.netns_name:
+                continue
+            yield _Draft(
+                f"veth pair {_q(f'{fqn}:{first.name}')}/{_q(second.name)} has both ends in "
+                f"{_netns_text(first.netns_name)}, so it crosses no namespace boundary",
+                (fqn,),
+                _index_path(owner, first.name, "peer"),
+            )
+
+
+def _netns_text(namespace: str) -> str:
+    """``the initial namespace`` / ``namespace 'blue'`` — the phrase §23 findings use."""
+    return f"namespace {_q(namespace)}" if namespace else "the initial namespace"
+
+
 #: Every check, paired with the rule it reports, in report order.
 _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("E001", _check_endpoint_references),
@@ -5054,6 +5228,8 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("E046", _check_account_identifiers),
     ("E047", _check_gateway_redundancy),
     ("E048", _check_declared_power_redundancy),
+    ("E049", _check_cable_on_veth),
+    ("E050", _check_aggregate_spans_netns),
     ("W101", _check_unaddressed_interface),
     ("W102", _check_mtu_mismatch),
     ("W103", _check_orphan_device),
@@ -5099,10 +5275,12 @@ _CHECKS: Final[tuple[tuple[str, Check], ...]] = (
     ("W143", _check_empty_area),
     ("W144", _check_invisible_style),
     ("W145", _check_unreadable_label),
+    ("W146", _check_empty_netns),
     ("I001", _check_local_mac),
     ("I002", _check_uncabled_interface),
     ("I003", _check_nonstandard_port),
     ("I004", _check_ungrouped_user),
+    ("I005", _check_veth_inside_one_netns),
 )
 
 

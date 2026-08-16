@@ -1,0 +1,97 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-host-a
+  description: >-
+    Container host. Two tenants in their own network namespaces, bridged onto
+    one host bridge, plus a namespace nested inside 'blue' for its web tier.
+spec:
+  forwarding:
+    ipv4: true
+    ipv6: false
+  vendor: Supermicro
+  model: SYS-5019C-MR
+  netns:
+    - name: blue
+      description: Tenant blue.
+    - name: blue-web
+      parent: blue
+      description: The web tier of tenant blue, nested inside its namespace.
+    - name: green
+      description: Tenant green.
+  interfaces:
+    # The initial namespace: the uplink, and the bridge every container hangs
+    # off. Neither names a 'netns', which is what puts them in the machine's own
+    # stack.
+    - name: eno1
+      type: ethernet
+      description: Uplink to sw-lab.
+      mtu: 1500
+      ipv4:
+        addresses:
+          - ip: 10.20.0.11
+            prefix_length: 24
+        gateway: 10.20.0.1
+    - name: br-tenants
+      type: bridge
+      description: Host side of every tenant veth pair; the tenants' gateway.
+      members: [veth-blue-h, veth-green-h]
+      ipv4:
+        addresses:
+          - ip: 10.30.0.1
+            prefix_length: 24
+
+    # Tenant blue. The host end is a bridge port; the far end is the container's
+    # only interface, and it is in another stack.
+    - name: veth-blue-h
+      type: ethernet
+      description: Host end of the blue pair.
+      peer: veth-blue
+    - name: veth-blue
+      type: ethernet
+      description: Container end of the blue pair.
+      netns: blue
+      peer: veth-blue-h
+      ipv4:
+        addresses:
+          - ip: 10.30.0.11
+            prefix_length: 24
+        gateway: 10.30.0.1
+
+    # One level deeper: a namespace created from inside 'blue', reached by a
+    # second veth pair that never touches the initial namespace at all.
+    - name: veth-web-h
+      type: ethernet
+      description: Blue's end of the pair into its web tier.
+      ipv4:
+        addresses:
+          - ip: 10.31.0.1
+            prefix_length: 30
+      netns: blue
+      peer: veth-web
+    - name: veth-web
+      type: ethernet
+      description: Web tier end of the pair.
+      netns: blue-web
+      peer: veth-web-h
+      ipv4:
+        addresses:
+          - ip: 10.31.0.2
+            prefix_length: 30
+        gateway: 10.31.0.1
+
+    # Tenant green, same shape as blue and one level shallower.
+    - name: veth-green-h
+      type: ethernet
+      description: Host end of the green pair.
+      peer: veth-green
+    - name: veth-green
+      type: ethernet
+      description: Container end of the green pair.
+      ipv4:
+        addresses:
+          - ip: 10.30.0.12
+            prefix_length: 24
+        gateway: 10.30.0.1
+      netns: green
+      peer: veth-green-h

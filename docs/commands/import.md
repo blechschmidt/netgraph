@@ -235,7 +235,7 @@ $ netgraph import drawio site.drawio         # apply it
 <!-- generated: options import drawio -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
-| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity]` | the view the file says it was exported from | Which view the diagram draws. Read from the file for anything netgraph exported; needed only for a diagram netgraph did not write. |
+| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns]` | the view the file says it was exported from | Which view the diagram draws. Read from the file for anything netgraph exported; needed only for a diagram netgraph did not write. |
 | `--geometry`, `--no-geometry` | — | `--geometry` | Carry cells that were dragged back as stored geometry. |
 | `--renames`, `--no-renames` | — | `--renames` | Carry a retyped label back as a rename, rewriting every reference to it. |
 | `--deletions`, `--no-deletions` | — | `--deletions` | Carry a deleted cell back as a deleted element. Never applied to a diagram that was exported from a filtered view, whichever way this is set. |

@@ -72,6 +72,7 @@ from netgraph.export.config.plan import (
     TunnelPlan,
     addresses_of,
     is_stacked,
+    netns_limits,
     restricts_vlans,
     route_interface,
 )
@@ -146,6 +147,7 @@ def limits(plan: DevicePlan) -> tuple[Unsupported, ...]:
 
 
 def _limits(plan: DevicePlan) -> Iterator[Unsupported]:
+    yield from netns_limits(plan, "systemd-networkd")
     for index, vrf in enumerate(plan.device.spec.vrfs):
         yield Unsupported(
             element=plan.fqn,

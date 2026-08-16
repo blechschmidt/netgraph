@@ -1244,6 +1244,53 @@ server with both cords in the A side is the single most common way a
 **Suppress with** `E048`, or an annotation on the element. As with `E047`, the
 fix is a second independent feed or an honest annotation.
 
+#### `E049` — cable on a virtual interface
+
+*Alias: `NG-N024`. Severity: error.*
+
+A `cable` terminates on one end of a veth pair (§23.2). A veth end is
+`type: ethernet` — deliberately, because it is `ianaift:ethernetCsmacd` in every
+respect that matters — so [`E012`](#e012--cable-terminates-on-an-interface-with-no-socket) waves it
+through: the type check cannot tell it apart from the port on the back of the
+machine, and should not, since everything that can be stacked on a physical port
+can be stacked on a veth end.
+
+What a veth end does not have is a socket. Its far side is already claimed, by
+the `peer` it names. The finding lists the ports on that element a cable *can*
+land on, because the mistake is almost always a name one character away from the
+right one.
+
+**Why it matters.** The cable is drawn, so the diagram shows a link that cannot
+exist — and the physical port somebody meant is left looking free, which is how
+the same port gets patched twice.
+
+**Suppress with** `E049` / `NG-N024`, or an annotation on the cable. There is no
+good reason to: the run has to land somewhere real.
+
+#### `E050` — aggregate spans network namespaces
+
+*Alias: `NG-N025`. Severity: error.*
+
+A `bridge` or a `lag` lists a member that is in a different network namespace
+from the aggregate itself (§23.1). A bridge forwards frames between its ports
+and a bond schedules them across its slaves; both are one datapath, and a
+datapath belongs to exactly one network stack. Moving a port into a namespace is
+precisely the operation that takes it out of that stack, so the kernel drops it
+from the aggregate on the way — the two lines cannot both be true afterwards.
+
+This is the one place §23 constrains the stacking of §6.2, and only here. A
+`vlan` sub-interface whose parent is in another namespace is **not** reported:
+moving a sub-interface across is supported, and it keeps receiving the frames
+its parent tags.
+
+**Why it matters.** The document describes a bridge that would come up with
+fewer ports than it names, and the ports that are missing are the ones somebody
+isolated on purpose. Nothing about the running system says which of the two
+statements was meant.
+
+**Suppress with** `E050` / `NG-N025`, or an annotation on the element. The fix is
+to decide which stack the port belongs to: drop the member, or drop the `netns`.
+
 #### `W101` — interface neither routes nor switches
 
 *Alias: `NG-I013`. Severity: warning.*
@@ -1321,7 +1368,7 @@ splits a subnet into halves that cannot reach each other while every individual
 document still looks right. The other reading is just as useful — the neighbour
 exists but was never written down, so the diagram is missing a device. Only the
 layer-3 view can show this at all, which is why the rule arrived with it; see
-[`--layer l3`](rendering.md#layers-one-inventory-nine-questions).
+[`--layer l3`](rendering.md#layers-one-inventory-ten-questions).
 
 **Suppress with** `W105` / `NG-A008`, or an annotation on the element holding
 the address. A deliberately sparse management prefix, and a link whose peer is
@@ -2243,6 +2290,29 @@ Otherwise the fix is in `fontColor` — give it something that contrasts with
 
 ### Info
 
+#### `W146` — network namespace with no interface
+
+*Alias: `NG-N026`. Severity: warning.*
+
+A device declares a namespace in `spec.netns` and no interface names it
+(§23.1). A namespace is a stack, and a stack with no interface in it holds no
+address, has no route and has no way in or out. If it nests others, the finding
+says so — those are all it contains.
+
+The sibling of [`W136`](#w136--vrf-with-no-interface-bound-to-it), and the same reasoning:
+the reference resolves, so nothing is broken, but the isolation somebody
+declared does not exist.
+
+**Why it matters.** `ip netns add` really does make exactly this, and a document
+may be describing a sandbox before anything is moved into it. Far more often the
+interfaces were renamed out from under it, or the `netns` line was written on one
+end of a veth pair and forgotten on the other — which is
+[`I005`](#i005--veth-pair-crosses-no-boundary) seen from the other side.
+
+**Suppress with** `W146` / `NG-N026`, or an annotation on the device. An
+inventory that declares namespaces before their contents should say
+`ignore = ["W146"]` in `netgraph.toml` once.
+
 #### `I001` — locally administered MAC address
 
 *Alias: `NG-I010`. Severity: info.*
@@ -2324,6 +2394,25 @@ that was *meant* to be in a group and is not looks exactly like this.
 **Suppress with** `I004` / `NG-S016`, or an annotation on the user. An inventory
 that models people without modelling groups at all should say
 `ignore = ["I004"]` in `netgraph.toml` once.
+
+#### `I005` — veth pair crosses no boundary
+
+*Alias: `NG-N027`. Severity: info.*
+
+Both ends of a veth pair are in the same network namespace (§23.2) — usually
+both in the machine's initial one, because that is what a forgotten `netns`
+looks like.
+
+**Why it matters.** Information rather than a complaint: a veth pair inside one
+stack is the standard way to join two bridges, and plenty of hosts have one on
+purpose. It is printed because the far more common reading is that `netns` was
+written on one end and forgotten on the other — a mistake that validates, draws
+a link, and leaves a namespace nothing reaches (which is then
+[`W146`](#w146--network-namespace-with-no-interface)).
+
+**Suppress with** `I005` / `NG-N027`, or an annotation on the device. A host that
+joins bridges this way as a matter of course should say `ignore = ["I005"]` in
+`netgraph.toml` once.
 
 ## Fixing a finding
 
@@ -2409,7 +2498,7 @@ schema rule is a usage error:
 <!-- run: rc=2 -->
 ```console
 $ netgraph validate --disable NG-D005
-error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, I001, I002, I003, I004, an NG-* alias from docs/schema.md §10, or '*'
+error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, I001, I002, I003, I004, I005, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 Every mechanism accepts both spellings of an id — `W102` and `NG-C010` select

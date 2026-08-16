@@ -49,6 +49,7 @@ from netgraph.export.config.plan import (
     DevicePlan,
     TunnelPlan,
     addresses_of,
+    netns_limits,
     restricts_vlans,
     route_interface,
     unwritable_vlan,
@@ -126,6 +127,7 @@ def limits(plan: DevicePlan) -> tuple[Unsupported, ...]:
 
 
 def _limits(plan: DevicePlan) -> Iterator[Unsupported]:
+    yield from netns_limits(plan, "netplan")
     for index, vrf in enumerate(plan.device.spec.vrfs):
         yield Unsupported(
             element=plan.fqn,

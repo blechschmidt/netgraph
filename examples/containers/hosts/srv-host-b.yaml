@@ -1,0 +1,44 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-host-b
+  description: >-
+    The second host. One sandbox namespace, joined by a veth pair that is
+    routed rather than bridged - the other of the two shapes a pair comes in.
+spec:
+  vendor: Supermicro
+  model: SYS-5019C-MR
+  interfaces:
+    - name: eno1
+      type: ethernet
+      description: Uplink to sw-lab.
+      mtu: 1500
+      ipv4:
+        addresses:
+          - ip: 10.20.0.12
+            prefix_length: 24
+        gateway: 10.20.0.1
+    - name: veth-sbx-h
+      type: ethernet
+      description: Host end of the sandbox pair, addressed rather than bridged.
+      ipv4:
+        addresses:
+          - ip: 10.32.0.1
+            prefix_length: 30
+      peer: veth-sbx
+    - name: veth-sbx
+      type: ethernet
+      description: Sandbox end of the pair.
+      ipv4:
+        addresses:
+          - ip: 10.32.0.2
+            prefix_length: 30
+        gateway: 10.32.0.1
+      netns: sandbox
+      peer: veth-sbx-h
+  forwarding:
+    ipv4: true
+    ipv6: false
+  netns:
+    - name: sandbox
+      description: Throwaway namespace for testing; routed off the host.

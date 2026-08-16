@@ -844,6 +844,47 @@ class Interface(NetgraphModel):
     parent: IfName | None = None
     #: ``if:lower-layer-if`` of a ``lag`` or ``bridge`` interface.
     members: list[IfName] | None = None
+    #: The network namespace this interface lives in (§23). Names an entry of
+    #: the device's ``spec.netns`` (``NG-N022``); unset means the device's
+    #: initial namespace. This is the *whole* stack the interface is in, not
+    #: just its routing table — see :attr:`vrf`, which partitions the second.
+    netns: ElementName | None = None
+    #: The other end of the veth pair this interface is one end of (§23.2).
+    #: Names another ``type: ethernet`` interface of the same element, which
+    #: must name this one back (``NG-N023``). Unset means an ordinary port.
+    peer: IfName | None = None
+
+    @model_validator(mode="after")
+    def _check_veth(self) -> Interface:
+        """``NG-N023``: only an ethernet interface is one end of a veth pair.
+
+        A veth end is ``ianaift:ethernetCsmacd`` and nothing else — that is the
+        point of §23.2 — so ``peer`` on a ``loopback``, a ``bridge``, a ``vlan``
+        sub-interface or a ``tunnel`` is not a veth pair described unusually, it
+        is a kind of link that does not exist. ``wifi`` and ``lag`` are refused
+        for the same reason even though a cable may terminate on them: a radio
+        has no far end inside the machine, and an aggregate of veths is
+        expressed by aggregating the two ends, not by pairing the bond.
+
+        Symmetry, and that the peer exists at all, need the rest of the element
+        in view and are checked by :func:`~netgraph.models.device.check_interface_set`.
+        """
+        if self.peer is None:
+            return self
+        if self.type is not InterfaceType.ETHERNET:
+            raise field_error(
+                f"'peer' makes this interface one end of a veth pair, which is a pair of "
+                f"'ethernet' interfaces (schema §23.2), not {self.type.value!r}",
+                rule="NG-N023",
+                path=("peer",),
+            )
+        if self.peer == self.name:
+            raise field_error(
+                "'peer' must not be the interface itself: a veth pair has two ends",
+                rule="NG-N023",
+                path=("peer",),
+            )
+        return self
 
     @model_validator(mode="after")
     def _check_stacking(self) -> Interface:
@@ -964,6 +1005,31 @@ class Interface(NetgraphModel):
     def is_cableable(self) -> bool:
         """``NG-C009``: only physical and aggregate interfaces can be cabled."""
         return self.type.is_cableable
+
+    @property
+    def is_veth(self) -> bool:
+        """Is this one end of a veth pair (§23.2)?
+
+        Asked wherever a rule is about a *socket* rather than about a port: a
+        veth end is cableable by type and uncabled by nature, so ``I002`` and
+        ``NG-N024`` both have to be able to tell the two apart.
+        """
+        return self.peer is not None
+
+    @property
+    def netns_name(self) -> str:
+        """The network namespace this interface is in, ``""`` for the initial one.
+
+        The normalised form of :attr:`netns`: every consumer wants a string it
+        can group by, and ``None`` and ``""`` meaning the same namespace would
+        make two of them.
+
+        Deliberately not called ``namespace``. That word already means the
+        *folder* namespace of §2.2 everywhere else in this codebase — it is what
+        :attr:`~netgraph.render.graph.Node.namespace` holds — and two unrelated
+        things under one name on neighbouring objects is how a bug gets written.
+        """
+        return self.netns or ""
 
     @property
     def lower_layer_if(self) -> tuple[str, ...]:

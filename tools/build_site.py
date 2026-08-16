@@ -112,7 +112,7 @@ class Demo:
 #: Every example, with the layers worth drawing for it. Explicit rather than
 #: derived: which layers an inventory has anything to say at is a property of
 #: what it was written to demonstrate, and a probe that guessed would put an
-#: empty ``overlay`` tab on four of these five.
+#: empty ``overlay`` tab on five of these six.
 DEMOS: Final[tuple[Demo, ...]] = (
     Demo(
         name="home-lab",
@@ -145,6 +145,14 @@ DEMOS: Final[tuple[Demo, ...]] = (
         name="patch-room",
         summary="Patch panels, racks and power feeds: the layers a diagram usually leaves out.",
         layers=("physical", "l1", "rack", "power"),
+    ),
+    Demo(
+        name="containers",
+        summary=(
+            "What is inside a machine: five network namespaces, one nested inside "
+            "another, joined by veth pairs. The one to open the netns layer on."
+        ),
+        layers=("l1", "l3", "netns"),
     ),
 )
 

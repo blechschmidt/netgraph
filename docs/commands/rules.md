@@ -95,6 +95,8 @@ E045  error     NG-S012           Group membership forms a cycle.
 E046  error     NG-S013           Two identities claim the same login, uid or gid.
 E047  error     -                 An element declares it must keep its gateway under any single failure, and does not.
 E048  error     -                 An element declares it must keep power under any single failure, and does not.
+E049  error     NG-N024           A cable terminates on one end of a veth pair.
+E050  error     NG-N025           A bridge or lag aggregates a member in another network namespace.
 W101  warning   NG-I013           An interface has neither IPv4 nor IPv6 and is not a switchport.
 W102  warning   NG-C010           The two endpoints of a cable disagree about the MTU.
 W103  warning   NG-C016           A device terminates no cable and hosts no adapter: an orphan node.
@@ -140,10 +142,12 @@ W142  warning   NG-G001           A diagram annotation names an element the inve
 W143  warning   NG-G004           An area's selector matches no element of the inventory.
 W144  warning   NG-Z003           A style fades an element to nothing, so it is drawn invisibly.
 W145  warning   NG-Z005           A style draws an element's label in the colour of the box behind it.
+W146  warning   NG-N026           A declared network namespace holds no interface.
 I001  info      NG-I010           A MAC address is locally administered rather than vendor-assigned.
 I002  info      NG-C015           An interface is enabled but terminates no cable.
 I003  info      NG-T015           A tunnel listens on a port other than the registered one for its type.
 I004  info      NG-S016           A person's account is a member of no group.
+I005  info      NG-N027           Both ends of a veth pair are in the same network namespace.
 ```
 
 Two things the table does not say, both deliberate:

@@ -107,6 +107,7 @@ from netgraph.models import (
     GROUP_KIND,
     PATCHPANEL_KIND,
     PDU_KIND,
+    ROOT_NETNS,
     USER_KIND,
     Adapter,
     Cable,
@@ -121,6 +122,7 @@ from netgraph.models import (
     TunnelType,
     User,
     format_bitrate,
+    netns_path,
 )
 from netgraph.models.metadata import Location
 from netgraph.power import Feed, PowerNode, PowerPlan, power_plan
@@ -141,6 +143,8 @@ if TYPE_CHECKING:  # pragma: no cover - imported for typing only
 
 __all__ = [
     "GROUP_KIND",
+    "NETNS_ID_PREFIX",
+    "NETNS_KIND",
     "NODE_KINDS",
     "PATCHPANEL_KIND",
     "PDU_KIND",
@@ -157,6 +161,7 @@ __all__ = [
     "FilterSpec",
     "Graph",
     "Layer",
+    "NetnsView",
     "Node",
     "NodeType",
     "PatchHop",
@@ -172,6 +177,7 @@ __all__ = [
     "build_graph",
     "filter_graph",
     "is_routable_address",
+    "netns_node_id",
     "rack_elevations",
     "resolve_tunnels",
     "splice_patch_panels",
@@ -204,6 +210,12 @@ class Layer(str, Enum):
     #: Identity: the users and groups, joined by membership (§19.3). Not a
     #: network at all — it answers "who", which no other view can.
     IDENTITY = "identity"
+    #: Namespaces: the network stacks *inside* each machine, nested as they are
+    #: declared and joined by the veth pairs that cross between them (§23.3).
+    #: The one view that looks below the device: everywhere else a host is one
+    #: box, and a container host drawn as one box says nothing about the dozen
+    #: stacks it is actually running.
+    NETNS = "netns"
 
     def __str__(self) -> str:
         return self.value
@@ -250,6 +262,10 @@ class NodeType(str, Enum):
     #: elements the diagram no longer draws, so a consumer must be able to tell
     #: it from the single device it otherwise looks like.
     AGGREGATE = "aggregate"
+    #: One network namespace *inside* a device (§23). Derived: the device
+    #: declares it, but the node standing for it is minted by the netns view,
+    #: which is the only layer that draws below the machine.
+    NETNS = "netns"
 
     def __str__(self) -> str:
         return self.value
@@ -279,6 +295,24 @@ TUNNEL_KIND: Final = "tunnel"
 #: of declared names, so the node and the element it stands for stay distinct
 #: even in a graph that holds both.
 TUNNEL_ID_PREFIX: Final = "tunnel:"
+
+#: ``kind`` reported for a network-namespace node, and the prefix of its
+#: identity: ``netns:hosts/srv-01:blue`` is the namespace ``blue`` on
+#: ``hosts/srv-01``. Two colons rather than one because both halves need to be
+#: recoverable and neither an element name nor a namespace name may contain one.
+NETNS_KIND: Final = "netns"
+NETNS_ID_PREFIX: Final = "netns:"
+
+
+def netns_node_id(element: str, namespace: str) -> str:
+    """Identity of the node standing for ``namespace`` on ``element`` (§23.3).
+
+    The device's own fqn for its initial namespace: that node *is* the machine —
+    it keeps the element, the icon, the source link and the geometry — and
+    minting a second identity for it would mean a stored arrangement of the
+    netns view could not be shared with any other.
+    """
+    return f"{NETNS_ID_PREFIX}{element}:{namespace}" if namespace else element
 
 
 class EdgeKind(str, Enum):
@@ -310,6 +344,14 @@ class EdgeKind(str, Enum):
     #: ``powered_by: poe``. Drawn distinctly from an outlet feed because it is a
     #: different kind of fact — nobody can unplug it without unplugging the data.
     POE = "poe"
+    #: A veth pair: two ``ethernet`` interfaces of one machine naming each other
+    #: with ``peer`` (§23.2). Drawn between the namespaces their ends are in,
+    #: which is the whole point of one.
+    VETH = "veth"
+    #: A namespace's ``parent``: that stack was created from inside this one
+    #: (§23.1). Directed in the only sense an undirected edge can be — source is
+    #: the containing namespace — because nesting is what the edge says.
+    NESTING = "nesting"
 
     def __str__(self) -> str:
         return self.value
@@ -341,6 +383,14 @@ class PortView:
     vlan_mode: str | None = None
     #: Every VLAN the port is a member of, native VLAN included (§9.3).
     vlans: frozenset[int] = frozenset()
+    #: The network namespace the port is in, ``""`` for the machine's initial
+    #: one (§23.1). Carried on every port, at every layer: which stack an
+    #: address is in is a fact about the address, so a tooltip that named the
+    #: address without it would be naming an address that may not be unique.
+    netns: str = ""
+    #: The other end of the veth pair this port is one end of, or ``None``
+    #: (§23.2). An interface name on the *same* element, always.
+    peer: str | None = None
 
     @classmethod
     def of(cls, interface: Interface) -> PortView:
@@ -359,7 +409,14 @@ class PortView:
             ),
             vlan_mode=vlan.mode.value if vlan is not None else None,
             vlans=vlan.vlan_ids() if vlan is not None else frozenset(),
+            netns=interface.netns_name,
+            peer=interface.peer,
         )
+
+    @property
+    def is_veth(self) -> bool:
+        """Is this port one end of a veth pair (§23.2)?"""
+        return self.peer is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -488,6 +545,66 @@ class TunnelView:
         would report endpoints the reader cannot see.
         """
         return replace(self, ends=tuple(end for end in self.ends if end.element in elements))
+
+
+@dataclass(frozen=True, slots=True)
+class NetnsView:
+    """One network namespace of one machine, resolved (§23.3).
+
+    Minted for every namespace the netns layer draws, the machine's initial one
+    included — that one is carried on the *element* node rather than on a node of
+    its own, so a reader looking at ``srv-01`` sees which of its interfaces never
+    left the machine's own stack.
+
+    Flattened here, once, for the reason :class:`RoutingView` is: four renderers
+    draw this view and none of them may disagree about which stack an address is
+    in.
+    """
+
+    #: Fully-qualified name of the machine the namespace is on.
+    element: str
+    #: ``spec.netns[].name``, or ``""`` for the machine's initial namespace.
+    name: str = ""
+    #: The chain from the initial namespace down to this one, outermost first;
+    #: ``()`` for the initial namespace. ``("blue", "web")`` is ``web`` nested
+    #: inside ``blue``, which is what makes nesting readable at a glance.
+    path: tuple[str, ...] = ()
+    #: The namespace this one was created inside, ``""`` for the initial one and
+    #: for anything directly in it.
+    parent: str = ""
+    #: The interfaces in this namespace, in declaration order.
+    ports: tuple[PortView, ...] = ()
+    description: str | None = None
+
+    @property
+    def id(self) -> str:
+        """Identity of the node standing for this namespace."""
+        return netns_node_id(self.element, self.name)
+
+    @property
+    def is_root(self) -> bool:
+        """Is this the machine's initial namespace rather than a declared one?"""
+        return not self.name
+
+    @property
+    def depth(self) -> int:
+        """How deeply the namespace is nested; ``0`` for the initial one."""
+        return len(self.path)
+
+    @property
+    def label(self) -> str:
+        """``blue/web`` — the namespace as a reader spells its containment."""
+        return "/".join(self.path) if self.path else short_name(self.element)
+
+    @property
+    def addresses(self) -> tuple[str, ...]:
+        """Every routable address configured in this stack, in interface order."""
+        return tuple(address for port in self.ports for address in port.routable_addresses)
+
+    @property
+    def veth_ends(self) -> tuple[PortView, ...]:
+        """The ports of this namespace that are one end of a veth pair."""
+        return tuple(port for port in self.ports if port.is_veth)
 
 
 @dataclass(frozen=True, slots=True)
@@ -812,6 +929,10 @@ class Node:
     #: What this element contributes to the power view; set at
     #: :attr:`Layer.POWER` only (§17.5).
     power: PowerNode | None = None
+    #: The network namespace this node stands for; set at :attr:`Layer.NETNS`
+    #: only (§23.3), on the derived nodes *and* on the element node, which
+    #: stands for the machine's initial namespace.
+    netns: NetnsView | None = None
     #: The box this node is drawn inside when the *layer* groups the nodes rather
     #: than the reader: the VRF at :attr:`Layer.ROUTING`. Distinct from
     #: :attr:`namespace`, which is where the document lives — a router holds any
@@ -926,6 +1047,17 @@ class Node:
     def is_aggregate(self) -> bool:
         """Does this node stand for a whole namespace rather than one thing?"""
         return self.type is NodeType.AGGREGATE
+
+    @property
+    def is_netns(self) -> bool:
+        """Does this node stand for a network namespace inside a machine (§23.3)?
+
+        False for the element node of the netns view even though it carries a
+        :attr:`netns`: that node is still the machine, and a renderer that drew
+        it as a bare namespace box would lose the icon, the kind and the link to
+        the document.
+        """
+        return self.type is NodeType.NETNS
 
     @property
     def identity(self) -> User | Group | None:
@@ -1379,6 +1511,8 @@ def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph:
         nodes, edges = _power_view(inventory, nodes)
     elif layer is Layer.IDENTITY:
         nodes, edges = _identity_view(inventory)
+    elif layer is Layer.NETNS:
+        nodes, edges = _netns_view(nodes, edges)
     geometry = resolve_geometry(inventory, layer.value)
     annotations = annotations_for_view(inventory, layer.value)
     return Graph(
@@ -1854,6 +1988,168 @@ def _routed_view(
         node = Node.for_subnet(subnet)
         kept[node.fqn] = node
     return kept, tuple(edges)
+
+
+def _netns_view(
+    nodes: Mapping[str, Node], edges: Sequence[Edge]
+) -> tuple[dict[str, Node], tuple[Edge, ...]]:
+    """Open every machine up and draw the stacks inside it (§23.3).
+
+    Every other layer treats a device as one box, which is the right abstraction
+    right up to the point where the box is a container host: a machine running
+    twelve namespaces has twelve routing tables, and a diagram that draws one
+    node has drawn one of them. This view draws them all.
+
+    The element node stays, and stands for the machine's **initial** namespace —
+    it keeps the kind, the icon, the document link and the arrangement, because
+    it is still the machine. Each declared namespace becomes a node beside it,
+    and every node of one machine is put in a cluster named after that machine,
+    so the boxes a reader sees are "inside this host".
+
+    Three kinds of edge, and each says something no other layer can:
+
+    * a **veth pair** joins the two namespaces its ends are in — the crossing
+      itself, which at layer 1 is invisible because both ends are inside one
+      box;
+    * a **nesting** edge runs from a namespace to the one created inside it,
+      which is how arbitrarily deep nesting is drawn without nested boxes;
+    * a **cable** is kept, re-pointed at the namespace holding the interface it
+      lands on, which is what answers the question the view exists for: how does
+      the stack in this container reach the wire?
+
+    A machine that declares no namespace and no veth pair is drawn only when
+    something it is cabled to *is* opened up. It has one stack, drawn as it is
+    at every other layer, so it is here as context — the wire the container
+    reaches the world by has to arrive somewhere — and not as a subject.
+    Everything further away is dropped, for the reason the routing view drops
+    the cabling: a view that answers one question should not also be a map.
+    """
+    kept: dict[str, Node] = {}
+    where: dict[tuple[str, str], str] = {}  # (element, interface) -> node id
+    opened: set[str] = set()
+    veths: list[Edge] = []
+    nesting: list[Edge] = []
+
+    for fqn, node in nodes.items():
+        device = node.element if isinstance(node.element, Device) else None
+        views = _netns_views(fqn, device) if device is not None else ()
+        if device is None or not views:
+            kept[fqn] = node
+            for port in node.ports:
+                where[(fqn, port.name)] = fqn
+            continue
+
+        cluster = fqn
+        opened.add(fqn)
+        for view in views:
+            for port in view.ports:
+                where[(fqn, port.name)] = view.id
+            if view.is_root:
+                kept[fqn] = replace(node, ports=view.ports, netns=view, cluster=cluster)
+                continue
+            kept[view.id] = Node(
+                fqn=view.id,
+                name=view.label,
+                kind=NETNS_KIND,
+                namespace=node.namespace,
+                ports=view.ports,
+                vlans=frozenset().union(*(port.vlans for port in view.ports))
+                if view.ports
+                else frozenset(),
+                type=NodeType.NETNS,
+                netns=view,
+                cluster=cluster,
+            )
+            nesting.append(_nesting_edge(fqn, view))
+
+        veths.extend(
+            _veth_edge(fqn, first, second, where) for first, second in device.spec.veth_pairs()
+        )
+
+    if not opened:
+        return {}, ()
+
+    physical = tuple(
+        replace(
+            edge,
+            source=where.get((edge.source, edge.source_port), edge.source),
+            target=where.get((edge.target, edge.target_port), edge.target),
+        )
+        for edge in edges
+        if edge.source in kept and edge.target in kept
+    )
+    # Exactly one hop of context. ``subject`` is every stack of every machine
+    # this view opened — ``cluster`` is the machine, which makes the test one
+    # lookup rather than a walk back through ``where`` — and ``context`` is
+    # whatever is directly joined to one of them. Deliberately not a fixed point:
+    # a second hop is the rest of the network, and this view is not a map of it.
+    subject = {fqn for fqn, node in kept.items() if node.cluster in opened}
+    context = {
+        far
+        for edge in physical
+        for near, far in ((edge.source, edge.target), (edge.target, edge.source))
+        if near in subject
+    }
+    drawn = subject | context
+    kept = {fqn: node for fqn, node in kept.items() if fqn in drawn}
+    surviving = tuple(edge for edge in physical if edge.source in kept and edge.target in kept)
+    return kept, (*surviving, *veths, *nesting)
+
+
+def _netns_views(fqn: str, device: Device) -> tuple[NetnsView, ...]:
+    """Every namespace of one machine, the initial one first.
+
+    ``()`` when the machine has only one stack, which is what leaves it drawn as
+    the single box every other layer draws it as. "Only one" means the document
+    says nothing about namespaces *and* nothing about veth pairs: a machine may
+    run a pair entirely inside its initial namespace (``I005``), and that is
+    still a fact this view exists to show.
+    """
+    spec = device.spec
+    if not spec.netns and not spec.veth_pairs():
+        return ()
+    parents = spec.netns_parents()
+    described = {entry.name: entry.description for entry in spec.netns}
+    return tuple(
+        NetnsView(
+            element=fqn,
+            name=name,
+            path=netns_path(name, parents),
+            parent=parents.get(name, ROOT_NETNS),
+            ports=tuple(PortView.of(interface) for interface in spec.interfaces_in_netns(name)),
+            description=described.get(name),
+        )
+        for name in spec.netns_names()
+    )
+
+
+def _veth_edge(
+    fqn: str, first: Interface, second: Interface, where: Mapping[tuple[str, str], str]
+) -> Edge:
+    """The edge one veth pair is: a link between the two stacks it joins (§23.2)."""
+    return Edge(
+        id=f"{fqn}:{first.name}#veth",
+        kind=EdgeKind.VETH,
+        source=where.get((fqn, first.name), fqn),
+        target=where.get((fqn, second.name), fqn),
+        source_port=first.name,
+        target_port=second.name,
+        # No ``label``: the two port names are drawn from ``source_port`` and
+        # ``target_port`` already, and a label repeating them put the same pair
+        # on the diagram twice.
+        medium="",
+    )
+
+
+def _nesting_edge(fqn: str, view: NetnsView) -> Edge:
+    """The edge one ``spec.netns[].parent`` is: that stack created this one."""
+    return Edge(
+        id=f"{view.id}#nesting",
+        kind=EdgeKind.NESTING,
+        source=netns_node_id(fqn, view.parent),
+        target=view.id,
+        medium="",
+    )
 
 
 def _routing_view(
@@ -2729,6 +3025,16 @@ def _kept_derived(
             if not elevation.slots and fqn != seed:
                 continue
             surviving[fqn] = replace(node, rack=elevation)
+        elif node.netns is not None:
+            # A namespace has exactly one member and it is not in the graph: the
+            # machine that runs it, which is drawn as the node standing for its
+            # initial namespace. So a stack survives when its machine does —
+            # ``--name srv-01`` selects the host *and everything inside it*,
+            # which is what somebody who asked for a container host by name
+            # meant on the one layer that draws its containers.
+            if node.netns.element not in elements and fqn != seed:
+                continue
+            surviving[fqn] = node
     return surviving
 
 

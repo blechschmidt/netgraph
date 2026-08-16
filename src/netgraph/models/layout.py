@@ -137,6 +137,7 @@ LAYOUT_VIEWS: Final[tuple[str, ...]] = (
     "rack",
     "power",
     "identity",
+    "netns",
 )
 
 #: Largest coordinate magnitude, in points. A drawing 10 000 inches across is

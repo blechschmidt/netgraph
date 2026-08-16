@@ -77,6 +77,7 @@ from netgraph.models import (  # noqa: E402
     Location,
     Medium,
     Metadata,
+    NetnsDefinition,
     NodeGeometry,
     NoteAnchor,
     NoteSpec,
@@ -311,6 +312,25 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "lists at most one (`NG-W006`).",
             "`vlan` is where the SSID's traffic goes on the wired side. It has to be a VLAN the "
             "access point carries somewhere (`NG-W009`), or clients associate and reach nothing.",
+        ),
+    ),
+    Section(
+        NetnsDefinition,
+        "`spec.netns[]`",
+        "One network namespace the machine runs (§23.1) — a whole second network stack, "
+        "with its own interfaces, addresses and routing table. An interface joins it with "
+        "`netns`.",
+        notes=(
+            "`parent` names another entry of the same table, which is how namespaces nest: a "
+            "namespace is created from inside exactly one other, so the nesting is a tree "
+            "(`NG-N021`). Unset means the machine's initial namespace, which no document "
+            "declares.",
+            "Not a VRF. A VRF partitions the routing table of one stack; a namespace *is* a "
+            "second stack, so it partitions the interface names, the addresses and the "
+            "sockets as well. An interface can be in both.",
+            "Namespaces are joined by veth pairs, which are ordinary `type: ethernet` "
+            "interfaces naming each other with `peer` (§23.2).",
+            "A namespace no interface is in holds nothing, which is `NG-N026`.",
         ),
     ),
     Section(

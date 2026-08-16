@@ -74,6 +74,7 @@ from netgraph.render.graph import (
     TunnelView,
 )
 from netgraph.render.options import DEFAULT_RANKDIR, RenderOptions
+from netgraph.render.palette import CLUSTER_NOUN
 
 __all__ = ["MERMAID_MAX_EDGES", "mermaid_advisories", "render_mermaid", "to_mermaid"]
 
@@ -278,14 +279,15 @@ def _clustered_nodes(
     *,
     skip: Container[str] = frozenset(),
 ) -> Iterator[str]:
-    """One ``subgraph`` per box the layer asked for: the VRFs of §16.6."""
+    """One ``subgraph`` per box the layer asked for: a VRF (§16.6) or a machine (§23.3)."""
     loose = [node for node in graph.nodes.values() if not node.cluster and node.fqn not in skip]
     yield from (f"{_INDENT}{line}" for line in _nodes(loose, ids, options, graph.layer))
+    noun = CLUSTER_NOUN.get(graph.layer, "group")
     for index, cluster in enumerate(graph.clusters):
         members = [node for node in graph.nodes_in_cluster(cluster) if node.fqn not in skip]
         if not members:
             continue
-        yield f"{_INDENT}subgraph vrf{index}[{_label(f'vrf {cluster}')}]"
+        yield f"{_INDENT}subgraph vrf{index}[{_label(f'{noun} {cluster}')}]"
         yield f"{_INDENT * 2}direction {options.rankdir or DEFAULT_RANKDIR}"
         yield from (f"{_INDENT * 2}{line}" for line in _nodes(members, ids, options, graph.layer))
         yield f"{_INDENT}end"

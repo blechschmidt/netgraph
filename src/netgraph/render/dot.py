@@ -171,6 +171,7 @@ from netgraph.render.options import DEFAULT_RANKDIR, RenderOptions
 from netgraph.render.palette import (
     CLUSTER_FONT_SIZE,
     CLUSTER_LABEL_COLOUR,
+    CLUSTER_NOUN,
     CLUSTER_PALETTE,
     CLUSTER_STROKE,
     DEFAULT_EDGE_PALETTE,
@@ -1521,6 +1522,7 @@ def _cluster_groups(
         )
     )
     groups: list[_GroupView] = [_GroupView(nodes=loose)] if loose else []
+    noun = CLUSTER_NOUN.get(graph.layer, "group")
     for index, cluster in enumerate(graph.clusters):
         members = [node for node in graph.nodes_in_cluster(cluster) if node.fqn not in skip]
         if not members:
@@ -1529,10 +1531,12 @@ def _cluster_groups(
             _GroupView(
                 nodes=tuple(_node_views(graph, members, options, look, identity, details, plan)),
                 # Offset past the namespace clusters' numbering space so the two
-                # groupings can never mint the same subgraph name.
+                # groupings can never mint the same subgraph name. The ``vrf``
+                # in it is historical and does the job of being unique, not of
+                # naming what the box holds — the *label* does that.
                 id=f"cluster_vrf_{index}",
-                label=f"vrf {cluster}",
-                tooltip=_cluster_tooltip(cluster, members, options, identity, details, kind="vrf"),
+                label=f"{noun} {cluster}",
+                tooltip=_cluster_tooltip(cluster, members, options, identity, details, kind=noun),
                 element_id=identity.cluster(cluster) if options.element_ids else None,
             )
         )

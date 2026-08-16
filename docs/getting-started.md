@@ -523,6 +523,7 @@ spec:
   forwarding:
     ipv4: false
     ipv6: false
+  netns: []
   vrfs: []
   routes: []
 ```

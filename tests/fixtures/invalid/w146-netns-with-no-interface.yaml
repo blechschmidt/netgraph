@@ -1,0 +1,41 @@
+# W146 (NG-N026) - a declared network namespace nothing is in.
+#
+# A namespace is a stack, and a stack with no interface holds no address, has no
+# route and has no way in or out. The isolation the document declares does not
+# exist.
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-a
+spec:
+  netns:
+    - name: blue
+      description: tenant blue, nothing moved into it yet
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - srv-a:eth0
+    - srv-b:eth0
+  medium: copper

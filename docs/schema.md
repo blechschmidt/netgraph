@@ -58,6 +58,7 @@ expands §9 with the reasoning and with what is deliberately left uncovered.
 20. [Test suites: executable assertions](#20-test-suites-executable-assertions)
 21. [Diagram annotations: notes, areas and legends](#21-diagram-annotations-notes-areas-and-legends)
 22. [Per-element styling and themes](#22-per-element-styling-and-themes)
+23. [Network namespaces and veth pairs](#23-network-namespaces-and-veth-pairs)
 
 ---
 
@@ -391,6 +392,7 @@ filtering.
 | `from` | element-ref | O | — | §6.6. Names a `kind: template` document whose partial spec is merged underneath this one. |
 | `bridge` | Bridge | O | `null` | §6.3. Permitted on `switch`, `router`, `computer`, `server`. |
 | `vlans` | list[VlanDef] | O | `[]` | §6.4. VLAN database. Same permission set as `bridge`. |
+| `netns` | list[Netns] | O | `[]` | §23.1. The network namespaces the machine runs. Same permission set as `bridge`. |
 | `forwarding` | mapping | O | see §6.1.1 | `{ipv4: boolean, ipv6: boolean}`. |
 | `power` | PowerConfig | O | `null` | §17.2. What the device draws, which PDU outlets feed it, and how much PoE it hands out. |
 
@@ -422,6 +424,8 @@ free of boilerplate.
 | `poe` | PoeConfig | O | `null` | §17.3. This port hands power down the cable. `type: ethernet` or `lag` only (`NG-E006`). |
 | `parent` | ifname | C | — | Required for `type: vlan`, optional for `type: tunnel`, MUST NOT appear otherwise. → `if:lower-layer-if`. |
 | `members` | list[ifname] | C | — | Required for `type: lag` and `type: bridge`; MUST NOT appear otherwise. → `if:lower-layer-if`. |
+| `netns` | name | O | *unset* | §23.1. The network namespace the interface is in; unset means the machine's initial one. Names an entry of `spec.netns` (`NG-N022`). |
+| `peer` | ifname | O | *unset* | §23.2. The other end of the veth pair this interface is one end of. `type: ethernet` only, and symmetric (`NG-N023`). |
 
 #### 6.2.1 Interface `type`
 
@@ -1499,6 +1503,23 @@ severities and the schema/semantic split are stated there.
 is parsed and not suppressible; `NG-Z003` and `NG-Z005` are semantic and carry
 the short ids above. [§22.7](#227-rules) states them in context, with why each
 one is graded the way it is.
+
+### 10.18 Network namespaces and veth pairs (§23)
+
+| ID | Sev. | Rule |
+|---|---|---|
+| `NG-N020` | error | `spec.netns[].name` is unique within its device. |
+| `NG-N021` | error | `spec.netns[].parent` names another entry of the same table, is not the entry itself, and the nesting chain does not loop. |
+| `NG-N022` | error | `interfaces[].netns` names an entry of the device's `spec.netns`. An `adapter` declares no namespace table, so any value on one is refused. |
+| `NG-N023` | error | `peer` appears only on `type: ethernet`, names another interface of the same element, is not the interface itself, and that interface names it back. |
+| `NG-N024` | error | No cable terminates on an interface that declares a `peer`: a veth end has no socket. Reported as `E049`. |
+| `NG-N025` | error | Every member of a `bridge` or `lag` is in the same network namespace as the aggregate. Reported as `E050`. |
+| `NG-N026` | warning | Every declared namespace holds at least one interface. Reported as `W146`. |
+| `NG-N027` | info | The two ends of a veth pair are in different network namespaces. Reported as `I005`. |
+
+`NG-N020` to `NG-N023` are schema rules, reported while the document is parsed;
+`NG-N024` to `NG-N027` need the whole inventory and are the semantic
+validator's. [§23.4](#234-rules) states them in context.
 
 ---
 
@@ -3757,7 +3778,7 @@ value has not changed.
 ### 18.3 Views
 
 `spec.views` is keyed by the layer being drawn — `physical`, `l1`, `l2`, `l3`,
-`overlay`, `routing`, `rack`, `power`, `identity` — because the same device sits
+`overlay`, `routing`, `rack`, `power`, `identity`, `netns` — because the same device sits
 somewhere different in each. The l3 diagram is a different graph with different neighbours,
 not the same diagram recoloured.
 
@@ -4305,7 +4326,7 @@ renderer asks about one:
 | `color` | string | O | *unset* | Fill colour, `#rgb` or `#rrggbb`. Absent takes the kind's default. |
 
 `views` is the closed set §18 scopes geometry by — `physical`, `l1`, `l2`, `l3`,
-`overlay`, `routing`, `rack`, `power`, `identity` — and an unknown name is
+`overlay`, `routing`, `rack`, `power`, `identity`, `netns` — and an unknown name is
 refused (`NG-G003`) rather than accepted and silently drawn nowhere. Empty is
 the default because a remark about a site is a remark about the site in every
 picture of it; `views: [l3]` is for the remark that only makes sense once the
@@ -5125,3 +5146,194 @@ see, and a warning about a pair the element does not fully control is a warning
 nobody can act on without editing somebody else's file. `fill: none` is exempt
 for the same reason — it means "whatever is behind this", and dark text on it is
 the ordinary way to draw an unfilled shape.
+
+## 23. Network namespaces and veth pairs
+
+Everywhere else in this document a machine is one network stack. §6.2 gives it
+interfaces, §6.2.3 gives those addresses, §16 gives it a routing table, and one
+box on a diagram holds all of it. That abstraction is exactly right for a
+switch, a router and a laptop, and it stops being right the moment the machine
+is a container host: a server running twelve containers has twelve interface
+name spaces, twelve address spaces and twelve routing tables, and an inventory
+that records one of them has recorded one twelfth of the truth.
+
+Linux calls the second stack a **network namespace**; `ip netns` creates one; a
+container runtime creates one per container and tells nobody. FreeBSD calls it a
+`vnet` jail. This section models it, and the thing that joins two of them:
+
+* **`spec.netns[]`** (§23.1) — the namespaces one machine runs. Each has a name
+  and, optionally, the namespace it was created inside, which is what makes them
+  nest to any depth.
+* **`interfaces[].netns`** (§23.1) — which stack an interface is in. Unset means
+  the machine's initial namespace, which no document declares because every
+  machine has one.
+* **`interfaces[].peer`** (§23.2) — the other end of a **veth pair**: two
+  `type: ethernet` interfaces of one machine naming each other. There is no new
+  interface type, and that is the point.
+* **`--layer netns`** (§23.3) — the view that draws it.
+
+### 23.1 `spec.netns[]` and `interfaces[].netns`
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `name` | name | M | — | As `ip netns` spells it. Unique within the device (`NG-N020`), and what `parent` and `interfaces[].netns` refer to. |
+| `parent` | name | O | *unset* | Another entry of the same table (`NG-N021`). Unset means the machine's initial namespace. |
+| `description` | string | O | `null` | What the namespace is for: a tenant, a container, a test harness. |
+
+`spec.netns` is permitted on the five device kinds and **not** on an `adapter`
+(`NG-N022`): a namespace belongs to a machine with a kernel in it, and a USB
+dongle is not one. It is not permitted on a `hub` either, for the reason §6.5
+gives — a layer-1 repeater has no stack to duplicate.
+
+```yaml
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-container-01
+spec:
+  netns:
+    - name: blue
+      description: Tenant blue
+    - name: web
+      parent: blue          # nested: created from inside 'blue'
+  interfaces:
+    - name: eno1            # the initial namespace: no 'netns' key
+      type: ethernet
+      ipv4:
+        addresses: [{ip: 10.0.0.10, prefix_length: 24}]
+    - name: veth-blue-h
+      type: ethernet
+      peer: veth-blue
+    - name: veth-blue
+      type: ethernet
+      netns: blue
+      peer: veth-blue-h
+      ipv4:
+        addresses: [{ip: 10.1.0.1, prefix_length: 24}]
+```
+
+**Nesting is a tree, and it is a tree because a namespace has exactly one
+creator.** `parent` is that creator, the chain always ends at the initial
+namespace, and a cycle is `NG-N021`. There is no depth limit: `web` inside
+`blue` inside the initial namespace is three levels, and so is anything deeper.
+A namespace no interface is in is `NG-N026` — legal, since `ip netns add` makes
+exactly that, but far more often the isolation somebody declared does not exist.
+
+**A namespace is not a VRF, and the two compose.** A VRF (§16.1) partitions the
+*routing table* of one stack. A namespace is a whole second stack, so it
+partitions the interface names, the addresses, the sockets and the routes at
+once. An interface may name both: `netns: blue` with `vrf: red` is the `red`
+instance of the `blue` stack, which has nothing whatever to do with the `red`
+instance of the initial one. Everything §10 says about address collisions is
+scoped to the pair, not to either half.
+
+### 23.2 Veth pairs
+
+A veth pair is two interfaces of one machine wired back to back in the kernel: a
+frame written into one comes out of the other. It is how a container reaches the
+host, and it is the only thing that crosses a namespace boundary at layer 2.
+
+**It is modelled as what it is: two `type: ethernet` interfaces naming each
+other.** A veth end is `ianaift:ethernetCsmacd` in every respect the rest of this
+document cares about — it has a MAC, it carries 802.3 frames, it can be a bridge
+port, it can carry a `vlan` sub-interface — so giving it an interface type of its
+own would mean re-stating §6.2 for a port that behaves identically. The one
+thing it does not have is a socket, and that is expressed by the field it *does*
+have:
+
+| Field | Type | Req. | Default | Notes |
+|---|---|---|---|---|
+| `peer` | ifname | O | *unset* | The other end. `type: ethernet` only (`NG-N023`), an interface of the same element, and it must name this one back. |
+
+Four rules follow from that, and each says something the model would otherwise
+have to be trusted about:
+
+* **`NG-N023` — the pairing is symmetric.** A veth pair is created as a pair and
+  destroyed as a pair; there is no operation that leaves one end. A document in
+  which `veth0` names `veth1` and `veth1` names nothing does not describe half a
+  pair, it describes something that cannot be asked for — and the half that is
+  written is as likely to be the wrong half as the right one.
+* **`NG-N024` — a cable must not terminate on a veth end.** Its far side is
+  already claimed. `NG-C009` cannot catch this, because by *type* a veth end is
+  cableable and should be.
+* **`NG-N025` — a `bridge` or `lag` must not aggregate a member in another
+  namespace.** One datapath belongs to one stack; moving a port into a namespace
+  is precisely the operation that takes it out of the aggregate. A `vlan`
+  sub-interface is deliberately not constrained: moving one across is supported
+  and it keeps receiving the frames its parent tags.
+* **`NG-N027` — a pair with both ends in one namespace is reported as info.** It
+  is legal, and it is the standard way to join two bridges inside one stack; it
+  is printed because the commoner reading is a `netns` written on one end and
+  forgotten on the other.
+
+`I002` (*enabled interface terminates no cable*) exempts veth ends. Every one of
+them would otherwise be reported, and none of the reports would be actionable:
+the "spare port" reading does not apply to an interface that has no socket.
+
+### 23.3 The `netns` view
+
+<!-- norun: writes netns.svg into the reader's directory -->
+```console
+$ netgraph -i examples/containers render --layer netns -o netns.svg
+```
+
+The one view that draws *below* the machine. The element node stays and stands
+for the machine's initial namespace — it keeps its kind, its icon, its link to
+the document and its place in a stored arrangement (§18), because it is still
+the machine — and every declared namespace becomes a rounded box beside it. All
+the boxes of one machine are drawn inside a cluster named after it.
+
+Three kinds of edge, each saying something no other layer can:
+
+| Edge | What it is |
+|---|---|
+| veth | A pair (§23.2), drawn between the two namespaces its ends are in. Invisible at layer 1, where both ends are inside one box. |
+| nesting | A namespace's `parent` (§23.1): that stack created this one. This is how arbitrary depth is drawn without arbitrarily nested boxes. |
+| cable | Kept, and re-pointed at the namespace holding the interface it lands on — which is what answers the question the view exists for: how does the stack inside this container reach the wire? |
+
+A machine that declares no namespace and no veth pair is drawn only when
+something it is cabled to *is* opened up, and everything further away is
+dropped. It has one stack, which every other layer already draws; it is here as
+context, because the wire has to arrive somewhere.
+
+**What this view does not change is the other views.** Layer 3 still draws one
+node per *element*, so a container and the machine hosting it are one node
+there — which means `netgraph path` cannot trace out of a container through its
+own host, even though the addresses and the forwarding flag say it should.
+That is recorded as follow-up 23 in [`docs/follow-ups.md`](follow-ups.md); it is
+a decision about what an element node *is* at layer 3, not about §23.
+
+### 23.4 Rules
+
+| Id | Severity | Rule |
+|---|---|---|
+| `NG-N020` | error | `spec.netns[].name` is unique within its device. |
+| `NG-N021` | error | `spec.netns[].parent` names another entry of the same table, is not the entry itself, and the nesting chain does not loop. |
+| `NG-N022` | error | `interfaces[].netns` names an entry of the device's `spec.netns`. An `adapter` declares no namespace table, so any value on one is refused. |
+| `NG-N023` | error | `peer` appears only on `type: ethernet`, names another interface of the same element, is not the interface itself, and that interface names it back. An `adapter` has no stack to join, so any value on one is refused. |
+| `NG-N024` | error | No cable terminates on an interface that declares a `peer`. |
+| `NG-N025` | error | Every member of a `bridge` or `lag` is in the same network namespace as the aggregate. |
+| `NG-N026` | warning | Every declared namespace holds at least one interface. |
+| `NG-N027` | info | The two ends of a veth pair are in different network namespaces. |
+
+`NG-N020` to `NG-N023` are checked by the model, on one document, and are
+therefore reported by the schema pass; `NG-N024` to `NG-N027` need the whole
+inventory and are the semantic validator's, as `E049`, `E050`, `W146` and
+`I005`. §10.11 says how to suppress any of them.
+
+### 23.5 What generates from it
+
+`netgraph export interfaces` — the vendor-neutral dialect, which is defined as
+whatever holds one device's interface configuration *completely* — writes a
+`netns` stanza per namespace and a `netns`/`peer` attribute per interface. It is
+what `netgraph import` reads back and what `netgraph drift` compares, so nothing
+of §23 is lost on the round trip.
+
+**`netplan`, `networkd`, `ifupdown` and `frr` refuse a device that declares
+either, and write nothing.** Not an omission: each of those files configures the
+network stack it is applied *in*, and none of them has syntax for `ip netns` or
+for creating a veth pair. A netplan file listing a container's interface would
+put the container's address on the host — and on a machine running two
+containers out of one image, the two addresses would collide where the inventory
+says they do not. The refusal names every field and points at `export
+interfaces`, which is where the whole of it is written.

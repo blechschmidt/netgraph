@@ -151,6 +151,13 @@ from netgraph.models.layout import (
     ViewGeometry,
 )
 from netgraph.models.metadata import RESERVED_LABEL_PREFIX, Location, Metadata
+from netgraph.models.netns import (
+    ROOT_NETNS,
+    NetnsDefinition,
+    netns_depth,
+    netns_path,
+    resolve_netns_tree,
+)
 from netgraph.models.patchpanel import (
     FRONT,
     MAX_PANEL_PORTS,
@@ -300,6 +307,7 @@ __all__ = [
     "REACHABILITY_ASSERTIONS",
     "REAR",
     "RESERVED_LABEL_PREFIX",
+    "ROOT_NETNS",
     "SELECTOR_ASSERTIONS",
     "SHAPES",
     "STYLE_COLOUR_PATTERN",
@@ -367,6 +375,7 @@ __all__ = [
     "Medium",
     "Metadata",
     "NetgraphModel",
+    "NetnsDefinition",
     "NodeGeometry",
     "Note",
     "NoteAnchor",
@@ -428,6 +437,8 @@ __all__ = [
     "format_bitrate",
     "format_watts",
     "hex_colour",
+    "netns_depth",
+    "netns_path",
     "normalise_mac",
     "panel_port",
     "parse_annotation",
@@ -439,5 +450,6 @@ __all__ = [
     "parse_template",
     "parse_test_suite",
     "parse_theme",
+    "resolve_netns_tree",
     "split_panel_port",
 ]

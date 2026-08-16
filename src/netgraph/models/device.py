@@ -6,7 +6,7 @@ differ in which fields are permitted (§6.5) and in how the renderer draws them.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from enum import Enum
 from typing import ClassVar, Final, Literal
 
@@ -16,6 +16,7 @@ from netgraph.models.base import NetgraphModel
 from netgraph.models.diagnostics import field_error
 from netgraph.models.element import ElementBase
 from netgraph.models.interface import Interface, InterfaceList, InterfaceType
+from netgraph.models.netns import ROOT_NETNS, NetnsDefinition, resolve_netns_tree
 from netgraph.models.power import PowerConfig
 from netgraph.models.routing import RoutingConfig, StaticRoute, VrfDefinition
 from netgraph.models.scalars import Boolean, ElementName, MacAddress, VlanId
@@ -98,6 +99,9 @@ class DeviceSpec(NetgraphModel):
     vlans: list[VlanDefinition] = Field(default_factory=list)
     #: ``None`` until the per-kind default of §6.1.1 is applied by the element.
     forwarding: Forwarding | None = None
+    #: The network namespaces this device runs (§23.1). Each is a whole second
+    #: network stack; ``parent`` nests one inside another, arbitrarily deep.
+    netns: list[NetnsDefinition] = Field(default_factory=list)
     #: The routing instances this device implements (§16.1).
     vrfs: list[VrfDefinition] = Field(default_factory=list)
     #: Configured static routes (§16.2).
@@ -158,6 +162,58 @@ class DeviceSpec(NetgraphModel):
         return self
 
     @model_validator(mode="after")
+    def _check_netns_table(self) -> DeviceSpec:
+        """``NG-N020``/``NG-N021``/``NG-N022``: the namespace table and its references.
+
+        The same shape as :meth:`_check_vrf_table`, and here for the same
+        reason: a namespace is named from two places in one ``spec`` — another
+        namespace nests inside it, an interface lives in it — so both references
+        are resolved where the whole table is in view. Nothing here reaches
+        outside the document, because a namespace cannot: it is a stack inside
+        one machine, and the only thing that crosses the boundary is a veth pair,
+        whose two ends are also in this document.
+        """
+        declared: set[str] = set()
+        for index, entry in enumerate(self.netns):
+            if entry.name in declared:
+                raise field_error(
+                    f"network namespace {entry.name!r} is declared twice",
+                    rule="NG-N020",
+                    path=("netns", index, "name"),
+                )
+            declared.add(entry.name)
+
+        for index, entry in enumerate(self.netns):
+            if entry.parent is not None and entry.parent not in declared:
+                raise field_error(
+                    f"namespace {entry.name!r} is nested inside {entry.parent!r}, which "
+                    f"{_netns_table(declared)}",
+                    rule="NG-N021",
+                    path=("netns", index, "parent"),
+                )
+
+        parents = resolve_netns_tree(self.netns)
+        for index, entry in enumerate(self.netns):
+            if (cycle := _netns_cycle(entry.name, parents)) is not None:
+                raise field_error(
+                    f"namespace nesting is cyclic: {' -> '.join(repr(name) for name in cycle)}. "
+                    f"A namespace is created from inside exactly one other, so the chain has "
+                    f"to end at the initial namespace.",
+                    rule="NG-N021",
+                    path=("netns", index, "parent"),
+                )
+
+        for index, interface in enumerate(self.interfaces):
+            if interface.netns is not None and interface.netns not in declared:
+                raise field_error(
+                    f"{interface.name!r} is in network namespace {interface.netns!r}, which "
+                    f"{_netns_table(declared)}",
+                    rule="NG-N022",
+                    path=("interfaces", index, "netns"),
+                )
+        return self
+
+    @model_validator(mode="after")
     def _check_vlan_database(self) -> DeviceSpec:
         """``NG-V001``: ``vlans[].id`` is unique within a device."""
         seen: set[int] = set()
@@ -183,6 +239,57 @@ class DeviceSpec(NetgraphModel):
         """Look a routing instance up by name (§16.1)."""
         return next((vrf for vrf in self.vrfs if vrf.name == name), None)
 
+    def netns_entry(self, name: str) -> NetnsDefinition | None:
+        """Look a network namespace up by name (§23.1).
+
+        Not ``namespace``: that word means the folder namespace of §2.2
+        everywhere else here, and a device does not own one of those.
+        """
+        return next((entry for entry in self.netns if entry.name == name), None)
+
+    def interfaces_in_netns(self, netns: str) -> tuple[Interface, ...]:
+        """Every interface in ``netns``, in declaration order.
+
+        :data:`~netgraph.models.netns.ROOT_NETNS` selects the interfaces that
+        name no namespace, which is the device's initial one.
+        """
+        wanted = netns or None
+        return tuple(interface for interface in self.interfaces if interface.netns == wanted)
+
+    def netns_parents(self) -> dict[str, str]:
+        """``name -> parent`` over ``spec.netns``, the initial namespace being ``""``."""
+        return resolve_netns_tree(self.netns)
+
+    def netns_names(self) -> tuple[str, ...]:
+        """Every network stack the device has, the initial namespace first.
+
+        Declaration order after that, which is the order ``spec.netns`` is
+        written in, so a diagram and the document agree on which box comes
+        first. A declared namespace that holds no interface is still listed —
+        it exists, it is just empty, and ``W146`` is what says so.
+        """
+        names = [ROOT_NETNS, *(entry.name for entry in self.netns)]
+        return tuple(dict.fromkeys(names))
+
+    def veth_pairs(self) -> tuple[tuple[Interface, Interface], ...]:
+        """Every veth pair of the device, once each, in declaration order (§23.2).
+
+        Once each rather than twice: the pairing is symmetric (``NG-N023``), so
+        walking the interfaces would find every pair from both ends. The end
+        declared first is the source, which is what makes the result — and the
+        edge a renderer draws from it — deterministic.
+        """
+        by_name = {interface.name: interface for interface in self.interfaces}
+        seen: set[str] = set()
+        pairs: list[tuple[Interface, Interface]] = []
+        for interface in self.interfaces:
+            peer = by_name.get(interface.peer or "")
+            if peer is None or interface.name in seen or peer.name in seen:
+                continue
+            seen.update((interface.name, peer.name))
+            pairs.append((interface, peer))
+        return tuple(pairs)
+
     def interfaces_in(self, vrf: str) -> tuple[Interface, ...]:
         """Every interface bound to ``vrf``, in declaration order.
 
@@ -199,6 +306,34 @@ def _vrf_table(declared: Iterable[str]) -> str:
     if not names:
         return "is not declared: the device declares no 'spec.vrfs' at all"
     return f"is not declared in 'spec.vrfs'; it holds {', '.join(repr(name) for name in names)}"
+
+
+def _netns_table(declared: Iterable[str]) -> str:
+    """The tail of ``NG-N021`` and ``NG-N022``, shaped like :func:`_vrf_table`."""
+    names = sorted(declared)
+    if not names:
+        return "is not declared: the device declares no 'spec.netns' at all"
+    return f"is not declared in 'spec.netns'; it holds {', '.join(repr(name) for name in names)}"
+
+
+def _netns_cycle(start: str, parents: Mapping[str, str]) -> tuple[str, ...] | None:
+    """The nesting chain from ``start`` back to itself, or ``None`` if it ends.
+
+    The one-step case (a namespace naming itself) is refused by the entry's own
+    validator; this finds the longer ones, which are only visible once the whole
+    table is in view. The walk is bounded by the number of declared namespaces,
+    so a chain that ends at the initial namespace always returns ``None``.
+    """
+    chain: list[str] = [start]
+    current = parents.get(start, "")
+    while current:
+        if current == start:
+            return (*chain, start)
+        if current in chain:  # a loop that ``start`` only leads into
+            return None
+        chain.append(current)
+        current = parents.get(current, "")
+    return None
 
 
 def check_interface_set(interfaces: Iterable[Interface], *, reserved: Iterable[str] = ()) -> None:
@@ -237,6 +372,44 @@ def check_interface_set(interfaces: Iterable[Interface], *, reserved: Iterable[s
                     rule="NG-I002" if key == "parent" else "NG-I003",
                     path=("interfaces", index, key),
                 )
+
+    check_veth_pairs(entries)
+
+
+def check_veth_pairs(interfaces: Iterable[Interface]) -> None:
+    """``NG-N023``: every ``peer`` names a free interface that names it back (§23.2).
+
+    A veth pair is created as a pair and destroyed as a pair; there is no
+    operation that leaves one end. So a document in which ``veth0`` names
+    ``veth1`` and ``veth1`` names nothing does not describe half a pair — it
+    describes something the kernel cannot be asked for, and the half that is
+    written is as likely to be the wrong half as the right one. Requiring both
+    sides also means the pairing can be read off either end, which is what lets
+    the graph layer draw it without a second index.
+    """
+    entries = list(interfaces)
+    by_name = {interface.name: interface for interface in entries}
+    for index, interface in enumerate(entries):
+        peer_name = interface.peer
+        if peer_name is None:
+            continue
+        peer = by_name.get(peer_name)
+        if peer is None:
+            raise field_error(
+                f"{interface.name!r} is one end of a veth pair whose other end "
+                f"{peer_name!r} is not an interface of this element; both ends of a veth "
+                f"pair are interfaces of the machine that holds it",
+                rule="NG-N023",
+                path=("interfaces", index, "peer"),
+            )
+        if peer.peer != interface.name:
+            written = "names nothing" if peer.peer is None else f"names {peer.peer!r}"
+            raise field_error(
+                f"{interface.name!r} names {peer_name!r} as its veth peer, but {peer_name!r} "
+                f"{written}; a veth pair is symmetric",
+                rule="NG-N023",
+                path=("interfaces", index, "peer"),
+            )
 
 
 class Device(ElementBase):

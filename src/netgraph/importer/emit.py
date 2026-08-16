@@ -212,6 +212,19 @@ def render_device(device: DraftDevice, *, schema: bool = True) -> str:
     for key in ("vendor", "model", "serial", "location"):
         out.optional(key, getattr(device, key), indent=2)
 
+    if device.netns:
+        out.comment(
+            "the network namespaces observed on this machine (schema section 23); a capture "
+            "reports which stack a port is in, not what the stack is for, so add the "
+            "descriptions by hand",
+            indent=2,
+        )
+        out.line("netns:", indent=2)
+        for name, parent in device.netns.items():
+            out.line(f"- name: {scalar(name)}", indent=4)
+            if parent:
+                out.field("parent", parent, indent=6)
+
     out.line("interfaces:", indent=2)
     for interface in device.sorted_interfaces():
         _render_interface(out, interface)
@@ -247,6 +260,8 @@ def _render_interface(out: _Document, interface: DraftInterface) -> None:
     out.optional("parent", interface.parent, indent=6)
     if interface.members:
         out.line(f"members: {_flow(interface.members)}", indent=6)
+    out.optional("netns", interface.netns, indent=6)
+    out.optional("peer", interface.peer, indent=6)
 
 
 def _render_addresses(out: _Document, family: str, addresses: Sequence[str]) -> None:

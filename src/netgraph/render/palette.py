@@ -30,6 +30,7 @@ from typing import Final
 from netgraph.render.aggregate import AGGREGATE_KIND
 from netgraph.render.graph import (
     GROUP_KIND,
+    NETNS_KIND,
     PATCHPANEL_KIND,
     PDU_KIND,
     RACK_KIND,
@@ -38,9 +39,11 @@ from netgraph.render.graph import (
     USER_KIND,
     Edge,
     EdgeKind,
+    Layer,
 )
 
 __all__ = [
+    "CLUSTER_NOUN",
     "CLUSTER_PALETTE",
     "DEFAULT_EDGE_PALETTE",
     "DEFAULT_MEDIUM_STYLE",
@@ -48,8 +51,10 @@ __all__ = [
     "DEFAULT_NODE_STYLE",
     "EDGE_PALETTE",
     "MEDIUM_STYLE",
+    "NESTING_STYLE",
     "NODE_PALETTE",
     "NODE_STYLE",
+    "VETH_STYLE",
     "edge_palette_key",
     "edge_style_for",
     "node_style_for",
@@ -114,6 +119,13 @@ NODE_STYLE: Final[Mapping[str, tuple[str, str, str]]] = MappingProxyType(
         # collapsed namespace uses and the identity palette, saying both things at
         # once: something is inside it, and what is inside it is people.
         GROUP_KIND: ("folder", "#fbcfe8", "#9d174d"),
+        # A network namespace is a *stack*, not a box on a shelf and not a folder
+        # of documents. ``rounded`` is the shape every container diagram draws
+        # one with, and it is the last one here no element kind had taken. Cyan
+        # is the last accent free, and pairing it with the veth colour is what
+        # makes the netns view legible at a glance: the boxes and the lines
+        # between them are one vocabulary.
+        NETNS_KIND: ("rounded", "#cffafe", "#0891b2"),
     }
 )
 DEFAULT_NODE_STYLE: Final[tuple[str, str, str]] = ("box", "#f5f5f5", "#6b7280")
@@ -173,6 +185,15 @@ OSPF_STYLE: Final[tuple[str, str]] = ("#0f766e", "dotted")
 OUTLET_STYLE: Final[tuple[str, str]] = ("#b45309", "solid")
 POE_STYLE: Final[tuple[str, str]] = ("#ca8a04", "dashed")
 
+#: The two edges of the netns view (§23.3). A veth pair is a real link that
+#: carries real frames, so it is drawn *solid*, in the cyan no other edge uses;
+#: a nesting edge is not a path at all — it says one stack was created inside
+#: another — so it borrows the encapsulation vocabulary of "this is carried by
+#: that" and is dotted, in the slate the aggregate node already uses for "a
+#: container of things". The line style is again what survives greyscale.
+VETH_STYLE: Final[tuple[str, str]] = ("#0891b2", "solid")
+NESTING_STYLE: Final[tuple[str, str]] = ("#475569", "dotted")
+
 #: Fill and outline per element kind, without the Graphviz shape — for a
 #: renderer that draws its own glyphs but must colour a node the way a diagram
 #: does. Derived from :data:`NODE_STYLE` rather than restated, so the mxGraph
@@ -201,6 +222,8 @@ EDGE_PALETTE: Final[Mapping[str, tuple[str, str]]] = MappingProxyType(
         "ospf": OSPF_STYLE,
         "outlet": OUTLET_STYLE,
         "poe": POE_STYLE,
+        "veth": VETH_STYLE,
+        "nesting": NESTING_STYLE,
     }
 )
 
@@ -224,6 +247,24 @@ _EDGE_KIND_KEYS: Final[Mapping[EdgeKind, str]] = MappingProxyType(
         EdgeKind.OSPF: "ospf",
         EdgeKind.OUTLET: "outlet",
         EdgeKind.POE: "poe",
+        EdgeKind.VETH: "veth",
+        EdgeKind.NESTING: "nesting",
+    }
+)
+
+
+#: What the box a *layer* asks for is called, per layer. Only the two layers that
+#: group their own nodes have an entry; every other layer clusters by namespace,
+#: which is labelled with the namespace itself. Here rather than in either
+#: renderer because a DOT diagram and a Mermaid one of the same graph must not
+#: name the same box two things.
+CLUSTER_NOUN: Final[Mapping[Layer, str]] = MappingProxyType(
+    {
+        Layer.ROUTING: "vrf",
+        # The netns view boxes every stack of one machine together, so the box
+        # *is* the machine — and saying so is what keeps it from being read as
+        # one more namespace, which is exactly what the things inside it are.
+        Layer.NETNS: "machine",
     }
 )
 

@@ -375,7 +375,7 @@ $ netgraph -i examples/patch-room export cable-list --table-format markdown
 the `SITE`/`ROOM` columns for both ends.)*
 
 **One row per cable document**, which is one run of cable an installer pulls.
-The graph is built at [`--layer physical`](rendering.md#layers-one-inventory-nine-questions)
+The graph is built at [`--layer physical`](rendering.md#layers-one-inventory-ten-questions)
 for exactly that reason: every other layer splices a run through a patch panel
 into the single logical link it is electrically equivalent to (§15.2), which is
 right for a diagram and wrong for a worklist — the two segments either side of a
@@ -1492,7 +1492,7 @@ cabling record.
 
 | Option | Default | Effect |
 |---|---|---|
-| `--view VIEW` | `l1` | Which view the diagram draws. Any of the nine layers a render draws. |
+| `--view VIEW` | `l1` | Which view the diagram draws. Any of the ten layers a render draws. |
 | `--icons THEME\|DIR` | `cisco` | Icon theme inlined as data URIs, so the file needs nothing beside it. `none` draws coloured boxes. |
 | `--compress` / `--no-compress` | `--no-compress` | Write the deflate+base64 encoding draw.io writes by default. Off here: a plain diagram is one that reviews and diffs, and draw.io opens both. |
 | `--frames` / `--no-frames` | `--frames` | Draw a container frame per namespace, so dragging a site carries its devices. |

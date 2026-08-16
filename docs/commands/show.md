@@ -161,6 +161,7 @@ spec:
   forwarding:
     ipv4: false
     ipv6: false
+  netns: []
   vrfs:
   - name: mgmt
     rd: 65001:99
@@ -233,6 +234,7 @@ spec:
   forwarding:
     ipv4: false
     ipv6: false
+  netns: []
   vrfs: []
   routes: []
 ```

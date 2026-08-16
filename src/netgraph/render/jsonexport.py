@@ -111,6 +111,7 @@ from netgraph.render.graph import (
     Edge,
     EdgeKind,
     Graph,
+    NetnsView,
     Node,
     PatchView,
     PortView,
@@ -408,6 +409,8 @@ def _node(
         payload["routing"] = _routing(node.routing)
     if node.power is not None:
         payload["power"] = _power(node.power)
+    if node.netns is not None:
+        payload["netns"] = _netns(node.netns)
     if node.cluster:
         payload["cluster"] = node.cluster
     payload["vlans"] = sorted(node.vlans)
@@ -574,6 +577,24 @@ def _subnet(subnet: Subnet) -> dict[str, Any]:
     return payload
 
 
+def _netns(view: NetnsView) -> dict[str, Any]:
+    """One network namespace of one machine (§23.3).
+
+    ``path`` rather than only ``name`` because nesting is the fact a consumer
+    cannot re-derive: ``parent`` gives it one link of the chain and the chain is
+    what says how deep the stack is. The initial namespace emits an empty name
+    and an empty path, which is exactly what distinguishes it.
+    """
+    payload: dict[str, Any] = {"name": view.name, "element": view.element}
+    if view.path:
+        payload["path"] = list(view.path)
+    if view.parent:
+        payload["parent"] = view.parent
+    if view.description:
+        payload["description"] = view.description
+    return payload
+
+
 def _routing(view: RoutingView) -> dict[str, Any]:
     """What one element contributes to the control plane (§16.6).
 
@@ -674,6 +695,13 @@ def _port(port: PortView, options: RenderOptions) -> dict[str, Any]:
         payload["addresses"] = list(port.addresses)
     if options.show_vlans and port.vlan_mode is not None:
         payload["vlan"] = {"mode": port.vlan_mode, "vlans": sorted(port.vlans)}
+    # Emitted at every layer, not only ``netns``: which stack an interface is
+    # in is a fact about the interface, and a consumer reading ``10.0.0.1/24``
+    # off two ports of one machine has to be able to tell whether they collide.
+    if port.netns:
+        payload["netns"] = port.netns
+    if port.peer is not None:
+        payload["peer"] = port.peer
     return payload
 
 

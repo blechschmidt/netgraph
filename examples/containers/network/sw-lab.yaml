@@ -1,0 +1,25 @@
+apiVersion: netgraph.dev/v1alpha1
+kind: switch
+metadata:
+  name: sw-lab
+  description: Lab access switch. Two ports, both taken by the container hosts.
+spec:
+  vendor: MikroTik
+  model: CRS310-1G-5S-4S+
+  interfaces:
+    - name: ether1
+      type: ethernet
+      description: srv-host-a
+      vlan:
+        mode: access
+        access_vlan: 20
+    - name: ether2
+      type: ethernet
+      description: srv-host-b
+      vlan:
+        mode: access
+        access_vlan: 20
+  vlans:
+    - id: 20
+      name: lab
+      description: The lab segment both container hosts sit on.

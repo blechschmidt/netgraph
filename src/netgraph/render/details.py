@@ -609,6 +609,13 @@ def _interface_row(port: Mapping[str, Any]) -> str:
         )
     if port.get("mac"):
         parts.append(plain_text(str(port["mac"])))
+    # §23: which stack the port is in, and the far end of the pair if it is one.
+    # After the address on purpose — the address is what a reader came for, and
+    # the namespace is what tells them whether it is the address they meant.
+    if port.get("netns"):
+        parts.append(f"netns {plain_text(str(port['netns']))}")
+    if port.get("peer"):
+        parts.append(f"veth ⇄ {plain_text(str(port['peer']))}")
     return "  ".join(parts)
 
 

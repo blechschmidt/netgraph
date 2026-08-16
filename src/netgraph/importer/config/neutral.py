@@ -192,14 +192,17 @@ def _read_stanza(state: _Pass, header: str, body: list[str]) -> None:
         _read_interface(state, words, body)
     elif kind == "route":
         state.routes.append(" ".join(words[1:]) or "an unnamed prefix")
+    elif kind == "netns":
+        _read_netns_stanza(state, words, body)
     elif kind == "vrf":
         state.vrfs.append(_vrf_text(words, body))
     elif kind == "tunnel":
         state.tunnels.append(_tunnel_text(words))
     else:
         state.note(
-            f"{kind!r} is not one of the six stanza kinds this grammar has ('device', 'vlan', "
-            "'vrf', 'interface', 'route', 'tunnel'), so the stanza was not imported"
+            f"{kind!r} is not one of the seven stanza kinds this grammar has ('device', "
+            "'vlan', 'netns', 'vrf', 'interface', 'route', 'tunnel'), so the stanza was not "
+            "imported"
         )
 
 
@@ -240,6 +243,27 @@ def _read_kind(state: _Pass, value: str) -> None:
         )
         return
     state.device.refine_kind(value, None)
+
+
+def _read_netns_stanza(state: _Pass, words: list[str], body: list[str]) -> None:
+    """A ``netns`` stanza: one network namespace of the machine (§23.1).
+
+    The parent is kept because it is the only thing that makes the nesting a
+    tree, and a draft that dropped it would flatten a two-level container host
+    into one level without saying so.
+    """
+    name = words[1] if len(words) > 1 else ""
+    if not name:
+        state.note("a 'netns' stanza names no namespace and was skipped")
+        return
+    parent = ""
+    for line in body:
+        attribute, value = _attribute(line)
+        if attribute == "parent" and value:
+            parent = value
+        elif attribute not in ("parent", "description"):
+            _note_attribute(state, attribute)
+    state.device.netns[name] = parent or state.device.netns.get(name, "")
 
 
 def _read_vlan_stanza(state: _Pass, words: list[str], body: list[str]) -> None:
@@ -304,6 +328,11 @@ def _read_interface_line(
         _read_parent(state, interface, value)
     elif attribute == "member":
         _read_member(state, interface, value)
+    elif attribute == "netns":
+        interface.netns = interface.netns or value
+        state.device.netns.setdefault(value, "")
+    elif attribute == "peer":
+        interface.peer = interface.peer or interface_name(value)[0]
     elif attribute == "vlan-mode":
         _read_vlan_mode(state, vlan, value)
     elif attribute == "vlan-access":

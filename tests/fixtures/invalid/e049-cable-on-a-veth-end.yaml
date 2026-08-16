@@ -1,0 +1,65 @@
+# E049 (NG-N024) - a cable terminates on one end of a veth pair.
+#
+# A veth end is 'ethernet' by type, so the type check of E012 waves it through;
+# what it does not have is a socket, because its far side is the peer it names.
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-a
+spec:
+  netns:
+    - name: blue
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.1/30]
+    - name: veth-a
+      type: ethernet
+      peer: veth-b
+      ipv4:
+        addresses: [10.1.0.1/30]
+    - name: veth-b
+      type: ethernet
+      netns: blue
+      peer: veth-a
+      ipv4:
+        addresses: [10.1.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: server
+metadata:
+  name: srv-b
+spec:
+  interfaces:
+    - name: eth0
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.0.0.2/30]
+    - name: eth1
+      type: ethernet
+      mtu: 1500
+      ipv4:
+        addresses: [10.1.0.2/30]
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-b
+spec:
+  endpoints:
+    - srv-a:eth0
+    - srv-b:eth0
+  medium: copper
+---
+apiVersion: netgraph.dev/v1alpha1
+kind: cable
+metadata:
+  name: cbl-a-veth
+spec:
+  endpoints:
+    - srv-a:veth-a
+    - srv-b:eth1
+  medium: copper

@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from netgraph.errors import compact_ids
+from netgraph.export.config.model import Unsupported
 from netgraph.export.context import ExportContext, elements_of
 from netgraph.loader.inventory import Inventory, namespace_of, short_name
 from netgraph.models import Device, Interface, InterfaceType, StaticRoute, Tunnel
@@ -45,6 +46,7 @@ __all__ = [
     "addresses_of",
     "device_plans",
     "is_stacked",
+    "netns_limits",
     "restricts_vlans",
     "route_interface",
     "unwritable_vlan",
@@ -430,6 +432,48 @@ def restricts_vlans(interface: Interface) -> bool:
     restriction, and records a skip instead of refusing.
     """
     return interface.vlan is not None and interface.type in _VLAN_ENFORCING_TYPES
+
+
+def netns_limits(plan: DevicePlan, dialect: str) -> Iterator[Unsupported]:
+    """Every §23 fact a dialect with no network-namespace syntax must refuse.
+
+    Shared, because the reason is the same for all four file-based dialects and
+    is not a matter of taste. A netplan, networkd or ifupdown file configures the
+    stack it is applied *in* — the machine's initial namespace — and none of them
+    has syntax for ``ip netns`` or for creating a veth pair. Writing the file
+    anyway would configure a container's interface on the host: the address goes
+    on the wrong stack, and on a host running two containers out of one image the
+    two would collide where the inventory says they do not.
+
+    That is exactly what :class:`~netgraph.export.config.model.Unsupported` is
+    for — the value is within the dialect's remit, the dialect has no syntax for
+    it, and a file without it describes a different machine. ``netgraph export
+    interfaces`` writes all of it, and is where the refusal points.
+    """
+    for index, entry in enumerate(plan.device.spec.netns):
+        yield Unsupported(
+            element=plan.fqn,
+            field=plan.field("netns", index),
+            detail=(
+                f"the machine runs the network namespace {entry.name!r} (schema section 23.1), "
+                f"and {dialect} configures one stack with no syntax for 'ip netns'. Writing "
+                f"this file would put the namespace's interfaces on the host. See 'netgraph "
+                f"export interfaces', which carries the whole of it"
+            ),
+        )
+    for interface in plan.interfaces:
+        if interface.peer is None:
+            continue
+        yield Unsupported(
+            element=plan.fqn,
+            field=plan.interface_field(interface, "peer"),
+            detail=(
+                f"{interface.name!r} is one end of the veth pair "
+                f"{interface.name}/{interface.peer} (schema section 23.2), and {dialect} has no "
+                f"syntax for creating one. A file that configured the end without creating the "
+                f"pair would address an interface that does not exist"
+            ),
+        )
 
 
 def unwritable_vlan(plan: DevicePlan, interface: Interface) -> str:

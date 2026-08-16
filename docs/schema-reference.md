@@ -98,6 +98,7 @@ The five device kinds share one spec shape. They differ in which fields they per
 | `bridge` | [BridgeConfig](#specbridge) | no | *unset* | The 802.1Q bridge component this device implements. Absent means the device is not a bridge. | `/dot1q:bridges/dot1q:bridge` |
 | `vlans` | [VlanDefinition](#specvlans) list | no | `[]` | The device VLAN database: which VLANs exist on this device, and what they are called. | `…/dot1q:bridge-vlan/dot1q:vlan` |
 | `forwarding` | [Forwarding](#specforwarding) | no | *unset* | Device-wide default for per-interface IP forwarding. Defaults to true/true on a `router` and false/false on every other kind; a `hub` must not declare it. | — |
+| `netns` | [NetnsDefinition](#specnetns) list | no | `[]` | The network namespaces this machine runs (§23.1). Each is a whole second network stack — its own interfaces, addresses and routing table — and `parent` nests one inside another, arbitrarily deep. Not a VRF: a VRF partitions one stack's routing table, a namespace *is* a second stack. | — |
 | `vrfs` | [VrfDefinition](#specvrfs) list | no | `[]` | The routing instances (VRFs) this device implements. An interface binds to one with `vrf`, and that binding is what partitions the address namespace. | `/ni:network-instances/ni:network-instance` |
 | `routes` | [StaticRoute](#specroutes) list | no | `[]` | Configured static routes, in the order the device holds them. | `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rt:static-routes` |
 | `routing` | [RoutingConfig](#specrouting) | no | *unset* | The dynamic routing protocols the device takes part in: an OSPF area, a BGP autonomous system, or both. | `…/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol` |
@@ -156,6 +157,8 @@ One entry per port or logical interface. Used by both devices and adapters.
 | `poe` | [PoeConfig](#interfacespoe) | no | *unset* | This port is power sourcing equipment: it hands power down the cable (§17.3). Only on a type a cable terminates on — `ethernet` or `lag` (`NG-E006`). | `/power-ethernet-mib:pethPsePortTable/pethPsePortEntry` |
 | `parent` | interface name | no | *unset* | The interface this one is stacked on. Required for `type: vlan`, forbidden otherwise (`NG-I002`). | `…/if:lower-layer-if` |
 | `members` | interface name list | no | *unset* | The interfaces aggregated by this one. Required for `type: lag` and `type: bridge`, forbidden otherwise (`NG-I003`). | `…/if:lower-layer-if` |
+| `netns` | element name | no | *unset* | The network namespace this interface lives in (§23.1). Names an entry of the device's `spec.netns` (`NG-N022`); unset means the machine's initial namespace. Unlike `vrf`, which partitions one stack's routing table, this places the interface in a different stack entirely — its addresses do not collide with the same addresses elsewhere on the machine. | — |
+| `peer` | interface name | no | *unset* | The other end of the veth pair this interface is one end of (§23.2). Names another `type: ethernet` interface of the same element, which must name this one back (`NG-N023`). A veth end is `ianaift:ethernetCsmacd` like any other port; what it has instead of a socket is this peer, so a cable must not terminate on it (`NG-N024`). | `…/if:lower-layer-if` |
 | `range` | string | no | *unset* | Declares many interfaces at once instead of `name`, by bracket expansion over one or more numeric spans (`GigabitEthernet1/0/[1-48]`). Consumed by the loader: the entry is replaced by the interfaces it expands to before anything else sees the document. Exactly one of `name` and `range` is written. | — |
 
 * `range` expands as an odometer, the rightmost span varying fastest, and the width of a span's low bound is its zero padding (`[01-12]` yields `01`…`12`). In `description`, `{}` and `%d` stand for the last span and `{0}`, `{1}`, … for a span by position. See §6.2.5 of [`schema.md`](schema.md).
@@ -258,6 +261,21 @@ One basic service set: an SSID the radio beacons, or — on a client radio — t
 
 * An `ap` radio lists one entry per SSID it serves; a `station` or `mesh` radio lists at most one (`NG-W006`).
 * `vlan` is where the SSID's traffic goes on the wired side. It has to be a VLAN the access point carries somewhere (`NG-W009`), or clients associate and reach nothing.
+
+## `spec.netns[]`
+
+One network namespace the machine runs (§23.1) — a whole second network stack, with its own interfaces, addresses and routing table. An interface joins it with `netns`.
+
+| Field | Type | Required | Default | Description | YANG |
+|---|---|---|---|---|---|
+| `name` | element name | **yes** | — | Name of the namespace, as `ip netns` spells it. Unique within the device (`NG-N020`), and what `interfaces[].netns` and another entry's `parent` refer to. | — |
+| `parent` | element name | no | *unset* | The namespace this one was created inside (`NG-N021`). Unset means the machine's initial namespace. This is the whole of the hierarchy: a namespace has exactly one creator, so nesting is a tree. | — |
+| `description` | string | no | *unset* | Free text: what the namespace is for — a tenant, a container, a test harness. | — |
+
+* `parent` names another entry of the same table, which is how namespaces nest: a namespace is created from inside exactly one other, so the nesting is a tree (`NG-N021`). Unset means the machine's initial namespace, which no document declares.
+* Not a VRF. A VRF partitions the routing table of one stack; a namespace *is* a second stack, so it partitions the interface names, the addresses and the sockets as well. An interface can be in both.
+* Namespaces are joined by veth pairs, which are ordinary `type: ethernet` interfaces naming each other with `peer` (§23.2).
+* A namespace no interface is in holds nothing, which is `NG-N026`.
 
 ## `spec.vrfs[]`
 

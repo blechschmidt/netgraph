@@ -3601,8 +3601,9 @@ _LAYER_OPTION: Final[Callable[[Any], Any]] = click.option(
         "and the elements addressed in them; overlay draws the tunnels; routing draws the "
         "BGP sessions and OSPF adjacencies, clustered by VRF; physical adds the patch panels "
         "l1 splices out; rack draws a front elevation per rack; power draws the PDUs and the "
-        "feeds into everything they power. Repeatable for -f html, which draws each layer and "
-        "puts a switcher over them."
+        "feeds into everything they power; identity draws the users and groups; netns opens "
+        "each machine up into the network stacks inside it, joined by their veth pairs. "
+        "Repeatable for -f html, which draws each layer and puts a switcher over them."
     ),
 )
 
@@ -4333,6 +4334,12 @@ def _empty_graph_reason(layer: Layer, spec: FilterSpec) -> str:
             "nothing to draw in the power view: the inventory declares no 'pdu' and no "
             "'spec.power'. Add a pdu document and name its outlets in a device's "
             "'power.inputs', or run 'netgraph list power' to see what is recorded"
+        )
+    if layer is Layer.NETNS:
+        return (
+            "nothing to draw in the netns view: no device declares 'spec.netns' or a veth "
+            "pair. This view opens a machine up; a machine with one network stack is drawn "
+            "at every other layer already"
         )
     # No filter and nothing at layer 1 means the tree itself is empty, which is
     # what a freshly scaffolded 'netgraph init --minimal' looks like.

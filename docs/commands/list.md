@@ -299,7 +299,7 @@ own: validation is not run and findings do not change the code.
   name.
 * [`netgraph ipam`](ipam.md) and [`docs/ipam.md`](../ipam.md) — `list subnets`
   says which prefixes exist; `ipam` says whether the plan is healthy.
-* [`docs/rendering.md`](../rendering.md#layers-one-inventory-nine-questions) — the
+* [`docs/rendering.md`](../rendering.md#layers-one-inventory-ten-questions) — the
   layers whose groupings `subnets`, `tunnels` and `power` print as tables.
 * [`netgraph export power`](export.md) and [`docs/export.md`](../export.md#power) —
   `list power` says whether each strip has room; the load schedule says which outlet

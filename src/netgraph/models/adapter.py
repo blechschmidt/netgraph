@@ -84,6 +84,26 @@ class AdapterSpec(NetgraphModel):
 
     @model_validator(mode="after")
     def _check_interfaces(self) -> AdapterSpec:
+        # §23 is about a machine's network stacks, and an adapter is not a
+        # machine: it has no ``spec.netns`` to name and nothing inside it to
+        # create a veth pair between. Refused before ``check_interface_set`` so
+        # the reader is told *that* rather than that the peer does not resolve.
+        for index, interface in enumerate(self.interfaces):
+            if interface.netns is not None:
+                raise field_error(
+                    f"{interface.name!r} is placed in a network namespace, but an adapter "
+                    f"declares no namespace table; a namespace belongs to the host the "
+                    f"adapter is attached to (schema §23.1)",
+                    rule="NG-N022",
+                    path=("interfaces", index, "netns"),
+                )
+            if interface.peer is not None:
+                raise field_error(
+                    f"{interface.name!r} declares a veth peer, but an adapter is hardware "
+                    f"with no network stack of its own to join (schema §23.2)",
+                    rule="NG-N023",
+                    path=("interfaces", index, "peer"),
+                )
         # NG-X004: the upstream port shares the interface namespace.
         check_interface_set(self.interfaces, reserved={self.upstream.name})
         for index, interface in enumerate(self.interfaces):

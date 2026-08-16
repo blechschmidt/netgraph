@@ -34,8 +34,9 @@ to the end of the line, and a repeated attribute is a list::
         ipv4-address 192.168.10.20/24
         ipv4-gateway 192.168.10.1
 
-Five stanza kinds — ``device``, ``vlan``, ``vrf``, ``interface``, ``route`` and
-``tunnel`` — in that order, which is the order they depend on each other in. A
+Six stanza kinds — ``device``, ``vlan``, ``netns``, ``vrf``, ``interface``,
+``route`` and ``tunnel`` — in that order, which is the order they depend on each
+other in. A
 value is present exactly when the inventory states it: there is no default to
 read into an absent line, which is what makes the file a faithful projection and
 what lets :mod:`netgraph.importer.neutral` read it back without inventing the
@@ -51,7 +52,13 @@ from netgraph.export.config.header import config_header
 from netgraph.export.config.model import ConfigFile
 from netgraph.export.config.plan import DevicePlan, TunnelPlan
 from netgraph.export.manifest import Recorder
-from netgraph.models import Interface, StaticRoute, VlanDefinition, VrfDefinition
+from netgraph.models import (
+    Interface,
+    NetnsDefinition,
+    StaticRoute,
+    VlanDefinition,
+    VrfDefinition,
+)
 from netgraph.models.interface import WirelessConfig
 from netgraph.models.power import PoeConfig
 
@@ -86,6 +93,8 @@ def files(plan: DevicePlan, recorder: Recorder) -> tuple[ConfigFile, ...]:
     ]
     for definition in plan.device.spec.vlans:
         lines.extend(["", *_vlan(definition)])
+    for entry in plan.device.spec.netns:
+        lines.extend(["", *_netns(entry)])
     for vrf in plan.device.spec.vrfs:
         lines.extend(["", *_vrf(vrf)])
     for interface in plan.interfaces:
@@ -138,6 +147,20 @@ def _vlan(vlan: VlanDefinition) -> Iterator[str]:
         yield f"    description {_inline(vlan.description)}"
 
 
+def _netns(entry: NetnsDefinition) -> Iterator[str]:
+    """A ``netns`` stanza — one network namespace of the machine (§23.1).
+
+    Before the interfaces, because they name it, and after the VLANs for the
+    same reason the ``vrf`` stanzas are: this file is written in dependency
+    order so that a reader typing it in from the top never refers forward.
+    """
+    yield f"netns {entry.name}"
+    if entry.parent:
+        yield f"    parent {entry.parent}"
+    if entry.description:
+        yield f"    description {_inline(entry.description)}"
+
+
 def _vrf(vrf: VrfDefinition) -> Iterator[str]:
     yield f"vrf {vrf.name}"
     yield f"    rd {vrf.rd}"
@@ -164,6 +187,10 @@ def _interface(plan: DevicePlan, interface: Interface) -> Iterator[str]:
         yield f"    parent {interface.parent}"
     for member in interface.members or ():
         yield f"    member {member}"
+    if interface.netns:
+        yield f"    netns {interface.netns}"
+    if interface.peer:
+        yield f"    peer {interface.peer}"
     if interface.vrf:
         yield f"    vrf {interface.vrf}"
     yield from _vlan_block(interface)
