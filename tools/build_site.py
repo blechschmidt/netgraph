@@ -71,7 +71,7 @@ EXAMPLES: Final = REPO_ROOT / "examples"
 
 #: The canonical home of the built site. Written into the README badge and into
 #: ``docs/README.md``; ``tests/test_site.py`` checks the three agree.
-SITE_URL: Final = "https://blechschmidt.github.io/netgraph/"
+SITE_URL: Final = "https://blechschmidt.github.io/netviz/"
 
 #: Root documents that are published beside the docs set, and where each lands.
 #: ``README.md`` is the landing page: it is already the shortest correct answer
@@ -177,7 +177,7 @@ NAV: Final[tuple[tuple[str, str], ...]] = (
 )
 
 #: Where the source lives, for the "edit this page" link every page carries.
-SOURCE_URL: Final = "https://github.com/blechschmidt/netgraph"
+SOURCE_URL: Final = "https://github.com/blechschmidt/netviz"
 
 #: Link targets that are already somewhere else, and are left alone. ``#`` is a
 #: same-page anchor and ``data:`` is the favicon this shell inlines.

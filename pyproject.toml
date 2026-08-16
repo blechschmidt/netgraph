@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "netviz"
-version = "0.1.0"
+version = "0.0.1"
 description = "Declare network elements in YAML and render them as network graphs."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -94,9 +94,9 @@ browser = [
 # The canonical URLs. ``netviz.rules.RULES_DOC_URL`` and the SARIF
 # ``informationUri`` are built from the same repository, so a rename has to
 # happen here and there at once; ``tests/test_docs.py`` pins the anchors.
-Homepage = "https://github.com/blechschmidt/netgraph"
-Repository = "https://github.com/blechschmidt/netgraph"
-Issues = "https://github.com/blechschmidt/netgraph/issues"
+Homepage = "https://github.com/blechschmidt/netviz"
+Repository = "https://github.com/blechschmidt/netviz"
+Issues = "https://github.com/blechschmidt/netviz/issues"
 
 [project.scripts]
 netviz = "netviz.cli:main"

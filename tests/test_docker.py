@@ -37,18 +37,18 @@ DOC = REPO_ROOT / "docs" / "docker.md"
 README = REPO_ROOT / "README.md"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 CONTAINER_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "container.yml"
-RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
+RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pypi.yaml"
 
 #: The registry the two publishing workflows write to, spelled the way GHCR
 #: requires: lowercase, and the repository's own namespace.
-IMAGE = "ghcr.io/blechschmidt/netgraph"
+IMAGE = "ghcr.io/blechschmidt/netviz"
 
 #: What ``container.yml`` publishes from the default branch. ``latest`` is
 #: pointedly absent -- see :func:`test_a_branch_build_can_never_take_latest`.
 #:
 #: These are also the only tags that exist in the registry at all, because no
 #: version has been released yet: ``latest``, ``X.Y.Z`` and ``X.Y`` are set by
-#: ``release.yml`` and it has never run. So they double as the set the docs are
+#: ``pypi.yaml`` and it has never run. So they double as the set the docs are
 #: allowed to tell a reader to pull -- see
 #: :func:`test_no_documented_command_pulls_a_tag_that_does_not_exist`, and add
 #: the version tags here when the first release is cut.
@@ -516,7 +516,7 @@ def test_the_ci_workflow_exercises_every_service() -> None:
 # Publishing the image: .github/workflows/container.yml
 # --------------------------------------------------------------------------- #
 #
-# ``container.yml`` and ``release.yml`` both push to the same repository in GHCR,
+# ``container.yml`` and ``pypi.yaml`` both push to the same repository in GHCR,
 # and the whole design is the line between them: the release owns the version
 # tags and ``latest``, the container workflow owns ``edge`` and everything named
 # after a commit. Cross that line and an unqualified ``docker pull`` starts
@@ -554,7 +554,7 @@ def test_the_container_workflow_builds_on_every_branch_and_pull_request(
     triggers = container_workflow[True]
     assert triggers["push"]["branches"] == ["**"]
     assert "pull_request" in triggers
-    # A ``v*`` push is release.yml's; building it here too would race it for the
+    # A ``v*`` push is pypi.yaml's; building it here too would race it for the
     # same tags in the same registry.
     assert triggers["push"]["tags-ignore"] == ["v*"]
 
@@ -610,7 +610,7 @@ def test_nothing_is_published_from_a_pull_request(
     assert "github.event_name != 'pull_request'" in condition
 
     # The one other way not to push: asking for a build without one, either by
-    # unticking the box on a manual run or through release.yml's dry run, which
+    # unticking the box on a manual run or through pypi.yaml's dry run, which
     # arrives here as a workflow_call still carrying the caller's event name.
     assert "github.event_name != 'workflow_dispatch' || inputs.push" in condition
 
@@ -631,7 +631,7 @@ def test_a_branch_build_can_never_take_latest(container_workflow: dict[Any, Any]
     ``latest=false`` turns off ``docker/metadata-action``'s ``latest=auto``,
     which would otherwise hand ``latest`` to *any* semver tag, pre-release
     included. The single remaining source of it is an input, which only
-    release.yml passes and only when its guard says the version is not a
+    pypi.yaml passes and only when its guard says the version is not a
     pre-release -- a push to a branch leaves it unset, and unset is false.
     """
     steps = steps_of(container_workflow, "publish")
@@ -640,7 +640,7 @@ def test_a_branch_build_can_never_take_latest(container_workflow: dict[Any, Any]
     produced = [line for line in steps.splitlines() if "value=latest" in line]
     assert len(produced) == 1, f"expected exactly one source of :latest, found {produced}"
     assert "enable=${{ inputs.latest == true }}" in produced[0], (
-        "container.yml can tag :latest without release.yml having asked for it"
+        "container.yml can tag :latest without pypi.yaml having asked for it"
     )
 
     # And the other half of the contract: the release still asks for it, and
@@ -677,22 +677,22 @@ def test_a_version_tag_reaches_the_container_workflow_exactly_once(
     """One build of the commit, one push of ``1.2.3``.
 
     The image is built by one file, and a ``v*`` tag reaches it through
-    release.yml's call and through nothing else. Were container.yml also
+    pypi.yaml's call and through nothing else. Were container.yml also
     triggered by the tag directly, two runs would build the same commit and race
     to push the same version tag, and whichever finished last would silently
     decide what it resolves to.
     """
     assert container_workflow[True]["push"]["tags-ignore"] == ["v*"], (
-        "container.yml also triggers on version tags, so it races release.yml"
+        "container.yml also triggers on version tags, so it races pypi.yaml"
     )
     assert "workflow_call" in container_workflow[True], (
-        "container.yml cannot be called, so release.yml has to build its own image"
+        "container.yml cannot be called, so pypi.yaml has to build its own image"
     )
 
     release = yaml.safe_load(RELEASE_WORKFLOW.read_text(encoding="utf-8"))
     image = release["jobs"]["image"]
     assert image["uses"] == "./.github/workflows/container.yml"
-    assert "steps" not in image, "release.yml still builds an image of its own"
+    assert "steps" not in image, "pypi.yaml still builds an image of its own"
 
 
 @pytest.mark.parametrize("tag", DEVELOPMENT_TAGS)
@@ -803,7 +803,7 @@ def test_the_docs_page_documents_the_published_development_tags() -> None:
 #: A fenced code block, fence included. What a reader copies.
 _FENCED_BLOCK = re.compile(r"^```.*?^```", re.DOTALL | re.MULTILINE)
 
-#: ``ghcr.io/blechschmidt/netgraph:<tag>``, capturing the tag.
+#: ``ghcr.io/blechschmidt/netviz:<tag>``, capturing the tag.
 _IMAGE_REFERENCE = re.compile(re.escape(IMAGE) + r":([A-Za-z0-9][\w.-]*)")
 
 
@@ -812,7 +812,7 @@ def test_no_documented_command_pulls_a_tag_that_does_not_exist(page: Path) -> No
     """A command in the docs has to work when it is pasted into a terminal.
 
     Both pages told the reader to ``docker run ghcr.io/…/netviz:latest``, and
-    ``latest`` has never been pushed: it is set only by ``release.yml``, and no
+    ``latest`` has never been pushed: it is set only by ``pypi.yaml``, and no
     version has been released. So the first thing anybody following the README
     typed came back ``manifest unknown``.
 

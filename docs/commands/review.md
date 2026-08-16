@@ -153,7 +153,7 @@ everything else a pipeline wants, from the same load and the same validation:
 ```json
 {
   "schemaVersion": 1,
-  "tool": {"name": "netviz", "version": "0.1.0"},
+  "tool": {"name": "netviz", "version": "0.0.1"},
   "verdict": "failed",
   "broken": false,
   "changed": true,

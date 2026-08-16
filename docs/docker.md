@@ -10,27 +10,27 @@ Every push to the default branch publishes one, so there is nothing to build:
 
 <!-- norun: needs a Docker daemon -->
 ```bash
-docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netgraph:main validate
+docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netviz:main validate
 ```
 
 **`main` is the tag to pull, not `latest`.** No version has been released yet, so the
 registry holds no `latest` and no `X.Y.Z`: the tags that exist today are `main`, `edge` and
 one `sha-…` per commit, all described under [the development
 image](#the-development-image). `latest` is reserved for releases and cannot be reached by
-a branch build, so an unqualified `docker pull ghcr.io/blechschmidt/netgraph` finds nothing
+a branch build, so an unqualified `docker pull ghcr.io/blechschmidt/netviz` finds nothing
 at all rather than finding unreleased work.
 
 ## The image
 
-`ghcr.io/blechschmidt/netgraph`, built from the [`Dockerfile`](../Dockerfile) in this
+`ghcr.io/blechschmidt/netviz`, built from the [`Dockerfile`](../Dockerfile) in this
 repository by [`.github/workflows/container.yml`](../.github/workflows/container.yml) —
-on every push to every branch, and again from [`release.yml`](../.github/workflows/release.yml)
+on every push to every branch, and again from [`pypi.yaml`](../.github/workflows/pypi.yaml)
 when a version is tagged, after the guard, the CI gate and the cross-platform verification
 have passed.
 
 | | |
 |---|---|
-| Registry | `ghcr.io/blechschmidt/netgraph` — no login needed to pull |
+| Registry | `ghcr.io/blechschmidt/netviz` — no login needed to pull |
 | Tags today | `main`, `edge`, `sha-…` — see [the development image](#the-development-image) |
 | Tags a release adds | `X.Y.Z` (exact), `X.Y` (follows patch releases), `latest` (the newest non-pre-release) |
 | Platforms | `linux/amd64`, `linux/arm64` |
@@ -43,7 +43,7 @@ pin, the immutable tag is the commit:
 
 <!-- norun: needs a Docker daemon, and names a commit that may have been pruned -->
 ```bash
-docker pull ghcr.io/blechschmidt/netgraph:sha-1a2b3c4
+docker pull ghcr.io/blechschmidt/netviz:sha-1a2b3c4
 ```
 
 The image is signed with GitHub's build provenance, so you can check that the thing you
@@ -52,8 +52,8 @@ carry it too, so there is nothing to wait for:
 
 <!-- norun: needs the gh CLI and a Docker daemon -->
 ```bash
-gh attestation verify oci://ghcr.io/blechschmidt/netgraph:main \
-  --repo blechschmidt/netgraph
+gh attestation verify oci://ghcr.io/blechschmidt/netviz:main \
+  --repo blechschmidt/netviz
 ```
 
 ## The development image
@@ -75,7 +75,7 @@ a dash: `feature/vlans` publishes as `feature-vlans`.
 
 <!-- norun: needs a Docker daemon -->
 ```bash
-docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netgraph:edge validate
+docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netviz:edge validate
 ```
 
 Same file, same steps, same two platforms, same provenance attestation and SBOM as a
@@ -88,9 +88,9 @@ is how to run a colleague's work without a Python environment.
 
 **`latest` is never a development build**, which is why there is none to pull yet. It
 follows releases and nothing else, so an unqualified `docker pull
-ghcr.io/blechschmidt/netgraph` cannot land on unreleased work — today it resolves to
+ghcr.io/blechschmidt/netviz` cannot land on unreleased work — today it resolves to
 nothing at all. A branch build has no way to reach it: `latest` is set only when
-`release.yml` asks for it, and it only asks once its guard confirms the version is not a
+`pypi.yaml` asks for it, and it only asks once its guard confirms the version is not a
 pre-release. That split is enforced in `tests/test_docker.py`, not just intended, along
 with the rule that no example on this page tells you to pull a tag that does not exist.
 
@@ -268,7 +268,7 @@ image:
 
 <!-- norun: needs a Docker daemon, and the last starts a server that never exits -->
 ```bash
-image=ghcr.io/blechschmidt/netgraph:main
+image=ghcr.io/blechschmidt/netviz:main
 
 docker run --rm -v "$PWD:/inventory:ro" "$image" validate
 docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/inventory" \
@@ -291,7 +291,7 @@ The image is a way to run `netviz validate` on a runner with no Python:
 
 <!-- norun: needs a Docker daemon, and is a fragment of somebody else's pipeline -->
 ```bash
-docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netgraph:sha-1a2b3c4 \
+docker run --rm -v "$PWD:/inventory:ro" ghcr.io/blechschmidt/netviz:sha-1a2b3c4 \
   validate --strict --output-format github
 ```
 
@@ -311,7 +311,7 @@ The image's entrypoint is netviz itself, so:
 
 <!-- norun: needs a Docker daemon; the versions are properties of the image -->
 ```bash
-docker run --rm ghcr.io/blechschmidt/netgraph:main version --json
+docker run --rm ghcr.io/blechschmidt/netviz:main version --json
 ```
 
 That prints the netviz, Python and Graphviz versions inside the container, which is the
@@ -322,7 +322,7 @@ first thing worth pasting into a bug report about a render — see
 <!-- norun: needs a Docker daemon -->
 ```bash
 docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' \
-  ghcr.io/blechschmidt/netgraph:main
+  ghcr.io/blechschmidt/netviz:main
 ```
 
 ## How this is kept honest
@@ -354,7 +354,7 @@ was just published. You can run it yourself, on anything:
 
 <!-- norun: needs a Docker daemon and pulls ~250 MB -->
 ```bash
-tools/verify_published_image.py --image ghcr.io/blechschmidt/netgraph:edge
+tools/verify_published_image.py --image ghcr.io/blechschmidt/netviz:edge
 ```
 
 It asks the registry for an anonymous pull token — which GHCR grants only for a public

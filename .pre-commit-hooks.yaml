@@ -4,7 +4,7 @@
 # netviz runs on *itself*. This file is the public one: it is what
 #
 #   repos:
-#     - repo: https://github.com/blechschmidt/netgraph
+#     - repo: https://github.com/blechschmidt/netviz
 #       rev: v0.1.0
 #       hooks:
 #         - id: netviz-validate

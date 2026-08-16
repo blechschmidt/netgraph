@@ -21,7 +21,7 @@ name: container
 # only on a branch, so the two columns cannot both appear and neither needs to be
 # guarded by hand.
 #
-# ``release.yml`` does not build its own image. It calls this workflow
+# ``pypi.yaml`` does not build its own image. It calls this workflow
 # (``workflow_call``, below) once its guard, the full CI gate and the
 # cross-platform verification have passed, which is what keeps a version tag
 # meaning "this was checked" -- and, more mundanely, what stops two workflows
@@ -45,7 +45,7 @@ name: container
 # pullable by anyone, and explicitly *not* ``latest``.
 #
 # The tags this produces are documented in docs/docker.md, and the split of
-# responsibility with release.yml is asserted in tests/test_docker.py.
+# responsibility with pypi.yaml is asserted in tests/test_docker.py.
 
 on:
   push:
@@ -54,7 +54,7 @@ on:
     # and test_every_push_triggered_workflow_names_the_branches_it_runs_on.
     branches:
       - "**"
-    # A ``v*`` tag arrives here through release.yml's ``workflow_call``, not
+    # A ``v*`` tag arrives here through pypi.yaml's ``workflow_call``, not
     # through this filter, so that the image is pushed only after the release
     # guard and the CI gate have passed. Triggering on it directly as well would
     # mean two runs of this file building the same commit and racing to push
@@ -76,7 +76,7 @@ on:
         type: boolean
         default: true
 
-  # How release.yml gets its image. Every input is something this workflow
+  # How pypi.yaml gets its image. Every input is something this workflow
   # cannot work out for itself: whether the run is a real push or a dry run,
   # whether the version being released is allowed to take ``latest``, and where
   # to leave the standalone SBOM. The version *tags* are not among them -- they
@@ -263,7 +263,7 @@ jobs:
     # from one built from a merged commit.
     #
     # The ``workflow_dispatch`` clause covers two callers at once -- a manual run
-    # of this workflow with the box unticked, and release.yml's dry run, which
+    # of this workflow with the box unticked, and pypi.yaml's dry run, which
     # reaches here as a ``workflow_call`` whose event is still the caller's
     # ``workflow_dispatch``. Both mean "build it, do not push it".
     if: >-
@@ -334,7 +334,7 @@ jobs:
       # nor "the newest pre-release". ``flavor: latest=false`` turns off the
       # action's own ``auto`` handling -- which would otherwise hand it to any
       # semver tag, pre-release included -- and the single ``type=raw`` below
-      # gives it out only on the say-so of release.yml's guard, which is the one
+      # gives it out only on the say-so of pypi.yaml's guard, which is the one
       # place that knows whether 1.2.3-rc1 is a pre-release. A push to a branch
       # cannot reach it: ``inputs.latest`` is unset there, and unset is false.
       - name: Work out the tags and the labels

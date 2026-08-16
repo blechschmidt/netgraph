@@ -27,7 +27,7 @@
 
 | | Rule | Where | What |
 |---|---|---|---|
-| ❌ error | [`E001`](https://github.com/blechschmidt/netgraph/blob/main/docs/validation-rules.md#e001--unknown-cable-endpoint) | [`inventory/cables/links.yaml:28`](https://github.com/o/r/blob/0123456789abcdef/inventory/cables/links.yaml#L28) | cable 'cables/cbl-1' endpoint pc-desk:eno1: no element named 'pc-desk' |
+| ❌ error | [`E001`](https://github.com/blechschmidt/netviz/blob/main/docs/validation-rules.md#e001--unknown-cable-endpoint) | [`inventory/cables/links.yaml:28`](https://github.com/o/r/blob/0123456789abcdef/inventory/cables/links.yaml#L28) | cable 'cables/cbl-1' endpoint pc-desk:eno1: no element named 'pc-desk' |
 
 Also: **1 pre-existing problem fixed** 🎉 and 1 pre-existing finding left alone — the check does not fail on what this change did not do.
 
@@ -49,4 +49,4 @@ flowchart LR
 
 📎 [Download the full diagram (SVG, PNG)](https://github.com/o/r/actions/runs/42#artifacts) from `netviz-review`.
 
-<sub>netviz 0.1.0 · this comment is edited in place on every push · reproduce it with <code>netviz review --from origin/main</code></sub>
+<sub>netviz 0.0.1 · this comment is edited in place on every push · reproduce it with <code>netviz review --from origin/main</code></sub>

@@ -53,8 +53,8 @@ FROM python:${PYTHON_VERSION}-slim AS runtime
 
 LABEL org.opencontainers.image.title="netviz" \
       org.opencontainers.image.description="Declare network elements in YAML and render them as network graphs." \
-      org.opencontainers.image.source="https://github.com/blechschmidt/netgraph" \
-      org.opencontainers.image.documentation="https://github.com/blechschmidt/netgraph/blob/main/docs/docker.md" \
+      org.opencontainers.image.source="https://github.com/blechschmidt/netviz" \
+      org.opencontainers.image.documentation="https://github.com/blechschmidt/netviz/blob/main/docs/docker.md" \
       org.opencontainers.image.licenses="MIT"
 
 # ``graphviz`` for the raster and vector renders; ``fonts-dejavu-core`` because

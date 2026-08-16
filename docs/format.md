@@ -449,8 +449,8 @@ come back changed:
 ```yaml
 # .pre-commit-config.yaml
 repos:
-  - repo: https://github.com/blechschmidt/netgraph
-    rev: v0.1.0
+  - repo: https://github.com/blechschmidt/netviz
+    rev: v0.0.1
     hooks:
       - id: netviz-fmt          # rewrites in place; git add and commit again
 ```

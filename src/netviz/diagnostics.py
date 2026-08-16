@@ -95,7 +95,7 @@ SARIF_SCHEMA_URL: Final = (
 )
 
 #: Where the tool itself is documented, for SARIF's ``informationUri``.
-TOOL_URL: Final = "https://github.com/blechschmidt/netgraph"
+TOOL_URL: Final = "https://github.com/blechschmidt/netviz"
 
 #: The pseudo-rule every loader and schema problem is filed under.
 #:

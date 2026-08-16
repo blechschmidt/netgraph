@@ -474,7 +474,7 @@ byte-identical between two runs over unchanged inputs.
 
 ```json
 {
-  "version": "0.1.0",
+  "version": "0.0.1",
   "root": "examples/home-lab",
   "inputs": ["sw-home.lldp.json", "patch.csv"],
   "captureDialects": ["csv", "lldp"],

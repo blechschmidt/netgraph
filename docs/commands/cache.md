@@ -56,7 +56,7 @@ identity (an entry is keyed by this and the file's contents)
 INPUT       VALUE
 ----------  ---------------------
 format      1
-netviz    0.1.0
+netviz    0.0.1
 apiVersion  netviz.dev/v1alpha1
 parser      CStrictSafeLoader
 pydantic    2.13.4

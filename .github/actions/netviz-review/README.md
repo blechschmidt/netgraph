@@ -38,7 +38,7 @@ jobs:
           python-version: "3.12"
 
       - id: netviz
-        uses: blechschmidt/netgraph/.github/actions/netviz-review@v0.1.0
+        uses: blechschmidt/netviz/.github/actions/netviz-review@v0.0.1
         with:
           inventory: inventory
           base: ${{ github.event.pull_request.base.sha }}

@@ -36,7 +36,7 @@ report — both are shown below — but the shape of a document is worth typing 
 
 Before spending anything on an install, spend two minutes here:
 
-**<https://blechschmidt.github.io/netgraph/demo/>**
+**<https://blechschmidt.github.io/netviz/demo/>**
 
 Every example inventory in the repository is published there as a live diagram.
 Those pages are not a demo built to look like netviz — they are the output of

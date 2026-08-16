@@ -1,6 +1,6 @@
 name: Pages
 
-# The demo site: https://blechschmidt.github.io/netgraph/
+# The demo site: https://blechschmidt.github.io/netviz/
 #
 # Why this exists: until it did, nothing in the project let a stranger see what
 # netviz does without first installing Python *and* Graphviz. What is

@@ -75,7 +75,7 @@ $ netviz -q -i examples/home-lab report -f json --generated-at none --revision '
   "meta": {
     "title": "home-lab — as-built network documentation",
     "inventory": "home-lab",
-    "netviz": "0.1.0",
+    "netviz": "0.0.1",
     "generatedAt": null,
     "revision": null,
     "revisionState": null,

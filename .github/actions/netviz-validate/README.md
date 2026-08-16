@@ -31,7 +31,7 @@ jobs:
           python-version: "3.12"
 
       - id: netviz
-        uses: blechschmidt/netgraph/.github/actions/netviz-validate@v0.1.0
+        uses: blechschmidt/netviz/.github/actions/netviz-validate@v0.0.1
         with:
           inventory: inventory
           strict: "true"
@@ -52,7 +52,7 @@ Annotate the diff instead, with no code-scanning upload and no extra
 permissions:
 
 ```yaml
-      - uses: blechschmidt/netgraph/.github/actions/netviz-validate@v0.1.0
+      - uses: blechschmidt/netviz/.github/actions/netviz-validate@v0.0.1
         with:
           inventory: inventory
           output-format: github

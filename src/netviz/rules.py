@@ -170,7 +170,7 @@ _NON_SLUG: Final[re.Pattern[str]] = re.compile(r"[^\w\s-]", re.UNICODE)
 #: Where the rules are written up. Diagnostics in the machine-readable formats
 #: link here, so it has to be a URL a stranger reading a CI annotation can open
 #: — not a path relative to whatever directory the tool happened to run in.
-RULES_DOC_URL: Final = "https://github.com/blechschmidt/netgraph/blob/main/docs/validation-rules.md"
+RULES_DOC_URL: Final = "https://github.com/blechschmidt/netviz/blob/main/docs/validation-rules.md"
 
 
 #: Every rule, in report order. ``aliases`` ties each one to ``docs/schema.md``.

@@ -285,7 +285,7 @@ never mistaken for a complete one.
 ```json
 {
   "schemaVersion": 1,
-  "tool": { "name": "netviz", "version": "0.1.0" },
+  "tool": { "name": "netviz", "version": "0.0.1" },
   "modes": ["fail"],
   "anchors": { "elements": ["sites/north/distribution/sw-north-dist-01"], "source": "gateways" },
   "failed": [{ "element": "sites/north/access/sw-north-acc-01", "kind": "switch",

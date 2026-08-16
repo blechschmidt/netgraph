@@ -42,7 +42,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - uses: blechschmidt/netgraph/.github/actions/netviz-render@main
+      - uses: blechschmidt/netviz/.github/actions/netviz-render@main
         with:
           inventory: inventory
           # Three layers become three views behind one switcher.
@@ -63,7 +63,7 @@ permission:
 
 ```yaml
       - id: diagram
-        uses: blechschmidt/netgraph/.github/actions/netviz-render@main
+        uses: blechschmidt/netviz/.github/actions/netviz-render@main
         with:
           inventory: inventory
           format: svg

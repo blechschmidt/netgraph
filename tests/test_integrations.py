@@ -266,7 +266,7 @@ def test_the_action_readme_documents_every_input_and_output(action: dict[str, An
 
 def test_the_action_readme_shows_a_usable_snippet() -> None:
     readme = ACTION_README.read_text(encoding="utf-8")
-    assert "uses: blechschmidt/netgraph/.github/actions/netviz-validate@" in readme
+    assert "uses: blechschmidt/netviz/.github/actions/netviz-validate@" in readme
     assert "github/codeql-action/upload-sarif" in readme
     assert "actions/setup-python" in readme, "the action deliberately installs no interpreter"
 
@@ -472,7 +472,7 @@ def test_the_render_action_readme_documents_every_input_and_output(
 
 def test_the_render_action_readme_shows_a_usable_snippet() -> None:
     readme = RENDER_ACTION_README.read_text(encoding="utf-8")
-    assert "uses: blechschmidt/netgraph/.github/actions/netviz-render@" in readme
+    assert "uses: blechschmidt/netviz/.github/actions/netviz-render@" in readme
     assert "actions/setup-python" in readme, "the action deliberately installs no interpreter"
     assert "upload-pages-artifact" in readme
 
@@ -772,7 +772,7 @@ def test_the_pages_workflow_renders_with_the_action_that_belongs_to_it(
     """
     steps = pages_workflow["jobs"]["build"]["steps"]
     checkout = next(
-        step for step in steps if step.get("with", {}).get("repository") == "blechschmidt/netgraph"
+        step for step in steps if step.get("with", {}).get("repository") == "blechschmidt/netviz"
     )
     assert checkout["with"]["ref"] == "${{ github.job_workflow_sha }}"
     assert checkout["with"]["persist-credentials"] is False
@@ -997,7 +997,7 @@ def test_the_review_action_readme_documents_every_input_and_output(
 
 def test_the_review_action_readme_shows_a_usable_snippet() -> None:
     readme = REVIEW_ACTION_README.read_text(encoding="utf-8")
-    assert "uses: blechschmidt/netgraph/.github/actions/netviz-review@" in readme
+    assert "uses: blechschmidt/netviz/.github/actions/netviz-review@" in readme
     assert "actions/setup-python" in readme, "the action deliberately installs no interpreter"
     assert "github/codeql-action/upload-sarif" in readme
     assert "pull_request_target" in readme, "the trigger it must not be run under goes unsaid"
@@ -1270,7 +1270,7 @@ def test_the_review_workflow_reviews_with_the_action_that_belongs_to_it(
     """Pinned in fact and not only in name; the same reasoning as the pages workflow."""
     steps = steps_of(review_workflow)
     checkout = next(
-        step for step in steps if step.get("with", {}).get("repository") == "blechschmidt/netgraph"
+        step for step in steps if step.get("with", {}).get("repository") == "blechschmidt/netviz"
     )
     assert checkout["with"]["ref"] == "${{ github.job_workflow_sha }}"
     assert checkout["with"]["persist-credentials"] is False

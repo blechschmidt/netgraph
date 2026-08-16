@@ -94,7 +94,7 @@ $ netviz -q -i inventory validate -F json
 ```json
 {
   "schemaVersion": 1,
-  "tool": { "name": "netviz", "version": "0.1.0" },
+  "tool": { "name": "netviz", "version": "0.0.1" },
   "inventory": { "root": "/home/ops/net/inventory", "prefix": "inventory" },
   "summary": { "error": 1, "warning": 0, "info": 0, "total": 1 },
   "failed": true,
@@ -112,7 +112,7 @@ $ netviz -q -i inventory validate -F json
       "line": 8,
       "column": 7,
       "pointer": "/spec/endpoints/1",
-      "help": "https://github.com/blechschmidt/netgraph/blob/main/docs/validation-rules.md#e001--unknown-cable-endpoint"
+      "help": "https://github.com/blechschmidt/netviz/blob/main/docs/validation-rules.md#e001--unknown-cable-endpoint"
     }
   ]
 }
@@ -239,7 +239,7 @@ jobs:
           python-version: "3.12"
 
       - id: netviz
-        uses: blechschmidt/netgraph/.github/actions/netviz-validate@v0.1.0
+        uses: blechschmidt/netviz/.github/actions/netviz-validate@v0.0.1
         with:
           inventory: inventory
           strict: "true"
@@ -282,7 +282,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - uses: blechschmidt/netgraph/.github/actions/netviz-validate@v0.1.0
+      - uses: blechschmidt/netviz/.github/actions/netviz-validate@v0.0.1
         with:
           inventory: inventory
           output-format: github
@@ -331,7 +331,7 @@ the job that produced it rather than on the site it was published to.
 
 ```yaml
       - id: diagram
-        uses: blechschmidt/netgraph/.github/actions/netviz-render@main
+        uses: blechschmidt/netviz/.github/actions/netviz-render@main
         with:
           inventory: inventory
           format: svg
@@ -368,7 +368,7 @@ jobs:
       # cannot hold more than its caller grants, so the grant is here.
       pages: write
       id-token: write
-    uses: blechschmidt/netgraph/.github/workflows/netviz-pages.yml@main
+    uses: blechschmidt/netviz/.github/workflows/netviz-pages.yml@main
     with:
       inventory: inventory
       # Three layers, one page: the switcher is in the HTML.
@@ -483,7 +483,7 @@ jobs:
       contents: read
       pull-requests: write
       security-events: write
-    uses: blechschmidt/netgraph/.github/workflows/netviz-review.yml@main
+    uses: blechschmidt/netviz/.github/workflows/netviz-review.yml@main
     with:
       inventory: inventory
 ```
@@ -812,8 +812,8 @@ Start with validation:
 ```yaml
 # .pre-commit-config.yaml
 repos:
-  - repo: https://github.com/blechschmidt/netgraph
-    rev: v0.1.0
+  - repo: https://github.com/blechschmidt/netviz
+    rev: v0.0.1
     hooks:
       - id: netviz-validate
         args: [--strict]

@@ -24,7 +24,7 @@ credentials; that is the point, since a credential would defeat the test. The
 runtime checks need a daemon and are skipped, loudly, without one.
 
     tools/verify_published_image.py
-    tools/verify_published_image.py --image ghcr.io/blechschmidt/netgraph:main
+    tools/verify_published_image.py --image ghcr.io/blechschmidt/netviz:main
     tools/verify_published_image.py --registry-only --json
 
 Exit status is 0 when every check that ran passed, 1 when one failed, and 2 for
@@ -53,7 +53,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 #: What ``docs/docker.md`` tells a reader to pull when they want the tip of
 #: ``main``. Every push to the default branch moves it, so it is the tag that is
 #: always there to check -- unlike ``latest``, which exists only after a release.
-DEFAULT_IMAGE = "ghcr.io/blechschmidt/netgraph:edge"
+DEFAULT_IMAGE = "ghcr.io/blechschmidt/netviz:edge"
 
 #: The inventory rendered through the entrypoint. Committed, small, and the same
 #: tree ``container.yml``'s own smoke test uses.

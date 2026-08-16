@@ -82,7 +82,7 @@ shape: a shell script, a pipeline, an editor, a pinned schema, a colleague's inv
 7. **The environment variables** netviz reads: `NETVIZ_DOT`, `NETVIZ_YAML_LOADER`,
    `NO_COLOR`, and the ones the compose file documents in
    [`.env.example`](../.env.example).
-8. **The container image reference** `ghcr.io/blechschmidt/netgraph`, its entrypoint
+8. **The container image reference** `ghcr.io/blechschmidt/netviz`, its entrypoint
    (`netviz` itself), its working directory (`/inventory`) and the uid it runs as.
 
 ### What is internal
@@ -192,7 +192,7 @@ and it should not.
 
 ## What the release workflow does
 
-[`.github/workflows/release.yml`](../.github/workflows/release.yml), triggered by a `v*` tag
+[`.github/workflows/pypi.yaml`](../.github/workflows/pypi.yaml), triggered by a `v*` tag
 and by `workflow_dispatch`.
 
 1. **`guard`** — `tools/release.py check` on the tag: the tag matches
@@ -220,7 +220,7 @@ and by `workflow_dispatch`.
    this commit.
 7. **`image`** — [`container.yml`](../.github/workflows/container.yml) called as a reusable
    workflow, exactly as `ci` above is called. It pushes `linux/amd64` and `linux/arm64` to
-   `ghcr.io/blechschmidt/netgraph` tagged `X.Y.Z`, `X.Y` and `latest`, with an SPDX SBOM and
+   `ghcr.io/blechschmidt/netviz` tagged `X.Y.Z`, `X.Y` and `latest`, with an SPDX SBOM and
    a provenance attestation of the image digest. The version tags are read off the ref, not
    passed down, so the tag that triggered the release is the only source of them. This job
    is the *only* thing that may set `latest`, and it passes it only when the guard says the
@@ -240,7 +240,7 @@ written per job rather than once at the top of the file.
 
 [`.github/workflows/container.yml`](../.github/workflows/container.yml) is the only file
 that builds the image and the only one that pushes it. It runs on every push to every
-branch and on every pull request, and `release.yml` reaches it through the `workflow_call`
+branch and on every pull request, and `pypi.yaml` reaches it through the `workflow_call`
 above. It exists for two reasons: so a Dockerfile break is a red pull request rather than a
 surprise in the middle of a release, and so unreleased work can be run without a Python
 environment.
@@ -256,7 +256,7 @@ both appear and neither needs a hand-written condition:
 
 | | a `v*.*.*` tag | any other push |
 |---|---|---|
-| Entered through | `release.yml`, after guard + CI + verify | the `push` trigger directly |
+| Entered through | `pypi.yaml`, after guard + CI + verify | the `push` trigger directly |
 | Publishes | `X.Y.Z`, `X.Y`, `sha-…`, and `latest` when asked | `<branch>`, `sha-…`, plus `edge` on `main` |
 | Stands for | a version somebody released | whatever passed CI most recently |
 
@@ -265,8 +265,8 @@ else. It takes no `1.2`, because a release candidate must not become what `:1.2`
 to, and no `latest`, because the guard does not ask for it.
 
 `latest` is the one tag not derived from the ref: it comes from an input that only
-`release.yml` passes and only for a non-pre-release, so a push to a branch cannot reach it
-and an unqualified `docker pull ghcr.io/blechschmidt/netgraph` cannot land on unreleased
+`pypi.yaml` passes and only for a non-pre-release, so a push to a branch cannot reach it
+and an unqualified `docker pull ghcr.io/blechschmidt/netviz` cannot land on unreleased
 work. That split is asserted in `tests/test_docker.py` rather than left as an intention.
 
 Two details worth knowing when reading that file. The build and the push are separate jobs
@@ -279,7 +279,7 @@ pulling them.
 
 ### Pinning
 
-`release.yml` and `container.yml` pin every action to a commit SHA with the tag in a
+`pypi.yaml` and `container.yml` pin every action to a commit SHA with the tag in a
 trailing comment:
 
 ```yaml
@@ -298,7 +298,7 @@ SHA and the comment:
 git ls-remote --tags https://github.com/pypa/gh-action-pypi-publish v1.12.4
 ```
 
-[`tests/test_release.py`](../tests/test_release.py) fails if any `uses:` in `release.yml`
+[`tests/test_release.py`](../tests/test_release.py) fails if any `uses:` in `pypi.yaml`
 names a tag or a branch instead of a 40-character SHA, or if the trailing comment is missing.
 
 ## Registering the trusted publisher
@@ -310,13 +310,35 @@ settings (or as a *pending* publisher if the name is not yet claimed):
 |---|---|
 | Owner | `blechschmidt` |
 | Repository | `netviz` |
-| Workflow name | `release.yml` |
+| Workflow name | `pypi.yaml` |
 | Environment | `pypi` |
+
+That row is the **repository slug**, not the package name, and PyPI matches it literally
+against the `repository` claim in the OIDC token — so it has to track a rename of the
+GitHub repository the moment one happens. This one was renamed from `netgraph` to `netviz`
+after the project was, which also moved the demo site to
+<https://blechschmidt.github.io/netviz/> and the image to `ghcr.io/blechschmidt/netviz`.
+A publisher still registered against the old slug is a mismatch PyPI reports only at upload
+time, after the version has been built and verified.
 
 Repeat on TestPyPI with the environment `testpypi`. The two GitHub environments of those
 names are what make the mapping specific: without them any workflow in the repository could
 mint an upload token, and with them only a job that names the environment can — which is why
 `pypi` and `testpypi` are the only jobs that do.
+
+Two things about that registration constrain this repository rather than the other way
+round, and both are easy to trip over:
+
+- **The workflow file name is matched literally**, against the OIDC token's
+  `job_workflow_ref` claim. That is why the release workflow is
+  [`.github/workflows/pypi.yaml`](../.github/workflows/pypi.yaml) — `.yaml`, not `.yml`,
+  because that is the string on file at PyPI. Nor can the upload be split into a small
+  reusable workflow of that name called from a `release.yml`: PyPI does not accept a
+  reusable workflow as a trusted publisher.
+- **The environment's deployment branch policy has to admit tags.** A release runs on
+  `refs/tags/vX.Y.Z`, so a `pypi` environment restricted to `main` blocks the upload job
+  before it starts — the run simply waits, then fails. Under *Settings → Environments →
+  pypi*, the selected refs must include a **tag** rule of `v*`.
 
 Nothing needs to be registered for GHCR: `GITHUB_TOKEN` with `packages: write` is enough, and
 the package inherits the repository's visibility.

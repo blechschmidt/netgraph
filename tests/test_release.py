@@ -15,7 +15,7 @@ Five things are checked:
 * The repository's own ``pyproject.toml`` and ``CHANGELOG.md`` pass that gate
   right now, so the next tag cannot fail on something a pull request could have
   caught.
-* ``.github/workflows/release.yml`` pins every action to a commit SHA, keeps its
+* ``.github/workflows/pypi.yaml`` pins every action to a commit SHA, keeps its
   permissions per job, and names the environments the PyPI trusted publisher is
   scoped to.
 * ``netviz --version`` and ``netviz version --json`` report the package, the
@@ -60,7 +60,7 @@ from netviz.version import (
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PYPROJECT = REPO_ROOT / "pyproject.toml"
 CHANGELOG = REPO_ROOT / "CHANGELOG.md"
-RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "release.yml"
+RELEASE_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "pypi.yaml"
 CI_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 RELEASING_DOC = REPO_ROOT / "docs" / "releasing.md"
 
@@ -425,15 +425,27 @@ _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 PUBLISHING_PERMISSIONS = frozenset({"contents", "packages", "id-token", "attestations"})
 
 
+def workflow_files() -> list[Path]:
+    """Every workflow GitHub reads, by both spellings of the extension.
+
+    ``.yaml`` is not a stylistic choice here: a PyPI trusted publisher names the
+    file that may upload, and this project's is registered as ``pypi.yaml``. A
+    glob for ``*.yml`` alone would quietly drop the one workflow that holds an
+    OIDC token -- the rules below would still pass, having checked nothing.
+    """
+    workflows = REPO_ROOT / ".github" / "workflows"
+    return sorted(list(workflows.glob("*.yml")) + list(workflows.glob("*.yaml")))
+
+
 def privileged_workflows() -> list[Path]:
     """Every workflow in which some job can publish something.
 
     Membership is derived rather than listed, so the rule below applies to the
     next publishing workflow somebody adds without anyone having to remember to
-    name it here. Today that is ``release.yml`` and ``container.yml``.
+    name it here. Today that is ``pypi.yaml`` and ``container.yml``.
     """
     privileged = []
-    for path in sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")):
+    for path in workflow_files():
         workflow = yaml.safe_load(path.read_text(encoding="utf-8"))
         jobs: dict[str, Any] = workflow.get("jobs", {})
         grants = [workflow.get("permissions") or {}]
@@ -473,7 +485,7 @@ def test_there_are_privileged_workflows_and_they_use_actions() -> None:
     the pinning rule into a test that passes by having nothing to check.
     """
     names = {path.name for path in privileged_workflows()}
-    assert {"release.yml", "container.yml"} <= names, names
+    assert {"pypi.yaml", "container.yml"} <= names, names
     assert len(privileged_uses()) >= 12
 
 
@@ -569,7 +581,7 @@ def test_no_long_lived_pypi_token_is_referenced() -> None:
     """Trusted Publishing, or nothing. There is no credential here to leak."""
     text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
     for forbidden in ("PYPI_API_TOKEN", "PYPI_TOKEN", "TWINE_PASSWORD", "password: __token__"):
-        assert forbidden not in text, f"release.yml names {forbidden}"
+        assert forbidden not in text, f"pypi.yaml names {forbidden}"
 
 
 @pytest.mark.parametrize(("job", "environment"), [("pypi", "pypi"), ("testpypi", "testpypi")])
@@ -640,7 +652,7 @@ def test_the_release_image_is_the_one_every_commit_builds(
     """
     image = release_workflow["jobs"]["image"]
     assert image["uses"] == "./.github/workflows/container.yml"
-    assert "steps" not in image, "release.yml builds an image of its own again"
+    assert "steps" not in image, "pypi.yaml builds an image of its own again"
 
     # The inputs it cannot leave to the ref: a dry run must not push, and the
     # SBOM the GitHub release attaches has to be named after this version.
@@ -668,7 +680,7 @@ def test_every_push_triggered_workflow_names_the_branches_it_runs_on() -> None:
     Asserted for every workflow rather than for that one, because the next
     ``tags-ignore`` will be added to a different file.
     """
-    for path in sorted((REPO_ROOT / ".github" / "workflows").glob("*.yml")):
+    for path in workflow_files():
         triggers = yaml.safe_load(path.read_text(encoding="utf-8"))[True]
         push = triggers.get("push")
         if not isinstance(push, dict):

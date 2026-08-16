@@ -305,7 +305,7 @@ whatever the test wrote is still there to look at afterwards.
 
 ## The published site
 
-`tests/test_site.py` builds the whole of <https://blechschmidt.github.io/netgraph/>
+`tests/test_site.py` builds the whole of <https://blechschmidt.github.io/netviz/>
 into a temporary directory — documentation, hero diagrams and every example
 rendered by `netviz render -f html` — and asserts three things a look at the
 page would not catch:

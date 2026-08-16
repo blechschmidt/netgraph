@@ -7,7 +7,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/blechschmidt/netgraph.git",
+    "url": "https://github.com/blechschmidt/netviz.git",
     "directory": "editors/vscode"
   },
   "engines": {
@@ -52,7 +52,7 @@
     "yamlValidation": [
       {
         "fileMatch": ["*.yaml", "*.yml"],
-        "url": "https://raw.githubusercontent.com/blechschmidt/netgraph/main/schema/netviz.schema.json"
+        "url": "https://raw.githubusercontent.com/blechschmidt/netviz/main/schema/netviz.schema.json"
       }
     ]
   },

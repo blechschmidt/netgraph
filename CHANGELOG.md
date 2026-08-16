@@ -16,7 +16,92 @@ publish a version whose section is missing or empty — see
 
 ## [Unreleased]
 
+_Nothing yet._
+
+## [0.0.1] - 2026-08-16
+
+First release. netviz reads a folder tree of YAML documents describing a network, checks
+that the documents agree with each other, and renders the result.
+
+Nothing has been published before it, so this section is the whole of the project rather
+than a delta against something already installed, and it is laid out that way: each heading
+lists what the foundation was built with, and then the work done on top of it. Entries in
+the second half are worded as changes because that is what they were to the tree; to a
+first-time installer they are simply how netviz behaves.
+
 ### Added
+
+- **The inventory format.** `apiVersion: netviz.dev/v1alpha1` documents in nine kinds —
+  `switch`, `router`, `hub`, `computer`, `server`, `adapter`, `cable`, `tunnel` and
+  `patchpanel` — discovered recursively under a root folder, where the folder a document
+  sits in becomes its namespace. Field names and value spaces follow RFC 8343
+  (`ietf-interfaces`), RFC 8344 (`ietf-ip`) and the IEEE 802.1Q bridge model. Normative
+  specification in [`docs/schema.md`](docs/schema.md).
+- **Interfaces, addressing and VLANs.** Physical and logical interfaces with MAC addresses,
+  IPv4/IPv6 addresses and prefixes, DHCP, `access`/`trunk`/`routed` port modes, native and
+  tagged VLANs, LAGs, bridges and sub-interfaces. Interface *ranges*
+  (`ethernet-1/1..1/48`) and reusable device templates so a 48-port switch is not 48 blocks
+  of YAML.
+- **Wireless detail.** SSIDs, bands, channels and widths, and the BSS-to-SSID mapping, with
+  station associations drawn as links.
+- **Routing.** VRFs, static routes and protocol adjacencies (OSPF, BGP, IS-IS), following
+  RFC 8349, plus a `routing` layer that draws them.
+- **Tunnels as a first-class kind.** WireGuard, IPsec, OpenVPN, PPTP, GRE, L2TP and VXLAN,
+  including tunnels carried inside other tunnels.
+- **Passive plant.** Patch panels with derived ports, racks, rack units and a rack-elevation
+  view.
+- **`netviz validate`** — three passes (schema, reference resolution, semantics) over a
+  catalogue of graded rules, each with an `NG-*` alias, a documented reason and a fix.
+  `--strict` promotes warnings, `--disable` silences by id or alias, and the machine-readable
+  forms are `--output-format json|sarif|github` for pipelines, code scanning and inline
+  annotations. Exit codes: `0` clean, `1` findings, `2` usage.
+- **`netviz render`** — seven layers (`l1`, `l2`, `l3`, `overlay`, `routing`, `rack`,
+  `logical`) to `svg`, `png`, `pdf`, `dot`, `mermaid`, `json` and a self-contained
+  interactive `html` page. Filters by namespace, VLAN, kind and neighbourhood; namespace
+  collapsing and link bundling for inventories too large to read whole; `--icons cisco` for
+  device pictures. SVG output carries per-element tooltips, `--link-template` links back to
+  the YAML, and stable element ids for deep-linking.
+- **`netviz web`** and **`netviz watch`** — the inventory edited in one browser pane and
+  drawn in the other, and a live preview that re-renders on every save.
+- **`netviz path`** — trace how two elements reach each other, at any layer, with the
+  answer optionally drawn.
+- **`netviz ipam`** — subnet utilisation, free space, the next free block, aggregation and
+  overlap detection.
+- **`netviz export`** — hosts file, DNS zone, DHCP reservations, Ansible inventory and
+  Prometheus targets, generated from the same documents.
+- **`netviz import`** — bootstrap a first inventory from LLDP, `ip -j addr`, `show`
+  command output or a cabling CSV.
+- **`netviz drift`** — the declared inventory compared against what the live network
+  reports, with per-element coverage so an unchecked device is not silently counted as
+  agreeing.
+- **`netviz fmt`** — one canonical form for inventory YAML, with `--check` and `--diff`.
+- **`netviz list`**, **`show`**, **`rules`**, **`schema`**, **`config`** — interrogate an
+  inventory, the rule catalogue and the resolved configuration from the shell.
+- **`netviz init`** — scaffold a small, valid inventory, including the JSON Schema and the
+  editor wiring.
+- **`netviz completion`** — completion scripts for bash, zsh, fish and PowerShell, with
+  completion of element names, namespaces, kinds, layers, formats, profiles and rule ids.
+- **`netviz version`** — the netviz, Python and Graphviz versions in use, the selected
+  YAML parser and the resolved dependency versions; `--json` for pasting into a bug report.
+  `netviz --version` prints the same text.
+- **JSON Schema output** (`netviz schema`) so an editor underlines a typo'd key as it is
+  typed, checked into `schema/` and wired up by `netviz init`.
+- **`netviz.toml`** — per-inventory render defaults and named profiles, so the flags a
+  diagram needs live next to the inventory instead of in shell history.
+- **CI integrations** — a `netviz-validate` composite GitHub Action, three `pre-commit`
+  hooks (`netviz-validate`, `netviz-fmt`, `netviz-fmt-check`) and a documented GitLab
+  recipe.
+- **Published artefacts.** `pip install netviz` (also `pipx` and `uv tool install`), from
+  PyPI via Trusted Publishing, and a `linux/amd64` + `linux/arm64` container image at
+  `ghcr.io/blechschmidt/netviz` that already has Graphviz in it and runs unprivileged on a
+  read-only root filesystem. The wheel, the sdist and the image carry build provenance
+  attestations, and each release attaches an SBOM for the wheel's dependency closure and one
+  for the image. [`docs/releasing.md`](docs/releasing.md) records what the version number
+  promises and which surfaces it promises it about.
+- **A compose file** for the three ways the tool is used in a container — one command at a
+  time, as a live preview, and as the browser editor.
+- **Windows and macOS support**, tested in CI. Graphviz installed without landing on `PATH`
+  is found in the documented install locations, and `NETVIZ_DOT` names the binary outright.
 
 - **Icons are a switch in the editor, not a flag you restart for.** `netviz web` could
   draw devices as pictures only if `--icons` had been passed when the server started, which
@@ -580,12 +665,12 @@ publish a version whose section is missing or empty — see
   the menu key open it from the keyboard, the arrow keys walk it and <kbd>Esc</kbd> leaves
   it. Right-clicking a *bend* still removes that bend and shows no menu.
 
-- **A published demo site: <https://blechschmidt.github.io/netgraph/>.** Until now nothing
+- **A published demo site: <https://blechschmidt.github.io/netviz/>.** Until now nothing
   in the project let a stranger see what netviz does without first installing Python
   *and* Graphviz. The site is the whole documentation set as browsable pages, and — the
   part that matters — every example inventory rendered by `netviz render -f html`, so
   the layers, the filters and the per-element detail are clickable at
-  <https://blechschmidt.github.io/netgraph/demo/>.
+  <https://blechschmidt.github.io/netviz/demo/>.
 
   Those pages are the command's own output rather than a viewer written to look like it,
   which is what keeps them honest: there is no second front end to fall behind the first.
@@ -1165,7 +1250,7 @@ publish a version whose section is missing or empty — see
   [`docs/commands/edit.md`](docs/commands/edit.md) and
   [`docs/editing.md`](docs/editing.md).
 
-- **A container image published on every push.** `ghcr.io/blechschmidt/netgraph` now also
+- **A container image published on every push.** `ghcr.io/blechschmidt/netviz` now also
   carries unreleased work, tagged after the ref it was built from: `<branch>` for every
   branch pushed (slashes become dashes, so `feature/vlans` is `feature-vlans`),
   `sha-<commit>` for the exact commit, and `edge` for the tip of the default branch. So a
@@ -1174,7 +1259,7 @@ publish a version whose section is missing or empty — see
   attestation and SBOM as a release, because it is now the same workflow: a `v*.*.*` tag
   builds through the same file and takes the semantic version tags `X.Y.Z` and `X.Y` from
   the tag itself. `latest` is unchanged and still follows releases only — a branch build has
-  no way to reach it — so an unqualified `docker pull ghcr.io/blechschmidt/netgraph` cannot
+  no way to reach it — so an unqualified `docker pull ghcr.io/blechschmidt/netviz` cannot
   land on unreleased work. The image is rebuilt weekly against a fresh `python:3.12-slim`
   and Graphviz, and every pull request now builds it for both architectures and runs it
   before anything can be merged. See
@@ -1239,6 +1324,15 @@ publish a version whose section is missing or empty — see
 
 ### Changed
 
+- `netviz validate` is about 3.1× faster on a 10 000-element inventory, and loading is
+  about 1.4× faster; both were driven by a committed profiler rather than by guesswork
+  (`tools/profile_validate.py`, `tools/bench_pipeline.py`).
+- The `html` output no longer grows with the number of layers in it: the views share one
+  document instead of each carrying a copy.
+- The documentation was reorganised into a lean `README.md` and a navigable `docs/` set with
+  one page per command; every flag table is generated from the CLI and every shell transcript
+  is either executed by the test suite or marked with the reason it cannot be.
+
 - **The project is now called netviz.** Every name the old one appeared in moved with it, and
   all of them are breaking:
 
@@ -1262,10 +1356,17 @@ publish a version whose section is missing or empty — see
 
   The GitHub repository, the container image and the demo site keep their URLs — those name a
   location rather than the project, and moving them would break links that already exist.
-  `ghcr.io/blechschmidt/netgraph:main` still gives you a container whose entrypoint is
+  `ghcr.io/blechschmidt/netviz:main` still gives you a container whose entrypoint is
   `netviz`.
 
 ### Fixed
+
+- Six loader and renderer defects found by property-based and fuzz testing, all of them cases
+  where a hand-written but unusual document was mis-parsed or crashed rather than being
+  reported: see `tests/test_properties.py` and `tests/test_fuzz_loader.py` for the
+  regression examples.
+- Mermaid front matter escaped `"` but not `\`, so a title containing a backslash produced a
+  diagram Mermaid would not parse.
 
 - **The editor's style inspector emptied itself, and would not fill up again.** Selecting a
   device and opening the panel showed nine rows once — and then, after the first view
@@ -1294,8 +1395,8 @@ publish a version whose section is missing or empty — see
   including a folded namespace's aggregate node — is asserted per view.
 
 - **The documented way to pull the container did not work.** `README.md` and
-  `docs/docker.md` both opened with `docker run … ghcr.io/blechschmidt/netgraph:latest`, and
-  that tag has never existed: `latest` is set only by `release.yml`, only for a
+  `docs/docker.md` both opened with `docker run … ghcr.io/blechschmidt/netviz:latest`, and
+  that tag has never existed: `latest` is set only by `pypi.yaml`, only for a
   non-pre-release, and no version has been released — so the first command a reader typed
   came back `manifest unknown`. Every pull instruction now names **`main`**, the tip of the
   default branch, which `container.yml` publishes on every push and which resolves today,
@@ -1463,104 +1564,5 @@ publish a version whose section is missing or empty — see
   would end up never written at all, and stay a cache miss for good. Each writer now has
   its own.
 
-## [0.1.0] - 2026-07-30
-
-First release. netviz reads a folder tree of YAML documents describing a network, checks
-that the documents agree with each other, and renders the result.
-
-### Added
-
-- **The inventory format.** `apiVersion: netviz.dev/v1alpha1` documents in nine kinds —
-  `switch`, `router`, `hub`, `computer`, `server`, `adapter`, `cable`, `tunnel` and
-  `patchpanel` — discovered recursively under a root folder, where the folder a document
-  sits in becomes its namespace. Field names and value spaces follow RFC 8343
-  (`ietf-interfaces`), RFC 8344 (`ietf-ip`) and the IEEE 802.1Q bridge model. Normative
-  specification in [`docs/schema.md`](docs/schema.md).
-- **Interfaces, addressing and VLANs.** Physical and logical interfaces with MAC addresses,
-  IPv4/IPv6 addresses and prefixes, DHCP, `access`/`trunk`/`routed` port modes, native and
-  tagged VLANs, LAGs, bridges and sub-interfaces. Interface *ranges*
-  (`ethernet-1/1..1/48`) and reusable device templates so a 48-port switch is not 48 blocks
-  of YAML.
-- **Wireless detail.** SSIDs, bands, channels and widths, and the BSS-to-SSID mapping, with
-  station associations drawn as links.
-- **Routing.** VRFs, static routes and protocol adjacencies (OSPF, BGP, IS-IS), following
-  RFC 8349, plus a `routing` layer that draws them.
-- **Tunnels as a first-class kind.** WireGuard, IPsec, OpenVPN, PPTP, GRE, L2TP and VXLAN,
-  including tunnels carried inside other tunnels.
-- **Passive plant.** Patch panels with derived ports, racks, rack units and a rack-elevation
-  view.
-- **`netviz validate`** — three passes (schema, reference resolution, semantics) over a
-  catalogue of graded rules, each with an `NG-*` alias, a documented reason and a fix.
-  `--strict` promotes warnings, `--disable` silences by id or alias, and the machine-readable
-  forms are `--output-format json|sarif|github` for pipelines, code scanning and inline
-  annotations. Exit codes: `0` clean, `1` findings, `2` usage.
-- **`netviz render`** — seven layers (`l1`, `l2`, `l3`, `overlay`, `routing`, `rack`,
-  `logical`) to `svg`, `png`, `pdf`, `dot`, `mermaid`, `json` and a self-contained
-  interactive `html` page. Filters by namespace, VLAN, kind and neighbourhood; namespace
-  collapsing and link bundling for inventories too large to read whole; `--icons cisco` for
-  device pictures. SVG output carries per-element tooltips, `--link-template` links back to
-  the YAML, and stable element ids for deep-linking.
-- **`netviz web`** and **`netviz watch`** — the inventory edited in one browser pane and
-  drawn in the other, and a live preview that re-renders on every save.
-- **`netviz path`** — trace how two elements reach each other, at any layer, with the
-  answer optionally drawn.
-- **`netviz ipam`** — subnet utilisation, free space, the next free block, aggregation and
-  overlap detection.
-- **`netviz export`** — hosts file, DNS zone, DHCP reservations, Ansible inventory and
-  Prometheus targets, generated from the same documents.
-- **`netviz import`** — bootstrap a first inventory from LLDP, `ip -j addr`, `show`
-  command output or a cabling CSV.
-- **`netviz drift`** — the declared inventory compared against what the live network
-  reports, with per-element coverage so an unchecked device is not silently counted as
-  agreeing.
-- **`netviz fmt`** — one canonical form for inventory YAML, with `--check` and `--diff`.
-- **`netviz list`**, **`show`**, **`rules`**, **`schema`**, **`config`** — interrogate an
-  inventory, the rule catalogue and the resolved configuration from the shell.
-- **`netviz init`** — scaffold a small, valid inventory, including the JSON Schema and the
-  editor wiring.
-- **`netviz completion`** — completion scripts for bash, zsh, fish and PowerShell, with
-  completion of element names, namespaces, kinds, layers, formats, profiles and rule ids.
-- **`netviz version`** — the netviz, Python and Graphviz versions in use, the selected
-  YAML parser and the resolved dependency versions; `--json` for pasting into a bug report.
-  `netviz --version` prints the same text.
-- **JSON Schema output** (`netviz schema`) so an editor underlines a typo'd key as it is
-  typed, checked into `schema/` and wired up by `netviz init`.
-- **`netviz.toml`** — per-inventory render defaults and named profiles, so the flags a
-  diagram needs live next to the inventory instead of in shell history.
-- **CI integrations** — a `netviz-validate` composite GitHub Action, three `pre-commit`
-  hooks (`netviz-validate`, `netviz-fmt`, `netviz-fmt-check`) and a documented GitLab
-  recipe.
-- **Published artefacts.** `pip install netviz` (also `pipx` and `uv tool install`), from
-  PyPI via Trusted Publishing, and a `linux/amd64` + `linux/arm64` container image at
-  `ghcr.io/blechschmidt/netgraph` that already has Graphviz in it and runs unprivileged on a
-  read-only root filesystem. The wheel, the sdist and the image carry build provenance
-  attestations, and each release attaches an SBOM for the wheel's dependency closure and one
-  for the image. [`docs/releasing.md`](docs/releasing.md) records what the version number
-  promises and which surfaces it promises it about.
-- **A compose file** for the three ways the tool is used in a container — one command at a
-  time, as a live preview, and as the browser editor.
-- **Windows and macOS support**, tested in CI. Graphviz installed without landing on `PATH`
-  is found in the documented install locations, and `NETVIZ_DOT` names the binary outright.
-
-### Changed
-
-- `netviz validate` is about 3.1× faster on a 10 000-element inventory, and loading is
-  about 1.4× faster; both were driven by a committed profiler rather than by guesswork
-  (`tools/profile_validate.py`, `tools/bench_pipeline.py`).
-- The `html` output no longer grows with the number of layers in it: the views share one
-  document instead of each carrying a copy.
-- The documentation was reorganised into a lean `README.md` and a navigable `docs/` set with
-  one page per command; every flag table is generated from the CLI and every shell transcript
-  is either executed by the test suite or marked with the reason it cannot be.
-
-### Fixed
-
-- Six loader and renderer defects found by property-based and fuzz testing, all of them cases
-  where a hand-written but unusual document was mis-parsed or crashed rather than being
-  reported: see `tests/test_properties.py` and `tests/test_fuzz_loader.py` for the
-  regression examples.
-- Mermaid front matter escaped `"` but not `\`, so a title containing a backslash produced a
-  diagram Mermaid would not parse.
-
-[Unreleased]: https://github.com/blechschmidt/netgraph/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/blechschmidt/netgraph/releases/tag/v0.1.0
+[Unreleased]: https://github.com/blechschmidt/netviz/compare/v0.0.1...HEAD
+[0.0.1]: https://github.com/blechschmidt/netviz/releases/tag/v0.0.1

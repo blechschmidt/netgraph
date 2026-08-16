@@ -1,5 +1,14 @@
 name: release
 
+# The file name is not ours to choose. A PyPI trusted publisher is registered
+# against an exact workflow *file name*, and PyPI matches the OIDC token's
+# ``job_workflow_ref`` claim against it literally -- so the job that uploads has
+# to live in a file called ``pypi.yaml`` and nowhere else. Nor can that job be
+# hived off into a small reusable workflow of that name and called from a
+# ``release.yml``: PyPI does not accept a reusable workflow as a trusted
+# publisher at all. The whole release therefore lives in the file the publisher
+# names, and ``name: release`` above is what it is called in the Actions list.
+#
 # Two triggers, and the difference between them is the whole design.
 #
 # A ``v*`` tag is the real thing: it publishes to PyPI, pushes the container
@@ -429,7 +438,7 @@ jobs:
   #
   # A separate job so that ``attestations: write`` is held by nothing that also
   # builds. ``gh attestation verify netviz-X.Y.Z-py3-none-any.whl --repo
-  # blechschmidt/netgraph`` then ties a downloaded file to this repository, this
+  # blechschmidt/netviz`` then ties a downloaded file to this repository, this
   # workflow and this commit.
   provenance:
     name: provenance

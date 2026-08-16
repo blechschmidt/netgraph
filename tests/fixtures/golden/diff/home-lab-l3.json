@@ -1158,7 +1158,7 @@
     "schemaVersion": 1,
     "tool": {
       "name": "netviz",
-      "version": "0.1.0"
+      "version": "0.0.1"
     },
     "source": {
       "kind": "tree",
