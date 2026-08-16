@@ -1,6 +1,6 @@
-"""``netgraph drift``: does the inventory still describe the network?
+"""``netviz drift``: does the inventory still describe the network?
 
-The command inverts ``netgraph import``, and inverting it is where the risk
+The command inverts ``netviz import``, and inverting it is where the risk
 lies. Importing may safely omit anything it did not see; *comparing* may not,
 because an omission read as a deletion turns every partial capture into a false
 alarm — and every capture is partial. So the properties asserted here are, in
@@ -8,7 +8,7 @@ order of how badly getting them wrong would hurt:
 
 * **A blind spot is never drift.** Whatever the dialect cannot see is reported
   as unobserved, with a reason, and does not appear in the tally, does not set
-  :attr:`~netgraph.drift.DriftReport.drifted`, and does not fail the run. This
+  :attr:`~netviz.drift.DriftReport.drifted`, and does not fail the run. This
   is checked per dialect and per field shape — a link no dialect reports, an
   address an ``ip -j link show`` never carried, a trunk VLAN set nothing prints.
 * **A real difference is always drift.** A MAC that changed, a VLAN that
@@ -36,9 +36,9 @@ from xml.etree import ElementTree
 import pytest
 from click.testing import CliRunner, Result
 
-from netgraph.cli import cli, main
-from netgraph.diagnostics import JUnitCase, as_junit
-from netgraph.drift import (
+from netviz.cli import cli, main
+from netviz.diagnostics import JUnitCase, as_junit
+from netviz.drift import (
     CAPABILITIES,
     Capability,
     Change,
@@ -53,8 +53,8 @@ from netgraph.drift import (
     coverage_of,
     render_drift,
 )
-from netgraph.drift.report import _root_text
-from netgraph.importer import (
+from netviz.drift.report import _root_text
+from netviz.importer import (
     Draft,
     DraftCable,
     DraftDevice,
@@ -62,7 +62,7 @@ from netgraph.importer import (
     DraftVlan,
     ImportSourceError,
 )
-from netgraph.loader import Inventory, load_tree
+from netviz.loader import Inventory, load_tree
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HOME_LAB = REPO_ROOT / "examples" / "home-lab"
@@ -337,7 +337,7 @@ def test_a_device_kind_lldp_determined_is_compared(home_lab: Inventory, tmp_path
 
 
 def test_the_neutral_computer_fallback_is_not_evidence_of_a_kind(home_lab: Inventory) -> None:
-    """``pc-desk`` advertises only Station, which maps to no netgraph kind."""
+    """``pc-desk`` advertises only Station, which maps to no netviz kind."""
     report = run_drift(home_lab, SW_HOME, dialect="lldp")
     assert not [change for change in changes_at(report, "hosts/pc-desk") if change.field == "kind"]
 
@@ -396,7 +396,7 @@ def test_two_dialects_covering_one_device_union_their_coverage(home_lab: Invento
 
 def test_the_dialect_of_each_input_is_recorded_on_the_draft() -> None:
     """The join coverage is built from: source name to how it was read."""
-    from netgraph.importer import build_draft, read_inputs
+    from netviz.importer import build_draft, read_inputs
 
     draft = build_draft(read_inputs([str(SW_HOME), str(PC_DESK), str(PATCH)]))
     assert draft.dialects == {
@@ -491,7 +491,7 @@ def test_a_declared_trunk_vlan_the_capture_cannot_see_is_unobserved(
 
 
 def test_an_inferred_trunk_does_not_contradict_a_declared_mode(home_lab: Inventory) -> None:
-    """The block netgraph reasoned its way to is not evidence about the mode."""
+    """The block netviz reasoned its way to is not evidence about the mode."""
     device = DraftDevice(name="rtr-home", sources=["capture"])
     device.add_interface(
         DraftInterface(
@@ -557,13 +557,13 @@ def test_a_cable_whose_endpoint_does_not_resolve_is_left_to_the_validator(
 ) -> None:
     """``E001``'s business, not drift's: the network is not to blame."""
     (tmp_path / "tree.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc}\n"
         "spec:\n"
         "  interfaces: [{name: eth0, type: ethernet}]\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata: {name: cbl}\n"
         "spec:\n"
@@ -655,7 +655,7 @@ def test_the_json_envelope_carries_the_run_and_both_lists(home_lab: Inventory) -
     report = run_drift(home_lab, PC_DESK, dialect="iproute", spec=CompareSpec(only=("pc-desk",)))
     payload = as_json(report)
     assert payload["schemaVersion"] == 1
-    assert payload["tool"]["name"] == "netgraph"
+    assert payload["tool"]["name"] == "netviz"
     assert payload["capture"] == {
         "inputs": ["pc-desk.addr.json"],
         "dialects": ["iproute"],
@@ -721,7 +721,7 @@ def test_render_drift_rejects_a_format_it_does_not_write(home_lab: Inventory) ->
 def test_the_text_header_prefers_a_relative_root(tmp_path: Path) -> None:
     """Relative where it can be, and forward slashes either way.
 
-    The separator is the report's, not the platform's: every other path netgraph
+    The separator is the report's, not the platform's: every other path netviz
     prints uses ``/``, and a header that did not would need a second copy of
     every transcript that quotes it.
     """
@@ -808,7 +808,7 @@ def test_quiet_drops_the_summary_but_not_the_document(runner: CliRunner) -> None
 
 def test_drift_refuses_an_inventory_that_does_not_load(runner: CliRunner, tmp_path: Path) -> None:
     """A rejected document is absent from the comparison and would read as drift."""
-    (tmp_path / "broken.yaml").write_text("apiVersion: netgraph.dev/v1alpha1\nkind: nope\n")
+    (tmp_path / "broken.yaml").write_text("apiVersion: netviz.dev/v1alpha1\nkind: nope\n")
     result = invoke(runner, "-i", str(tmp_path), "drift", str(PC_DESK))
     assert result.exit_code == 1
     assert "refusing to compare" in result.output
@@ -913,7 +913,7 @@ def test_a_passive_patch_panel_is_matched_without_comparing_its_ports(
 ) -> None:
     """A panel configures nothing, so there is nothing of its own to disagree."""
     (tmp_path / "tree.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: patchpanel\n"
         "metadata: {name: pp-a}\n"
         "spec:\n"

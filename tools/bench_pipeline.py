@@ -40,8 +40,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT / "src") not in sys.path:  # pragma: no cover - convenience for a checkout
     sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from netgraph.loader import load_tree  # noqa: E402
-from netgraph.loader.documents import (  # noqa: E402
+from netviz.loader import load_tree  # noqa: E402
+from netviz.loader.documents import (  # noqa: E402
     HAVE_LIBYAML,
     NodeLoader,
     PureStrictSafeLoader,
@@ -49,7 +49,7 @@ from netgraph.loader.documents import (  # noqa: E402
     libyaml_loader,
     read_documents,
 )
-from netgraph.render import (  # noqa: E402
+from netviz.render import (  # noqa: E402
     AggregateSpec,
     BundleMode,
     Graph,
@@ -57,12 +57,12 @@ from netgraph.render import (  # noqa: E402
     build_graph,
     render,
 )
-from netgraph.render.dot import DOT_EXECUTABLE, to_image  # noqa: E402
-from netgraph.validate import validate  # noqa: E402
+from netviz.render.dot import DOT_EXECUTABLE, to_image  # noqa: E402
+from netviz.validate import validate  # noqa: E402
 
 T = TypeVar("T")
 
-API_VERSION = "netgraph.dev/v1alpha1"
+API_VERSION = "netviz.dev/v1alpha1"
 
 
 # --------------------------------------------------------------------------- #
@@ -399,7 +399,7 @@ def timed(label: str, call: Callable[[], T], *, repeat: int) -> tuple[T, float]:
 
 def parse_with(loader: type[NodeLoader], files: list[Path], root: Path) -> int:
     """Re-parse every file through ``loader``, returning the document count."""
-    import netgraph.loader.documents as module
+    import netviz.loader.documents as module
 
     previous = module.StrictSafeLoader
     module.StrictSafeLoader = loader  # type: ignore[misc]
@@ -532,7 +532,7 @@ def _inventory_root(args: argparse.Namespace) -> Iterator[Path]:
         hosts_per_rack=args.hosts,
         uplinks_per_rack=args.uplinks,
     )
-    target = Path(args.keep) if args.keep else Path(tempfile.mkdtemp(prefix="netgraph-bench-"))
+    target = Path(args.keep) if args.keep else Path(tempfile.mkdtemp(prefix="netviz-bench-"))
     if target.exists() and args.keep:
         shutil.rmtree(target)
     files, documents = generate(target, shape)

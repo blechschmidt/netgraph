@@ -2,7 +2,7 @@
 #
 # 'sw-a' forwards neither IPv4 nor IPv6, so its management address belongs on a
 # 'type: vlan' SVI rather than on the bridge port itself.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -17,7 +17,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -29,7 +29,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

@@ -1,4 +1,4 @@
-"""``netgraph path``: endpoint resolution, the two searches, and the report.
+"""``netviz path``: endpoint resolution, the two searches, and the report.
 
 The properties asserted here are the ones a user of the command depends on:
 
@@ -29,11 +29,11 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.fsio import write_text
-from netgraph.loader import Inventory, load_tree
-from netgraph.render import Layer, RenderOptions, build_graph, render_text
-from netgraph.trace import (
+from netviz.cli import cli
+from netviz.fsio import write_text
+from netviz.loader import Inventory, load_tree
+from netviz.render import Layer, RenderOptions, build_graph, render_text
+from netviz.trace import (
     DEFAULT_MAX_HOPS,
     MAX_PATHS,
     PATH_KIND,
@@ -80,7 +80,7 @@ def overlay() -> Inventory:
 
 def device(name: str, *interfaces: str, kind: str = "computer", extra: str = "") -> str:
     return (
-        f"apiVersion: netgraph.dev/v1alpha1\n"
+        f"apiVersion: netviz.dev/v1alpha1\n"
         f"kind: {kind}\n"
         f"metadata: {{name: {name}}}\n"
         f"spec:\n"
@@ -104,7 +104,7 @@ def port(name: str, address: str = "") -> str:
 
 def cable(name: str, left: str, right: str) -> str:
     return (
-        f"apiVersion: netgraph.dev/v1alpha1\n"
+        f"apiVersion: netviz.dev/v1alpha1\n"
         f"kind: cable\n"
         f"metadata: {{name: {name}}}\n"
         f"spec: {{endpoints: [{left}, {right}], medium: copper}}\n"
@@ -189,7 +189,7 @@ def test_an_adapters_upstream_port_is_a_valid_selector(home_lab: Inventory) -> N
 def test_an_unknown_element_says_how_to_find_the_right_one(home_lab: Inventory) -> None:
     with pytest.raises(TraceError, match="no element named 'nope'") as caught:
         resolve_endpoint(home_lab, "nope")
-    assert "netgraph list devices" in str(caught.value)
+    assert "netviz list devices" in str(caught.value)
 
 
 def test_an_unknown_interface_lists_the_ones_that_exist(home_lab: Inventory) -> None:
@@ -665,7 +665,7 @@ def test_a_cleartext_tunnel_on_the_path_is_called_out(tmp_path: Path) -> None:
             "{name: gre0, type: tunnel, parent: eth0, ipv4: [10.0.0.2/30]}",
             kind="router",
         ),
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: tunnel\n"
         "metadata: {name: gre-open}\n"
         "spec: {type: gre, endpoints: [rtr-a:gre0, rtr-b:gre0]}\n",
@@ -696,7 +696,7 @@ def test_a_multipoint_layer_two_tunnel_is_walked_end_to_end(tmp_path: Path) -> N
     inventory = inventory_of(
         tmp_path,
         *documents,
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: tunnel\n"
         "metadata: {name: vx-mesh}\n"
         "spec: {type: vxlan, vni: 50, endpoints: [rtr-a:vx0, rtr-b:vx0, rtr-c:vx0]}\n",
@@ -799,7 +799,7 @@ def test_the_json_report_lists_the_cleartext_tunnels_of_a_path(tmp_path: Path) -
             "{name: gre0, type: tunnel, parent: eth0, ipv4: [10.0.0.2/30]}",
             kind="router",
         ),
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: tunnel\n"
         "metadata: {name: gre-open}\n"
         "spec: {type: gre, endpoints: [rtr-a:gre0, rtr-b:gre0]}\n",
@@ -831,7 +831,7 @@ def test_a_multipoint_tunnel_hairpinned_on_one_element_is_not_a_hop(tmp_path: Pa
             "{name: vx0, type: tunnel, parent: eth0, vlan: {mode: access, access_vlan: 50}}",
             kind="router",
         ),
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: tunnel\n"
         "metadata: {name: vx-mesh}\n"
         "spec: {type: vxlan, vni: 50, endpoints: [rtr-a:vx0, rtr-a:vx1, rtr-b:vx0]}\n",
@@ -906,7 +906,7 @@ def test_the_text_report_is_hop_by_hop(home_lab: Inventory) -> None:
 
 def test_the_json_report_carries_the_document_envelope(home_lab: Inventory) -> None:
     document = json.loads(render_trace(trace(home_lab, "pc-desk", "srv-nas"), "json"))
-    assert document["apiVersion"] == "netgraph.dev/v1alpha1"
+    assert document["apiVersion"] == "netviz.dev/v1alpha1"
     assert document["kind"] == PATH_KIND
     assert document["found"] is True
     assert document["layer"] == "l2"
@@ -1027,7 +1027,7 @@ def test_highlight_without_output_puts_the_diagram_on_stdout(runner: CliRunner) 
     result = invoke(runner, "home-lab", "pc-desk", "srv-nas", "--highlight")
     assert result.exit_code == 0
     # stdout is the diagram's; the hop-by-hop report moves to stderr.
-    assert result.stdout.startswith("graph netgraph {")
+    assert result.stdout.startswith("graph netviz {")
     assert "path 1 of 1" in result.stderr
 
 
@@ -1055,7 +1055,7 @@ def test_a_cleartext_tunnel_is_warned_about_on_stderr(runner: CliRunner, tmp_pat
             "{name: gre0, type: tunnel, parent: eth0, ipv4: [10.0.0.2/30]}",
             kind="router",
         ),
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: tunnel\n"
         "metadata: {name: gre-open}\n"
         "spec: {type: gre, endpoints: [rtr-a:gre0, rtr-b:gre0]}\n",
@@ -1156,7 +1156,7 @@ def test_a_trace_matches_its_golden_file(case: Case, regen_golden: bool) -> None
         golden = GOLDEN_DIR / f"{case.name}{suffix}"
         actual = _rendered(case, suffix)
         if regen_golden:
-            # ``netgraph.fsio.write_text`` rather than ``Path.write_text``: a
+            # ``netviz.fsio.write_text`` rather than ``Path.write_text``: a
             # golden is a byte-for-byte artefact, and regenerating one on Windows
             # through Python's text mode would rewrite every line ending in the
             # file. See ``.gitattributes``, which keeps the committed copies at
@@ -1196,7 +1196,7 @@ def test_goldens_are_free_of_machine_specific_paths() -> None:
             assert "/root/" not in text
 
 
-def test_the_documented_path_example_is_what_netgraph_produces() -> None:
+def test_the_documented_path_example_is_what_netviz_produces() -> None:
     """The worked example in the tutorial, traced rather than typed.
 
     A sample of output in a document is a promise about the tool, and the only
@@ -1204,7 +1204,7 @@ def test_the_documented_path_example_is_what_netgraph_produces() -> None:
     """
     guide = (REPO_ROOT / "docs" / "getting-started.md").read_text(encoding="utf-8")
     block = guide.partition("<!-- path-example -->")[2]
-    documented = block.partition("$ netgraph path pc-alice rtr-gw\n")[2].partition("```")[0]
+    documented = block.partition("$ netviz path pc-alice rtr-gw\n")[2].partition("```")[0]
     assert documented, "the path example is missing from docs/getting-started.md"
 
     produced = render_trace(trace(load_tree(EXAMPLES / "quickstart"), "pc-alice", "rtr-gw"), "text")

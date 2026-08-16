@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: sw-lab-to-srv-host-a
@@ -8,7 +8,7 @@ spec:
   speed: 1Gbps
   category: cat6
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: sw-lab-to-srv-host-b

@@ -1,6 +1,6 @@
 """Drawing the notes, areas and legends of §21.
 
-The promise these tests exist to hold is the one :mod:`netgraph.models.annotation`
+The promise these tests exist to hold is the one :mod:`netviz.models.annotation`
 makes: an annotation changes the *picture* and nothing else. So the first
 assertion here is a counting one — a graph with three annotation documents has
 exactly the nodes and edges of the same graph without them — and everything
@@ -21,9 +21,9 @@ from pathlib import Path
 
 import pytest
 
-from netgraph.loader import Inventory, load_tree
-from netgraph.render import FilterSpec, Layer, RenderOptions, build_graph, filter_graph
-from netgraph.render.annotations import (
+from netviz.loader import Inventory, load_tree
+from netviz.render import FilterSpec, Layer, RenderOptions, build_graph, filter_graph
+from netviz.render.annotations import (
     AREA_ID_PREFIX,
     LEGEND_ID_PREFIX,
     NOTE_ID_PREFIX,
@@ -31,10 +31,10 @@ from netgraph.render.annotations import (
     darken,
     parse_markup,
 )
-from netgraph.render.dot import layout_plan, to_dot, to_image
-from netgraph.render.jsonexport import to_json
-from netgraph.render.mermaid import to_mermaid
-from netgraph.render.palette import NODE_PALETTE
+from netviz.render.dot import layout_plan, to_dot, to_image
+from netviz.render.jsonexport import to_json
+from netviz.render.mermaid import to_mermaid
+from netviz.render.palette import NODE_PALETTE
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -43,7 +43,7 @@ from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path,
 # --------------------------------------------------------------------------- #
 
 TOPOLOGY = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata: {name: sw-core}
 spec:
@@ -51,33 +51,33 @@ spec:
     - {name: eth0, type: ethernet, ipv4: [10.0.0.1/24]}
     - {name: eth1, type: ethernet}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata: {name: srv-proxy}
 spec:
   interfaces: [{name: eth0, type: ethernet, ipv4: [10.0.0.2/24], vlan: {mode: access, access_vlan: 20}}]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-fibre}
 spec: {endpoints: [sw-core:eth0, srv-proxy:eth0], medium: fiber}
 """
 
 OFFICE = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata: {name: pc}
 spec:
   interfaces: [{name: eth0, type: ethernet, ipv4: [10.0.0.3/24], vlan: {mode: access, access_vlan: 10}}]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-desk}
 spec: {endpoints: [pc:eth0, edge/sw-core:eth1], medium: copper}
 """
 
 ANNOTATIONS = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata: {name: dmz}
 spec:
@@ -85,7 +85,7 @@ spec:
   members: [edge/sw-core, edge/srv-proxy]
   color: "#fee2e2"
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata: {name: why-orange}
 spec:
@@ -98,7 +98,7 @@ spec:
   anchor: {element: edge/sw-core}
   color: "#fef3c7"
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: legend
 metadata: {name: key}
 spec:
@@ -108,10 +108,10 @@ spec:
 """
 
 #: A stored arrangement for every node of the fixture, which is what makes
-#: :attr:`~netgraph.layout.geometry.LayoutMode.FIXED` — and therefore the
+#: :attr:`~netviz.layout.geometry.LayoutMode.FIXED` — and therefore the
 #: ``_background`` path — reachable.
 LAYOUT = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: layout
 metadata: {name: layout}
 spec:
@@ -185,7 +185,7 @@ def test_an_annotation_scoped_to_another_view_does_not_appear(tmp_path: Path) ->
     inventory = write_inventory(
         tmp_path / "scoped",
         annotations=(
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: note\n"
             "metadata: {name: l3-only}\n"
             "spec:\n"
@@ -322,7 +322,7 @@ def test_an_annotation_without_a_colour_takes_its_kind_s_default(tmp_path: Path)
     inventory = write_inventory(
         tmp_path / "uncoloured",
         annotations=(
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: area\n"
             "metadata: {name: plain}\n"
             "spec: {members: [edge/sw-core]}\n"
@@ -366,7 +366,7 @@ def test_a_written_out_legend_is_left_alone(tmp_path: Path) -> None:
     inventory = write_inventory(
         tmp_path / "written",
         annotations=(
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: legend\n"
             "metadata: {name: key}\n"
             "spec:\n"
@@ -412,12 +412,12 @@ def test_the_first_declared_area_wins_an_overlapping_node(tmp_path: Path) -> Non
     inventory = write_inventory(
         tmp_path / "overlapping",
         annotations=(
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: area\n"
             "metadata: {name: first}\n"
             "spec: {label: first, members: [edge/sw-core, edge/srv-proxy]}\n"
             "---\n"
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: area\n"
             "metadata: {name: second}\n"
             "spec: {label: second, members: [edge/sw-core, office/pc]}\n"
@@ -455,7 +455,7 @@ def test_a_legend_is_a_cluster_of_swatches(annotated: Inventory) -> None:
     source = to_dot(build_graph(annotated))
     assert "subgraph cluster_legend_0 {" in source
     # The title is a row of the table, not the cluster's label: see
-    # ``netgraph.render.dot._legend_views``.
+    # ``netviz.render.dot._legend_views``.
     assert "<B>Key</B>" in source
     assert 'BGCOLOR="#dcf0dc"' in source, "the switch swatch is the switch's fill"
     assert ">switch</TD>" in source
@@ -510,7 +510,7 @@ def test_mermaid_draws_an_area_as_a_subgraph_and_a_note_as_a_node(
 ) -> None:
     source = to_mermaid(build_graph(annotated))
     assert 'subgraph area0["DMZ"]' in source
-    assert "classDef netgraphNote" in source
+    assert "classDef netvizNote" in source
     assert "note0[" in source
     assert "note0 -.- n0" in source, "the leader points at the anchor"
 
@@ -528,7 +528,7 @@ def test_mermaid_drops_an_area_that_is_a_rectangle_rather_than_a_set(
     inventory = write_inventory(
         tmp_path / "canvas",
         annotations=(
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: area\n"
             "metadata: {name: ups}\n"
             "spec:\n"

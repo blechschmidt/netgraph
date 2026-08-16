@@ -6,9 +6,9 @@ Everything §16 adds, in the five places it has to hold together:
   next-hop/prefix family rule, the "a route needs somewhere to send the packet"
   rule and the VRF references inside one ``spec``, each reported at schema time
   with an ``NG-F*`` id and the path of the offending value;
-* the **address space** — that a VRF partitions it: :mod:`netgraph.subnets`
+* the **address space** — that a VRF partitions it: :mod:`netviz.subnets`
   groups per instance, ``E004``/``W111`` stop firing across instances, and
-  :mod:`netgraph.ipam` sizes and aggregates per instance;
+  :mod:`netviz.ipam` sizes and aggregates per instance;
 * the **validator** — the seven cross-document rules, each on an inventory that
   differs from a clean one in exactly the way the rule is about, so a finding
   cannot be an accident of the fixture;
@@ -34,12 +34,12 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.errors import SchemaError
-from netgraph.export import EXPORTERS
-from netgraph.ipam import aggregate, free_space, utilisation_of
-from netgraph.loader import Inventory, load_tree
-from netgraph.models import (
+from netviz.cli import cli
+from netviz.errors import SchemaError
+from netviz.export import EXPORTERS
+from netviz.ipam import aggregate, free_space, utilisation_of
+from netviz.loader import Inventory, load_tree
+from netviz.models import (
     API_VERSION,
     GLOBAL_VRF,
     BgpConfig,
@@ -50,21 +50,21 @@ from netgraph.models import (
     VrfDefinition,
     parse_document,
 )
-from netgraph.models.routing import (
+from netviz.models.routing import (
     AddressFamily,
     normalise_area,
     normalise_fwmark,
     normalise_rd,
 )
-from netgraph.render.details import build_details, detail_text
-from netgraph.render.dot import to_dot
-from netgraph.render.graph import EdgeKind, Layer, build_graph
-from netgraph.render.ids import element_ids
-from netgraph.render.jsonexport import graph_to_dict
-from netgraph.render.mermaid import to_mermaid
-from netgraph.render.options import RenderOptions
-from netgraph.subnets import subnets_of
-from netgraph.validate import validate
+from netviz.render.details import build_details, detail_text
+from netviz.render.dot import to_dot
+from netviz.render.graph import EdgeKind, Layer, build_graph
+from netviz.render.ids import element_ids
+from netviz.render.jsonexport import graph_to_dict
+from netviz.render.mermaid import to_mermaid
+from netviz.render.options import RenderOptions
+from netviz.subnets import subnets_of
+from netviz.validate import validate
 
 from platform_marks import requires_posix_shell  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -243,7 +243,7 @@ def test_a_default_route_says_so() -> None:
 
 
 def test_a_route_prefix_with_host_bits_is_refused() -> None:
-    """A destination with host bits is a typo or a /32; netgraph will not guess."""
+    """A destination with host bits is a typo or a /32; netviz will not guess."""
     with pytest.raises(ValueError):
         StaticRoute(prefix="10.0.0.1/24", blackhole=True)  # type: ignore[arg-type]
 
@@ -1028,7 +1028,7 @@ def test_the_routing_view_keeps_the_static_routes_and_instances(two_instances: I
 
 
 def test_the_routing_view_can_be_filtered_like_any_other(peers: Inventory) -> None:
-    from netgraph.render.graph import FilterSpec, filter_graph
+    from netviz.render.graph import FilterSpec, filter_graph
 
     graph = filter_graph(build_graph(peers, layer=Layer.ROUTING), FilterSpec(names=("rtr-a",)))
     assert list(graph.nodes) == ["rtr-a"]
@@ -1499,7 +1499,7 @@ def test_a_vrf_is_a_table_a_rule_may_look_up() -> None:
         )
     )
     assert element.spec.has_table("blue")
-    # ...and netgraph has no *number* for it, which is what every emitter that
+    # ...and netviz has no *number* for it, which is what every emitter that
     # needs one has to refuse over.
     assert element.spec.table_id("blue") is None
 

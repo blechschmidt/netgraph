@@ -3,7 +3,7 @@
 
 ``.github/workflows/pages.yml`` runs this on every push to ``main`` and deploys
 what it writes to GitHub Pages. The point of it is the first sentence of the
-README's problem statement: until now nothing let a stranger see what netgraph
+README's problem statement: until now nothing let a stranger see what netviz
 does without installing Python and Graphviz first.
 
 What it produces
@@ -16,7 +16,7 @@ What it produces
     derives, so a URL somebody has bookmarked or a ``NG-*`` rule's help link
     lands in the same place here as it does on GitHub.
 ``demo/<example>-diagram.html``
-    ``netgraph render -f html`` over each inventory in ``examples/``, several
+    ``netviz render -f html`` over each inventory in ``examples/``, several
     layers deep, exactly as a reader would get by running the command — byte for
     byte, with nothing added. The layers, the filters, the tooltips and the
     outline are all live; there is no second front end to keep in step with the
@@ -294,7 +294,7 @@ SHELL: Final = """\
 <body>
 <a class="skip" href="#content">Skip to the content</a>
 <header class="site-head">
-  <a class="brand" href="{root}index.html">netgraph</a>
+  <a class="brand" href="{root}index.html">netviz</a>
   <nav aria-label="Site">{nav}</nav>
   <a class="repo" href="{source}">GitHub</a>
 </header>
@@ -303,7 +303,7 @@ SHELL: Final = """\
 </main>
 <footer class="site-foot">
   <p><a href="{edit}">Edit this page on GitHub</a> &middot;
-     netgraph is MIT-licensed &middot;
+     netviz is MIT-licensed &middot;
      this site is built from {commit} by <code>tools/build_site.py</code></p>
 </footer>
 </body>
@@ -346,7 +346,7 @@ def shell(
 STYLE: Final = """\
 /* The published site. One stylesheet, no font to fetch, no script.
  *
- * The colours are the editor's own tokens (netgraph/web/assets/app.css), for
+ * The colours are the editor's own tokens (netviz/web/assets/app.css), for
  * the same reason and to the same contrast requirement: every one of them
  * clears 4.5:1 against its own background, in both schemes, and nothing is
  * dimmed with opacity. */
@@ -573,7 +573,7 @@ def demo_strip(root: str) -> str:
     return (
         '<section class="demo-strip">'
         "<h2>Try it without installing anything</h2>"
-        "<p>Every example inventory below is the real <code>netgraph render -f html</code> "
+        "<p>Every example inventory below is the real <code>netviz render -f html</code> "
         "output: switch layers, filter by VLAN, hover a node for its interfaces and "
         "addresses. Nothing is fetched and nothing is installed.</p>"
         f"<ul>{links}</ul>"
@@ -603,9 +603,7 @@ def build_pages(output: Path, *, commit: str) -> list[str]:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(
             shell(
-                title="netgraph"
-                if page.destination == "index.html"
-                else f"{page.title} — netgraph",
+                title="netviz" if page.destination == "index.html" else f"{page.title} — netviz",
                 body=body,
                 destination=page.destination,
                 description=_summary(text),
@@ -628,7 +626,7 @@ def _reroot(body: str, depth: int) -> str:
 
     :func:`rewrite_links` produces paths from the root of the site because that
     is what the map holds. The site is deployed under a project path on GitHub
-    Pages (``/netgraph/``), so a leading slash would leave the domain; every
+    Pages (``/netviz/``), so a leading slash would leave the domain; every
     link is therefore relative, and this is where the ``../`` comes from.
     """
     prefix = "../" * depth
@@ -648,11 +646,11 @@ def _summary(text: str) -> str:
         line = " ".join(block.split())
         if line and not line.startswith(("#", "|", "```", ">", "<", "-", "*")):
             return line[:200]
-    return "netgraph — declare your network in YAML and render it as a network graph."
+    return "netviz — declare your network in YAML and render it as a network graph."
 
 
 def render_examples(output: Path, *, commit: str) -> list[str]:
-    """Draw every example with ``netgraph render -f html``, and frame each one.
+    """Draw every example with ``netviz render -f html``, and frame each one.
 
     Two files per example, and the split is the point. ``<name>-diagram.html`` is
     the command's output, byte for byte, with nothing added — that is what makes
@@ -678,14 +676,14 @@ def render_examples(output: Path, *, commit: str) -> list[str]:
         command = [
             sys.executable,
             "-m",
-            "netgraph",
+            "netviz",
             "--inventory",
             str(inventory),
             "render",
             "--format",
             "html",
             "--title",
-            f"{demo.name} — netgraph",
+            f"{demo.name} — netviz",
             "--element-ids",
             "--output",
             str(target),
@@ -714,11 +712,11 @@ def _frame(output: Path, demo: Demo, *, commit: str) -> None:
         f'<p class="demo-meta">Drawn at {" · ".join(demo.layers)} from '
         f'<a href="{SOURCE_URL}/tree/main/examples/{demo.name}"><code>'
         f"examples/{html.escape(demo.name)}</code></a> by "
-        f"<code>netgraph -i examples/{html.escape(demo.name)} render -f html</code>. "
+        f"<code>netviz -i examples/{html.escape(demo.name)} render -f html</code>. "
         f'<a href="{diagram}">Open it on its own</a> — it is one file, and it works '
         "offline.</p>"
         f'<iframe class="demo-frame" src="{diagram}" '
-        f'title="{html.escape(demo.name)}, drawn by netgraph" loading="lazy"></iframe>'
+        f'title="{html.escape(demo.name)}, drawn by netviz" loading="lazy"></iframe>'
         '<p class="demo-meta">Pick a layer from the switcher inside the diagram; hover or '
         "focus a node for its interfaces, addresses, VLANs and cabling; filter by VLAN or "
         'namespace. <a href="index.html">All the examples</a> · '
@@ -726,7 +724,7 @@ def _frame(output: Path, demo: Demo, *, commit: str) -> None:
     )
     (output / "demo" / f"{demo.name}.html").write_text(
         shell(
-            title=f"{demo.name} — netgraph",
+            title=f"{demo.name} — netviz",
             body=body,
             destination=f"demo/{demo.name}.html",
             description=demo.summary,
@@ -750,15 +748,15 @@ def build_demo_index(output: Path, *, commit: str) -> None:
         for demo in DEMOS
     )
     body = (
-        "<h1>Try netgraph in your browser</h1>"
-        "<p>Each diagram below is one <code>netgraph render -f html</code> run over the "
+        "<h1>Try netviz in your browser</h1>"
+        "<p>Each diagram below is one <code>netviz render -f html</code> run over the "
         'inventory of the same name in <a href="' + SOURCE_URL + '/tree/main/examples">'
         "<code>examples/</code></a>. They are self-contained files — the same ones the "
         "command writes — so everything works offline: pick a layer from the switcher, "
         "filter by VLAN or namespace, hover or focus a node to read its interfaces, "
         "addresses, VLANs and cabling.</p>"
         "<p>To draw your own the same way: "
-        "<code>netgraph -i my-network render -f html -o network.html</code>. "
+        "<code>netviz -i my-network render -f html -o network.html</code>. "
         '<a href="../docs/getting-started.html">Getting started</a> builds an inventory '
         "from nothing in about ten minutes.</p>"
         f'<ul class="cards">{cards}</ul>'
@@ -766,11 +764,11 @@ def build_demo_index(output: Path, *, commit: str) -> None:
     (output / "demo").mkdir(parents=True, exist_ok=True)
     (output / "demo" / "index.html").write_text(
         shell(
-            title="Try netgraph — netgraph",
+            title="Try netviz — netviz",
             body=body,
             destination="demo/index.html",
             description=(
-                "Every netgraph example inventory, rendered as an interactive diagram you "
+                "Every netviz example inventory, rendered as an interactive diagram you "
                 "can click through without installing anything."
             ),
             edit=f"{SOURCE_URL}/blob/main/tools/build_site.py",
@@ -801,7 +799,7 @@ def check_links(output: Path) -> list[str]:
     """Every local ``href``/``src`` in the built site points at a file that is there."""
     broken: list[str] = []
     for path in sorted(output.rglob("*.html")):
-        # Pages netgraph itself wrote -- the demo renders, and the committed
+        # Pages netviz itself wrote -- the demo renders, and the committed
         # one under docs/ -- are self-contained by construction and are checked
         # by tests/test_render_html.py. Re-reading them here would only assert
         # that a data URI is not a file.

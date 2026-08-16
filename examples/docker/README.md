@@ -81,7 +81,7 @@ nothing stops a fourth.
 
 **Two stacks, one address, no clash.** `rl-bob` is a second user's daemon, and
 its tap carries the same `10.0.2.100/24` alice's does, because slirp4netns gives
-every namespace it is asked about the same numbering. netgraph does not report a
+every namespace it is asked about the same numbering. netviz does not report a
 duplicate, for the same reason it does not report `dind-docker0` twice over on
 `srv-dock-01`: a namespace is an address space.
 
@@ -97,7 +97,7 @@ that the host routes, and it is the only one with a rule and a masquerade.
 
 <!-- norun: writes docker.svg into the reader's directory -->
 ```console
-$ netgraph -i examples/docker render --layer netns -o docker.svg
+$ netviz -i examples/docker render --layer netns -o docker.svg
 ```
 
 The `netns` layer is the one view that draws below the machine: the element node
@@ -125,19 +125,19 @@ the shape will meet all of them:
   ([follow-up 26](../../docs/follow-ups.md)). `I002` exempts veth ends because
   they can never terminate a cable; the four interfaces on `srv-dock-03` that
   also never can are not distinguishable from a spare port, so the device
-  carries a `netgraph/ignore: NG-C015` annotation saying which four and why.
+  carries a `netviz/ignore: NG-C015` annotation saying which four and why.
 
 ## Checking it
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/docker validate
+$ netviz -i examples/docker validate
 no problems found
 ```
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/docker test
+$ netviz -i examples/docker test
 ok    containers  13 passed  (what the three Docker hosts promise about their containers)
 
 13 passed in 1 suite

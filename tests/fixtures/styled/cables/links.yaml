@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-core-hq
@@ -14,7 +14,7 @@ spec:
     - sites/hq/rtr-core:eth0
     - sites/hq/sw-hq-a:uplink
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-hq-b
@@ -25,7 +25,7 @@ spec:
     - sites/hq/sw-hq-a:port1
     - sites/hq/sw-hq-b:uplink
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-core-edge
@@ -36,7 +36,7 @@ spec:
     - sites/hq/rtr-core:eth1
     - sites/branch/rtr-edge:eth0
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-edge-branch
@@ -47,7 +47,7 @@ spec:
     - sites/branch/rtr-edge:eth1
     - sites/branch/sw-branch:uplink
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-desk

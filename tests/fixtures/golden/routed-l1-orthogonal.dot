@@ -1,4 +1,4 @@
-graph netgraph {
+graph netviz {
   graph [
     rankdir=TB,
     splines=ortho,

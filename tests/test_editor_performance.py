@@ -1,4 +1,4 @@
-"""Regression guards on what one edit in ``netgraph web`` costs.
+"""Regression guards on what one edit in ``netviz web`` costs.
 
 ``tests/test_performance.py`` guards the two stages every command pays for,
 loading and validating. This file guards the *editor*: the loop between a person
@@ -71,16 +71,16 @@ from typing import Any, Final
 
 import pytest
 
-from netgraph.edit import session as edit_session
-from netgraph.layout import graphviz as layout_graphviz
-from netgraph.layout.geometry import Placement
-from netgraph.loader import load_tree
-from netgraph.loader.cache import DocumentCache
-from netgraph.render import build_graph, filter_graph
-from netgraph.render.dot import to_image
-from netgraph.web import session as web_session
-from netgraph.web.preview import MAX_PROBLEMS, ViewOptions
-from netgraph.web.session import EditingSession
+from netviz.edit import session as edit_session
+from netviz.layout import graphviz as layout_graphviz
+from netviz.layout.geometry import Placement
+from netviz.loader import load_tree
+from netviz.loader.cache import DocumentCache
+from netviz.render import build_graph, filter_graph
+from netviz.render.dot import to_image
+from netviz.web import session as web_session
+from netviz.web.preview import MAX_PROBLEMS, ViewOptions
+from netviz.web.session import EditingSession
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path
 from test_performance import (  # isort: skip -- the harness loader and the timer
@@ -145,7 +145,7 @@ def editor_tree(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 @pytest.fixture
 def editor(editor_tree: Path, tmp_path: Path) -> EditingSession:
-    """A writable session over it, cache warmed, as ``netgraph web --write`` builds one."""
+    """A writable session over it, cache warmed, as ``netviz web --write`` builds one."""
     session = EditingSession(
         root=editor_tree, writable=True, cache=DocumentCache(tmp_path / "cache")
     )
@@ -385,7 +385,7 @@ def test_separating_a_partial_arrangement_is_not_quadratic(
     assert growth <= MAX_SEPARATION_GROWTH, (
         f"quadrupling the drawing multiplied the separation pass's comparisons by "
         f"{growth:.1f}, over the budget of {MAX_SEPARATION_GROWTH:.1f}; a sweep over every "
-        f"pair would be {quadratic:.0f}. The grid in netgraph.layout.graphviz._Grid has "
+        f"pair would be {quadratic:.0f}. The grid in netviz.layout.graphviz._Grid has "
         f"stopped narrowing the candidates. See entry 20 of docs/follow-ups.md."
     )
 
@@ -431,8 +431,8 @@ def test_a_half_finished_arrangement_costs_a_few_auto_layouts(
     assert ratio <= MAX_PARTIAL_LAYOUT_RATIO, (
         f"a partly-arranged drawing costs {ratio:.2f}x an unarranged one "
         f"({partial:.0f} ms against {auto:.0f} ms), over the budget of "
-        f"{MAX_PARTIAL_LAYOUT_RATIO:.1f}x. Either netgraph.render.dot.unroutable stopped "
-        f"holding the spline router back, or netgraph.layout.graphviz.separate went "
+        f"{MAX_PARTIAL_LAYOUT_RATIO:.1f}x. Either netviz.render.dot.unroutable stopped "
+        f"holding the spline router back, or netviz.layout.graphviz.separate went "
         f"quadratic again. Measure with 'python tools/bench_editor.py' before changing "
         f"this threshold; see entry 20 of docs/follow-ups.md."
     )

@@ -6,7 +6,7 @@ default, because somebody wrote those down about this diagram; off for the
 printed page an audit reads, which wants the network and nothing said about it.
 
 What is asserted here is only the wiring: that the flag reaches every command
-that draws, that ``netgraph.toml`` can set it per inventory and per profile, and
+that draws, that ``netviz.toml`` can set it per inventory and per profile, and
 that an explicit flag still beats the file. *How* an annotation is drawn belongs
 to the renderer's own tests; this module never looks at a shape, only at whether
 the text somebody wrote reached the output at all.
@@ -19,10 +19,10 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner, Result
 
-from netgraph.cli import cli
-from netgraph.config import CONFIG_FILE_NAME
-from netgraph.render.options import RenderOptions
-from netgraph.settings import SETTINGS_BY_KEY
+from netviz.cli import cli
+from netviz.config import CONFIG_FILE_NAME
+from netviz.render.options import RenderOptions
+from netviz.settings import SETTINGS_BY_KEY
 
 #: The note's text, chosen so it cannot collide with a device name, a namespace
 #: or anything Graphviz emits of its own accord.
@@ -40,7 +40,7 @@ def inventory(tmp_path: Path) -> Path:
     tree = tmp_path / "inv"
     tree.mkdir(parents=True)
     (tree / "net.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata: {name: sw-a}\n"
         "spec:\n"
@@ -49,7 +49,7 @@ def inventory(tmp_path: Path) -> Path:
         "      type: ethernet\n"
         "      ipv4: [10.0.0.1/24]\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata: {name: sw-b}\n"
         "spec:\n"
@@ -58,14 +58,14 @@ def inventory(tmp_path: Path) -> Path:
         "      type: ethernet\n"
         "      ipv4: [10.0.0.2/24]\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata: {name: cbl-a-b}\n"
         "spec:\n"
         "  endpoints: [sw-a:port1, sw-b:port1]\n"
         "  medium: copper\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: note\n"
         "metadata: {name: why-two-uplinks}\n"
         "spec:\n"
@@ -124,7 +124,7 @@ def test_every_drawing_command_offers_the_flag(command: str) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# netgraph.toml
+# netviz.toml
 # --------------------------------------------------------------------------- #
 
 

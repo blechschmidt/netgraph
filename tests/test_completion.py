@@ -1,8 +1,8 @@
-"""Shell completion: the scripts, and the candidates they ask netgraph for.
+"""Shell completion: the scripts, and the candidates they ask netviz for.
 
 The scripts themselves come from click, so what is asserted about them is that
-they are generated for each supported shell and agree on the one thing netgraph
-chooses — the ``_NETGRAPH_COMPLETE`` variable that ties script to executable.
+they are generated for each supported shell and agree on the one thing netviz
+chooses — the ``_NETVIZ_COMPLETE`` variable that ties script to executable.
 
 The completers are ours, and they are exercised the way a shell exercises them:
 through :class:`click.shell_completion.ShellComplete`, with the same argument
@@ -21,15 +21,15 @@ import pytest
 from click.shell_completion import CompletionItem, ShellComplete
 from click.testing import CliRunner, Result
 
-from netgraph.cli import cli
-from netgraph.completion import PROG_NAME, SHELLS, complete_kind, completion_script
-from netgraph.completion import _inventory_path as inventory_path
-from netgraph.completion import _items as items
-from netgraph.completion import _load_elements as load_elements
-from netgraph.errors import NetgraphError
-from netgraph.models import DOCUMENT_KINDS, KINDS
-from netgraph.render import FORMATS, Layer
-from netgraph.rules import RULE_IDS
+from netviz.cli import cli
+from netviz.completion import PROG_NAME, SHELLS, complete_kind, completion_script
+from netviz.completion import _inventory_path as inventory_path
+from netviz.completion import _items as items
+from netviz.completion import _load_elements as load_elements
+from netviz.errors import NetvizError
+from netviz.models import DOCUMENT_KINDS, KINDS
+from netviz.render import FORMATS, Layer
+from netviz.rules import RULE_IDS
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -52,8 +52,8 @@ def runner() -> CliRunner:
 
 
 def complete(args: list[str], incomplete: str = "") -> list[CompletionItem]:
-    """What the shell would be offered for ``netgraph <args> <incomplete><TAB>``."""
-    completer = ShellComplete(cli, {}, PROG_NAME, "_NETGRAPH_COMPLETE")
+    """What the shell would be offered for ``netviz <args> <incomplete><TAB>``."""
+    completer = ShellComplete(cli, {}, PROG_NAME, "_NETVIZ_COMPLETE")
     return list(completer.get_completions(args, incomplete))
 
 
@@ -70,7 +70,7 @@ def values(args: list[str], incomplete: str = "") -> list[str]:
 def test_a_script_is_generated_for_every_supported_shell(shell: str) -> None:
     script = completion_script(shell, cli)
     assert script.endswith("\n")
-    assert "_NETGRAPH_COMPLETE" in script, "the script must invoke netgraph's own protocol"
+    assert "_NETVIZ_COMPLETE" in script, "the script must invoke netviz's own protocol"
     assert PROG_NAME in script
 
 
@@ -83,7 +83,7 @@ def test_the_command_prints_exactly_that_script(runner: CliRunner, shell: str) -
 
 def test_the_zsh_script_registers_itself_with_compdef() -> None:
     """The one shell whose script is inert without it."""
-    assert completion_script("zsh", cli).startswith("#compdef netgraph")
+    assert completion_script("zsh", cli).startswith("#compdef netviz")
 
 
 def test_an_unsupported_shell_is_a_usage_error(runner: CliRunner) -> None:
@@ -93,7 +93,7 @@ def test_an_unsupported_shell_is_a_usage_error(runner: CliRunner) -> None:
 
 
 def test_the_generator_refuses_a_shell_click_cannot_write() -> None:
-    with pytest.raises(NetgraphError, match="no completion script"):
+    with pytest.raises(NetvizError, match="no completion script"):
         completion_script("tcsh", cli)
 
 
@@ -258,7 +258,7 @@ def test_an_inventory_that_does_not_exist_offers_nothing_rather_than_failing(
 def test_a_broken_document_still_completes_what_did_load(tmp_path: Path) -> None:
     """Half-written YAML is the normal state of a tree while it is being edited."""
     (tmp_path / "ok.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata: {name: sw1}\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata: {name: sw1}\n"
         "spec: {interfaces: [{name: Gi0/1, type: ethernet}]}\n",
         encoding="utf-8",
     )

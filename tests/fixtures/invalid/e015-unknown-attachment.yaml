@@ -2,7 +2,7 @@
 #
 # Nothing called 'ghost-host' exists, so the renderer drops the attachment edge
 # and the dongle is drawn floating. One element means no W121 island to report.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: adapter
 metadata:
   name: adp-a

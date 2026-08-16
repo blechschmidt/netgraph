@@ -1,4 +1,4 @@
-"""The history timeline: the git plumbing, ``netgraph log``, and the editor's frames.
+"""The history timeline: the git plumbing, ``netviz log``, and the editor's frames.
 
 Every test here builds its own repository. A fixture repository committed to
 this one would be a repository inside a repository — ``git`` refuses to be told
@@ -19,10 +19,10 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.config import DEFAULT_MAX_REVISIONS, parse_config
-from netgraph.errors import ConfigurationError
-from netgraph.history import (  # the log format, under test below
+from netviz.cli import cli
+from netviz.config import DEFAULT_MAX_REVISIONS, parse_config
+from netviz.errors import ConfigurationError
+from netviz.history import (  # the log format, under test below
     _FIELD,
     _RECORD,
     Commit,
@@ -32,23 +32,23 @@ from netgraph.history import (  # the log format, under test below
     _parse_log,
     summarise,
 )
-from netgraph.loader import load_tree
-from netgraph.plan import diff as diff_states
-from netgraph.plan.address import parse_address
-from netgraph.plan.sources import (
+from netviz.loader import load_tree
+from netviz.plan import diff as diff_states
+from netviz.plan.address import parse_address
+from netviz.plan.sources import (
     MissingInventory,
     PlanSourceError,
     check_revision,
     git_ref,
 )
-from netgraph.web.preview import ViewOptions
-from netgraph.web.session import EditingSession, SessionError
+from netviz.web.preview import ViewOptions
+from netviz.web.session import EditingSession, SessionError
 
 EXAMPLES = Path(__file__).resolve().parent.parent / "examples" / "home-lab"
 
 #: A minimal second switch, for a commit that adds a device.
 LAB_SWITCH = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-lab
@@ -426,7 +426,7 @@ def test_git_ref_tells_a_missing_folder_from_a_missing_ref(tmp_path: Path) -> No
 def test_a_revision_that_is_really_a_git_option_is_refused(history: Repo, tmp_path: Path) -> None:
     """``git log --output=<file>`` writes a file, and a revision is user input.
 
-    ``netgraph web`` takes one from a query string, so a page this server did
+    ``netviz web`` takes one from a query string, so a page this server did
     not write could otherwise ask it to write anywhere it can reach. The guard
     is one leading character, and it is checked at every door.
     """
@@ -488,7 +488,7 @@ def _plan(before: str, after: str, tmp_path: Path) -> object:
 
 
 _ONE_SWITCH = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata: {name: sw-1}
 spec:
@@ -529,7 +529,7 @@ def test_a_removal_is_counted_as_one(tmp_path: Path) -> None:
 
 def test_a_summary_orders_by_kind_and_names_every_action(tmp_path: Path) -> None:
     """Built by hand: the point is the wording, not the rename detector."""
-    from netgraph.plan.model import Action, Change, Plan
+    from netviz.plan.model import Action, Change, Plan
 
     plan = Plan(
         changes=(
@@ -545,11 +545,11 @@ def test_a_summary_orders_by_kind_and_names_every_action(tmp_path: Path) -> None
 def test_a_summary_names_each_annotation_kind() -> None:
     """A sidecar has a noun too: `1 note added`, not `1 element added`.
 
-    ``netgraph log`` is read by somebody working out what a commit did, and
+    ``netviz log`` is read by somebody working out what a commit did, and
     "element" is the word for the thing the catalogue has no name for. The
     three §21 kinds and the arrangement all have one.
     """
-    from netgraph.plan.model import Action, Change, Plan
+    from netviz.plan.model import Action, Change, Plan
 
     plan = Plan(
         changes=(
@@ -627,7 +627,7 @@ def test_a_history_table_that_is_not_a_table_is_refused() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# netgraph log
+# netviz log
 # --------------------------------------------------------------------------- #
 
 
@@ -715,8 +715,8 @@ def test_log_refuses_a_range_wider_than_the_bound(runner: CliRunner, history: Re
     assert "more than the bound of 2" in result.output
 
 
-def test_the_bound_may_come_from_netgraph_toml(runner: CliRunner, history: Repo) -> None:
-    (history.inventory / "netgraph.toml").write_text(
+def test_the_bound_may_come_from_netviz_toml(runner: CliRunner, history: Repo) -> None:
+    (history.inventory / "netviz.toml").write_text(
         "[history]\nmax-revisions = 2\n", encoding="utf-8"
     )
 
@@ -749,7 +749,7 @@ def test_log_says_when_nothing_has_touched_the_inventory(runner: CliRunner, tmp_
 
 
 # --------------------------------------------------------------------------- #
-# netgraph diff, over two revisions
+# netviz diff, over two revisions
 # --------------------------------------------------------------------------- #
 
 
@@ -909,7 +909,7 @@ def test_a_frame_may_be_answered_with_a_fingerprint_the_caller_holds(
 
 
 def test_a_frame_is_drawn_at_the_layer_it_is_asked_for(session: EditingSession) -> None:
-    from netgraph.render import Layer
+    from netviz.render import Layer
 
     added = next(c for c in session.history()["commits"] if c["subject"] == "Add a lab switch")
 
@@ -924,7 +924,7 @@ def test_positions_come_from_the_layout_at_that_revision(history: Repo) -> None:
     """A diagram that was arranged stays arranged as you scrub back to it."""
     history.write(
         "layout.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: layout\n"
         "metadata: {name: layout}\n"
         "spec:\n"
@@ -955,7 +955,7 @@ def test_the_editor_truncates_a_long_history_rather_than_refusing_it(history: Re
     the count comes back with the list, so the page can say it is showing the
     newest two of five.
     """
-    (history.inventory / "netgraph.toml").write_text(
+    (history.inventory / "netviz.toml").write_text(
         "[history]\nmax-revisions = 2\n", encoding="utf-8"
     )
     session = EditingSession(root=history.inventory)
@@ -974,7 +974,7 @@ def test_the_session_reuses_one_timeline(session: EditingSession) -> None:
 
 
 def test_a_view_option_is_part_of_the_frame_key(session: EditingSession) -> None:
-    from netgraph.render import Layer
+    from netviz.render import Layer
 
     added = next(c for c in session.history()["commits"] if c["subject"] == "Add a lab switch")
     session.frame(added["hash"], ViewOptions())
@@ -994,7 +994,7 @@ def test_the_routes_answer_the_same_thing_the_session_does(history: Repo) -> Non
     from urllib.error import HTTPError
     from urllib.request import urlopen
 
-    from netgraph.web import WebServer
+    from netviz.web import WebServer
 
     session = EditingSession(root=history.inventory)
     with WebServer.create(source="", session=session, host="127.0.0.1", port=0) as server:

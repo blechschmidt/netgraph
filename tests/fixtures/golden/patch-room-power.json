@@ -1,5 +1,5 @@
 {
-  "apiVersion": "netgraph.dev/v1alpha1",
+  "apiVersion": "netviz.dev/v1alpha1",
   "kind": "NetworkGraph",
   "layer": "power",
   "nodes": [

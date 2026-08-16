@@ -3,7 +3,7 @@
 
 Some of what the docs must say is already stated precisely in the code: the
 flags of a command live in its ``click`` decorators, the rule catalogue lives in
-:data:`netgraph.rules.RULES`. Writing those out by hand means keeping two lists
+:data:`netviz.rules.RULES`. Writing those out by hand means keeping two lists
 in step, and the second list is the one that quietly goes stale.
 
 So the pages carry *regions* instead::
@@ -28,20 +28,20 @@ are:
 ``rule-index``
     Every validation rule, with severity, schema alias and a deep link.
 ``fix-index``
-    Every rule ``netgraph validate --fix`` can repair, what the repair does, and
-    the keys ``--choose`` takes, from :data:`netgraph.fixes.FIXES`.
+    Every rule ``netviz validate --fix`` can repair, what the repair does, and
+    the keys ``--choose`` takes, from :data:`netviz.fixes.FIXES`.
 ``keybindings``
     Every command the web interface has, and the keys that reach it, from
-    :data:`netgraph.web.bindings.BINDINGS` — which is also what the page fetches
+    :data:`netviz.web.bindings.BINDINGS` — which is also what the page fetches
     to build its palette and its shortcut sheet.
 ``context-menus``
     What right-clicking each kind of shape offers, from
-    :data:`netgraph.web.bindings.MENUS`, with the chord that runs the same
+    :data:`netviz.web.bindings.MENUS`, with the chord that runs the same
     command beside it.
 ``unique-fields``
     The fields a copy drops and the rule each would break, from
-    :data:`netgraph.edit.clipboard.UNIQUE_FIELDS` — so the documented table and
-    the one ``netgraph edit copy`` applies cannot drift.
+    :data:`netviz.edit.clipboard.UNIQUE_FIELDS` — so the documented table and
+    the one ``netviz edit copy`` applies cannot drift.
 
 Usage::
 
@@ -67,11 +67,11 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 
 import click  # noqa: E402
 
-from netgraph.cli import cli  # noqa: E402
-from netgraph.edit import unique_fields_markdown  # noqa: E402
-from netgraph.fixes import FIXES  # noqa: E402
-from netgraph.rules import RULES, rule_for  # noqa: E402
-from netgraph.web.bindings import markdown_menus, markdown_table  # noqa: E402
+from netviz.cli import cli  # noqa: E402
+from netviz.edit import unique_fields_markdown  # noqa: E402
+from netviz.fixes import FIXES  # noqa: E402
+from netviz.rules import RULES, rule_for  # noqa: E402
+from netviz.web.bindings import markdown_menus, markdown_table  # noqa: E402
 
 DOCS: Final = REPO_ROOT / "docs"
 COMMANDS: Final = DOCS / "commands"
@@ -238,7 +238,7 @@ SUMMARY: Final[dict[str, str]] = {
     "cache info": "Report where the parse cache is and what is in it.",
     "cache clear": "Delete this inventory's cached documents.",
     "completion": "Print the shell completion script.",
-    "version": "Report the netgraph, Python and Graphviz versions in use.",
+    "version": "Report the netviz, Python and Graphviz versions in use.",
 }
 
 
@@ -248,7 +248,7 @@ SUMMARY: Final[dict[str, str]] = {
 
 
 def command_paths() -> Iterator[str]:
-    """Every invocable command, as a space-separated path below ``netgraph``."""
+    """Every invocable command, as a space-separated path below ``netviz``."""
 
     def walk(command: click.Command, path: tuple[str, ...]) -> Iterator[str]:
         if path:
@@ -273,7 +273,7 @@ def lookup(path: str) -> click.Command:
 
 def context_for(path: str) -> click.Context:
     """A context chain matching ``path``, which ``click`` needs for metavars."""
-    context = click.Context(cli, info_name="netgraph")
+    context = click.Context(cli, info_name="netviz")
     command: click.Command = cli
     for part in path.split():
         assert isinstance(command, click.Group)
@@ -409,7 +409,7 @@ def argument_rows(path: str) -> Iterator[str]:
 def synopsis(path: str) -> str:
     command, context = lookup(path), context_for(path)
     pieces = command.collect_usage_pieces(context)
-    prefix = "netgraph [GLOBAL OPTIONS]" if path else "netgraph"
+    prefix = "netviz [GLOBAL OPTIONS]" if path else "netviz"
     return "```text\n" + " ".join([prefix, path, *pieces]).strip() + "\n```\n"
 
 
@@ -434,7 +434,7 @@ def command_index(base: str) -> str:
     for path in INDEX_ORDER:
         page = PAGE[path]
         lines.append(
-            f"| [`netgraph {path}`]({base}{page}) | {SUMMARY[path]} | [{page}]({base}{page}) |"
+            f"| [`netviz {path}`]({base}{page}) | {SUMMARY[path]} | [{page}]({base}{page}) |"
         )
     return "\n".join(lines) + "\n"
 
@@ -455,7 +455,7 @@ def fix_index() -> str:
     """Every mechanically repairable rule, and what repairing it does.
 
     Generated so the page cannot claim a fix that no longer exists: adding an
-    entry to :data:`netgraph.fixes.FIXES` and forgetting the documentation fails
+    entry to :data:`netviz.fixes.FIXES` and forgetting the documentation fails
     ``tests/test_docs.py`` instead of shipping.
     """
     lines = ["| Rule | Severity | What `--fix` does | `--choose` |", "|---|---|---|---|"]

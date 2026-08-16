@@ -3,7 +3,7 @@
   "meta": {
     "title": "home-lab — as-built network documentation",
     "inventory": "home-lab",
-    "netgraph": "0.0.0-test",
+    "netviz": "0.0.0-test",
     "generatedAt": "2026-01-31T09:00:00Z",
     "revision": null,
     "revisionState": null,
@@ -148,7 +148,7 @@
                 }
               ],
               "rows": [],
-              "note": "These are the findings 'netgraph validate' reports for this inventory. A report is only as authoritative as the inventory behind it, so they are documented here rather than left out."
+              "note": "These are the findings 'netviz validate' reports for this inventory. A report is only as authoritative as the inventory behind it, so they are documented here rather than left out."
             }
           ],
           "links": [],
@@ -1384,7 +1384,7 @@
                   "—"
                 ]
               ],
-              "note": "One row per cable document, which is one run somebody pulls: a link through a patch panel is several. RUN names the end-to-end link and SEGMENT which leg of it this is. 'netgraph export cable-list' writes the same rows as CSV, with the full location of both ends."
+              "note": "One row per cable document, which is one run somebody pulls: a link through a patch panel is several. RUN names the end-to-end link and SEGMENT which leg of it this is. 'netviz export cable-list' writes the same rows as CSV, with the full location of both ends."
             }
           ],
           "links": [],
@@ -3646,7 +3646,7 @@
               ],
               "rows": [
                 [
-                  "netgraph/ignore",
+                  "netviz/ignore",
                   "NG-C015"
                 ]
               ],

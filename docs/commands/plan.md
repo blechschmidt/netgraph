@@ -1,17 +1,17 @@
-# `netgraph plan`
+# `netviz plan`
 
-`netgraph plan` answers "what is the difference between these two networks?" and
+`netviz plan` answers "what is the difference between these two networks?" and
 answers it in terms of *elements and their fields*, not lines of YAML. Two
 inventory states go in — this branch and `main`, this folder and that one, what
 is declared and what the network reports — and an ordered changeset comes out:
 what is added, what is changed field by field, what is renamed, what is
 destroyed, in the order it would have to happen.
 
-The plan is the reviewable half of the write path. [`netgraph
+The plan is the reviewable half of the write path. [`netviz
 apply`](apply.md) executes one against the **files**, through the same typed
-operations [`netgraph edit`](edit.md) uses, so comments and formatting survive.
+operations [`netviz edit`](edit.md) uses, so comments and formatting survive.
 
-`netgraph plan` itself writes nothing unless you pass `-out`, and it never talks
+`netviz plan` itself writes nothing unless you pass `-out`, and it never talks
 to a device.
 
 ## Contents
@@ -36,7 +36,7 @@ to a device.
 
 <!-- generated: synopsis plan -->
 ```text
-netgraph [GLOBAL OPTIONS] plan [OPTIONS] [NAME=]INPUT...
+netviz [GLOBAL OPTIONS] plan [OPTIONS] [NAME=]INPUT...
 ```
 <!-- /generated -->
 
@@ -90,8 +90,8 @@ short name. Each is a shell-style glob:
 
 <!-- run: cwd=. -->
 ```console
-$ netgraph -i examples/home-lab plan --from-live tests/fixtures/drift/patch.csv --target 'cable.*'
-netgraph plan: the inventory → the live network (csv)
+$ netviz -i examples/home-lab plan --from-live tests/fixtures/drift/patch.csv --target 'cable.*'
+netviz plan: the inventory → the live network (csv)
 
   ~ cable.cables/cbl-sw-ap  [cable]
       ~ spec.medium: copper -> fiber
@@ -141,15 +141,15 @@ about to write.
 normal pipeline, so templates are merged, interface ranges are expanded,
 defaults are filled in and every scalar is in its canonical form before the
 comparison. Two trees that spell the same network differently produce an empty
-plan — which is what makes `netgraph plan --from HEAD` usable on a tree somebody
-has just run [`netgraph fmt`](fmt.md) over.
+plan — which is what makes `netviz plan --from HEAD` usable on a tree somebody
+has just run [`netviz fmt`](fmt.md) over.
 
 Comparing an inventory with itself is the shortest demonstration of both:
 
 <!-- run: cwd=. -->
 ```console
-$ netgraph -i examples/home-lab plan --to examples/home-lab
-netgraph plan: the inventory → examples/home-lab
+$ netviz -i examples/home-lab plan --to examples/home-lab
+netviz plan: the inventory → examples/home-lab
 
 No changes. The two states describe the same network.
 ```
@@ -169,7 +169,7 @@ identity**, strongest evidence first:
 
 | Evidence | What it is |
 |---|---|
-| `netgraph.dev/id` | An annotation you set yourself. Nothing beats being told. |
+| `netviz.dev/id` | An annotation you set yourself. Nothing beats being told. |
 | serial | `spec.serial`, with the vendor. Vendors do not reissue them. |
 | MAC | The set of hardware addresses a device's interfaces declare. |
 | ends | The two `device:interface` pairs a cable or tunnel joins; the host an adapter hangs off. |
@@ -215,8 +215,8 @@ plan, byte for byte.
 
 ## Planning against the live network
 
-`--from-live` reads the same captures [`netgraph import`](import.md) and
-[`netgraph drift`](drift.md) do — `lldpctl -f json`, `ip -j addr show`, a cabling
+`--from-live` reads the same captures [`netviz import`](import.md) and
+[`netviz drift`](drift.md) do — `lldpctl -f json`, `ip -j addr show`, a cabling
 CSV — and makes the **desired** side "the inventory as it would read if it agreed
 with the network". Diffing that against the declaration is the write half of the
 drift loop: `drift` tells you the files are wrong, `plan --from-live` tells you
@@ -237,7 +237,7 @@ observation *of*. What follows from it:
 - A re-patched cable keeps its document. Matched on its label, it becomes an
   update to `spec.endpoints` rather than a destroyed cable and an unrelated new
   one, so its length, its category and its comments survive.
-- A **trunk's VLAN set** is merged, never substituted: no dialect netgraph reads
+- A **trunk's VLAN set** is merged, never substituted: no dialect netviz reads
   prints a port's whole VLAN list, so an observed VLAN is evidence that one *is*
   carried and never evidence that another is not.
 - `kind: computer` from a capture is never adopted. It is the importer's "I
@@ -253,8 +253,8 @@ AP uplink fibre where the inventory says copper:
 
 <!-- run: cwd=. -->
 ```console
-$ netgraph -i examples/home-lab plan --from-live tests/fixtures/drift/patch.csv
-netgraph plan: the inventory → the live network (csv)
+$ netviz -i examples/home-lab plan --from-live tests/fixtures/drift/patch.csv
+netviz plan: the inventory → the live network (csv)
 
   ~ device.switches/sw-home  [switch]
       + spec.interfaces[name=port6]: {name: port6, type: ethernet, enabled: true}
@@ -282,7 +282,7 @@ intended behaviour: the fix is to correct the capture, not the inventory.
 
 ## Plan files and the state hash
 
-`-out FILE` writes the plan as JSON so that `netgraph apply FILE` executes
+`-out FILE` writes the plan as JSON so that `netviz apply FILE` executes
 **exactly what was reviewed**, and not a fresh diff that may have moved since.
 
 The file records a hash of the state the plan was made from, and `apply` refuses
@@ -290,10 +290,10 @@ to run against a tree that hashes differently:
 
 <!-- norun: writes files, and the digests differ per tree -->
 ```console
-$ netgraph plan --from-live caps/*.json -out drift.plan
-$ netgraph apply drift.plan
+$ netviz plan --from-live caps/*.json -out drift.plan
+$ netviz apply drift.plan
 error: drift.plan was made against a different state of net; the tree has changed since.
-Re-run 'netgraph plan' and review the new plan.
+Re-run 'netviz plan' and review the new plan.
   plan expects sha256:50195cf0…
   tree is      sha256:040ea676…
 ```
@@ -312,13 +312,13 @@ has to be.
 ## JSON, and gating CI on an empty plan
 
 `--json` (or `-F json`) puts the whole changeset on stdout and moves the summary
-to stderr, so `netgraph plan --json > plan.json` writes a file a script can read
+to stderr, so `netviz plan --json > plan.json` writes a file a script can read
 while a person watching the run still sees what happened. It is the same
 document `-out` writes.
 
 <!-- run: cwd=. -->
 ```console
-$ netgraph -q -i examples/home-lab plan --from-live tests/fixtures/drift/patch.csv --target cbl-sw-ap --json
+$ netviz -q -i examples/home-lab plan --from-live tests/fixtures/drift/patch.csv --target cbl-sw-ap --json
 {
   "schemaVersion": 1,
   "tool": {
@@ -349,7 +349,7 @@ $ netgraph -q -i examples/home-lab plan --from-live tests/fixtures/drift/patch.c
 }
 ```
 
-(`...` elides the `tool`, `source` and `target` blocks, which carry the netgraph
+(`...` elides the `tool`, `source` and `target` blocks, which carry the netviz
 version and the two state hashes.)
 
 A field that is absent on one side omits that key entirely, rather than carrying
@@ -357,13 +357,13 @@ A field that is absent on one side omits that key entirely, rather than carrying
 are different things, and only the second is restored by removing the key.
 
 By default `plan` exits 0 whether or not there is anything to do, so that
-`netgraph plan -out p && netgraph apply p` works. `--fail-on changes` makes a
+`netviz plan -out p && netviz apply p` works. `--fail-on changes` makes a
 non-empty plan exit 1, which is how CI asserts that a branch has been applied:
 
 <!-- run: cwd=. rc=1 -->
 ```console
-$ netgraph -q -i examples/home-lab plan --from-live tests/fixtures/drift/patch.csv --fail-on changes --target 'device.*'
-netgraph plan: the inventory → the live network (csv)
+$ netviz -q -i examples/home-lab plan --from-live tests/fixtures/drift/patch.csv --fail-on changes --target 'device.*'
+netviz plan: the inventory → the live network (csv)
 
   ~ device.switches/sw-home  [switch]
       + spec.interfaces[name=port6]: {name: port6, type: ethernet, enabled: true}
@@ -375,7 +375,7 @@ which in a workflow is one line:
 
 <!-- norun: a CI fragment, not a transcript -->
 ```yaml
-- run: netgraph -i net plan --from-live caps/ --fail-on changes
+- run: netviz -i net plan --from-live caps/ --fail-on changes
 ```
 
 ---
@@ -398,8 +398,8 @@ Inputs are only read with `--from-live`, and take the same `[NAME=]INPUT` form
 |---|---|---|---|
 | `--from` | `REF\|DIR` | — | Take the current state from a git ref or another folder instead of from the inventory. A directory that exists is a folder; anything else is a git ref, exported read-only — the working tree is never touched. |
 | `--to` | `REF\|DIR` | — | Take the desired state from a git ref or another folder. Defaults to the inventory. |
-| `--from-live` | — | off | Take the desired state from a live capture: the inventory as it would read if it agreed with what the network reports. Reads the same inputs 'netgraph import' and 'netgraph drift' do. |
-| `--dialect` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|nftables\|wireguard\|interfaces]` | `auto` | Input dialect for --from-live, as 'netgraph drift --from' takes it. |
+| `--from-live` | — | off | Take the desired state from a live capture: the inventory as it would read if it agreed with what the network reports. Reads the same inputs 'netviz import' and 'netviz drift' do. |
+| `--dialect` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|nftables\|wireguard\|interfaces]` | `auto` | Input dialect for --from-live, as 'netviz drift --from' takes it. |
 | `--host` | `NAME` | — | Device every --from-live input was captured on, when the input does not name it. |
 | `--only` | `GLOB` | — | Adopt only elements whose name matches this glob (--from-live only). Repeatable. |
 | `--exclude` | `GLOB` | — | Leave elements matching this glob out of the adoption (--from-live only). Repeatable. |
@@ -408,7 +408,7 @@ Inputs are only read with `--from-live`, and take the same `[NAME=]INPUT` form
 | `--no-renames` | — | off | Report every rename as a delete and a create rather than detecting it. |
 | `-F`, `--output-format` | `[text\|json]` | `text` | text is for reading; json is for CI and for a script. |
 | `--json` | — | off | Shorthand for '-F json'. |
-| `-out`, `--out` | `FILE` | — | Write the plan to FILE so 'netgraph apply FILE' executes exactly what was reviewed. The file records a hash of the current state and apply refuses if the tree has moved on. |
+| `-out`, `--out` | `FILE` | — | Write the plan to FILE so 'netviz apply FILE' executes exactly what was reviewed. The file records a hash of the current state and apply refuses if the tree has moved on. |
 | `--fail-on` | `[never\|changes]` | `never` | Exit 1 when the plan is not empty, so CI can gate on 'nothing to do'. |
 <!-- /generated -->
 
@@ -426,8 +426,8 @@ would read as a deletion.
 
 ## See also
 
-- [`netgraph apply`](apply.md) — executing a plan against the files.
-- [`netgraph drift`](drift.md) — the read half of the same loop.
-- [`netgraph edit`](edit.md) — the operations `apply` is built out of.
-- [`netgraph validate`](validate.md) — the gate a plan has to pass to be written.
+- [`netviz apply`](apply.md) — executing a plan against the files.
+- [`netviz drift`](drift.md) — the read half of the same loop.
+- [`netviz edit`](edit.md) — the operations `apply` is built out of.
+- [`netviz validate`](validate.md) — the gate a plan has to pass to be written.
 - [`docs/editing.md`](../editing.md) — the write path, in prose.

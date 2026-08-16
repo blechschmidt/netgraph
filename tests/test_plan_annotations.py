@@ -1,7 +1,7 @@
 """Annotations in a changeset: addressable, plannable, and never structural (§21).
 
 A note, an area and a legend are sidecars. They are part of the declared state —
-``netgraph apply`` has to be able to write one, and a plan that ignored them
+``netviz apply`` has to be able to write one, and a plan that ignored them
 would leave a tree it said it had finished with — and they are part of *no*
 network fact. Both halves of that are tested here, but the second is the one
 that matters: **adding, changing or removing an annotation must never show up as
@@ -21,11 +21,11 @@ from typing import Any
 
 import pytest
 
-from netgraph.edit import EditSession, Operation, SetField
-from netgraph.edit.operations import CreateAnnotation, DeleteAnnotation, SetAnnotation
-from netgraph.importer.draft import Draft
-from netgraph.loader import load_tree
-from netgraph.plan import (
+from netviz.edit import EditSession, Operation, SetField
+from netviz.edit.operations import CreateAnnotation, DeleteAnnotation, SetAnnotation
+from netviz.importer.draft import Draft
+from netviz.loader import load_tree
+from netviz.plan import (
     ADDRESS_TYPES,
     ANNOTATION_TYPES,
     LAYOUT_TYPE,
@@ -50,7 +50,7 @@ EXAMPLES = REPO_ROOT / "examples"
 
 #: One of each kind, anchored to things ``examples/home-lab`` really has.
 ANNOTATIONS = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: why-orange
@@ -60,7 +60,7 @@ spec:
     element: switches/sw-home
   color: "#fef3c7"
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: hallway
@@ -70,7 +70,7 @@ spec:
     - switches/sw-home
     - routers/rtr-home
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: legend
 metadata:
   name: key
@@ -181,17 +181,17 @@ def test_one_name_may_be_a_device_an_area_and_a_note(tmp_path: Path) -> None:
     root = tmp_path / "tree"
     root.mkdir()
     (root / "tree.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata:\n  name: dmz\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: note\n"
         "metadata:\n  name: dmz\n"
         "spec:\n  text: careful\n  anchor:\n    element: dmz\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: area\n"
         "metadata:\n  name: dmz\n"
         "spec:\n  members: [dmz]\n",
@@ -405,7 +405,7 @@ PLACED = ANNOTATIONS.replace(
 
 
 def apply_plan(plan: Plan, root: Path) -> tuple[Operation, ...]:
-    """Run a plan against a real tree and write it, as ``netgraph apply`` does."""
+    """Run a plan against a real tree and write it, as ``netviz apply`` does."""
     session = EditSession(root=root)
     applied = tuple(
         operation for _, operations in translate(plan, session) for operation in operations
@@ -451,7 +451,7 @@ def test_leaves_of_an_absent_block_are_grafted_back_together(home: Path) -> None
 
     A plan file is written now and applied later, and nothing stops one naming
     ``spec.geometry.x`` and ``spec.geometry.y`` as two changes — a hand-written
-    one, or one from a netgraph whose diff split them. Applied in order they
+    one, or one from a netviz whose diff split them. Applied in order they
     would be refused halfway, so the executor grafts them onto the one write of
     the block that the tree can actually take.
     """

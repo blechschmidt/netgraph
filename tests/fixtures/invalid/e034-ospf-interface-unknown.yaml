@@ -3,7 +3,7 @@
 # The area is only as wide as the interfaces that run it, so 'eth9' is an
 # adjacency that will never come up - and a link that looks like it is in the
 # IGP and is not.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-a
@@ -20,7 +20,7 @@ spec:
       router_id: 192.0.2.1
       interfaces: [eth0, eth9]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-b
@@ -32,7 +32,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

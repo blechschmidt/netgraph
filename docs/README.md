@@ -1,8 +1,8 @@
-# netgraph documentation
+# netviz documentation
 
-Everything netgraph can do, arranged by what you are trying to get done. Start with the
+Everything netviz can do, arranged by what you are trying to get done. Start with the
 table: find the row that describes your problem and follow the link. If you have never
-run netgraph before, [getting-started.md](getting-started.md) is the one to read first —
+run netviz before, [getting-started.md](getting-started.md) is the one to read first —
 or spend two minutes in [the live demo](https://blechschmidt.github.io/netgraph/demo/)
 first, which needs nothing installed.
 
@@ -13,8 +13,8 @@ This whole documentation set is also published, with those demos beside it, at
 
 | If you want to… | Read |
 |---|---|
-| see what netgraph draws before installing anything | [the live demo](https://blechschmidt.github.io/netgraph/demo/), then [getting-started.md](getting-started.md#try-it-without-installing) |
-| install netgraph and draw your first diagram | [getting-started.md](getting-started.md) |
+| see what netviz draws before installing anything | [the live demo](https://blechschmidt.github.io/netgraph/demo/), then [getting-started.md](getting-started.md#try-it-without-installing) |
+| install netviz and draw your first diagram | [getting-started.md](getting-started.md) |
 | decide how to lay out your files, namespaces and templates | [inventory-layout.md](inventory-layout.md) |
 | know exactly what a field means or what values it accepts | [schema-reference.md](schema-reference.md) |
 | know why the schema is shaped the way it is, normatively | [schema.md](schema.md) |
@@ -45,15 +45,15 @@ This whole documentation set is also published, with those demos beside it, at
 | hand over as-built documentation: a page per site and per device | [commands/report.md](commands/report.md) |
 | look up a command's flags | [commands/](commands/README.md) |
 | see how an inventory maps onto RFC 8343, RFC 8344 and 802.1Q | [yang-mapping.md](yang-mapping.md) |
-| work on netgraph itself | [architecture.md](architecture.md), [../CONTRIBUTING.md](../CONTRIBUTING.md) |
+| work on netviz itself | [architecture.md](architecture.md), [../CONTRIBUTING.md](../CONTRIBUTING.md) |
 | know whether upgrading will break your inventory | [releasing.md](releasing.md), [../CHANGELOG.md](../CHANGELOG.md) |
-| understand how netgraph is tested | [testing.md](testing.md) |
+| understand how netviz is tested | [testing.md](testing.md) |
 
 ## The pages, by kind
 
 ### Guides — read once, front to back
 
-* **[getting-started.md](getting-started.md)** — install netgraph and Graphviz, build a
+* **[getting-started.md](getting-started.md)** — install netviz and Graphviz, build a
   three-device inventory by hand, validate it, render it, then interrogate it. Ends with
   the editor setup that gives you completion and inline errors.
 * **[inventory-layout.md](inventory-layout.md)** — how files become namespaces, how
@@ -69,17 +69,17 @@ This whole documentation set is also published, with those demos beside it, at
   how to make it the inventory's default rather than a flag you have to remember.
 * **[validation.md](validation.md)** — the three passes, severities, `--strict`, the four
   ways to suppress a rule, and how to read a finding.
-* **[ci.md](ci.md)** — `netgraph validate` and `netgraph test` as gates: the JSON
+* **[ci.md](ci.md)** — `netviz validate` and `netviz test` as gates: the JSON
   envelope, SARIF and code scanning, inline annotations, JUnit, the two GitHub Actions,
   the reusable workflow that publishes the diagram to Pages, pre-commit, GitLab.
 * **[commands/test.md](commands/test.md)** — `kind: testsuite` documents and the eleven
-  assertions `netgraph test` grades. Validation says whether the files cohere; this says
+  assertions `netviz test` grades. Validation says whether the files cohere; this says
   whether the network still does what somebody built it to do.
-* **[format.md](format.md)** — the canonical form `netgraph fmt` writes, and why each
+* **[format.md](format.md)** — the canonical form `netviz fmt` writes, and why each
   decision in it is the way it is.
 * **[editing.md](editing.md)** — the write path: what an operation is, what its inverse
   is, how a rename finds every reference, and the two gates between an edit and the
-  disk. `netgraph apply` and the web editor are both built on it.
+  disk. `netviz apply` and the web editor are both built on it.
 * **[commands/plan.md](commands/plan.md)** — the diff engine: stable addresses, structural
   rename detection, the order a changeset has to run in, plan files and the state hash,
   and how a capture becomes a proposal. [commands/apply.md](commands/apply.md) executes
@@ -90,7 +90,7 @@ This whole documentation set is also published, with those demos beside it, at
 * **[commands/converge.md](commands/converge.md)** — the other half of the loop: drift
   joined to the configuration emitters, as a per-device plan. What a change is, the
   dependency order, how the management path is worked out and what makes a change
-  disruptive, the maintenance batches, and the boundary netgraph does not cross — it
+  disruptive, the maintenance batches, and the boundary netviz does not cross — it
   writes scripts and never opens a session to a device.
 * **[ipam.md](ipam.md)** — utilisation, free space, the next free block, aggregation and
   conflicts, with the arithmetic spelled out.
@@ -105,12 +105,12 @@ This whole documentation set is also published, with those demos beside it, at
 * **[commands/report.md](commands/report.md)** — the as-built document: what each page
   carries, how a namespace becomes a site, why the output is byte-stable, and how to edit
   the layout. [example-report/](example-report/) is one, committed and browsable.
-* **[configuration.md](configuration.md)** — `netgraph.toml`: per-inventory render
+* **[configuration.md](configuration.md)** — `netviz.toml`: per-inventory render
   defaults, named profiles, precedence, and how to see what resolved.
 * **[docker.md](docker.md)** — the image and the compose file: the CLI, the live preview and
   the browser editor in a container, what they mount, what they publish, and who owns the
   files they write.
-* **[lsp.md](lsp.md)** — `netgraph lsp` in VS Code, Neovim, Helix and Emacs: what each
+* **[lsp.md](lsp.md)** — `netviz lsp` in VS Code, Neovim, Helix and Emacs: what each
   capability is answered by, how it degrades when the editor opens a lone file, and where
   the published JSON Schema stops being enough.
 
@@ -120,23 +120,23 @@ This whole documentation set is also published, with those demos beside it, at
   are generated from the CLI, so they cannot drift.
 * **[query.md](query.md)** — the selector language: the grammar, the attribute
   vocabulary, the traversal forms and a cookbook of ten worked queries. One expression
-  answers `netgraph query`, `--select` on six commands, an `assert: query` and the
+  answers `netviz query`, `--select` on six commands, an `assert: query` and the
   editor's search box.
 * **[schema-reference.md](schema-reference.md)** — every field of every kind, with types,
   defaults and its YANG counterpart. Generated from the models.
 * **[validation-rules.md](validation-rules.md)** — every rule, with what triggers it, why
   it exists, how to fix it and how to suppress it. This is where a finding's help link
-  lands, so its anchors are part of netgraph's interface.
+  lands, so its anchors are part of netviz's interface.
 * **[schema.md](schema.md)** — the normative specification. Numbered sections and `NG-*`
   rule ids that code and diagnostics quote; the anchors are stable on purpose.
 * **[yang-mapping.md](yang-mapping.md)** — which standard each field comes from, and what
-  netgraph deliberately does not model.
+  netviz deliberately does not model.
 
 ### For contributors
 
 * **[architecture.md](architecture.md)** — the pipeline (`load_tree` → `validate` →
   `build_graph` → `filter`/`aggregate` → renderers), which module owns each stage, what
-  each may assume, and the invariants not to break. Also: using netgraph as a library.
+  each may assume, and the invariants not to break. Also: using netviz as a library.
 * **[../CONTRIBUTING.md](../CONTRIBUTING.md)** — dev setup, the gates, and step-by-step
   recipes for adding a validation rule or a renderer.
 * **[testing.md](testing.md)** — the property-based and fuzz testing, the Hypothesis
@@ -158,13 +158,13 @@ correct. [`tests/test_docs.py`](../tests/test_docs.py) asserts that:
 * every command and every flag the CLI has appears in `commands/`, and no documented flag
   has been removed — the tables are generated from Click by
   [`tools/gen_docs.py`](../tools/gen_docs.py) and compared against what is committed;
-* every rule in `netgraph/rules.py` has a section in [validation-rules.md](validation-rules.md)
+* every rule in `netviz/rules.py` has a section in [validation-rules.md](validation-rules.md)
   with the right severity, aliases and anchor, and appears in the index in
   [validation.md](validation.md);
 * every field of every model has an entry in [schema-reference.md](schema-reference.md);
-* every fenced `console` example that invokes `netgraph` is either **executed**, and its
+* every fenced `console` example that invokes `netviz` is either **executed**, and its
   transcript compared byte for byte, or explicitly marked non-executable with a reason —
   see [`tools/check_examples.py`](../tools/check_examples.py).
 
-So an example in these pages is not an illustration of what netgraph used to do. It is
+So an example in these pages is not an illustration of what netviz used to do. It is
 either a test, or it says why it is not.

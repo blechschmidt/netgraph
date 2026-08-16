@@ -12,8 +12,8 @@ So the coordinates live here, next to the tests that assert what they produce.
 `layout.yaml` was generated, and is regenerated the same way:
 
 ```bash
-netgraph -i tests/fixtures/arranged layout --write --layer l1 --waypoints
-netgraph -i tests/fixtures/arranged layout --write --layer l2 --group-by-namespace
+netviz -i tests/fixtures/arranged layout --write --layer l1 --waypoints
+netviz -i tests/fixtures/arranged layout --write --layer l2 --group-by-namespace
 ```
 
 Two views, deliberately different, so the goldens cover both halves of the
@@ -22,7 +22,7 @@ feature:
 * **`l1`** carries edge waypoints, which `--waypoints` seeds and which the
   render turns into spline control points. It has no group boxes.
 * **`l2`** carries group boxes, which only a `--group-by-namespace` render draws
-  — and which netgraph draws *itself*, from these numbers, because the no-op
+  — and which netviz draws *itself*, from these numbers, because the no-op
   layout engine draws no clusters.
 
 The numbers are Graphviz's own, run through the render path until they stopped

@@ -9,7 +9,7 @@ Everything mechanical — the field list, its order, the types, which fields are
 required, the defaults — is read straight off ``model_fields``, so the document
 cannot drift from the code. The two things pydantic cannot know, the prose
 description and the corresponding YANG path, live in
-:data:`netgraph.models.fielddocs.FIELD_DOCS`, which :mod:`netgraph.schema` reads
+:data:`netviz.models.fielddocs.FIELD_DOCS`, which :mod:`netviz.schema` reads
 too so that the reference and the JSON Schema say the same thing. That table is
 checked against the models on every run: a field with no entry, or an entry
 naming a field that no longer exists, aborts the generator rather than producing
@@ -43,7 +43,7 @@ from annotated_types import Ge, Gt, Le, Lt, MaxLen, MinLen  # noqa: E402
 from pydantic import BaseModel  # noqa: E402
 from pydantic.fields import FieldInfo  # noqa: E402
 
-from netgraph.models import (  # noqa: E402
+from netviz.models import (  # noqa: E402
     AcceptableFrames,
     AdapterSpec,
     AnnotationGeometry,
@@ -125,8 +125,8 @@ from netgraph.models import (  # noqa: E402
     WirelessConfig,
     Zone,
 )
-from netgraph.models.document import ELEMENT_MODELS  # noqa: E402
-from netgraph.models.element import (  # noqa: E402
+from netviz.models.document import ELEMENT_MODELS  # noqa: E402
+from netviz.models.element import (  # noqa: E402
     AREA_KIND,
     LAYOUT_KIND,
     LEGEND_KIND,
@@ -134,7 +134,7 @@ from netgraph.models.element import (  # noqa: E402
     TEMPLATE_KIND,
     TEST_SUITE_KIND,
 )
-from netgraph.models.fielddocs import (  # noqa: E402
+from netviz.models.fielddocs import (  # noqa: E402
     DOCUMENTED_MODELS,
     FIELD_DOCS,
     KIND_NOTES,
@@ -195,7 +195,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "`site`, `room` and `rack` together identify a rack (`NG-U001`). Two elements that "
             "name the same three share a cabinet and may not overlap; naming `position` or "
             "`rack_height` without `rack` is `NG-U004`.",
-            "`netgraph render --layer rack` draws one front elevation per rack, empty units "
+            "`netviz render --layer rack` draws one front elevation per rack, empty units "
             "included.",
         ),
     ),
@@ -275,7 +275,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
         notes=(
             "`10.0.0.1/24` is shorthand for the mapping form.",
             "`netmask: 255.255.255.0` may be written instead of `prefix_length`, but not as well "
-            "as; it is normalised away on load and never appears in `netgraph show` output.",
+            "as; it is normalised away on load and never appears in `netviz show` output.",
         ),
     ),
     Section(
@@ -548,7 +548,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "`ports` is the only required key. Each position it names becomes two interfaces, "
             "`front/<n>` and `rear/<n>`, which a cable terminates on exactly as it terminates "
             "on a device port (`NG-P001`).",
-            "A panel is not a hop. `netgraph render --layer physical` draws it and both cable "
+            "A panel is not a hop. `netviz render --layer physical` draws it and both cable "
             "segments; every other layer splices the run into the single edge it electrically "
             "is, between the two active ports.",
             "`couplers` is only needed for a panel that is cross-wired. The default is the "
@@ -565,7 +565,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "`ports` does. An outlet is **not** an interface: a power cord is not a `cable`, so "
             "nothing is cabled to a PDU — a device names an outlet in `power.inputs` instead.",
             "A PDU is placed on a rack elevation through `metadata.location`, exactly as a "
-            "switch is, and `netgraph render --layer rack` annotates it with its utilisation.",
+            "switch is, and `netviz render --layer rack` annotates it with its utilisation.",
             "`input_feed` is free text and is compared only for equality. It is what makes A/B "
             "redundancy checkable: two units on one feed fail together (`NG-E015`).",
         ),
@@ -653,7 +653,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
         LayoutSpec,
         "`spec` of a `layout` document",
         "Where things are drawn, per view. A sidecar: it carries no network facts, and the "
-        "elements it places know nothing about it. `netgraph layout` writes it.",
+        "elements it places know nothing about it. `netviz layout` writes it.",
         notes=(
             "Coordinates are **points** (1/72 inch), `y` upwards, origin at the bottom left, "
             "and a `position` is the **centre** of what it places — Graphviz's system, so a "
@@ -662,13 +662,13 @@ SECTIONS: Final[tuple[Section, ...]] = (
             "not declare is keyed by its graph id instead: `subnet:10.0.0.0/24`, "
             "`tunnel:site/wg0`, `rack:hq/comms/r1`.",
             "A key naming something the inventory no longer has is `NG-Y001`, a warning; "
-            "`netgraph layout --prune` drops it.",
+            "`netviz layout --prune` drops it.",
         ),
     ),
     Section(
         ViewGeometry,
         "`spec.views.<view>`",
-        "One view's arrangement. The view name is a layer netgraph draws — `physical`, `l1`, "
+        "One view's arrangement. The view name is a layer netviz draws — `physical`, `l1`, "
         "`l2`, `l3`, `overlay`, `routing`, `rack`, `power` — because the same device sits "
         "somewhere different in each.",
     ),
@@ -677,7 +677,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "`spec.views.<view>.nodes.<address>`",
         "Where one node is drawn.",
         notes=(
-            "`size` is optional and is not seeded by `netgraph layout --write`: Graphviz "
+            "`size` is optional and is not seeded by `netviz layout --write`: Graphviz "
             "derives the same box from the same label on every run. It is honoured on read, "
             "for an editor that lets somebody resize a box on purpose.",
         ),
@@ -686,7 +686,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
         EdgeGeometry,
         "`spec.views.<view>.edges.<address>`",
         "How one link is drawn: the bends it goes through, the style it is routed in and "
-        "where its label sits. Bends are not seeded unless `netgraph layout --write "
+        "where its label sits. Bends are not seeded unless `netviz layout --write "
         "--waypoints` is asked for — a computed spline is noise, a hand-placed bend is a "
         "decision — but a `routing` or a `label` is always written, neither being derivable.",
         notes=(
@@ -724,7 +724,7 @@ SECTIONS: Final[tuple[Section, ...]] = (
     Section(
         TestSuiteSpec,
         "`spec` of a `testsuite` document",
-        "Named claims about the network the other documents describe. `netgraph test` grades "
+        "Named claims about the network the other documents describe. `netviz test` grades "
         "them and exits non-zero when one does not hold.",
         notes=(
             "A suite must assert something (`NG-K002`). A suite that checked nothing would "
@@ -740,10 +740,10 @@ SECTIONS: Final[tuple[Section, ...]] = (
         "to a different assertion is rejected by name (`NG-K003`) rather than ignored.",
         notes=(
             "`reachable`, `not-reachable` and `path-shorter-than` take `from` and `to` in the "
-            "spellings `netgraph path` accepts: an element, `element:interface`, an IP address, "
+            "spellings `netviz path` accepts: an element, `element:interface`, an IP address, "
             "or a selector matching several of them.",
             "`same-vlan`, `distinct-vlan`, `within-prefix`, `has-interface`, "
-            "`port-count-at-least`, `unique` and `count` take `select`, in `netgraph render`'s "
+            "`port-count-at-least`, `unique` and `count` take `select`, in `netviz render`'s "
             "filter vocabulary.",
             "`no-single-point-of-failure` takes neither, and optionally narrows the candidates "
             "with `select` and the views with `layer`.",
@@ -755,8 +755,8 @@ SECTIONS: Final[tuple[Section, ...]] = (
     Section(
         NoteSpec,
         "`spec` of a `note` document",
-        "One callout on the diagram. Presentational throughout: a note cannot make `netgraph "
-        "validate` fail, cannot move a hop in `netgraph path`, and never reaches an exported "
+        "One callout on the diagram. Presentational throughout: a note cannot make `netviz "
+        "validate` fail, cannot move a hop in `netviz path`, and never reaches an exported "
         "configuration.",
         notes=(
             "A note needs somewhere to be: either an `anchor`, or a `geometry` giving `x` and "
@@ -849,7 +849,7 @@ ENUMS: Final[tuple[tuple[type[enum.Enum], str, str], ...]] = (
         "`interfaces[].type`",
         "Only `ethernet`, `wifi` and `lag` can terminate a cable (`NG-C009`).",
     ),
-    (VlanMode, "`vlan.mode`", "A netgraph abstraction; 802.1Q has no equivalent leaf."),
+    (VlanMode, "`vlan.mode`", "A netviz abstraction; 802.1Q has no equivalent leaf."),
     (
         AcceptableFrames,
         "`vlan.acceptable_frames`",
@@ -920,7 +920,7 @@ ENUMS: Final[tuple[tuple[type[enum.Enum], str, str], ...]] = (
     (
         TunnelAuth,
         "`tunnel.auth`",
-        "The authentication *method*. netgraph never stores key material (`NG-T010`).",
+        "The authentication *method*. netviz never stores key material (`NG-T010`).",
     ),
     (
         UserType,
@@ -1150,7 +1150,7 @@ def _check_coverage() -> None:
     """Fail loudly when :data:`FIELD_DOCS`, the models and :data:`SECTIONS` disagree.
 
     The table itself is checked by
-    :func:`netgraph.models.fielddocs.check_coverage`; what is left to check here
+    :func:`netviz.models.fielddocs.check_coverage`; what is left to check here
     is that this document renders every model that table documents. A model
     added to ``DOCUMENTED_MODELS`` but never given a :class:`Section` would
     otherwise vanish from the reference while still appearing in the schema.
@@ -1253,13 +1253,13 @@ def build() -> str:
         "",
         "# Schema reference",
         "",
-        "Every field netgraph accepts, read directly off the models in `src/netgraph/models/`.",
+        "Every field netviz accepts, read directly off the models in `src/netviz/models/`.",
         "This is the lookup table; [`docs/schema.md`](schema.md) is the specification that",
         "explains the design, and [`docs/yang-mapping.md`](yang-mapping.md) explains how the",
         "YANG column relates to RFC 8343, RFC 8344 and IEEE 802.1Q.",
         "",
         "**Reading the tables.** *Required* means the key must be present in the document.",
-        "*Default* is the value netgraph uses when it is absent — `—` for a required field,",
+        "*Default* is the value netviz uses when it is absent — `—` for a required field,",
         "*unset* when the field simply has no value and nothing downstream supplies one. Several",
         "defaults are filled in at load time from elsewhere in the document (an interface's MTU",
         "becomes the address families' MTU, the device's `forwarding` becomes each family's",
@@ -1297,7 +1297,7 @@ def build() -> str:
             "## Scalar formats",
             "",
             "Values that are normalised on load: what you write and what",
-            "`netgraph show` prints back may differ.",
+            "`netviz show` prints back may differ.",
             "",
             "| Type | Accepted | Stored as |",
             "|---|---|---|",
@@ -1317,7 +1317,7 @@ def build() -> str:
             "",
             'Booleans are strict on purpose: a quoted `"true"` or a YAML 1.1 `yes` is an error,',
             "not a silently accepted truth value. A MAC address written unquoted can be parsed by",
-            "YAML as a sexagesimal integer, which loses the original digits — netgraph detects the",
+            "YAML as a sexagesimal integer, which loses the original digits — netviz detects the",
             "case and tells you to quote it.",
             "",
         ]

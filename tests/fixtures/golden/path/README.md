@@ -1,6 +1,6 @@
 # Trace golden files
 
-Committed snapshots of `netgraph path` against the example inventories.
+Committed snapshots of `netviz path` against the example inventories.
 `tests/test_path.py` asserts each report reproduces its file byte for byte.
 
 They exist for the same reason the renderer goldens next door do, and for one

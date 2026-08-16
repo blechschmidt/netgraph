@@ -1,11 +1,11 @@
-# `netgraph report`
+# `netviz report`
 
-`netgraph report` writes the document a network engineer is actually asked to hand
+`netviz report` writes the document a network engineer is actually asked to hand
 over: an as-built record with a page per site and a page per device, carrying the
 diagrams, the address plan, the VLAN matrix, the cable schedule, the rack
 positions, the wireless plan and the open validation findings. Every table comes
-from the same derivation the matching command prints — `netgraph list`,
-`netgraph ipam`, `netgraph export cable-list` — so no two pages of one report can
+from the same derivation the matching command prints — `netviz list`,
+`netviz ipam`, `netviz export cable-list` — so no two pages of one report can
 disagree with each other or with the diagram above them.
 
 ---
@@ -33,7 +33,7 @@ disagree with each other or with the diagram above them.
 
 <!-- generated: synopsis report -->
 ```text
-netgraph [GLOBAL OPTIONS] report [OPTIONS]
+netviz [GLOBAL OPTIONS] report [OPTIONS]
 ```
 <!-- /generated -->
 
@@ -70,12 +70,12 @@ in the page that references it rather than writing `diagrams/`.
 
 <!-- run: -->
 ```console
-$ netgraph -q -i examples/home-lab report -f json --generated-at none --revision ''
+$ netviz -q -i examples/home-lab report -f json --generated-at none --revision ''
 {
   "meta": {
     "title": "home-lab — as-built network documentation",
     "inventory": "home-lab",
-    "netgraph": "0.1.0",
+    "netviz": "0.1.0",
     "generatedAt": null,
     "revision": null,
     "revisionState": null,
@@ -91,9 +91,9 @@ diagrams, every open validation finding, every element, the address plan, the VL
 tables, and the tunnels and PDUs when the inventory has any.
 
 **A site page** — the layer diagrams for that site; its elements; the address plan
-with utilisation from [`netgraph ipam`](ipam.md); a VLAN summary and a
+with utilisation from [`netviz ipam`](ipam.md); a VLAN summary and a
 VLAN-to-subnet-to-element matrix; the cable schedule from the same rows
-[`netgraph export cable-list`](export.md) writes, one row per run with the patch
+[`netviz export cable-list`](export.md) writes, one row per run with the patch
 panels named; a port map per patch panel, free positions included; the BSS and
 SSID plan; the PDU load schedule; the links that leave the page; and the findings
 anchored to its elements.
@@ -151,7 +151,7 @@ other, keyed `netns`:
 
 <!-- run: -->
 ```console
-$ netgraph -q -i examples/containers report -f json --generated-at none --revision ''
+$ netviz -q -i examples/containers report -f json --generated-at none --revision ''
 ...
           "key": "netns",
           "title": "Network namespaces",
@@ -178,7 +178,7 @@ $ netgraph -q -i examples/containers report -f json --generated-at none --revisi
 ## Sites, and how a namespace becomes one
 
 A "site" is a namespace. Which namespace depends on the tree, and by default
-`netgraph report` counts one level below the namespace every element shares — the
+`netviz report` counts one level below the namespace every element shares — the
 same definition `--collapse-depth` uses. A campus laid out as
 `sites/<site>/<tier>` therefore gets a page per site rather than one per tier,
 while a home lab whose directories are `routers/`, `switches/` and `hosts/` gets a
@@ -196,19 +196,19 @@ loses the uplinks.
 ## Scoping a report
 
 `--namespace`, `--kind`, `--name`, `--vlan` and `--neighbors-of`/`--depth` are the
-filters [`netgraph render`](render.md) takes, and they mean the same thing here.
+filters [`netviz render`](render.md) takes, and they mean the same thing here.
 They select *elements*; the pages, tables and diagrams are then built from what
 survived, and the scope is printed in the provenance block of every page.
 
 <!-- norun: writes a directory into the reader's tree -->
 ```console
-$ netgraph -i examples/campus report --namespace sites/north --out docs/north
+$ netviz -i examples/campus report --namespace sites/north --out docs/north
 wrote 18 files (389.7 kB) to docs/north
 ```
 
 ## Traceability: the stamp, the version and the revision
 
-Every page carries the netgraph version, the generated-at stamp and the
+Every page carries the netviz version, the generated-at stamp and the
 inventory's git revision when there is one — `abc123456789 (clean)`, or
 `(modified)` when tracked files under the inventory root differ from the commit,
 because then the report does *not* describe the commit it names.
@@ -229,7 +229,7 @@ pinned:
 
 <!-- norun: needs a writable directory and two runs to compare -->
 ```console
-$ netgraph -i examples/home-lab report --out docs/as-built --generated-at none
+$ netviz -i examples/home-lab report --out docs/as-built --generated-at none
 $ git diff --exit-code docs/as-built   # nothing changed, or the inventory did
 ```
 
@@ -239,7 +239,7 @@ removed only when you pass `--prune`.
 
 ## Editing the layout with `--template`
 
-The pages are Jinja2 templates in `netgraph/report/templates`: `overview`, `site`
+The pages are Jinja2 templates in `netviz/report/templates`: `overview`, `site`
 and `device`, in a `.md.j2` and a `.html.j2` variant each, over the shared macros
 in `macros.md.j2` and `macros.html.j2`. `--template DIR` puts a directory in front
 of them, one file at a time: a `DIR` holding only `device.md.j2` overrides the
@@ -253,7 +253,7 @@ model, which is what keeps a custom layout from disagreeing with the standard on
 ## Validation runs first
 
 A report presents an inventory as authoritative, so the same gate
-[`netgraph export`](export.md) applies is applied here: errors refuse the run
+[`netviz export`](export.md) applies is applied here: errors refuse the run
 unless `--force` is given, and `--strict` promotes warnings to errors. Findings
 that do *not* stop the run are still written into the report — on the overview,
 and on the site page of every element they name.
@@ -279,7 +279,7 @@ and on the site page of every element they name.
 | `--name` | `GLOB` | — | Keep only elements whose name matches this glob. Repeatable. |
 | `--neighbors-of` | `NAME` | — | Keep only the neighbourhood of this element. |
 | `--depth` | `INTEGER, >= 0` | `1` | How many hops --neighbors-of reaches. |
-| `--select` | `QUERY` | — | Keep only the elements this query selects, e.g. "kind = switch and not has vrf". The flags above are sugar for the equivalent query and are combined with it; 'netgraph query --explain' prints which. See docs/query.md. |
+| `--select` | `QUERY` | — | Keep only the elements this query selects, e.g. "kind = switch and not has vrf". The flags above are sugar for the equivalent query and are combined with it; 'netviz query --explain' prints which. See docs/query.md. |
 | `--strict` | — | off | Treat warnings as errors. |
 | `--force` | — | off | Proceed even when validation failed. The result may not match the files. |
 <!-- /generated -->
@@ -297,9 +297,9 @@ and on the site page of every element they name.
 
 ## See also
 
-* [`netgraph list`](list.md), [`netgraph ipam`](ipam.md) and
-  [`netgraph export`](export.md) — the commands whose tables the report reuses.
-* [`netgraph render`](render.md) — the diagrams, and the filters `report` shares.
+* [`netviz list`](list.md), [`netviz ipam`](ipam.md) and
+  [`netviz export`](export.md) — the commands whose tables the report reuses.
+* [`netviz render`](render.md) — the diagrams, and the filters `report` shares.
 * [`docs/example-report/`](../example-report/) — the committed report of
   `examples/patch-room`, browsable as it would be handed over.
 * [`docs/architecture.md`](../architecture.md) — where the report generator sits

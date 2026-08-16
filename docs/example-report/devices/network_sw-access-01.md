@@ -124,4 +124,4 @@ The drawings this element is in.
 
 ---
 
-netgraph 0.1.0, generated 2026-07-30T00:00:00Z.
+netviz 0.1.0, generated 2026-07-30T00:00:00Z.

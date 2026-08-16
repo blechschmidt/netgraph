@@ -6,12 +6,12 @@ way to pin down the handful of statements in this codebase that are universally
 quantified:
 
 * the loader and the model layer are inverses of each other, for every document;
-* ``netgraph fmt`` is idempotent and meaning-preserving, for every document;
+* ``netviz fmt`` is idempotent and meaning-preserving, for every document;
 * ``range:`` and ``spec.from`` are shorthands, so for every document that uses
   them there is a longhand document that means exactly the same thing;
 * no free text in an inventory can become *syntax* in any output format;
 * ``validate`` is a function of the inventory and of nothing else;
-* ``netgraph path`` reports routes that exist in the graph it was derived from.
+* ``netviz path`` reports routes that exist in the graph it was derived from.
 
 Each of those is a statement about all inputs, and an example test can only ever
 say it held for the inputs somebody thought of. The strategies in
@@ -51,26 +51,26 @@ import yaml
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
-from netgraph.edit import EditSession
-from netgraph.fmt import format_source
-from netgraph.fmt.verify import meaning, verify
-from netgraph.layout.geometry import (
+from netviz.edit import EditSession
+from netviz.fmt import format_source
+from netviz.fmt.verify import meaning, verify
+from netviz.layout.geometry import (
     Geometry,
     LabelPlacement,
     LayoutMode,
     LinkGeometry,
     Routing,
 )
-from netgraph.layout.graphviz import parse_drawing
-from netgraph.layout.resolve import resolve_geometry
-from netgraph.layout.seed import clear_operations, seed_geometry, write_operations
-from netgraph.loader import Inventory, load_tree, namespace_of
-from netgraph.render import RENDERERS, Graph, Layer, RenderOptions, build_graph
-from netgraph.render.dot import layout_plan, run_graphviz, to_dot
-from netgraph.render.ids import element_ids
-from netgraph.render.registry import draws_racks
-from netgraph.trace import TraceError, trace
-from netgraph.validate import validate
+from netviz.layout.graphviz import parse_drawing
+from netviz.layout.resolve import resolve_geometry
+from netviz.layout.seed import clear_operations, seed_geometry, write_operations
+from netviz.loader import Inventory, load_tree, namespace_of
+from netviz.render import RENDERERS, Graph, Layer, RenderOptions, build_graph
+from netviz.render.dot import layout_plan, run_graphviz, to_dot
+from netviz.render.ids import element_ids
+from netviz.render.registry import draws_racks
+from netviz.trace import TraceError, trace
+from netviz.validate import validate
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -78,7 +78,7 @@ import strategies as ng  # isort: skip -- tests/ is on sys.path, not a package
 
 
 #: How far a rendered coordinate may sit from its stored one, once the drawing's
-#: single translation is taken off. netgraph stores a position to a hundredth of
+#: single translation is taken off. netviz stores a position to a hundredth of
 #: a point; Graphviz takes it in points, keeps it in inches and prints it in
 #: points again, so what comes back is the same coordinate to within the last
 #: place *it* prints -- which is a hundredth of a point on Graphviz 2.43 and a
@@ -123,7 +123,7 @@ def written(
 def emit(element: Any) -> str:
     """One element as the YAML document it would be written as.
 
-    The round-trip property needs an emitter, and netgraph has none: it reads
+    The round-trip property needs an emitter, and netviz has none: it reads
     inventories and draws them. This is the smallest honest one — the model's
     own JSON-mode dump, which is exactly the set of fields the loader read —
     which makes "load, emit, load again" a test of the model layer rather than
@@ -157,7 +157,7 @@ def capped(limit: int) -> int:
     """At most ``limit`` examples, and fewer when the profile asks for fewer.
 
     Every property here inherits its budget from the profile
-    (``NETGRAPH_HYPOTHESIS_PROFILE``, see ``tests/conftest.py``) — an explicit
+    (``NETVIZ_HYPOTHESIS_PROFILE``, see ``tests/conftest.py``) — an explicit
     ``max_examples`` on the decorator overrides the profile rather than being
     combined with it, which would make the deep profile a no-op. The two
     Graphviz-backed properties are the exception: each example shells out to
@@ -220,7 +220,7 @@ def test_re_emitting_an_inventory_is_byte_identical(plan: ng.InventoryPlan) -> N
 
 
 # --------------------------------------------------------------------------- #
-# 2. netgraph fmt
+# 2. netviz fmt
 # --------------------------------------------------------------------------- #
 
 
@@ -249,7 +249,7 @@ def test_formatting_preserves_meaning(plan: ng.InventoryPlan) -> None:
     """The model loaded from formatted YAML equals the one loaded from the original.
 
     ``format_source`` already refuses to return output whose *documents* moved
-    (:func:`netgraph.fmt.verify.verify`); this goes one layer further and
+    (:func:`netviz.fmt.verify.verify`); this goes one layer further and
     compares what the loader and the models make of the two texts, which is the
     thing a user actually loses if the formatter is wrong.
     """
@@ -292,7 +292,7 @@ def test_interface_ranges_equal_their_hand_expansion(case: ng.TemplateCase) -> N
     """``range:`` is a shorthand, so the longhand must load to the same element.
 
     The expansion on the right-hand side is built by the strategy, not by
-    netgraph: comparing the loader's expansion against the loader's expansion
+    netviz: comparing the loader's expansion against the loader's expansion
     would assert only that it is deterministic.
     """
     with written(ng.InventoryPlan(case.written)) as (_, short):
@@ -439,9 +439,9 @@ def assert_graphviz_parses(source: str) -> None:
     encodes with the ANSI code page on Windows, so a label carrying a combining
     accent — which every property below is in the business of generating —
     raises :class:`UnicodeEncodeError` before ``dot`` is even started, a failure
-    of this call rather than of the DOT it was checking. netgraph's own
+    of this call rather than of the DOT it was checking. netviz's own
     invocation hands over bytes it encoded itself
-    (:mod:`netgraph.render.dot`); this is the same decision, made once, for the
+    (:mod:`netviz.render.dot`); this is the same decision, made once, for the
     three properties that shell out here.
     """
     completed = subprocess.run(
@@ -502,7 +502,7 @@ def test_the_laid_out_formats_complete_and_parse(plan: ng.InventoryPlan) -> None
 
 def _payload_documents(text: str) -> ng.InventoryPlan:
     """A fixed two-device inventory with ``text`` in every free-text field."""
-    api = "netgraph.dev/v1alpha1"
+    api = "netviz.dev/v1alpha1"
     switch = {
         "apiVersion": api,
         "kind": "switch",
@@ -714,7 +714,7 @@ def test_a_brace_in_a_label_is_text_and_not_structure(value: str) -> None:
                 namespace="",
                 stem="u1",
                 data={
-                    "apiVersion": "netgraph.dev/v1alpha1",
+                    "apiVersion": "netviz.dev/v1alpha1",
                     "kind": "user",
                     "metadata": {"name": "u1"},
                     "spec": {"full_name": value},
@@ -912,7 +912,7 @@ def _findings(findings: Sequence[Any]) -> list[tuple[str, str, str]]:
 
 
 # --------------------------------------------------------------------------- #
-# 7. netgraph path
+# 7. netviz path
 # --------------------------------------------------------------------------- #
 
 
@@ -982,7 +982,7 @@ def test_a_hand_built_chain_is_always_traceable(switches: int, medium: str) -> N
 
 def _chain(switches: int, medium: str) -> ng.InventoryPlan:
     """``hostA -- sw0 -- sw1 -- ... -- hostB``, all in one VLAN."""
-    api = "netgraph.dev/v1alpha1"
+    api = "netviz.dev/v1alpha1"
     documents: list[ng.PlannedDocument] = []
 
     def add(stem: str, data: dict[str, Any]) -> None:
@@ -1075,7 +1075,7 @@ def test_a_hand_edited_arrangement_survives_a_render_and_a_reload(
     nobody can arrange, and a bend that landed somewhere else, or on another
     link, is a cable that springs back the moment you look away.
 
-    Re-seeding then settles the translation away, so ``netgraph layout --write``
+    Re-seeding then settles the translation away, so ``netviz layout --write``
     leaves an arrangement that reproduces itself point for point; and removing
     the geometry leaves no residue at all, the diagram going back to the
     automatic layout rather than to a half-pinned version of what was deleted.
@@ -1221,14 +1221,14 @@ def test_a_hash_inside_a_multiline_scalar_is_not_a_comment() -> None:
     """``fmt`` refused a legal file whose scalar continued onto a ``#`` line.
 
     Found by :func:`test_formatting_comment_bearing_input_preserves_meaning_and_comments`.
-    :func:`netgraph.fmt.verify.comments` counted every line starting with ``#``,
+    :func:`netviz.fmt.verify.comments` counted every line starting with ``#``,
     including the second line of a multi-line quoted scalar. Formatting folds
     that scalar onto one line — legitimately, the meaning is identical — and the
     counter then reported a comment as lost and refused the file, with a message
-    saying it was a bug in netgraph. It was.
+    saying it was a bug in netviz. It was.
     """
     source = (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata:\n"
         "  name: sw1\n"
@@ -1255,7 +1255,7 @@ def test_a_real_comment_after_a_block_scalar_is_still_counted() -> None:
     the one comment most likely to be there.
     """
     source = (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata:\n"
         "  name: sw1\n"
@@ -1282,7 +1282,7 @@ def test_a_duplicate_address_is_reported_in_the_same_order_whatever_the_layout()
     ``elements`` list and re-anchored the finding to the other file. A duplicate
     address is symmetric: neither end is the original.
     """
-    api = "netgraph.dev/v1alpha1"
+    api = "netviz.dev/v1alpha1"
 
     def host(name: str) -> dict[str, Any]:
         return {
@@ -1332,7 +1332,7 @@ def test_a_rack_collision_is_reported_in_the_same_order_whatever_the_layout() ->
     in the order their documents happened to load. Fixed by ordering the
     occupants bottom-of-the-rack upwards, which is also how an elevation reads.
     """
-    api = "netgraph.dev/v1alpha1"
+    api = "netviz.dev/v1alpha1"
 
     def racked(name: str) -> dict[str, Any]:
         return {

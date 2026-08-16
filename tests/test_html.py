@@ -1,4 +1,4 @@
-"""The self-contained interactive page: ``netgraph render -f html``.
+"""The self-contained interactive page: ``netviz render -f html``.
 
 The output of this format is a *published artefact* — a file that gets emailed,
 committed, or served from a static host — so the properties asserted here are
@@ -32,9 +32,9 @@ from typing import Any
 
 import pytest
 
-from netgraph.errors import RenderError
-from netgraph.loader import Inventory, load_tree
-from netgraph.render import (
+from netviz.errors import RenderError
+from netviz.loader import Inventory, load_tree
+from netviz.render import (
     FORMATS,
     Graph,
     Layer,
@@ -49,13 +49,13 @@ from netgraph.render import (
     supports_layers,
     to_html,
 )
-from netgraph.render.html import DATA_ELEMENT_ID, PAGE_KIND
+from netviz.render.html import DATA_ELEMENT_ID, PAGE_KIND
 
 from platform_marks import requires_dot, requires_node  # isort: skip -- tests/ is on sys.path, not a package
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
-ASSETS = REPO_ROOT / "src" / "netgraph" / "render" / "assets"
+ASSETS = REPO_ROOT / "src" / "netviz" / "render" / "assets"
 
 
 # --------------------------------------------------------------------------- #
@@ -193,7 +193,7 @@ def test_the_page_is_one_html_document(page: str) -> None:
 def test_the_records_are_the_json_export_keyed_by_element_id(graph: Graph, page: str) -> None:
     data = data_of(page)
     assert data["kind"] == PAGE_KIND
-    assert data["apiVersion"] == "netgraph.dev/v1alpha1"
+    assert data["apiVersion"] == "netviz.dev/v1alpha1"
     assert [layer["layer"] for layer in data["layers"]] == ["l2"]
 
     identity = element_ids(graph)
@@ -317,7 +317,7 @@ def test_an_option_that_is_off_has_no_drawing_that_prints_it(graph: Graph) -> No
 def test_identical_drawings_are_embedded_once(tmp_path: Path) -> None:
     """An inventory with no VLAN draws the same with and without them."""
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc-a}\n"
         "spec: {interfaces: [{name: eth0, type: ethernet}]}\n",
@@ -391,8 +391,8 @@ def effective_text_properties(source: str) -> list[dict[str, str | None]]:
 @requires_dot
 def test_the_font_attributes_are_stated_once_and_still_resolve_the_same(graph: Graph) -> None:
     """Graphviz writes them on every label; the drawing states them on itself."""
-    from netgraph.render.dot import to_image
-    from netgraph.render.fragment import fragment
+    from netviz.render.dot import to_image
+    from netviz.render.fragment import fragment
 
     payload = to_image(graph, RenderOptions(element_ids=True, tooltips=False), format="svg")
     before = payload.decode("utf-8")
@@ -413,8 +413,8 @@ def test_hoisting_only_moves_an_attribute_every_label_carries(graph: Graph) -> N
     device name and on nothing else, so hoisting the majority value would
     silently embolden — or unbolden — every other label on the page.
     """
-    from netgraph.render.dot import to_image
-    from netgraph.render.fragment import fragment
+    from netviz.render.dot import to_image
+    from netviz.render.fragment import fragment
 
     payload = to_image(graph, RenderOptions(element_ids=True, tooltips=False), format="svg")
     assert b'font-weight="bold"' in payload, "the fixture has to exercise the case"
@@ -426,7 +426,7 @@ def test_hoisting_only_moves_an_attribute_every_label_carries(graph: Graph) -> N
 @requires_dot
 def test_an_icon_is_stored_once_however_many_views_draw_it(home_lab: Inventory) -> None:
     """``--icons`` is a fixed cost of the theme, not a cost per node per view."""
-    from netgraph.render.icons import icon_theme
+    from netviz.render.icons import icon_theme
 
     options = RenderOptions(icons=icon_theme("cisco"))
     graphs = [build_graph(home_lab, layer=layer) for layer in (Layer.L1, Layer.L2, Layer.L3)]
@@ -443,7 +443,7 @@ def test_an_icon_is_stored_once_however_many_views_draw_it(home_lab: Inventory) 
 
 def test_a_picture_that_is_not_an_inlined_icon_is_left_where_it_is() -> None:
     """Only artwork this renderer inlined is shared; anything else is a guess."""
-    from netgraph.render.fragment import fragment
+    from netviz.render.fragment import fragment
 
     payload = (
         b'<svg xmlns="http://www.w3.org/2000/svg" '
@@ -463,7 +463,7 @@ def test_a_picture_that_is_not_an_inlined_icon_is_left_where_it_is() -> None:
 @requires_dot
 def test_every_same_document_reference_names_something_the_page_holds(home_lab: Inventory) -> None:
     """A `#`-reference fetches nothing — but it must not point at nothing either."""
-    from netgraph.render.icons import icon_theme
+    from netviz.render.icons import icon_theme
 
     graphs = [build_graph(home_lab, layer=layer) for layer in (Layer.L1, Layer.L2)]
     page = html_document(graphs, RenderOptions(icons=icon_theme("cisco")))
@@ -568,7 +568,7 @@ def page_and_drawings(source: str) -> tuple[int, int, int]:
 @requires_dot
 @pytest.mark.parametrize("theme", [None, "cisco"], ids=["no-icons", "cisco"])
 def test_an_extra_view_costs_its_drawing_and_little_else(theme: str | None) -> None:
-    from netgraph.render.icons import icon_theme
+    from netviz.render.icons import icon_theme
 
     inventory = load_tree(EXAMPLES / "campus")
     options = RenderOptions(icons=icon_theme(theme))
@@ -722,8 +722,8 @@ def test_the_client_parses(asset: Path) -> None:
 
 
 def test_the_web_preview_serves_the_same_detail_renderer() -> None:
-    """One file, two front ends: see netgraph/render/assets/detail.js."""
-    from netgraph.web import asset
+    """One file, two front ends: see netviz/render/assets/detail.js."""
+    from netviz.web import asset
 
     assert asset("detail.js") == (ASSETS / "detail.js").read_bytes()
 
@@ -745,12 +745,12 @@ def test_the_page_inlines_exactly_those_files(page: str) -> None:
 def test_a_dropped_cable_is_named_in_the_page(tmp_path: Path) -> None:
     """Under --force the picture is missing links; the page has to say so."""
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc-a}\n"
         "spec: {interfaces: [{name: eth0, type: ethernet}]}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata: {name: cbl}\n"
         "spec: {endpoints: [pc-a:eth0, pc-gone:eth0], medium: copper}\n",
@@ -763,7 +763,7 @@ def test_a_dropped_cable_is_named_in_the_page(tmp_path: Path) -> None:
 
 @requires_dot
 def test_the_backend_is_reachable_under_both_of_its_names(graph: Graph) -> None:
-    from netgraph.render import render_html
+    from netviz.render import render_html
 
     assert render_html(graph) == to_html(graph)
     assert render(graph, "html").decode("utf-8") == to_html(graph)
@@ -801,7 +801,7 @@ STANDALONE = b"""<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 
 
 def test_the_fragment_is_the_svg_element_and_nothing_around_it() -> None:
-    from netgraph.render.fragment import fragment
+    from netviz.render.fragment import fragment
 
     out = fragment(STANDALONE)
     assert out.startswith("<svg") and out.rstrip().endswith("</svg>")
@@ -812,7 +812,7 @@ def test_the_fragment_is_the_svg_element_and_nothing_around_it() -> None:
 
 
 def test_the_fragment_can_neither_run_nor_navigate_by_default() -> None:
-    from netgraph.render.fragment import fragment
+    from netviz.render.fragment import fragment
 
     out = fragment(STANDALONE)
     assert "script" not in out
@@ -826,7 +826,7 @@ def test_the_fragment_can_neither_run_nor_navigate_by_default() -> None:
 
 
 def test_the_fragment_keeps_what_the_caller_asks_for() -> None:
-    from netgraph.render.fragment import fragment
+    from netviz.render.fragment import fragment
 
     out = fragment(STANDALONE, tooltips=True, links=True)
     assert "<title>a tooltip</title>" in out
@@ -837,7 +837,7 @@ def test_the_fragment_keeps_what_the_caller_asks_for() -> None:
 
 
 def test_the_fragment_prefixes_every_id_and_every_reference_to_one() -> None:
-    from netgraph.render.fragment import fragment
+    from netviz.render.fragment import fragment
 
     out = fragment(STANDALONE, prefix="v7")
     assert 'id="v7-node-a"' in out
@@ -850,7 +850,7 @@ def test_the_fragment_prefixes_every_id_and_every_reference_to_one() -> None:
 
 
 def test_a_prefix_that_could_not_be_an_id_is_refused() -> None:
-    from netgraph.render.fragment import fragment
+    from netviz.render.fragment import fragment
 
     for bad in ("7v", "a b", "a<b", "-x"):
         with pytest.raises(RenderError, match="cannot prefix an XML id"):
@@ -858,7 +858,7 @@ def test_a_prefix_that_could_not_be_an_id_is_refused() -> None:
 
 
 def test_something_that_is_not_a_sizeable_svg_is_refused() -> None:
-    from netgraph.render.fragment import fragment
+    from netviz.render.fragment import fragment
 
     with pytest.raises(RenderError, match="could not be parsed"):
         fragment(b"<svg")
@@ -869,8 +869,8 @@ def test_something_that_is_not_a_sizeable_svg_is_refused() -> None:
 
 
 def test_the_web_preview_still_gets_the_inert_fragment() -> None:
-    """``netgraph web`` embeds a diagram built from text being typed."""
-    from netgraph.web import prepare
+    """``netviz web`` embeds a diagram built from text being typed."""
+    from netviz.web import prepare
 
     out = prepare(STANDALONE)
     assert "<title>" not in out and "git.invalid" not in out and "script" not in out
@@ -885,7 +885,7 @@ def test_the_web_preview_still_gets_the_inert_fragment() -> None:
 def test_render_writes_a_page_to_a_file(tmp_path: Path) -> None:
     from click.testing import CliRunner
 
-    from netgraph.cli import cli
+    from netviz.cli import cli
 
     destination = tmp_path / "topology.html"
     result = CliRunner().invoke(
@@ -903,7 +903,7 @@ def test_render_writes_a_page_to_a_file(tmp_path: Path) -> None:
 def test_render_puts_several_layers_in_one_page(tmp_path: Path) -> None:
     from click.testing import CliRunner
 
-    from netgraph.cli import cli
+    from netviz.cli import cli
 
     destination = tmp_path / "topology.html"
     result = CliRunner().invoke(
@@ -934,7 +934,7 @@ def test_render_puts_several_layers_in_one_page(tmp_path: Path) -> None:
 def test_asking_svg_for_two_layers_is_a_usage_error(tmp_path: Path) -> None:
     from click.testing import CliRunner
 
-    from netgraph.cli import cli
+    from netviz.cli import cli
 
     result = CliRunner().invoke(
         cli,
@@ -965,7 +965,7 @@ def test_asking_svg_for_two_layers_is_a_usage_error(tmp_path: Path) -> None:
 
 @requires_dot
 def test_a_watch_cycle_renders_several_layers_into_one_page() -> None:
-    from netgraph.watch.pipeline import RenderRequest, Status, run_cycle
+    from netviz.watch.pipeline import RenderRequest, Status, run_cycle
 
     result = run_cycle(
         RenderRequest(
@@ -1016,7 +1016,7 @@ def test_the_committed_example_is_a_page_of_this_shape() -> None:
 
 def test_an_anchor_may_not_carry_a_fragment_of_its_own() -> None:
     """``<a href="#x">`` inside the diagram would move the page's selection."""
-    from netgraph.render.fragment import fragment
+    from netviz.render.fragment import fragment
 
     payload = (
         b'<svg xmlns="http://www.w3.org/2000/svg" '

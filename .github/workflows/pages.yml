@@ -3,9 +3,9 @@ name: Pages
 # The demo site: https://blechschmidt.github.io/netgraph/
 #
 # Why this exists: until it did, nothing in the project let a stranger see what
-# netgraph does without first installing Python *and* Graphviz. What is
+# netviz does without first installing Python *and* Graphviz. What is
 # published is the documentation set and, more to the point, every example
-# inventory rendered by ``netgraph render -f html`` -- the real command, whose
+# inventory rendered by ``netviz render -f html`` -- the real command, whose
 # output is a self-contained interactive page. There is no second front end to
 # keep in step with the first one.
 #
@@ -80,7 +80,7 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
-      - name: Install netgraph and the site extra
+      - name: Install netviz and the site extra
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip

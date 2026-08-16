@@ -1,0 +1,2271 @@
+/* The tree-backed half of the netviz web interface.
+ *
+ * `netviz web DIR` opens a folder rather than a string, and this file is what
+ * the page does with one: the file list, the open document, saving it back, the
+ * server-side undo stack, and the reconciliation that keeps all three honest
+ * when somebody edits the same tree in $EDITOR.
+ *
+ * It is loaded on every page and does nothing until app.js attaches it, which
+ * it only does when /api/state says the server is in session mode. The
+ * scratchpad -- one document stream, nothing on disk -- never comes through
+ * here.
+ *
+ * Three rules this file exists to keep:
+ *
+ *   1. **The server owns the truth.** Every list, every hash and every undo
+ *      depth on screen came from a response; nothing is inferred locally. The
+ *      one thing the page knows that the server does not is whether the text in
+ *      the textarea has been typed into since it arrived.
+ *   2. **A write states what it is replacing.** Saving sends the content hash
+ *      the file was opened at. The server refuses a stale one, and the refusal
+ *      is shown as a conflict rather than resolved by guessing.
+ *   3. **A moved revision is never papered over.** The stream says so, and the
+ *      files that moved, the diagram and the open file are brought up to date. A
+ *      file that is dirty and has also changed underneath is marked conflicted
+ *      and left alone -- the user's unsaved text is not something to throw away
+ *      quietly.
+ *
+ * How it hears about a change
+ * ---------------------------
+ *
+ * /api/events, a server-sent-events stream, says what moved the moment it
+ * moves: which files, which way the history went, who else is connected. Two
+ * things follow, and they are the point of it:
+ *
+ *   * **A single-file save refetches a single file.** The event names the paths,
+ *     so `/api/tree?path=...` answers for those and the other thousand rows stay
+ *     as they are.
+ *   * **A tree that moved is not a diagram that moved.** Every render sends the
+ *     fingerprint of the picture it is already showing; the server compares it
+ *     with the one this revision would produce and answers `unchanged` instead
+ *     of running Graphviz. app.js keeps the SVG it has, per view, so switching
+ *     back to a layer nothing touched costs a round trip and no render.
+ *
+ * **The stream is an optimisation, and the page works without it.** A proxy that
+ * buffers, a browser without EventSource, a stream that will not open: any of
+ * them drops this file back to polling /api/state, which replays the very same
+ * events out of the server's ring buffer into the very same handlers. Nothing
+ * below is reachable only from one of the two paths.
+ *
+ * Dependency-free, like the rest of this page: a local Python process serves it
+ * and there is no build step to put a bundler in.
+ */
+
+var netvizSession = (function () {
+  "use strict";
+
+  /** How often the tree revision is checked when there is no stream, in ms. */
+  var POLL_MS = 1000;
+  /** How long the stream has to say hello before we give up on it. */
+  var STREAM_TIMEOUT_MS = 4000;
+  /** How long one frame of the history is held before the next, in ms. Long
+   *  enough to read the subject beside it; short enough that a dozen commits
+   *  are a sequence rather than a slideshow. A frame slower than this makes the
+   *  next tick coalesce, which is the honest behaviour -- see playTimeline. */
+  var PLAY_MS = 1200;
+  /** How many times a stream may drop and reconnect before we stop trusting it.
+   *  EventSource retries by itself, so a couple of failures is a hiccup and a
+   *  steady trickle of them is a proxy that will not carry this. */
+  var STREAM_FAILURES = 3;
+
+  var host = null;
+  var el = null;
+  var state = { revision: 0, writable: false, undo: 0, redo: 0 };
+  var tree = { files: [], revision: 0 };
+  /** The file in the textarea: its path, the hash it was read at, and whether
+   *  the text has been typed into or has moved on disk since. */
+  var open = { path: null, hash: null, dirty: false, conflicted: false };
+  var timer = null;
+  /** The changes drawer: is it showing, what has it been told, and what is the
+   *  diagram being drawn against while it is. */
+  var changes = { open: false, against: "session", entries: [], commands: [], baselines: [] };
+  /** The history scrubber: the commits it can step over, oldest first, which
+   *  one is selected, and whether it is stepping through them by itself. */
+  var timeline = {
+    open: false, commits: [], index: -1, playing: false, timer: null,
+    bound: 0, message: "", loaded: false,
+    /** What each frame turned out to hold, keyed by commit hash. Remembered
+     *  rather than recomputed so that scrubbing back to a frame says what it
+     *  did before its picture has been fetched again. */
+    summaries: {}
+  };
+  /** The push channel: the connection, where we are in its numbering, and
+   *  whether we have given up on it and fallen back to polling. */
+  var link = { source: null, id: 0, live: false, failures: 0, timer: null, why: "" };
+  /** Who this page is to the server, and what it last told it. */
+  var me = { id: null, label: null, selection: [], reported: "" };
+  /** Everyone else, and the soft locks derived from them: path -> [label]. */
+  var peers = [];
+  var locks = {};
+
+  /* ------------------------------------------------------------- attaching */
+
+  /** Take over the page. `bridge` is app.js's side of the contract:
+   *
+   *    el          the elements shared with app.js
+   *    render()    ask for a fresh diagram
+   *    problems()  redraw the problems list from a diagnostics array
+   *    toast(text, kind)  say something, briefly
+   */
+  function attach(bridge, initial) {
+    host = bridge;
+    el = bridge.el;
+    state = initial;
+    el.files.hidden = false;
+    el.actions.hidden = !initial.writable;
+    el.filesRoot.textContent = initial.root || "";
+    el.filesMode.textContent = initial.writable ? "read-write" : "read-only";
+    el.filesMode.className = "hint " + (initial.writable ? "rw" : "ro");
+    el.timelineToggle.hidden = false;
+    el.editorTitle.textContent = "no file open";
+    el.editorHint.textContent = "choose a document on the left";
+    el.source.readOnly = true;
+    link.id = (initial.events && initial.events.lastEventId) || 0;
+    setPeers(initial.clients || []);
+    bindControls();
+    refreshTree();
+    refreshChanges();
+    connect();
+    return true;
+  }
+
+  function bindControls() {
+    el.save.addEventListener("click", function () { save(false); });
+    el.undo.addEventListener("click", function () { step("undo"); });
+    el.redo.addEventListener("click", function () { step("redo"); });
+    el.changesToggle.addEventListener("click", function () { showChanges(!changes.open); });
+    el.changesClose.addEventListener("click", function () { showChanges(false); });
+    el.changesCopy.addEventListener("click", copyCommands);
+    el.changesAgainst.addEventListener("change", function () {
+      changes.against = el.changesAgainst.value;
+      if (changes.open) { host.render(); }
+    });
+    el.timelineToggle.addEventListener("click", function () { showTimeline(!timeline.open); });
+    el.timelineClose.addEventListener("click", function () { showTimeline(false); });
+    el.timelineNow.addEventListener("click", function () { showTimeline(false); });
+    el.timelinePlay.addEventListener("click", function () { playTimeline(); });
+    el.timelinePrev.addEventListener("click", function () { stopPlaying(); stepTimeline(-1); });
+    el.timelineNext.addEventListener("click", function () { stopPlaying(); stepTimeline(1); });
+    // `input` rather than `change`: dragging the slider should repaint as it
+    // goes, which is what makes it a scrubber rather than a chooser. Frames
+    // already drawn come out of the cache, so a drag over old ground is free.
+    el.timelineRange.addEventListener("input", function () {
+      stopPlaying();
+      stepTimeline(parseInt(el.timelineRange.value, 10) - timeline.index);
+    });
+    // Ctrl-S, Ctrl-Z and Escape used to be caught here. They are commands now,
+    // registered in defineCommands() below and bound by netviz.web.bindings,
+    // which is what put them in the palette and in docs/commands/web.md.
+  }
+
+  /* ------------------------------------------------------ the push channel */
+
+  /** Open the event stream, or fall back to polling if it will not open.
+   *
+   * Everything the stream can tell us, /api/state can also tell us; the stream
+   * only tells us sooner and in smaller pieces. So a failure here is a
+   * degradation, never a breakage, and it is deliberately easy to reach: no
+   * EventSource, a construction that throws, four seconds without a hello, or a
+   * connection that keeps dropping.
+   */
+  function connect() {
+    if (!window.EventSource) { fallback("this browser has no EventSource"); return; }
+    var url = "/api/events" + (me.id ? "?client=" + encodeURIComponent(me.id) : "");
+    try {
+      link.source = new EventSource(url);
+    } catch (error) {
+      fallback("the event stream could not be opened");
+      return;
+    }
+    window.clearTimeout(link.timer);
+    link.timer = window.setTimeout(function () {
+      // Opened the socket and said nothing: a proxy holding the response until
+      // it ends, which for a stream is never. Polling is the honest answer.
+      if (!link.live) { drop(); fallback("the event stream did not deliver"); }
+    }, STREAM_TIMEOUT_MS);
+    ["hello", "tree-changed", "file-changed", "history-changed", "disk-changed",
+     "presence", "resync"].forEach(function (name) {
+      link.source.addEventListener(name, receive);
+    });
+    link.source.onerror = function () {
+      link.failures += 1;
+      if (link.live && link.failures <= STREAM_FAILURES) {
+        // EventSource reconnects on its own, resending Last-Event-ID; the
+        // server replays what we missed. Nothing to do but say so.
+        paintLink("reconnecting");
+        return;
+      }
+      drop();
+      fallback("the event stream keeps dropping");
+    };
+  }
+
+  function receive(event) {
+    var data;
+    try { data = JSON.parse(event.data); } catch (error) { return; }
+    dispatch(data);
+  }
+
+  /** One event, whether it arrived on the stream or in a poll's replay. */
+  function dispatch(data) {
+    if (data.id) { link.id = Math.max(link.id, data.id); }
+    var handler = handlers[data.event];
+    if (handler) { handler(data); }
+  }
+
+  var handlers = {
+    "hello": function (data) {
+      window.clearTimeout(link.timer);
+      link.live = true;
+      link.failures = 0;
+      me.id = data.client;
+      me.label = data.label;
+      setPeers(data.clients || []);
+      paintLink("live");
+      // Whatever this page had selected or half-typed before the stream came up
+      // is news to everybody else.
+      announce(true);
+      if (data.resync) { fullRefresh(); }
+    },
+
+    /* The tree moved. `files` names what moved, so only those rows are
+     * refetched; `outside` says something changed that is not a document of
+     * this inventory -- netviz.toml, most likely -- and there is no row for
+     * that, so the list is refetched whole. */
+    "tree-changed": function (data) {
+      if (data.client && data.client === me.id) { return; }   // we did this one
+      if (data.revision <= state.revision) { return; }        // already caught up
+      state.revision = data.revision;
+      var moved = data.files || [];
+      (moved.length && !data.outside ? patchTree(moved, true) : refreshTree());
+      host.render();
+      refreshChanges();
+    },
+
+    /* One file's bytes are different. The only thing this page has to decide is
+     * what to do with the *open* file, which the file list cannot answer: the
+     * text on screen may be the only copy of something. */
+    "file-changed": function (data) {
+      // Our own write, echoed back. The response to it says more than this
+      // event can -- whether the bytes written were the pane's text or a
+      // gesture applied behind it -- and `applied` decides on that. Acting here
+      // as well is a race the page can lose: an event that overtakes its own
+      // response used to badge a plain Ctrl-S as somebody else's conflict.
+      if (data.client && data.client === me.id) { return; }
+      if (!open.path || data.path !== open.path) { return; }
+      if (data.hash === null) { mark("gone", "deleted on disk"); return; }
+      if (data.hash === open.hash) { return; }
+      if (open.dirty) {
+        open.conflicted = true;
+        mark("conflict", "changed on disk since you opened it");
+        paintTree();
+        host.toast(open.path + " changed on disk and has unsaved edits here", "error");
+        return;
+      }
+      openFile(open.path);
+    },
+
+    /* The undo stack is the server's, so a Ctrl-Z in another tab moves this
+     * one's buttons. No fetch: the event carries the depths. */
+    "history-changed": function (data) {
+      state.undo = data.undo;
+      state.redo = data.redo;
+      state.undoLabel = data.undoLabel;
+      state.redoLabel = data.redoLabel;
+      paintHistory();
+    },
+
+    /* Something outside this editor wrote to the tree. Worth saying, except
+     * about the file in the pane: `file-changed` has already said something
+     * more specific about that one, and a second toast would replace it. */
+    "disk-changed": function (data) {
+      var names = (data.files || []).filter(function (path) { return path !== open.path; });
+      if (names.length) {
+        host.toast(names.join(", ") + " changed on disk", "ok");
+      } else if (!data.files.length && data.outside) {
+        host.toast("something changed in the folder outside the inventory", "ok");
+      }
+    },
+
+    "presence": function (data) { setPeers(data.clients || []); },
+
+    /* The server could not tell us what we missed -- a reconnect after too long
+     * away, or this stream falling behind. Everything we hold may be stale, so
+     * nothing we hold is patched: it is all fetched again. */
+    "resync": function () { fullRefresh(); }
+  };
+
+  function drop() {
+    window.clearTimeout(link.timer);
+    if (link.source) { link.source.close(); link.source = null; }
+    link.live = false;
+  }
+
+  /* ---------------------------------------------------------------- polling */
+
+  /** Give up on the stream and watch /api/state instead.
+   *
+   * Not a lesser code path: `?since=` replays the same events, with the same
+   * ids, into the same handlers, so a polling page behaves exactly like a
+   * streaming one a fraction of a second later. What it loses is the fraction of
+   * a second -- and it says so, because "why is this tab behind" deserves an
+   * answer on screen. */
+  function fallback(why) {
+    if (link.why) { return; }   // already fell back; do not restart the timer
+    link.why = why;
+    paintLink("polling");
+    poll();
+  }
+
+  function poll() {
+    window.clearTimeout(timer);
+    var url = "/api/state?since=" + link.id + (me.id ? "&client=" + encodeURIComponent(me.id) : "");
+    fetch(url, { cache: "no-store" })
+      .then(function (response) { return response.json(); })
+      .then(function (next) {
+        var moved = next.revision !== state.revision;
+        var replay = (next.events && next.events.replay) || [];
+        state.writable = next.writable;
+        state.undo = next.undo;
+        state.redo = next.redo;
+        state.undoLabel = next.undoLabel;
+        state.redoLabel = next.redoLabel;
+        setPeers(next.clients || []);
+        paintHistory();
+        if (replay.length) {
+          replay.forEach(dispatch);
+        } else if (moved) {
+          // Nothing to replay and yet the revision moved: the ring wrapped, or
+          // the server restarted under us. Fetch everything.
+          state.revision = next.revision;
+          fullRefresh();
+        }
+        if (!me.id) { announce(true); }
+      })
+      .catch(function () {})
+      .then(function () { timer = window.setTimeout(poll, POLL_MS); });
+  }
+
+  /** Everything we hold may be wrong: fetch all of it again.
+   *
+   * The decision about the open file waits for the refetch rather than racing
+   * it. Made against the tree still in hand, it is made against the hashes from
+   * *before* the change -- which always compare equal, so the file that just
+   * moved on disk was the one thing the reconciliation left alone. */
+  function fullRefresh() {
+    host.render();
+    // The drawer is a view of the session's own log, but the *diff* it paints
+    // is against the tree -- which anything may have moved. Refetch both.
+    refreshChanges();
+    return refreshTree().then(function () {
+      if (!open.path) { return; }
+      var entry = fileEntry(open.path);
+      if (!entry) {
+        // Deleted under us. The text stays on screen -- it may be the only copy
+        // left -- but it is no longer a file, so saving it would be a create.
+        mark("gone", "deleted on disk");
+        return;
+      }
+      if (entry.hash === open.hash) { return; }
+      if (open.dirty) {
+        open.conflicted = true;
+        mark("conflict", "changed on disk since you opened it");
+        host.toast(open.path + " changed on disk and has unsaved edits here", "error");
+        return;
+      }
+      openFile(open.path);
+    });
+  }
+
+  /* --------------------------------------------------------------- presence */
+
+  /** Tell the server what this page has selected and is editing.
+   *
+   * Sent only when it has actually changed, because every one of these wakes
+   * every other page. Advisory throughout: nothing here is a lock, and a save is
+   * refused by the content hash or not at all. */
+  function announce(force) {
+    var payload = {
+      client: me.id,
+      selection: me.selection,
+      editing: open.dirty && open.path ? [open.path] : [],
+      view: host.layer ? host.layer() : null
+    };
+    var fingerprint = JSON.stringify([payload.selection, payload.editing, payload.view]);
+    if (!force && fingerprint === me.reported) { return; }
+    me.reported = fingerprint;
+    fetch("/api/presence", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify(payload)
+    })
+      .then(readBody)
+      .then(function (body) {
+        me.id = body.client;
+        me.label = body.label;
+        setPeers(body.clients || []);
+      })
+      .catch(function () { me.reported = ""; });   // try again next time
+  }
+
+  /** Note what this page has selected, and let the others draw it.
+   *
+   * One address or a list of them: the canvas has a multi-selection now, and
+   * everybody else's page draws every element of it faintly. Advisory, like the
+   * rest of presence — nothing here is a lock.
+   */
+  function select(address) {
+    me.selection = Array.isArray(address) ? address.slice() : (address ? [address] : []);
+    announce(false);
+  }
+
+  /** Take everyone else's word for where they are and what they are in. */
+  function setPeers(clients) {
+    peers = (clients || []).filter(function (entry) { return entry.id !== me.id; });
+    locks = {};
+    var selected = [];
+    peers.forEach(function (entry) {
+      (entry.editing || []).forEach(function (path) {
+        (locks[path] = locks[path] || []).push(entry.label);
+      });
+      (entry.selection || []).forEach(function (address) {
+        if (selected.indexOf(address) === -1) { selected.push(address); }
+      });
+    });
+    if (host.remote) { host.remote(selected); }
+    paintPeers();
+    paintTree();
+  }
+
+  function paintPeers() {
+    el.clients.replaceChildren();
+    el.clients.hidden = !peers.length;
+    peers.forEach(function (entry) {
+      var chip = document.createElement("span");
+      chip.className = "client" + (entry.streaming ? "" : " lagging");
+      chip.textContent = entry.label;
+      var what = (entry.editing || []).length
+        ? "editing " + entry.editing.join(", ")
+        : ((entry.selection || []).length ? "looking at " + entry.selection.join(", ") : "connected");
+      chip.title = what + (entry.streaming ? "" : " (polling; may be a moment behind)");
+      el.clients.appendChild(chip);
+    });
+  }
+
+  /** Say which channel this page is on. A tab that is behind should look it. */
+  function paintLink(kind) {
+    el.linkState.hidden = false;
+    el.linkState.className = "hint link " + kind;
+    el.linkState.textContent = kind;
+    el.linkState.title = kind === "live"
+      ? "changes arrive as they happen"
+      : (kind === "polling"
+        ? "the event stream could not be used (" + link.why + "); checking once a second"
+        : "the event stream dropped; reconnecting");
+  }
+
+  /* -------------------------------------------------------------- the tree */
+
+  function refreshTree() {
+    return fetch("/api/tree", { cache: "no-store" })
+      .then(function (response) { return response.json(); })
+      .then(function (next) {
+        tree = next;
+        paintTree();
+        if (host.diagnostics) { host.diagnostics(next.diagnostics || [], next.diagnosticsOmitted || 0); }
+      })
+      .catch(function () {});
+  }
+
+  /** Bring just these files up to date, leaving the rest of the list alone.
+   *
+   * The whole point of the push channel on a large inventory: a save moves one
+   * file, and walking a thousand of them to learn what that one now hashes to is
+   * the cost this replaces. `diagnostics` is asked for only when we do not
+   * already have this revision's -- an applied change comes back with them --
+   * because computing them means validating the whole tree either way.
+   *
+   * Anything unexpected falls back to the full fetch. A partial update that
+   * silently failed would leave a stale hash in the list, and a stale hash is a
+   * save refused for no visible reason. */
+  function patchTree(paths, diagnostics) {
+    if (!paths || !paths.length) { return refreshTree(); }
+    var query = paths.map(function (path) {
+      return "path=" + encodeURIComponent(path);
+    }).join("&");
+    return fetch("/api/tree?" + query + "&diagnostics=" + (diagnostics ? "1" : "0"),
+      { cache: "no-store" })
+      .then(readBody)
+      .then(function (next) {
+        tree.revision = next.revision;
+        merge(next.files || [], next.missing || []);
+        paintTree();
+        if (diagnostics && host.diagnostics) {
+          host.diagnostics(next.diagnostics || [], next.diagnosticsOmitted || 0);
+        }
+      })
+      .catch(function () { return refreshTree(); });
+  }
+
+  /** Put fresh rows in place of the old ones, and drop the ones that are gone.
+   *
+   * Insertion keeps the list in path order, which is the order the server walks
+   * the tree in, so a file created elsewhere lands where a full refetch would
+   * have put it rather than at the end. */
+  function merge(files, missing) {
+    (missing || []).forEach(function (path) {
+      tree.files = tree.files.filter(function (file) { return file.path !== path; });
+    });
+    (files || []).forEach(function (file) {
+      var at = -1;
+      for (var i = 0; i < tree.files.length; i++) {
+        if (tree.files[i].path === file.path) { at = i; break; }
+      }
+      if (at >= 0) { tree.files[at] = file; return; }
+      var before = tree.files.findIndex(function (other) { return other.path > file.path; });
+      tree.files.splice(before === -1 ? tree.files.length : before, 0, file);
+    });
+  }
+
+  function fileEntry(path) {
+    for (var i = 0; i < tree.files.length; i++) {
+      if (tree.files[i].path === path) { return tree.files[i]; }
+    }
+    return null;
+  }
+
+  /** Draw the file list: one row per file, its documents indented under it.
+   *
+   * A flat list of paths, not a collapsible tree of directories: a namespace is
+   * a folder here, the paths are short, and a control that hides half the
+   * inventory behind a triangle is a control that hides half the inventory. */
+  function paintTree() {
+    var list = el.fileList;
+    list.replaceChildren();
+    if (!tree.files.length) {
+      var none = document.createElement("p");
+      none.className = "empty";
+      none.textContent = "no YAML documents below " + (tree.root || "the root");
+      list.appendChild(none);
+      return;
+    }
+    var namespace = null;
+    tree.files.forEach(function (file) {
+      if (file.namespace !== namespace) {
+        namespace = file.namespace;
+        var heading = document.createElement("div");
+        heading.className = "ns";
+        heading.textContent = namespace || "/";
+        list.appendChild(heading);
+      }
+      list.appendChild(fileRow(file));
+      file.documents.forEach(function (document_) {
+        list.appendChild(documentRow(file, document_));
+      });
+    });
+  }
+
+  /* A row that opens a file is a <button>: in the tab order, activated by Enter
+   * and by Space, announced as a control. A <div> with a click handler is none
+   * of those things, and the file list is the first thing Tab reaches. */
+  function fileRow(file) {
+    var row = document.createElement("button");
+    row.type = "button";
+    row.className = "file";
+    if (file.path === open.path) { row.classList.add("current"); }
+    if (file.error) { row.classList.add("broken"); }
+    row.dataset.path = file.path;
+    var name = document.createElement("span");
+    name.className = "name";
+    name.textContent = file.path.split("/").pop();
+    row.appendChild(name);
+    var badge = stateBadge(file);
+    if (badge) { row.appendChild(badge); }
+    var lock = lockBadge(file);
+    if (lock) { row.appendChild(lock); }
+    row.title = file.error ? file.path + " — " + file.error : file.path;
+    row.addEventListener("click", function () { openFile(file.path); });
+    return row;
+  }
+
+  /** The honest per-file state: what the browser has done to it and what the
+   *  disk has done underneath, never merged into one cheerful dot. */
+  function stateBadge(file) {
+    if (file.path !== open.path) { return null; }
+    var text = open.conflicted ? "conflict" : (open.dirty ? "unsaved" : null);
+    if (!text) { return null; }
+    var badge = document.createElement("span");
+    badge.className = "badge " + (open.conflicted ? "conflict" : "dirty");
+    badge.textContent = text;
+    return badge;
+  }
+
+  /** Somebody else has unsaved edits in this file.
+   *
+   * A courtesy, not a lock: the row still opens, the file still saves, and the
+   * only thing that can refuse the save is the content hash. Saying so is worth
+   * doing because the alternative is finding out by being refused. */
+  function lockBadge(file) {
+    var who = locks[file.path];
+    if (!who || !who.length) { return null; }
+    var badge = document.createElement("span");
+    badge.className = "badge elsewhere";
+    badge.textContent = "in use";
+    badge.title = who.join(", ") + " has unsaved edits here";
+    return badge;
+  }
+
+  function documentRow(file, entry) {
+    var row = document.createElement("button");
+    row.type = "button";
+    row.className = "doc";
+    row.dataset.address = entry.address || "";
+    var kind = document.createElement("span");
+    kind.className = "kind";
+    kind.textContent = entry.kind;
+    var name = document.createElement("span");
+    name.className = "name";
+    name.textContent = entry.name;
+    row.appendChild(kind);
+    row.appendChild(name);
+    row.title = (entry.address || entry.name) + " — " + file.path + ":" + (entry.line || 1);
+    row.addEventListener("click", function () { openFile(file.path, entry.line); });
+    return row;
+  }
+
+  /* ------------------------------------------------------------- one file */
+
+  /** Open `path`, optionally putting the cursor on `line`.
+   *
+   * `options.focus === false` opens the file without taking the keyboard from
+   * wherever it is; see app.js's goToLine. */
+  function openFile(path, line, options) {
+    if (open.dirty && open.path && open.path !== path) {
+      if (!window.confirm(open.path + " has unsaved changes. Discard them?")) { return; }
+    }
+    return fetch("/api/file/" + encodePath(path), { cache: "no-store" })
+      .then(readBody)
+      .then(function (body) {
+        var wasDirty = open.dirty;
+        open = { path: body.path, hash: body.hash, dirty: false, conflicted: false };
+        if (wasDirty) { announce(false); }   // the file we were in is free again
+        el.source.value = body.text;
+        el.source.readOnly = !state.writable;
+        el.editorTitle.textContent = body.path;
+        el.editorHint.textContent = state.writable
+          ? "Ctrl-S saves · Ctrl-Z undoes on the server"
+          : "read-only session";
+        mark(null, "");
+        paintTree();
+        if (line) { host.goToLine(line, options); }
+      })
+      .catch(function (error) { host.toast(String(error.message || error), "error"); });
+  }
+
+  /** Put the pane back the way `attach` left it: nothing open, nothing to save.
+   *
+   * For the file that has stopped existing. The alternative -- leaving the text
+   * of a document nobody declares any more on screen under its old title -- is
+   * an editor offering to save something back into a file the person deleted on
+   * purpose, which is how a cascade delete comes undone one file at a time. */
+  function closeFile() {
+    var wasDirty = open.dirty;
+    open = { path: null, hash: null, dirty: false, conflicted: false };
+    el.source.value = "";
+    el.source.readOnly = true;
+    el.editorTitle.textContent = "no file open";
+    el.editorHint.textContent = "choose a document on the left";
+    mark(null, "");
+    paintTree();
+    if (wasDirty) { announce(false); }   // that file is no longer "in use" by us
+  }
+
+  /** The pane and the file are the same bytes again.
+   *
+   * Everything that says "there is something here that is not on disk" comes
+   * off together: the badge, the enabled Save, the claim on the file everybody
+   * else's list shows. One function because those four had drifted apart --
+   * a save that wrote no bytes used to clear none of them.
+   */
+  function synced(hash) {
+    open.hash = hash;
+    open.dirty = false;
+    open.conflicted = false;
+    mark(null, "");
+    paintTree();
+    announce(false);
+  }
+
+  /** app.js calls this on every keystroke in the textarea. */
+  function markDirty() {
+    if (!open.path || open.dirty) { return; }
+    open.dirty = true;
+    mark("dirty", "unsaved changes");
+    paintTree();
+    paintHistory();
+    // The first keystroke is what puts the "in use" badge on this file in
+    // everybody else's list; the ones after it change nothing and send nothing.
+    announce(false);
+  }
+
+  function save(force) {
+    if (!open.path || !state.writable) { return; }
+    var path = open.path;
+    // Always with the precondition, including the deliberate write over
+    // somebody else's work: by then `refused` has adopted the hash the file
+    // really has, so quoting it says "over *that* version" rather than "over
+    // whatever happens to be there when this arrives". A file that moved a
+    // third time between the refusal and the retry is refused again, which is
+    // the whole point of having a precondition at all.
+    var body = { text: el.source.value, force: !!force, client: me.id, hash: open.hash };
+    var quoted = body.hash;   // what we believe the file is, or null to create
+    el.save.disabled = true;
+    fetch("/api/file/" + encodePath(open.path), {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify(body)
+    })
+      .then(readBody)
+      .then(function (result) {
+        // Saving bytes that were already there writes no file, so the changeset
+        // names none and `applied` finds nothing to adopt -- but the pane is in
+        // sync with the disk all the same, which is the only thing the badge is
+        // about. Without this the page said "saved" and "unsaved changes" at
+        // once, and left Save enabled over a file it had just agreed with.
+        //
+        // `quoted` is what makes it safe to say so without going to look: the
+        // server checked the file against that hash before deciding it had
+        // nothing to write, so that is what the file hashes to now.
+        if (open.path === path && !result.files[path] && quoted) { synced(quoted); }
+        applied(result, "saved " + path);
+      })
+      .catch(function (error) { refused(error, force); })
+      .then(paintHistory);
+  }
+
+  /* Returns a promise that settles when the history has actually moved, so a
+   * caller that has to wait for it -- the guided tour, which undoes three
+   * batches in a row -- can, and a button that does not simply ignores it. */
+  function step(verb) {
+    if (!state.writable) { return Promise.resolve(false); }
+    if (verb === "undo" && !state.undo) { return Promise.resolve(false); }
+    if (verb === "redo" && !state.redo) { return Promise.resolve(false); }
+    var query = me.id ? "?client=" + encodeURIComponent(me.id) : "";
+    return fetch("/api/" + verb + query, { method: "POST", cache: "no-store" })
+      .then(readBody)
+      .then(function (result) { applied(result, verb + "ne", true); return true; })
+      .catch(function (error) {
+        host.toast(String(error.message || error), "error");
+        return false;
+      })
+      .then(function (moved) { paintHistory(); return moved; });
+  }
+
+  /** What every successful write does: adopt the new revision and redraw.
+   *
+   * `rewrote` says the text on screen is not what was just written -- true of an
+   * undo, which puts back a file the pane is showing the *new* version of, and
+   * false of a save, where the pane is already the file. Without it an undo left
+   * the editor showing text that was nowhere on disk, under a clean badge.
+   *
+   * The three things that can have happened to the open file are three
+   * different answers, and conflating them is what made the badge lie:
+   * the change removed it, the change rewrote it out from under typing nobody
+   * has saved, or the change rewrote it and there was nothing to lose. */
+  function applied(result, what, rewrote) {
+    state.revision = result.revision;
+    state.undo = result.undo;
+    state.redo = result.redo;
+    var mine = open.path ? result.files[open.path] : null;
+    /* Said *after* the "it worked" toast below, because one replaces the other
+     * and the caveat is the half somebody has to read. */
+    var caveat = null;
+    if (mine && mine.state === "deleted") {
+      // Unsaved text may be the only copy of it left anywhere, so it stays on
+      // screen and is badged for what it is. Text that was only ever the file's
+      // has nothing left to be about, and the pane closes.
+      if (open.dirty) { mark("gone", "deleted; this text is the only copy"); }
+      else { closeFile(); }
+    } else if (mine && mine.state === "written" && rewrote && open.dirty) {
+      // The gesture was applied to the file, not to the text in the pane, and
+      // the text in the pane was never saved. Adopting the file here would
+      // throw that typing away without anybody being asked -- the one thing
+      // this module does not do to unsaved text; see `file-changed`.
+      open.conflicted = true;
+      mark("conflict", "your unsaved text, over a file this change rewrote");
+      caveat = open.path + " was rewritten by that change and still has unsaved edits here";
+    } else if (mine && mine.state === "written") {
+      synced(mine.hash);
+      if (rewrote) { openFile(open.path); }
+    }
+    host.toast(what, "ok");
+    if (caveat) { host.toast(caveat, "error"); }
+    // Only the files the change touched, and no diagnostics: the response
+    // already carries this revision's, and recomputing them would mean
+    // validating the whole tree a second time for the same answer.
+    patchTree(Object.keys(result.files), false).then(function () {
+      // An undo can rewrite the file that is open; reload it unless the user is
+      // in the middle of typing something else into it.
+      if (open.path && !open.dirty) {
+        var entry = fileEntry(open.path);
+        if (entry && entry.hash !== open.hash) { openFile(open.path); }
+      }
+    });
+    host.render();
+    refreshChanges();
+    if (result.diagnostics && host.diagnostics) {
+      host.diagnostics(result.diagnostics, result.diagnosticsOmitted || 0);
+    }
+  }
+
+  /** A refusal is information, not a failure to hide: say which kind it was. */
+  function refused(error, wasForced) {
+    var body = error.body || {};
+    if (body.conflict) {
+      open.conflicted = true;
+      // Adopt the hash the server says the file *really* has, so that the save
+      // this message invites is a write over that version. Without it the retry
+      // quoted nothing, the server read "quoting nothing" as "I am creating
+      // this file", and refused it a second time with "already exists" -- the
+      // offer in the sentence below could not be taken up. `null` here is a
+      // file that has been deleted underneath, where a create is exactly right.
+      // A revision conflict from /api/ops names no path, and is not about this
+      // file; only the one that names the open file re-aims its precondition.
+      if (open.path && body.conflict.path === open.path) { open.hash = body.conflict.hash; }
+      mark("conflict", "changed on disk since you opened it");
+      paintTree();
+      host.toast(body.message + " — save again to overwrite it", "error");
+    } else if (body.problems && !wasForced) {
+      host.toast(body.message, "error");
+      if (host.diagnostics) {
+        host.diagnostics(body.problems.map(function (problem) {
+          return {
+            severity: "error",
+            location: problem.location,
+            rule: problem.rule,
+            message: problem.message
+          };
+        }));
+      }
+      if (window.confirm(body.message + "\n\nWrite it anyway?")) { save(true); return; }
+    } else {
+      host.toast(String(body.message || error.message || error), "error");
+    }
+    paintHistory();
+  }
+
+  /* ---------------------------------------------------------- the diagram */
+
+  /** Reveal the document that declares `address`, from a click in the diagram.
+   *
+   * This is the mapping the whole command is for: the shape under the pointer
+   * carries the element's address, the tree says which file and line declares
+   * it, and the editor goes there. */
+  function reveal(address) {
+    if (!address) { return false; }
+    for (var i = 0; i < tree.files.length; i++) {
+      var file = tree.files[i];
+      for (var j = 0; j < file.documents.length; j++) {
+        if (file.documents[j].address === address) {
+          // Without the focus: the request was "show me this document", made
+          // from the diagram, and answering it by moving the keyboard into the
+          // text pane ends whatever navigation it was part of.
+          openFile(file.path, file.documents[j].line || 1, { focus: false });
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /** Where a diagnostic points: `switches/sw.yaml#0:17` is file and line. */
+  function locate(location) {
+    var match = /^(.+?)#\d+(?::(\d+))?$/.exec(location || "");
+    if (!match) { return false; }
+    var path = match[1];
+    if (!fileEntry(path)) { return false; }
+    if (path === open.path) {
+      if (match[2]) { host.goToLine(parseInt(match[2], 10)); }
+      return true;
+    }
+    openFile(path, match[2] ? parseInt(match[2], 10) : 0);
+    return true;
+  }
+
+  /* ------------------------------------------------------- changes drawer */
+
+  /* The drawer is a log of *gestures*, not of operations: deleting a switch is
+   * one entry even though the mutation layer made it four operations. Each one
+   * carries the YAML it produced, because that is the thing being reviewed --
+   * this editor's whole claim is that the picture and the text are one document,
+   * and a change log that showed only the picture would quietly give that up.
+   *
+   * Opening it also repaints the canvas as a diff against the baseline, which is
+   * why it is a mode rather than a panel: the drawer and the diagram are two
+   * views of one answer. */
+
+  /** Which URL app.js should fetch the diagram from, given the view options.
+   *
+   * The drawer decides, not app.js: whether the canvas is showing a state or a
+   * change is this file's business, and app.js only has to draw what comes back.
+   */
+  function graphPath(query) {
+    var frame = framePath(query);
+    if (frame) { return frame; }
+    if (!changes.open) { return "/api/graph?" + query; }
+    return "/api/diff?" + query + "&against=" + encodeURIComponent(changes.against);
+  }
+
+  function showChanges(next) {
+    // One canvas, two overlays; the history yields to the drawer as the drawer
+    // yields to it.
+    if (next && timeline.open) { showTimeline(false); }
+    changes.open = !!next;
+    el.changes.hidden = !changes.open;
+    el.changesToggle.setAttribute("aria-expanded", changes.open ? "true" : "false");
+    el.changesToggle.classList.toggle("on", changes.open);
+    el.legend.hidden = !changes.open;
+    if (changes.open) { refreshChanges(); }
+    host.render();
+  }
+
+  function refreshChanges() {
+    return fetch("/api/changes", { cache: "no-store" })
+      .then(readBody)
+      .then(function (next) {
+        changes.entries = next.entries || [];
+        changes.commands = next.commands || [];
+        changes.baselines = next.baselines || ["session"];
+        paintBaselines();
+        paintChanges();
+      })
+      .catch(function () {});
+  }
+
+  /** Offer git only when the server says the tree is in a repository. */
+  function paintBaselines() {
+    var labels = { session: "this session started", git: "git HEAD" };
+    if (changes.baselines.indexOf(changes.against) === -1) { changes.against = "session"; }
+    el.changesAgainst.replaceChildren();
+    changes.baselines.forEach(function (name) {
+      var option = document.createElement("option");
+      option.value = name;
+      option.textContent = labels[name] || name;
+      option.selected = name === changes.against;
+      el.changesAgainst.appendChild(option);
+    });
+  }
+
+  function paintChanges() {
+    var live = changes.entries.filter(function (entry) { return !entry.reverted; }).length;
+    el.changesCount.textContent = live ? "(" + live + ")" : "";
+    el.changesCopy.disabled = !changes.commands.length;
+    var list = el.changesList;
+    list.replaceChildren();
+    if (!changes.entries.length) {
+      var none = document.createElement("p");
+      none.className = "empty";
+      none.textContent = "nothing changed yet in this session";
+      list.appendChild(none);
+      return;
+    }
+    // Newest first: the thing just done is the thing being looked for.
+    changes.entries.slice().reverse().forEach(function (entry) {
+      list.appendChild(changeRow(entry));
+    });
+  }
+
+  function changeRow(entry) {
+    var row = document.createElement("div");
+    row.className = "change" + (entry.reverted ? " reverted" : "");
+    row.dataset.id = String(entry.id);
+
+    var head = document.createElement("div");
+    head.className = "change-head";
+    var number = document.createElement("span");
+    number.className = "n";
+    number.textContent = "#" + entry.id;
+    var address = (entry.addresses || [])[0];
+    var revealable = address || (entry.files || []).length;
+    var label = document.createElement(revealable ? "button" : "span");
+    if (revealable) { label.type = "button"; }
+    label.className = "label";
+    label.textContent = entry.label + (entry.reverted ? " (put back)" : "");
+    // Click-to-reveal: the gesture names an element, the tree says which file
+    // and line declares it, and the editor goes there. The same mapping the
+    // diagram uses when a shape is clicked. A gesture that named no element --
+    // a whole-file save, a deletion whose document is gone -- falls back to the
+    // file it wrote, which is the next most useful place to be.
+    if (revealable) {
+      label.classList.add("revealable");
+      label.title = "reveal " + (address || (entry.files || [])[0]);
+      label.addEventListener("click", function () {
+        if (!reveal(address) && !revealFile(entry)) {
+          host.toast("nothing left to reveal for this change", "error");
+        }
+      });
+    }
+    head.appendChild(number);
+    head.appendChild(label);
+    if (entry.revertible && state.writable) {
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "ghost revert";
+      button.textContent = "Revert";
+      button.title = "Apply the inverse of this change as a new change";
+      button.addEventListener("click", function () { revert(entry.id); });
+      head.appendChild(button);
+    }
+    row.appendChild(head);
+
+    var where = document.createElement("div");
+    where.className = "where";
+    where.textContent = (entry.files || []).join(", ");
+    row.appendChild(where);
+
+    if (entry.hunk) { row.appendChild(hunkBlock(entry.hunk)); }
+    return row;
+  }
+
+  /** The unified diff, one line per element so each can carry its own colour.
+   *
+   * textContent throughout: a hunk is file content, and file content is the last
+   * thing to hand to innerHTML. */
+  function hunkBlock(hunk) {
+    var pre = document.createElement("pre");
+    hunk.split("\n").forEach(function (line, index, all) {
+      if (index === all.length - 1 && line === "") { return; }
+      var span = document.createElement("span");
+      span.className = hunkClass(line);
+      span.textContent = line + "\n";
+      pre.appendChild(span);
+    });
+    return pre;
+  }
+
+  function hunkClass(line) {
+    if (line.indexOf("+++") === 0 || line.indexOf("---") === 0) { return "file"; }
+    if (line.charAt(0) === "+") { return "add"; }
+    if (line.charAt(0) === "-") { return "del"; }
+    if (line.charAt(0) === "@") { return "at"; }
+    return "";
+  }
+
+  /** Fall back to opening the file a gesture touched, when its element is gone.
+   *
+   * A deletion is the case: there is no document left to reveal, and the file
+   * it was removed from is the next most useful place to be. */
+  function revealFile(entry) {
+    var path = (entry.files || []).find(function (file) { return !!fileEntry(file); });
+    if (!path) { return false; }
+    openFile(path);
+    return true;
+  }
+
+  /** Apply the mechanical repair for one diagnostic, as one logged gesture.
+   *
+   * The finding is named by rule and message rather than by its place in the
+   * list, because the list may be several edits old by the time the button is
+   * pressed -- and position 3 of an old list is not a thing the server can
+   * recognise. If nothing still reports that finding the server says so and
+   * nothing is written.
+   *
+   * `key` picks between the repairs a rule offers more than one of, and is left
+   * out when it offers one. */
+  function fix(problem, key) {
+    if (!state.writable) { host.toast("this session is read-only", "error"); return; }
+    fetch("/api/fix", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({
+        rule: problem.rule,
+        message: problem.message,
+        fix: key || null,
+        revision: state.revision,
+        client: me.id
+      })
+    })
+      .then(readBody)
+      .then(function (result) { applied(result, "fixed " + problem.rule, true); })
+      .catch(function (error) { refused(error, false); })
+      .then(refreshChanges);
+  }
+
+  function revert(id) {
+    if (!state.writable) { return; }
+    fetch("/api/revert", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ id: id, revision: state.revision, client: me.id })
+    })
+      .then(readBody)
+      .then(function (result) { applied(result, "put change #" + id + " back", true); })
+      .catch(function (error) { refused(error, false); })
+      .then(refreshChanges);
+  }
+
+  /** The handover: the session as a script somebody else can run or review. */
+  function copyCommands() {
+    var text = changes.commands.join("\n") + (changes.commands.length ? "\n" : "");
+    if (!text) { host.toast("nothing to copy yet", "error"); return; }
+    var done = function () {
+      host.toast("copied " + changes.commands.length + " command(s)", "ok");
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () { fallbackCopy(text, done); });
+      return;
+    }
+    fallbackCopy(text, done);
+  }
+
+  /* No clipboard API over plain HTTP in some browsers, and this page is served
+   * over loopback without TLS. A hidden textarea and execCommand is the old way
+   * and still the working one. */
+  function fallbackCopy(text, done) {
+    var area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    var ok = false;
+    try { ok = document.execCommand("copy"); } catch (error) { ok = false; }
+    document.body.removeChild(area);
+    if (ok) { done(); } else { host.toast("could not copy; select the text instead", "error"); }
+  }
+
+  /* ------------------------------------------------------ history timeline */
+
+  /* The same overlay the changes drawer paints, over a different pair of
+   * states: a commit and its parent, instead of the working tree and a
+   * baseline. Everything downstream is shared -- the server renders it with the
+   * same code `netviz diff` runs, app.js draws it into the same canvas, and
+   * the legend means the same four things.
+   *
+   * What is this file's own business:
+   *
+   *   * **The commit list is fetched once per opening, not per frame.** Listing
+   *     costs one `git log`; summarising a commit costs two inventory loads, so
+   *     only the *selected* one is summarised and that comes back with its
+   *     frame.
+   *   * **Oldest on the left.** The server answers newest-first, which is what a
+   *     log wants; a scrubber wants time running the way a reader expects, so
+   *     the list is reversed on arrival and the index is the slider's value.
+   *   * **Play advances on a timer and never overlaps.** app.js queues a render
+   *     that arrives while one is in flight, so a tick during a slow frame
+   *     coalesces rather than piling up; reaching the newest commit stops.
+   *   * **A refusal is shown in the bar, not swallowed.** No repository, no
+   *     history, a range wider than the bound: the scrubber says which and
+   *     stays open, because "why is this empty" is a question it should answer.
+   */
+
+  function showTimeline(next) {
+    timeline.open = !!next;
+    el.timeline.hidden = !timeline.open;
+    el.timelineToggle.setAttribute("aria-expanded", timeline.open ? "true" : "false");
+    el.timelineToggle.classList.toggle("on", timeline.open);
+    if (!timeline.open) {
+      stopPlaying();
+      host.render();
+      return;
+    }
+    // The two are one canvas and cannot both have it. Opening the history puts
+    // the drawer away rather than drawing this afternoon's edits over a commit
+    // from March.
+    if (changes.open) { showChanges(false); }
+    el.legend.hidden = false;
+    // Listed afresh on every opening, not once per session: a session outlives
+    // commits, and a scrubber missing the commit somebody just made is the same
+    // lie the changes drawer refuses to tell. It is one `git log`.
+    if (timeline.loaded) { paintTimeline(); host.render(); }
+    refreshTimeline();
+  }
+
+  function refreshTimeline() {
+    return fetch("/api/history", { cache: "no-store" })
+      .then(readBody)
+      .then(function (body) {
+        // Oldest first: see above.
+        timeline.commits = (body.commits || []).slice().reverse();
+        timeline.bound = body.bound || 0;
+        // Truncated, not refused -- and said so rather than implying that the
+        // newest hundred are all there ever were.
+        timeline.message = body.truncated
+          ? "the newest " + timeline.commits.length + " of " + body.total + " revisions"
+          : "";
+        timeline.loaded = true;
+        if (timeline.index < 0 || timeline.index >= timeline.commits.length) {
+          timeline.index = timeline.commits.length - 1;
+        }
+        paintTimeline();
+        host.render();
+      })
+      .catch(function (error) {
+        timeline.commits = [];
+        timeline.index = -1;
+        timeline.loaded = true;
+        timeline.message = String((error.body && error.body.message) || error.message || error);
+        paintTimeline();
+        host.render();
+      });
+  }
+
+  /** The commit the canvas is showing, or null when the history is not in use. */
+  function frameCommit() {
+    if (!timeline.open) { return null; }
+    return timeline.commits[timeline.index] || null;
+  }
+
+  function stepTimeline(delta) {
+    if (!timeline.commits.length) { return false; }
+    var next = timeline.index + delta;
+    if (next < 0 || next >= timeline.commits.length) { return false; }
+    timeline.index = next;
+    paintTimeline();
+    host.render();
+    return true;
+  }
+
+  function playTimeline(next) {
+    var wanted = next === undefined ? !timeline.playing : !!next;
+    if (wanted === timeline.playing) { return; }
+    if (!wanted) { stopPlaying(); return; }
+    if (timeline.index >= timeline.commits.length - 1) { timeline.index = 0; }
+    timeline.playing = true;
+    paintTimeline();
+    timeline.timer = window.setInterval(function () {
+      if (!stepTimeline(1)) { stopPlaying(); }
+    }, PLAY_MS);
+    host.render();
+  }
+
+  function stopPlaying() {
+    window.clearInterval(timeline.timer);
+    timeline.timer = null;
+    if (!timeline.playing) { return; }
+    timeline.playing = false;
+    paintTimeline();
+  }
+
+  /** Which URL a frame comes from, or null when the history is not showing. */
+  function framePath(query) {
+    var commit = frameCommit();
+    if (!commit) { return null; }
+    return "/api/frame?" + query + "&rev=" + encodeURIComponent(commit.hash);
+  }
+
+  function paintTimeline() {
+    var commit = frameCommit();
+    var range = el.timelineRange;
+    range.max = String(Math.max(0, timeline.commits.length - 1));
+    range.value = String(Math.max(0, timeline.index));
+    range.disabled = timeline.commits.length < 2;
+    el.timelinePlay.setAttribute("aria-pressed", timeline.playing ? "true" : "false");
+    el.timelinePlay.textContent = timeline.playing ? "❚❚" : "▶";
+    el.timelinePlay.disabled = timeline.commits.length < 2;
+    el.timelinePrev.disabled = timeline.index <= 0;
+    el.timelineNext.disabled = timeline.index >= timeline.commits.length - 1;
+    if (!commit) {
+      el.timelineHash.textContent = "";
+      el.timelineSubject.textContent = timeline.message
+        || "no commit has touched this inventory";
+      el.timelineWho.textContent = "";
+      el.timelineSummary.textContent = "";
+      el.timeline.classList.toggle("broken", !!timeline.message);
+      return;
+    }
+    el.timelineHash.textContent = commit.abbrev;
+    el.timelineSubject.textContent = commit.subject;
+    el.timelineSubject.title = commit.subject;
+    el.timelineWho.textContent = commit.author + " · " + (commit.date || "").slice(0, 10)
+      + (timeline.message ? " · " + timeline.message : "");
+    // The summary belongs to the *frame*, which is only known once it has been
+    // drawn once. Until then, say which of the range this is rather than
+    // leaving a gap that reads as "nothing changed".
+    var known = timeline.summaries[commit.hash];
+    el.timelineSummary.textContent = known
+      ? known.summary
+      : (timeline.index + 1) + " of " + timeline.commits.length;
+    el.timelineSummary.title = known ? known.summary : "";
+    el.timeline.classList.toggle("broken", !!(known && known.error));
+  }
+
+  /** app.js has drawn something. If it was a frame, say what it held.
+   *
+   * The answer is matched against the frame *currently* selected before it is
+   * allowed to stop anything. A render in flight when the selection moves still
+   * comes back, and a frame that failed two steps ago must not reach out of the
+   * past to halt a playback that has already gone by it. Its summary is
+   * remembered either way -- that is keyed by commit and is true whenever it
+   * arrives.
+   */
+  function drew(result) {
+    if (!timeline.open || !result || !result.hash) { return; }
+    timeline.summaries[result.hash] = { summary: result.summary || "", error: result.error };
+    var current = frameCommit();
+    // A revision that will not load stops the playback rather than being
+    // skipped: it is a fact about the history, and one worth stopping on.
+    if (result.error && current && current.hash === result.hash) { stopPlaying(); }
+    paintTimeline();
+  }
+
+  /* ------------------------------------------------------- edit gestures */
+
+  /* Everything below turns a keystroke into a batch of netviz.edit
+   * operations, posted to /api/ops. That route is the *same* write path
+   * `netviz edit` uses from a terminal -- the same operations, the same
+   * placement, the same validation gate -- so a device created with `n` here
+   * and one created with `netviz edit create` there produce the same
+   * document, comments and all. There is no second, browser-shaped mutation
+   * layer, and this file could not invent one if it wanted to.
+   *
+   * Every gesture asks for its arguments in a prompt rather than reading them
+   * off the canvas, and every prompt's element field is pre-filled with
+   * whatever the diagram has focused. That is what makes each of them reachable
+   * two ways: as a letter on the canvas, and as a palette entry from anywhere,
+   * including from a page whose canvas has never been touched.
+   */
+
+  /** Post a batch and adopt what came back. */
+  function ops(list, said) {
+    return fetch("/api/ops", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({ ops: list, revision: state.revision, client: me.id })
+    })
+      .then(readBody)
+      .then(function (result) {
+        applied(result, said, true);
+        paintHistory();
+        return result;
+      })
+      .catch(function (error) {
+        refused(error, false);
+        paintHistory();
+        throw error;
+      });
+  }
+
+  /** Post to any of this session's routes, and turn a refusal into an Error.
+   *
+   * The half of `ops` that is not about operations: the revision precondition,
+   * the client id, and the one place a refusal becomes a toast. `clipboard.js`
+   * uses it for the four routes whose body is not a list of operations — a copy
+   * answers with a fragment and no change at all, and folding that into `ops`
+   * would mean `ops` growing a second meaning.
+   */
+  function request(path, body) {
+    var payload = { revision: state.revision, client: me.id };
+    Object.keys(body || {}).forEach(function (key) { payload[key] = body[key]; });
+    return fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify(payload)
+    })
+      .then(readBody)
+      .catch(function (error) {
+        refused(error, false);
+        paintHistory();
+        throw error;
+      });
+  }
+
+  /** Adopt a changeset that came back from one of those routes.
+   *
+   * Split from `request` because not every one of them produces a change: a
+   * copy writes nothing, so calling this for it would announce a revision that
+   * did not move and refetch a tree that did not change.
+   */
+  function adopt(result, said) {
+    if (!result || !result.files) { return result; }
+    if (!Object.keys(result.files).length) {
+      host.toast("nothing to write", "ok");
+      return result;
+    }
+    applied(result, said, true);
+    paintHistory();
+    return result;
+  }
+
+  /** Post one tidying of the selection: align, distribute or snap.
+   *
+   * A route of its own rather than a batch of set-geometry operations built
+   * here, because the arithmetic needs the *stored* arrangement — which layout
+   * document holds which node, and what every other entry in it says — and the
+   * page has the merged view of that, not the documents. The server answers
+   * with one changeset, so a whole alignment is one Ctrl-Z. See
+   * netviz/edit/arrange.py.
+   */
+  function arrange(command, addresses) {
+    if (!state.writable) { host.toast("this session is read-only", "error"); return; }
+    fetch("/api/arrange", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      cache: "no-store",
+      body: JSON.stringify({
+        command: command,
+        view: host.layer(),
+        addresses: addresses,
+        revision: state.revision,
+        client: me.id
+      })
+    })
+      .then(readBody)
+      .then(function (result) {
+        if (!Object.keys(result.files || {}).length) {
+          host.toast("nothing moved: they are already " + said(command), "ok");
+          return;
+        }
+        applied(result, said(command) + " " + addresses.length + " element"
+          + (addresses.length === 1 ? "" : "s"), true);
+      })
+      .catch(function (error) { refused(error, false); })
+      .then(paintHistory);
+  }
+
+  /** Re-home a selection into a namespace: the drop half of a container drag.
+   *
+   * A route of its own for the same reason `arrange` has one: the decision this
+   * makes is "which file does each of these documents land in", and that is the
+   * placement convention's answer, which lives on the server beside the tree it
+   * is about. The browser knows which namespace the pointer was over and nothing
+   * else -- see netviz/edit/containers.py and containers.js.
+   *
+   * Answers with a promise so containers.js can put its preview back when the
+   * drop is refused; a refusal has already been toasted by then.
+   */
+  function reparent(addresses, namespace, said) {
+    if (!state.writable) {
+      host.toast("this session is read-only", "error");
+      return Promise.reject(new Error("read-only"));
+    }
+    return request("/api/reparent", { addresses: addresses, namespace: namespace })
+      .then(function (result) {
+        if (!Object.keys(result.files || {}).length) {
+          host.toast("nothing moved: they are already there", "ok");
+          return result;
+        }
+        applied(result, said, true);
+        paintHistory();
+        return result;
+      });
+  }
+
+  /** How one arrangement reads in a sentence. */
+  function said(command) {
+    if (command === "snap") { return "snapped to the grid"; }
+    var parts = command.split(".");
+    return parts[0] === "align" ? "aligned " + parts[1] : "distributed " + parts[1] + "ly";
+  }
+
+  /** The address of whatever the diagram has focused, or "". */
+  function here() {
+    var focused = netvizA11y.focused();
+    return focused ? window.netvizSelect.addressOf(focused.record) : "";
+  }
+
+  /** What a bulk gesture acts on: the selection, or the focused element. */
+  function chosen() {
+    return netvizSelect.targets();
+  }
+
+  /** A count, worded. `plural` is for the nouns English does not pluralise
+   * with an s -- "layout entries", not "layout entrys". */
+  function many(count, noun, plural) {
+    return count + " " + (count === 1 ? noun : (plural || noun + "s"));
+  }
+
+  /** The selection when it is worth acting on as one, or null.
+   *
+   * Null for a selection of one, because a bulk gesture over a single element
+   * is just that gesture and the prompt should read the way it always has.
+   */
+  function bulk(kind) {
+    var selected = chosen().filter(function (address) {
+      return kind === "edge" ? isLink(address) : !isLink(address);
+    });
+    return selected.length > 1 ? selected : null;
+  }
+
+  /** The element field of a gesture's prompt, worded for how many it acts on.
+   *
+   * Read-only and pre-filled with the list when there are several. Editable
+   * text would invite somebody to change one name of twelve and wonder why the
+   * change landed on the other eleven anyway. */
+  function element(selected) {
+    if (!selected) {
+      return { name: "address", label: "element", value: here(), list: addresses("node") };
+    }
+    return {
+      name: "address",
+      label: "elements",
+      type: "select",
+      value: selected[0],
+      options: selected.map(function (address) {
+        return { value: address, label: address };
+      }),
+      hint: "the whole selection; Escape on the canvas clears it"
+    };
+  }
+
+  /** What a gesture's log line calls the thing it acted on. */
+  function subject(on) {
+    return on.length === 1 ? on[0] : many(on.length, "element");
+  }
+
+  /** Is this address a link rather than an element? A cable is deleted by
+   *  disconnecting it, which is a different operation with a different name. */
+  function isLink(address) {
+    var found = recordFor(address);
+    return !!found && found.type === "edge";
+  }
+
+  function recordFor(address) {
+    var wanted = String(address || "");
+    var found = netvizA11y.elements().filter(function (entry) {
+      return window.netvizSelect.addressOf(entry.record) === wanted;
+    })[0];
+    return found ? found.record : null;
+  }
+
+  /** Every address the diagram is showing, for a prompt's completion list.
+   *
+   * Deduplicated, because one address may be drawn several times: a container
+   * host is its own box plus one per network namespace at layer 3, and all of
+   * them complete to the same machine. */
+  function addresses(kind) {
+    var seen = {};
+    return netvizA11y.elements()
+      .filter(function (entry) {
+        return kind === "edge" ? entry.record.type === "edge" : entry.record.type !== "edge";
+      })
+      .map(function (entry) { return window.netvizSelect.addressOf(entry.record); })
+      .filter(function (address) {
+        if (!address || seen[address]) { return false; }
+        seen[address] = true;
+        return true;
+      });
+  }
+
+  /** The interface names declared on an element, for the connect prompt. */
+  function ports(address) {
+    var record = recordFor(address);
+    return record ? (record.interfaces || []).map(function (port) { return port.name; }) : [];
+  }
+
+  function paths() {
+    return tree.files.map(function (file) { return file.path; });
+  }
+
+  /** An address as `namespace/name`, the way the tree keys documents. */
+  function addressOf(namespace, name) {
+    return namespace ? namespace + "/" + name : name;
+  }
+
+  /** Put the focus ring back on an element once the redraw that created it has
+   *  landed. The render is a round trip, so this retries rather than guessing
+   *  how long one takes. */
+  function focusLater(address, tries) {
+    if (!host.focusElement || tries <= 0) { return; }
+    window.setTimeout(function () {
+      if (!host.focusElement(address)) { focusLater(address, tries - 1); }
+    }, 200);
+  }
+
+  /** Register every command that writes. Called at boot in both faces: a
+   *  scratchpad has them too, greyed, with the reason on the row. */
+  function defineCommands(bridge) {
+    host = bridge;
+    el = bridge.el;
+    var K = netvizKeys;
+
+    K.define("file.open", { run: function () { K.palette("files", ""); } });
+    K.define("file.save", {
+      run: function () { save(false); },
+      enabled: function () { return open.path ? true : "no file is open"; }
+    });
+    K.define("history.undo", {
+      run: function () { step("undo"); },
+      enabled: function () { return state.undo ? true : "nothing to undo"; }
+    });
+    K.define("history.redo", {
+      run: function () { step("redo"); },
+      enabled: function () { return state.redo ? true : "nothing to redo"; }
+    });
+    K.define("changes.toggle", { run: function () { showChanges(!changes.open); } });
+    K.define("timeline.toggle", { run: function () { showTimeline(!timeline.open); } });
+    K.define("timeline.prev", {
+      run: function () { stopPlaying(); stepTimeline(-1); },
+      enabled: function () {
+        if (!timeline.open) { return "the history is not showing"; }
+        return timeline.index > 0 ? true : "this is the oldest revision listed";
+      }
+    });
+    K.define("timeline.next", {
+      run: function () { stopPlaying(); stepTimeline(1); },
+      enabled: function () {
+        if (!timeline.open) { return "the history is not showing"; }
+        return timeline.index < timeline.commits.length - 1
+          ? true : "this is the newest revision";
+      }
+    });
+    K.define("timeline.play", {
+      run: function () { playTimeline(); },
+      enabled: function () {
+        if (!timeline.open) { return "the history is not showing"; }
+        return timeline.commits.length > 1 ? true : "there is only one revision to show";
+      }
+    });
+    K.define("changes.copy", {
+      run: copyCommands,
+      enabled: function () { return changes.commands.length ? true : "nothing to copy yet"; }
+    });
+
+    K.define("element.create", {
+      run: function (context) {
+        var kinds = K.kinds();
+        // The context menu's New submenu names the kind, so the form opens with
+        // that question already answered. It stays a field rather than
+        // disappearing: choosing "switch" and then wanting a router is one
+        // correction, not a cancel and a second right-click.
+        var wanted = context && context.kind;
+        var kind = kinds.indexOf(wanted) === -1
+          ? (kinds.indexOf("switch") === -1 ? kinds[0] : "switch")
+          : wanted;
+        K.prompt({
+          title: "Create an element",
+          detail: "The same thing 'netviz edit create' does: a document, placed "
+            + "where the inventory's own convention puts it.",
+          fields: [
+            {
+              name: "kind",
+              label: "kind",
+              type: "select",
+              value: kind,
+              options: kinds.map(function (kind_) { return { value: kind_, label: kind_ }; })
+            },
+            { name: "name", label: "name", hint: "as metadata.name, e.g. sw-lab" },
+            {
+              name: "namespace",
+              label: "namespace",
+              value: (context && context.namespace) || "",
+              list: netvizContainers.namespaces(),
+              hint: "optional; the folder the document goes in"
+            },
+            {
+              name: "interface",
+              label: "first interface",
+              value: "eth0",
+              hint: "left blank, the element is created with no ports"
+            }
+          ],
+          confirm: "Create",
+          onSubmit: function (values) {
+            if (!values.name) { return "a name is required"; }
+            var spec = {};
+            if (values.interface) {
+              spec.interfaces = [{ name: values.interface, type: "ethernet" }];
+            }
+            var address = addressOf(values.namespace, values.name);
+            ops([{
+              op: "create",
+              kind: values.kind,
+              name: values.name,
+              namespace: values.namespace,
+              spec: spec
+            }], "created " + values.kind + " " + address).then(function () {
+              focusLater(address, 12);
+            }, function () {});
+          }
+        });
+      }
+    });
+
+    K.define("element.connect", {
+      run: function () {
+        var from = here();
+        K.prompt({
+          title: "Connect two interfaces",
+          detail: "A cable, named and placed from its endpoints. 'netviz edit connect'.",
+          fields: [
+            { name: "a", label: "from element", value: from, list: addresses("node") },
+            { name: "aPort", label: "from port", value: (ports(from)[0] || ""), list: ports(from) },
+            { name: "b", label: "to element", list: addresses("node") },
+            { name: "bPort", label: "to port", hint: "the far end's interface name" }
+          ],
+          confirm: "Connect",
+          onSubmit: function (values) {
+            if (!values.a || !values.aPort) { return "the near end needs an element and a port"; }
+            if (!values.b || !values.bPort) { return "the far end needs an element and a port"; }
+            ops([{
+              op: "connect",
+              a: values.a + ":" + values.aPort,
+              b: values.b + ":" + values.bPort
+            }], "connected " + values.a + ":" + values.aPort + " to "
+              + values.b + ":" + values.bPort).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.define("element.delete", {
+      run: function () {
+        var selected = chosen();
+        if (selected.length > 1) { deleteMany(selected); return; }
+        // The commentary answers here too, so that Delete means one thing on
+        // this canvas. It wins only when nothing is *explicitly* selected:
+        // `chosen` falls back to the focused element, and a note somebody has
+        // just clicked is a better answer than a focus ring left behind by the
+        // arrow keys.
+        var target = netvizSelect.size()
+          ? selected[0]
+          : (netvizNotes.token() || selected[0] || here());
+        K.prompt({
+          title: "Delete",
+          detail: "An element goes with whatever cannot survive it — the cables, "
+            + "the tunnels over them, the notes anchored to them and the "
+            + "coordinates that placed them. You are asked first when it is more "
+            + "than what you named, and Ctrl-Z puts all of it back either way.",
+          fields: [{
+            name: "address",
+            label: "element",
+            value: target,
+            list: addresses("node").concat(addresses("edge"), netvizNotes.tokens())
+          }],
+          confirm: "Delete",
+          onSubmit: function (values) {
+            if (!values.address) { return "name what to delete"; }
+            deleteOne(values.address);
+          }
+        });
+      }
+    });
+
+    K.define("element.rename", {
+      run: function () {
+        K.prompt({
+          title: "Rename an element",
+          detail: "The element and every reference to it. 'netviz edit rename'.",
+          fields: [
+            { name: "address", label: "element", value: here(), list: addresses("node") },
+            { name: "name", label: "new name" }
+          ],
+          confirm: "Rename",
+          onSubmit: function (values) {
+            if (!values.address || !values.name) { return "an element and a new name, please"; }
+            ops([{ op: "rename", address: values.address, new_name: values.name }],
+              "renamed " + values.address + " to " + values.name).catch(function () {});
+          }
+        });
+      }
+    });
+
+    /* The three field gestures below are one shape three times: they act on the
+     * *selection* when there is one and on the focused element when there is
+     * not, and either way the result is one batch through /api/ops -- so
+     * setting `spec.site` on twelve switches is one entry in the undo stack,
+     * one validation of the tree it would produce, and one save. The element
+     * field says so rather than disappearing: a bulk edit somebody cannot see
+     * the extent of is a bulk edit they should not be making. */
+
+    K.define("element.set", {
+      run: function () {
+        var many_ = bulk("node");
+        K.prompt({
+          title: many_ ? "Set a field on " + many(many_.length, "element") : "Set a field",
+          detail: "'netviz edit set'. The document keeps its comments and its order."
+            + (many_ ? " Applied to every selected element as one change." : ""),
+          fields: [
+            element(many_),
+            { name: "path", label: "field", hint: "a dotted path, e.g. spec.model" },
+            { name: "value", label: "value", hint: "JSON when it parses as JSON, text otherwise" }
+          ],
+          confirm: "Set",
+          onSubmit: function (values) {
+            var on = many_ || (values.address ? [values.address] : []);
+            if (!on.length || !values.path) { return "an element and a field, please"; }
+            ops(on.map(function (address) {
+              return {
+                op: "set", address: address, path: values.path, value: scalar(values.value)
+              };
+            }), "set " + values.path + " on " + subject(on)).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.define("element.unset", {
+      run: function () {
+        var many_ = bulk("node");
+        K.prompt({
+          title: many_ ? "Remove a field from " + many(many_.length, "element") : "Remove a field",
+          detail: "'netviz edit unset'."
+            + (many_ ? " Applied to every selected element as one change." : ""),
+          fields: [
+            element(many_),
+            { name: "path", label: "field", hint: "a dotted path, e.g. spec.model" }
+          ],
+          confirm: "Remove",
+          onSubmit: function (values) {
+            var on = many_ || (values.address ? [values.address] : []);
+            if (!on.length || !values.path) { return "an element and a field, please"; }
+            ops(on.map(function (address) {
+              return { op: "unset", address: address, path: values.path };
+            }), "removed " + values.path + " from " + subject(on)).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.define("element.move", {
+      run: function () {
+        var many_ = bulk("node");
+        K.prompt({
+          title: many_ ? "Move " + many(many_.length, "document") : "Move a document",
+          detail: "'netviz edit move'. The element is untouched; only the file it "
+            + "is declared in changes."
+            + (many_ ? " Every selected element lands in the same file, as one change." : ""),
+          fields: [
+            element(many_),
+            { name: "file", label: "file", hint: "relative to the inventory root", list: paths() }
+          ],
+          confirm: "Move",
+          onSubmit: function (values) {
+            var on = many_ || (values.address ? [values.address] : []);
+            if (!on.length || !values.file) { return "an element and a file, please"; }
+            ops(on.map(function (address) {
+              return { op: "move", address: address, file: values.file };
+            }), "moved " + subject(on) + " to " + values.file).catch(function () {});
+          }
+        });
+      }
+    });
+
+    /* Making a namespace, and moving things into one. Two commands rather than
+     * one because they are two questions -- "where should this live" and "what
+     * lives here" -- but one route: both end in /api/reparent, which is the
+     * typed spelling of dragging something into a container's box. */
+    K.define("container.move", {
+      run: function (context) {
+        var on = chosen();
+        K.prompt({
+          title: on.length > 1 ? "Move " + many(on.length, "element") + " into a namespace"
+            : "Move into a namespace",
+          detail: "The same thing dragging it into that container's box does, and the "
+            + "same thing 'netviz edit move' does: the documents are rewritten into "
+            + "the folder, and every reference to them is re-spelled. Leave it blank "
+            + "for the root namespace.",
+          fields: [
+            element(on.length > 1 ? on : null),
+            {
+              name: "namespace",
+              label: "namespace",
+              value: (context && context.namespace) || "",
+              list: netvizContainers.namespaces(),
+              hint: "the folder they go in; blank is the inventory root"
+            }
+          ],
+          confirm: "Move",
+          onSubmit: function (values) {
+            var wanted = on.length > 1 ? on : (values.address ? [values.address] : []);
+            if (!wanted.length) { return "name what to move"; }
+            reparent(wanted, values.namespace || "",
+              "moved " + subject(wanted) + " into "
+                + (values.namespace || "the root namespace")).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.define("container.create", {
+      run: function (context) {
+        var on = chosen();
+        var inside = (context && context.namespace) || "";
+        K.prompt({
+          title: "New namespace",
+          detail: "A namespace is a folder, and a folder netviz reads is one with a "
+            + "document in it — so an empty namespace is not something the inventory "
+            + "can record. This makes the folder by putting something in it: the "
+            + "selection, moved there, or a new element created there.",
+          fields: [
+            {
+              name: "namespace",
+              label: "namespace",
+              value: inside ? inside + "/" : "",
+              list: netvizContainers.namespaces(),
+              hint: "a path, e.g. sites/north/racks/r1"
+            },
+            {
+              name: "name",
+              label: "first element",
+              value: on.length ? "" : "site",
+              hint: on.length
+                ? "leave blank to move the " + many(on.length, "selected element")
+                  + " in instead"
+                : "the document that makes the folder exist"
+            },
+            {
+              name: "kind",
+              label: "of kind",
+              type: "select",
+              value: "switch",
+              options: K.kinds().map(function (kind) { return { value: kind, label: kind }; })
+            }
+          ],
+          confirm: "Create",
+          onSubmit: function (values) {
+            var namespace = String(values.namespace || "").replace(/^\/+|\/+$/g, "");
+            if (!namespace) { return "a namespace is a path; name one"; }
+            if (!values.name) {
+              if (!on.length) {
+                return "a namespace needs something in it: name an element, or select "
+                  + "what to move there first";
+              }
+              reparent(on, namespace,
+                "moved " + subject(on) + " into the new namespace " + namespace)
+                .catch(function () {});
+              return undefined;
+            }
+            var address = addressOf(namespace, values.name);
+            ops([{
+              op: "create",
+              kind: values.kind,
+              name: values.name,
+              namespace: namespace,
+              spec: {}
+            }], "created namespace " + namespace + " with " + values.kind + " " + address)
+              .then(function () { focusLater(address, 12); }, function () {});
+            return undefined;
+          }
+        });
+      }
+    });
+
+    K.define("element.disconnect", {
+      run: function () {
+        K.prompt({
+          title: "Disconnect a cable",
+          detail: "'netviz edit disconnect'. Both devices stay.",
+          fields: [{
+            name: "address",
+            label: "cable",
+            value: isLink(here()) ? here() : "",
+            list: addresses("edge")
+          }],
+          confirm: "Disconnect",
+          onSubmit: function (values) {
+            if (!values.address) { return "name the cable"; }
+            ops([{ op: "disconnect", address: values.address.split("#")[0] }],
+              "disconnected " + values.address).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.define("interface.add", {
+      run: function () {
+        K.prompt({
+          title: "Add an interface",
+          detail: "'netviz edit add-interface'.",
+          fields: [
+            { name: "address", label: "element", value: here(), list: addresses("node") },
+            { name: "name", label: "name", hint: "e.g. eth1" },
+            { name: "type", label: "type", value: "ethernet" }
+          ],
+          confirm: "Add",
+          onSubmit: function (values) {
+            if (!values.address || !values.name) { return "an element and a name, please"; }
+            ops([{
+              op: "add-interface",
+              address: values.address,
+              interface: { name: values.name, type: values.type || "ethernet" }
+            }], "added " + values.name + " to " + values.address).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.define("interface.remove", {
+      run: function () {
+        K.prompt({
+          title: "Remove an interface",
+          detail: "'netviz edit remove-interface'. A cable that terminated on it "
+            + "goes too.",
+          fields: [
+            { name: "address", label: "element", value: here(), list: addresses("node") },
+            { name: "name", label: "name", list: ports(here()) }
+          ],
+          confirm: "Remove",
+          onSubmit: function (values) {
+            if (!values.address || !values.name) { return "an element and a name, please"; }
+            ops([{ op: "remove-interface", address: values.address, name: values.name }],
+              "removed " + values.name + " from " + values.address).catch(function () {});
+          }
+        });
+      }
+    });
+
+    K.provide("files", function () {
+      return tree.files.map(function (file) {
+        return {
+          id: file.path,
+          title: file.path,
+          detail: (file.documents || []).map(function (entry) {
+            return entry.kind + " " + entry.name;
+          }).join(", "),
+          group: "file",
+          run: function () { openFile(file.path); }
+        };
+      });
+    });
+  }
+
+  /** Delete one thing the canvas can name: an element, a link or an annotation.
+   *
+   * An annotation is answered here rather than through the cascade, because
+   * nothing in an inventory refers to one: a note is only ever about something,
+   * never depended on by it, so deleting one takes nothing and needs no
+   * question. Everything else goes through `cascading`.
+   */
+  function deleteOne(address) {
+    var annotation = netvizNotes.parse(address);
+    if (annotation) {
+      ops([{
+        op: "delete-annotation",
+        kind: annotation.kind,
+        name: annotation.name,
+        namespace: annotation.namespace
+      }], "deleted " + annotation.kind + " " + annotation.fqn).catch(function () {});
+      return;
+    }
+    cascading([address], isLink(address) ? "disconnected " + address : "deleted " + address);
+  }
+
+  /** Delete a whole selection, once, having said exactly what goes.
+   *
+   * Two things this owes the person pressing Delete on eleven shapes:
+   *
+   *   * **One question.** Eleven confirmations is eleven chances to click
+   *     through without reading, so there is one, and it lists what will go —
+   *     in full for a handful and counted for a rack.
+   *   * **The collateral, before the fact, and *exactly*.** See `cascading`.
+   */
+  function deleteMany(selected) {
+    var annotations = selected.filter(function (token) { return netvizNotes.parse(token); });
+    var elements = selected.filter(function (token) { return !netvizNotes.parse(token); });
+    cascading(elements, "deleted " + many(selected.length, "element"), {
+      extra: annotations.map(function (token) {
+        var note = netvizNotes.parse(token);
+        return {
+          op: "delete-annotation",
+          kind: note.kind,
+          name: note.name,
+          namespace: note.namespace
+        };
+      }),
+      named: annotations,
+      done: function () { netvizSelect.clear({ quiet: true }); }
+    });
+  }
+
+  /** Ask what a delete would take, say so if it is more, then do all of it.
+   *
+   * The whole point of the round trip: **the canvas is not the inventory.** It
+   * shows the cables that would dangle, so a client-side guess gets those
+   * right; it does not show the tunnel three levels up that runs over one of
+   * them, the note anchored to a switch in a view you are not looking at, the
+   * group that lists it as a member, or the eleven layout entries that placed
+   * all of it. `GET /api/cascade` is netviz.edit answering with the set it
+   * will actually remove, so the question put to the person is the truth.
+   *
+   * Then it cascades, always. A delete that stops halfway to ask for a flag is
+   * a delete that has already decided the answer is yes — the useful thing is
+   * to say what "yes" costs, once, and make one Ctrl-Z undo it. Which is also
+   * why this is *one* batch: the elements, the annotations that cannot survive
+   * them and the geometry that placed them are one entry in the undo stack.
+   *
+   * The links go first and the elements after, so a cable that is both selected
+   * *and* collateral is removed once rather than named twice.
+   */
+  function cascading(addresses, said, options) {
+    var settings = options || {};
+    var extra = settings.extra || [];
+    if (!addresses.length && !extra.length) { return; }
+    var query = addresses.map(function (address) {
+      return "address=" + encodeURIComponent(address);
+    }).join("&");
+    var asked = addresses.length ? fetch("/api/cascade?" + query, { cache: "no-store" })
+      .then(readBody) : Promise.resolve(null);
+    asked.then(function (plan) {
+      if (plan && plan.takes_more
+        && !window.confirm(cascadeQuestion(addresses.concat(settings.named || []), plan))) {
+        return;
+      }
+      var links = addresses.filter(isLink);
+      var nodes = addresses.filter(function (address) { return !isLink(address); });
+      var batch = links.map(function (address) {
+        return { op: "disconnect", address: address.split("#")[0], cascade: true };
+      }).concat(nodes.map(function (address) {
+        return { op: "delete", address: address, cascade: true };
+      })).concat(extra);
+      ops(batch, said).then(settings.done || function () {}, function () {});
+    }, function () {});
+  }
+
+  /** The question a cascading delete asks, built from the server's own plan.
+   *
+   * One section per *kind* of consequence, because they are different promises:
+   * a document that goes is gone, a document that merely loses a reference to
+   * the deleted thing survives with everything else it said, and geometry is
+   * counted rather than listed — nobody wants eleven coordinates read back at
+   * them, and a stale one is the litter this is here to stop being left behind.
+   */
+  function cascadeQuestion(named, plan) {
+    var lines = ["Delete " + many(named.length, "element") + "?", "", listed(named)];
+    var going = (plan.elements || []).map(function (entry) {
+      return entry.address + " — " + entry.reason;
+    }).concat((plan.annotations || []).map(function (entry) {
+      return entry.kind + " " + entry.address + " — " + entry.reason;
+    }));
+    if (going.length) {
+      lines.push("", "These cannot survive it and go too:", listed(going));
+    }
+    if ((plan.cleared || []).length) {
+      lines.push("", "These stay, and stop naming it:", listed(plan.cleared.map(function (entry) {
+        return entry.address + " — loses " + entry.what;
+      })));
+    }
+    if ((plan.geometry || []).length) {
+      lines.push("", many(plan.geometry.length, "layout entry", "layout entries")
+        + " that placed them are dropped.");
+    }
+    lines.push("", "This is one change: Ctrl-Z puts all of it back.");
+    return lines.join("\n");
+  }
+
+  /** How many names a confirmation spells out before it counts the rest. */
+  var MAX_LISTED = 12;
+
+  function listed(items) {
+    if (items.length <= MAX_LISTED) { return items.join("\n"); }
+    return items.slice(0, MAX_LISTED).join("\n")
+      + "\n… and " + (items.length - MAX_LISTED) + " more";
+  }
+
+  /** A typed value, as JSON when it is JSON and as text when it is not.
+   *
+   * `mtu: 9000` has to arrive as a number and `model: C9300` as a string, and
+   * the difference is not something to ask the user about in a second field. */
+  function scalar(text) {
+    if (text === "") { return ""; }
+    try { return JSON.parse(text); } catch (error) { return text; }
+  }
+
+  /* ------------------------------------------------------------- painting */
+
+  function paintHistory() {
+    el.actions.hidden = !state.writable;
+    el.save.disabled = !state.writable || !open.path || !open.dirty;
+    el.undo.disabled = !state.writable || !state.undo;
+    el.redo.disabled = !state.writable || !state.redo;
+    el.undo.title = state.undoLabel ? "Undo: " + state.undoLabel : "Nothing to undo";
+    el.redo.title = state.redoLabel ? "Redo: " + state.redoLabel : "Nothing to redo";
+  }
+
+  function mark(kind, text) {
+    el.editorState.hidden = !kind;
+    el.editorState.className = "badge " + (kind || "");
+    el.editorState.textContent = text;
+    paintHistory();
+  }
+
+  /* --------------------------------------------------------------- fetch */
+
+  /** Read a JSON body and turn a refusal into an Error carrying it.
+   *
+   * The server answers every refusal with a JSON object holding a message and,
+   * where it has one, the thing the page can act on -- the hash that is really
+   * there, or the problems a validation gate objected to. */
+  function readBody(response) {
+    return response.json().then(function (body) {
+      if (response.ok) { return body; }
+      var error = new Error(body.message || response.statusText);
+      error.body = body;
+      throw error;
+    });
+  }
+
+  /** Percent-encode a path without encoding the separators. */
+  function encodePath(path) {
+    return path.split("/").map(encodeURIComponent).join("/");
+  }
+
+  /* A closing tab is worth one more request: without it the others keep this
+   * page's selection and its "in use" badge on screen until the presence entry
+   * expires. sendBeacon because a fetch started in pagehide is not guaranteed to
+   * leave. The expiry is still there as the backstop, for the tab that crashes
+   * or the laptop that closes. */
+  window.addEventListener("pagehide", function () {
+    if (!me.id || !navigator.sendBeacon) { return; }
+    var payload = JSON.stringify({ client: me.id, leaving: true });
+    navigator.sendBeacon("/api/presence", new Blob([payload], { type: "application/json" }));
+  });
+
+  return {
+    attach: attach,
+    defineCommands: defineCommands,
+    /* The one way anything on this page changes a file. links.js posts its
+     * geometry through it, so a bend written from the canvas takes exactly
+     * the route a rename does. */
+    ops: ops,
+    /* The generic form of it, for the routes whose body is not operations:
+     * clipboard.js posts /api/copy, /api/cut, /api/paste and /api/duplicate
+     * through these two, so a paste reaches the disk exactly the way a rename
+     * does and shows up in the same drawer. */
+    request: request,
+    adopt: adopt,
+    /* Who this tab is, so a write it made is not echoed back to it. */
+    client: function () { return me.id; },
+    /* Align, distribute and snap. Its own route because the arithmetic needs
+     * the layout documents, which the page does not have; see arrange above. */
+    arrange: arrange,
+    /* Dropping a selection into a namespace box. Its own route for the reason
+     * arrange has one; see reparent above. */
+    reparent: reparent,
+    markDirty: markDirty,
+    /* The history, as a promise. tour.js undoes its own three batches with it. */
+    step: step,
+    /* What the page is looking at, for anything that has to wait for a write to
+     * land before it says something about it. */
+    revision: function () { return state.revision || 0; },
+    depth: function () { return { undo: state.undo || 0, redo: state.redo || 0 }; },
+    isWritable: function () { return !!state.writable; },
+    reveal: reveal,
+    locate: locate,
+    select: select,
+    isOpen: function () { return !!open.path; },
+    save: save,
+    fix: fix,
+    graphPath: graphPath,
+    showChanges: showChanges,
+    refreshChanges: refreshChanges,
+    showTimeline: showTimeline,
+    stepTimeline: function (delta) { stopPlaying(); return stepTimeline(delta); },
+    selectRevision: function (index) {
+      stopPlaying();
+      return stepTimeline(index - timeline.index);
+    },
+    playTimeline: playTimeline,
+    drew: drew,
+    isScrubbing: function () { return timeline.open; },
+    isDiffing: function () { return changes.open || timeline.open; },
+    isLive: function () { return link.live; }
+  };
+})();

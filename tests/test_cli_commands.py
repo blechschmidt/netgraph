@@ -20,9 +20,9 @@ import pytest
 import yaml
 from click.testing import CliRunner, Result
 
-from netgraph.cli import cli, main
-from netgraph.errors import ConfigurationError, RenderError
-from netgraph.render import MERMAID_MAX_EDGES
+from netviz.cli import cli, main
+from netviz.errors import ConfigurationError, RenderError
+from netviz.render import MERMAID_MAX_EDGES
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -91,7 +91,7 @@ def test_disable_rejects_an_unknown_rule(capsys: pytest.CaptureFixture[str]) -> 
     """A suppression that names no rule is a mistake, not a no-op.
 
     Driven through ``main`` because the translation from
-    :class:`~netgraph.errors.ConfigurationError` to an exit status happens there.
+    :class:`~netviz.errors.ConfigurationError` to an exit status happens there.
     """
     assert (
         main(["-i", str(HOME_LAB), "validate", "--disable", "E999"]) == ConfigurationError.exit_code
@@ -250,12 +250,12 @@ def test_rules_lists_what_can_be_fixed(runner: CliRunner) -> None:
 def test_render_writes_dot_to_stdout_by_default(runner: CliRunner) -> None:
     result = invoke(runner, "-i", str(HOME_LAB), "render")
     assert result.exit_code == 0
-    assert result.stdout.startswith("graph netgraph {")
+    assert result.stdout.startswith("graph netviz {")
 
 
 @pytest.mark.parametrize(
     ("output_format", "marker"),
-    [("dot", "graph netgraph {"), ("mermaid", "flowchart TB"), ("json", '"kind": "NetworkGraph"')],
+    [("dot", "graph netviz {"), ("mermaid", "flowchart TB"), ("json", '"kind": "NetworkGraph"')],
 )
 def test_each_text_format_reaches_stdout(
     runner: CliRunner, output_format: str, marker: str
@@ -272,7 +272,7 @@ def test_render_writes_to_the_named_file_and_leaves_stdout_clean(
     result = invoke(runner, "-i", str(HOME_LAB), "render", "-o", str(target))
 
     assert result.exit_code == 0
-    assert target.read_text().startswith("graph netgraph {")
+    assert target.read_text().startswith("graph netviz {")
     assert result.stdout == "", "the diagram went to the file, not to stdout"
 
 
@@ -306,7 +306,7 @@ def test_a_format_that_cannot_draw_icons_says_so(runner: CliRunner) -> None:
 
 
 def test_render_refuses_a_broken_inventory_and_writes_no_diagram(runner: CliRunner) -> None:
-    """The refusal must leave stdout empty: `netgraph render > f.dot` truncates f."""
+    """The refusal must leave stdout empty: `netviz render > f.dot` truncates f."""
     result = invoke(runner, "-i", str(BROKEN), "render")
     assert result.exit_code == 1
     assert result.stdout == ""
@@ -317,7 +317,7 @@ def test_render_refuses_a_broken_inventory_and_writes_no_diagram(runner: CliRunn
 def test_force_renders_anyway_and_says_so(runner: CliRunner) -> None:
     result = invoke(runner, "-i", str(BROKEN), "render", "--force")
     assert result.exit_code == 0
-    assert result.stdout.startswith("graph netgraph {")
+    assert result.stdout.startswith("graph netviz {")
     assert "--force" in result.stderr
     # The cable that could not be resolved is named, not silently missing.
     assert "dropped from the graph" in result.stderr
@@ -326,7 +326,7 @@ def test_force_renders_anyway_and_says_so(runner: CliRunner) -> None:
 def test_a_warning_does_not_block_a_render(runner: CliRunner) -> None:
     result = invoke(runner, "-i", str(WARNING_ONLY), "render")
     assert result.exit_code == 0
-    assert result.stdout.startswith("graph netgraph {")
+    assert result.stdout.startswith("graph netviz {")
     assert "W103" in result.stderr
 
 
@@ -412,7 +412,7 @@ def test_an_unaddressed_inventory_at_layer_3_blames_the_addressing_not_the_filte
 ) -> None:
     """No filter was given, so "the filters selected no elements" would misdirect."""
     (tmp_path / "sw.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata: {name: sw1}\n"
         "spec:\n"
@@ -600,7 +600,7 @@ def test_binary_output_is_never_dumped_on_a_terminal(
     capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, output_format: str
 ) -> None:
     """Writing a PNG to a TTY garbles the terminal and helps nobody."""
-    monkeypatch.setattr("netgraph.cli._is_a_terminal", lambda stream: True)
+    monkeypatch.setattr("netviz.cli._is_a_terminal", lambda stream: True)
     status = main(["-i", str(HOME_LAB), "render", "-f", output_format])
 
     assert status == RenderError.exit_code
@@ -653,7 +653,7 @@ def star_inventory(path: Path, edges: int) -> Path:
     ports = [f"Gi0/{index}" for index in range(1, edges + 1)]
     documents: list[dict[str, object]] = [
         {
-            "apiVersion": "netgraph.dev/v1alpha1",
+            "apiVersion": "netviz.dev/v1alpha1",
             "kind": "switch",
             "metadata": {"name": "sw1"},
             "spec": {
@@ -671,7 +671,7 @@ def star_inventory(path: Path, edges: int) -> Path:
     for index, port in enumerate(ports, start=1):
         documents.append(
             {
-                "apiVersion": "netgraph.dev/v1alpha1",
+                "apiVersion": "netviz.dev/v1alpha1",
                 "kind": "computer",
                 "metadata": {"name": f"pc{index}"},
                 "spec": {
@@ -687,7 +687,7 @@ def star_inventory(path: Path, edges: int) -> Path:
         )
         documents.append(
             {
-                "apiVersion": "netgraph.dev/v1alpha1",
+                "apiVersion": "netviz.dev/v1alpha1",
                 "kind": "cable",
                 "metadata": {"name": f"c{index}"},
                 "spec": {"medium": "copper", "endpoints": [f"sw1:{port}", f"pc{index}:eth0"]},
@@ -867,7 +867,7 @@ def test_an_empty_inventory_lists_nothing_without_failing(
 def test_a_listing_notes_documents_it_could_not_load(runner: CliRunner, tmp_path: Path) -> None:
     """An unrelated broken file must not hide the answer, nor be hidden itself."""
     (tmp_path / "good.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc}\n"
         "spec:\n"
@@ -893,7 +893,7 @@ def test_show_prints_the_resolved_document(runner: CliRunner) -> None:
     document = yaml.safe_load(result.stdout)
     assert document["kind"] == "switch"
     assert document["metadata"]["name"] == "sw-home"
-    assert document["apiVersion"] == "netgraph.dev/v1alpha1"
+    assert document["apiVersion"] == "netviz.dev/v1alpha1"
 
 
 def test_show_materialises_the_defaults(runner: CliRunner) -> None:
@@ -921,7 +921,7 @@ def test_show_refuses_an_ambiguous_short_name(runner: CliRunner, tmp_path: Path)
         folder = tmp_path / directory
         folder.mkdir()
         (folder / "twin.yaml").write_text(
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: computer\n"
             "metadata: {name: twin}\n"
             "spec:\n"
@@ -992,7 +992,7 @@ def test_a_single_yaml_file_is_a_valid_inventory(runner: CliRunner) -> None:
 
 
 def test_the_rules_command_documents_every_rule(runner: CliRunner) -> None:
-    from netgraph.rules import RULE_IDS
+    from netviz.rules import RULE_IDS
 
     result = invoke(runner, "rules")
     assert result.exit_code == 0

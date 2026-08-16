@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Time ``netgraph impact`` on a thousand-device tree, stage by stage.
+"""Time ``netviz impact`` on a thousand-device tree, stage by stage.
 
 ``bench_pipeline.py`` measures what it costs to *draw* an inventory. This
 measures what it costs to *ask a question of* one, which is a different shape of
@@ -24,7 +24,7 @@ nothing this command does can be faster than it.
 
 **--fail (one element)** — the whole simulation, including the second resolution
 pass over the pruned inventory. This is the stage that pays for exactness (see
-:mod:`netgraph.impact.engine`), so the number worth watching is its ratio to
+:mod:`netviz.impact.engine`), so the number worth watching is its ratio to
 **views**: anything much above 2x means something is being rebuilt that should
 have been carried over.
 
@@ -33,14 +33,14 @@ the isolation counts. On a generated tree this is the worst case there is: a tre
 has no redundancy at all, so *every* internal node is an articulation point and
 *every* cable is a bridge, and the answer runs to more than a thousand entries.
 The naive implementation — remove each candidate, re-traverse — is O(V·(V+E))
-and takes minutes here; :func:`netgraph.connectivity.analyse` gets the same
+and takes minutes here; :func:`netviz.connectivity.analyse` gets the same
 answer out of one depth-first search, in single-digit milliseconds per layer.
 
 **--redundancy** — the validation pass the expectations are graded by, with an
 expectation annotated on every rack switch so the rules actually run.
 
 Each is reported with the median of five runs. Run it after any change to
-:mod:`netgraph.connectivity` or :mod:`netgraph.impact`; the numbers in
+:mod:`netviz.connectivity` or :mod:`netviz.impact`; the numbers in
 ``docs/commands/impact.md`` came out of it.
 """
 
@@ -65,11 +65,11 @@ if str(REPO_ROOT / "tools") not in sys.path:  # pragma: no cover - importing the
 
 from bench_pipeline import Shape, generate, yaml_files  # noqa: E402
 
-from netgraph.connectivity import analyse  # noqa: E402
-from netgraph.impact import LAYERS, simulate, views  # noqa: E402
-from netgraph.impact.engine import anchors_for  # noqa: E402
-from netgraph.loader import load_tree  # noqa: E402
-from netgraph.validate import validate  # noqa: E402
+from netviz.connectivity import analyse  # noqa: E402
+from netviz.impact import LAYERS, simulate, views  # noqa: E402
+from netviz.impact.engine import anchors_for  # noqa: E402
+from netviz.loader import load_tree  # noqa: E402
+from netviz.validate import validate  # noqa: E402
 
 T = TypeVar("T")
 
@@ -80,7 +80,7 @@ SAMPLES: Final = 5
 #: The annotation the ``--redundancy`` measurement puts on every rack switch, so
 #: the rules being timed have something to grade. Timing them against an
 #: inventory that declares nothing would time the early return.
-EXPECTATION: Final = "  annotations:\n    netgraph/redundancy: gateway\n"
+EXPECTATION: Final = "  annotations:\n    netviz/redundancy: gateway\n"
 
 
 def timed(label: str, call: Callable[[], T]) -> tuple[T, float]:
@@ -101,7 +101,7 @@ def annotate(root: Path) -> int:
     count = 0
     for path in yaml_files(root):
         text = path.read_text(encoding="utf-8")
-        if "kind: switch" not in text or "netgraph/redundancy" in text:
+        if "kind: switch" not in text or "netviz/redundancy" in text:
             continue
         lines = text.splitlines(keepends=True)
         out: list[str] = []
@@ -200,7 +200,7 @@ def _inventory_root(args: argparse.Namespace) -> Iterator[tuple[Path, int]]:
         racks_per_site=args.racks,
         hosts_per_rack=args.hosts,
     )
-    with tempfile.TemporaryDirectory(prefix="netgraph-bench-impact-") as directory:
+    with tempfile.TemporaryDirectory(prefix="netviz-bench-impact-") as directory:
         root = Path(directory)
         files, documents = generate(root, shape)
         print(f"generated {documents} documents in {files} files")

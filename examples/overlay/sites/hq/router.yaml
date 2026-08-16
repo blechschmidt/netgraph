@@ -4,7 +4,7 @@
 # Each tunnel interface carries the addressing *inside* its tunnel and its own
 # MTU, sized from the encapsulation overhead of the stack above it
 # (docs/schema.md §14.1). 'parent' names the port the outer packets leave by.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-hq

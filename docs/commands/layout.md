@@ -1,13 +1,13 @@
-# `netgraph layout`
+# `netviz layout`
 
 Store the diagram's arrangement in the inventory, so a diagram that has been
 arranged stays arranged.
 
-Everywhere else in netgraph, the picture is derived: you describe the network and
+Everywhere else in netviz, the picture is derived: you describe the network and
 Graphviz decides where things go. That is the right default and it is what
 `render` still does. But it means the diagram cannot be *edited* — drag a switch
 to where it belongs and the next render puts it back, because nothing in the
-tree remembers that you moved it. `netgraph layout` is what makes the
+tree remembers that you moved it. `netviz layout` is what makes the
 arrangement part of the model: a `kind: layout` document holding a position per
 node — and, when asked, the route each link takes and the style it is drawn in —
 scoped by view, loaded, validated and edited like everything else.
@@ -24,7 +24,7 @@ renderers honour it. This page is the reference for the command.
 
 <!-- generated: synopsis layout -->
 ```text
-netgraph [GLOBAL OPTIONS] layout [OPTIONS]
+netviz [GLOBAL OPTIONS] layout [OPTIONS]
 ```
 <!-- /generated -->
 
@@ -36,7 +36,7 @@ name nothing the diagram has.
 
 <!-- norun: the numbers depend on which example is arranged -->
 ```console
-$ netgraph layout --layer l1 --layer l2
+$ netviz layout --layer l1 --layer l2
 layout documents: layout
 VIEW  MODE     NODES  EDGES  GROUPS  STALE
 ----  -------  -----  -----  ------  -----
@@ -61,11 +61,11 @@ out afresh.
 
 <!-- norun: each of these writes to the inventory it is pointed at -->
 ```bash
-netgraph layout --write                       # place what is not placed yet
-netgraph layout --write --replace             # lay every node out afresh
-netgraph layout --write --engine circo        # ... with a different engine
-netgraph layout --write --layer l1 --layer l3 # arrange two views
-netgraph layout --write --dry-run             # print the diff, write nothing
+netviz layout --write                       # place what is not placed yet
+netviz layout --write --replace             # lay every node out afresh
+netviz layout --write --engine circo        # ... with a different engine
+netviz layout --write --layer l1 --layer l3 # arrange two views
+netviz layout --write --dry-run             # print the diff, write nothing
 ```
 
 What is written is a **fixed point**: the coordinates stored are the coordinates
@@ -91,7 +91,7 @@ An arrangement seeded with `--no-show-ips` and rendered with addresses on is an
 arrangement of boxes that are now too small for their contents.
 
 So seed with the options you render with. Better, put them in
-[`netgraph.toml`](../configuration.md) — this command reads `[render]` and
+[`netviz.toml`](../configuration.md) — this command reads `[render]` and
 `--profile` exactly as `render` does, which is the only way to be sure the two
 cannot drift apart.
 
@@ -106,7 +106,7 @@ Graphviz's coordinate system, unchanged, because the whole point is to be able t
 hand it straight back.
 
 Group boxes too, when the render groups by namespace: the no-op layout engine
-does not draw clusters, so netgraph draws them itself from the stored box, which
+does not draw clusters, so netviz draws them itself from the stored box, which
 means the frame is where you put it rather than wherever a layout happened to
 land. Its caption sits centred above the frame rather than inside it —
 [`docs/follow-ups.md` §17](../follow-ups.md) explains why that is not a matter
@@ -119,8 +119,8 @@ route is a handful of points per link that the render recomputes identically,
 and that is a lot of noise for no decision; a *hand-placed* bend is a decision,
 and the flag is how you get a starting point to drag one from. It brings the
 **sizes** of the nodes those routes leave from with it, which is the one case
-where a stored size is worth having: a route netgraph computes has to stop at
-the shape it runs into, and netgraph cannot measure a label. Every other node is
+where a stored size is worth having: a route netviz computes has to stop at
+the shape it runs into, and netviz cannot measure a label. Every other node is
 left sized by its label, because Graphviz derives the same box from the same
 label on every run and a stored size would go stale the moment a device grew an
 interface ([`docs/follow-ups.md` §16](../follow-ups.md)).
@@ -137,13 +137,13 @@ that is worse.
 
 A style pinned on *one link*, and where a link's label sits, are decisions a
 person takes rather than ones a layout run can seed, so they are written by the
-canvas editor of [`netgraph web`](web.md) instead;
+canvas editor of [`netviz web`](web.md) instead;
 [`docs/rendering.md`](../rendering.md#links-are-geometry-too) is what all three
 draw as.
 
 ## Writes go through the edit layer
 
-Every change is a [`netgraph edit`](edit.md) operation
+Every change is a [`netviz edit`](edit.md) operation
 (`set-geometry`), which means it inherits the whole write path: comments and
 formatting in a hand-arranged file survive, `--dry-run` shows the exact hunk,
 the tree is loaded and validated as it *would be* before anything is written,
@@ -166,7 +166,7 @@ a list of what moved.
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
 | `--layer` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | `l1` | Which view to arrange. Repeatable; each view is arranged separately. |
-| `--engine` | `[dot\|neato\|fdp\|sfdp\|circo\|twopi]` | `dot` | Graphviz engine to lay the diagram out with when seeding. dot is the hierarchical layout netgraph draws with; circo suits a ring, fdp and neato a flat mesh. |
+| `--engine` | `[dot\|neato\|fdp\|sfdp\|circo\|twopi]` | `dot` | Graphviz engine to lay the diagram out with when seeding. dot is the hierarchical layout netviz draws with; circo suits a ring, fdp and neato a flat mesh. |
 | `--write` | — | off | Run the layout once and store the result, making the arrangement editable. |
 | `--clear` | — | off | Drop the stored arrangement, so the view is laid out from scratch again. |
 | `--replace` | — | off | With --write, lay every node out afresh instead of keeping what is already arranged and placing only the rest. |
@@ -187,10 +187,10 @@ a list of what moved.
 | `--element-ids` | — | off | Give every node, edge and namespace a stable id derived from its name, so the diagram can be deep-linked and styled from outside. dot and svg only. |
 | `--max-addresses` | `N` | `4` | Longest address list spelled out under a node before it is abbreviated to 'and N more'. 0 prints the count alone. |
 | `--rankdir` | `[tb\|lr\|bt\|rl]` | TB, top to bottom | Layout direction. A wide network reads better left to right; a deep one top to bottom. Honoured by the Graphviz backends and by mermaid. |
-| `--routing` | `[spline\|orthogonal\|straight]` | whatever the inventory's layout documents say, else spline | How links are drawn between the bends they are pinned through: 'spline' is the curve Graphviz draws, 'orthogonal' right angles, 'straight' segment to segment. A default: a link that pins a style of its own keeps it. Honoured by the Graphviz backends, the JSON export and the editor. 'netgraph layout --write' records it in the view it arranges, so the choice is the inventory's rather than the command line's from then on. |
+| `--routing` | `[spline\|orthogonal\|straight]` | whatever the inventory's layout documents say, else spline | How links are drawn between the bends they are pinned through: 'spline' is the curve Graphviz draws, 'orthogonal' right angles, 'straight' segment to segment. A default: a link that pins a style of its own keeps it. Honoured by the Graphviz backends, the JSON export and the editor. 'netviz layout --write' records it in the view it arranges, so the choice is the inventory's rather than the command line's from then on. |
 | `--avoid`, `--no-avoid` | — | avoid | Route orthogonal links around the boxes they are not attached to instead of straight across them. Only applies to an arranged diagram drawn with '--routing orthogonal': a spline has nothing to route around, and an unarranged one is routed by Graphviz, which already avoids nodes. A bend you placed yourself is never moved — routing fills the segments between them. '--no-avoid' is the local Z-and-L every orthogonal diagram was drawn with before this existed. |
 | `--title` | `TEXT` | — | Caption for the diagram. |
-| `--profile` | `NAME` | — | Apply the [profile.NAME] block of netgraph.toml on top of its [render] table. Explicit flags still win over both. |
+| `--profile` | `NAME` | — | Apply the [profile.NAME] block of netviz.toml on top of its [render] table. Explicit flags still win over both. |
 | `--show-config` | — | off | Print the settings this invocation resolves to, and where each one came from, then exit without doing any work. |
 | `-n`, `--dry-run` | — | off | Write nothing; print the unified diff the edit would apply. |
 | `--json` | — | off | Print the applied operations and their inverses as JSON, so a caller can keep an undo stack. |
@@ -215,7 +215,7 @@ a list of what moved.
   and `json` honour an arrangement, and what each publishes;
   [Links are geometry too](../rendering.md#links-are-geometry-too) is the same
   for bends, routing styles and label positions.
-* [`netgraph edit`](edit.md) — the write path this command goes through, and its
+* [`netviz edit`](edit.md) — the write path this command goes through, and its
   two gates.
 * [`docs/follow-ups.md` §16](../follow-ups.md) — why the geometry is a sidecar
   and not a field on each element.

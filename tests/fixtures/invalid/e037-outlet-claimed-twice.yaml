@@ -2,14 +2,14 @@
 #
 # Both switches name 'pdu-r1-a:1'. An outlet takes one plug, so one of the two
 # is plugged in somewhere nobody has written down.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: pdu
 metadata:
   name: pdu-r1-a
 spec:
   outlets: 8
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -26,7 +26,7 @@ spec:
     inputs:
       - pdu-r1-a:1
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-b
@@ -43,7 +43,7 @@ spec:
     inputs:
       - pdu-r1-a:1
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

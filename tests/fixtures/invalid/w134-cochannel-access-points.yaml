@@ -2,7 +2,7 @@
 #
 # Channels 1 and 3 at 2.4 GHz are 10 MHz apart and 20 MHz wide, so the two
 # radios share spectrum: they take turns instead of adding their capacity up.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: ap-a
@@ -25,7 +25,7 @@ spec:
         bss:
           - ssid: lab
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: ap-b
@@ -48,7 +48,7 @@ spec:
         bss:
           - ssid: lab
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

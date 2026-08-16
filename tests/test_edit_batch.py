@@ -2,7 +2,7 @@
 
 Two things are asserted here and nowhere else.
 
-**A batch is all-or-nothing.** ``netgraph.edit`` was already atomic per
+**A batch is all-or-nothing.** ``netviz.edit`` was already atomic per
 operation — an applier that refuses puts back what it touched — and that is the
 wrong grain for a selection. Deleting eleven switches when the seventh cannot go
 must leave the other ten alone, and the assertion below is the strong form of
@@ -26,8 +26,8 @@ from typing import Any, Final
 import pytest
 import yaml
 
-from netgraph.config import parse_config
-from netgraph.edit import (
+from netviz.config import parse_config
+from netviz.edit import (
     ARRANGEMENTS,
     Batch,
     CreateElement,
@@ -39,8 +39,8 @@ from netgraph.edit import (
     arrange_operations,
     describe_arrangement,
 )
-from netgraph.edit.batch import describe
-from netgraph.loader import load_tree
+from netviz.edit.batch import describe
+from netviz.loader import load_tree
 
 REPO_ROOT: Final = Path(__file__).resolve().parent.parent
 EXAMPLES: Final = REPO_ROOT / "examples"
@@ -49,7 +49,7 @@ EXAMPLES: Final = REPO_ROOT / "examples"
 #: a y, and the sizes differ so that "align left" is a claim about *edges* and
 #: not about centres. Positions are points, ``y`` upwards, centre-anchored.
 RAGGED: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: layout
 metadata:
   name: default
@@ -215,7 +215,7 @@ def test_one_refused_operation_keeps_its_own_exception(home: Path) -> None:
     ``CascadeRequired`` carries the dependents the caller has to be shown; a
     generic ``EditError`` around it would throw them away for no gain.
     """
-    from netgraph.edit import CascadeRequired
+    from netviz.edit import CascadeRequired
 
     session = EditSession(root=home)
     with pytest.raises(CascadeRequired) as raised:
@@ -345,7 +345,7 @@ def test_distributing_equalises_the_gaps_and_leaves_the_extremes(arranged: Path)
     assert ys[-1] == 300.0
     gaps = [b - a for a, b in pairwise(ys)]
     # Within the hundredth of a point coordinates are stored to; see
-    # netgraph.layout.geometry.round_coordinate.
+    # netviz.layout.geometry.round_coordinate.
     assert max(gaps) - min(gaps) <= 0.02, gaps
 
 
@@ -366,8 +366,8 @@ def test_snapping_rounds_to_the_configured_pitch(arranged: Path) -> None:
     }
 
 
-def test_snapping_takes_its_pitch_from_netgraph_toml(arranged: Path) -> None:
-    (arranged / "netgraph.toml").write_text("[editor]\ngrid = 50\n", encoding="utf-8", newline="\n")
+def test_snapping_takes_its_pitch_from_netviz_toml(arranged: Path) -> None:
+    (arranged / "netviz.toml").write_text("[editor]\ngrid = 50\n", encoding="utf-8", newline="\n")
     config = parse_config({"editor": {"grid": 50}})
     session = EditSession(root=arranged, config=config)
     operations = arrange_operations(
@@ -406,7 +406,7 @@ def test_an_arrangement_spans_the_layout_documents_it_has_to(tmp_path: Path) -> 
     root = tmp_path / "split"
     shutil.copytree(EXAMPLES / "home-lab", root)
     (root / "north.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: layout\nmetadata:\n  name: north\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: layout\nmetadata:\n  name: north\n"
         "spec:\n  views:\n    physical:\n      nodes:\n"
         "        rtr-home: {position: {x: 10, y: 300}}\n"
         "        sw-home: {position: {x: 40, y: 200}}\n",
@@ -414,7 +414,7 @@ def test_an_arrangement_spans_the_layout_documents_it_has_to(tmp_path: Path) -> 
         newline="\n",
     )
     (root / "south.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: layout\nmetadata:\n  name: south\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: layout\nmetadata:\n  name: south\n"
         "spec:\n  views:\n    physical:\n      nodes:\n"
         "        pc-desk: {position: {x: 70, y: 100}}\n"
         "        srv-nas: {position: {x: 90, y: 20}}\n",
@@ -447,7 +447,7 @@ def test_a_layout_key_written_short_keeps_its_spelling(tmp_path: Path) -> None:
     namespaced = sorted(fqn for fqn in inventory.elements if "/" in fqn)[:2]
     folder = namespaced[0].rsplit("/", 1)[0]
     (root / folder / "layout.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: layout\nmetadata:\n  name: here\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: layout\nmetadata:\n  name: here\n"
         "spec:\n  views:\n    physical:\n      nodes:\n"
         + "".join(
             f"        {fqn.rsplit('/', 1)[1]}: {{position: {{x: {10 + index * 30}, y: 0}}}}\n"
@@ -546,12 +546,12 @@ def test_one_element_is_named_in_the_singular() -> None:
 
 
 # --------------------------------------------------------------------------- #
-# The grid, in netgraph.toml
+# The grid, in netviz.toml
 # --------------------------------------------------------------------------- #
 
 
 def test_the_grid_defaults_to_twenty_points() -> None:
-    from netgraph.layout.geometry import DEFAULT_GRID
+    from netviz.layout.geometry import DEFAULT_GRID
 
     assert parse_config({}).editor.grid == DEFAULT_GRID
 
@@ -572,14 +572,14 @@ def test_the_grid_is_read_from_the_editor_table(value: float) -> None:
     ],
 )
 def test_a_bad_editor_table_says_which_key_and_why(table: dict[str, Any], complaint: str) -> None:
-    from netgraph.errors import ConfigurationError
+    from netviz.errors import ConfigurationError
 
     with pytest.raises(ConfigurationError, match=complaint):
         parse_config({"editor": table})
 
 
 def test_the_editor_table_must_be_a_table() -> None:
-    from netgraph.errors import ConfigurationError
+    from netviz.errors import ConfigurationError
 
     with pytest.raises(ConfigurationError, match="must be a table"):
         parse_config({"editor": 20})

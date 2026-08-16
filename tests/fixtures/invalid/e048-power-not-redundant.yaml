@@ -5,14 +5,14 @@
 # PDU switches the machine off, so the claim is false and the fix is either a
 # second feed from an independent source or an honest deletion of the
 # annotation.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: pdu
 metadata:
   name: pdu-a
 spec:
   outlets: 8
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-a
@@ -25,12 +25,12 @@ spec:
         addresses:
           - 10.0.0.1/24
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
   annotations:
-    netgraph/redundancy: power
+    netviz/redundancy: power
 spec:
   interfaces:
     - name: eth0
@@ -45,7 +45,7 @@ spec:
       - pdu: pdu-a
         outlet: '1'
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a

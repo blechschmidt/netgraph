@@ -1,27 +1,27 @@
-# `netgraph converge`
+# `netviz converge`
 
-[`netgraph drift`](drift.md) says how the live network differs from the declared
-inventory. [`netgraph export`](../export.md#device-configuration-the-seven-dialects)
+[`netviz drift`](drift.md) says how the live network differs from the declared
+inventory. [`netviz export`](../export.md#device-configuration-the-seven-dialects)
 says what a device would run if it agreed. Nothing joined them: an operator read
 a list of differences and typed the fix, and typing the fix is where the network
 and the inventory started disagreeing in the first place.
 
-`netgraph converge plan` is the join. It takes the same captures `drift` takes
+`netviz converge plan` is the join. It takes the same captures `drift` takes
 and produces, per device, the **minimal ordered set of changes** that would move
 it from what the capture found to what the inventory declares — each one
 carrying the drift finding that asked for it, a risk classification, its
 prerequisites, the commands that perform it and the commands that undo it.
 
 It is `plan`/`apply` pointed at devices rather than at files. Where
-[`netgraph plan`](plan.md) diffs two inventory *states* and
-[`netgraph apply`](apply.md) writes YAML, this diffs the inventory against the
+[`netviz plan`](plan.md) diffs two inventory *states* and
+[`netviz apply`](apply.md) writes YAML, this diffs the inventory against the
 *network* and writes a script somebody runs.
 
 ---
 
 ## Contents
 
-- [netgraph does not touch your devices](#netgraph-does-not-touch-your-devices)
+- [netviz does not touch your devices](#netviz-does-not-touch-your-devices)
 - [Synopsis](#synopsis)
 - [A worked example](#a-worked-example)
 - [What a change is](#what-a-change-is)
@@ -29,7 +29,7 @@ It is `plan`/`apply` pointed at devices rather than at files. Where
 - [Risk, the management path, and `--allow-disruptive`](#risk-the-management-path-and---allow-disruptive)
 - [Maintenance batches](#maintenance-batches)
 - [The dialects](#the-dialects)
-- [What netgraph will not write a command for](#what-netgraph-will-not-write-a-command-for)
+- [What netviz will not write a command for](#what-netviz-will-not-write-a-command-for)
 - [Per-device scripts, and `--rollback`](#per-device-scripts-and---rollback)
 - [Output formats](#output-formats)
 - [The JSON document](#the-json-document)
@@ -40,18 +40,18 @@ It is `plan`/`apply` pointed at devices rather than at files. Where
 
 ---
 
-## netgraph does not touch your devices
+## netviz does not touch your devices
 
 **There is no transport in this command, and there is no flag that adds one.**
 
-netgraph opens no SSH session, holds no credential, reads no `known_hosts`, and
+netviz opens no SSH session, holds no credential, reads no `known_hosts`, and
 has no code path that sends a byte to a device. `converge plan` reads capture
 files somebody already collected and writes a plan and a set of `.txt` scripts.
 A person — or a purpose-built tool with its own threat model — runs them.
 
 That is a deliberate boundary and it is worth stating plainly, because the
 alternative is the thing people are right to be afraid of. The security surface
-of the whole netgraph project is *reads files, writes files*, and that is a
+of the whole netviz project is *reads files, writes files*, and that is a
 sentence an auditor can check by grepping for a socket. A tool that can also log
 in to four hundred switches has an entirely different one: it needs credentials
 somewhere, it needs to decide what a host key means, it needs a story about what
@@ -75,7 +75,7 @@ needs without re-deriving anything. It would be a separate program.
 
 <!-- generated: synopsis converge plan -->
 ```text
-netgraph [GLOBAL OPTIONS] converge plan [OPTIONS] [NAME=]INPUT...
+netviz [GLOBAL OPTIONS] converge plan [OPTIONS] [NAME=]INPUT...
 ```
 <!-- /generated -->
 
@@ -89,12 +89,12 @@ captures, in the same `[NAME=]INPUT` form [`import`](import.md) and
 
 `tests/fixtures/drift/` holds captures taken against the
 [home-lab example](../../examples/home-lab), the same ones
-[`netgraph drift`](drift.md#a-worked-example) is documented with. Collect what you
+[`netviz drift`](drift.md#a-worked-example) is documented with. Collect what you
 would for `drift`, then plan:
 
 <!-- run: cwd=. rc=4 -->
 ```console
-$ netgraph -i examples/home-lab converge plan --only pc-desk --only srv-nas tests/fixtures/drift/pc-desk.addr.json tests/fixtures/drift/srv-nas.link.json
+$ netviz -i examples/home-lab converge plan --only pc-desk --only srv-nas tests/fixtures/drift/pc-desk.addr.json tests/fixtures/drift/srv-nas.link.json
 error: refusing to emit a plan: 2 change(s) on 1 device(s) would touch the path the device is managed on. Nothing was written. Re-run with --allow-disruptive once you have a way back in -- console, out-of-band, or somebody standing next to the rack
   hosts/pc-desk: set mac on eno1 to 3c:97:0e:20:01:01 -- changes mac on eno1, which bounces the interface; eno1 carries the management address 192.168.10.20/24
   hosts/pc-desk: remove the vlan interface eno1.30 -- removes the interface eno1.30; anything configured on it goes with it
@@ -106,7 +106,7 @@ the rack:
 
 <!-- run: cwd=. rc=2 -->
 ```console
-$ netgraph -i examples/home-lab converge plan --allow-disruptive --only pc-desk --only srv-nas tests/fixtures/drift/pc-desk.addr.json tests/fixtures/drift/srv-nas.link.json
+$ netviz -i examples/home-lab converge plan --allow-disruptive --only pc-desk --only srv-nas tests/fixtures/drift/pc-desk.addr.json tests/fixtures/drift/srv-nas.link.json
 converge plan for examples/home-lab from 2 input(s) (iproute), written as interfaces commands
 
 hosts/pc-desk (computer) [batch 0]
@@ -134,7 +134,7 @@ maintenance batches
 4 change(s) across 2 element(s) (0 create, 2 update, 2 delete), 2 disruptive; 1 maintenance batch(es)
 ```
 
-Every line of the plan traces back to a line of `netgraph drift`. Nothing else
+Every line of the plan traces back to a line of `netviz drift`. Nothing else
 is ever proposed.
 
 ---
@@ -159,16 +159,16 @@ One entry of the plan is one thing to do to one device. It carries:
 | `commands` | What to run, in order. |
 | `rollback` | What to run to put the device back the way the capture found it. |
 
-**A change with no provenance would be netgraph's own opinion about a network,
+**A change with no provenance would be netviz's own opinion about a network,
 and this command does not have one.** It only ever proposes what closes a
-difference somebody can go and read in `netgraph drift` output.
+difference somebody can go and read in `netviz drift` output.
 
 The vocabulary is bounded by what a capture can actually detect, which is what
 `drift` compares: the interface set, `mac`/`mtu`/`enabled`/`parent`, the address
 list per family, bridge and bond membership, VLAN mode, access VLAN and carried
 VLANs. Nothing here proposes a change to something no input could have
 contradicted — a plan that "fixed" an OSPF area nobody measured would be
-netgraph guessing with a root shell.
+netviz guessing with a root shell.
 
 One prerequisite is filled in from the *inventory* rather than from the capture:
 if a port is being put into VLAN 20 and the declared device has 20 in its VLAN
@@ -244,13 +244,13 @@ or when it shuts or deletes an interface.
 
 The management path is three things, and the first is not a guess:
 
-1. **The interface netgraph would reach the box on.** That is the same ranking
+1. **The interface netviz would reach the box on.** That is the same ranking
    that picks `ansible_host` and a Prometheus scrape target in
-   [`netgraph export`](export.md): an explicitly named management port
+   [`netviz export`](export.md): an explicitly named management port
    (`mgmt0`, `idrac`, anything whose name or description says management or
    out-of-band) first, then a loopback with a routable address, then the
    declared interface order, IPv4 before IPv6. One definition, three consumers —
-   if netgraph would monitor the device over `mgmt0`, then `mgmt0` is what a
+   if netviz would monitor the device over `mgmt0`, then `mgmt0` is what a
    converge script must not pull out from under itself.
 2. **Everything that interface is built on.** Taking a member out of the bond
    that carries the management address, or deleting the parent of the management
@@ -274,7 +274,7 @@ Deliberately **not** disruptive: setting an MTU, correcting a MAC on an
 interface that is not the management one, adding an address, creating a VLAN,
 bringing an interface up. Those are the changes a converge run should be able to
 make at three in the morning without an argument. `mtu` in particular is left
-safe on the management path too: every stack netgraph writes for changes it on a
+safe on the management path too: every stack netviz writes for changes it on a
 live interface without taking the link down, and classifying it as disruptive
 would make `--allow-disruptive` the flag every run needs, which is the same as
 having no flag.
@@ -288,7 +288,7 @@ operator deciding whether to pass the flag is deciding about the whole set.
 
 A plan that lists forty devices is a plan nobody can schedule. What an operator
 needs to know is *which of these can I do at the same time, and what goes dark
-while I do*. That is the question [`netgraph impact`](impact.md) already answers
+while I do*. That is the question [`netviz impact`](impact.md) already answers
 for a hypothetical failure, and a device being reconfigured is a device that may
 bounce — so it is the same question and gets the same engine.
 
@@ -312,13 +312,13 @@ the inventory grows by one is a schedule nobody trusts.
 ## The dialects
 
 `--dialect` chooses what the commands are written in. Every dialect is one
-netgraph already generates configuration for, and the plan runs those same
+netviz already generates configuration for, and the plan runs those same
 emitters rather than a second rendering that could disagree with them.
 
 | `--dialect` | What a change looks like |
 |---|---|
-| `interfaces` (default) | netgraph's own imperative grammar, one line per change. |
-| `netplan` | the generated `/etc/netplan/10-netgraph.yaml`, then `netplan apply`. |
+| `interfaces` (default) | netviz's own imperative grammar, one line per change. |
+| `netplan` | the generated `/etc/netplan/10-netviz.yaml`, then `netplan apply`. |
 | `networkd` | the generated `.network`/`.netdev` units, then `networkctl reload`. |
 | `ifupdown` | the generated `/etc/network/interfaces`, then `systemctl restart networking`. |
 | `frr` | the generated `/etc/frr/frr.conf`, then `vtysh -b`. |
@@ -360,7 +360,7 @@ So minimality for these is at the file level, and it is measured rather than
 assumed. The existing emitters are run **twice** — over the declared inventory,
 giving what the device should have, and over the *observed* inventory (the
 declaration with every observation folded in, which is what
-[`netgraph plan --from-live`](plan.md) already builds), giving what it has now.
+[`netviz plan --from-live`](plan.md) already builds), giving what it has now.
 A file is in the plan only if the two differ, ignoring the generated banner. A
 file the observed side has and the declared side does not is removed.
 
@@ -378,12 +378,12 @@ final as `ip addr del`.
 If the *capture* found a device in a shape the dialect has no syntax for, the
 plan says so in a note and falls back to listing every generated file rather
 than failing. If the *inventory* declares something the dialect cannot express,
-the run fails with exit code 4, exactly as `netgraph export` does — half a
+the run fails with exit code 4, exactly as `netviz export` does — half a
 configuration on a real box is worse than none.
 
 ---
 
-## What netgraph will not write a command for
+## What netviz will not write a command for
 
 Three classes of finding stay in the plan as `manual` changes. They are kept
 rather than dropped, because "the plan is empty" and "the plan is empty and
@@ -394,16 +394,16 @@ they carry no commands, so nothing can pretend otherwise.
   Configuration does not move fibre.
 * **A physical port the inventory does not declare.** The capture found it
   because it is physically there; the thing that is wrong is the document.
-  netgraph only ever deletes interfaces it could have *created* — an interface
+  netviz only ever deletes interfaces it could have *created* — an interface
   whose `type` is `vlan`, `bridge`, `lag` or `tunnel` — which keeps the rule
-  symmetric: netgraph removes what netgraph makes. An `ethernet`, `wifi` or
+  symmetric: netviz removes what netviz makes. An `ethernet`, `wifi` or
   `loopback` interface is never removed or shut.
 * **A device the inventory does not declare, or one that is a different kind
   than declared.** There is no declared state to converge on to. Run
-  [`netgraph import`](import.md) to adopt it, or take it off the network.
+  [`netviz import`](import.md) to adopt it, or take it off the network.
 
 An interface whose *type* disagrees is manual too: changing an interface's type
-is a re-creation rather than an edit, and netgraph leaves that to somebody who
+is a re-creation rather than an edit, and netviz leaves that to somebody who
 can see what else is on it.
 
 ---
@@ -412,12 +412,12 @@ can see what else is on it.
 
 `-o/--out DIR` writes one script per element, under a directory named after the
 element's fully-qualified name — the same layout
-[`netgraph export config --out`](export.md#a-configuration-dialect-writes-a-tree) uses, so the tree is shaped like the
+[`netviz export config --out`](export.md#a-configuration-dialect-writes-a-tree) uses, so the tree is shaped like the
 inventory tree and `diff -r` between two runs is readable:
 
 <!-- norun: writes a tree into the reader's directory -->
 ```console
-$ netgraph -i net converge plan --allow-disruptive --dialect networkd -o scripts/ caps/*
+$ netviz -i net converge plan --allow-disruptive --dialect networkd -o scripts/ caps/*
 2 script(s) written under scripts/
 $ find scripts -type f
 scripts/hosts/pc-desk/converge.txt
@@ -443,9 +443,9 @@ reviewer comparing them does not have to hold two paths in their head.
 
 <!-- norun: writes a tree into the reader's directory -->
 ```console
-$ netgraph -i net converge plan --allow-disruptive -o scripts/ caps/*
+$ netviz -i net converge plan --allow-disruptive -o scripts/ caps/*
 2 script(s) written under scripts/
-$ netgraph -i net converge plan --allow-disruptive --rollback -o scripts/ caps/*
+$ netviz -i net converge plan --allow-disruptive --rollback -o scripts/ caps/*
 2 script(s) written under scripts/
 $ ls scripts/hosts/pc-desk/
 converge.txt  rollback.txt
@@ -533,9 +533,9 @@ a consumer does not have to parse a here-document out of a script.
 <!-- generated: options converge plan -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
-| `--from` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|nftables\|wireguard\|interfaces]` | `auto` | Input dialect, exactly as 'netgraph drift --from' takes it. |
+| `--from` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|nftables\|wireguard\|interfaces]` | `auto` | Input dialect, exactly as 'netviz drift --from' takes it. |
 | `--host` | `NAME` | — | Device every input was captured on, when the input does not name it. |
-| `--dialect` | `[interfaces\|netplan\|networkd\|ifupdown\|frr\|wireguard]` | `interfaces` | Which configuration dialect the commands are written in. 'interfaces' is netgraph's own imperative grammar and covers every device kind; the other five are declarative, so their remediation is the generated file plus a reload. |
+| `--dialect` | `[interfaces\|netplan\|networkd\|ifupdown\|frr\|wireguard]` | `interfaces` | Which configuration dialect the commands are written in. 'interfaces' is netviz's own imperative grammar and covers every device kind; the other five are declarative, so their remediation is the generated file plus a reload. |
 | `--only` | `GLOB` | — | Converge only elements whose name matches this glob. Repeatable. |
 | `--exclude` | `GLOB` | — | Leave elements whose name matches this glob out of the plan. Repeatable. |
 | `--exclude-interface` | `GLOB` | — | Leave interfaces whose name matches this glob out, as 'drift' takes it. Repeatable. |
@@ -553,11 +553,11 @@ a consumer does not have to parse a here-document out of a script.
 |---|---|
 | 0 | Converged: the network already matches the inventory, and there is nothing to do. |
 | 1 | The inventory itself does not load, so nothing was compared. |
-| 2 | Changes are pending — or a usage error, or an unusable `netgraph.toml`. |
+| 2 | Changes are pending — or a usage error, or an unusable `netviz.toml`. |
 | 3 | An input was missing, unreadable, not UTF-8, oversized, or not the dialect it was given as. |
 | 4 | The plan was refused: it holds a disruptive change and `--allow-disruptive` was not given, or a dialect cannot express a declared device. Nothing was written. |
 
-The 0/2 contract mirrors [`netgraph plan`](plan.md), so a pipeline can gate on
+The 0/2 contract mirrors [`netviz plan`](plan.md), so a pipeline can gate on
 "nothing to do" without parsing anything. A `manual` change counts: a plan that
 is empty except for three cables in the wrong ports is not a converged network,
 and an exit code saying otherwise would be the one thing this command must not
@@ -567,12 +567,12 @@ get wrong.
 
 ## See also
 
-* [`netgraph drift`](drift.md) — the differences this plan closes, and what each
+* [`netviz drift`](drift.md) — the differences this plan closes, and what each
   capture dialect can and cannot see.
-* [`netgraph export`](../export.md#device-configuration-the-seven-dialects) — the seven
+* [`netviz export`](../export.md#device-configuration-the-seven-dialects) — the seven
   configuration dialects, and what each one is lossy about.
-* [`netgraph impact`](impact.md) — the blast-radius engine the batches use.
-* [`netgraph plan`](plan.md) and [`netgraph apply`](apply.md) — the same
+* [`netviz impact`](impact.md) — the blast-radius engine the batches use.
+* [`netviz plan`](plan.md) and [`netviz apply`](apply.md) — the same
   discipline pointed at the inventory files rather than at devices.
 * [Importing a live network](../importing.md) — what to collect, and the exact
   collection command for each dialect.

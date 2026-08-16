@@ -1,8 +1,8 @@
 """Fuzzing the untrusted edge: the loader.
 
-Everything else in netgraph reads a tree the loader has already accepted. The
+Everything else in netviz reads a tree the loader has already accepted. The
 loader reads whatever is on disk — and increasingly that is not a file anybody
-wrote: ``netgraph import`` emits one from captured device output, a colleague
+wrote: ``netviz import`` emits one from captured device output, a colleague
 sends an inventory from a different tool, a pipeline generates one. So the
 loader is the only component with a genuine trust boundary, and the contract at
 that boundary is not "parses correct input" but:
@@ -10,11 +10,11 @@ that boundary is not "parses correct input" but:
 1. **It terminates.** No input makes it loop, and none makes it spend
    super-linear time on a linear amount of text.
 2. **It fails structurally.** Every rejection is a
-   :class:`~netgraph.errors.NetgraphError` or a recorded
-   :class:`~netgraph.loader.LoadError` naming the file — never a traceback out
+   :class:`~netviz.errors.NetvizError` or a recorded
+   :class:`~netviz.loader.LoadError` naming the file — never a traceback out
    of PyYAML, pydantic, :mod:`ipaddress` or a bare ``KeyError``.
 3. **It stays bounded.** A diagnostic quotes back at most
-   :data:`~netgraph.errors.MAX_ECHOED_VALUE_LENGTH` characters of the value it
+   :data:`~netviz.errors.MAX_ECHOED_VALUE_LENGTH` characters of the value it
    rejected (follow-up 3), so a 200 000-character scalar cannot become a
    200 000-character error line — or a terminal full of escape sequences.
 4. **It stays cheap.** A pathological document costs bounded memory, so
@@ -39,9 +39,9 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from netgraph.errors import MAX_ECHOED_VALUE_LENGTH, NetgraphError
-from netgraph.loader import Inventory, LoadError, load_stream, load_tree
-from netgraph.loader.documents import MAX_NESTING_DEPTH
+from netviz.errors import MAX_ECHOED_VALUE_LENGTH, NetvizError
+from netviz.loader import Inventory, LoadError, load_stream, load_tree
+from netviz.loader.documents import MAX_NESTING_DEPTH
 
 CORPUS_DIR: Final = Path(__file__).resolve().parent / "fuzz-corpus"
 
@@ -51,7 +51,7 @@ CORPUS: Final[dict[str, str]] = {
     path.name: path.read_text(encoding="utf-8") for path in sorted(CORPUS_DIR.glob("*.yaml"))
 }
 
-#: Ceiling on one diagnostic. The longest legal value netgraph accepts is a
+#: Ceiling on one diagnostic. The longest legal value netviz accepts is a
 #: 253-character name and a diagnostic may quote two of them plus prose, so this
 #: is generous — it exists to catch an *unbounded* echo, not to police wording.
 MAX_DIAGNOSTIC_LENGTH: Final = 4096
@@ -145,7 +145,7 @@ def test_every_corpus_seed_is_rejected_cleanly(name: str, tmp_path: Path) -> Non
 
 
 #: Seeds that are not merely awkward but must actually be *refused*: valid YAML
-#: netgraph has to say no to, or text that is not YAML at all. Listed rather
+#: netviz has to say no to, or text that is not YAML at all. Listed rather
 #: than inferred, so a seed that silently starts loading is noticed.
 MUST_FAIL: Final[frozenset[str]] = frozenset(
     {
@@ -287,7 +287,7 @@ def _mutate(draw: st.DrawFn, text: str) -> str:
 @settings(max_examples=searched(200), suppress_health_check=[HealthCheck.too_slow])
 @given(mutants())
 def test_a_mutated_document_never_escapes_the_loader(payload: str) -> None:
-    """Whatever comes out is an inventory with diagnostics, or a netgraph error.
+    """Whatever comes out is an inventory with diagnostics, or a netviz error.
 
     ``load_stream`` rather than a directory walk, so that 200 examples cost 200
     parses and no filesystem at all; the filesystem-specific failure modes are
@@ -296,7 +296,7 @@ def test_a_mutated_document_never_escapes_the_loader(payload: str) -> None:
     start = time.monotonic()
     try:
         inventory = load_stream(payload, name="fuzz.yaml")
-    except NetgraphError:
+    except NetvizError:
         # A structured refusal is a correct outcome.
         return
     elapsed = time.monotonic() - start
@@ -313,7 +313,7 @@ def test_a_mutated_document_is_read_the_same_way_twice(payload: str) -> None:
     try:
         first = load_stream(payload, name="fuzz.yaml")
         second = load_stream(payload, name="fuzz.yaml")
-    except NetgraphError:
+    except NetvizError:
         return
     assert [str(error) for error in first.errors] == [str(error) for error in second.errors]
     assert sorted(first.elements) == sorted(second.elements)
@@ -330,7 +330,7 @@ UNDECODABLE: Final[dict[str, bytes]] = {
     "lone-continuation": b"apiVersion: \xff\xfe\nkind: switch\n",
     "truncated-utf8": "kind: switché".encode()[:-1],
     "utf16-le": "kind: switch\n".encode("utf-16-le"),
-    "nul-bytes": b"api\x00Version: netgraph.dev/v1alpha1\n",
+    "nul-bytes": b"api\x00Version: netviz.dev/v1alpha1\n",
     "latin1": "description: café".encode("latin-1"),
     "random-binary": bytes(range(256)),
 }
@@ -353,15 +353,15 @@ def test_a_file_that_is_not_text_is_reported_not_raised(name: str, tmp_path: Pat
 #: is a way of asking the loader to do unbounded work with bounded typing.
 AMPLIFIERS: Final[dict[str, str]] = {
     "interface-range": (
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: a\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n  name: a\n"
         "spec:\n  interfaces:\n    - range: e[1-999999999]\n      type: ethernet\n"
     ),
     "interface-range-product": (
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: a\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n  name: a\n"
         "spec:\n  interfaces:\n    - range: e[1-9999][1-9999][1-9999]\n      type: ethernet\n"
     ),
     "patch-panel": (
-        "apiVersion: netgraph.dev/v1alpha1\nkind: patchpanel\nmetadata:\n  name: p\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: patchpanel\nmetadata:\n  name: p\n"
         "spec:\n  ports: 1-999999999\n"
     ),
     "billion-laughs": (
@@ -373,7 +373,7 @@ AMPLIFIERS: Final[dict[str, str]] = {
     ),
     "deep-flow-nesting": "a: " + "[" * 5000 + "]" * 5000 + "\n",
     "huge-scalar": (
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: a\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n  name: a\n"
         "spec:\n  vendor: " + "Z" * 1_000_000 + "\n"
     ),
 }
@@ -393,7 +393,7 @@ def test_an_amplifying_document_costs_bounded_time_and_memory(name: str) -> None
         start = time.monotonic()
         try:
             inventory = load_stream(payload, name="fuzz.yaml")
-        except NetgraphError:
+        except NetvizError:
             inventory = None
         elapsed = time.monotonic() - start
         _, peak = tracemalloc.get_traced_memory()
@@ -428,7 +428,7 @@ def test_a_patch_panel_port_range_is_counted_before_it_is_expanded() -> None:
     tracemalloc.start()
     try:
         inventory = load_stream(
-            "apiVersion: netgraph.dev/v1alpha1\nkind: patchpanel\nmetadata:\n  name: p\n"
+            "apiVersion: netviz.dev/v1alpha1\nkind: patchpanel\nmetadata:\n  name: p\n"
             "spec:\n  ports: 1-999999999\n",
             name="regression.yaml",
         )
@@ -446,12 +446,12 @@ def test_a_patch_panel_port_range_is_counted_before_it_is_expanded() -> None:
     [
         (
             "interface mtu",
-            "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: a\n"
+            "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n  name: a\n"
             "spec:\n  interfaces:\n    - name: e0\n      type: ethernet\n      mtu: {digits}\n",
         ),
         (
             "vlan id",
-            "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: a\n"
+            "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n  name: a\n"
             "spec:\n  interfaces:\n    - name: e0\n      type: ethernet\n"
             "      vlan: {{mode: access, access_vlan: {digits}}}\n",
         ),
@@ -506,13 +506,13 @@ def test_a_document_at_the_nesting_limit_still_loads() -> None:
 def test_an_oversized_range_span_is_not_echoed_in_full() -> None:
     """The ``range`` diagnostic quoted the whole 5000-digit span back.
 
-    Every other diagnostic goes through :func:`~netgraph.errors.echo_value`,
+    Every other diagnostic goes through :func:`~netviz.errors.echo_value`,
     which clips; this one interpolated ``match.group()`` with ``!r`` and produced
     a 5297-character error line. Found by
     :func:`test_a_mutated_document_never_escapes_the_loader` via ``assert_bounded``.
     """
     inventory = load_stream(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: a\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n  name: a\n"
         "spec:\n  interfaces:\n    - range: e[1-" + "9" * 5000 + "]\n      type: ethernet\n",
         name="regression.yaml",
     )

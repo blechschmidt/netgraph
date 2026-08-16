@@ -2,7 +2,7 @@
 #
 # 'eth0' and 'eth1' are both in 10.0.0.0/24, so nothing in the routing table
 # says which of them a packet for that subnet should leave by.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -20,7 +20,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -32,7 +32,7 @@ spec:
       ipv4:
         addresses: [10.0.0.3/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

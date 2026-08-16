@@ -1,6 +1,6 @@
-# Running netgraph in a container
+# Running netviz in a container
 
-netgraph is a Python package with one dependency it cannot vendor: the Graphviz `dot`
+netviz is a Python package with one dependency it cannot vendor: the Graphviz `dot`
 binary, which draws every `svg`, `png`, `pdf` and `html` render. On a machine where
 neither a Python environment nor a system package is welcome — a shared CI runner, a
 jump host, a colleague's laptop — a container is the shortest route from a folder of
@@ -112,7 +112,7 @@ browser editor:
 
 <!-- norun: needs a Docker daemon, and the last two start servers that never exit -->
 ```bash
-docker compose run --rm netgraph validate      # the CLI, one shot
+docker compose run --rm netviz validate      # the CLI, one shot
 docker compose up web                          # the browser editor, http://127.0.0.1:8081/
 docker compose up watch                        # the live preview,   http://127.0.0.1:8080/
 ```
@@ -135,32 +135,32 @@ the interpreter.
 
 Three properties are worth knowing, because commands you type inherit them:
 
-* **The entrypoint is `netgraph` itself.** Everything after the image or the service name
-  is netgraph's own argument list, so `docker compose run --rm netgraph list devices` is
-  `netgraph list devices`. With no arguments it prints `--help` rather than guessing.
+* **The entrypoint is `netviz` itself.** Everything after the image or the service name
+  is netviz's own argument list, so `docker compose run --rm netviz list devices` is
+  `netviz list devices`. With no arguments it prints `--help` rather than guessing.
 * **The working directory is `/inventory`,** which is where the compose file mounts your
-  tree. netgraph's `-i/--inventory` defaults to the working directory, so no command needs
+  tree. netviz's `-i/--inventory` defaults to the working directory, so no command needs
   to name it.
 * **It runs unprivileged,** as uid 1000 by default, with no capabilities, no privilege
-  escalation, a read-only root filesystem and a tmpfs on `/tmp`. Nothing netgraph does
+  escalation, a read-only root filesystem and a tmpfs on `/tmp`. Nothing netviz does
   needs more than that.
 
 ## The three services
 
 | Service | What it is | Port | The mount |
 |---|---|---|---|
-| `netgraph` | Any single command: `validate`, `render`, `list`, `export`, `fmt`, `path`, `ipam`, … | — | read-write |
-| `web` | [`netgraph web`](commands/web.md): edit YAML in one pane, see the diagram in the other | 8081 | read-only |
-| `watch` | [`netgraph watch --serve`](commands/watch.md): re-render on every save, served on a page that reloads itself | 8080 | read-only |
+| `netviz` | Any single command: `validate`, `render`, `list`, `export`, `fmt`, `path`, `ipam`, … | — | read-write |
+| `web` | [`netviz web`](commands/web.md): edit YAML in one pane, see the diagram in the other | 8081 | read-only |
+| `watch` | [`netviz watch --serve`](commands/watch.md): re-render on every save, served on a page that reloads itself | 8080 | read-only |
 
 `docker compose up` with no service named starts both servers; naming one starts only that one.
-The `netgraph` service sits behind a compose profile (`cli`) so that it is *not* started
+The `netviz` service sits behind a compose profile (`cli`) so that it is *not* started
 that way — a one-shot command has nothing to keep running, and `up` would report it as a
 container that exited. `docker compose run` enables the profile itself, so you never name
 it.
 
 The servers mount the inventory **read-only**, because neither writes: `watch` renders to
-memory and serves it, and `web` holds the document stream in the browser. The `netgraph`
+memory and serves it, and `web` holds the document stream in the browser. The `netviz`
 service mounts it read-write, because `render -o`, `fmt`, `export -o`, `init` and `import`
 all write into the tree.
 
@@ -168,10 +168,10 @@ Anything the CLI can do, it can do here:
 
 <!-- norun: needs a Docker daemon -->
 ```bash
-docker compose run --rm netgraph validate --strict --output-format json
-docker compose run --rm netgraph render --layer l2 --vlan 10 -f svg -o vlan10.svg
-docker compose run --rm netgraph export ansible-inventory -o inventory.yaml
-docker compose run --rm netgraph path pc-alice rtr-gw
+docker compose run --rm netviz validate --strict --output-format json
+docker compose run --rm netviz render --layer l2 --vlan 10 -f svg -o vlan10.svg
+docker compose run --rm netviz export ansible-inventory -o inventory.yaml
+docker compose run --rm netviz path pc-alice rtr-gw
 ```
 
 ## Pointing it at your own inventory
@@ -181,7 +181,7 @@ something before it describes a network of its own. Your own tree is one variabl
 
 <!-- norun: needs a Docker daemon, and names a path on the reader's machine -->
 ```bash
-NETGRAPH_INVENTORY=~/net/my-network docker compose run --rm netgraph validate
+NETVIZ_INVENTORY=~/net/my-network docker compose run --rm netviz validate
 ```
 
 or, since typing that on every command gets old, copy [`.env.example`](../.env.example) to
@@ -191,10 +191,10 @@ back to, so the file is a convenience and never a requirement. It is git-ignored
 paths and ids on one machine, which is not a fact about this repository.
 
 There are nine variables, and they are the whole configuration surface:
-`NETGRAPH_INVENTORY` (which tree), `NETGRAPH_UID` and `NETGRAPH_GID` (who writes),
-`NETGRAPH_BIND`, `NETGRAPH_WEB_PORT` and `NETGRAPH_WATCH_PORT` (who can reach the two
-servers, and on which host ports), `NETGRAPH_LAYER` and `NETGRAPH_ICONS` (what the diagram
-looks like), and `NETGRAPH_YAML_LOADER` (`auto` for libyaml, `python` to force the
+`NETVIZ_INVENTORY` (which tree), `NETVIZ_UID` and `NETVIZ_GID` (who writes),
+`NETVIZ_BIND`, `NETVIZ_WEB_PORT` and `NETVIZ_WATCH_PORT` (who can reach the two
+servers, and on which host ports), `NETVIZ_LAYER` and `NETVIZ_ICONS` (what the diagram
+looks like), and `NETVIZ_YAML_LOADER` (`auto` for libyaml, `python` to force the
 pure-Python parser — the same switch CI flips, see [testing.md](testing.md)). Each is
 described below or in `.env.example`; anything else is an edit to the compose file, which
 is a starting point rather than an interface.
@@ -203,35 +203,35 @@ is a starting point rather than an interface.
 
 A container that writes to a bind mount writes as whatever user it runs as, and a file
 owned by uid 1000 on a host where you are uid 1002 is a small daily annoyance. So the
-compose file runs the image as `${NETGRAPH_UID:-1000}:${NETGRAPH_GID:-1000}`:
+compose file runs the image as `${NETVIZ_UID:-1000}:${NETVIZ_GID:-1000}`:
 
 <!-- norun: needs a Docker daemon -->
 ```bash
-NETGRAPH_UID=$(id -u) NETGRAPH_GID=$(id -g) \
-  docker compose run --rm netgraph render -f svg -o topology.svg
+NETVIZ_UID=$(id -u) NETVIZ_GID=$(id -g) \
+  docker compose run --rm netviz render -f svg -o topology.svg
 ```
 
 Put those two in `.env` once and every render lands owned by you. The ids need no account
-in the image — netgraph reads no passwd entry, and `HOME` is set to the tmpfs so that
+in the image — netviz reads no passwd entry, and `HOME` is set to the tmpfs so that
 anything reaching for a home directory (fontconfig, above all) finds a writable one.
 
 ## Publishing the ports
 
 Both servers bind `0.0.0.0` *inside* the container, which sounds worse than it is: a
-container's loopback is its own, so binding netgraph to 127.0.0.1 there would make it
+container's loopback is its own, so binding netviz to 127.0.0.1 there would make it
 unreachable from the machine running Docker. What decides who can reach it is the
 published port, and that is on loopback by default:
 
 ```yaml
 ports:
-  - "${NETGRAPH_BIND:-127.0.0.1}:${NETGRAPH_WEB_PORT:-8081}:8081"
+  - "${NETVIZ_BIND:-127.0.0.1}:${NETVIZ_WEB_PORT:-8081}:8081"
 ```
 
-`NETGRAPH_BIND=0.0.0.0` publishes to everyone who can reach the host. That is the same
+`NETVIZ_BIND=0.0.0.0` publishes to everyone who can reach the host. That is the same
 decision `--host` is outside a container, and it deserves the same pause: an inventory
 describes internal topology — addresses, VLANs, what is plugged into what.
 
-Because the *container-side* bind is a wildcard, netgraph prints its usual warning on
+Because the *container-side* bind is a wildcard, netviz prints its usual warning on
 startup — `the preview is bound to every interface` — and inside a container published to
 loopback that warning overstates the exposure. It is left in place rather than suppressed:
 the process cannot see the port mapping, and a server that decided for itself that its
@@ -256,9 +256,9 @@ WATCHFILES_FORCE_POLLING=1 docker compose up watch
 On Linux, where the events do arrive, leave it unset — polling a large tree costs CPU for
 nothing.
 
-`NETGRAPH_LAYER` chooses what the preview draws (`l1`, `l2`, `l3`, `overlay`, `rack`) and
-`NETGRAPH_ICONS` chooses the icon theme (`none`, `cisco`). Anything beyond those two is an
-edit to the service's `command:` — every flag of [`netgraph render`](commands/render.md)
+`NETVIZ_LAYER` chooses what the preview draws (`l1`, `l2`, `l3`, `overlay`, `rack`) and
+`NETVIZ_ICONS` chooses the icon theme (`none`, `cisco`). Anything beyond those two is an
+edit to the service's `command:` — every flag of [`netviz render`](commands/render.md)
 applies to `watch`, and the compose file is a starting point, not an interface.
 
 ## Without compose
@@ -277,17 +277,17 @@ docker run --rm --init -p 127.0.0.1:8080:8080 -v "$PWD:/inventory:ro" \
   "$image" watch --serve --host 0.0.0.0
 ```
 
-Substitute `netgraph:local` after a `docker build -t netgraph:local .` to run your own
+Substitute `netviz:local` after a `docker build -t netviz:local .` to run your own
 checkout instead.
 
-`--init` matters for the servers. netgraph is PID 1 in the container and a Python process
+`--init` matters for the servers. netviz is PID 1 in the container and a Python process
 that has installed no `SIGTERM` handler ignores that signal when it is PID 1 — so without
 an init, `docker stop` waits out the ten-second grace period and kills it. With one, it
 stops in about a second. The compose file sets `init: true` for the same reason.
 
 ## In a pipeline
 
-The image is a way to run `netgraph validate` on a runner with no Python:
+The image is a way to run `netviz validate` on a runner with no Python:
 
 <!-- norun: needs a Docker daemon, and is a fragment of somebody else's pipeline -->
 ```bash
@@ -307,16 +307,16 @@ does have Python, the [GitHub Action](ci.md#the-github-action) and the
 
 ## What version am I running
 
-The image's entrypoint is netgraph itself, so:
+The image's entrypoint is netviz itself, so:
 
 <!-- norun: needs a Docker daemon; the versions are properties of the image -->
 ```bash
 docker run --rm ghcr.io/blechschmidt/netgraph:main version --json
 ```
 
-That prints the netgraph, Python and Graphviz versions inside the container, which is the
+That prints the netviz, Python and Graphviz versions inside the container, which is the
 first thing worth pasting into a bug report about a render — see
-[`netgraph version`](commands/version.md). The image also carries the usual OCI labels, so
+[`netviz version`](commands/version.md). The image also carries the usual OCI labels, so
 `docker inspect` answers the same question without running anything:
 
 <!-- norun: needs a Docker daemon -->
@@ -328,11 +328,11 @@ docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.versi
 ## How this is kept honest
 
 [`tests/test_docker.py`](../tests/test_docker.py) reads both files and asserts what this
-page claims: that every service's command is a real netgraph invocation with real flags,
+page claims: that every service's command is a real netviz invocation with real flags,
 that the published ports are the defaults those commands actually bind, that the servers'
 mount is read-only and the CLI service's is not, that every variable has a default, that
 `.env.example` documents exactly the variables the compose file reads, and that the image
-ends up unprivileged with `netgraph` as its entrypoint. The `docker` job in
+ends up unprivileged with `netviz` as its entrypoint. The `docker` job in
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) then builds the image for real,
 runs a command through each service and fetches a page from each server, so a compose file
 that parses but does not work fails there.
@@ -360,7 +360,7 @@ tools/verify_published_image.py --image ghcr.io/blechschmidt/netgraph:edge
 It asks the registry for an anonymous pull token — which GHCR grants only for a public
 package — resolves the tag, checks the index really carries both architectures and the
 provenance and SBOM attachments, then pulls it cold and runs it: bare `docker run` prints
-help, the entrypoint is `netgraph` and reports the version this repository declares,
+help, the entrypoint is `netviz` and reports the version this repository declares,
 Graphviz answers, a read-only mount validates and renders, and a writable one comes back
 owned by the user who asked rather than by root. `--registry-only` drops everything needing
 a daemon, for a quick "is it there and is it public".

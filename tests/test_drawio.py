@@ -7,7 +7,7 @@ produces an *empty plan*, for every published example and for every view. This
 is the property the whole feature rests on: if re-importing an untouched diagram
 proposed changes, nobody could ever trust the ones it proposed after a real
 edit. It is checked by running the real pipeline — the same emitter the CLI
-runs, the same reconciler, the same :func:`netgraph.plan.diff` — rather than by
+runs, the same reconciler, the same :func:`netviz.plan.diff` — rather than by
 comparing coordinates, because a no-op is a statement about the *plan*.
 
 **An edit means exactly one thing.** ``tests/fixtures/drawio/arranged-edited.
@@ -37,8 +37,8 @@ from click.testing import CliRunner
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from netgraph.cli import cli
-from netgraph.drawio import (
+from netviz.cli import cli
+from netviz.drawio import (
     ATTRIBUTES,
     MODEL_VERSION,
     BuildOptions,
@@ -62,21 +62,21 @@ from netgraph.drawio import (
     reconcile,
     write_mxfile,
 )
-from netgraph.drawio.build import HALF_SELECTED, NOT_ARRANGED, NOT_REPRESENTABLE
-from netgraph.drawio.identity import format_points, parse_points
-from netgraph.drawio.mxfile import AGENT, MAX_DOCUMENT_BYTES
-from netgraph.drawio.styles import data_uri, icon_data_uri
-from netgraph.edit import EditSession, RenameElement, SetGeometry
-from netgraph.export import EXPORTERS, ExportContext, ExportOptions, export, layers_for
-from netgraph.export.header import GENERATOR
-from netgraph.export.manifest import Reason
-from netgraph.fsio import write_text
-from netgraph.loader import Inventory, load_tree
-from netgraph.plan import diff as diff_states
-from netgraph.plan import render_plan
-from netgraph.render import build_graph, filter_graph
-from netgraph.render.graph import FilterSpec, Layer
-from netgraph.render.icons import CISCO, icon_theme
+from netviz.drawio.build import HALF_SELECTED, NOT_ARRANGED, NOT_REPRESENTABLE
+from netviz.drawio.identity import format_points, parse_points
+from netviz.drawio.mxfile import AGENT, MAX_DOCUMENT_BYTES
+from netviz.drawio.styles import data_uri, icon_data_uri
+from netviz.edit import EditSession, RenameElement, SetGeometry
+from netviz.export import EXPORTERS, ExportContext, ExportOptions, export, layers_for
+from netviz.export.header import GENERATOR
+from netviz.export.manifest import Reason
+from netviz.fsio import write_text
+from netviz.loader import Inventory, load_tree
+from netviz.plan import diff as diff_states
+from netviz.plan import render_plan
+from netviz.render import build_graph, filter_graph
+from netviz.render.graph import FilterSpec, Layer
+from netviz.render.icons import CISCO, icon_theme
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -102,7 +102,7 @@ def run_export(
     spec: FilterSpec | None = None,
     **overrides: object,
 ) -> str:
-    """Export ``inventory`` the way :func:`netgraph.cli.export_command` does.
+    """Export ``inventory`` the way :func:`netviz.cli.export_command` does.
 
     ``complete`` follows from ``spec``, exactly as the CLI derives it from what
     the reader typed: an export that was narrowed is a partial diagram, and
@@ -186,7 +186,7 @@ def test_the_declared_layers_are_the_default_when_no_options_are_given() -> None
 def test_the_builders_reason_tokens_are_real_manifest_reasons(token: str) -> None:
     """The wire format spells them as literals; they must still be Reasons.
 
-    :mod:`netgraph.drawio` must not import :mod:`netgraph.export` — the
+    :mod:`netviz.drawio` must not import :mod:`netviz.export` — the
     dependency runs the other way — so the tokens are restated there. This is
     what stops the two copies drifting apart in silence.
     """
@@ -196,9 +196,9 @@ def test_the_builders_reason_tokens_are_real_manifest_reasons(token: str) -> Non
 def test_the_agent_string_is_the_one_every_other_export_writes() -> None:
     """Restated in the wire format for the same reason, and pinned for the same one.
 
-    :mod:`netgraph.drawio.mxfile` cannot import :mod:`netgraph.export.header`
+    :mod:`netviz.drawio.mxfile` cannot import :mod:`netviz.export.header`
     without making the two packages import each other, so it spells the agent
-    string itself. Two spellings of "which netgraph wrote this" that disagree
+    string itself. Two spellings of "which netviz wrote this" that disagree
     would be worse than none.
     """
     assert AGENT == GENERATOR
@@ -214,8 +214,8 @@ def test_the_export_is_well_formed_xml_and_names_its_namespace(
 ) -> None:
     payload = run_export(inventories["arranged"])
     assert payload.startswith('<?xml version="1.0" encoding="UTF-8"?>')
-    assert f'xmlns:netgraph="{qualified("").rstrip(":")}"' not in payload  # sanity: not the prefix
-    assert "xmlns:netgraph=" in payload
+    assert f'xmlns:netviz="{qualified("").rstrip(":")}"' not in payload  # sanity: not the prefix
+    assert "xmlns:netviz=" in payload
     assert payload.endswith("\n")
     parse_mxfile(payload)  # raises if it is not well-formed
 
@@ -309,7 +309,7 @@ def test_every_node_carries_the_identity_the_import_reconciles_by(
 def test_the_icons_are_inlined_so_the_file_needs_nothing_beside_it(
     inventories: dict[str, Inventory],
 ) -> None:
-    """A stakeholder opens the file on a machine that has never seen netgraph."""
+    """A stakeholder opens the file on a machine that has never seen netviz."""
     diagram = parse_mxfile(run_export(inventories["fixture"]))
     styles = [cell.style for cell in diagram.of_role(CellRole.NODE)]
     assert styles and all("shape=image;" in style for style in styles)
@@ -349,7 +349,7 @@ def test_a_theme_with_no_picture_for_a_kind_falls_back_and_says_so(tmp_path: Pat
     assert "image=data:image/png," in result.payload
 
 
-def test_an_unarranged_inventory_still_exports_and_says_the_layout_is_netgraphs(
+def test_an_unarranged_inventory_still_exports_and_says_the_layout_is_netvizs(
     inventories: dict[str, Inventory],
 ) -> None:
     inventory = inventories["home-lab"]
@@ -371,9 +371,9 @@ def test_an_unarranged_inventory_still_exports_and_says_the_layout_is_netgraphs(
 
 def test_an_empty_inventory_produces_an_openable_diagram(tmp_path: Path) -> None:
     """Nothing to draw is a diagram with no cells, not a crash and not a blank file."""
-    (tmp_path / "netgraph.toml").write_text("", encoding="utf-8")
+    (tmp_path / "netviz.toml").write_text("", encoding="utf-8")
     diagram = parse_mxfile(run_export(load_tree(tmp_path)))
-    assert diagram.is_netgraph
+    assert diagram.is_netviz
     assert not diagram.of_role(CellRole.NODE)
 
 
@@ -382,7 +382,7 @@ def test_a_hostile_free_text_field_survives_the_xml(tmp_path: Path) -> None:
     hostile = "q\"uote <&> 'apos\ttab"
     write_text(
         tmp_path / "device.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n"
         f"  name: sw-1\n  description: {json.dumps(hostile)}\n"
         f"  labels:\n    role: {json.dumps(hostile)}\n"
         "spec:\n  interfaces:\n    - name: e0\n      type: ethernet\n",
@@ -410,7 +410,7 @@ def test_the_two_coordinate_systems_are_exact_inverses(
 ) -> None:
     """Every stored position passes through this twice; a drift here is a drift."""
     frame = Frame(origin_x=origin_x, origin_y=origin_y)
-    back = frame.to_netgraph(*frame.to_drawio(x, y))
+    back = frame.to_netviz(*frame.to_drawio(x, y))
     assert back[0] == pytest.approx(x, abs=0.01)
     assert back[1] == pytest.approx(y, abs=0.01)
 
@@ -420,10 +420,10 @@ def test_the_two_coordinate_systems_are_exact_inverses(
 def test_a_box_survives_the_centre_to_corner_conversion(
     x: float, y: float, width: float, height: float
 ) -> None:
-    """netgraph places a centre, draw.io places a corner; neither may drift."""
+    """netviz places a centre, draw.io places a corner; neither may drift."""
     frame = Frame(origin_x=-13.5, origin_y=907.25)
     corner = frame.box_to_drawio(x, y, width, height)
-    centre = frame.box_to_netgraph(corner[0], corner[1], width, height)
+    centre = frame.box_to_netviz(corner[0], corner[1], width, height)
     assert centre[0] == pytest.approx(x, abs=0.02)
     assert centre[1] == pytest.approx(y, abs=0.02)
 
@@ -514,7 +514,7 @@ def test_the_hand_edited_fixture_produces_its_golden_plan(
 
     The fixture is the pristine export with a node moved, a label retyped, a
     node deleted and an edge drawn — the four things a draw.io user can do that
-    netgraph acts on. Regenerate both with ``tools/gen_drawio_fixtures.py`` and
+    netviz acts on. Regenerate both with ``tools/gen_drawio_fixtures.py`` and
     this test with ``--regen-golden``.
     """
     inventory = load_tree(workspace)
@@ -539,7 +539,7 @@ def test_the_hand_edited_fixture_produces_its_golden_plan(
 
 #: The state digest names the temporary directory the workspace was copied to,
 #: so it is elided from the golden. What it asserts — that a plan is only ever
-#: applied to the tree it was made from — is ``netgraph apply``'s to test.
+#: applied to the tree it was made from — is ``netviz apply``'s to test.
 _DIGEST = re.compile(r'"hash": "[0-9a-f]+"')
 
 
@@ -578,7 +578,7 @@ def test_a_retyped_label_becomes_a_rename(workspace: Path) -> None:
 def test_a_label_that_is_not_a_name_is_reported_rather_than_written(
     workspace: Path,
 ) -> None:
-    """A stakeholder types a caption where a name was; netgraph does not oblige."""
+    """A stakeholder types a caption where a name was; netviz does not oblige."""
     text = (FIXTURES / "arranged-edited.drawio").read_text("utf-8")
     text = text.replace('<object label="srv-web"', '<object label="the big one (rack 3)"')
     inventory = load_tree(workspace)
@@ -639,7 +639,7 @@ def test_an_edge_with_nowhere_to_land_is_reported_rather_than_forced(
 ) -> None:
     """A cable on an occupied port is the mistake this whole tool exists to catch."""
     text = (FIXTURES / "arranged-l1.drawio").read_text("utf-8")
-    ids = dict(re.findall(r'netgraph:name="([^"]+)"[^>]*id="(n-[^"]+)"', text))
+    ids = dict(re.findall(r'netviz:name="([^"]+)"[^>]*id="(n-[^"]+)"', text))
     drawn = (
         f'<mxCell id="drawn-2" style="edgeStyle=none;" edge="1" parent="1" '
         f'source="{ids["devices/rtr-core"]}" target="{ids["devices/rtr-core"]}">'
@@ -655,7 +655,7 @@ def test_an_edge_with_nowhere_to_land_is_reported_rather_than_forced(
     assert any("both ends on one element" in note.message for note in result.notes)
 
 
-def test_a_cell_netgraph_did_not_write_is_reported_and_left_alone(
+def test_a_cell_netviz_did_not_write_is_reported_and_left_alone(
     workspace: Path,
 ) -> None:
     """A legend, a note, an arrow: welcome on the canvas, absent from the tree."""
@@ -673,7 +673,7 @@ def test_a_cell_netgraph_did_not_write_is_reported_and_left_alone(
     )
     assert result.operations == ()
     assert result.unmapped == 1
-    assert any("netgraph did not write" in note.message for note in result.notes)
+    assert any("netviz did not write" in note.message for note in result.notes)
 
 
 # --------------------------------------------------------------------------- #
@@ -703,7 +703,7 @@ def test_an_unfiltered_export_is_stamped_complete(inventories: dict[str, Invento
 def test_an_unreadable_scope_is_read_as_partial(inventories: dict[str, Inventory]) -> None:
     """Guessing the other way lets a corrupt attribute authorise a mass delete."""
     text = run_export(inventories["fixture"]).replace(
-        'netgraph:scope="complete"', 'netgraph:scope="nonsense"'
+        'netviz:scope="complete"', 'netviz:scope="nonsense"'
     )
     assert parse_mxfile(text).scope is Scope.PARTIAL
 
@@ -742,13 +742,11 @@ def test_an_element_that_changed_under_the_diagram_is_reported_not_refused(
     assert any("changed in the inventory" in note.message for note in result.of_level(Level.INFO))
 
 
-def test_a_diagram_from_a_newer_netgraph_is_refused_with_a_sentence(
+def test_a_diagram_from_a_newer_netviz_is_refused_with_a_sentence(
     inventories: dict[str, Inventory],
 ) -> None:
     inventory = inventories["fixture"]
-    text = run_export(inventory).replace(
-        f'netgraph:version="{MODEL_VERSION}"', 'netgraph:version="99"'
-    )
+    text = run_export(inventory).replace(f'netviz:version="{MODEL_VERSION}"', 'netviz:version="99"')
     result = reconcile(parse_mxfile(text), inventory, build_graph(inventory, layer=Layer.L1))
     assert result.failed
     assert result.operations == ()
@@ -772,7 +770,7 @@ def test_a_cell_naming_an_element_that_is_gone_is_reported(workspace: Path) -> N
 
 
 # --------------------------------------------------------------------------- #
-# A diagram netgraph did not write
+# A diagram netviz did not write
 # --------------------------------------------------------------------------- #
 
 FOREIGN = """<?xml version="1.0" encoding="UTF-8"?>
@@ -807,13 +805,13 @@ def test_a_hand_drawn_diagram_is_read_and_reported_but_never_reconciled(
     """Inferring a device from a rectangle would put hardware nobody owns in the tree."""
     inventory = inventories["fixture"]
     diagram = parse_mxfile(FOREIGN)
-    assert not diagram.is_netgraph
+    assert not diagram.is_netviz
 
     result = reconcile(diagram, inventory, build_graph(inventory, layer=Layer.L1))
     assert result.operations == ()
     assert result.unmapped == 1  # the unlabelled rounded box, and only it
     messages = " ".join(note.message for note in result.notes)
-    assert "not written by 'netgraph export drawio'" in messages
+    assert "not written by 'netviz export drawio'" in messages
     assert "looks like a router" in messages
     assert "looks like a switch" in messages
     assert "docs/drawio.md" in messages
@@ -889,13 +887,13 @@ def test_a_namespace_declaration_an_editor_dropped_is_put_back(
 ) -> None:
     """An unbound prefix is a spelling problem, not a corrupted diagram."""
     text = run_export(inventories["fixture"])
-    stripped = text.replace(f' xmlns:netgraph="{_namespace_uri(text)}"', "")
-    assert "xmlns:netgraph" not in stripped
+    stripped = text.replace(f' xmlns:netviz="{_namespace_uri(text)}"', "")
+    assert "xmlns:netviz" not in stripped
     assert parse_mxfile(stripped).cells == parse_mxfile(text).cells
 
 
 def _namespace_uri(text: str) -> str:
-    match = re.search(r'xmlns:netgraph="([^"]+)"', text)
+    match = re.search(r'xmlns:netviz="([^"]+)"', text)
     assert match is not None
     return match[1]
 
@@ -951,8 +949,8 @@ def test_the_metadata_cell_is_invisible_locked_and_singular(
     assert "deletable=0" in metadata[0].style
 
 
-def test_a_diagram_with_no_metadata_cell_is_not_one_of_netgraphs() -> None:
-    assert not Diagram(cells=(Cell(id="a", role=CellRole.NODE),)).is_netgraph
+def test_a_diagram_with_no_metadata_cell_is_not_one_of_netvizs() -> None:
+    assert not Diagram(cells=(Cell(id="a", role=CellRole.NODE),)).is_netviz
 
 
 def test_the_builder_is_usable_without_a_notes_accumulator(
@@ -1045,7 +1043,7 @@ def test_importing_an_untouched_export_through_the_command_changes_nothing(
 
 
 def test_the_legacy_import_signature_still_works(tmp_path: Path) -> None:
-    """``netgraph import caps/*.json`` is in everybody's shell history."""
+    """``netviz import caps/*.json`` is in everybody's shell history."""
     runner = CliRunner()
     capture = tmp_path / "sw-1.csv"
     capture.write_text("sw-1,port1,pc-1,eno1\n", encoding="utf-8")

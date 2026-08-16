@@ -2,7 +2,7 @@
 
 A schema generated from the models is only worth having if it agrees with them.
 ``jsonschema`` is that second opinion: it knows nothing about pydantic, so when
-it and :func:`~netgraph.models.parse_document` reach the same verdict on a
+it and :func:`~netviz.models.parse_document` reach the same verdict on a
 document, the schema is doing its job.
 
 Five promises are asserted here:
@@ -14,7 +14,7 @@ Five promises are asserted here:
   by the models, because the examples only exercise one spelling of each;
 * every deliberately-broken document is rejected, again by both, so the two
   cannot quietly disagree;
-* ``schema/netgraph.schema.json`` is what the models produce right now, the
+* ``schema/netviz.schema.json`` is what the models produce right now, the
   same drift guard ``docs/schema-reference.md`` has.
 """
 
@@ -31,17 +31,17 @@ import jsonschema
 import pytest
 from click.testing import CliRunner
 
-from netgraph import schema as schema_module
-from netgraph.cli import cli
-from netgraph.errors import SchemaError
-from netgraph.loader.documents import read_documents
-from netgraph.models import DOCUMENT_KINDS, KINDS, element_model_for, fielddocs, parse_document
-from netgraph.schema import SCHEMA_DIALECT, UnknownKindError, build_schema, schema_id
+from netviz import schema as schema_module
+from netviz.cli import cli
+from netviz.errors import SchemaError
+from netviz.loader.documents import read_documents
+from netviz.models import DOCUMENT_KINDS, KINDS, element_model_for, fielddocs, parse_document
+from netviz.schema import SCHEMA_DIALECT, UnknownKindError, build_schema, schema_id
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
 GENERATOR = REPO_ROOT / "tools" / "gen_json_schema.py"
-COMMITTED = REPO_ROOT / "schema" / "netgraph.schema.json"
+COMMITTED = REPO_ROOT / "schema" / "netviz.schema.json"
 
 
 # --------------------------------------------------------------------------- #
@@ -194,7 +194,7 @@ def test_every_example_document_matches_its_own_kind_only(
 
 def _document(kind: str, spec: Any, **metadata: Any) -> dict[str, Any]:
     return {
-        "apiVersion": "netgraph.dev/v1alpha1",
+        "apiVersion": "netviz.dev/v1alpha1",
         "kind": kind,
         "metadata": {"name": "el", **metadata},
         "spec": spec,
@@ -299,15 +299,15 @@ def test_a_valid_document_is_accepted_by_the_models(case: str) -> None:
 
 #: Each case is a document that must be refused twice over: once by the JSON
 #: Schema, once by the pydantic models. A case that only one of them rejects is
-#: a case where the editor and ``netgraph validate`` would disagree.
+#: a case where the editor and ``netviz validate`` would disagree.
 BROKEN: dict[str, dict[str, Any]] = {
     "unknown kind": _document("loadbalancer", {"interfaces": [_port()]}),
     "missing kind": {
-        "apiVersion": "netgraph.dev/v1alpha1",
+        "apiVersion": "netviz.dev/v1alpha1",
         "metadata": {"name": "el"},
         "spec": {"interfaces": [_port()]},
     },
-    "unknown apiVersion": {**_switch(), "apiVersion": "netgraph.dev/v2"},
+    "unknown apiVersion": {**_switch(), "apiVersion": "netviz.dev/v2"},
     "unknown top-level key": {**_switch(), "extras": {}},
     "unknown field on an interface": _switch(_port(descrption="typo")),
     "unknown field in metadata": _document("switch", {"interfaces": [_port()]}, tags=["a"]),
@@ -384,7 +384,7 @@ def test_a_broken_document_is_refused_by_the_models(case: str) -> None:
 # The drift guards
 # --------------------------------------------------------------------------- #
 #
-# Every table in ``netgraph.schema`` names models by string. A rename that is
+# Every table in ``netviz.schema`` names models by string. A rename that is
 # not followed through would otherwise leave a shorthand unwidened and a schema
 # that quietly refuses valid documents, so each table checks itself. These tests
 # prove the checks fire.
@@ -463,7 +463,7 @@ def test_the_generator_check_mode_agrees() -> None:
 
 def test_the_generator_rewrites_the_file(tmp_path: Path) -> None:
     generator = load_generator()
-    target = tmp_path / "nested" / "netgraph.schema.json"
+    target = tmp_path / "nested" / "netviz.schema.json"
     assert generator.main(["--check", "-o", str(target)]) == 1
     assert generator.main(["-o", str(target)]) == 0
     assert generator.main(["--check", "-o", str(target)]) == 0
@@ -492,7 +492,7 @@ def test_the_command_writes_the_schema_to_stdout() -> None:
 
 
 def test_the_command_writes_the_same_bytes_as_the_generator() -> None:
-    """``netgraph schema > file`` and the tool must produce one artefact."""
+    """``netviz schema > file`` and the tool must produce one artefact."""
     result = CliRunner().invoke(cli, ["schema"])
     assert result.output == load_generator().build()
 

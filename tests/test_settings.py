@@ -8,8 +8,8 @@ Three things are asserted here, in that order:
 * **Precedence.** Flag beats profile beats ``[render]`` beats built-in default,
   every rung of it — including the one that only exists because Click cannot
   tell "flag absent" from "flag given its default value" by inspection.
-* **Discoverability.** ``netgraph config show`` and ``--show-config`` say where
-  each value came from, ``--profile`` completes, and ``netgraph init``
+* **Discoverability.** ``netviz config show`` and ``--show-config`` say where
+  each value came from, ``--profile`` completes, and ``netviz init``
   scaffolds an example that actually parses.
 
 The promise that an inventory *without* a ``[render]`` table renders exactly as
@@ -28,19 +28,19 @@ import pytest
 from click.shell_completion import ShellComplete
 from click.testing import CliRunner, Result
 
-from netgraph.cli import CONFIGURABLE, cli, main
-from netgraph.completion import PROG_NAME, complete_profile
+from netviz.cli import CONFIGURABLE, cli, main
+from netviz.completion import PROG_NAME, complete_profile
 
-# The TOML parser netgraph itself uses. Taken from there rather than imported
+# The TOML parser netviz itself uses. Taken from there rather than imported
 # directly because ``tomllib`` only entered the standard library in 3.11 and this
 # package supports 3.10, where the dependency is ``tomli``: a bare ``import
 # tomllib`` here made the whole module uncollectable on the oldest interpreter
 # the project claims to support.
-from netgraph.config import CONFIG_FILE_NAME, load_config, parse_config, tomllib
-from netgraph.errors import ConfigurationError
-from netgraph.render import FORMATS, NODE_KINDS, RANKDIRS, Layer
-from netgraph.scaffold import build_scaffold
-from netgraph.settings import (
+from netviz.config import CONFIG_FILE_NAME, load_config, parse_config, tomllib
+from netviz.errors import ConfigurationError
+from netviz.render import FORMATS, NODE_KINDS, RANKDIRS, Layer
+from netviz.scaffold import build_scaffold
+from netviz.settings import (
     SETTINGS,
     SETTINGS_BY_KEY,
     Origin,
@@ -71,7 +71,7 @@ def inventory(tmp_path: Path) -> Path:
     tree = tmp_path / "inv"
     (tree / "devices").mkdir(parents=True)
     (tree / "devices" / "sw.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata: {name: sw-core}\n"
         "spec:\n"
@@ -99,7 +99,7 @@ def test_every_key_is_the_long_flag_without_its_dashes() -> None:
     flags = {option for parameter in render.params for option in parameter.opts}
     for setting in SETTINGS:
         assert setting.flag in flags or f"--{setting.key}/--no-{setting.key}" in str(flags), (
-            f"[render] {setting.key} mirrors no flag of 'netgraph render'"
+            f"[render] {setting.key} mirrors no flag of 'netviz render'"
         )
 
 
@@ -107,7 +107,7 @@ def test_every_setting_feeds_a_parameter_render_declares() -> None:
     render = cli.commands["render"]
     declared = {parameter.name for parameter in render.params}
     for setting in SETTINGS:
-        assert setting.param in declared, f"'netgraph render' has no {setting.param} parameter"
+        assert setting.param in declared, f"'netviz render' has no {setting.param} parameter"
 
 
 def test_no_setting_can_redirect_output_or_bypass_validation() -> None:
@@ -395,7 +395,7 @@ def test_an_unknown_profile_is_reported_and_nothing_is_drawn(
     captured = capsys.readouterr()
     assert status == ConfigurationError.exit_code
     assert "no profile 'nope'" in captured.err
-    assert "graph netgraph" not in captured.out
+    assert "graph netviz" not in captured.out
 
 
 def test_a_broken_file_refuses_the_render(
@@ -470,7 +470,7 @@ def test_config_show_without_a_file_says_so(runner: CliRunner, inventory: Path) 
 
 def test_config_show_defaults_to_render(runner: CliRunner, inventory: Path) -> None:
     assert (
-        "settings for 'netgraph render'"
+        "settings for 'netviz render'"
         in runner.invoke(cli, ["-i", str(inventory), "config", "show"]).output
     )
 
@@ -481,7 +481,7 @@ def test_config_show_resolves_every_configurable_command(
 ) -> None:
     result = runner.invoke(cli, ["-i", str(inventory), "config", "show", command])
     assert result.exit_code == 0, result.output
-    assert f"settings for 'netgraph {command}'" in result.output
+    assert f"settings for 'netviz {command}'" in result.output
 
 
 def test_config_show_lists_only_what_web_takes(runner: CliRunner, inventory: Path) -> None:
@@ -501,7 +501,7 @@ def test_config_show_rejects_an_unknown_profile(
 def test_show_config_draws_nothing(runner: CliRunner, inventory: Path) -> None:
     result = runner.invoke(cli, ["-i", str(inventory), "render", "--show-config"])
     assert result.exit_code == 0
-    assert "graph netgraph" not in result.output
+    assert "graph netviz" not in result.output
 
 
 @pytest.mark.parametrize("command", ["render", "watch", "path", "web"])
@@ -513,7 +513,7 @@ def test_show_config_exits_before_doing_any_work(
     arguments = ["a", "b"] if command == "path" else []
     result = runner.invoke(cli, ["-i", str(inventory), command, *arguments, "--show-config"])
     assert result.exit_code == 0, result.output
-    assert f"settings for 'netgraph {command}'" in result.output
+    assert f"settings for 'netviz {command}'" in result.output
 
 
 # --------------------------------------------------------------------------- #
@@ -522,7 +522,7 @@ def test_show_config_exits_before_doing_any_work(
 
 
 def complete(args: list[str], incomplete: str = "") -> list[str]:
-    completer = ShellComplete(cli, {}, PROG_NAME, "_NETGRAPH_COMPLETE")
+    completer = ShellComplete(cli, {}, PROG_NAME, "_NETVIZ_COMPLETE")
     return [item.value for item in completer.get_completions(args, incomplete)]
 
 
@@ -561,7 +561,7 @@ def test_the_profile_flag_is_offered_by_every_configurable_command(command: str)
 def test_the_scaffolded_example_parses_once_uncommented() -> None:
     """A commented example nobody runs is an example that rots.
 
-    Every commented *setting* of the generated ``netgraph.toml`` — a table
+    Every commented *setting* of the generated ``netviz.toml`` — a table
     header or a ``key = value``, as distinct from the prose around them — is
     uncommented and fed back through the parser, so a key renamed in
     :data:`SETTINGS` without the scaffold following fails here.
@@ -630,7 +630,7 @@ def test_the_keys_a_profile_sets_are_reported_in_registry_order() -> None:
 
 
 def test_a_toml_date_is_reported_by_its_own_type_name() -> None:
-    """TOML has types netgraph has no key for; the diagnostic still names one."""
+    """TOML has types netviz has no key for; the diagnostic still names one."""
     import datetime
 
     expected = re.escape("render.title must be a string, got date")

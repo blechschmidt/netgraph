@@ -1,10 +1,10 @@
-"""``netgraph export <dialect>`` — the configuration a device would actually run.
+"""``netviz export <dialect>`` — the configuration a device would actually run.
 
 Five properties are asserted here, in this order of importance:
 
 **The round trip closes.** Every dialect, over every shipped example, generated
-and then read back through ``netgraph drift``, must report *no drift*. That is
-the whole claim of the feature: the file netgraph writes and the file netgraph
+and then read back through ``netviz drift``, must report *no drift*. That is
+the whole claim of the feature: the file netviz writes and the file netviz
 reads are the same file, and a difference between them would mean one of the two
 halves is lying. This is the test that would catch a refactor of either side.
 
@@ -22,7 +22,7 @@ configuration applied to a real estate is the failure mode worth a test.
 including the provenance banner, which holds no clock, host or path.
 
 **The output cannot escape.** A path is relative, stays inside ``--out``, and
-overwriting a file netgraph did not write is refused.
+overwriting a file netviz did not write is refused.
 """
 
 from __future__ import annotations
@@ -35,20 +35,20 @@ from typing import Final
 import pytest
 from click.testing import CliRunner
 
-from netgraph.cli import cli, main
-from netgraph.drift import check_drift
-from netgraph.export import CONFIG_DIALECTS, CONFIG_FORMATS, ExportContext, ExportOptions, export
-from netgraph.export.config import CONFIG_LAYERS, UnsupportedConfigError, generate
-from netgraph.export.config.header import DIALECT_KEY, ELEMENT_KEY, SOURCE_KEY, parse_banner
-from netgraph.export.config.model import ConfigFile, ConfigSet, DeviceConfig, safe_relative_path
-from netgraph.export.config.write import ConfigWriteError, stale_files, write_config
-from netgraph.export.manifest import Recorder
-from netgraph.importer import DIALECTS
-from netgraph.importer.config import CONFIG_READERS, sniff
-from netgraph.importer.draft import Draft
-from netgraph.loader import Inventory, load_tree
-from netgraph.render import build_graph, filter_graph
-from netgraph.render.graph import FilterSpec, Layer
+from netviz.cli import cli, main
+from netviz.drift import check_drift
+from netviz.export import CONFIG_DIALECTS, CONFIG_FORMATS, ExportContext, ExportOptions, export
+from netviz.export.config import CONFIG_LAYERS, UnsupportedConfigError, generate
+from netviz.export.config.header import DIALECT_KEY, ELEMENT_KEY, SOURCE_KEY, parse_banner
+from netviz.export.config.model import ConfigFile, ConfigSet, DeviceConfig, safe_relative_path
+from netviz.export.config.write import ConfigWriteError, stale_files, write_config
+from netviz.export.manifest import Recorder
+from netviz.importer import DIALECTS
+from netviz.importer.config import CONFIG_READERS, sniff
+from netviz.importer.draft import Draft
+from netviz.loader import Inventory, load_tree
+from netviz.render import build_graph, filter_graph
+from netviz.render.graph import FilterSpec, Layer
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -104,11 +104,11 @@ def test_every_dialect_is_registered_as_an_export_format() -> None:
 
 
 def test_every_dialect_can_be_read_back() -> None:
-    """A dialect netgraph writes is a dialect ``netgraph drift`` accepts.
+    """A dialect netviz writes is a dialect ``netviz drift`` accepts.
 
     The claim of the whole feature is that generate-then-compare is symmetric, and
     a dialect with an emitter and no reader would break it silently — the export
-    would work and the check would say "not a capture netgraph reads".
+    would work and the check would say "not a capture netviz reads".
     """
     assert set(CONFIG_DIALECTS) == set(CONFIG_READERS)
     for name in CONFIG_DIALECTS:
@@ -141,7 +141,7 @@ def config_inputs(config: ConfigSet, root: Path) -> list[str]:
 def test_generating_and_reading_back_reports_no_drift(
     example: str, dialect: str, inventories: dict[str, Inventory], tmp_path: Path
 ) -> None:
-    """The central claim: what netgraph writes, netgraph reads as agreement.
+    """The central claim: what netviz writes, netviz reads as agreement.
 
     Blind spots are expected and are not drift — a netplan file has never seen a
     cable — so only :attr:`DriftReport.changes` is asserted on. A single change
@@ -270,7 +270,7 @@ def test_no_generated_file_holds_key_material(
 #: nor ``dev``, so no interface to hang off), and a route whose egress is an
 #: interface a host dialect leaves out.
 AWKWARD_HOST = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-awkward
@@ -323,7 +323,7 @@ def test_a_radio_with_no_ssid_is_left_out_and_recorded(awkward: Inventory) -> No
     """netplan requires an access point and refuses the file without one.
 
     So the radio cannot go in ``wifis:`` — there is nothing to put in the key
-    netplan insists on, and netgraph does not invent an SSID. The point of the
+    netplan insists on, and netviz does not invent an SSID. The point of the
     test is the second half: it is *recorded*, not dropped.
     """
     recorder = Recorder()
@@ -382,7 +382,7 @@ def test_an_ssid_is_not_reshaped_on_the_way_out(tmp_path: Path) -> None:
     configured with the second never associates with the first.
     """
     (tmp_path / "ap.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata:\n"
         "  name: pc-wifi\n"
@@ -413,7 +413,7 @@ def test_an_unstated_security_mode_does_not_assert_a_passphrase(tmp_path: Path) 
     dialects must not read one inventory two ways.
     """
     (tmp_path / "pc.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata:\n"
         "  name: pc-open\n"
@@ -457,7 +457,7 @@ def test_a_slash_in_an_interface_name_does_not_nest_a_wireguard_file(tmp_path: P
     reads, and reading it back invents an interface called ``0``.
     """
     (tmp_path / "net.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: router\n"
         "metadata: {name: rtr-a}\n"
         "spec:\n"
@@ -465,7 +465,7 @@ def test_a_slash_in_an_interface_name_does_not_nest_a_wireguard_file(tmp_path: P
         "    - {name: eth0, type: ethernet, ipv4: [198.51.100.1/24]}\n"
         "    - {name: wg/0, type: tunnel, parent: eth0, ipv4: [10.9.0.1/24]}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: router\n"
         "metadata: {name: rtr-b}\n"
         "spec:\n"
@@ -473,7 +473,7 @@ def test_a_slash_in_an_interface_name_does_not_nest_a_wireguard_file(tmp_path: P
         "    - {name: eth0, type: ethernet, ipv4: [198.51.100.2/24]}\n"
         "    - {name: wg0, type: tunnel, parent: eth0, ipv4: [10.9.0.2/24]}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: tunnel\n"
         "metadata: {name: wg-ab}\n"
         "spec:\n"
@@ -494,7 +494,7 @@ def test_a_slash_in_an_interface_name_does_not_nest_a_wireguard_file(tmp_path: P
 #: tagged set of a bridge port, so both must refuse rather than write a file that
 #: leaves the port admitting every VLAN there is.
 TRUNKING_HOST = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-trunked
@@ -509,7 +509,7 @@ spec:
         mode: trunk
         trunk_vlans: [10, 20]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-plain
@@ -641,7 +641,7 @@ def test_the_tree_is_one_directory_per_device(
         assert (tmp_path / Path(device.directory)).is_dir()
 
 
-def test_writing_over_a_file_netgraph_did_not_write_is_refused(
+def test_writing_over_a_file_netviz_did_not_write_is_refused(
     inventories: dict[str, Inventory], tmp_path: Path
 ) -> None:
     config = build(inventories["quickstart"], "netplan")
@@ -654,7 +654,7 @@ def test_writing_over_a_file_netgraph_did_not_write_is_refused(
         write_config(config, tmp_path)
     assert "--force" in str(caught.value)
 
-    # The same file, once netgraph wrote it, is its own to replace.
+    # The same file, once netviz wrote it, is its own to replace.
     write_config(config, tmp_path, force=True)
     write_config(config, tmp_path)
 
@@ -674,7 +674,7 @@ def test_writing_into_the_inventory_is_refused(
 def test_files_from_an_earlier_run_are_reported_and_never_deleted(
     inventories: dict[str, Inventory], tmp_path: Path
 ) -> None:
-    """A device dropped from the inventory leaves a file; netgraph says so."""
+    """A device dropped from the inventory leaves a file; netviz says so."""
     whole = build(inventories["campus"], "netplan")
     write_config(whole, tmp_path)
     narrowed = build(inventories["campus"], "netplan", spec=FilterSpec(names=("srv-north-01",)))
@@ -703,7 +703,7 @@ def test_a_single_device_goes_to_stdout_verbatim(runner: CliRunner) -> None:
     )
     assert result.exit_code == 0, result.output
     # One device, one file: no separator banner, so the output is a netplan file.
-    assert result.stdout.startswith("# Generated by 'netgraph export netplan'")
+    assert result.stdout.startswith("# Generated by 'netviz export netplan'")
     assert "==>" not in result.stdout
 
 
@@ -750,7 +750,7 @@ def test_out_is_refused_for_a_format_that_is_not_a_dialect(
 def test_a_refusal_exits_with_the_validation_status(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Through :func:`netgraph.cli.main`, which is what translates the exception.
+    """Through :func:`netviz.cli.main`, which is what translates the exception.
 
     ``CliRunner`` invokes the command group and not the entry point, so it would
     see the exception rather than the status an operator gets; this is the path a
@@ -800,7 +800,7 @@ def test_a_generated_file_sniffs_as_its_own_dialect_without_its_banner(
     """A running configuration has no banner, so the shape has to be enough."""
     config = build(inventories["campus"], dialect)
     for relative, content in config.files():
-        stripped = "\n".join(line for line in content.splitlines() if "netgraph-" not in line)
+        stripped = "\n".join(line for line in content.splitlines() if "netviz-" not in line)
         assert sniff(stripped) == dialect, relative
 
 
@@ -835,7 +835,7 @@ def test_a_reader_never_raises_on_a_malformed_capture(dialect: str, text: str) -
     """A drift run over a hundred devices must not stop at the one that is wrong.
 
     A reader reports and continues. Every one of these arrived as a traceback out
-    of ``netgraph drift`` — or, for the unbounded VLAN range, as a ``MemoryError``
+    of ``netviz drift`` — or, for the unbounded VLAN range, as a ``MemoryError``
     — which is the one behaviour the readers' contract rules out.
     """
     draft = Draft()

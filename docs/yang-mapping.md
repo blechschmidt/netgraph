@@ -1,20 +1,20 @@
 # YANG mapping
 
-netgraph's field names and value spaces are not invented. They are taken from
+netviz's field names and value spaces are not invented. They are taken from
 the standard data models a real device already speaks, so that an inventory
 stays comparable with what the hardware reports.
 
-This document explains the relationship: which standards netgraph borrows from,
-how each YAML key lands on a YANG node, where netgraph deliberately departs
+This document explains the relationship: which standards netviz borrows from,
+how each YAML key lands on a YANG node, where netviz deliberately departs
 from the models, and — the part that usually matters most — **which parts of
-those models netgraph does not cover, and why**.
+those models netviz does not cover, and why**.
 
 The per-field lookup table lives in
 [`docs/schema-reference.md`](schema-reference.md); the normative path list is
 [§9 of the specification](schema.md#9-yang-mapping). This document is the
 reasoning around both.
 
-* [The models netgraph borrows from](#the-models-netgraph-borrows-from)
+* [The models netviz borrows from](#the-models-netviz-borrows-from)
 * [Intended state, not a datastore](#intended-state-not-a-datastore)
 * [RFC 8343 — interfaces](#rfc-8343--interfaces)
 * [RFC 8344 — IP](#rfc-8344--ip)
@@ -26,7 +26,7 @@ reasoning around both.
 * [Things with no YANG home](#things-with-no-yang-home)
 * [If you want to export](#if-you-want-to-export)
 
-## The models netgraph borrows from
+## The models netviz borrows from
 
 | Short name | Module | Prefix | Source |
 |---|---|---|---|
@@ -65,26 +65,26 @@ the way it does rather than like a drawing tool's file format:
 
 ## Intended state, not a datastore
 
-netgraph is a documentation and visualisation tool. It records **intended**
+netviz is a documentation and visualisation tool. It records **intended**
 state: what the network is supposed to be, as reviewed and merged by humans.
 That single decision explains most of the divergences below.
 
 **It accepts `config false` nodes.** RFC 8343 marks `if:phys-address`,
 `if:speed` and `if:lower-layer-if` as operational state — a device reports
-them, you do not set them. netgraph lets you write them anyway, because a
+them, you do not set them. netviz lets you write them anyway, because a
 burned-in MAC address and a negotiated link rate are exactly the sort of fact
 an inventory exists to record. An exporter targeting a live datastore must not
 write them; they are documentation here, not configuration.
 
 **There is no "device" node.** YANG models a single device's datastore, so
-there is no data node meaning "a device". In netgraph, `metadata.name` is the
+there is no data node meaning "a device". In netviz, `metadata.name` is the
 datastore boundary: everything under one document's `spec` is what that one
 device would report. This is why a `cable` — which is inherently *between* two
 datastores — has no YANG representation at all.
 
 **Defaults are materialised.** RFC 8344 defaults `ip:*/forwarding` to false; a
-netgraph `router` defaults it to true. Once a document is loaded, the resolved
-value is present rather than implied, which is what `netgraph show` prints. The
+netviz `router` defaults it to true. Once a document is loaded, the resolved
+value is present rather than implied, which is what `netviz show` prints. The
 YANG default is still the fallback when nothing else supplies one.
 
 ## RFC 8343 — interfaces
@@ -107,7 +107,7 @@ YANG default is still the fallback when nothing else supplies one.
 
 ### Interface types
 
-netgraph offers six types, each mapping to one IANA identity. Only the three
+netviz offers six types, each mapping to one IANA identity. Only the three
 marked cableable can terminate a cable.
 
 | `type` | `if:type` identity | Cableable |
@@ -124,7 +124,7 @@ mapping; it is the set that a *topology* document needs. Adding another is a
 one-line change if a real inventory turns out to need it — but a type that no
 diagram would draw differently earns nothing.
 
-### What netgraph does not model from RFC 8343
+### What netviz does not model from RFC 8343
 
 | Node | Why not |
 |---|---|
@@ -135,7 +135,7 @@ diagram would draw differently earns nothing.
 | `if:admin-status` | Redundant with `enabled`, which is the intended-state half of the same fact. |
 
 The rule behind all five: **if a device's answer would change without anyone
-editing the inventory, netgraph does not store it.** See
+editing the inventory, netviz does not store it.** See
 [Deliberately not covered](#deliberately-not-covered) for the general form.
 
 ## RFC 8344 — IP
@@ -158,7 +158,7 @@ path.
 | `interfaces[].ipv6.addresses[].prefix_length` | `…/ip:ipv6/ip:address/ip:prefix-length` | `uint8`, 0…128 |
 
 RFC 8344 models the subnet as a `choice` with a `prefix-length` case and a
-`netmask` case. netgraph accepts both spellings on input and stores the prefix
+`netmask` case. netviz accepts both spellings on input and stores the prefix
 length, so a document and its normalised form always compare equal. IPv6 has no
 netmask case in the RFC either, which is why `prefix_length` is mandatory
 there.
@@ -173,14 +173,14 @@ to one host's interface naming.
 IETF interface model only has per-address-family MTUs; the layer-2 one lives in
 the `ietf-interfaces-common` draft as `if-cmn:mtu`, which is not an RFC.
 
-netgraph models it anyway, because a link MTU mismatch is one of the most
+netviz models it anyway, because a link MTU mismatch is one of the most
 common and most miserable misconfigurations there is (`W102` exists precisely
 to catch it). On export it is written to `ip:ipv4/mtu` and `ip:ipv6/mtu`,
 subject to their own ranges — so an MTU below 1280 propagates to IPv4 only.
 When `if-cmn:mtu` becomes standards-track, `interfaces[].mtu` maps there
 directly and this paragraph goes away.
 
-### What netgraph does not model from RFC 8344
+### What netviz does not model from RFC 8344
 
 | Node | Why not |
 |---|---|
@@ -194,7 +194,7 @@ routes, routing protocol configuration and VRFs are out of scope.
 
 ## IEEE 802.1Q — bridging and VLANs
 
-This is where netgraph deviates most visibly, and deliberately.
+This is where netviz deviates most visibly, and deliberately.
 
 **802.1Q has no "access port" and no "trunk port."** Those are vendor CLI
 abstractions layered over three independent knobs:
@@ -204,7 +204,7 @@ abstractions layered over three independent knobs:
 * per-VLAN egress and untagged membership lists.
 
 Nobody documents a network in those terms, and a schema that demanded it would
-be unusable. So netgraph keeps `mode: access | trunk` as the authoring
+be unusable. So netviz keeps `mode: access | trunk` as the authoring
 vocabulary and expands it to the standard nodes mechanically.
 
 ### Port configuration
@@ -262,9 +262,9 @@ A `type: vlan` sub-interface (an SVI) carries its encapsulation VID in
 `vlan.access_vlan`, which maps to `dot1q:pvid` on the sub-port and identifies
 the `l2vlan` interface's VLAN.
 
-### What netgraph does not model from 802.1Q
+### What netviz does not model from 802.1Q
 
-802.1Q is enormous. netgraph implements the VLAN bridging core and nothing
+802.1Q is enormous. netviz implements the VLAN bridging core and nothing
 else:
 
 | Area | Why not |
@@ -276,7 +276,7 @@ else:
 | The filtering database (learned MAC entries) | Operational state, and volatile. |
 | Time-sensitive networking (802.1Qbv/Qbu/CB), PTP | Whole standards of their own, orthogonal to topology. |
 | Port mirroring, storm control, private VLANs | Vendor-specific in practice, and none of them change the drawn graph. |
-| Link aggregation control (802.1AX / LACP: rates, keys, selection) | netgraph models the *fact* that ports are aggregated, via `type: lag` and `members`. How the bundle negotiates itself is protocol configuration. |
+| Link aggregation control (802.1AX / LACP: rates, keys, selection) | netviz models the *fact* that ports are aggregated, via `type: lag` and `members`. How the bundle negotiates itself is protocol configuration. |
 
 The consistent test: **would the diagram be different?** If the answer is no,
 the node is not modelled.
@@ -300,11 +300,11 @@ An interface of `type: wifi` already maps to `ianaift:ieee80211` (§9.1). The
 
 | YAML | YANG node | Notes |
 |---|---|---|
-| `wireless.role` | `…/dot11:station-config/dot11:desired-bss-type` | Approximate. The MIB distinguishes infrastructure from independent BSS, not "which side am I"; `ap` and `station` are that distinction seen from the two ends, and `mesh` has no counterpart at all — 802.11s mesh STAs are a separate subtree netgraph does not model. |
-| `wireless.band` | `…/dot11:phy/dot11:channel-starting-factor` | This is genuinely how 802.11 disambiguates the band: the starting factor anchors channel numbering (2407, 5000 and 5950 MHz), which is exactly why netgraph refuses a `channel` without a `band`. |
+| `wireless.role` | `…/dot11:station-config/dot11:desired-bss-type` | Approximate. The MIB distinguishes infrastructure from independent BSS, not "which side am I"; `ap` and `station` are that distinction seen from the two ends, and `mesh` has no counterpart at all — 802.11s mesh STAs are a separate subtree netviz does not model. |
+| `wireless.band` | `…/dot11:phy/dot11:channel-starting-factor` | This is genuinely how 802.11 disambiguates the band: the starting factor anchors channel numbering (2407, 5000 and 5950 MHz), which is exactly why netviz refuses a `channel` without a `band`. |
 | `wireless.channel` | `…/dot11:phy/dot11:current-channel-number` | The primary 20 MHz channel. |
 | `wireless.width_mhz` | `…/dot11:phy/dot11:current-channel-width` | 802.11n added the attribute; the 320 MHz value is 802.11be. |
-| `wireless.tx_power_dbm` | `…/dot11:phy/dot11:current-tx-power-level` | Approximate. The MIB numbers up to eight abstract *power levels* per PHY and states their dBm elsewhere; netgraph records the dBm, because that is what a survey and a regulatory limit are both written in. |
+| `wireless.tx_power_dbm` | `…/dot11:phy/dot11:current-tx-power-level` | Approximate. The MIB numbers up to eight abstract *power levels* per PHY and states their dBm elsewhere; netviz records the dBm, because that is what a survey and a regulatory limit are both written in. |
 
 ### The service sets
 
@@ -316,13 +316,13 @@ An interface of `type: wifi` already maps to `ianaift:ieee80211` (§9.1). The
 | `bss[].hidden` | — | Beacon SSID suppression is vendor configuration; 802.11 has no attribute for it, and it is recorded because it explains why a network is missing from a scan. |
 | `bss[].vlan` | — | 802.1Q, not 802.11: it is the VLAN the AP bridges that BSS into, and it is checked against the device's VLAN database and its ports (`NG-V004`, `NG-W009`). |
 
-### What netgraph does not model from 802.11
+### What netviz does not model from 802.11
 
 | Area | Why not |
 |---|---|
-| Associated stations: `dot11:association-table`, RSSI, rates, last-seen | Operational state, and the most volatile in the whole model. An association a file claims is stale before the file is saved. netgraph records the associations that are *infrastructure* — a mesh backhaul, a wireless bridge, a fixed client — as `medium: wireless` links, and nothing else. |
+| Associated stations: `dot11:association-table`, RSSI, rates, last-seen | Operational state, and the most volatile in the whole model. An association a file claims is stale before the file is saved. netviz records the associations that are *infrastructure* — a mesh backhaul, a wireless bridge, a fixed client — as `medium: wireless` links, and nothing else. |
 | PHY detail: modulation, MCS sets, guard interval, spatial streams, beamforming | Capability and negotiation. Two radios differing only in MCS draw the same diagram. |
-| Regulatory: country codes, DFS state, channel availability | The channel a radio is *allowed* to use is a function of where it is; netgraph records the channel it is set to. DFS radar events are live state. |
+| Regulatory: country codes, DFS state, channel availability | The channel a radio is *allowed* to use is a function of where it is; netviz records the channel it is set to. DFS radar events are live state. |
 | 802.11r/k/v roaming, band steering, airtime fairness | Behaviour on top of the topology, and vendor-specific in practice. |
 | RSN detail: cipher suites, AKM lists, PMK caching, 802.1X server addresses | `security` records what a reader of a diagram needs — is it open, is there a passphrase, is there an authentication server. The suite negotiation belongs to the device configuration. |
 | Multiple radios per band, radio resource management | A radio is an interface here. An AP with three radios declares three `wifi` interfaces, which is the honest model; what an RRM controller then does with them is not. |
@@ -331,10 +331,10 @@ The same test applies: **would the diagram be different?**
 
 ## Deliberately not covered
 
-The four tables above — [RFC 8343](#what-netgraph-does-not-model-from-rfc-8343),
-[RFC 8344](#what-netgraph-does-not-model-from-rfc-8344),
-[802.1Q](#what-netgraph-does-not-model-from-8021q) and
-[802.11](#what-netgraph-does-not-model-from-80211) — are not a to-do list. They
+The four tables above — [RFC 8343](#what-netviz-does-not-model-from-rfc-8343),
+[RFC 8344](#what-netviz-does-not-model-from-rfc-8344),
+[802.1Q](#what-netviz-does-not-model-from-8021q) and
+[802.11](#what-netviz-does-not-model-from-80211) — are not a to-do list. They
 are the scope boundary, and every entry falls into one of three buckets:
 
 1. **Operational state.** Anything a device's answer would change without
@@ -352,7 +352,7 @@ are the scope boundary, and every entry falls into one of three buckets:
    differing only in that node would render identically, the node is not
    modelled.
 
-Two boundaries have moved. Routing is the first: netgraph now borrows the *intent*
+Two boundaries have moved. Routing is the first: netviz now borrows the *intent*
 half of `ietf-routing` — static routes, and enough of a control-plane protocol to
 say which AS and which OSPF area a router is in — plus the network instance of
 RFC 8529 for VRFs; see [RFC 8349 — routing](#rfc-8349--routing) below. What stays
@@ -380,7 +380,7 @@ it: a `rt:control-plane-protocol` and a `rt:static-routes` container live inside
 a routing instance, and a routing instance is what RFC 8529 calls a network
 instance and everybody else calls a VRF.
 
-| netgraph | YANG |
+| netviz | YANG |
 |---|---|
 | `spec.vrfs[].name` | `/ni:network-instances/ni:network-instance/ni:name` |
 | `spec.vrfs[].description` | `…/ni:network-instance/ni:description` |
@@ -400,23 +400,23 @@ instance and everybody else calls a VRF.
 IPv6 routes use the `v6ur:` paths of the same module; only the IPv4 ones are
 written out.
 
-### What netgraph does not model from RFC 8349
+### What netviz does not model from RFC 8349
 
 | Node | Why not |
 |---|---|
 | `rt:routing-state`, `rt:routes` | Operational state: the table a router *computed*. The inventory holds what somebody configured. |
 | `rt:route/rt:source-protocol`, `rt:active`, `rt:last-updated` | The same — properties of a route in a running table. |
-| `rt:ribs`, `rt:default-rib` | A device's internal organisation of tables netgraph does not model the contents of. |
+| `rt:ribs`, `rt:default-rib` | A device's internal organisation of tables netviz does not model the contents of. |
 | `rt:next-hop-list` (ECMP), `rt:next-hop/rt:recurse` | A multi-path or recursive next hop is a forwarding decision; the schema records one hop per route (§16.7). |
 | `ietf-ospf` areas, interfaces, costs, network types | One area per device, deliberately (§16.7). Per-interface areas, costs and DR priorities describe how the IGP behaves rather than who is in it. |
 | `ietf-bgp` policy, capabilities, timers, route reflection | Policy is a language and the rest is behaviour; both are on the far side of the boundary above. |
 | `ietf-routing-policy` (RFC 9067) | *Route* policy — which routes a protocol accepts, advertises and rewrites — which is the item above, and a different thing from the policy-based routing of §16.4. That has no IETF model at all: the routing policy database is an implementation's, not a standard's, so `spec.routing_policy` follows the one every implementation shares (RFC 1812 §5.2.4.3) rather than a YANG module. |
-| `ni:vrf-root` sub-trees | RFC 8529 mounts a whole per-instance configuration tree under each instance. netgraph binds interfaces to instances and stops there. |
+| `ni:vrf-root` sub-trees | RFC 8529 mounts a whole per-instance configuration tree under each instance. netviz binds interfaces to instances and stops there. |
 
 ## Power — RFC 3621 and RFC 7460
 
 Power is the one area of this document where the standard model is a **MIB rather
-than a YANG module**, and that is not an omission on netgraph's part. The IETF
+than a YANG module**, and that is not an omission on netviz's part. The IETF
 never migrated the power work to YANG: PoE lives in
 [RFC 3621](https://www.rfc-editor.org/rfc/rfc3621), the POWER-ETHERNET-MIB, and a
 device's own power lives in the Energy Management pair,
@@ -427,7 +427,7 @@ Context MIB"), whose framework and vocabulary —
 [RFC 7326](https://www.rfc-editor.org/rfc/rfc7326). IEEE publishes **no YANG
 module for PoE at all**: the class tables are normative text in IEEE Std
 802.3-2022, clauses 33 (802.3af/at) and 145 (802.3bt), so the MIB is the only
-machine-readable reference there is and it is the one netgraph borrows from.
+machine-readable reference there is and it is the one netviz borrows from.
 
 The division of labour between the three is exactly the division §17 uses, which
 is why the schema is shaped that way:
@@ -448,10 +448,10 @@ is why the schema is shaped that way:
 
 `pethPsePortTable`/`pethPsePortEntry` is one row per PSE port, indexed by a group
 number and a port number rather than by the interface name RFC 8343 keys on.
-netgraph hangs the block off the interface instead, because an inventory names a
+netviz hangs the block off the interface instead, because an inventory names a
 port the way a configuration does:
 
-| netgraph | YANG/MIB |
+| netviz | YANG/MIB |
 |---|---|
 | `interfaces[].poe` | `pethPsePortTable/pethPsePortEntry` — declaring the block *is* the row: this port is power sourcing equipment |
 | `interfaces[].poe.enabled` | `…/pethPsePortAdminEnable` — the intended half; a disabled PSE reserves nothing |
@@ -462,31 +462,31 @@ port the way a configuration does:
 | the watt figures behind a `class` | — (IEEE Std 802.3-2022 clauses 33 and 145; no YANG or MIB node carries the tables, only the classification) |
 
 `pethPsePortPowerClassifications` is an enumeration in the MIB
-(`class0`…`class4`, extended by later work) while netgraph writes the integer
+(`class0`…`class4`, extended by later work) while netviz writes the integer
 0–8, because 802.3bt classes 5 to 8 postdate RFC 3621 and an inventory should not
 have to spell a class the MIB has no name for.
 
 ### A device's power, and a PDU's
 
-`eoPowerTable`/`eoPowerEntry` is one row per Energy Object, and a netgraph
+`eoPowerTable`/`eoPowerEntry` is one row per Energy Object, and a netviz
 element — a server, a switch, a PDU — is one Energy Object:
 
-| netgraph | YANG/MIB |
+| netviz | YANG/MIB |
 |---|---|
 | `spec.power` | `eoPowerTable/eoPowerEntry` — the element as an Energy Object |
 | `spec.power.draw_watts.typical` | `…/eoPowerEntry/eoPower` — the power actually drawn |
 | `spec.power.draw_watts.maximum` | `…/eoPowerEntry/eoPowerNameplate` — the rating |
 | a `pdu`'s `spec.capacity_watts` | `…/eoPowerEntry/eoPowerNameplate` — the same node, read at the other end of the cord: what may be drawn *through* the unit |
 | `spec.power.inputs[]` | `eoPowerRelationTable/eoPowerRelationEntry` (RFC 7461) — one row per "this object is powered by that one" |
-| a `pdu`'s `spec.input_feed` | the same table, one relation further upstream: the supply the unit itself hangs off. netgraph records it as free text rather than as a reference, because the UPS string on the other end is usually not an element of the inventory |
-| `inputs[].pdu`, `inputs[].outlet` | — (the relation table indexes Energy Objects by their own index; netgraph names them by `pdu:outlet`, which is what is printed on the cord) |
-| `inputs[].psu` | — (netgraph-only; the label on the back of the chassis) |
+| a `pdu`'s `spec.input_feed` | the same table, one relation further upstream: the supply the unit itself hangs off. netviz records it as free text rather than as a reference, because the UPS string on the other end is usually not an element of the inventory |
+| `inputs[].pdu`, `inputs[].outlet` | — (the relation table indexes Energy Objects by their own index; netviz names them by `pdu:outlet`, which is what is printed on the cord) |
+| `inputs[].psu` | — (netviz-only; the label on the back of the chassis) |
 | a `pdu`'s `spec.outlets` | `entPhysicalTable/entPhysicalEntry` (RFC 6933) — an outlet is a physical component, not an interface (§17.1) |
-| a power supply as a component | `…/entPhysicalEntry/entPhysicalClass` = `powerSupply(6)` — which is what `inputs[].psu` labels, and as far as netgraph goes towards the component tree |
-| `spec.power.redundant` | — netgraph-only. The relation table can record that a box has two inlets; nothing in any of these models says the two were *bought to survive each other*, which is a design intention only a human can state (`NG-E015`) |
-| `spec.power.powered_by` | — netgraph-only. RFC 7326 has both a power inlet and a PoE port, but nothing that says "this box has no cord, so read its power path off its uplink", which is the fact that lets netgraph derive the feed (§17.4) |
+| a power supply as a component | `…/entPhysicalEntry/entPhysicalClass` = `powerSupply(6)` — which is what `inputs[].psu` labels, and as far as netviz goes towards the component tree |
+| `spec.power.redundant` | — netviz-only. The relation table can record that a box has two inlets; nothing in any of these models says the two were *bought to survive each other*, which is a design intention only a human can state (`NG-E015`) |
+| `spec.power.powered_by` | — netviz-only. RFC 7326 has both a power inlet and a PoE port, but nothing that says "this box has no cord, so read its power path off its uplink", which is the fact that lets netviz derive the feed (§17.4) |
 
-`eoPower` is `read-only` in the MIB, because it is a *measurement*. netgraph
+`eoPower` is `read-only` in the MIB, because it is a *measurement*. netviz
 writes an intended figure there anyway, for the same reason it accepts
 `if:phys-address` and `if:speed`
 ([above](#intended-state-not-a-datastore)): a nameplate draw is exactly the sort
@@ -494,7 +494,7 @@ of fact an inventory exists to record, and it is the only figure a load schedule
 can be built from before the rack is powered on. An exporter aiming at a live
 datastore must not write it back.
 
-### What netgraph does not model from the power MIBs
+### What netviz does not model from the power MIBs
 
 | Node | Why not |
 |---|---|
@@ -503,10 +503,10 @@ datastore must not write it back.
 | `pethPsePortPowerPriority` and the notification controls | Behaviour under overload — which port gets shed first — and SNMP trap configuration. Both change what happens when the budget runs out; neither changes what is drawn. |
 | `eoPowerStateTable` (RFC 7460) | Power states and their wake semantics: which of a dozen sleep or standby states a box is in, and how to bring it out of one. That is control plus operational state, and a diagram of a rack does not differ because a server supports one more ACPI state. |
 | RFC 7460's energy accounting — accumulated kilowatt-hours, metering intervals, historical buckets | Measurement over time, which is the definition of what this file does not hold. A load schedule is built from nameplates; a bill is built from a meter. |
-| RFC 7460's unit multiplier and accuracy leaves | netgraph stores a wattage as a number in watts (§5). A device that reports milliwatts to three digits is reporting a measurement, and there is no measurement here to qualify. |
-| `entPhysicalTable` beyond the outlet: the full component tree, `entPhysicalContainedIn`, per-component serials and firmware | netgraph models a PDU's outlets as *numbers you can plug into*, because that is what a load schedule references. Enumerating a chassis as a component hierarchy is asset management, and nothing in a power diagram would differ. |
+| RFC 7460's unit multiplier and accuracy leaves | netviz stores a wattage as a number in watts (§5). A device that reports milliwatts to three digits is reporting a measurement, and there is no measurement here to qualify. |
+| `entPhysicalTable` beyond the outlet: the full component tree, `entPhysicalContainedIn`, per-component serials and firmware | netviz models a PDU's outlets as *numbers you can plug into*, because that is what a load schedule references. Enumerating a chassis as a component hierarchy is asset management, and nothing in a power diagram would differ. |
 | The rest of RFC 7461's context — the administrative domain and the role an Energy Object is placed in | Site metadata that `metadata.labels` and `metadata.location` already carry in whatever vocabulary the team uses (§3.1, §3.2), rather than in one the MIB fixes. |
-| Anything about phases, breakers, circuits or transfer switches | No standard here models them, and neither does netgraph. `input_feed` is the deliberate one-field answer: free text, compared only for equality (§17.1), because what counts as "a different feed" is site knowledge and a schema that guessed would be confidently wrong. |
+| Anything about phases, breakers, circuits or transfer switches | No standard here models them, and neither does netviz. `input_feed` is the deliberate one-field answer: free text, compared only for equality (§17.1), because what counts as "a different feed" is site knowledge and a schema that guessed would be confidently wrong. |
 
 The same test as everywhere else: **would the diagram be different?** A PSE's
 detection status changes twice a day and never changes the drawing. Which outlet
@@ -515,13 +515,13 @@ entirely.
 
 ## Things with no YANG home
 
-Three netgraph concepts have no standard counterpart, because the standards
+Three netviz concepts have no standard counterpart, because the standards
 model devices and these are not device configuration.
 
 ### Cables
 
 A cable is *between* two datastores, so neither ietf-interfaces nor 802.1Q has
-anywhere to put it. netgraph makes it a first-class element anyway — it is the
+anywhere to put it. netviz makes it a first-class element anyway — it is the
 single most important fact in a topology document — and projects its fields
 onto the endpoints:
 
@@ -529,7 +529,7 @@ onto the endpoints:
 |---|---|
 | `cable.speed` | `if:speed` on both endpoint interfaces (`yang:gauge64`, bit/s, `config false`) |
 | `cable.medium` | No YANG node. Informs the `ianaift` identity at export time: `ethernetCsmacd` for copper and fibre alike, `ieee80211` for `wireless`. |
-| `cable.duplex`, `length_m`, `category`, `connector`, `label` | netgraph-only physical-plant metadata |
+| `cable.duplex`, `length_m`, `category`, `connector`, `label` | netviz-only physical-plant metadata |
 
 `medium` distinguishing copper from fibre while both export as
 `ethernetCsmacd` is not an oversight: the IANA identity describes the MAC
@@ -549,7 +549,7 @@ without being a device anyone configures.
 | `upstream.speed` | `if:speed` on the upstream interface |
 | `interfaces[]` | ordinary `if:interface` entries, each with `if:lower-layer-if = [upstream.name]` |
 | *(derived)* | `if:higher-layer-if` on the upstream port lists every downstream interface |
-| `upstream.attached_to` | No YANG node; a netgraph topology edge |
+| `upstream.attached_to` | No YANG node; a netviz topology edge |
 
 IANA registers no identity for Thunderbolt, PCIe, M.2 or SFP as a *host bus*,
 which is why everything outside USB collapses to `ianaift:other`. The
@@ -564,25 +564,25 @@ datastore is not a folder tree.
 
 ## If you want to export
 
-netgraph does not ship a NETCONF or RESTCONF exporter. If you write one, three
+netviz does not ship a NETCONF or RESTCONF exporter. If you write one, three
 rules keep it honest:
 
 1. **Never write a `config false` node** to a live datastore: `if:phys-address`,
    `if:speed`, `if:lower-layer-if` and `if:higher-layer-if` are all read-only
-   there. netgraph stores them as documentation of intent.
-2. **Expand, do not copy.** `vlan.mode` and `trunk_vlans` are netgraph
+   there. netviz stores them as documentation of intent.
+2. **Expand, do not copy.** `vlan.mode` and `trunk_vlans` are netviz
    vocabulary. The datastore wants `dot1q:pvid`, `dot1q:acceptable-frame` and
    per-VLAN port lists, produced by the tables above.
 3. **Materialise defaults first.** Load the document through
-   `netgraph.loader`; the models resolve `forwarding`, the address-family MTUs,
-   `bridge.name` and `acceptable_frames`. `netgraph show NAME` prints exactly
+   `netviz.loader`; the models resolve `forwarding`, the address-family MTUs,
+   `bridge.name` and `acceptable_frames`. `netviz show NAME` prints exactly
    what an exporter would see.
 
 <!-- norun: pipes into an exporter the reader writes, over an illustrative inventory -->
 ```bash
-netgraph -i inventory show sw-access-01 -F json | your-exporter
+netviz -i inventory show sw-access-01 -F json | your-exporter
 ```
 
-The JSON graph export (`netgraph render -f json`) is the other direction: the
+The JSON graph export (`netviz render -f json`) is the other direction: the
 resolved *topology*, nodes and edges, for tools that care about connectivity
 rather than device configuration.

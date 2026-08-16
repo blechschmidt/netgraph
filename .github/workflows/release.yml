@@ -167,8 +167,8 @@ jobs:
           shopt -s nullglob
           built=(dist/*)
 
-          wheel="dist/netgraph-${VERSION}-py3-none-any.whl"
-          sdist="dist/netgraph-${VERSION}.tar.gz"
+          wheel="dist/netviz-${VERSION}-py3-none-any.whl"
+          sdist="dist/netviz-${VERSION}.tar.gz"
           for expected in "$wheel" "$sdist"; do
             if [ ! -s "$expected" ]; then
               echo "::error::expected ${expected}; dist/ holds: ${built[*]}"
@@ -186,7 +186,7 @@ jobs:
 
       # The SBOM is taken from an environment the wheel was *installed* into
       # rather than from the wheel file, because the interesting content of a
-      # netgraph SBOM is the dependency closure -- pydantic, PyYAML, click,
+      # netviz SBOM is the dependency closure -- pydantic, PyYAML, click,
       # networkx, Jinja2 and what they pull in -- and a wheel only declares its
       # requirements, it does not resolve them.
       - name: Install the wheel into an environment to be inventoried
@@ -196,7 +196,7 @@ jobs:
           set -euo pipefail
           python -m venv sbom-env
           ./sbom-env/bin/pip install --upgrade pip
-          ./sbom-env/bin/pip install "dist/netgraph-${VERSION}-py3-none-any.whl"
+          ./sbom-env/bin/pip install "dist/netviz-${VERSION}-py3-none-any.whl"
           ./sbom-env/bin/pip list
 
       - name: Generate a CycloneDX SBOM of the wheel and its closure
@@ -204,12 +204,12 @@ jobs:
         with:
           path: sbom-env
           format: cyclonedx-json
-          artifact-name: netgraph-${{ needs.guard.outputs.version }}-wheel.cdx.json
-          output-file: sbom/netgraph-${{ needs.guard.outputs.version }}-wheel.cdx.json
+          artifact-name: netviz-${{ needs.guard.outputs.version }}-wheel.cdx.json
+          output-file: sbom/netviz-${{ needs.guard.outputs.version }}-wheel.cdx.json
           upload-artifact: false
           upload-release-assets: false
 
-      - name: Check the SBOM names netgraph and its dependencies
+      - name: Check the SBOM names netviz and its dependencies
         run: |
           set -euo pipefail
           python - <<'PY'
@@ -223,7 +223,7 @@ jobs:
           # fail over that.
           names = {component.get("name", "").lower() for component in document["components"]}
           print(f"{path}: {len(names)} components")
-          expected = {"netgraph", "pydantic", "pyyaml", "click", "networkx", "jinja2"}
+          expected = {"netviz", "pydantic", "pyyaml", "click", "networkx", "jinja2"}
           missing = expected - names
           if missing:
               raise SystemExit(f"::error::the SBOM never names {sorted(missing)}")
@@ -254,7 +254,7 @@ jobs:
   # unpacks but does not build.
   #
   # Nothing here touches the checkout except for the dist/ it downloaded, and
-  # Graphviz is deliberately *not* installed: ``netgraph --version`` must work
+  # Graphviz is deliberately *not* installed: ``netviz --version`` must work
   # without it and say so, which is also what a user filing a bug report will run.
   verify:
     name: verify (${{ matrix.os }})
@@ -295,13 +295,13 @@ jobs:
           [ "$RUNNER_OS" = "Windows" ] && bin="from-wheel/Scripts"
 
           "$bin/python" -m pip install --upgrade pip
-          "$bin/python" -m pip install "dist/netgraph-${VERSION}-py3-none-any.whl"
+          "$bin/python" -m pip install "dist/netviz-${VERSION}-py3-none-any.whl"
 
           # The console script, by name, from the environment's bin directory --
-          # not ``python -m netgraph``. A wheel can be importable and still ship
+          # not ``python -m netviz``. A wheel can be importable and still ship
           # no entry point, and the entry point is what a user types.
-          "$bin/netgraph" --version
-          "$bin/netgraph" version --json >version.json
+          "$bin/netviz" --version
+          "$bin/netviz" version --json >version.json
           "$bin/python" - <<'PY'
           import json
           import os
@@ -309,8 +309,8 @@ jobs:
           report = json.load(open("version.json", encoding="utf-8"))
           expected = os.environ["VERSION"]
           print(json.dumps(report, indent=2))
-          if report["netgraph"] != expected:
-              raise SystemExit(f"::error::the wheel reports {report['netgraph']}, expected {expected}")
+          if report["netviz"] != expected:
+              raise SystemExit(f"::error::the wheel reports {report['netviz']}, expected {expected}")
           if report["schemaVersion"] != 1:
               raise SystemExit(f"::error::unexpected report version {report['schemaVersion']}")
           if not report["python"]["version"]:
@@ -327,9 +327,9 @@ jobs:
           bin="from-wheel/bin"
           [ "$RUNNER_OS" = "Windows" ] && bin="from-wheel/Scripts"
 
-          "$bin/netgraph" init smoke-test
-          "$bin/netgraph" --inventory smoke-test validate --strict
-          "$bin/netgraph" --inventory smoke-test render -f dot -o smoke.dot
+          "$bin/netviz" init smoke-test
+          "$bin/netviz" --inventory smoke-test validate --strict
+          "$bin/netviz" --inventory smoke-test render -f dot -o smoke.dot
           if ! grep -q "digraph\|graph " smoke.dot; then
             echo "::error::the render produced no DOT graph"
             cat smoke.dot
@@ -351,12 +351,12 @@ jobs:
           [ "$RUNNER_OS" = "Windows" ] && bin="from-sdist/Scripts"
 
           "$bin/python" -m pip install --upgrade pip
-          "$bin/python" -m pip install "dist/netgraph-${VERSION}.tar.gz"
+          "$bin/python" -m pip install "dist/netviz-${VERSION}.tar.gz"
 
-          reported="$("$bin/netgraph" --version | head -n 1)"
+          reported="$("$bin/netviz" --version | head -n 1)"
           echo "$reported"
-          if [ "$reported" != "netgraph ${VERSION}" ]; then
-            echo "::error::the sdist install reports '${reported}', expected 'netgraph ${VERSION}'"
+          if [ "$reported" != "netviz ${VERSION}" ]; then
+            echo "::error::the sdist install reports '${reported}', expected 'netviz ${VERSION}'"
             exit 1
           fi
 
@@ -374,7 +374,7 @@ jobs:
     # environment, any workflow in this repository could mint an upload token.
     environment:
       name: pypi
-      url: https://pypi.org/project/netgraph/${{ needs.guard.outputs.version }}
+      url: https://pypi.org/project/netviz/${{ needs.guard.outputs.version }}
     permissions:
       # The OIDC token the runner exchanges for a short-lived upload token. This
       # is the whole reason no PyPI credential is stored in this repository:
@@ -403,7 +403,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment:
       name: testpypi
-      url: https://test.pypi.org/project/netgraph/
+      url: https://test.pypi.org/project/netviz/
     permissions:
       id-token: write
 
@@ -428,7 +428,7 @@ jobs:
   # --------------------------------------------------------------------------- #
   #
   # A separate job so that ``attestations: write`` is held by nothing that also
-  # builds. ``gh attestation verify netgraph-X.Y.Z-py3-none-any.whl --repo
+  # builds. ``gh attestation verify netviz-X.Y.Z-py3-none-any.whl --repo
   # blechschmidt/netgraph`` then ties a downloaded file to this repository, this
   # workflow and this commit.
   provenance:
@@ -544,9 +544,9 @@ jobs:
             echo "## Install"
             echo
             echo '```bash'
-            echo "pip install netgraph==${VERSION}"
-            echo "pipx install netgraph==${VERSION}"
-            echo "uv tool install netgraph==${VERSION}"
+            echo "pip install netviz==${VERSION}"
+            echo "pipx install netviz==${VERSION}"
+            echo "uv tool install netviz==${VERSION}"
             echo '```'
             echo
             echo "Or the container image, which already has Graphviz in it:"
@@ -567,7 +567,7 @@ jobs:
             echo "Verify a download before trusting it:"
             echo
             echo '```bash'
-            echo "gh attestation verify netgraph-${VERSION}-py3-none-any.whl --repo ${GITHUB_REPOSITORY}"
+            echo "gh attestation verify netviz-${VERSION}-py3-none-any.whl --repo ${GITHUB_REPOSITORY}"
             echo "gh attestation verify oci://${IMAGE}@${DIGEST} --repo ${GITHUB_REPOSITORY}"
             echo '```'
             echo
@@ -584,7 +584,7 @@ jobs:
           PRERELEASE: ${{ needs.guard.outputs.prerelease }}
         run: |
           set -euo pipefail
-          flags=(--title "netgraph ${VERSION}" --notes-file body.md --verify-tag)
+          flags=(--title "netviz ${VERSION}" --notes-file body.md --verify-tag)
           if [ "$PRERELEASE" = "true" ]; then
             flags+=(--prerelease)
           fi
@@ -594,7 +594,7 @@ jobs:
           # assets end up as this run produced them.
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "::notice::${TAG} already has a release; updating it"
-            gh release edit "$TAG" --title "netgraph ${VERSION}" --notes-file body.md
+            gh release edit "$TAG" --title "netviz ${VERSION}" --notes-file body.md
             gh release upload "$TAG" dist/* sbom/* --clobber
           else
             gh release create "$TAG" "${flags[@]}" dist/* sbom/*

@@ -6,7 +6,7 @@
 # a subnet-router anycast address nobody configured for the second.
 #
 # The /30 is here as the contrast: same job, two addresses wasted.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-a
@@ -30,7 +30,7 @@ spec:
       ipv4:
         addresses: [10.0.1.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-b
@@ -47,7 +47,7 @@ spec:
       ipv6:
         addresses: ["2001:db8::1/127"]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-c
@@ -62,7 +62,7 @@ spec:
       ipv4:
         addresses: [10.0.1.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b
@@ -72,7 +72,7 @@ spec:
     - rtr-b:eth0
   medium: fiber
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-c

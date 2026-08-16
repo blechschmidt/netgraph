@@ -3,10 +3,10 @@
 The delete half of this was fixed first (``tests/test_cascade.py``); this is the
 same defect one operation over, and the same invariant states it: **a rename
 never leaves a finding behind, and the renamed element is drawn exactly where it
-was.** ``netgraph edit rename A B`` used to rewrite the *references* to ``A`` and
+was.** ``netviz edit rename A B`` used to rewrite the *references* to ``A`` and
 nothing else, so the layout keys that placed it (``W138``), the note anchored to
 it and the area enclosing it (``W142``) were left naming a name that no longer
-existed — and ``netgraph layout --prune`` then dropped the coordinates rather
+existed — and ``netviz layout --prune`` then dropped the coordinates rather
 than moving them, which is an arrangement lost silently.
 
 The second half of what follows is about *spelling*, and it is the part a delete
@@ -25,13 +25,13 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.edit import EditSession, MoveElement, RenameElement
-from netgraph.edit.references import NameIndex
-from netgraph.edit.rename import plan_rename, respelled_key
-from netgraph.layout.resolve import resolve_geometry
-from netgraph.loader import load_tree
-from netgraph.validate import validate
+from netviz.cli import cli
+from netviz.edit import EditSession, MoveElement, RenameElement
+from netviz.edit.references import NameIndex
+from netviz.edit.rename import plan_rename, respelled_key
+from netviz.layout.resolve import resolve_geometry
+from netviz.loader import load_tree
+from netviz.validate import validate
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -132,7 +132,7 @@ def write(root: Path, relative: str, text: str) -> Path:
 
 def hub(name: str) -> str:
     return (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: hub\n"
         f"metadata:\n  name: {name}\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n"
@@ -246,12 +246,12 @@ def test_a_rename_repoints_a_note_anchor_and_an_area_member(tmp_path: Path) -> N
     write(
         tmp_path,
         "annotations.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: note\n"
         "metadata:\n  name: about-the-switch\n"
         "spec:\n  text: the one with the loud fan\n  anchor:\n    element: racks/sw-a\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: area\n"
         "metadata:\n  name: rack-3\n"
         "spec:\n  label: Rack 3\n  members:\n    - racks/sw-a\n    - racks/sw-spare\n",
@@ -298,7 +298,7 @@ def arrange(root: Path, relative: str, *keys: str) -> None:
     write(
         root,
         relative,
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: layout\n"
         "metadata:\n  name: layout\n"
         f"spec:\n  views:\n    l1:\n      nodes:\n{entries}",

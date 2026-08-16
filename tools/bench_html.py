@@ -71,11 +71,11 @@ if str(REPO_ROOT / "tools") not in sys.path:  # pragma: no cover
 
 from bench_pipeline import Shape, generate  # noqa: E402
 
-from netgraph.loader import load_tree  # noqa: E402
-from netgraph.render import Layer, RenderOptions, build_graph, html_document  # noqa: E402
-from netgraph.render.dot import DOT_EXECUTABLE  # noqa: E402
-from netgraph.render.html import DATA_ELEMENT_ID  # noqa: E402
-from netgraph.render.icons import icon_theme  # noqa: E402
+from netviz.loader import load_tree  # noqa: E402
+from netviz.render import Layer, RenderOptions, build_graph, html_document  # noqa: E402
+from netviz.render.dot import DOT_EXECUTABLE  # noqa: E402
+from netviz.render.html import DATA_ELEMENT_ID  # noqa: E402
+from netviz.render.icons import icon_theme  # noqa: E402
 
 #: The layer stacks measured, shortest first. A page holding one layer is the
 #: baseline every marginal figure is taken against.
@@ -216,7 +216,7 @@ def breakdown(page: Page) -> dict[str, int]:
 #:   after one discarded warm-up.
 _DRIVER: Final = """
 const { chromium } = require(process.argv[2]);
-const executablePath = process.env.NETGRAPH_CHROMIUM || undefined;
+const executablePath = process.env.NETVIZ_CHROMIUM || undefined;
 const files = process.argv.slice(3);
 (async () => {
   const browser = await chromium.launch({ executablePath });
@@ -267,7 +267,7 @@ def time_in_browser(paths: Sequence[Path], modules: Path) -> dict[str, dict[str,
 
     Returns an empty mapping -- rather than failing the run -- when the browser
     is not installed, because every byte column above it is still worth having.
-    ``NETGRAPH_CHROMIUM`` names a Chromium build to use instead of the one
+    ``NETVIZ_CHROMIUM`` names a Chromium build to use instead of the one
     ``playwright-core`` would download for itself.
     """
     entry = modules / "playwright-core"
@@ -375,7 +375,7 @@ def _workspace(keep: Path | None) -> Iterator[Path]:
         yield keep
         print(f"\npages left in {keep}")
         return
-    with tempfile.TemporaryDirectory(prefix="netgraph-pages-") as work:
+    with tempfile.TemporaryDirectory(prefix="netviz-pages-") as work:
         yield Path(work)
 
 
@@ -383,7 +383,7 @@ def _tree(label: str, shape: Shape | None) -> Iterator[Path]:
     if shape is None:
         yield EXAMPLES / label
         return
-    target = Path(tempfile.mkdtemp(prefix="netgraph-html-"))
+    target = Path(tempfile.mkdtemp(prefix="netviz-html-"))
     try:
         generate(target, shape)
         yield target

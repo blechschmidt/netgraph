@@ -3,7 +3,7 @@
 # Half a run: the cable was pulled and the front patched, and the rear position
 # the coupler leads to is still empty. 'sw-a:port1' is not connected to
 # anything, however patched it looks.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -16,14 +16,14 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: patchpanel
 metadata:
   name: pp-a
 spec:
   ports: 1-4
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-sw-pp

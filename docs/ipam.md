@@ -1,18 +1,18 @@
-# Address-space health with `netgraph ipam`
+# Address-space health with `netviz ipam`
 
-[`netgraph list subnets`](commands/list.md) enumerates the prefixes an
+[`netviz list subnets`](commands/list.md) enumerates the prefixes an
 inventory happens to contain. It does not say whether the address plan is
-*healthy*. `netgraph ipam` answers the three questions that come next:
+*healthy*. `netviz ipam` answers the three questions that come next:
 
 > **How full is every prefix? What is left inside one? And what is broken?**
 
 ```
-netgraph ipam [OPTIONS]
+netviz ipam [OPTIONS]
 ```
 
 Nothing is probed and no device is contacted. Every number comes from the same
 prefix derivation the layer-3 diagram draws and the validator reasons about —
-[`netgraph.subnets`](../src/netgraph/subnets.py) — so a utilisation figure, a
+[`netviz.subnets`](../src/netviz/subnets.py) — so a utilisation figure, a
 subnet node in a rendering and an addressing finding can never tell three
 different stories.
 
@@ -33,11 +33,11 @@ different stories.
 
 ## Utilisation
 
-With no options, `netgraph ipam` prints one row per derived prefix:
+With no options, `netviz ipam` prints one row per derived prefix:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus ipam --family ipv4
+$ netviz -i examples/campus ipam --family ipv4
 VRF   PREFIX           IP  VLANS  HOSTS  USED  FREE    UTIL  DEVICES
 ----  ---------------  --  -----  -----  ----  ----  ------  -------
 -     10.1.0.0/30       4  -          2     2     0  100.0%        2
@@ -122,7 +122,7 @@ as the fewest CIDR blocks that cover them:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus ipam --free 10.1.0.0/22
+$ netviz -i examples/campus ipam --free 10.1.0.0/22
 BLOCK          IP  HOSTS
 -------------  --  -----
 10.1.0.4/30     4      2
@@ -160,11 +160,11 @@ device. It prints one prefix and nothing else, so it composes:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus ipam --next-free 10.1.0.0/16
+$ netviz -i examples/campus ipam --next-free 10.1.0.0/16
 10.1.1.0/24
-$ netgraph -i examples/campus ipam --next-free 10.1.10.0/23 --size /26
+$ netviz -i examples/campus ipam --next-free 10.1.10.0/23 --size /26
 10.1.11.0/26
-$ netgraph -i examples/campus ipam --next-free 2001:db8:1::/48
+$ netviz -i examples/campus ipam --next-free 2001:db8:1::/48
 2001:db8:1:1::/64
 ```
 
@@ -181,8 +181,8 @@ When there is no room, the command says so on stderr and exits 1:
 
 <!-- run: rc=1 -->
 ```console
-$ netgraph -i examples/campus ipam --next-free 10.1.10.0/24 --size 8
-error: no free /8 inside 10.1.10.0/24; run 'netgraph ipam --free 10.1.10.0/24' to see what is left
+$ netviz -i examples/campus ipam --next-free 10.1.10.0/24 --size 8
+error: no free /8 inside 10.1.10.0/24; run 'netviz ipam --free 10.1.10.0/24' to see what is left
 ```
 
 ---
@@ -194,7 +194,7 @@ so a large inventory produces a summary rather than a wall of `/24`s:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus ipam --aggregate --family ipv6
+$ netviz -i examples/campus ipam --aggregate --family ipv6
 PREFIX              IP  VLANS  HOSTS  USED  FREE    UTIL  DEVICES  PARTS
 ------------------  --  -----  -----  ----  ----  ------  -------  -----
 2001:db8::1/128      6  -          1     1     0  100.0%        1      -
@@ -225,11 +225,11 @@ can hold, so it is what is reported.
 ## Conflicts
 
 The second half of the default report is the address-plan conflicts. They are
-**not computed here**: `netgraph ipam` calls
-[`netgraph.validate`](../src/netgraph/validate.py) and filters the findings to
+**not computed here**: `netviz ipam` calls
+[`netviz.validate`](../src/netviz/validate.py) and filters the findings to
 the rules that are about addressing. There is one implementation of "is this
-address plan sound", and `netgraph validate` and `netgraph ipam` are two views
-of it — so a suppression in `netgraph.toml` or a `netgraph/ignore` annotation
+address plan sound", and `netviz validate` and `netviz ipam` are two views
+of it — so a suppression in `netviz.toml` or a `netviz/ignore` annotation
 silences a conflict here exactly as it does there, and a rule re-graded per
 inventory is reported at the severity the inventory chose.
 
@@ -252,7 +252,7 @@ called instead.
 
 <!-- run: -->
 ```console
-$ netgraph -i tests/fixtures/invalid/w131-nested-prefix-other-domain.yaml ipam
+$ netviz -i tests/fixtures/invalid/w131-nested-prefix-other-domain.yaml ipam
 PREFIX       IP  VLANS  HOSTS  USED   FREE   UTIL  DEVICES
 -----------  --  -----  -----  ----  -----  -----  -------
 10.0.0.0/16   4  10     65534     2  65532  <0.1%        2
@@ -314,7 +314,7 @@ not in `ietf-ip`. See [§6.2.3 of the schema](schema.md#623-ipv4--ipv6).
 
 <!-- norun: a jq pipeline -->
 ```console
-$ netgraph -i examples/campus ipam -F json | jq '.subnets[0], (.conflicts|length)'
+$ netviz -i examples/campus ipam -F json | jq '.subnets[0], (.conflicts|length)'
 {
   "prefix": "10.1.0.0/30",
   "family": "ipv4",
@@ -333,7 +333,7 @@ $ netgraph -i examples/campus ipam -F json | jq '.subnets[0], (.conflicts|length
 prints. `utilisation` is a fraction in `[0, 1]`, or `null` for a prefix with no
 capacity. `aggregated` lists the prefixes an `--aggregate` row stands for.
 Conflict entries have the same shape as the `findings` array of
-[`netgraph validate -F json`](ci.md).
+[`netviz validate -F json`](ci.md).
 
 **CSV** holds one table, because that is what a CSV *is*. The default emits the
 utilisation rows — the half a spreadsheet or an `awk` script wants — and notes
@@ -341,7 +341,7 @@ on stderr how many conflicts were left out:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus ipam -F csv --family ipv6
+$ netviz -i examples/campus ipam -F csv --family ipv6
 prefix,family,vlans,capacity,assigned,free,utilisation,devices
 2001:db8::1/128,ipv6,,1,1,0,1.000000,1
 ...
@@ -351,7 +351,7 @@ For the conflicts as CSV, ask for them on their own:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus ipam --conflicts -F csv
+$ netviz -i examples/campus ipam --conflicts -F csv
 rule,alias,severity,element,file,message
 ```
 
@@ -394,4 +394,4 @@ not get.
 | `2` | The command line does not make sense (click's own exit code). |
 
 A warning-severity conflict does not fail the run — use
-`netgraph validate --strict` for a gate that treats every finding as fatal.
+`netviz validate --strict` for a gate that treats every finding as fatal.

@@ -41,12 +41,12 @@ from pathlib import Path
 if __package__ is None and __name__ == "__main__":  # pragma: no cover - script entry
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from netgraph.layout.avoid import crossings
-from netgraph.layout.geometry import LayoutMode, Routing
-from netgraph.loader import load_tree
-from netgraph.render.graph import Layer, build_graph
-from netgraph.render.options import RenderOptions
-from netgraph.render.routes import obstacles_of, route_plan
+from netviz.layout.avoid import crossings
+from netviz.layout.geometry import LayoutMode, Routing
+from netviz.loader import load_tree
+from netviz.render.graph import Layer, build_graph
+from netviz.render.options import RenderOptions
+from netviz.render.routes import obstacles_of, route_plan
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,7 +111,7 @@ def report(root: Path, *, layer: str, repeat: int, clearance: float, verbose: bo
         print()
         print(
             "  nothing to measure: this drawing is not fully arranged, so Graphviz routes it\n"
-            "  and 'splines=ortho' already avoids nodes. Run 'netgraph layout --write' first."
+            "  and 'splines=ortho' already avoids nodes. Run 'netviz layout --write' first."
         )
         return 0
 

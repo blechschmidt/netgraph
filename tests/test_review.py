@@ -1,7 +1,7 @@
-"""The pull-request review: ``netgraph.review`` and ``netgraph review``.
+"""The pull-request review: ``netviz.review`` and ``netviz review``.
 
 The comment body is a *pure function* of a
-:class:`~netgraph.review.model.Review`, and almost everything here exercises it
+:class:`~netviz.review.model.Review`, and almost everything here exercises it
 that way — a changeset and two lists of diagnostics in, Markdown out, with no
 repository, no GitHub and no clock anywhere near it. That split is the point of
 the module: the formatting of the thing a team reads on every pull request is
@@ -35,12 +35,12 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.diagnostics import Diagnostic, as_sarif, build_report, fingerprint
-from netgraph.plan.address import parse_address
-from netgraph.plan.model import Action, Change, FieldChange, Plan, StateRef
-from netgraph.plan.paths import parse_path
-from netgraph.review import (
+from netviz.cli import cli
+from netviz.diagnostics import Diagnostic, as_sarif, build_report, fingerprint
+from netviz.plan.address import parse_address
+from netviz.plan.model import Action, Change, FieldChange, Plan, StateRef
+from netviz.plan.paths import parse_path
+from netviz.review import (
     MARKER_PREFIX,
     Diagram,
     FindingDelta,
@@ -52,7 +52,7 @@ from netgraph.review import (
     render_comment,
     summarise,
 )
-from netgraph.rules import Severity
+from netviz.rules import Severity
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples" / "home-lab"
@@ -133,8 +133,8 @@ def review_of(**overrides: object) -> Review:
 
 
 def test_the_body_begins_with_the_marker_the_workflow_looks_for() -> None:
-    body = render_comment(review_of(title="netgraph (campus)"))
-    assert body.splitlines()[0] == marker("netgraph (campus)")
+    body = render_comment(review_of(title="netviz (campus)"))
+    assert body.splitlines()[0] == marker("netviz (campus)")
     assert body.startswith(MARKER_PREFIX)
 
 
@@ -378,7 +378,7 @@ def test_a_published_diagram_is_embedded_and_an_artifact_is_linked() -> None:
                 Diagram(label="PNG", path="diff.png"),
             ),
             artifact_url="https://example.test/run/1#artifacts",
-            artifact_name="netgraph-review",
+            artifact_name="netviz-review",
         )
     )
     assert '<img src="https://example.test/diff.svg"' in body
@@ -494,7 +494,7 @@ def test_the_summary_of_a_broken_head_says_broken() -> None:
 def test_the_rendered_comment_is_what_it_was(regen_golden: bool) -> None:
     """One golden body, so that a change to any part of the layout is visible."""
     review = review_of(
-        title="netgraph (home-lab)",
+        title="netviz (home-lab)",
         delta=FindingDelta(
             new=(
                 finding(
@@ -511,7 +511,7 @@ def test_the_rendered_comment_is_what_it_was(regen_golden: bool) -> None:
         ),
         diagrams=(Diagram(label="SVG", path="diff.svg"), Diagram(label="PNG", path="diff.png")),
         artifact_url="https://github.com/o/r/actions/runs/42#artifacts",
-        artifact_name="netgraph-review",
+        artifact_name="netviz-review",
         repository_url="https://github.com/o/r",
         head_sha="0123456789abcdef",
     )
@@ -559,7 +559,7 @@ class Repo:
         return self.commit("Bring the home lab under description")
 
 
-DANGLING_CABLE = """apiVersion: netgraph.dev/v1alpha1
+DANGLING_CABLE = """apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-nowhere
@@ -570,7 +570,7 @@ spec:
   medium: copper
 """
 
-NEW_DEVICE = """apiVersion: netgraph.dev/v1alpha1
+NEW_DEVICE = """apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-new
@@ -659,7 +659,7 @@ def test_fail_on_changes_gates_on_the_changeset(repo: Repo) -> None:
 
 
 def test_a_head_that_does_not_load_fails_and_says_which_document(repo: Repo) -> None:
-    repo.write("hosts/bad.yaml", "apiVersion: netgraph.dev/v1alpha1\nkind: nonsense\n")
+    repo.write("hosts/bad.yaml", "apiVersion: netviz.dev/v1alpha1\nkind: nonsense\n")
     result = run(repo, "--from", "HEAD")
     assert result.exit_code == 1
     assert "the inventory does not load" in result.output
@@ -672,7 +672,7 @@ def test_the_side_documents_are_written_and_agree_with_the_comment(
     repo.write("hosts/newpc.yaml", NEW_DEVICE)
     body = tmp_path / "comment.md"
     plan = tmp_path / "plan.json"
-    sarif = tmp_path / "netgraph.sarif"
+    sarif = tmp_path / "netviz.sarif"
     summary = tmp_path / "summary.json"
     result = run(
         repo,
@@ -748,11 +748,11 @@ def test_disable_applies_to_both_sides(repo: Repo) -> None:
 def test_the_sarif_and_the_comment_come_from_one_validation(repo: Repo, tmp_path: Path) -> None:
     """Two validations could disagree; the command runs one and shares it."""
     repo.write("hosts/newpc.yaml", NEW_DEVICE)
-    sarif = tmp_path / "netgraph.sarif"
+    sarif = tmp_path / "netviz.sarif"
     assert run(repo, "--from", "HEAD", "--sarif-out", str(sarif)).exit_code == 0
 
-    from netgraph.loader import load_tree
-    from netgraph.validate import validate
+    from netviz.loader import load_tree
+    from netviz.validate import validate
 
     inventory = load_tree(repo.inventory)
     expected = as_sarif(build_report(inventory, validate(inventory)))
@@ -782,7 +782,7 @@ def test_two_folders_can_be_compared_without_a_repository(tmp_path: Path) -> Non
 
 def test_a_base_that_does_not_load_is_reviewed_with_a_caveat(repo: Repo) -> None:
     """A branch that was already broken is exactly what this has to cope with."""
-    repo.write("hosts/bad.yaml", "apiVersion: netgraph.dev/v1alpha1\nkind: nonsense\n")
+    repo.write("hosts/bad.yaml", "apiVersion: netviz.dev/v1alpha1\nkind: nonsense\n")
     repo.commit("Break it")
     (repo.inventory / "hosts" / "bad.yaml").unlink()
 

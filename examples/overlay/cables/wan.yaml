@@ -1,6 +1,6 @@
 # The physical topology, which is all three sites homed to one provider edge.
 # Every overlay in tunnels/ rides over these three links.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-wan-hq
@@ -11,7 +11,7 @@ spec:
   connector: lc
   label: PE-01
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-wan-branch-a
@@ -22,7 +22,7 @@ spec:
   connector: lc
   label: PE-02
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-wan-branch-b

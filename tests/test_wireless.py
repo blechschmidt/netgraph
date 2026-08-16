@@ -28,10 +28,10 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.errors import SchemaError
-from netgraph.loader import Inventory, load_tree
-from netgraph.models import (
+from netviz.cli import cli
+from netviz.errors import SchemaError
+from netviz.loader import Inventory, load_tree
+from netviz.models import (
     API_VERSION,
     Band,
     Bss,
@@ -41,13 +41,13 @@ from netgraph.models import (
     WirelessConfig,
     parse_document,
 )
-from netgraph.models.interface import CHANNEL_WIDTHS
-from netgraph.render.details import _wireless_text
-from netgraph.render.dot import to_dot
-from netgraph.render.graph import Layer, build_graph
-from netgraph.render.jsonexport import graph_to_dict
-from netgraph.render.mermaid import to_mermaid
-from netgraph.validate import validate
+from netviz.models.interface import CHANNEL_WIDTHS
+from netviz.render.details import _wireless_text
+from netviz.render.dot import to_dot
+from netviz.render.graph import Layer, build_graph
+from netviz.render.jsonexport import graph_to_dict
+from netviz.render.mermaid import to_mermaid
+from netviz.validate import validate
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HOME_LAB = REPO_ROOT / "examples" / "home-lab"

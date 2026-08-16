@@ -1,4 +1,4 @@
-"""The diff engine and the two commands: ``netgraph.plan``, ``plan``, ``apply``.
+"""The diff engine and the two commands: ``netviz.plan``, ``plan``, ``apply``.
 
 Four properties carry the whole feature, and everything here is one of them:
 
@@ -29,9 +29,9 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.console import Console
-from netgraph.edit import (
+from netviz.cli import cli
+from netviz.console import Console
+from netviz.edit import (
     AddInterface,
     Connect,
     CreateElement,
@@ -43,11 +43,11 @@ from netgraph.edit import (
     SetField,
     UnsetField,
 )
-from netgraph.fsio import write_text
-from netgraph.importer import build_draft, read_inputs
-from netgraph.importer.draft import Draft, DraftInterface, DraftVlan
-from netgraph.loader import Inventory, load_tree
-from netgraph.plan import (
+from netviz.fsio import write_text
+from netviz.importer import build_draft, read_inputs
+from netviz.importer.draft import Draft, DraftInterface, DraftVlan
+from netviz.loader import Inventory, load_tree
+from netviz.plan import (
     MISSING,
     Action,
     Address,
@@ -121,7 +121,7 @@ def plan_of(before: Path, after: Path, **kwargs: Any) -> Plan:
 
 
 def text_of(plan: Plan) -> str:
-    """The plan as ``netgraph plan`` prints it, without colour.
+    """The plan as ``netviz plan`` prints it, without colour.
 
     The line endings are folded to ``\\n``, which is what Click's own
     ``Result.output`` does with the same buffer and for the same reason: the
@@ -243,7 +243,7 @@ def test_a_malformed_plan_path_is_refused(text: str) -> None:
 
 def test_a_selector_survives_an_insertion() -> None:
     """The whole reason a plan does not store indices."""
-    from netgraph.plan.paths import resolve
+    from netviz.plan.paths import resolve
 
     before = {"spec": {"interfaces": [{"name": "eth0"}, {"name": "eth1"}]}}
     after = {"spec": {"interfaces": [{"name": "new"}, {"name": "eth0"}, {"name": "eth1"}]}}
@@ -253,7 +253,7 @@ def test_a_selector_survives_an_insertion() -> None:
 
 
 def test_a_selector_that_names_nothing_is_an_error_not_a_guess() -> None:
-    from netgraph.plan.paths import resolve
+    from netviz.plan.paths import resolve
 
     with pytest.raises(PathError):
         resolve(parse_path("spec.interfaces[name=gone].mtu"), {"spec": {"interfaces": []}})
@@ -330,7 +330,7 @@ def test_an_inventory_does_not_differ_from_itself(name: str) -> None:
 
 
 def test_a_reformatted_tree_is_not_a_change(home: Path, twin: Path) -> None:
-    """A plan is a diff of meaning; ``netgraph fmt`` must not produce one."""
+    """A plan is a diff of meaning; ``netviz fmt`` must not produce one."""
     runner = CliRunner()
     assert runner.invoke(cli, ["-i", str(twin), "fmt"]).exit_code == 0
     assert plan_of(home, twin).empty
@@ -480,12 +480,12 @@ def test_an_explicit_id_beats_every_inference(tmp_path: Path) -> None:
         root.mkdir()
         write_text(
             root / "panels.yaml",
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: patchpanel\n"
             "metadata:\n"
             f"  name: {name}\n"
             "  annotations:\n"
-            "    netgraph.dev/id: P-1\n"
+            "    netviz.dev/id: P-1\n"
             "spec:\n"
             "  ports: 4\n",
         )
@@ -531,7 +531,7 @@ def test_an_ambiguous_pairing_is_left_alone(tmp_path: Path) -> None:
 
 def _documents(*elements: tuple[str, str]) -> str:
     return "---\n".join(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         f"kind: {kind}\n"
         "metadata:\n"
         f"  name: {name}\n"
@@ -968,7 +968,7 @@ def test_a_trunk_vlan_set_is_read_in_every_spelling(
     declared: str | None, observed: list[int], expected: list[int] | None
 ) -> None:
     """A ``vlan-set`` may be a list, a comma run or a range; a capture is a list."""
-    from netgraph.plan.live import _adopt_vlan, _vlan_ids
+    from netviz.plan.live import _adopt_vlan, _vlan_ids
 
     entry_: dict[str, Any] = {"name": "eth0"}
     if declared is not None:
@@ -983,7 +983,7 @@ def test_a_trunk_vlan_set_is_read_in_every_spelling(
 
 
 def test_a_new_cable_sits_in_the_namespace_both_ends_share(home: Path) -> None:
-    from netgraph.plan.live import _common_namespace
+    from netviz.plan.live import _common_namespace
 
     assert _common_namespace("sites/hq/a", "sites/hq/b") == "sites/hq"
     assert _common_namespace("hosts/a", "switches/b") == ""
@@ -1122,7 +1122,7 @@ def test_apply_refuses_something_that_is_not_a_plan(home: Path, tmp_path: Path) 
     write_text(broken, "not json at all")
     result = run("-i", str(home), "apply", str(broken))
     assert result.exit_code == 1
-    assert "is not a netgraph plan" in result.output
+    assert "is not a netviz plan" in result.output
 
 
 def test_apply_reports_nothing_to_do(home: Path, tmp_path: Path) -> None:

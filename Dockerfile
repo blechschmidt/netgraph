@@ -1,16 +1,16 @@
-# netgraph in a container: the CLI, the live preview and the browser editor.
+# netviz in a container: the CLI, the live preview and the browser editor.
 #
 # Two stages, so what ships carries no build tooling, no pip cache and no copy
 # of the source tree -- only the virtual environment the build produced and the
-# one dependency netgraph cannot vendor: the Graphviz ``dot`` binary behind
+# one dependency netviz cannot vendor: the Graphviz ``dot`` binary behind
 # every svg, png, pdf and html render. Being in the image is the point of the
 # image; a container is the shortest route to "draw this inventory" on a machine
 # where installing Python packages and system packages is not welcome.
 #
 # Build and run it directly:
 #
-#     docker build -t netgraph:local .
-#     docker run --rm -v "$PWD:/inventory:ro" netgraph:local validate
+#     docker build -t netviz:local .
+#     docker run --rm -v "$PWD:/inventory:ro" netviz:local validate
 #
 # or through ``docker-compose.yml``, which wires up the mount, the ports and the
 # user id for you. See docs/docker.md.
@@ -40,10 +40,10 @@ COPY src ./src
 
 # A venv rather than the system interpreter: one directory to copy into the next
 # stage, and nothing of pip's own installed alongside the application.
-RUN python -m venv /opt/netgraph \
-    && /opt/netgraph/bin/pip install --upgrade pip \
-    && /opt/netgraph/bin/pip install . \
-    && /opt/netgraph/bin/netgraph --version
+RUN python -m venv /opt/netviz \
+    && /opt/netviz/bin/pip install --upgrade pip \
+    && /opt/netviz/bin/pip install . \
+    && /opt/netviz/bin/netviz --version
 
 
 # --------------------------------------------------------------------------- #
@@ -51,7 +51,7 @@ RUN python -m venv /opt/netgraph \
 # --------------------------------------------------------------------------- #
 FROM python:${PYTHON_VERSION}-slim AS runtime
 
-LABEL org.opencontainers.image.title="netgraph" \
+LABEL org.opencontainers.image.title="netviz" \
       org.opencontainers.image.description="Declare network elements in YAML and render them as network graphs." \
       org.opencontainers.image.source="https://github.com/blechschmidt/netgraph" \
       org.opencontainers.image.documentation="https://github.com/blechschmidt/netgraph/blob/main/docs/docker.md" \
@@ -69,10 +69,10 @@ RUN apt-get update \
     && fc-cache --force \
     && dot -V
 
-COPY --from=build /opt/netgraph /opt/netgraph
+COPY --from=build /opt/netviz /opt/netviz
 
-ENV PATH="/opt/netgraph/bin:${PATH}" \
-    # Status lines from ``netgraph watch`` have to reach ``docker logs`` as they
+ENV PATH="/opt/netviz/bin:${PATH}" \
+    # Status lines from ``netviz watch`` have to reach ``docker logs`` as they
     # happen, not when a pipe buffer fills.
     PYTHONUNBUFFERED=1 \
     # The venv is already byte-compiled and the root filesystem may be
@@ -96,9 +96,9 @@ RUN install --directory --owner=1000 --group=1000 /inventory
 USER 1000:1000
 WORKDIR /inventory
 
-# The image *is* the command: ``docker run … netgraph:local validate`` reads the
+# The image *is* the command: ``docker run … netviz:local validate`` reads the
 # way the tool does. ``--help`` rather than a default action, because guessing
-# what an operator meant by "run netgraph" is how a container writes a file
+# what an operator meant by "run netviz" is how a container writes a file
 # nobody asked for.
-ENTRYPOINT ["netgraph"]
+ENTRYPOINT ["netviz"]
 CMD ["--help"]

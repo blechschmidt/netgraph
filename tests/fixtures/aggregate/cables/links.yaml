@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-lag-1
@@ -14,7 +14,7 @@ spec:
   length_m: 2
   label: CBL-LAG-1
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-lag-2
@@ -30,7 +30,7 @@ spec:
   length_m: 2
   label: CBL-LAG-2
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-lag-3
@@ -46,7 +46,7 @@ spec:
   length_m: 2
   label: CBL-LAG-3
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-lag-4
@@ -62,7 +62,7 @@ spec:
   length_m: 2
   label: CBL-LAG-4
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-spare-1
@@ -78,7 +78,7 @@ spec:
   length_m: 2
   label: CBL-SPARE-1
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-spare-2
@@ -94,7 +94,7 @@ spec:
   length_m: 2
   label: CBL-SPARE-2
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-desk-1
@@ -110,7 +110,7 @@ spec:
   length_m: 2
   label: CBL-DESK-1
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-east-west
@@ -126,7 +126,7 @@ spec:
   length_m: 2
   label: CBL-EAST-WEST
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-east-west-2

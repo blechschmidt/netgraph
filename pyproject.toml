@@ -3,13 +3,13 @@ requires = ["hatchling>=1.21"]
 build-backend = "hatchling.build"
 
 [project]
-name = "netgraph"
+name = "netviz"
 version = "0.1.0"
 description = "Declare network elements in YAML and render them as network graphs."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-authors = [{ name = "netgraph contributors" }]
+authors = [{ name = "netviz contributors" }]
 keywords = ["network", "topology", "graph", "yaml", "yang", "graphviz"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -30,17 +30,17 @@ dependencies = [
     "click>=8.1",
     "networkx>=3.0",
     "jinja2>=3.1",
-    # ``netgraph watch``. Imported lazily, so a platform without a prebuilt
+    # ``netviz watch``. Imported lazily, so a platform without a prebuilt
     # wheel still gets every other command.
     "watchfiles>=0.21",
-    # ``netgraph fmt`` only. PyYAML discards comments, blank lines and quoting
+    # ``netviz fmt`` only. PyYAML discards comments, blank lines and quoting
     # style while parsing -- which is what makes it fast, and what a formatter
     # cannot do without -- so the fmt path uses a round-trip parser and every
-    # other path keeps PyYAML unchanged. Imported lazily too (netgraph.cli): it
+    # other path keeps PyYAML unchanged. Imported lazily too (netviz.cli): it
     # costs ~30 ms of import time and ``validate`` runs in a pre-commit hook.
     # Entry 9 of docs/follow-ups.md records the decision.
     "ruamel.yaml>=0.18",
-    # ``tomllib`` is stdlib from 3.11; ``netgraph.toml`` needs a reader before that.
+    # ``tomllib`` is stdlib from 3.11; ``netviz.toml`` needs a reader before that.
     "tomli>=2.0; python_version < '3.11'",
 ]
 
@@ -48,7 +48,7 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
-    # netgraph itself runs the ``dot`` binary directly (netgraph.render.dot), so
+    # netviz itself runs the ``dot`` binary directly (netviz.render.dot), so
     # this wrapper is not a runtime dependency. The tests use its builder API as
     # an independent second opinion: tests/test_examples.py lays every example
     # out through it, which would not prove much if it shared our code path.
@@ -91,7 +91,7 @@ browser = [
 ]
 
 [project.urls]
-# The canonical URLs. ``netgraph.rules.RULES_DOC_URL`` and the SARIF
+# The canonical URLs. ``netviz.rules.RULES_DOC_URL`` and the SARIF
 # ``informationUri`` are built from the same repository, so a rename has to
 # happen here and there at once; ``tests/test_docs.py`` pins the anchors.
 Homepage = "https://github.com/blechschmidt/netgraph"
@@ -99,10 +99,10 @@ Repository = "https://github.com/blechschmidt/netgraph"
 Issues = "https://github.com/blechschmidt/netgraph/issues"
 
 [project.scripts]
-netgraph = "netgraph.cli:main"
+netviz = "netviz.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/netgraph"]
+packages = ["src/netviz"]
 
 [tool.hatch.build.targets.sdist]
 # None of these are optional decoration. tests/test_examples.py loads, validates
@@ -174,7 +174,7 @@ ignore = [
 
 [tool.mypy]
 python_version = "3.10"
-files = ["src/netgraph", "tests", "tools"]
+files = ["src/netviz", "tests", "tools"]
 strict = true
 warn_unreachable = true
 show_error_codes = true
@@ -185,7 +185,7 @@ module = ["graphviz.*", "networkx.*"]
 ignore_missing_imports = true
 
 # Only tools/render_icons.py imports it, and only to regenerate the raster
-# icons; it is deliberately not a netgraph dependency (it needs system cairo).
+# icons; it is deliberately not a netviz dependency (it needs system cairo).
 [[tool.mypy.overrides]]
 module = ["cairosvg"]
 ignore_missing_imports = true
@@ -203,7 +203,7 @@ ignore_missing_imports = true
 module = ["playwright.*", "axe_core_python.*"]
 ignore_missing_imports = true
 
-# ``netgraph.loader.documents`` subclasses PyYAML's loaders and calls two methods
+# ``netviz.loader.documents`` subclasses PyYAML's loaders and calls two methods
 # -- ``add_implicit_resolver`` and ``construct_yaml_str`` -- whose annotations
 # differ between releases of ``types-PyYAML``. Under one resolution they are
 # untyped and the calls need ``# type: ignore[no-untyped-call]``; under another
@@ -215,14 +215,14 @@ ignore_missing_imports = true
 # about, and this narrows the blind spot to three lines whose reason is written
 # above them.
 [[tool.mypy.overrides]]
-module = ["netgraph.loader.documents"]
+module = ["netviz.loader.documents"]
 warn_unused_ignores = false
 
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
 # Every test in this suite is a function. Collecting classes as well would only
-# ever pick up an import -- ``TestSuite`` and ``TestReport`` are netgraph types,
+# ever pick up an import -- ``TestSuite`` and ``TestReport`` are netviz types,
 # not test cases -- and warn about not being able to instantiate them.
 python_classes = []
 markers = [
@@ -239,7 +239,7 @@ addopts = [
     "-ra",
     "--strict-markers",
     "--strict-config",
-    "--cov=netgraph",
+    "--cov=netviz",
     "--cov-report=term-missing:skip-covered",
     # Pin the property tests' seed so a run is reproducible. Hypothesis refuses
     # ``derandomize`` alongside an explicit example database (see
@@ -252,7 +252,7 @@ xfail_strict = true
 
 [tool.coverage.run]
 branch = true
-source = ["netgraph"]
+source = ["netviz"]
 
 [tool.coverage.report]
 show_missing = true

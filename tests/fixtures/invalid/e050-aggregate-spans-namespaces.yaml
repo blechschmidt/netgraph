@@ -2,7 +2,7 @@
 #
 # One datapath belongs to one network stack: moving a port into a namespace is
 # precisely the operation that takes it out of the bridge.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-a
@@ -30,7 +30,7 @@ spec:
       ipv4:
         addresses: [10.2.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-b
@@ -42,7 +42,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

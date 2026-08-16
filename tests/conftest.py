@@ -3,7 +3,7 @@
 The parse cache is redirected to a temporary directory for the whole session
 (:func:`isolate_the_parse_cache`), so a test run never reads or writes the
 developer's real cache and a fresh checkout behaves like a machine that has run
-netgraph before. It is deliberately *not* switched off: the cache is on by
+netviz before. It is deliberately *not* switched off: the cache is on by
 default in every command, and a suite that disabled it would leave the warm path
 tested only by ``tests/test_cache.py`` while every golden, transcript and
 end-to-end assertion kept exercising the cold one.
@@ -21,7 +21,7 @@ the browser console log *only* for a failure. pytest does not otherwise tell a
 fixture anything about the outcome, and a suite that saved an artefact for every
 passing test would bury the one that matters.
 
-``NETGRAPH_HYPOTHESIS_PROFILE`` picks how hard the property tests in
+``NETVIZ_HYPOTHESIS_PROFILE`` picks how hard the property tests in
 ``tests/test_properties.py`` and ``tests/test_fuzz_loader.py`` search. The
 profiles are registered here rather than per module so that every property in
 the suite runs under one budget and one seed; see :data:`PROFILES` for what each
@@ -39,7 +39,7 @@ import pytest
 from hypothesis import HealthCheck, Phase, settings
 from hypothesis.database import DirectoryBasedExampleDatabase
 
-from netgraph.loader import CACHE_DIR_ENV_VAR
+from netviz.loader import CACHE_DIR_ENV_VAR
 
 #: Where a failing example is recorded so the next run tries it first. Kept at
 #: the repository root rather than in a temporary directory precisely so it can
@@ -91,13 +91,13 @@ for _name, _examples in PROFILES.items():
         print_blob=True,
     )
 
-_REQUESTED = os.environ.get("NETGRAPH_HYPOTHESIS_PROFILE") or DEFAULT_PROFILE
+_REQUESTED = os.environ.get("NETVIZ_HYPOTHESIS_PROFILE") or DEFAULT_PROFILE
 if _REQUESTED not in PROFILES:
     # Hypothesis's own error for an unknown profile does not say what the known
     # ones are, and a typo in an environment variable that silently ran 25
     # examples where somebody asked for 1000 would be worse than either.
     raise RuntimeError(
-        f"NETGRAPH_HYPOTHESIS_PROFILE={_REQUESTED!r} is not a profile; "
+        f"NETVIZ_HYPOTHESIS_PROFILE={_REQUESTED!r} is not a profile; "
         f"expected one of {', '.join(PROFILES)}"
     )
 settings.load_profile(_REQUESTED)
@@ -145,9 +145,9 @@ def regen_golden(request: pytest.FixtureRequest) -> bool:
     return bool(request.config.getoption("--regen-golden"))
 
 
-#: Environment variables that decide, before any code in netgraph runs, whether
+#: Environment variables that decide, before any code in netviz runs, whether
 #: its output is styled. ``NO_COLOR`` and ``FORCE_COLOR`` are read by
-#: :meth:`netgraph.console.Console._detect`; the rest are what the libraries
+#: :meth:`netviz.console.Console._detect`; the rest are what the libraries
 #: underneath consult for the same question.
 _COLOUR_ENV_VARS: Final = ("NO_COLOR", "FORCE_COLOR", "CLICOLOR", "CLICOLOR_FORCE")
 
@@ -156,7 +156,7 @@ _COLOUR_ENV_VARS: Final = ("NO_COLOR", "FORCE_COLOR", "CLICOLOR", "CLICOLOR_FORC
 def take_colour_out_of_the_environment() -> Iterator[None]:
     """Decide styling by the stream, never by the ambient environment.
 
-    A dozen assertions in this suite are about *whether* netgraph styles its
+    A dozen assertions in this suite are about *whether* netviz styles its
     output — that a redirect drops the escapes, that a table's header is plain
     when it is piped. Those are properties of the stream, and the environment can
     overrule the stream: ``FORCE_COLOR`` says "style anyway".
@@ -164,7 +164,7 @@ def take_colour_out_of_the_environment() -> Iterator[None]:
     CI sets exactly that, so every one of those assertions failed there and
     passed on the developer's machine — the worst shape a test failure comes in.
     The environment is therefore cleared for the whole session rather than
-    per test, because several tests run netgraph in a subprocess, which inherits
+    per test, because several tests run netviz in a subprocess, which inherits
     it. A test that wants styling asks for it explicitly (``--color``, or a fake
     tty), which is the path a user takes too.
     """
@@ -179,7 +179,7 @@ def take_colour_out_of_the_environment() -> Iterator[None]:
 
 @pytest.fixture(scope="session", autouse=True)
 def isolate_the_parse_cache(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Path]:
-    """Point :data:`~netgraph.loader.CACHE_DIR_ENV_VAR` at a throwaway directory.
+    """Point :data:`~netviz.loader.CACHE_DIR_ENV_VAR` at a throwaway directory.
 
     Set in ``os.environ`` rather than through ``monkeypatch`` because several
     tests run the installed console script in a subprocess, and a cache is only
@@ -190,7 +190,7 @@ def isolate_the_parse_cache(tmp_path_factory: pytest.TempPathFactory) -> Iterato
     letting the suite hit means the assertions it already makes — goldens,
     documented transcripts, every CLI test — are made against the warm path too.
     """
-    directory = tmp_path_factory.mktemp("netgraph-cache")
+    directory = tmp_path_factory.mktemp("netviz-cache")
     previous = os.environ.get(CACHE_DIR_ENV_VAR)
     os.environ[CACHE_DIR_ENV_VAR] = str(directory)
     try:

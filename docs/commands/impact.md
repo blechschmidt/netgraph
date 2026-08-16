@@ -1,6 +1,6 @@
-# `netgraph impact`
+# `netviz impact`
 
-`netgraph impact` answers the question an inventory exists to answer and a
+`netviz impact` answers the question an inventory exists to answer and a
 diagram cannot: **what breaks if this dies.** It removes elements from the
 resolved graph, derives every layer again without them, and reports what stops
 being reachable — or, given nothing to remove, enumerates the single points of
@@ -35,7 +35,7 @@ what does.
 
 <!-- generated: synopsis impact -->
 ```text
-netgraph [GLOBAL OPTIONS] impact [OPTIONS]
+netviz [GLOBAL OPTIONS] impact [OPTIONS]
 ```
 <!-- /generated -->
 
@@ -58,7 +58,7 @@ it could have meant instead:
 
 <!-- norun: the wrapped error message is illustrative; no example inventory has three sw-01 -->
 ```console
-$ netgraph impact --fail sw-01
+$ netviz impact --fail sw-01
 Error: Invalid value for '--fail': 'sw-01' is ambiguous: it matches 3 elements.
 Qualify it with a namespace or a kind, e.g. 'device/sw-01'.
 ```
@@ -85,7 +85,7 @@ spellings as `--fail`.
 
 <!-- run: cwd=examples/campus rc=1 -->
 ```console
-$ netgraph impact --fail device/sw-north-acc-01 --layer l1
+$ netviz impact --fail device/sw-north-acc-01 --layer l1
 1 element removed:
   sw-north-acc-01 (switch)
 
@@ -125,13 +125,13 @@ none the wiser.
 
 ## Power failures cascade
 
-`src/netgraph/power.py` already resolves every feed, so a PDU is not a special
+`src/netviz/power.py` already resolves every feed, so a PDU is not a special
 case in the topology — it is a source, and everything whose *only* remaining
 source is gone goes with it, transitively:
 
 <!-- norun: the inventory is the two-PDU rack of the section, which is not an example tree -->
 ```console
-$ netgraph impact --fail pdu/pdu-a --from rtr-core
+$ netviz impact --fail pdu/pdu-a --from rtr-core
 1 element removed:
   pdu-a (pdu)
 
@@ -150,13 +150,13 @@ into *one* survives neither, and that is what `E042` and `--spof` are for.
 ## `--path`: assertions that survive, or do not
 
 `--path SRC=DST` re-runs the [trace engine](path.md) on both sides of the failure
-and reports whether the route survived. Each end takes the spellings `netgraph
+and reports whether the route survived. Each end takes the spellings `netviz
 path` takes; `=` separates them, because a colon already means
 `element:interface` and an arrow has to be quoted in every shell there is.
 
 <!-- norun: the note is wrapped to the page width; the command prints it on one line -->
 ```console
-$ netgraph impact --fail sw-north-acc-01 --path pc-north-01=srv-north-01
+$ netviz impact --fail sw-north-acc-01 --path pc-north-01=srv-north-01
 paths:
   broken    pc-north-01 → srv-north-01  (1 route the trace still finds crosses a
             prefix or a tunnel whose two ends are no longer physically connected,
@@ -184,7 +184,7 @@ each one isolates:
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph impact --spof --limit 5
+$ netviz impact --spof --limit 5
 reachable from 1 gateway: sw-north-dist-01
 
 38 single points of failure, worst 5 shown:
@@ -233,7 +233,7 @@ An inventory records what the network *is*. An annotation records what it is
 metadata:
   name: sw-ward-01
   annotations:
-    netgraph/redundancy: "gateway, power"
+    netviz/redundancy: "gateway, power"
 ```
 
 `gateway` says losing any one element must not cut this one off from its default
@@ -244,13 +244,13 @@ somebody re-patches a rack, and both are graded by ordinary validation rules —
 [`E048`](../validation-rules.md#e048--declared-power-redundancy-is-not-met) and
 [`W141`](../validation-rules.md#w141--unknown-redundancy-expectation).
 
-Ordinary means `netgraph validate` gates on them too, which is the point: CI
-fails the change that removed somebody's second path, and `netgraph impact
+Ordinary means `netviz validate` gates on them too, which is the point: CI
+fails the change that removed somebody's second path, and `netviz impact
 --redundancy` is where you go to find out why.
 
 <!-- norun: the finding is wrapped to the page width; the command prints it on one line -->
 ```console
-$ netgraph impact --redundancy
+$ netviz impact --redundancy
 1 redundancy expectation not met:
   E047 element 'sites/north/hosts/pc-north-01' declares a 'gateway' redundancy
   expectation, but 3 single failures would cut it off from its gateway 10.1.10.1
@@ -266,7 +266,7 @@ no line of YAML is guilty of. See [`docs/ci.md`](../ci.md) for the upload.
 
 ## Failure mode in the editor
 
-`netgraph web DIR` has the same analysis on the canvas. **Alt-F** puts the
+`netviz web DIR` has the same analysis on the canvas. **Alt-F** puts the
 session in failure mode; clicking an element greys out everything its loss would
 isolate and the status line names the count. Escape or Alt-F again puts the
 diagram back.
@@ -285,7 +285,7 @@ never mistaken for a complete one.
 ```json
 {
   "schemaVersion": 1,
-  "tool": { "name": "netgraph", "version": "0.1.0" },
+  "tool": { "name": "netviz", "version": "0.1.0" },
   "modes": ["fail"],
   "anchors": { "elements": ["sites/north/distribution/sw-north-dist-01"], "source": "gateways" },
   "failed": [{ "element": "sites/north/access/sw-north-acc-01", "kind": "switch",
@@ -342,7 +342,7 @@ Median of five runs, Python 3.12, libyaml. Two of those numbers are the design.
 `analyse()` at **5.7 ms for 1056 nodes** is what makes `--spof` usable at all.
 The obvious implementation — remove each candidate, re-traverse — is O(V·(V+E)),
 which on this tree is a few million node visits per layer and takes minutes.
-[`netgraph.connectivity`](../../src/netgraph/connectivity.py) gets every
+[`netviz.connectivity`](../../src/netviz/connectivity.py) gets every
 articulation point, every bridge *and* every isolation count out of one
 depth-first search, from the subtree sizes and the number of anchors each subtree
 contains. The identities of the isolated endpoints are materialised only for the
@@ -361,9 +361,9 @@ because a `--fail` run does it twice in total rather than once per candidate.
 |---|---|---|---|
 | `--fail` | `ELEMENT` | — | Remove this element and report what breaks. Takes a name, a fully-qualified name, or a kind-qualified one such as 'device/sw1' or 'cable/rack1-a3'. Repeatable: several failures are simulated together. |
 | `--from` | `ELEMENT` | — | Measure reachability from here instead of from the designated gateways. Repeatable. |
-| `--path` | `SRC=DST` | — | Re-run this trace on both sides of the failure and report whether it survived. Repeatable. Each end takes the spellings 'netgraph path' takes. |
+| `--path` | `SRC=DST` | — | Re-run this trace on both sides of the failure and report whether it survived. Repeatable. Each end takes the spellings 'netviz path' takes. |
 | `--spof` | — | off | Enumerate the single points of failure instead of simulating one, ranked by how many endpoints each isolates. The default when no --fail is given. |
-| `--redundancy` | — | off | Check the redundancy expectations elements declare in their 'netgraph/redundancy' annotation, and report E047, E048 and W141 through the ordinary rule machinery. |
+| `--redundancy` | — | off | Check the redundancy expectations elements declare in their 'netviz/redundancy' annotation, and report E047, E048 and W141 through the ordinary rule machinery. |
 | `--layer` | `[l1\|l2\|l3]` | — | Which views to analyse. Repeatable; all three by default. |
 | `--limit` | `N` | `25` | Report at most this many single points of failure. 0 reports every one of them. |
 | `--min-isolated` | `N` | `1` | Ignore a single point of failure that isolates fewer endpoints than this. |
@@ -390,11 +390,11 @@ nobody could put in a pipeline.
 
 ## See also
 
-* [`netgraph path`](path.md) and [`docs/paths.md`](../paths.md) — the trace
+* [`netviz path`](path.md) and [`docs/paths.md`](../paths.md) — the trace
   engine `--path` re-runs, and what it does and does not decide.
-* [`netgraph validate`](validate.md) and
+* [`netviz validate`](validate.md) and
   [`docs/validation-rules.md`](../validation-rules.md) — `E047`, `E048` and
   `W141`, and how to suppress or re-grade them.
-* [`netgraph list power`](list.md) — the feeds and budgets the power sweep reads.
-* [`netgraph web`](web.md) — the editor, and the failure-mode overlay.
+* [`netviz list power`](list.md) — the feeds and budgets the power sweep reads.
+* [`netviz web`](web.md) — the editor, and the failure-mode overlay.
 * [`docs/ci.md`](../ci.md) — gating a pull request on the exit code.

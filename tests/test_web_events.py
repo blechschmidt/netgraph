@@ -1,6 +1,6 @@
 """The push channel, presence, and what two clients do to each other.
 
-``netgraph web DIR`` used to be a page polling an integer. This file covers what
+``netviz web DIR`` used to be a page polling an integer. This file covers what
 replaced it and the properties that replacement must not cost:
 
 * **The bus is honest about what it lost.** Events are numbered, replayed from a
@@ -36,17 +36,17 @@ from typing import Any
 
 import pytest
 
-from netgraph.web.events import (
+from netviz.web.events import (
     EVENT_NAMES,
     QUEUE_CAPACITY,
     Event,
     EventBus,
     TooManyStreams,
 )
-from netgraph.web.presence import Presence
-from netgraph.web.preview import ViewOptions, graph_digest
-from netgraph.web.server import WebServer
-from netgraph.web.session import EditingSession
+from netviz.web.presence import Presence
+from netviz.web.preview import ViewOptions, graph_digest
+from netviz.web.server import WebServer
+from netviz.web.session import EditingSession
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -231,7 +231,7 @@ def test_a_change_on_disk_is_announced_as_one(session: EditingSession, tree: Pat
 
 def test_a_change_outside_the_inventory_names_no_file(session: EditingSession, tree: Path) -> None:
     """The config file, an editor's swap file: the revision moves, no row does."""
-    session.invalidate([str(tree / "netgraph.toml"), "/somewhere/else.yaml"])
+    session.invalidate([str(tree / "netviz.toml"), "/somewhere/else.yaml"])
     tree_changed = next(event for event in session.events if event.name == "tree-changed")
     assert tree_changed.data["files"] == []
     assert tree_changed.data["outside"] is True
@@ -267,7 +267,7 @@ def test_a_partial_fetch_names_what_is_no_longer_there(session: EditingSession) 
 
 
 def test_a_partial_fetch_still_checks_the_path(session: EditingSession) -> None:
-    from netgraph.web.session import SessionError
+    from netviz.web.session import SessionError
 
     with pytest.raises(SessionError):
         session.tree(["../../etc/passwd"])
@@ -328,7 +328,7 @@ def test_a_graph_that_did_move_is_drawn_and_fingerprinted_afresh(
 @requires_dot
 def test_a_fingerprint_distinguishes_the_views_it_has_to(session: EditingSession) -> None:
     """One hash per (graph, options): sending l1's for l2 must simply miss."""
-    from netgraph.render import Layer
+    from netviz.render import Layer
 
     digests = {
         layer: session.graph(ViewOptions(layer=layer))[0].graph_hash
@@ -342,7 +342,7 @@ def test_a_fingerprint_distinguishes_the_views_it_has_to(session: EditingSession
 @requires_dot
 def test_the_fingerprint_is_of_the_drawing_not_of_the_tree(session: EditingSession) -> None:
     """Same graph, same options, same hash — computed twice from scratch."""
-    from netgraph.render import build_graph, filter_graph
+    from netviz.render import build_graph, filter_graph
 
     inventory = session.inventory()
     options = ViewOptions()

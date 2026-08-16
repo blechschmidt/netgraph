@@ -3,7 +3,7 @@
 # A software loopback has no medium and therefore no hardware address. The
 # 127.0.0.1/8 prefix is the host-scoped one every OS configures, which W112
 # exempts.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -20,7 +20,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -32,7 +32,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

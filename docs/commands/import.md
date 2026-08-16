@@ -1,16 +1,16 @@
-# `netgraph import`
+# `netviz import`
 
-`netgraph import` brings something from outside the tree into the inventory.
+`netviz import` brings something from outside the tree into the inventory.
 There are two sources, and they are different jobs:
 
 | Form | Reads | Produces |
 |---|---|---|
-| `netgraph import captures/*.json` | what live devices printed | a `devices/` and `cables/` tree, written |
-| `netgraph import drawio FILE` | a diagram somebody edited in draw.io | a [`netgraph plan`](plan.md) changeset, confirmed |
+| `netviz import captures/*.json` | what live devices printed | a `devices/` and `cables/` tree, written |
+| `netviz import drawio FILE` | a diagram somebody edited in draw.io | a [`netviz plan`](plan.md) changeset, confirmed |
 
 The first is the original signature and needs no sub-command: anything that is
-not the name of one is read as a capture file, so `netgraph import caps/*.json`
-means what it always did. It is spelled `netgraph import captures …` when you
+not the name of one is read as a capture file, so `netviz import caps/*.json`
+means what it always did. It is spelled `netviz import captures …` when you
 want to be explicit.
 
 This page is the reference for both. [Importing a live network](../importing.md)
@@ -27,7 +27,7 @@ and may not safely change.
 - [Naming the host a capture came from](#naming-the-host-a-capture-came-from)
 - [Writing, and refusing to](#writing-and-refusing-to)
 - [A worked example](#a-worked-example)
-- [`netgraph import drawio`](#netgraph-import-drawio)
+- [`netviz import drawio`](#netviz-import-drawio)
 - [Arguments](#arguments)
 - [Options](#options)
 - [Exit codes](#exit-codes)
@@ -39,19 +39,19 @@ and may not safely change.
 
 <!-- generated: synopsis import -->
 ```text
-netgraph [GLOBAL OPTIONS] import [OPTIONS] COMMAND [ARGS]...
+netviz [GLOBAL OPTIONS] import [OPTIONS] COMMAND [ARGS]...
 ```
 <!-- /generated -->
 
 <!-- generated: synopsis import captures -->
 ```text
-netgraph [GLOBAL OPTIONS] import captures [OPTIONS] [NAME=]INPUT...
+netviz [GLOBAL OPTIONS] import captures [OPTIONS] [NAME=]INPUT...
 ```
 <!-- /generated -->
 
 <!-- generated: synopsis import drawio -->
 ```text
-netgraph [GLOBAL OPTIONS] import drawio [OPTIONS] FILE
+netviz [GLOBAL OPTIONS] import drawio [OPTIONS] FILE
 ```
 <!-- /generated -->
 
@@ -69,8 +69,8 @@ sniffs each input on its own, so one run may mix all three:
 | `iproute` | a JSON array of link records | `ip -j link show`, `ip -j addr show`; pass both for one host and they merge |
 | `csv` | anything that is not JSON | any spreadsheet or script that writes `device,port,device,port[,medium[,label]]` rows |
 
-Sniffing is what makes `netgraph import collected/*` work on a directory holding
-all three. An input that is JSON but no capture netgraph knows is refused with
+Sniffing is what makes `netviz import collected/*` work on a directory holding
+all three. An input that is JSON but no capture netviz knows is refused with
 the advice to name the dialect; a malformed one is refused with the parser's own
 message. [What each dialect reads](../importing.md#what-each-dialect-reads) goes
 through the three in detail.
@@ -86,7 +86,7 @@ topology, and it is repeatable.
 An `lldpctl` or `ip` capture describes one host and never says which, so the name
 comes from the first of these that applies — most explicit first:
 
-1. `NAME=INPUT` on the argument: `netgraph import sw-core=neighbors.json`;
+1. `NAME=INPUT` on the argument: `netviz import sw-core=neighbors.json`;
 2. `--host NAME`, which applies to **every** input of the run, so
    `--host pc1 link.json addr.json` means the obvious thing;
 3. the file name up to its first dot: `sw-core-01.lldp.json` → `sw-core-01`.
@@ -111,8 +111,8 @@ started editing prefer a fresh directory and a diff.
 
 `--dry-run` prints the tree to stdout — the same bytes that would be written —
 and writes nothing; the run report and the validation findings go to stderr, so
-`netgraph import --dry-run … > tree.yaml` keeps the two apart. `--schema` (the
-default) points each document at `schema/netgraph.schema.json` with a
+`netviz import --dry-run … > tree.yaml` keeps the two apart. `--schema` (the
+default) points each document at `schema/netviz.schema.json` with a
 `yaml-language-server` modeline and writes that schema when the tree does not
 already hold one; `--no-schema` leaves the modeline off.
 
@@ -123,21 +123,21 @@ to put in a script.
 
 ## A worked example
 
-`tests/fixtures/import/` holds the captures netgraph's own tests import: two LLDP
+`tests/fixtures/import/` holds the captures netviz's own tests import: two LLDP
 neighbour tables, one `ip -j addr show` and a patch list exported from a
 spreadsheet. Reading all four in one run — dialects sniffed, hosts named after the
 files — gives seven devices and seven cables:
 
 <!-- run: cwd=tests/fixtures/import -->
 ```console
-$ netgraph import --dry-run --exclude 'veth*' sw-core-01.lldp.json pc-alice.lldp.json srv-hyper.addr.json patch-panel.csv
+$ netviz import --dry-run --exclude 'veth*' sw-core-01.lldp.json pc-alice.lldp.json srv-hyper.addr.json patch-panel.csv
 # ===== devices/ap-lobby.yaml =====
 ...
 # ===== cables/links.yaml =====
 ...
 4 notes about what was not imported:
 ...
-dry run: 8 files would be written to ., plus schema/netgraph.schema.json
+dry run: 8 files would be written to ., plus schema/netviz.schema.json
 
 imported 7 devices and 7 cables from 4 inputs
 
@@ -149,15 +149,15 @@ warnings (15):
 
 Drop `--dry-run` and add `-o net` to write it. Three things in that report are
 worth reading rather than skipping: the notes say what was left out and why, the
-`...` in the tree hides comments marking everything netgraph *concluded*, and the
+`...` in the tree hides comments marking everything netviz *concluded*, and the
 closing paragraph names the findings an imported tree is expected to trip. The
 whole of [importing a live network](../importing.md) is about those three.
 
 ---
 
-## `netgraph import drawio`
+## `netviz import drawio`
 
-A diagram that came back from draw.io is reconciled by the identity netgraph
+A diagram that came back from draw.io is reconciled by the identity netviz
 stamped into each cell when it exported it — never by the label and never by the
 position. Four gestures carry:
 
@@ -168,12 +168,12 @@ position. Four gestures carry:
 | a cell deleted | `delete`, cascading to what cannot survive it |
 | two cells newly joined | `connect`, on the first free port at each end |
 
-Everything becomes a [`netgraph edit`](edit.md) operation and is shown as a
-[`netgraph plan`](plan.md) changeset before a single file is touched. `--dry-run`
+Everything becomes a [`netviz edit`](edit.md) operation and is shown as a
+[`netviz plan`](plan.md) changeset before a single file is touched. `--dry-run`
 prints the changeset and the diff and writes nothing; without `--auto-approve`
 you are asked to confirm.
 
-`--view` is read from the file and is needed only for a diagram netgraph did not
+`--view` is read from the file and is needed only for a diagram netviz did not
 export. `--geometry`/`--no-geometry`, `--renames`/`--no-renames`,
 `--deletions`/`--no-deletions` and `--connections`/`--no-connections` each turn
 one of the four gestures off. `--name`, `--namespace` and `--file` say where new
@@ -185,15 +185,15 @@ as JSON.
 A cell that is simply missing is a deletion only when the file says it held the
 whole view. Export narrowed by `--namespace` and nothing is ever deleted on the
 strength of it: absence proves nothing about a diagram that was filtered before
-it was drawn. A file netgraph did not export carries no identity at all, so
+it was drawn. A file netviz did not export carries no identity at all, so
 nothing is reconciled; it is read anyway and reported cell by cell, with the kind
-each one looks like, and netgraph will not invent hardware from a rectangle.
+each one looks like, and netviz will not invent hardware from a rectangle.
 
 <!-- norun: needs a diagram that has been round-tripped through draw.io -->
 ```console
-$ netgraph export drawio -o site.drawio      # hand this out
-$ netgraph import drawio site.drawio -n      # see what came back
-$ netgraph import drawio site.drawio         # apply it
+$ netviz export drawio -o site.drawio      # hand this out
+$ netviz import drawio site.drawio -n      # see what came back
+$ netviz import drawio site.drawio         # apply it
 ```
 
 ---
@@ -216,26 +216,26 @@ $ netgraph import drawio site.drawio         # apply it
 
 ## Options
 
-### `netgraph import captures`
+### `netviz import captures`
 
 <!-- generated: options import captures -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
-| `--from` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|nftables\|wireguard\|interfaces]` | `auto` | Input dialect. 'auto' sniffs each input on its own, so one run may mix all ten: lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', csv is 'device,port,device,port' cabling rows, and netplan, networkd, ifupdown, frr, nftables, wireguard and interfaces are a device's running configuration in the same dialects 'netgraph export' writes. |
+| `--from` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|nftables\|wireguard\|interfaces]` | `auto` | Input dialect. 'auto' sniffs each input on its own, so one run may mix all ten: lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', csv is 'device,port,device,port' cabling rows, and netplan, networkd, ifupdown, frr, nftables, wireguard and interfaces are a device's running configuration in the same dialects 'netviz export' writes. |
 | `--host` | `NAME` | — | Device every input was captured on. An lldp or iproute capture never names its own host. Without this the name comes from the file name, or from a 'NAME=path' argument. |
 | `-o`, `--output` | `DIRECTORY` | current directory | Inventory root to write the devices/ and cables/ tree into. |
 | `--dry-run` | — | off | Print the tree to stdout and write nothing. |
 | `--force` | — | off | Overwrite files that are already in the output tree. Without it they are refused. |
-| `--schema`, `--no-schema` | — | `--schema` | Point each generated document at schema/netgraph.schema.json with a yaml-language-server modeline, writing the schema when the tree does not already hold one. |
+| `--schema`, `--no-schema` | — | `--schema` | Point each generated document at schema/netviz.schema.json with a yaml-language-server modeline, writing the schema when the tree does not already hold one. |
 | `--exclude` | `PATTERN` | — | Leave out interfaces whose name matches this glob. Applies to 'iproute' captures, where 'veth*' and 'docker*' are rarely part of a physical topology. Repeatable. |
 <!-- /generated -->
 
-### `netgraph import drawio`
+### `netviz import drawio`
 
 <!-- generated: options import drawio -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
-| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | the view the file says it was exported from | Which view the diagram draws. Read from the file for anything netgraph exported; needed only for a diagram netgraph did not write. |
+| `--view` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | the view the file says it was exported from | Which view the diagram draws. Read from the file for anything netviz exported; needed only for a diagram netviz did not write. |
 | `--geometry`, `--no-geometry` | — | `--geometry` | Carry cells that were dragged back as stored geometry. |
 | `--renames`, `--no-renames` | — | `--renames` | Carry a retyped label back as a rename, rewriting every reference to it. |
 | `--deletions`, `--no-deletions` | — | `--deletions` | Carry a deleted cell back as a deleted element. Never applied to a diagram that was exported from a filtered view, whichever way this is set. |
@@ -257,14 +257,14 @@ $ netgraph import drawio site.drawio         # apply it
 |---|---|
 | 0 | The tree was written (or printed) and holds no error-level finding. |
 | 1 | The generated tree does not validate, or nothing could be imported from the inputs at all. The files are still written, so you can see what went wrong. |
-| 2 | Usage error, or an unusable `netgraph.toml`. |
+| 2 | Usage error, or an unusable `netviz.toml`. |
 | 3 | An input was missing, unreadable, not UTF-8, oversized, not the dialect it was given as — or a file in the output tree would have been clobbered without `--force`. `import drawio` also uses it for a file that is not a draw.io diagram it can read. |
 
 Warnings and infos do not fail the run: an imported inventory is partial by
 construction and
 [legitimately has findings](../importing.md#the-findings-afterwards-are-expected).
 The configuration that decides which of them are reported is the *output* tree's
-`netgraph.toml`, not the working directory's, so importing into a tree that
+`netviz.toml`, not the working directory's, so importing into a tree that
 already ignores a rule does not produce a report contradicting it.
 
 ---
@@ -273,11 +273,11 @@ already ignores a rule does not produce a report contradicting it.
 
 * [Importing a live network](../importing.md) — what to collect, what is inferred
   and what to fix afterwards.
-* [`netgraph init`](init.md) — a first tree for a network that does not exist yet.
-* [`netgraph fmt`](fmt.md) — put the generated YAML into the canonical form
+* [`netviz init`](init.md) — a first tree for a network that does not exist yet.
+* [`netviz fmt`](fmt.md) — put the generated YAML into the canonical form
   before committing it.
-* [`netgraph validate`](validate.md) — the same check `import` runs, on demand.
+* [`netviz validate`](validate.md) — the same check `import` runs, on demand.
 * [draw.io round trips](../drawio.md) — handing a diagram out, and what comes
   back.
-* [`netgraph export`](export.md) — the other half of the round trip,
+* [`netviz export`](export.md) — the other half of the round trip,
   `export drawio`.

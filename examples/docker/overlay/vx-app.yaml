@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: tunnel
 metadata:
   name: vx-app
@@ -17,7 +17,7 @@ spec:
   vni: 4097
   # `docker network create --opt encrypted`: swarm wraps the VXLAN in IPsec ESP
   # between every pair of nodes. It is one flag and it is off by default, which
-  # is why an unencrypted overlay is worth the warning netgraph gives it.
+  # is why an unencrypted overlay is worth the warning netviz gives it.
   encrypted: true
   # 1500 for the underlay less 50 bytes of VXLAN header: the number the bridge
   # and both container interfaces carry, and the one whose absence produces the

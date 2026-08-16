@@ -1,4 +1,4 @@
-"""``netgraph import``: does the tree it writes describe what was captured?
+"""``netviz import``: does the tree it writes describe what was captured?
 
 Three properties are asserted throughout, because they are what the command
 promises and everything else is detail:
@@ -14,7 +14,7 @@ promises and everything else is detail:
   the cables it has.
 
 The JSON fixtures in ``tests/fixtures/import/`` are shaped like real output,
-field for field, including the parts netgraph ignores — ``qdisc``,
+field for field, including the parts netviz ignores — ``qdisc``,
 ``valid_life_time``, ``info_slave_data`` — because a reader that only works on
 trimmed input is a reader that does not work.
 """
@@ -29,8 +29,8 @@ import pytest
 import yaml
 from click.testing import CliRunner, Result
 
-from netgraph.cli import cli, main
-from netgraph.importer import (
+from netviz.cli import cli, main
+from netviz.importer import (
     Draft,
     DraftCable,
     DraftDevice,
@@ -48,11 +48,11 @@ from netgraph.importer import (
     render_device,
     write_files,
 )
-from netgraph.importer.csvlinks import CsvError
-from netgraph.importer.emit import scalar
-from netgraph.loader import load_tree
-from netgraph.rules import Severity
-from netgraph.validate import validate
+from netviz.importer.csvlinks import CsvError
+from netviz.importer.emit import scalar
+from netviz.loader import load_tree
+from netviz.rules import Severity
+from netviz.validate import validate
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -707,7 +707,7 @@ def test_non_utf8_input_is_refused(tmp_path: Path) -> None:
     [(PC_ALICE, "lldp"), (SRV_HYPER, "iproute"), (PATCH_PANEL, "csv")],
 )
 def test_the_dialect_of_each_input_is_sniffed(path: Path, expected: str) -> None:
-    """Sniffing is what makes ``netgraph import collected/*`` work."""
+    """Sniffing is what makes ``netviz import collected/*`` work."""
     draft = build_draft(read_inputs([str(path)]))
     assert bool(draft.devices)
     forced = build_draft(read_inputs([str(path)]), dialect=expected)
@@ -873,9 +873,9 @@ def test_an_import_that_produces_nothing_fails(runner: CliRunner, tmp_path: Path
 
 
 def test_the_written_tree_carries_a_schema_and_a_modeline(imported: Path) -> None:
-    assert (imported / "schema" / "netgraph.schema.json").is_file()
+    assert (imported / "schema" / "netviz.schema.json").is_file()
     text = (imported / "devices" / "pc-alice.yaml").read_text(encoding="utf-8")
-    assert text.startswith("# yaml-language-server: $schema=../schema/netgraph.schema.json")
+    assert text.startswith("# yaml-language-server: $schema=../schema/netviz.schema.json")
 
 
 def test_no_schema_leaves_the_editor_unwired(runner: CliRunner, tmp_path: Path) -> None:
@@ -964,7 +964,7 @@ def lldp_notes(record: dict[str, Any], *, host: str = "pc1") -> tuple[Draft, lis
         ),
     ],
 )
-def test_every_lldp_record_netgraph_cannot_use_is_reported(
+def test_every_lldp_record_netviz_cannot_use_is_reported(
     record: dict[str, Any], message: str
 ) -> None:
     draft, notes = lldp_notes(record)
@@ -1016,7 +1016,7 @@ def test_a_link_record_with_no_name_is_reported() -> None:
     assert any("no 'ifname'" in note for note in draft.notes)
 
 
-def test_a_kernel_type_with_no_netgraph_equivalent_says_which_it_was() -> None:
+def test_a_kernel_type_with_no_netviz_equivalent_says_which_it_was() -> None:
     draft = Draft()
     read_iproute(
         [{"ifname": "vrf-red", "link_type": "ether", "linkinfo": {"info_kind": "vrf"}}],
@@ -1024,7 +1024,7 @@ def test_a_kernel_type_with_no_netgraph_equivalent_says_which_it_was() -> None:
         host="pc1",
         draft=draft,
     )
-    assert any("vrf" in note and "no netgraph interface type" in note for note in draft.notes)
+    assert any("vrf" in note and "no netviz interface type" in note for note in draft.notes)
 
 
 def test_a_veth_style_link_is_written_as_ethernet_and_says_so() -> None:
@@ -1142,7 +1142,7 @@ def test_a_refusal_summarises_a_long_list_of_clashes(tmp_path: Path) -> None:
 
 
 def test_an_unwritable_target_is_reported(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    # ``Path.open`` rather than ``Path.write_text``: netgraph.fsio opens with an
+    # ``Path.open`` rather than ``Path.write_text``: netviz.fsio opens with an
     # explicit ``newline=""`` (see the module docstring there), so a patch on
     # ``write_text`` would intercept nothing and this test would assert that a
     # successful write raises.
@@ -1162,7 +1162,7 @@ def test_an_empty_stdin_is_refused() -> None:
 
 
 def test_an_oversized_input_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from netgraph.importer import run as run_module
+    from netviz.importer import run as run_module
 
     path = tmp_path / "huge.json"
     path.write_text("[]", encoding="utf-8")
@@ -1177,7 +1177,7 @@ def test_the_output_trees_own_configuration_governs_the_report(
     """Importing into a tree that ignores a rule must not report it anyway."""
     target = tmp_path / "net"
     target.mkdir()
-    (target / "netgraph.toml").write_text('[validate]\nignore = ["W101"]\n', encoding="utf-8")
+    (target / "netviz.toml").write_text('[validate]\nignore = ["W101"]\n', encoding="utf-8")
     result = invoke(runner, "import", "-o", str(target), str(PC_ALICE))
     assert result.exit_code == 0, result.output
     assert "W101" not in result.output
@@ -1187,6 +1187,6 @@ def test_an_imported_tree_that_does_not_validate_fails_the_run(tmp_path: Path) -
     """The files are still written — you cannot fix what you cannot read."""
     target = tmp_path / "net"
     target.mkdir()
-    (target / "netgraph.toml").write_text('[validate.severity]\nW101 = "error"\n', encoding="utf-8")
+    (target / "netviz.toml").write_text('[validate.severity]\nW101 = "error"\n', encoding="utf-8")
     assert main(["import", "-o", str(target), str(PC_ALICE)]) == 1
     assert (target / "cables" / "links.yaml").is_file()

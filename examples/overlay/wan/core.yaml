@@ -1,6 +1,6 @@
 # The provider edge every site is homed to. It carries no overlay of its own:
 # the tunnels run *through* it, which is the whole point of an overlay.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: wan-core

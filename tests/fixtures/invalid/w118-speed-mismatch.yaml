@@ -2,7 +2,7 @@
 #
 # The dongle's USB upstream port is 5Gbps; the cable claims 1Gbps. Section 9.4
 # projects the cable's speed onto both ends, so the two cannot both hold.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: adapter
 metadata:
   name: adp-a
@@ -18,7 +18,7 @@ spec:
       enabled: false
       mtu: 1500
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -30,7 +30,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

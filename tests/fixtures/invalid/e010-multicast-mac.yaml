@@ -3,7 +3,7 @@
 # The first octet of 01:00:5e:00:00:01 is odd, which marks a group address
 # (IEEE 802-2014 section 8.2). No interface can own one: it is only ever a
 # destination.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -16,7 +16,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -28,7 +28,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

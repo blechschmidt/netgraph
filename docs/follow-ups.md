@@ -17,10 +17,10 @@ deferred.
 
 **Status:** closed 2026-07-28. Parsing goes through libyaml where PyYAML has it.
 
-`netgraph.loader.documents` no longer subclasses `yaml.SafeLoader` directly. The
+`netviz.loader.documents` no longer subclasses `yaml.SafeLoader` directly. The
 strictness lives in `_StrictLoaderMixin` and is mixed over `yaml.SafeLoader` and
 `yaml.CSafeLoader` alike; the module selects one at import time and binds it to
-`StrictSafeLoader`. `NETGRAPH_YAML_LOADER` overrides that choice — `python` to
+`StrictSafeLoader`. `NETVIZ_YAML_LOADER` overrides that choice — `python` to
 force the pure-Python parser, `libyaml` to demand the fast one and fail loudly on
 a build without the bindings.
 
@@ -51,9 +51,9 @@ End to end, including interpreter start, on the same tree:
 
 | Command | Pure Python | libyaml |
 |---|---|---|
-| `netgraph validate` | 2.82 s | 0.85 s |
-| `netgraph render -f dot` | 2.88 s | 0.90 s |
-| `netgraph render -f svg` | 3.48 s | 1.55 s |
+| `netviz validate` | 2.82 s | 0.85 s |
+| `netviz render -f dot` | 2.88 s | 0.90 s |
+| `netviz render -f svg` | 3.48 s | 1.55 s |
 
 Peak RSS is 57–65 MB either way: libyaml buys time, not memory.
 
@@ -77,7 +77,7 @@ against "**in this context**". Only the marks are load-bearing, and the two
 places the suite asserted on wording now use a message both bases agree on.
 
 CI runs the suite on both paths. The `python` entry in the test matrix sets
-`NETGRAPH_YAML_LOADER=python`, and a step ahead of the tests fails the job if
+`NETVIZ_YAML_LOADER=python`, and a step ahead of the tests fails the job if
 the loader actually selected is not the one that entry asked for — so the
 fallback is exercised rather than assumed.
 
@@ -110,7 +110,7 @@ spec.endpoints[0].device: String should match pattern '^[A-Za-z0-9]+(?:[-_.][A-Z
 ```
 
 The resolution logic is not the problem — it is already written and correct.
-`Inventory.lookup` (`src/netgraph/loader/inventory.py:239`) opens with
+`Inventory.lookup` (`src/netviz/loader/inventory.py:239`) opens with
 `if "/" in name:` and implements exactly the documented relative-then-absolute
 order. What blocks it is one level up: `InterfaceRef.device` is typed
 `ElementName`, whose pattern is the grammar for *declaring* a name
@@ -122,7 +122,7 @@ happily, because it calls `lookup` directly:
 
 <!-- norun: the element name is illustrative and the second line is a comment, not a command -->
 ```console
-$ netgraph show sites/hq/sw1        # works
+$ netviz show sites/hq/sw1        # works
 $ # the same name in a cable endpoint  -> schema error
 ```
 
@@ -134,7 +134,7 @@ cannot both be cabled from a common `cables/` directory — there is no way to
 disambiguate the endpoint. That is the exact case §2.2 introduces the syntax to
 solve.
 
-**Why it was deferred.** Fixing it widens the set of documents netgraph accepts.
+**Why it was deferred.** Fixing it widens the set of documents netviz accepts.
 That is a schema-surface change with golden-fixture and specification
 consequences, and a review pass should not make one silently.
 
@@ -156,7 +156,7 @@ still holds: a document carrying secrets in `metadata.description`,
 of them. Only the single offending value appears, which is what the user has to
 go and fix. What was unbounded was the length of that one value.
 
-`netgraph.errors.echo_value` now renders a rejected value for a diagnostic:
+`netviz.errors.echo_value` now renders a rejected value for a diagnostic:
 `repr` of the whole value up to `MAX_ECHOED_VALUE_LENGTH` (120) characters, and
 past that a `repr` of the prefix followed by `… (+N more characters)`. The
 200 000-character `mac:` that produced a **200 135-character** line now produces
@@ -208,12 +208,12 @@ but only once `maxEdges` is raised. At the default it reports:
 > config via configuration inside the diagram as it is a secure config.
 
 The limit is enforced by the *renderer*, and deliberately cannot be lifted from
-inside the document, so netgraph cannot emit anything that fixes it. GitHub and
+inside the document, so netviz cannot emit anything that fixes it. GitHub and
 GitLab render with the default, so a Mermaid diagram of an inventory this size
 will not display there.
 
 Nothing changed in the output, then — the warning is the fix. Both the number
-and the check live in `src/netgraph/render/mermaid.py` (`MERMAID_MAX_EDGES` and
+and the check live in `src/netviz/render/mermaid.py` (`MERMAID_MAX_EDGES` and
 `mermaid_advisories`), and `render` and `watch` reach them through the renderer
 registry: each asks "anything to say about a graph this size?" without knowing
 which backend has a limit. They emit:
@@ -246,12 +246,12 @@ the majority of it. Timing the stages of `load_tree` separately on the same
 |---|---|
 | libyaml compose (C) | 150 ms |
 | PyYAML's Python constructor | 130 ms |
-| pydantic + netgraph model validators | 162 ms |
+| pydantic + netviz model validators | 162 ms |
 | cyclic garbage collection | 86 ms |
 | loader bookkeeping, file reads | ~60 ms |
 
 So model validation was **27 %** of the load, not 74 %, and the second largest
-item — 18 % of it — was not netgraph's code at all but the garbage collector.
+item — 18 % of it — was not netviz's code at all but the garbage collector.
 Three changes came out of that, in descending order of what they were worth.
 
 **The collector is held off for the duration of a load** (`_deferred_gc` in
@@ -329,9 +329,9 @@ End to end, including interpreter start:
 
 | Command | libyaml before | libyaml after | pure Python before | pure Python after |
 |---|---|---|---|---|
-| `netgraph validate` | 1.06 s | 0.94 s | 3.00 s | 2.91 s |
-| `netgraph render -f dot` | 1.15 s | 1.03 s | 3.14 s | 2.95 s |
-| `netgraph render -f svg` | 1.82 s | 1.71 s | 3.88 s | 3.66 s |
+| `netviz validate` | 1.06 s | 0.94 s | 3.00 s | 2.91 s |
+| `netviz render -f dot` | 1.15 s | 1.03 s | 3.14 s | 2.95 s |
+| `netviz render -f svg` | 1.82 s | 1.71 s | 3.88 s | 3.66 s |
 
 Peak RSS is 60–69 MB before and 60–68 MB after: as with entry 1, the win is
 time, not memory.
@@ -436,7 +436,7 @@ drawn and why the drawing is safe.
 
 **1. Should a tunnel be a glyph at all? Yes.** The alternative the entry floated
 — leaving tunnels as the only shapes on a page of icons — reads as an oversight
-rather than as a distinction. A reader cannot tell "netgraph has no picture for
+rather than as a distinction. A reader cannot tell "netviz has no picture for
 this" from "this theme is incomplete", and the encapsulation view (`--layer
 overlay`) is *entirely* tunnels: with no glyph it was a page of violet hexagons
 with icons only at the edges. Mixing two visual languages in one diagram was the
@@ -628,8 +628,8 @@ End to end, including interpreter start, best of three:
 
 | Command | libyaml before | libyaml after | pure Python before | pure Python after |
 |---|---|---|---|---|
-| `netgraph validate` | 0.95–0.96 s | 0.80–0.81 s | 2.90–2.91 s | 2.73–2.78 s |
-| `netgraph render -f dot` | 0.96–0.97 s | 0.80–0.81 s | 2.91 s | 2.70–2.75 s |
+| `netviz validate` | 0.95–0.96 s | 0.80–0.81 s | 2.90–2.91 s | 2.73–2.78 s |
+| `netviz render -f dot` | 0.96–0.97 s | 0.80–0.81 s | 2.91 s | 2.70–2.75 s |
 
 There is no `render -f svg` row: the benchmark tree reports 42 `E009` errors, so
 `render` stops before it reaches Graphviz and would measure the same work as the
@@ -1083,7 +1083,7 @@ each of them to name an id the page actually has.
 
 **The records themselves are unchanged.** A record is still the `-f json` export
 plus an element id and a links cross-reference — only *where it is stored*
-changed — so `detail.js`, `netgraph web` and the `-f json` exporter are
+changed — so `detail.js`, `netviz web` and the `-f json` exporter are
 untouched by this entry.
 
 Three test expectations changed, each because it was asserting the old storage
@@ -1128,7 +1128,7 @@ flag that removes one is weaker than it was, not stronger.
 
 Entries 1, 5 and 7 all measured the *pipeline* on `tools/bench_pipeline.py`'s
 default tree and made it fast. None of them measured the **diagram**, and the
-diagram was where the size actually hurt: every filter netgraph had removed
+diagram was where the size actually hurt: every filter netviz had removed
 detail by removing elements, so a reader of a 1056-device tree could ask for a
 part of the network but never for a summary of the whole of it. `dot` will lay
 1056 nodes out — but the result is 3.5 MB of SVG that no one can read.
@@ -1189,8 +1189,8 @@ flag defaults to 1 so the tree entries 1, 5 and 7 measured is unchanged.
 `--collapse` does not *summarise the summary*: an aggregate node lists its
 element count per kind, its VLANs and its prefixes, but not, say, the internal
 diameter or the oversubscription ratio. Those are analyses, and
-`netgraph render -f json` now exports the element list behind every box, so a
-consumer that wants one can compute it without netgraph guessing which one.
+`netviz render -f json` now exports the element list behind every box, so a
+consumer that wants one can compute it without netviz guessing which one.
 
 The other bound worth naming: `--collapse-depth` counts from the shallowest
 namespace every element shares, which makes depth 1 mean "one node per site" in
@@ -1200,12 +1200,12 @@ producing a different answer, not a special case.
 
 ---
 
-## 10. netgraph now depends on a second YAML parser
+## 10. netviz now depends on a second YAML parser
 
 **Status:** accepted 2026-07-29, deliberately. `ruamel.yaml` is a runtime
-dependency, used by `netgraph fmt` and by nothing else.
+dependency, used by `netviz fmt` and by nothing else.
 
-**Why a second parser at all.** `netgraph fmt` has to preserve comments, blank
+**Why a second parser at all.** `netviz fmt` has to preserve comments, blank
 lines, quoting style and whether a collection was written flow or block. PyYAML
 discards all four during parsing — that is not a gap in it, it is most of why it
 is fast — and there is no configuration that changes this. A formatter built on
@@ -1221,22 +1221,22 @@ keep, which is writing a round-trip parser and calling it something else.
   enough to have to reconcile.
 - *Making `fmt` an optional extra.* Rejected: it is a published pre-commit hook
   and a documented CI step, and an extra that half the users do not install
-  turns "run `netgraph fmt`" into a support question.
+  turns "run `netviz fmt`" into a support question.
 - *Replacing PyYAML with ruamel everywhere.* Rejected on measurement. The
   loading path is the throughput bottleneck (entries 1 and 5) and is currently
   libyaml-backed; ruamel's round-trip parser is pure Python and much slower, and
-  the strictness `netgraph.loader.documents` adds — duplicate-key rejection, the
+  the strictness `netviz.loader.documents` adds — duplicate-key rejection, the
   YAML 1.2 boolean rule — would all have to be rebuilt on a different API for a
   path that has no use for a single thing round-tripping buys.
 
 **What the dependency is fenced with.**
 
-- **Nothing on the loading path imports it.** `netgraph.fmt` is imported lazily,
+- **Nothing on the loading path imports it.** `netviz.fmt` is imported lazily,
   inside `fmt_command`, so `validate` and `render` do not pay its ~30 ms of
   import time — an eighth of what starting the CLI costs at all, and `validate`
-  runs in a pre-commit hook. `netgraph.loader` is untouched by this work.
+  runs in a pre-commit hook. `netviz.loader` is untouched by this work.
 - **The two parsers are checked against each other on every format.**
-  `netgraph.fmt.verify` re-reads every formatted file with the *strict* loader
+  `netviz.fmt.verify` re-reads every formatted file with the *strict* loader
   and compares it against what that loader read before. Nothing is written that
   the two disagree about, so a divergence is a refusal rather than a corruption.
 - **The divergences are real, and the fence caught them.** Building this found
@@ -1245,26 +1245,26 @@ keep, which is writing a round-trip parser and calling it something else.
   emits `::1/128` unquoted inside a flow sequence, which PyYAML then refuses to
   parse. Both were found by the verification pass failing on
   `examples/`, not by review. They are handled in
-  `netgraph.fmt.scalars` — `is_untouchable` and `plain_survives` respectively —
-  and both ask netgraph's own loader for the answer rather than assuming one.
+  `netviz.fmt.scalars` — `is_untouchable` and `plain_survives` respectively —
+  and both ask netviz's own loader for the answer rather than assuming one.
 
 **What would justify revisiting this.** A PyYAML release that can round-trip
 comments, or a `fmt` that needs to run on the loading path — neither of which is
-in sight. If ruamel became unmaintained, `netgraph.fmt.canonical` is the only
+in sight. If ruamel became unmaintained, `netviz.fmt.canonical` is the only
 module that imports it, and `docs/format.md` is a specification precise enough
 to reimplement against.
 
 ---
 
-## 11. A YAML parser can still be crashed from outside netgraph's control
+## 11. A YAML parser can still be crashed from outside netviz's control
 
 **Status:** bounded 2026-07-29, not eliminated. Raised by the loader fuzz target
 added with the property tests (`tests/test_fuzz_loader.py`).
 
 Fuzzing the loader found three ways a document could get past every diagnostic
-netgraph writes and reach a failure netgraph does not own. All three are fixed;
+netviz writes and reach a failure netviz does not own. All three are fixed;
 what is *not* fixed is the underlying reason they were possible, which is that
-the parser is a dependency and its limits are not netgraph's.
+the parser is a dependency and its limits are not netviz's.
 
 **What was found and fixed.**
 
@@ -1272,8 +1272,8 @@ the parser is a dependency and its limits are not netgraph's.
   one (CVE-2020-10735), and PyYAML's constructors call `int()` on whatever the
   resolver matched — so `mtu: 999…9` came out of the *parser* as a bare
   `ValueError` about `sys.set_int_max_str_digits`, past a `try` that caught only
-  `yaml.YAMLError`. `netgraph.loader.documents` now translates it, and the three
-  places netgraph itself calls `int()` on document text — an interface range, a
+  `yaml.YAMLError`. `netviz.loader.documents` now translates it, and the three
+  places netviz itself calls `int()` on document text — an interface range, a
   patch-panel port range, a prefix length — bound the digit count first.
 - **Nesting deeper than the parser's stack.** The pure-Python composer recurses
   once per level and raised an uncatchable-in-practice `RecursionError` at a few
@@ -1286,19 +1286,19 @@ the parser is a dependency and its limits are not netgraph's.
   1-999999999` built a billion strings and then checked the limit. The check is
   arithmetic now.
 
-**What remains.** The nesting guard is netgraph putting a fence in front of
+**What remains.** The nesting guard is netviz putting a fence in front of
 somebody else's cliff. It costs a C-speed `str.count` on every document and a
 full scan only for one carrying more than `MAX_NESTING_DEPTH` flow openers —
 every example inventory in this repository has fewer than 110 in total — so the
 price is right, but the guard exists because *libyaml crashes the process*
 rather than because 256 levels of nesting is a meaningful schema limit. A
 document that nests 257 deep is refused with an accurate diagnostic that
-describes netgraph's limit and not the real one.
+describes netviz's limit and not the real one.
 
 The number was 1024 until it was measured against the parser it was protecting
 rather than against the one that crashes. The pure-Python composer spends two
 Python frames per level, so under CPython's default recursion limit it gives out
-somewhere past 450 — and sooner when netgraph is called from a stack that is
+somewhere past 450 — and sooner when netviz is called from a stack that is
 already deep. A limit above that ceiling is a limit at which the two parsers
 still disagree, which is the one thing this guard exists to prevent: a document
 *at* the documented maximum was refused by one and accepted by the other.
@@ -1354,7 +1354,7 @@ spread does on a shared runner. Two changes, in the order they matter.
 entry offered, and it is the one that removes a *systematic* error rather than
 budgeting for it: coverage costs time per line executed, so the hundred small
 functions of `validate` pay far more than the floor's one tight loop, and the
-ratio read half a point high for a reason that has nothing to do with netgraph.
+ratio read half a point high for a reason that has nothing to do with netviz.
 The lines that go untraced during the measurement are `validate` and the loader,
 which several hundred other tests execute; total coverage did not move.
 
@@ -1448,16 +1448,16 @@ up to 11.0.
 
 ---
 
-## 13. `netgraph --version --json` is not the spelling that works
+## 13. `netviz --version --json` is not the spelling that works
 
 **Status:** deliberate, 2026-07-30. The machine-readable report is
-`netgraph version --json`.
+`netviz version --json`.
 
 `--version` is an *eager* Click option: its callback runs before any other
-parameter is processed, which is why `netgraph --version` answers from a directory
+parameter is processed, which is why `netviz --version` answers from a directory
 holding no inventory and does not care whether `-i` names a path that exists.
 Click parses the whole argument list before running any callback, though, so
-`netgraph --version --json` fails during parsing with `No such option '--json'` —
+`netviz --version --json` fails during parsing with `No such option '--json'` —
 the eager callback never gets the chance to notice the second flag.
 
 Three ways to make that exact spelling work were considered and none is worth it:
@@ -1466,14 +1466,14 @@ Three ways to make that exact spelling work were considered and none is worth it
   they appear on the command line, so `--version` would still be handled first and
   would print text having silently ignored `--json`. Worse than an error.
 - **Make `--version` non-eager** and print from the group body. Then `-i` is
-  validated first, so `netgraph -i /nonexistent --version` would fail to report a
+  validated first, so `netviz -i /nonexistent --version` would fail to report a
   version — precisely when a user most wants one.
 - **An optional value** (`--version=json`). This one works, but it is a spelling
-  nobody guesses, and it would sit next to `netgraph version --json` doing the same
+  nobody guesses, and it would sit next to `netviz version --json` doing the same
   job.
 
-So the report lives on a command instead: `netgraph version` for the text and
-`netgraph version --json` for the document, with `-V`/`--version` kept as the eager
+So the report lives on a command instead: `netviz version` for the text and
+`netviz version --json` for the document, with `-V`/`--version` kept as the eager
 shortcut for the text form. The flag's own help text names the command, and
 `docs/commands/version.md` documents both.
 
@@ -1485,8 +1485,8 @@ approach becomes correct rather than merely tempting.
 
 ## 14. ~~Every command re-parses the whole tree~~ — fixed, 3.3× cold-process, 21× in-process
 
-**Status:** closed 2026-07-30. `netgraph.loader.cache` remembers a parsed file by
-the hash of its bytes; `netgraph cache info|clear` and `--no-cache` are the
+**Status:** closed 2026-07-30. `netviz.loader.cache` remembers a parsed file by
+the hash of its bytes; `netviz cache info|clear` and `--no-cache` are the
 controls.
 
 Entries 1, 5 and 7 cut the constant factors of `load_tree` and `validate` — 3.3×,
@@ -1557,7 +1557,7 @@ Two things follow from the same numbers and are worth saying plainly:
 
 * **Filling the cache costs 19 %.** A CI runner that starts empty and is thrown
   away pays that for nothing, which is why `docs/configuration.md` tells it to set
-  `NETGRAPH_NO_CACHE=1` or to persist the directory rather than leaving the
+  `NETVIZ_NO_CACHE=1` or to persist the directory rather than leaving the
   default in place.
 * **The win is much larger on the pure-Python parser** — 0.06 rather than 0.30 of
   a cold load — because the denominator is five times bigger there. A machine
@@ -1567,9 +1567,9 @@ Two things follow from the same numbers and are worth saying plainly:
 
 The key is `sha256(identity, relative path, file bytes)`. No timestamp: a file
 rewritten identically hits, a `git checkout` of an old revision hits again, a
-`touch` changes nothing. The *identity* is the netgraph version, the document
+`touch` changes nothing. The *identity* is the netviz version, the document
 `apiVersion`, the selected YAML parser, the pydantic and PyYAML versions, and a
-digest over the mtimes and sizes of netgraph's own sources — that last one so
+digest over the mtimes and sizes of netviz's own sources — that last one so
 that editing a validator invalidates the cache in a source checkout, where the
 version number would not move.
 
@@ -1646,14 +1646,14 @@ endpoints in canonical order and every `document_index` comes back as the
 canonical position.
 
 Nothing surfaces it today. The only consumer is `_Endpoint.field_path` in
-`netgraph.validate`, whose field paths reach the user solely through the
+`netviz.validate`, whose field paths reach the user solely through the
 machine-readable `validate` formats — and those pass `keep_provenance=True`,
 which disables the cache by construction. The text format reports a document,
 not a field.
 
 It was found by the edit layer, which needed the same fact for a different
 reason: to rewrite the right endpoint of a cable when an element is renamed.
-That is why `netgraph.edit.references.locate_reference` does not trust the
+That is why `netviz.edit.references.locate_reference` does not trust the
 index it is given. It uses it as a hint, checks that the value there reads as
 the reference the model reported, and otherwise searches the sibling entries for
 the unique one that does — which is the right behaviour regardless, since a
@@ -1662,7 +1662,7 @@ document may write its endpoints in either order.
 A fix would have to make the serialised form carry the written order, most
 plausibly by emitting `spec.endpoints` in document order and letting
 `sort_endpoints` re-derive the index on the way back in. That is a change to a
-model serializer shared by `netgraph show` and by every consumer of
+model serializer shared by `netviz show` and by every consumer of
 `model_dump`, so it wants its own change and its own golden review rather than
 being smuggled in beside an unrelated feature.
 
@@ -1673,7 +1673,7 @@ being smuggled in beside an unrelated feature.
 **Status:** decided and implemented; recorded here because the alternative is
 the obvious one and somebody will propose it again.
 
-`netgraph layout` had to put a node's position *somewhere*, and there were two
+`netviz layout` had to put a node's position *somewhere*, and there were two
 plausible places:
 
 **(a) On the element.** `spec.position: {x: 240, y: 396}` on each device, next
@@ -1681,7 +1681,7 @@ to its interfaces.
 
 **(b) In its own document.** `kind: layout`, keyed by element address, scoped by
 view — which is what was built (§18 of `docs/schema.md`,
-`netgraph.models.layout`).
+`netviz.models.layout`).
 
 (b) won on four counts, and the fourth is the one that settles it.
 
@@ -1719,13 +1719,13 @@ Two things, both accepted.
 *A layout key can go stale.* Deleting a switch leaves its coordinates behind,
 where a field on the element would have gone with it. That is `W138`, a warning
 rather than an error — a diagram must not stop validating because a device was
-retired — and `netgraph layout --prune` is the fix. The rule only checks keys
+retired — and `netviz layout --prune` is the fix. The rule only checks keys
 that name *elements*; a `subnet:` key can only be judged against a drawing, and
 `--prune` builds one, so a prune removes a little more than the rule reports.
 
 *A layout file is uncacheable.* The parse cache stores elements, and a layout is
 not one, so a file declaring one stays on the slow path — the same treatment
-`kind: template` gets, for the same reason (`netgraph.loader.tree._Builder.harvest`).
+`kind: template` gets, for the same reason (`netviz.loader.tree._Builder.harvest`).
 An arrangement is one small file, so this is measured in microseconds; it would
 stop being acceptable if geometry were ever moved *into* the element files,
 which is one more reason not to.
@@ -1753,7 +1753,7 @@ namespace captions sit where they do.
 
 A fixed arrangement is drawn by `neato -n2`, and `neato` does not draw clusters —
 only `dot` and `fdp` do. So the namespace frames a `--group-by-namespace` render
-would otherwise lose have to be drawn by netgraph, from the boxes the
+would otherwise lose have to be drawn by netviz, from the boxes the
 arrangement stores. The obvious mechanism is the `_background` graph attribute,
 which takes xdot draw operations and which Graphviz grows the canvas to fit.
 
@@ -1779,7 +1779,7 @@ Every variant was tried: all three justifications, with and without a preceding
 colour operation, with and without an `F` font operation, integer and float
 coordinates. All segfault. Only the polygon operations survive.
 
-### What netgraph does instead
+### What netviz does instead
 
 `_background` carries the rectangles alone. Each caption is emitted as an
 ordinary `shape=plaintext` node with a `pos`, which every engine handles, which
@@ -1790,7 +1790,7 @@ The caption is centred **above** its frame rather than inside it at the left,
 where `labeljust=l` puts a real cluster's label, and both halves of that are
 forced rather than chosen:
 
-* *Centred*, because netgraph does not measure text. An estimated left edge would
+* *Centred*, because netviz does not measure text. An estimated left edge would
   be visibly wrong for a short name or a long one; a centred caption is exactly
   where it says it is.
 * *Above*, because a node placed inside the frame touches whatever the
@@ -1811,8 +1811,8 @@ small for label" warning per frame, which is not an improvement.
 
 ## 18. ~~The editor polls, and a second tab is a race~~ — fixed, 9.3× an edit
 
-**Status:** closed 2026-08-14. `netgraph.web.events` is the push channel,
-`GET /api/events` serves it, `netgraph.web.presence` is who else is connected.
+**Status:** closed 2026-08-14. `netviz.web.events` is the push channel,
+`GET /api/events` serves it, `netviz.web.presence` is who else is connected.
 
 `session.js` polled `/api/state` once a second and, whenever the revision moved,
 refetched the whole file list and re-rendered the diagram from scratch. Three
@@ -1905,7 +1905,7 @@ in `tests/test_web_events.py` are written against those, not against the badge.
 
 ## 19. ~~Orthogonal routes go through nodes, not around them~~ — fixed, and every crossing is gone
 
-**Status:** closed 2026-08-15. `netgraph.layout.avoid` is the router,
+**Status:** closed 2026-08-15. `netviz.layout.avoid` is the router,
 `tools/route_crossings.py` the measurement, `tests/fixtures/obstructed` the
 reproduction, `tests/test_avoid.py` the guard.
 
@@ -1944,7 +1944,7 @@ unmeasured defects made twice over.
 
 ### What was built
 
-**`netgraph/layout/avoid.py`.** Every placed node is inflated by a clearance
+**`netviz/layout/avoid.py`.** Every placed node is inflated by a clearance
 into an obstacle; so is a free-standing `kind: area` and a placed `kind: note`
 (an area that names *members* is not — it is a zone drawn behind the devices it
 encloses, and treating it as solid would make every cable terminating inside it
@@ -1955,7 +1955,7 @@ channel. The arrival axis is in the state because without it the search finds th
 shortest *staircase* rather than the shortest route.
 
 **The output is a waypoint list** — the same list `SetLinkGeometry` stores and
-the same list a person produces by dragging a bend — so `netgraph.layout.routing`
+the same list a person produces by dragging a bend — so `netviz.layout.routing`
 is untouched. It still draws the line, locally, one leg at a time, and
 `web/assets/links.js` still mirrors it exactly. The original entry's objection
 that a global router would break the mirror is answered by not putting the router
@@ -2022,7 +2022,7 @@ does will say so rather than quietly stop avoiding things half way through.
 
 **The remaining ceiling is the drag preview.** While a bend is being dragged the
 canvas draws the *local* line, because that is what its mirror of
-`netgraph.layout.routing` computes and the router does not run in the browser.
+`netviz.layout.routing` computes and the router does not run in the browser.
 On release the server answers with the avoided route and the line snaps to it.
 For the gesture avoidance exists for — dragging a device, not a bend — there is
 no preview to be wrong, since the whole drawing is refetched. Closing it properly
@@ -2055,12 +2055,12 @@ the cache has.
 Every editor feature to date was built and tested against `examples/home-lab`:
 five devices. `tools/bench_pipeline.py` has generated a **1056-device,
 2106-document, 138-file** tree since entry 5, and nobody had ever pointed
-`netgraph web` at it.
+`netviz web` at it.
 
 ### The harness
 
 `tools/bench_editor.py` (new) starts the real `WebServer` over a real
-`EditingSession` — the same objects `netgraph web --write` builds, with the same
+`EditingSession` — the same objects `netviz web --write` builds, with the same
 parse cache — points the Playwright Chromium from `tests/test_browser.py` at it,
 and measures the interactions rather than the functions: navigation to first
 paint, a `set` on one field timed to the moment the page has caught up, a write
@@ -2093,7 +2093,7 @@ picture *has* moved the 2 MB SVG has to be replaced, and parsing it is about
 200 ms of a 1.8 s cycle — not where the time was. Nothing was changed here.
 
 **Re-running the pipeline per keystroke instead of the entry-14 cache — half
-confirmed, and in the half nobody had looked at.** `netgraph web` does pass the
+confirmed, and in the half nobody had looked at.** `netviz web` does pass the
 cache, and a reload after one edit is 25 ms. But `EditSession` — the *write*
 path — loads the tree three times per batch (the baseline, the tree between
 operations, the tree the validation gate compares against) and passed the cache
@@ -2147,7 +2147,7 @@ runs pass `False`. Nothing a reader sees depends on it — the drawing that is
 *shown* is the second run, which routes everything exactly as before.
 
 *The overlap repair was quadratic.* Undoing Graphviz's scale reintroduces the
-overlaps it removed, so `netgraph.layout.graphviz.separate` pushes boxes apart —
+overlaps it removed, so `netviz.layout.graphviz.separate` pushes boxes apart —
 and it compared every pair on every one of up to 24 passes. On this tree that is
 thirteen million comparisons and 4.7 s. Two boxes can only overlap if their
 centres are within one box of each other, so the nodes are now bucketed into a
@@ -2158,7 +2158,7 @@ node.
 
 ### Viewport culling and level of detail
 
-`src/netgraph/web/assets/cull.js` (new). Above 400 groups, every node and link
+`src/netviz/web/assets/cull.js` (new). Above 400 groups, every node and link
 outside the viewport plus half a screen has its *contents* moved into a detached
 fragment; the `<g>` stays, empty. Zoomed in, that is 140 of 2106 elements drawn
 and 2 872 DOM nodes instead of 12 682.
@@ -2199,10 +2199,10 @@ to hang, and the number is here rather than only in somebody's memory.
 |---|---|---|
 | first layout of 1056 nodes | 675 ms of Graphviz, ~1.3 s to first paint | the status line counts the seconds and says a large inventory is a real layout |
 | a redraw that moves the picture | ~1.8 s | same |
-| a redraw after a drag (partial arrangement) | ~2.1 s, 3× an unarranged one | same; `netgraph layout --write` places the rest and takes it to 0.3 s |
+| a redraw after a drag (partial arrangement) | ~2.1 s, 3× an unarranged one | same; `netviz layout --write` places the rest and takes it to 0.3 s |
 | the drawing at 1× | the whole 2106 elements, unculled | it *is* all on screen; the level of detail is what applies here |
 | the tab's heap | 8 MB at first paint, ~27 MB after switching layers | bounded by the byte cap on the view cache |
-| problems reported | 200 per answer | "and N more, not listed here. Run `netgraph validate` for all of them." |
+| problems reported | 200 per answer | "and N more, not listed here. Run `netviz validate` for all of them." |
 
 The first three are Graphviz, and Graphviz is not ours. What is ours is not
 pretending otherwise: a progress indicator that counts beats a frozen tab, and a
@@ -2215,7 +2215,7 @@ rest.
   Graphviz drawing would mean owning the layout, because moving one node moves
   its neighbours. The fingerprint already makes the common edit cost no layout at
   all, and the honest way to make a *changed* picture cheap is a stored
-  arrangement — which is `netgraph layout --write`, and which takes the same
+  arrangement — which is `netviz layout --write`, and which takes the same
   redraw to 0.3 s.
 * **No virtualised list for the file tree.** 138 rows is not a problem, and
   2106 documents are not rows: the tree lists files.
@@ -2239,16 +2239,16 @@ step summary.
 
 ## 21. ~~A rename leaves the geometry keyed by the old name~~ — fixed
 
-**Status:** closed 2026-08-16. `netgraph.edit.rename` is the plan,
+**Status:** closed 2026-08-16. `netviz.edit.rename` is the plan,
 `tests/test_rename.py` the guard.
 
-Found while making a delete take its geometry with it (`netgraph.edit.cascade`),
-and it was the same defect one operation over. `netgraph edit rename sw-a sw-b`
+Found while making a delete take its geometry with it (`netviz.edit.cascade`),
+and it was the same defect one operation over. `netviz edit rename sw-a sw-b`
 rewrote every *reference* to `sw-a` — a cable end, a tunnel's `over`, an
 adapter's `attached_to` — and nothing else, so the **layout keys** that placed
 it, a note's anchor and an area's member list were left naming a name that no
 longer existed: a `W138`, possibly a `W142`, and an arrangement lost silently,
-because the element was then drawn wherever the engine put it and `netgraph
+because the element was then drawn wherever the engine put it and `netviz
 layout --prune` dropped the coordinates rather than moving them.
 
 ### What changed
@@ -2258,7 +2258,7 @@ rewrite, computed without touching anything, the way `plan_cascade` does for a
 delete — and it reuses the two pieces the cascade had already built rather than
 re-deciding either question: `placed_element` says which element a layout key
 depends on, `annotation_references` walks a note's anchor and an area's members.
-`_repoint` in `netgraph.edit.apply` carries the plan out, so `edit move` gets it
+`_repoint` in `netviz.edit.apply` carries the plan out, so `edit move` gets it
 too — a move that changes an element's namespace is a rename of its address.
 
 The third part, which a delete never needed because a delete never has to *write*
@@ -2278,7 +2278,7 @@ decoration is part of the name.
 
 `tests/fixtures/drawio/arranged-edited.plan.json`, the reproduction this entry
 named, now carries `hosts/srv-web` at the coordinates `hosts/srv-app` had. That
-took one more change than the rename itself: `netgraph import drawio` orders the
+took one more change than the rename itself: `netviz import drawio` orders the
 geometry write *after* the renames and builds it from the arrangement the tree
 held before the import, so it was putting the old key straight back into the file
 the rename had just fixed — the same shape as the deleted-key bug fixed one entry
@@ -2297,7 +2297,7 @@ placing anything and shows up as a box that moved.
 
 ### Left out deliberately
 
-An area's `selector`. It names a pattern, not an element, and netgraph cannot
+An area's `selector`. It names a pattern, not an element, and netviz cannot
 tell whether the pattern was meant to match the old name or merely happened to —
 `namespace: sites/north` survives a rename inside that namespace, and a
 `labels:` query may or may not. Rewriting one would be guessing, and §21 already
@@ -2305,24 +2305,24 @@ reports what a selector matches.
 
 Group keys, for the opposite reason: a group key is a *namespace*, and renaming
 an element never renames the folder it is in. Renaming a namespace is
-`netgraph edit move` over every element in it, and each of those moves carries
+`netviz edit move` over every element in it, and each of those moves carries
 its own geometry.
 
 Nothing was done about a layout key spelled short in a document where a short key
 never resolved — `tunnel:vx-100` at the root of a tree whose tunnel is in
 `sites/hq/`. It placed nothing before the rename and places nothing after it;
 `W138` does not report it because a `:` makes the key a derived id it cannot
-judge, and inventing a diagnostic for it belongs with `netgraph layout --prune`,
+judge, and inventing a diagnostic for it belongs with `netviz layout --prune`,
 which builds the drawing that could answer it.
 
 ---
 
 ## 22. ~~The as-built report says nothing about network namespaces~~ — fixed, and nothing else moved
 
-**Status:** closed 2026-08-16. `netgraph.report.pages._netns_section` is the
+**Status:** closed 2026-08-16. `netviz.report.pages._netns_section` is the
 section, `tests/fixtures/report/containers-markdown.txt` the golden.
 
-`netgraph report` writes a page per device, and that page is where an operator
+`netviz report` writes a page per device, and that page is where an operator
 looks for "what is this machine". Since §23 a machine may run several network
 stacks, and the report showed none of them: the interface table had a `VRF`
 column and no `NETNS` one, and there was no section listing `spec.netns` the way
@@ -2371,16 +2371,16 @@ committed: `srv-host-a` and `srv-host-b` have the section, `sw-lab` does not.
 `overlay-markdown.txt` are byte-identical to what they were before this, which is
 the other half of the claim.
 
-Namespaces remain visible everywhere they already were: `netgraph show`,
+Namespaces remain visible everywhere they already were: `netviz show`,
 `render -f json` (every port carries `netns` and `peer`, at every layer), the
 tooltips and the detail panel of a rendering, `export interfaces`, and
 `--layer netns`.
 
-## 23. `netgraph path` cannot trace out of a container, because layer 3 draws one node per machine
+## 23. `netviz path` cannot trace out of a container, because layer 3 draws one node per machine
 
 <!-- norun: the transcript is elided; the command exits 1, which is the point -->
 ```console
-$ netgraph -i examples/containers path 10.30.0.11 10.20.0.12
+$ netviz -i examples/containers path 10.30.0.11 10.20.0.12
 no path from hosts/srv-host-a to hosts/srv-host-b within 16 hops.
 ```
 
@@ -2460,7 +2460,7 @@ default settings both have a `docker0` at `172.17.0.1/16`, both hand out
 to the machine and every packet leaving it is masqueraded to the uplink address,
 so nothing on the wire ever sees the collision.
 
-netgraph derives subnets from addresses across the *whole* inventory (§17). Two
+netviz derives subnets from addresses across the *whole* inventory (§17). Two
 hosts holding `172.17.0.1` are therefore one subnet with two claimants, which is
 [`W106`](validation-rules.md#w106--one-address-claimed-twice-in-a-subnet) —
 a real finding about a real duplicate address, reported about a design that is
@@ -2513,7 +2513,7 @@ and the schema has no word for that: `type` is one of seven values and none of
 them is `macvlan`, `ipvlan` or `tap`, while `peer` is the only field that says
 "this interface was made as half of something else".
 
-So the example annotates the device with `netgraph/ignore: NG-C015` and a
+So the example annotates the device with `netviz/ignore: NG-C015` and a
 comment naming all four interfaces, and `tests.yaml` names them a second time in
 the query that asserts every other interface in a namespace is one end of a
 veth pair. Two lists of the same four names, kept in step by hand, is the cost.
@@ -2569,7 +2569,7 @@ Recorded so a later reviewer knows these were examined rather than skipped.
   than a copy, making expansion O(n) rather than O(9ⁿ). The key-position variant
   is rejected outright as an unhashable key.
 - **No shell is involved anywhere.** There is no `os.system`, `shell=`, `eval`
-  or `exec` in `src/`. The one subprocess is Graphviz: `netgraph.render.dot`
+  or `exec` in `src/`. The one subprocess is Graphviz: `netviz.render.dot`
   runs `dot` through `subprocess.run` with a fixed argument *list*
   (`[<resolved dot>, '-Tsvg']`), never a string and never a shell, resolving the
   executable with `shutil.which` and feeding the DOT source over **stdin**. No
@@ -2596,7 +2596,7 @@ Recorded so a later reviewer knows these were examined rather than skipped.
   bug is fixed (`_front_matter` now escapes backslashes) and covered by
   `test_mermaid_front_matter_stays_valid_yaml`.
 - **Packaging.** The wheel installs into a clean venv and pulls only its declared
-  dependencies. Both the `netgraph` console script and `python -m netgraph` work
+  dependencies. Both the `netviz` console script and `python -m netviz` work
   from outside the source tree — version, `validate`, `render -f dot`,
   `render -f svg -o`, and `watch`. Exit codes are 1 for a rejected inventory and
   0 for a clean one; `watch` stops cleanly on SIGINT (0) and SIGTERM (143). The

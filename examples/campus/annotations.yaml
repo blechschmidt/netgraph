@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: why-fibre
@@ -17,7 +17,7 @@ spec:
   anchor:
     link: backbone/cbl-bb-north-south
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: mgmt-is-not-routed
@@ -39,7 +39,7 @@ spec:
     width: 240
   leader: true
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: voice-rollout
@@ -58,7 +58,7 @@ spec:
     y: 900
     width: 240
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: backbone-ring
@@ -78,7 +78,7 @@ spec:
   border: solid
   padding: 24.0
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: site-north
@@ -94,7 +94,7 @@ spec:
   selector:
     namespace: sites/north
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: on-the-generator
@@ -114,7 +114,7 @@ spec:
     height: 420.0
   border: dotted
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: legend
 metadata:
   name: key
@@ -128,7 +128,7 @@ spec:
   corner: bottom-right
   auto: layers
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: legend
 metadata:
   name: media

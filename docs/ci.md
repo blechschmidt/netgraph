@@ -1,18 +1,18 @@
-# netgraph in CI
+# netviz in CI
 
-`netgraph validate` is built to be a gate. It loads the tree, applies every rule
+`netviz validate` is built to be a gate. It loads the tree, applies every rule
 in [`docs/validation-rules.md`](validation-rules.md), prints what it found and
 exits non-zero when anything is an error — so the shortest useful pipeline is
 one line:
 
 <!-- run: cwd=examples/quickstart -->
 ```console
-$ netgraph --inventory . validate --strict
+$ netviz --inventory . validate --strict
 no problems found
 ```
 
-`netgraph test` is the second gate, and it answers a different question — see
-[below](#netgraph-test-assertions-as-a-gate).
+`netviz test` is the second gate, and it answers a different question — see
+[below](#netviz-test-assertions-as-a-gate).
 
 This page covers the rest: the machine-readable output formats, the three
 composite GitHub Actions, the reusable workflows that publish a diagram and
@@ -31,7 +31,7 @@ findings can reach a pull request.
 * [Workflow: publish the diagram to GitHub Pages](#workflow-publish-the-diagram-to-github-pages)
 * [The review action](#the-review-action)
 * [Workflow: review a pull request](#workflow-review-a-pull-request)
-* [`netgraph test`: assertions as a gate](#netgraph-test-assertions-as-a-gate)
+* [`netviz test`: assertions as a gate](#netviz-test-assertions-as-a-gate)
 * [Workflow: a scheduled drift check](#workflow-a-scheduled-drift-check)
 * [pre-commit](#pre-commit)
 * [Other CI systems](#other-ci-systems)
@@ -51,7 +51,7 @@ Three properties hold for all of them.
 
 **stdout is the document, stderr is the commentary.** Under the three
 structured formats the human summary moves to stderr, so
-`netgraph validate -F sarif > report.sarif` writes a file that uploads cleanly
+`netviz validate -F sarif > report.sarif` writes a file that uploads cleanly
 while a person watching the run still sees what happened.
 
 **`--quiet` silences the summary, never the document.** `-q` is about the
@@ -61,14 +61,14 @@ without it.
 **The order is deterministic**: file, then line, then rule id. Two runs over an
 unchanged inventory produce byte-identical output, so a report can be committed
 and diffed. Every format honours `--strict` and `--disable`, and re-grading a
-rule in `netgraph.toml` changes the `severity` field, the SARIF `level` and the
+rule in `netviz.toml` changes the `severity` field, the SARIF `level` and the
 workflow command alike.
 
 `--strict` and `--disable` behave exactly as they do for `text`:
 
 <!-- norun: redirects stdout into a file in the reader's directory -->
 ```console
-$ netgraph -i inventory validate -F sarif --strict --disable W105 --disable I002 > netgraph.sarif
+$ netviz -i inventory validate -F sarif --strict --disable W105 --disable I002 > netviz.sarif
 ```
 
 ## Exit codes
@@ -77,7 +77,7 @@ $ netgraph -i inventory validate -F sarif --strict --disable W105 --disable I002
 |---|---|
 | `0` | No errors. Warnings and infos may still have been reported. |
 | `1` | At least one **error**, or a document that could not be loaded. |
-| `2` | Usage error — an unknown option, an unknown rule id in `--disable` — or an unusable `netgraph.toml`. |
+| `2` | Usage error — an unknown option, an unknown rule id in `--disable` — or an unusable `netviz.toml`. |
 | `3` | The inventory path does not exist or cannot be read at all. |
 
 A structured document is written for `0` and `1`. It is *not* written for the
@@ -88,13 +88,13 @@ in the [command reference](commands/README.md#exit-codes).
 
 <!-- norun: the envelope below is from an inventory with a broken cable, at an illustrative path -->
 ```console
-$ netgraph -q -i inventory validate -F json
+$ netviz -q -i inventory validate -F json
 ```
 
 ```json
 {
   "schemaVersion": 1,
-  "tool": { "name": "netgraph", "version": "0.1.0" },
+  "tool": { "name": "netviz", "version": "0.1.0" },
   "inventory": { "root": "/home/ops/net/inventory", "prefix": "inventory" },
   "summary": { "error": 1, "warning": 0, "info": 0, "total": 1 },
   "failed": true,
@@ -121,7 +121,7 @@ $ netgraph -q -i inventory validate -F json
 | Key | Type | Meaning |
 |---|---|---|
 | `schemaVersion` | integer | Version of *this* envelope. Bumped only when a key is renamed or removed; a new optional key does not bump it. |
-| `tool.version` | string | The netgraph release that produced the report. |
+| `tool.version` | string | The netviz release that produced the report. |
 | `inventory.root` | string | Absolute path of the directory `findings[].file` is relative to. |
 | `inventory.prefix` | string | The same directory relative to the working directory, or `""`. Prepend it to `file` to get a repository-relative path. |
 | `summary` | object | One count per severity, plus `total`. Every severity is present, zero included. |
@@ -133,7 +133,7 @@ Each entry of `findings`:
 |---|---|---|
 | `rule` | string | Canonical rule id (`E001`), or `load` for a problem the loader or the schema rejected the document over. |
 | `alias` | string \| null | The `NG-*` identifier from [the schema](schema.md) §10. |
-| `severity` | string | `error`, `warning` or `info`, **after** `netgraph.toml`, `netgraph/ignore`, `--disable` and `--strict`. |
+| `severity` | string | `error`, `warning` or `info`, **after** `netviz.toml`, `netviz/ignore`, `--disable` and `--strict`. |
 | `message` | string | One line, naming every element involved. |
 | `element` | string \| null | Fully-qualified name of the element the finding is anchored to. `null` for a load error, which has no element yet. |
 | `namespace` | string \| null | Namespace of `element`; `""` at the inventory root. |
@@ -152,7 +152,7 @@ Counting warnings by rule, for a dashboard:
 
 <!-- norun: a shell pipeline into jq -->
 ```console
-$ netgraph -q -i inventory validate -F json \
+$ netviz -q -i inventory validate -F json \
     | jq -r '.findings | group_by(.rule) | map({rule: .[0].rule, n: length}) | .[] | "\(.n)\t\(.rule)"'
 ```
 
@@ -160,7 +160,7 @@ $ netgraph -q -i inventory validate -F json \
 
 `-F sarif` emits a [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/)
 log with exactly one run. It is validated against the official schema in
-netgraph's own test suite, so the format cannot drift.
+netviz's own test suite, so the format cannot drift.
 
 Every rule is described once in `runs[0].tool.driver.rules`, **whether or not it
 fired** — a driver that only lists the rules that happened to trigger tells a
@@ -202,9 +202,9 @@ annotations disappearing with the run.
 
 ## The GitHub Action
 
-[`.github/actions/netgraph-validate`](../.github/actions/netgraph-validate/) is
-a composite action that installs netgraph, runs the check and reports the
-result. Its own [README](../.github/actions/netgraph-validate/README.md) has the
+[`.github/actions/netviz-validate`](../.github/actions/netviz-validate/) is
+a composite action that installs netviz, runs the check and reports the
+result. Its own [README](../.github/actions/netviz-validate/README.md) has the
 full input and output tables; the two workflows below are the reason it exists.
 
 `python` must already be on `PATH` — put `actions/setup-python` before it. The
@@ -238,8 +238,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - id: netgraph
-        uses: blechschmidt/netgraph/.github/actions/netgraph-validate@v0.1.0
+      - id: netviz
+        uses: blechschmidt/netgraph/.github/actions/netviz-validate@v0.1.0
         with:
           inventory: inventory
           strict: "true"
@@ -251,12 +251,12 @@ jobs:
 
       - uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: ${{ steps.netgraph.outputs.report }}
-          # Keeps netgraph's alerts separate from any other analysis in the repo.
-          category: netgraph
+          sarif_file: ${{ steps.netviz.outputs.report }}
+          # Keeps netviz's alerts separate from any other analysis in the repo.
+          category: netviz
 
       - name: Fail the job if the inventory did not validate
-        if: steps.netgraph.outputs.failed == 'true'
+        if: steps.netviz.outputs.failed == 'true'
         run: exit 1
 ```
 
@@ -282,7 +282,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - uses: blechschmidt/netgraph/.github/actions/netgraph-validate@v0.1.0
+      - uses: blechschmidt/netgraph/.github/actions/netviz-validate@v0.1.0
         with:
           inventory: inventory
           output-format: github
@@ -294,8 +294,8 @@ jobs:
 Without the action, the same thing by hand:
 
 ```yaml
-      - run: pip install netgraph
-      - run: netgraph --inventory inventory validate --output-format github --strict
+      - run: pip install netviz
+      - run: netviz --inventory inventory validate --output-format github --strict
 ```
 
 ## The render action
@@ -304,10 +304,10 @@ Everything above answers "did this change break the inventory?" The other half
 of a pipeline is "what does the network look like now?" — and the answer nobody
 reads is the one they have to check out a repository and install Graphviz to see.
 
-[`.github/actions/netgraph-render`](../.github/actions/netgraph-render/) installs
-netgraph *and* Graphviz, runs [`netgraph render`](commands/render.md), and leaves
+[`.github/actions/netviz-render`](../.github/actions/netviz-render/) installs
+netviz *and* Graphviz, runs [`netviz render`](commands/render.md), and leaves
 the diagram on disk. Its own
-[README](../.github/actions/netgraph-render/README.md) has the input and output
+[README](../.github/actions/netviz-render/README.md) has the input and output
 tables. Three things are worth knowing before reading them.
 
 **`html` is the default format**, and it is the only one that is publishable on
@@ -331,7 +331,7 @@ the job that produced it rather than on the site it was published to.
 
 ```yaml
       - id: diagram
-        uses: blechschmidt/netgraph/.github/actions/netgraph-render@main
+        uses: blechschmidt/netgraph/.github/actions/netviz-render@main
         with:
           inventory: inventory
           format: svg
@@ -346,7 +346,7 @@ the job that produced it rather than on the site it was published to.
 ## Workflow: publish the diagram to GitHub Pages
 
 A rendered page in an artifact is a page somebody has to download and unzip.
-[`netgraph-pages.yml`](../.github/workflows/netgraph-pages.yml) is a **reusable
+[`netviz-pages.yml`](../.github/workflows/netviz-pages.yml) is a **reusable
 workflow** that takes the same render and publishes it, so the inventory
 repository grows a live diagram of its own network at a URL — rebuilt from the
 YAML on every push, and therefore never the stale export somebody drew in
@@ -368,7 +368,7 @@ jobs:
       # cannot hold more than its caller grants, so the grant is here.
       pages: write
       id-token: write
-    uses: blechschmidt/netgraph/.github/workflows/netgraph-pages.yml@main
+    uses: blechschmidt/netgraph/.github/workflows/netviz-pages.yml@main
     with:
       inventory: inventory
       # Three layers, one page: the switcher is in the HTML.
@@ -409,11 +409,11 @@ ships Graphviz, `graphviz: "false"` skips the install.
 | `layer` | *(empty)* | Layers to draw, separated by commas or whitespace. Several become one page with a switcher. |
 | `title` | *(empty)* | Caption for the diagram. |
 | `theme` | *(empty)* | `blueprint`, `mono`, `none`, or a path to a `kind: theme` document. |
-| `args` | *(empty)* | Further `netgraph render` flags, split on whitespace. |
+| `args` | *(empty)* | Further `netviz render` flags, split on whitespace. |
 | `strict` | `false` | Treat validation warnings as errors and publish nothing. |
 | `page` | `index.html` | Name of the page inside the published site. |
 | `python-version` | `3.12` | Interpreter to set up. Empty uses the runner's own. |
-| `version` | *(empty)* | netgraph to install, as a pip requirement. |
+| `version` | *(empty)* | netviz to install, as a pip requirement. |
 | `ref` | *(empty)* | Branch, tag or SHA of the calling repository to render. |
 | `graphviz` | `auto` | Install `dot`: `auto`, `true` or `false`. |
 | `deploy` | `true` | Publish. `false` builds and uploads the artifact and stops. |
@@ -421,7 +421,7 @@ ships Graphviz, `graphviz: "false"` skips the install.
 
 Only the deploy job holds `pages: write` and `id-token: write`; the job that
 renders runs read-only, so a workflow that fails to draw the inventory cannot
-have reached the Pages API to publish anything. And because `netgraph render`
+have reached the Pages API to publish anything. And because `netviz render`
 validates before it draws, an inventory with a dangling cable stops the
 deployment rather than publishing a diagram that misrepresents the network. A
 tree still under construction opts out of that with `args: --force`, which is
@@ -441,33 +441,33 @@ is the one a reviewer actually has — **what does this change do?** A green che
 on a branch that rewires the core answers it no better than a green check on a
 typo fix.
 
-[`.github/actions/netgraph-review`](../.github/actions/netgraph-review/) answers
+[`.github/actions/netviz-review`](../.github/actions/netviz-review/) answers
 it. Given a base and a head it produces four things from machinery that already
-exists — [`netgraph plan`](commands/plan.md),
-[`netgraph diff`](commands/diff.md) and
-[`netgraph validate`](commands/validate.md) — and one that is new,
-[`netgraph review`](commands/review.md), which is the three of them written up as
+exists — [`netviz plan`](commands/plan.md),
+[`netviz diff`](commands/diff.md) and
+[`netviz validate`](commands/validate.md) — and one that is new,
+[`netviz review`](commands/review.md), which is the three of them written up as
 one Markdown document:
 
 | File | What it is |
 |---|---|
 | `comment.md` | The review, as a comment body. Its first line is the sticky marker. |
-| `plan.json` | The typed changeset, exactly as `netgraph plan --json` writes it. |
-| `netgraph.sarif` | The head's findings, for `github/codeql-action/upload-sarif`. |
+| `plan.json` | The typed changeset, exactly as `netviz plan --json` writes it. |
+| `netviz.sarif` | The head's findings, for `github/codeql-action/upload-sarif`. |
 | `summary.json` | The verdict and the counts, for a step that gates on them. |
 | `diff.svg`, `diff.png` | The visual diff — additions green, removals red and dashed but still in place, changes amber. |
 
-`netgraph review` is a command like any other, so the same review can be read
+`netviz review` is a command like any other, so the same review can be read
 before anything is pushed:
 
 <!-- norun: needs a repository with two states to compare, which the docs build has no fixture for -->
 ```console
-$ netgraph --inventory inventory review --from origin/main
+$ netviz --inventory inventory review --from origin/main
 ```
 
 ## Workflow: review a pull request
 
-[`netgraph-review.yml`](../.github/workflows/netgraph-review.yml) is the
+[`netviz-review.yml`](../.github/workflows/netviz-review.yml) is the
 reusable workflow around it. It runs the action, uploads the bundle, uploads the
 SARIF, and posts **one** comment that it edits in place on every push:
 
@@ -483,7 +483,7 @@ jobs:
       contents: read
       pull-requests: write
       security-events: write
-    uses: blechschmidt/netgraph/.github/workflows/netgraph-review.yml@main
+    uses: blechschmidt/netgraph/.github/workflows/netviz-review.yml@main
     with:
       inventory: inventory
 ```
@@ -528,7 +528,7 @@ absolute count would be turned off within a day by the first team whose network
 has grown a wart nobody has time to fix this quarter — and a gate that is off
 catches nothing at all.
 
-Identity is [`netgraph.diagnostics.fingerprint`](../src/netgraph/diagnostics.py):
+Identity is [`netviz.diagnostics.fingerprint`](../src/netviz/diagnostics.py):
 the rule, the file, the element, the pointer and the message, and deliberately
 **not** the line. Inserting a document above a broken one does not report
 everything below it as newly introduced. It is the same fingerprint code
@@ -549,7 +549,7 @@ everything the job does is read YAML the pull request wrote.
 `pull_request_target` would run the base branch's workflow with a *writable*
 token while the untrusted head is one `git checkout` away. Every published escape
 from that pattern has the same shape: a step reads a file the pull request
-controls, and the token it is holding can push to the default branch. netgraph
+controls, and the token it is holding can push to the default branch. netviz
 parses the head's YAML by design, so that is exactly the trigger it must not be
 run under.
 
@@ -571,7 +571,7 @@ watching.
 
 ### The comment is sticky
 
-The first line of the body is an HTML comment — `<!-- netgraph-review: TITLE -->`
+The first line of the body is an HTML comment — `<!-- netviz-review: TITLE -->`
 — and the workflow looks for it among the pull request's comments before it
 decides whether to post or to edit. A branch pushed twenty times has one review
 comment, showing the twentieth state.
@@ -587,21 +587,21 @@ the same title and the second job will overwrite the first job's comment.
 | `runs-on` | `ubuntu-latest` | Where the job runs: a label, a JSON array of labels, or a runner group. |
 | `inventory` | `.` | Root folder of the YAML tree, or a single YAML file. |
 | `base` | *(empty)* | What to compare against. Empty is the pull request's base commit. |
-| `title` | `netgraph` | Heading of the comment, and the key of its sticky marker. |
+| `title` | `netviz` | Heading of the comment, and the key of its sticky marker. |
 | `layer` | *(empty)* | Which layer the diff is drawn at. One only — a diff compares one view. |
 | `theme` | *(empty)* | `blueprint`, `mono`, `none`, or a path to a `kind: theme` document. |
-| `args` | *(empty)* | Further `netgraph diff` flags, split on whitespace. |
+| `args` | *(empty)* | Further `netviz diff` flags, split on whitespace. |
 | `formats` | `svg,png` | Image formats to draw. Empty draws none and needs no Graphviz. |
 | `strict` | `false` | Promote every warning to an error, on both sides. |
 | `disable` | *(empty)* | Rule ids to silence on both sides. |
 | `comment` | `true` | Post the review. `false` writes it to the job summary only. |
 | `upload-sarif` | `true` | Upload the head's findings to code scanning. |
-| `sarif-category` | `netgraph` | One per inventory: uploads sharing a category replace each other. |
+| `sarif-category` | `netviz` | One per inventory: uploads sharing a category replace each other. |
 | `fail-on-new-errors` | `true` | Fail on an error the base did not have. Pre-existing errors never fail it. |
-| `artifact-name` | `netgraph-review` | Name of the uploaded bundle. |
+| `artifact-name` | `netviz-review` | Name of the uploaded bundle. |
 | `artifact-retention-days` | `0` | How long to keep it. `0` leaves the repository default. |
 | `python-version` | `3.12` | Interpreter to set up. Empty uses the runner's own. |
-| `version` | *(empty)* | netgraph to install, as a pip requirement. |
+| `version` | *(empty)* | netviz to install, as a pip requirement. |
 | `graphviz` | `auto` | Install `dot`: `auto`, `true` or `false`. |
 
 The outputs — `verdict`, `changed`, `new-errors` and `comment-url` — are there
@@ -620,7 +620,7 @@ summary. That is the same path a fork's pull request takes, so it is worth
 having a way to run it deliberately rather than discovering how it reads the
 first time a fork turns up.
 
-## `netgraph test`: assertions as a gate
+## `netviz test`: assertions as a gate
 
 `validate` answers "do these files cohere?" Every rule it applies is a statement
 about inventories *in general* — a cable endpoint resolves, an address is inside
@@ -628,7 +628,7 @@ its subnet — which is exactly why none of them can say that the ward switch mu
 not be the only path to the ward. That is a fact about *this* network, known only
 to the people who built it.
 
-[`netgraph test`](commands/test.md) grades the facts they wrote down. A
+[`netviz test`](commands/test.md) grades the facts they wrote down. A
 `kind: testsuite` document ([§20](schema.md#20-test-suites-executable-assertions))
 holds named assertions — reachable, not-reachable, same VLAN, within a prefix,
 unique management addresses, no single point of failure — and the command exits 1
@@ -637,9 +637,9 @@ device, so it belongs on a pull request beside `validate` rather than on a
 schedule:
 
 ```yaml
-      - run: pip install netgraph
-      - run: netgraph --inventory inventory validate --strict
-      - run: netgraph --inventory inventory test
+      - run: pip install netviz
+      - run: netviz --inventory inventory validate --strict
+      - run: netviz --inventory inventory test
 ```
 
 Both gates in one job, in that order: an inventory that does not load cannot be
@@ -653,7 +653,7 @@ Jenkins all render it natively, so a failure arrives as a named row somebody can
 click rather than as a line in a log:
 
 ```yaml
-      - run: netgraph --inventory inventory test -F junit -o test-results.xml
+      - run: netviz --inventory inventory test -F junit -o test-results.xml
         continue-on-error: true
       - uses: mikepenz/action-junit-report@v5
         if: always()
@@ -668,12 +668,12 @@ in the run that had them.
 On GitLab the same two lines, and the report is picked up by name:
 
 ```yaml
-netgraph:
+netviz:
   image: python:3.12-slim
   script:
-    - pip install netgraph
-    - netgraph --inventory inventory validate --strict
-    - netgraph --inventory inventory test -F junit -o test-results.xml
+    - pip install netviz
+    - netviz --inventory inventory validate --strict
+    - netviz --inventory inventory test -F junit -o test-results.xml
   artifacts:
     when: always
     reports:
@@ -692,13 +692,13 @@ assertion looks like.
 ## Workflow: a scheduled drift check
 
 `validate` answers "is this inventory self-consistent?" — a question about the
-files, which a pull request can settle. [`netgraph drift`](commands/drift.md)
+files, which a pull request can settle. [`netviz drift`](commands/drift.md)
 answers the other one: "is the network still what the files say?" Nothing in a
 pull request can settle that, because the network changes when nobody is looking
 at the repository. So it belongs on a schedule rather than on a push.
 
 The shape is: collect on the network, compare in the repository, publish the
-result. Collection is not netgraph's job — it opens no socket and reads no
+result. Collection is not netviz's job — it opens no socket and reads no
 credential — so a runner with reach into the network, or a cron job on a jump
 host that commits its captures, does that half:
 
@@ -723,9 +723,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install netgraph
+      - run: pip install netviz
 
-      # Collect. Your commands, your credentials, netgraph's input format.
+      # Collect. Your commands, your credentials, netviz's input format.
       - name: Capture the live network
         run: |
           mkdir -p captures
@@ -736,7 +736,7 @@ jobs:
 
       - name: Compare the capture with the inventory
         run: |
-          netgraph --inventory inventory drift \
+          netviz --inventory inventory drift \
             --exclude-interface 'veth*' --exclude-interface 'docker*' \
             --output-format junit captures/* > drift.xml
 
@@ -764,7 +764,7 @@ failures. That is what makes the schedule survivable; the reasoning is in
 **`--exclude-interface` should match how the capture was taken.** Container and
 virtual-ethernet interfaces are not part of a physical topology, and without the
 pattern they read as interfaces the inventory failed to declare — the same
-patterns [`netgraph import`](commands/import.md) is given.
+patterns [`netviz import`](commands/import.md) is given.
 
 **`-F junit` is the format to publish.** One test case per element, so the row
 list stays put between runs: a device goes red when it drifts and green when
@@ -787,8 +787,8 @@ drift:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
   script:
-    - pip install netgraph
-    - netgraph --inventory inventory drift --output-format junit captures/* > drift.xml
+    - pip install netviz
+    - netviz --inventory inventory drift --output-format junit captures/* > drift.xml
   artifacts:
     when: always
     reports:
@@ -797,15 +797,15 @@ drift:
 
 ## pre-commit
 
-netgraph ships `.pre-commit-hooks.yaml`, so an inventory repository can run the
+netviz ships `.pre-commit-hooks.yaml`, so an inventory repository can run the
 same checks before the commit is written. Four hooks are published:
 
 | Hook | What it does |
 |---|---|
-| `netgraph-validate` | Validates the whole tree. Takes no filenames. |
-| `netgraph-test` | Grades the tree's own assertions. Takes no filenames. |
-| `netgraph-fmt` | Rewrites the staged files into canonical form. |
-| `netgraph-fmt-check` | Reports staged files that are not canonical, rewriting nothing. |
+| `netviz-validate` | Validates the whole tree. Takes no filenames. |
+| `netviz-test` | Grades the tree's own assertions. Takes no filenames. |
+| `netviz-fmt` | Rewrites the staged files into canonical form. |
+| `netviz-fmt-check` | Reports staged files that are not canonical, rewriting nothing. |
 
 Start with validation:
 
@@ -815,7 +815,7 @@ repos:
   - repo: https://github.com/blechschmidt/netgraph
     rev: v0.1.0
     hooks:
-      - id: netgraph-validate
+      - id: netviz-validate
         args: [--strict]
 ```
 
@@ -828,39 +828,39 @@ repository root, override `entry`, which is where the global `--inventory`
 option has to go:
 
 ```yaml
-      - id: netgraph-validate
-        entry: netgraph --inventory inventory validate
+      - id: netviz-validate
+        entry: netviz --inventory inventory validate
         args: [--strict]
         files: ^inventory/.*\.ya?ml$
 ```
 
 ### Assertions
 
-`netgraph-test` grades the `kind: testsuite` documents the tree declares, so a
+`netviz-test` grades the `kind: testsuite` documents the tree declares, so a
 commit that quietly removes somebody's second path fails before it lands. Like
-`netgraph-validate` it takes no filenames — an assertion is about the whole tree
+`netviz-validate` it takes no filenames — an assertion is about the whole tree
 — and it is worth pairing the two:
 
 ```yaml
-      - id: netgraph-validate
+      - id: netviz-validate
         args: [--strict]
-      - id: netgraph-test
+      - id: netviz-test
 ```
 
 The hook is a no-op cost only when the tree declares no suite, and in that case
 it fails rather than passing: see
-[`netgraph test`](commands/test.md#exit-codes). Leave it out until there is
+[`netviz test`](commands/test.md#exit-codes). Leave it out until there is
 something to assert.
 
 ### Formatting
 
-`netgraph-fmt` puts the staged YAML into the canonical form of
+`netviz-fmt` puts the staged YAML into the canonical form of
 [`docs/format.md`](format.md). Unlike the hook above it *does* take filenames —
 formatting is per-file, whereas a cable is only dangling when compared against
 the devices in the other files:
 
 ```yaml
-      - id: netgraph-fmt
+      - id: netviz-fmt
 ```
 
 It rewrites in place and relies on pre-commit noticing the modification, which
@@ -870,30 +870,30 @@ a document means — see [Safety](format.md#safety) — but nothing is committed
 without being seen.
 
 For a repository that would rather see the failure than have files rewritten
-underneath it, `netgraph-fmt-check` reports and changes nothing:
+underneath it, `netviz-fmt-check` reports and changes nothing:
 
 ```yaml
-      - id: netgraph-fmt-check
+      - id: netviz-fmt-check
 ```
 
 Restrict `files` rather than overriding `entry` for an inventory below the
 repository root; this hook is given the paths to work on:
 
 ```yaml
-      - id: netgraph-fmt
+      - id: netviz-fmt
         files: ^inventory/.*\.ya?ml$
 ```
 
 The same check belongs in the build, next to whatever formats the code:
 
 ```yaml
-      - run: pip install netgraph
-      - run: netgraph fmt --check inventory
+      - run: pip install netviz
+      - run: netviz fmt --check inventory
 ```
 
 This repository does exactly that for its own `examples/` tree; the step is in
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml), and it prints a
-`netgraph fmt --diff` into the log when it fails so the fix is in the build
+`netviz fmt --diff` into the log when it fails so the fix is in the build
 output rather than only reproducible locally.
 
 ## Other CI systems
@@ -906,11 +906,11 @@ Anywhere else, the JSON envelope plus the exit code is the whole interface:
 validate:
   image: python:3.12
   script:
-    - pip install netgraph
-    - netgraph --inventory inventory validate --strict --output-format json > netgraph.json
+    - pip install netviz
+    - netviz --inventory inventory validate --strict --output-format json > netviz.json
   artifacts:
     when: always
-    paths: [netgraph.json]
+    paths: [netviz.json]
 ```
 
 SARIF is not GitHub-specific either — GitLab, Azure DevOps and most static

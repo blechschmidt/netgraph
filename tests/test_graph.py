@@ -1,6 +1,6 @@
 """The networkx view of an inventory: construction, filtering, layers, stats.
 
-The properties asserted here are the ones a caller of :mod:`netgraph.graph`
+The properties asserted here are the ones a caller of :mod:`netviz.graph`
 depends on:
 
 * the multigraph says exactly what the resolved graph says — same nodes, same
@@ -21,7 +21,7 @@ from pathlib import Path
 import networkx as nx
 import pytest
 
-from netgraph.graph import (
+from netviz.graph import (
     DOMAIN_TYPE,
     ELEMENT_TYPE,
     SUBNET_ID_PREFIX,
@@ -39,9 +39,9 @@ from netgraph.graph import (
     stats,
     to_networkx,
 )
-from netgraph.loader import Inventory, load_tree
-from netgraph.render import build_graph
-from netgraph.subnets import subnets_of
+from netviz.loader import Inventory, load_tree
+from netviz.render import build_graph
+from netviz.subnets import subnets_of
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -79,7 +79,7 @@ def campus_graph(campus: Inventory) -> nx.MultiGraph:
 def document(name: str, *interfaces: str, kind: str = "computer", extra: str = "") -> str:
     """One element document whose interfaces are given as flow mappings."""
     return (
-        f"apiVersion: netgraph.dev/v1alpha1\n"
+        f"apiVersion: netviz.dev/v1alpha1\n"
         f"kind: {kind}\n"
         f"metadata: {{name: {name}}}\n"
         f"spec:\n"
@@ -90,7 +90,7 @@ def document(name: str, *interfaces: str, kind: str = "computer", extra: str = "
 
 def cable(name: str, left: str, right: str, *, medium: str = "copper", speed: str = "") -> str:
     return (
-        f"apiVersion: netgraph.dev/v1alpha1\n"
+        f"apiVersion: netviz.dev/v1alpha1\n"
         f"kind: cable\n"
         f"metadata: {{name: {name}}}\n"
         f"spec: {{endpoints: [{left}, {right}], medium: {medium}{speed}}}\n"

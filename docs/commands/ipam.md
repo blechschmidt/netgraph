@@ -1,6 +1,6 @@
-# `netgraph ipam`
+# `netviz ipam`
 
-[`netgraph list subnets`](list.md) says which prefixes exist. `netgraph ipam`
+[`netviz list subnets`](list.md) says which prefixes exist. `netviz ipam`
 says whether the address plan is *healthy*: how full every prefix is, what is
 free inside one, where the next block starts, and what conflicts. This page is
 the reference for the command and its modes;
@@ -25,7 +25,7 @@ contracts and the worked examples.
 
 <!-- generated: synopsis ipam -->
 ```text
-netgraph [GLOBAL OPTIONS] ipam [OPTIONS]
+netviz [GLOBAL OPTIONS] ipam [OPTIONS]
 ```
 <!-- /generated -->
 
@@ -65,7 +65,7 @@ With no options, `ipam` prints how full every prefix is, then the conflicts:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus ipam --family ipv4
+$ netviz -i examples/campus ipam --family ipv4
 VRF   PREFIX           IP  VLANS  HOSTS  USED  FREE    UTIL  DEVICES
 ----  ---------------  --  -----  -----  ----  ----  ------  -------
 -     10.1.0.0/30       4  -          2     2     0  100.0%        2
@@ -101,8 +101,8 @@ skimmable; `NO_COLOR` or a redirect gives the same numbers without the colour.
 
 The other half of the report is the conflicts, and they are **not** a second
 implementation of anything. `ipam` calls
-[`netgraph validate`](../validation.md) and filters to the addressing rules, so a
-suppression or a re-grading in [`netgraph.toml`](../configuration.md#validate--how-findings-are-graded)
+[`netviz validate`](../validation.md) and filters to the addressing rules, so a
+suppression or a re-grading in [`netviz.toml`](../configuration.md#validate--how-findings-are-graded)
 applies to both commands identically:
 
 | Conflict | Rule |
@@ -125,7 +125,7 @@ Adding a device is two commands — what is left, and where the next block start
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus ipam --free 10.1.0.0/22
+$ netviz -i examples/campus ipam --free 10.1.0.0/22
 BLOCK          IP  HOSTS
 -------------  --  -----
 10.1.0.4/30     4      2
@@ -133,9 +133,9 @@ BLOCK          IP  HOSTS
 ...
 10.1.2.0/23     4    510
 free space in 10.1.0.0/22: 8 block(s), 1 allocation(s) already carved out
-$ netgraph -i examples/campus ipam --next-free 10.1.0.0/16
+$ netviz -i examples/campus ipam --next-free 10.1.0.0/16
 10.1.1.0/24
-$ netgraph -i examples/campus ipam --next-free 2001:db8:1::/48
+$ netviz -i examples/campus ipam --next-free 2001:db8:1::/48
 2001:db8:1:1::/64
 ```
 
@@ -155,8 +155,8 @@ left:
 
 <!-- run: rc=1 -->
 ```console
-$ netgraph -i examples/campus ipam --next-free 10.1.0.0/30
-error: no free /24 inside 10.1.0.0/30; run 'netgraph ipam --free 10.1.0.0/30' to see what is left
+$ netviz -i examples/campus ipam --next-free 10.1.0.0/30
+error: no free /24 inside 10.1.0.0/30; run 'netviz ipam --free 10.1.0.0/30' to see what is left
 ```
 
 [Free space](../ipam.md#free-space) and
@@ -202,7 +202,7 @@ two contracts are in [Output formats](../ipam.md#output-formats).
 * [`docs/ipam.md`](../ipam.md) — the sizing rules per prefix length, how free
   space and aggregation are computed, the JSON and CSV contracts, and why
   "overlapping but not nested" is a VLAN question.
-* [`netgraph list`](list.md) — `list subnets` is the same grouping without the
+* [`netviz list`](list.md) — `list subnets` is the same grouping without the
   arithmetic.
 * [`docs/validation.md`](../validation.md) and
   [`docs/validation-rules.md`](../validation-rules.md) — the rules the conflicts

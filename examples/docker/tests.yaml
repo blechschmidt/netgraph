@@ -1,9 +1,9 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: testsuite
 metadata:
   name: containers
   description: |
-    The claims a container host is built on, written so that `netgraph test`
+    The claims a container host is built on, written so that `netviz test`
     fails a change that quietly stops one being true. Every one of them is a
     sentence somebody would say while explaining the design, and most of them
     are about a stack rather than about a machine - which is the whole reason

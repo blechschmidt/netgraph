@@ -1,4 +1,4 @@
-"""``netgraph test``: the ``testsuite`` kind, the eleven assertions, the reports.
+"""``netviz test``: the ``testsuite`` kind, the eleven assertions, the reports.
 
 The contracts asserted here are the ones a pipeline depends on:
 
@@ -20,13 +20,13 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner, Result
 
-from netgraph.cli import cli
-from netgraph.loader import load_stream, load_tree
-from netgraph.loader.inventory import Inventory
-from netgraph.models import TestSuite
-from netgraph.models.document import parse_test_suite
-from netgraph.schema import build_schema
-from netgraph.testing import (
+from netviz.cli import cli
+from netviz.loader import load_stream, load_tree
+from netviz.loader.inventory import Inventory
+from netviz.models import TestSuite
+from netviz.models.document import parse_test_suite
+from netviz.schema import build_schema
+from netviz.testing import (
     FAILED,
     PASSED,
     SKIPPED,
@@ -35,7 +35,7 @@ from netgraph.testing import (
     render_test_report,
     run_tests,
 )
-from netgraph.testing.fields import FieldError, evaluate, render_value
+from netviz.testing.fields import FieldError, evaluate, render_value
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -46,7 +46,7 @@ FIXTURE = REPO_ROOT / "tests" / "fixtures" / "testsuite"
 #: A small, complete inventory: two desks either side of one switch, plus a
 #: router. Written as a stream so a test can bolt any suite onto it.
 NETWORK = """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata: {name: rtr}
 spec:
@@ -54,7 +54,7 @@ spec:
     - {name: eth0, type: ethernet, ipv4: [10.0.0.1/24]}
     - {name: eth1, type: ethernet, ipv4: [10.0.1.1/24]}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata: {name: sw}
 spec:
@@ -70,7 +70,7 @@ spec:
     - {name: port3, type: ethernet, vlan: {mode: access, access_vlan: 20}}
   vlans: [{id: 10, name: office}, {id: 20, name: guest}]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata: {name: pc-a}
 spec:
@@ -80,7 +80,7 @@ spec:
       ipv4: {addresses: [10.0.0.10/24], gateway: 10.0.0.1}
       vlan: {mode: access, access_vlan: 10}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata: {name: pc-b}
 spec:
@@ -90,17 +90,17 @@ spec:
       ipv4: {addresses: [10.0.1.11/24]}
       vlan: {mode: access, access_vlan: 20}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-rtr}
 spec: {medium: copper, endpoints: [rtr:eth0, sw:port1]}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-a}
 spec: {medium: copper, endpoints: [pc-a:eth0, sw:port2]}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-b}
 spec: {medium: copper, endpoints: [pc-b:eth0, sw:port3]}
@@ -111,7 +111,7 @@ def inventory_with(*assertions: str) -> Inventory:
     """The fixture network plus a one-suite document holding ``assertions``."""
     body = "\n".join(f"    - {assertion.strip()}" for assertion in assertions)
     suite = (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: testsuite\n"
         "metadata: {name: suite}\n"
         "spec:\n"
@@ -148,7 +148,7 @@ def test_a_suite_and_an_element_may_share_a_name() -> None:
     inventory = load_stream(
         NETWORK
         + "---\n"
-        + "apiVersion: netgraph.dev/v1alpha1\n"
+        + "apiVersion: netviz.dev/v1alpha1\n"
         + "kind: testsuite\n"
         + "metadata: {name: sw}\n"
         + "spec: {assertions: [{assert: count, select: kind=switch, equals: 1}]}\n"
@@ -160,7 +160,7 @@ def test_a_suite_and_an_element_may_share_a_name() -> None:
 
 def test_two_suites_of_one_name_are_ng_k001() -> None:
     document = (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: testsuite\n"
         "metadata: {name: twice}\n"
         "spec: {assertions: [{assert: count, select: kind=switch, equals: 1}]}\n"
@@ -173,7 +173,7 @@ def test_two_suites_of_one_name_are_ng_k001() -> None:
 def test_a_suite_must_assert_something() -> None:
     """``NG-K002`` — a suite that checked nothing would report a green run."""
     inventory = load_stream(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: testsuite\n"
         "metadata: {name: empty}\n"
         "spec: {assertions: []}\n"
@@ -199,7 +199,7 @@ def test_a_key_that_belongs_to_another_assertion_is_ng_k003(document: str, expec
     with pytest.raises(Exception) as caught:
         parse_test_suite(
             {
-                "apiVersion": "netgraph.dev/v1alpha1",
+                "apiVersion": "netviz.dev/v1alpha1",
                 "kind": "testsuite",
                 "metadata": {"name": "s"},
                 "spec": {"assertions": [json.loads(_yamlish(document))]},
@@ -224,7 +224,7 @@ def test_the_kind_is_in_the_all_kinds_schema_and_has_one_of_its_own() -> None:
 
 
 def test_the_formatter_orders_an_assertion_with_assert_first() -> None:
-    from netgraph.fmt.order import document_shape
+    from netviz.fmt.order import document_shape
 
     shape = document_shape("testsuite")
     assertion = shape.children["spec"].children["assertions"].item
@@ -414,14 +414,14 @@ def test_a_failure_says_where_the_assertion_is_written() -> None:
 def test_two_selectors_that_would_trace_too_many_routes_are_refused() -> None:
     """The product of two wide selectors is a search that would never finish."""
     hosts = "\n---\n".join(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         f"metadata: {{name: pc-{index:03d}}}\n"
         "spec: {interfaces: [{name: eth0, type: ethernet}]}"
         for index in range(20)
     )
     suite = (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: testsuite\n"
         "metadata: {name: wide}\n"
         "spec:\n"
@@ -590,7 +590,7 @@ def test_the_json_document_declares_its_schema_version() -> None:
 
 
 def test_completion_offers_the_declared_suites() -> None:
-    from netgraph.completion import complete_test_suite
+    from netviz.completion import complete_test_suite
 
     context = CliRunner().invoke(cli, ["-i", str(HOME_LAB), "test", "--help"])
     assert context.exit_code == 0
@@ -609,13 +609,13 @@ def test_a_suite_carries_its_own_provenance_without_keep_provenance() -> None:
 
 def test_a_file_declaring_a_suite_is_not_cached(tmp_path: Path) -> None:
     """A replayed slot list would not carry the suite, losing it silently."""
-    from netgraph.loader import open_cache
+    from netviz.loader import open_cache
 
     tree = tmp_path / "inv"
     tree.mkdir()
     (tree / "net.yaml").write_text(NETWORK, encoding="utf-8")
     (tree / "tests.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: testsuite\n"
         "metadata: {name: s}\n"
         "spec: {assertions: [{assert: count, select: kind=router, equals: 1}]}\n",

@@ -1,4 +1,4 @@
-"""The write path: ``netgraph.edit`` and ``netgraph edit``.
+"""The write path: ``netviz.edit`` and ``netviz edit``.
 
 The promises this module holds to account are the four in ``docs/editing.md``:
 
@@ -29,8 +29,8 @@ from typing import Final
 import pytest
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.edit import (
+from netviz.cli import cli
+from netviz.edit import (
     INVENTORY_PLACEHOLDER,
     AddInterface,
     AddressError,
@@ -69,16 +69,16 @@ from netgraph.edit import (
     operations_to_json,
     parse_field_path,
 )
-from netgraph.edit.paths import MISSING, get_field, set_field, unset_field
-from netgraph.edit.placement import check_file, normalise_file
-from netgraph.edit.references import (
+from netviz.edit.paths import MISSING, get_field, set_field, unset_field
+from netviz.edit.placement import check_file, normalise_file
+from netviz.edit.references import (
     Reference,
     ReferenceRole,
     drop_reference,
     references_of,
     rewrite_reference,
 )
-from netgraph.loader import load_tree
+from netviz.loader import load_tree
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -177,7 +177,7 @@ def test_a_leading_comment_and_a_trailing_one_both_survive() -> None:
     text = (
         "# what this file is for\n\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: hub\n"
         "metadata:\n"
         "  name: h1\n"
@@ -213,10 +213,10 @@ def test_a_scalar_the_round_trip_parser_reads_differently_is_a_refusal(tmp_path:
     The loader reads it as the string it plainly is, so the document is valid and
     the inventory renders; the round-trip parser reaches ``float("-.")`` and
     raises a bare ``ValueError``. That has to arrive as a refusal naming the
-    file, the way ``netgraph fmt`` reports it, and not as a traceback.
+    file, the way ``netviz fmt`` reports it, and not as a traceback.
     """
     (tmp_path / "sw.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: sw\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n  name: sw\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n"
         "    - name: -._\n      type: ethernet\n",
         encoding="utf-8",
@@ -409,7 +409,7 @@ def test_an_ambiguous_address_lists_every_candidate(tmp_path: Path) -> None:
     for folder in ("a", "b"):
         (tmp_path / folder).mkdir()
         (tmp_path / folder / "sw.yaml").write_text(
-            "apiVersion: netgraph.dev/v1alpha1\nkind: hub\nmetadata:\n  name: sw\n"
+            "apiVersion: netviz.dev/v1alpha1\nkind: hub\nmetadata:\n  name: sw\n"
             "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n",
             encoding="utf-8",
         )
@@ -684,9 +684,9 @@ def test_renaming_to_the_same_name_is_refused(home: Path) -> None:
 
 def test_renaming_onto_an_existing_name_is_refused(tmp_path: Path) -> None:
     (tmp_path / "a.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: hub\nmetadata:\n  name: a\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: hub\nmetadata:\n  name: a\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n---\n"
-        "apiVersion: netgraph.dev/v1alpha1\nkind: hub\nmetadata:\n  name: b\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: hub\nmetadata:\n  name: b\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n",
         encoding="utf-8",
     )
@@ -699,17 +699,17 @@ def test_a_qualified_reference_stays_qualified(tmp_path: Path) -> None:
     """The spelling an author chose is a choice, and it is kept."""
     (tmp_path / "site").mkdir()
     (tmp_path / "site" / "sw.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: hub\nmetadata:\n  name: sw\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: hub\nmetadata:\n  name: sw\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n",
         encoding="utf-8",
     )
     (tmp_path / "pc.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: computer\nmetadata:\n  name: pc\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: computer\nmetadata:\n  name: pc\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n",
         encoding="utf-8",
     )
     (tmp_path / "link.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: cable\nmetadata:\n  name: c1\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: cable\nmetadata:\n  name: c1\n"
         "spec:\n  endpoints:\n    - site/sw:eth0\n    - pc:eth0\n  medium: copper\n",
         encoding="utf-8",
     )
@@ -752,7 +752,7 @@ def test_a_move_that_deletes_a_file_it_cannot_remake_is_inverted_by_bytes(
 ) -> None:
     """The inverse has to *make* the emptied file again, and cannot always.
 
-    A file netgraph makes is plain UTF-8, ``\n``-terminated, and starts at its
+    A file netviz makes is plain UTF-8, ``\n``-terminated, and starts at its
     first document. A CRLF checkout and a licence header are neither, so moving
     the last document out of such a file and moving it back would rewrite every
     line of it — which is why those moves fall back to the primitive restore.
@@ -760,7 +760,7 @@ def test_a_move_that_deletes_a_file_it_cannot_remake_is_inverted_by_bytes(
     semantic inverse, which is the point of asking the question at all.
     """
     document = (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata:\n"
         "  name: sw-a\n"
@@ -803,7 +803,7 @@ def test_moving_onto_a_colliding_name_is_refused(tmp_path: Path) -> None:
     for folder in ("a", "b"):
         (tmp_path / folder).mkdir()
         (tmp_path / folder / "sw.yaml").write_text(
-            "apiVersion: netgraph.dev/v1alpha1\nkind: hub\nmetadata:\n  name: sw\n"
+            "apiVersion: netviz.dev/v1alpha1\nkind: hub\nmetadata:\n  name: sw\n"
             "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n",
             encoding="utf-8",
         )
@@ -1102,9 +1102,9 @@ def test_a_reference_prints_with_and_without_its_detail() -> None:
 def test_a_deleted_pdu_takes_the_power_block_with_the_last_input(tmp_path: Path) -> None:
     """``powered_by: outlet`` with no inputs is refused by the schema (§17)."""
     (tmp_path / "tree.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: pdu\nmetadata:\n  name: pdu-a\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: pdu\nmetadata:\n  name: pdu-a\n"
         "spec:\n  outlets: 4\n---\n"
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: sw\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n  name: sw\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n"
         "  power:\n    inputs:\n      - pdu-a:1\n",
         encoding="utf-8",
@@ -1131,13 +1131,13 @@ def two_sites(root: Path) -> None:
     for folder in ("a", "b"):
         (root / folder).mkdir(parents=True)
         (root / folder / "sw.yaml").write_text(
-            "apiVersion: netgraph.dev/v1alpha1\nkind: hub\nmetadata:\n  name: sw\n"
+            "apiVersion: netviz.dev/v1alpha1\nkind: hub\nmetadata:\n  name: sw\n"
             "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n"
             "    - name: eth1\n      type: ethernet\n",
             encoding="utf-8",
         )
     (root / "a" / "link.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: cable\nmetadata:\n  name: c1\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: cable\nmetadata:\n  name: c1\n"
         "spec:\n  endpoints:\n    - sw:eth0\n    - sw:eth1\n  medium: copper\n",
         encoding="utf-8",
     )
@@ -1157,7 +1157,7 @@ def test_moving_a_document_re_qualifies_the_references_it_makes(tmp_path: Path) 
 
 
 HUB = (
-    "apiVersion: netgraph.dev/v1alpha1\nkind: hub\nmetadata:\n  name: {name}\n"
+    "apiVersion: netviz.dev/v1alpha1\nkind: hub\nmetadata:\n  name: {name}\n"
     "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n"
 )
 
@@ -1255,7 +1255,7 @@ def test_a_cable_name_that_is_taken_twice_is_refused(home: Path) -> None:
 def test_removing_a_port_removes_the_vlan_interfaces_stacked_on_it(tmp_path: Path) -> None:
     """A sub-interface cannot outlive its parent (§6.2.4)."""
     (tmp_path / "sw.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: sw\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n  name: sw\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n"
         "    - name: eth1\n      type: ethernet\n"
         "    - name: Vlan10\n      type: vlan\n      parent: eth0\n"
@@ -1405,7 +1405,7 @@ def test_the_cable_name_ladder_falls_through_to_a_counter(tmp_path: Path) -> Non
 
 
 UNFAITHFUL = (
-    "apiVersion: netgraph.dev/v1alpha1\nkind: hub\nmetadata:\n  name: h\n"
+    "apiVersion: netviz.dev/v1alpha1\nkind: hub\nmetadata:\n  name: h\n"
     "spec:\n  interfaces:\n  - name: eth0\n    type: ethernet\n"
     '  location: "\\U0001F4A1"\n'
 )
@@ -1434,7 +1434,7 @@ def test_a_file_this_session_deleted_can_be_made_again(tmp_path: Path) -> None:
 
 def test_placement_does_not_reuse_a_file_this_session_deleted(tmp_path: Path) -> None:
     (tmp_path / "cables.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: cable\nmetadata:\n  name: c1\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: cable\nmetadata:\n  name: c1\n"
         "spec:\n  endpoints:\n    - a:eth0\n    - b:eth0\n  medium: copper\n",
         encoding="utf-8",
     )
@@ -1657,7 +1657,7 @@ def test_the_command_moves_and_unsets(home: Path) -> None:
 # --------------------------------------------------------------------------- #
 
 
-#: The console script's directory, so a rendered command line finds ``netgraph``
+#: The console script's directory, so a rendered command line finds ``netviz``
 #: whether or not the test run's shell has the virtualenv activated.
 _SCRIPTS: Final = str(Path(sys.executable).parent)
 
@@ -1667,7 +1667,7 @@ def _replay(root: Path, command: str) -> subprocess.CompletedProcess[str]:
 
     Through the real shell where there is one, because a rendering is a claim
     about what a shell does with it and ``/bin/sh`` is the authority on that.
-    Not on Windows: :mod:`netgraph.edit.commands` quotes with
+    Not on Windows: :mod:`netviz.edit.commands` quotes with
     :func:`shlex.quote` by design and says so, and the shell ``shell=True``
     reaches for there is ``cmd.exe``, which reads ``'OptiPlex 7020'`` as two
     arguments and a stray quote. :func:`shlex.split` is that same grammar
@@ -1714,7 +1714,7 @@ def _replay(root: Path, command: str) -> subprocess.CompletedProcess[str]:
 def test_an_operation_renders_as_the_command_that_makes_it(
     operation: Operation, expected: str
 ) -> None:
-    assert command_for(operation, inventory="net") == f"netgraph -i net {expected}"
+    assert command_for(operation, inventory="net") == f"netviz -i net {expected}"
 
 
 @pytest.mark.parametrize(
@@ -1734,7 +1734,7 @@ def test_an_operation_renders_as_the_command_that_makes_it(
 def test_an_operation_with_no_exact_spelling_hands_over_as_json(operation: Operation) -> None:
     """Never lossy: the JSON form is the same write path by a different door."""
     rendered = command_for(operation, inventory="net")
-    assert "netgraph -i net edit apply -f -" in rendered
+    assert "netviz -i net edit apply -f -" in rendered
     payload = json.loads(rendered[len("echo ") : rendered.index(" | ")].strip("'"))
     assert payload == [operation.to_dict()]
 
@@ -1747,7 +1747,7 @@ def test_the_placeholder_is_obviously_a_placeholder() -> None:
 def test_a_rendered_command_actually_does_what_the_operation_did(tmp_path: Path) -> None:
     """The whole claim of the module, checked by running it.
 
-    Two trees from one source: one edited through :mod:`netgraph.edit`, the
+    Two trees from one source: one edited through :mod:`netviz.edit`, the
     other through the command line the renderer produced. They must end up
     holding the same bytes.
     """

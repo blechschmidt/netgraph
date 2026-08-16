@@ -57,9 +57,9 @@ if str(REPO_ROOT / "tools") not in sys.path:  # pragma: no cover - importing the
 
 from bench_pipeline import Shape, generate, yaml_files  # noqa: E402
 
-from netgraph.render.dot import find_dot  # noqa: E402
-from netgraph.web.preview import ViewOptions  # noqa: E402
-from netgraph.web.session import EditingSession  # noqa: E402
+from netviz.render.dot import find_dot  # noqa: E402
+from netviz.web.preview import ViewOptions  # noqa: E402
+from netviz.web.session import EditingSession  # noqa: E402
 
 T = TypeVar("T")
 
@@ -174,7 +174,7 @@ def _inventory_root(args: argparse.Namespace) -> Iterator[Path]:
         yield Path(args.inventory)
         return
     shape = Shape(sites=args.sites, racks_per_site=args.racks, hosts_per_rack=args.hosts)
-    target = Path(args.keep) if args.keep else Path(tempfile.mkdtemp(prefix="netgraph-bench-"))
+    target = Path(args.keep) if args.keep else Path(tempfile.mkdtemp(prefix="netviz-bench-"))
     if target.exists() and args.keep:
         shutil.rmtree(target)
     files, documents = generate(target, shape)

@@ -1,10 +1,10 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-core
   description: Edge router. wan0 faces an ISP this inventory does not describe.
   annotations:
-    netgraph/ignore: NG-C015
+    netviz/ignore: NG-C015
 spec:
   vendor: MikroTik
   model: hEX S
@@ -29,7 +29,7 @@ spec:
     ipv4: true
     ipv6: false
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-access

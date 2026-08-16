@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: patchpanel
 metadata:
   name: pp-r1-a
@@ -22,7 +22,7 @@ spec:
   form_factor: keystone
   ports: 1-24
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: patchpanel
 metadata:
   name: pp-r2-a

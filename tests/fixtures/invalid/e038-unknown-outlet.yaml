@@ -3,14 +3,14 @@
 # The strip declares outlets 1 to 8; the switch is plugged into outlet 9. The
 # outlets come from a range rather than being written out, so this is only
 # visible next to that range -- which is why the diagnostic quotes it.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: pdu
 metadata:
   name: pdu-r1-a
 spec:
   outlets: 8
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -27,7 +27,7 @@ spec:
     inputs:
       - pdu-r1-a:9
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-b
@@ -40,7 +40,7 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

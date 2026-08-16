@@ -1,4 +1,4 @@
-"""Hypothesis strategies that generate structurally valid netgraph inventories.
+"""Hypothesis strategies that generate structurally valid netviz inventories.
 
 Every other test in this suite asserts behaviour on an inventory somebody wrote
 by hand, which samples the input space at whatever points the author happened to
@@ -41,7 +41,7 @@ other Unicode line breaks are normalised by *YAML itself* (a YAML processor is
 required to fold them to ``\\n``), and lone surrogates cannot be encoded as
 UTF-8 at all; a document containing either does not survive a round trip through
 any conforming YAML implementation, so generating one would assert a property of
-the format rather than of netgraph.
+the format rather than of netviz.
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ from typing import Any, Final
 import yaml
 from hypothesis import strategies as st
 
-from netgraph.models import API_VERSION
+from netviz.models import API_VERSION
 
 __all__ = [
     "BREAKOUT_PAYLOADS",
@@ -1057,7 +1057,7 @@ def inventory_plans(
 class TemplateCase:
     """A document written the short way, and the same thing written out.
 
-    Both halves are produced by the strategy rather than by netgraph, so the
+    Both halves are produced by the strategy rather than by netviz, so the
     comparison is against an independent expansion instead of against the code
     under test.
     """

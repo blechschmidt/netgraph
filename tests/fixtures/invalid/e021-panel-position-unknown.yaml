@@ -2,7 +2,7 @@
 #
 # 'pp-a' is a four-position panel, so 'front/9' is a hole that was never
 # punched. The switch port looks patched and reaches nothing.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -15,14 +15,14 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: patchpanel
 metadata:
   name: pp-a
 spec:
   ports: 1-4
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-sw-pp

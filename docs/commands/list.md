@@ -1,6 +1,6 @@
-# `netgraph list`
+# `netviz list`
 
-`netgraph list` prints what the inventory declares, one subject at a time: the
+`netviz list` prints what the inventory declares, one subject at a time: the
 devices, the cables, the tunnels, the VLANs, the subnets or the power strips. It
 answers "what is in here, and how much of it?" without drawing anything — which is
 what you want when the question is a count, a spelling or a missing row rather
@@ -12,7 +12,7 @@ than a shape.
 
 <!-- generated: synopsis list -->
 ```text
-netgraph [GLOBAL OPTIONS] list [OPTIONS] [devices|cables|tunnels|vlans|bss|subnets|power|users|groups]
+netviz [GLOBAL OPTIONS] list [OPTIONS] [devices|cables|tunnels|vlans|bss|subnets|power|users|groups]
 ```
 <!-- /generated -->
 
@@ -79,8 +79,8 @@ rather than left out — it is still on the air. See
 ### `power`: one row per PDU, and two load figures
 
 `power` is one row per `pdu` document
-([§17.6 of the schema](../schema.md#176-netgraph-list-power)), shaped after the
-[`netgraph ipam`](ipam.md) utilisation table and for the same reason: the question
+([§17.6 of the schema](../schema.md#176-netviz-list-power)), shaped after the
+[`netviz ipam`](ipam.md) utilisation table and for the same reason: the question
 is capacity planning, so the columns are what is there, what is used, what is left,
 and the percentage that decides whether anybody has to act.
 
@@ -105,7 +105,7 @@ to.
 
 <!-- run: -->
 ```console
-$ netgraph -q -i examples/patch-room list power
+$ netviz -q -i examples/patch-room list power
 PDU       FEED       OUTLETS  USED  FREE  CAPACITY   LOAD  FAILOVER   UTIL  LOADS
 --------  ---------  -------  ----  ----  --------  -----  --------  -----  -----
 pdu-r1-a  utility-a       24     2    22      3680   41.5        83   1.1%      2
@@ -119,7 +119,7 @@ Four strips, two racks, one A/B design. Each r2 unit carries 492.5 W of the
 of its 1840 W rating rather than 26.8 %, which is the headroom the second feed
 buys. Where each of those watts comes from and goes to is
 [`--layer power`](../rendering.md#power-the-pdus-and-what-they-feed) and
-[`netgraph export power`](export.md).
+[`netviz export power`](export.md).
 
 ### `users` and `groups`: the accounts, and what each grants
 
@@ -136,7 +136,7 @@ against it grants to — and no single document holds it.
 
 <!-- run: -->
 ```console
-$ netgraph -q -i examples/home-lab list groups
+$ netviz -q -i examples/home-lab list groups
 GROUP      GID  EMAIL  MEMBERS  NESTED  PEOPLE  HOLDS
 ---------  ---  -----  -------  ------  ------  -----------
 admins     100  -            1       0       1  ana
@@ -149,7 +149,7 @@ would be one more place to forget her.
 
 `GROUPS` on `users` is the same derivation read backwards. Membership is written
 on the group and nowhere else, so "which groups is this person in?" is a question
-$ netgraph -q -i examples/home-lab list users
+$ netviz -q -i examples/home-lab list users
 USER    LOGIN   FULL NAME   EMAIL                 UID  TYPE     STATUS  KEYS  GROUPS
 ------  ------  ----------  -------------------  ----  -------  ------  ----  ---------
 ana     ana     Ana Brandt  ana@example.invalid  1000  person   active     1  admins
@@ -177,7 +177,7 @@ The point of computing them is that they cannot disagree with the pictures.
 [`--layer l3`](../rendering.md#l3-prefixes-and-who-is-addressed-in-them) draws,
 `power` the same resolution
 [`--layer power`](../rendering.md#power-the-pdus-and-what-they-feed) and
-[`netgraph export power`](export.md) use,
+[`netviz export power`](export.md) use,
 `tunnels` the same resolution
 [`--layer overlay`](../rendering.md#overlay-tunnels-and-what-runs-inside-what)
 draws, and `groups` the same membership
@@ -190,7 +190,7 @@ itself but runs inside one that does:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/overlay list tunnels
+$ netviz -i examples/overlay list tunnels
 NAME                STACK             VNI  ENCRYPTED  ENDS  ENDPOINTS
 ------------------  ----------------  ---  ---------  ----  ----------------------------------------------
 tunnels/wg-mesh     wireguard           -  yes           3  rtr-branch-a:wg0, rtr-branch-b:wg0, rtr-hq:wg0
@@ -203,7 +203,7 @@ tunnels/ovpn-admin  openvpn             -  yes           2  pc-branch-b:tun0, rt
 A document that will not load is reported as a warning on stderr and its
 elements are simply absent from the table — `list` answers about what *did*
 load, and refusing to answer because an unrelated file is broken would not help.
-Run [`netgraph validate`](../validation.md) for the details.
+Run [`netviz validate`](../validation.md) for the details.
 
 ## Output formats
 
@@ -216,13 +216,13 @@ a VLAN or a prefix, and the `file#document:line` each element was read from.
 
 There is no `csv` here: a listing is a document with nested lists in it, and
 flattening one into a single row is a decision better made by whatever consumes
-it. [`netgraph ipam -F csv`](ipam.md) and
-[`netgraph export cable-list`](export.md) are the commands that produce a
+it. [`netviz ipam -F csv`](ipam.md) and
+[`netviz export cable-list`](export.md) are the commands that produce a
 spreadsheet on purpose.
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/home-lab list devices
+$ netviz -i examples/home-lab list devices
 NAME               KIND      PORTS  ADDRESS           VLANS
 -----------------  --------  -----  ----------------  -----
 hosts/adp-usb-eth  adapter       1  192.168.10.30/24  10
@@ -246,12 +246,12 @@ answer to everything else, and is usually faster to act on:
 * **Counting and spotting the gap.** Six devices where you expected seven is one
   glance at `list devices`; finding the missing box in a rendered graph is not.
 * **Spelling.** `list devices` is the canonical source of the fully-qualified
-  names that [`netgraph show`](show.md), `--neighbors-of` and
-  [`netgraph path`](path.md) take.
+  names that [`netviz show`](show.md), `--neighbors-of` and
+  [`netviz path`](path.md) take.
 * **Reviewing an addressing plan.** `list subnets` fits a whole campus on a
   screen, where the layer-3 diagram of one does not. When the question is *how
   full* a prefix is rather than *what* prefixes exist, go on to
-  [`netgraph ipam`](ipam.md).
+  [`netviz ipam`](ipam.md).
 * **No Graphviz.** `list` needs nothing but Python, so it works in a container
   where a render exits 5.
 * **Diffing.** Two `-F json` listings diff cleanly; two `.svg` files do not.
@@ -296,13 +296,13 @@ own: validation is not run and findings do not change the code.
 
 ## See also
 
-* [`netgraph show`](show.md) — one element in full, once `list` has told you its
+* [`netviz show`](show.md) — one element in full, once `list` has told you its
   name.
-* [`netgraph ipam`](ipam.md) and [`docs/ipam.md`](../ipam.md) — `list subnets`
+* [`netviz ipam`](ipam.md) and [`docs/ipam.md`](../ipam.md) — `list subnets`
   says which prefixes exist; `ipam` says whether the plan is healthy.
 * [`docs/rendering.md`](../rendering.md#layers-one-inventory-ten-questions) — the
   layers whose groupings `subnets`, `tunnels` and `power` print as tables.
-* [`netgraph export power`](export.md) and [`docs/export.md`](../export.md#power) —
+* [`netviz export power`](export.md) and [`docs/export.md`](../export.md#power) —
   `list power` says whether each strip has room; the load schedule says which outlet
   every cord is in.
 * [`docs/validation.md`](../validation.md) — the command to run when `list` warns

@@ -4,7 +4,7 @@
 # 10.0.0.1/30 facing 192.168.1.1/30 neither end is inside any prefix the other
 # declares, so the link carries nothing. Both prefixes are point-to-point, so
 # W105 (a subnet with a single member) correctly stays quiet.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -16,7 +16,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -28,7 +28,7 @@ spec:
       ipv4:
         addresses: [192.168.1.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

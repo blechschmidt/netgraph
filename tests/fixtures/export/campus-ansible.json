@@ -3,23 +3,23 @@
     "hostvars": {
       "pc-north-01.hosts.north.sites": {
         "ansible_host": "10.1.10.51",
-        "netgraph_element": "sites/north/hosts/pc-north-01",
-        "netgraph_name": "pc-north-01",
-        "netgraph_kind": "computer",
-        "netgraph_namespace": "sites/north/hosts",
-        "netgraph_description": "Staff workstation, North campus floor 1",
-        "netgraph_vendor": "Dell",
-        "netgraph_model": "OptiPlex 7010",
-        "netgraph_labels": {
+        "netviz_element": "sites/north/hosts/pc-north-01",
+        "netviz_name": "pc-north-01",
+        "netviz_kind": "computer",
+        "netviz_namespace": "sites/north/hosts",
+        "netviz_description": "Staff workstation, North campus floor 1",
+        "netviz_vendor": "Dell",
+        "netviz_model": "OptiPlex 7010",
+        "netviz_labels": {
           "env": "prod",
           "role": "workstation",
           "site": "north"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.1.10.51/24",
           "2001:db8:1:10::51/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "lo",
             "type": "loopback",
@@ -41,29 +41,29 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           10
         ]
       },
       "pc-north-02.hosts.north.sites": {
         "ansible_host": "10.1.10.52",
-        "netgraph_element": "sites/north/hosts/pc-north-02",
-        "netgraph_name": "pc-north-02",
-        "netgraph_kind": "computer",
-        "netgraph_namespace": "sites/north/hosts",
-        "netgraph_description": "Staff workstation, North campus floor 2",
-        "netgraph_vendor": "Lenovo",
-        "netgraph_model": "ThinkCentre M70q",
-        "netgraph_labels": {
+        "netviz_element": "sites/north/hosts/pc-north-02",
+        "netviz_name": "pc-north-02",
+        "netviz_kind": "computer",
+        "netviz_namespace": "sites/north/hosts",
+        "netviz_description": "Staff workstation, North campus floor 2",
+        "netviz_vendor": "Lenovo",
+        "netviz_model": "ThinkCentre M70q",
+        "netviz_labels": {
           "env": "prod",
           "role": "workstation",
           "site": "north"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.1.10.52/24",
           "2001:db8:1:10::52/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "lo",
             "type": "loopback",
@@ -85,29 +85,29 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           10
         ]
       },
       "pc-south-01.hosts.south.sites": {
         "ansible_host": "10.2.10.51",
-        "netgraph_element": "sites/south/hosts/pc-south-01",
-        "netgraph_name": "pc-south-01",
-        "netgraph_kind": "computer",
-        "netgraph_namespace": "sites/south/hosts",
-        "netgraph_description": "Staff workstation, South campus floor 1",
-        "netgraph_vendor": "Dell",
-        "netgraph_model": "OptiPlex 7010",
-        "netgraph_labels": {
+        "netviz_element": "sites/south/hosts/pc-south-01",
+        "netviz_name": "pc-south-01",
+        "netviz_kind": "computer",
+        "netviz_namespace": "sites/south/hosts",
+        "netviz_description": "Staff workstation, South campus floor 1",
+        "netviz_vendor": "Dell",
+        "netviz_model": "OptiPlex 7010",
+        "netviz_labels": {
           "env": "prod",
           "role": "workstation",
           "site": "south"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.2.10.51/24",
           "2001:db8:2:10::51/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "lo",
             "type": "loopback",
@@ -129,29 +129,29 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           10
         ]
       },
       "pc-south-02.hosts.south.sites": {
         "ansible_host": "10.2.10.52",
-        "netgraph_element": "sites/south/hosts/pc-south-02",
-        "netgraph_name": "pc-south-02",
-        "netgraph_kind": "computer",
-        "netgraph_namespace": "sites/south/hosts",
-        "netgraph_description": "Staff workstation, South campus floor 2",
-        "netgraph_vendor": "Lenovo",
-        "netgraph_model": "ThinkCentre M70q",
-        "netgraph_labels": {
+        "netviz_element": "sites/south/hosts/pc-south-02",
+        "netviz_name": "pc-south-02",
+        "netviz_kind": "computer",
+        "netviz_namespace": "sites/south/hosts",
+        "netviz_description": "Staff workstation, South campus floor 2",
+        "netviz_vendor": "Lenovo",
+        "netviz_model": "ThinkCentre M70q",
+        "netviz_labels": {
           "env": "prod",
           "role": "workstation",
           "site": "south"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.2.10.52/24",
           "2001:db8:2:10::52/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "lo",
             "type": "loopback",
@@ -173,29 +173,29 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           10
         ]
       },
       "pc-west-01.hosts.west.sites": {
         "ansible_host": "10.3.10.51",
-        "netgraph_element": "sites/west/hosts/pc-west-01",
-        "netgraph_name": "pc-west-01",
-        "netgraph_kind": "computer",
-        "netgraph_namespace": "sites/west/hosts",
-        "netgraph_description": "Staff workstation, West annexe floor 1",
-        "netgraph_vendor": "Dell",
-        "netgraph_model": "OptiPlex 7010",
-        "netgraph_labels": {
+        "netviz_element": "sites/west/hosts/pc-west-01",
+        "netviz_name": "pc-west-01",
+        "netviz_kind": "computer",
+        "netviz_namespace": "sites/west/hosts",
+        "netviz_description": "Staff workstation, West annexe floor 1",
+        "netviz_vendor": "Dell",
+        "netviz_model": "OptiPlex 7010",
+        "netviz_labels": {
           "env": "prod",
           "role": "workstation",
           "site": "west"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.3.10.51/24",
           "2001:db8:3:10::51/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "lo",
             "type": "loopback",
@@ -217,29 +217,29 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           10
         ]
       },
       "pc-west-02.hosts.west.sites": {
         "ansible_host": "10.3.10.52",
-        "netgraph_element": "sites/west/hosts/pc-west-02",
-        "netgraph_name": "pc-west-02",
-        "netgraph_kind": "computer",
-        "netgraph_namespace": "sites/west/hosts",
-        "netgraph_description": "Staff workstation, West annexe floor 2",
-        "netgraph_vendor": "Lenovo",
-        "netgraph_model": "ThinkCentre M70q",
-        "netgraph_labels": {
+        "netviz_element": "sites/west/hosts/pc-west-02",
+        "netviz_name": "pc-west-02",
+        "netviz_kind": "computer",
+        "netviz_namespace": "sites/west/hosts",
+        "netviz_description": "Staff workstation, West annexe floor 2",
+        "netviz_vendor": "Lenovo",
+        "netviz_model": "ThinkCentre M70q",
+        "netviz_labels": {
           "env": "prod",
           "role": "workstation",
           "site": "west"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.3.10.52/24",
           "2001:db8:3:10::52/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "lo",
             "type": "loopback",
@@ -261,25 +261,25 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           10
         ]
       },
       "rtr-north-core-01.core.north.sites": {
         "ansible_host": "192.0.2.1",
-        "netgraph_element": "sites/north/core/rtr-north-core-01",
-        "netgraph_name": "rtr-north-core-01",
-        "netgraph_kind": "router",
-        "netgraph_namespace": "sites/north/core",
-        "netgraph_description": "Layer-3 core router for the North campus. It routes between the campus VLANs\n(whose gateways sit on sw-north-dist-01) and carries the two backbone\nfibres of the inter-site ring.\n",
-        "netgraph_vendor": "Juniper",
-        "netgraph_model": "MX204",
-        "netgraph_labels": {
+        "netviz_element": "sites/north/core/rtr-north-core-01",
+        "netviz_name": "rtr-north-core-01",
+        "netviz_kind": "router",
+        "netviz_namespace": "sites/north/core",
+        "netviz_description": "Layer-3 core router for the North campus. It routes between the campus VLANs\n(whose gateways sit on sw-north-dist-01) and carries the two backbone\nfibres of the inter-site ring.\n",
+        "netviz_vendor": "Juniper",
+        "netviz_model": "MX204",
+        "netviz_labels": {
           "env": "prod",
           "role": "core",
           "site": "north"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.1.0.1/30",
           "192.0.2.1/32",
           "198.51.100.1/30",
@@ -289,7 +289,7 @@
           "2001:db8:ff:1::1/64",
           "2001:db8:ff:3::2/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "lo0",
             "type": "loopback",
@@ -337,23 +337,23 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": []
+        "netviz_vlan_ids": []
       },
       "rtr-south-core-01.core.south.sites": {
         "ansible_host": "192.0.2.2",
-        "netgraph_element": "sites/south/core/rtr-south-core-01",
-        "netgraph_name": "rtr-south-core-01",
-        "netgraph_kind": "router",
-        "netgraph_namespace": "sites/south/core",
-        "netgraph_description": "Layer-3 core router for the South campus. It routes between the campus VLANs\n(whose gateways sit on sw-south-dist-01) and carries the two backbone\nfibres of the inter-site ring.\n",
-        "netgraph_vendor": "Juniper",
-        "netgraph_model": "MX204",
-        "netgraph_labels": {
+        "netviz_element": "sites/south/core/rtr-south-core-01",
+        "netviz_name": "rtr-south-core-01",
+        "netviz_kind": "router",
+        "netviz_namespace": "sites/south/core",
+        "netviz_description": "Layer-3 core router for the South campus. It routes between the campus VLANs\n(whose gateways sit on sw-south-dist-01) and carries the two backbone\nfibres of the inter-site ring.\n",
+        "netviz_vendor": "Juniper",
+        "netviz_model": "MX204",
+        "netviz_labels": {
           "env": "prod",
           "role": "core",
           "site": "south"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.2.0.1/30",
           "192.0.2.2/32",
           "198.51.100.2/30",
@@ -363,7 +363,7 @@
           "2001:db8:ff:1::2/64",
           "2001:db8:ff:2::1/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "lo0",
             "type": "loopback",
@@ -411,23 +411,23 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": []
+        "netviz_vlan_ids": []
       },
       "rtr-west-core-01.core.west.sites": {
         "ansible_host": "192.0.2.3",
-        "netgraph_element": "sites/west/core/rtr-west-core-01",
-        "netgraph_name": "rtr-west-core-01",
-        "netgraph_kind": "router",
-        "netgraph_namespace": "sites/west/core",
-        "netgraph_description": "Layer-3 core router for the West annexe. It routes between the campus VLANs\n(whose gateways sit on sw-west-dist-01) and carries the two backbone\nfibres of the inter-site ring.\n",
-        "netgraph_vendor": "Juniper",
-        "netgraph_model": "MX204",
-        "netgraph_labels": {
+        "netviz_element": "sites/west/core/rtr-west-core-01",
+        "netviz_name": "rtr-west-core-01",
+        "netviz_kind": "router",
+        "netviz_namespace": "sites/west/core",
+        "netviz_description": "Layer-3 core router for the West annexe. It routes between the campus VLANs\n(whose gateways sit on sw-west-dist-01) and carries the two backbone\nfibres of the inter-site ring.\n",
+        "netviz_vendor": "Juniper",
+        "netviz_model": "MX204",
+        "netviz_labels": {
           "env": "prod",
           "role": "core",
           "site": "west"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.3.0.1/30",
           "192.0.2.3/32",
           "198.51.100.6/30",
@@ -437,7 +437,7 @@
           "2001:db8:ff:2::2/64",
           "2001:db8:ff:3::1/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "lo0",
             "type": "loopback",
@@ -485,27 +485,27 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": []
+        "netviz_vlan_ids": []
       },
       "srv-north-01.hosts.north.sites": {
         "ansible_host": "10.1.20.11",
-        "netgraph_element": "sites/north/hosts/srv-north-01",
-        "netgraph_name": "srv-north-01",
-        "netgraph_kind": "server",
-        "netgraph_namespace": "sites/north/hosts",
-        "netgraph_description": "Teaching-lab application server, North campus",
-        "netgraph_vendor": "HPE",
-        "netgraph_model": "ProLiant DL360 Gen11",
-        "netgraph_labels": {
+        "netviz_element": "sites/north/hosts/srv-north-01",
+        "netviz_name": "srv-north-01",
+        "netviz_kind": "server",
+        "netviz_namespace": "sites/north/hosts",
+        "netviz_description": "Teaching-lab application server, North campus",
+        "netviz_vendor": "HPE",
+        "netviz_model": "ProLiant DL360 Gen11",
+        "netviz_labels": {
           "env": "prod",
           "role": "application",
           "site": "north"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.1.20.11/24",
           "2001:db8:1:20::11/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "lo",
             "type": "loopback",
@@ -527,29 +527,29 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           20
         ]
       },
       "srv-south-01.hosts.south.sites": {
         "ansible_host": "10.2.20.11",
-        "netgraph_element": "sites/south/hosts/srv-south-01",
-        "netgraph_name": "srv-south-01",
-        "netgraph_kind": "server",
-        "netgraph_namespace": "sites/south/hosts",
-        "netgraph_description": "Teaching-lab application server, South campus",
-        "netgraph_vendor": "HPE",
-        "netgraph_model": "ProLiant DL360 Gen11",
-        "netgraph_labels": {
+        "netviz_element": "sites/south/hosts/srv-south-01",
+        "netviz_name": "srv-south-01",
+        "netviz_kind": "server",
+        "netviz_namespace": "sites/south/hosts",
+        "netviz_description": "Teaching-lab application server, South campus",
+        "netviz_vendor": "HPE",
+        "netviz_model": "ProLiant DL360 Gen11",
+        "netviz_labels": {
           "env": "prod",
           "role": "application",
           "site": "south"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.2.20.11/24",
           "2001:db8:2:20::11/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "lo",
             "type": "loopback",
@@ -571,29 +571,29 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           20
         ]
       },
       "srv-west-01.hosts.west.sites": {
         "ansible_host": "10.3.20.11",
-        "netgraph_element": "sites/west/hosts/srv-west-01",
-        "netgraph_name": "srv-west-01",
-        "netgraph_kind": "server",
-        "netgraph_namespace": "sites/west/hosts",
-        "netgraph_description": "Teaching-lab application server, West annexe",
-        "netgraph_vendor": "HPE",
-        "netgraph_model": "ProLiant DL360 Gen11",
-        "netgraph_labels": {
+        "netviz_element": "sites/west/hosts/srv-west-01",
+        "netviz_name": "srv-west-01",
+        "netviz_kind": "server",
+        "netviz_namespace": "sites/west/hosts",
+        "netviz_description": "Teaching-lab application server, West annexe",
+        "netviz_vendor": "HPE",
+        "netviz_model": "ProLiant DL360 Gen11",
+        "netviz_labels": {
           "env": "prod",
           "role": "application",
           "site": "west"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.3.20.11/24",
           "2001:db8:3:20::11/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "lo",
             "type": "loopback",
@@ -615,28 +615,28 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           20
         ]
       },
       "sw-north-acc-01.access.north.sites": {
         "ansible_host": "10.1.99.11",
-        "netgraph_element": "sites/north/access/sw-north-acc-01",
-        "netgraph_name": "sw-north-acc-01",
-        "netgraph_kind": "switch",
-        "netgraph_namespace": "sites/north/access",
-        "netgraph_description": "Access switch 01, North campus. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n",
-        "netgraph_vendor": "Cisco",
-        "netgraph_model": "C9200L-48P",
-        "netgraph_labels": {
+        "netviz_element": "sites/north/access/sw-north-acc-01",
+        "netviz_name": "sw-north-acc-01",
+        "netviz_kind": "switch",
+        "netviz_namespace": "sites/north/access",
+        "netviz_description": "Access switch 01, North campus. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n",
+        "netviz_vendor": "Cisco",
+        "netviz_model": "C9200L-48P",
+        "netviz_labels": {
           "env": "prod",
           "role": "access",
           "site": "north"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.1.99.11/24"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "br0",
             "type": "bridge",
@@ -708,14 +708,14 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           1,
           10,
           20,
           30,
           99
         ],
-        "netgraph_vlans": [
+        "netviz_vlans": [
           {
             "id": 10,
             "name": "staff"
@@ -736,22 +736,22 @@
       },
       "sw-north-acc-02.access.north.sites": {
         "ansible_host": "10.1.99.12",
-        "netgraph_element": "sites/north/access/sw-north-acc-02",
-        "netgraph_name": "sw-north-acc-02",
-        "netgraph_kind": "switch",
-        "netgraph_namespace": "sites/north/access",
-        "netgraph_description": "Access switch 02, North campus - second floor riser.",
-        "netgraph_vendor": "Cisco",
-        "netgraph_model": "C9200L-24P",
-        "netgraph_labels": {
+        "netviz_element": "sites/north/access/sw-north-acc-02",
+        "netviz_name": "sw-north-acc-02",
+        "netviz_kind": "switch",
+        "netviz_namespace": "sites/north/access",
+        "netviz_description": "Access switch 02, North campus - second floor riser.",
+        "netviz_vendor": "Cisco",
+        "netviz_model": "C9200L-24P",
+        "netviz_labels": {
           "env": "prod",
           "role": "access",
           "site": "north"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.1.99.12/24"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "br0",
             "type": "bridge",
@@ -811,14 +811,14 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           1,
           10,
           20,
           30,
           99
         ],
-        "netgraph_vlans": [
+        "netviz_vlans": [
           {
             "id": 10,
             "name": "staff"
@@ -839,22 +839,22 @@
       },
       "sw-north-acc-03.access.north.sites": {
         "ansible_host": "10.1.99.13",
-        "netgraph_element": "sites/north/access/sw-north-acc-03",
-        "netgraph_name": "sw-north-acc-03",
-        "netgraph_kind": "switch",
-        "netgraph_namespace": "sites/north/access",
-        "netgraph_description": "Access switch 03, North campus - third floor riser.",
-        "netgraph_vendor": "Cisco",
-        "netgraph_model": "C9200L-48P",
-        "netgraph_labels": {
+        "netviz_element": "sites/north/access/sw-north-acc-03",
+        "netviz_name": "sw-north-acc-03",
+        "netviz_kind": "switch",
+        "netviz_namespace": "sites/north/access",
+        "netviz_description": "Access switch 03, North campus - third floor riser.",
+        "netviz_vendor": "Cisco",
+        "netviz_model": "C9200L-48P",
+        "netviz_labels": {
           "env": "prod",
           "role": "access",
           "site": "north"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.1.99.13/24"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "br0",
             "type": "bridge",
@@ -1419,14 +1419,14 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           1,
           10,
           20,
           30,
           99
         ],
-        "netgraph_vlans": [
+        "netviz_vlans": [
           {
             "id": 10,
             "name": "staff"
@@ -1447,19 +1447,19 @@
       },
       "sw-north-dist-01.distribution.north.sites": {
         "ansible_host": "10.1.99.1",
-        "netgraph_element": "sites/north/distribution/sw-north-dist-01",
-        "netgraph_name": "sw-north-dist-01",
-        "netgraph_kind": "switch",
-        "netgraph_namespace": "sites/north/distribution",
-        "netgraph_description": "Distribution switch for the North campus. It aggregates the access-layer\ntrunks, hosts the SVI gateway for every campus VLAN, and reaches the core\nrouter over a routed (untagged) fibre uplink.\n",
-        "netgraph_vendor": "Arista",
-        "netgraph_model": "7050SX3-48YC8",
-        "netgraph_labels": {
+        "netviz_element": "sites/north/distribution/sw-north-dist-01",
+        "netviz_name": "sw-north-dist-01",
+        "netviz_kind": "switch",
+        "netviz_namespace": "sites/north/distribution",
+        "netviz_description": "Distribution switch for the North campus. It aggregates the access-layer\ntrunks, hosts the SVI gateway for every campus VLAN, and reaches the core\nrouter over a routed (untagged) fibre uplink.\n",
+        "netviz_vendor": "Arista",
+        "netviz_model": "7050SX3-48YC8",
+        "netviz_labels": {
           "env": "prod",
           "role": "distribution",
           "site": "north"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.1.0.2/30",
           "10.1.10.1/24",
           "10.1.20.1/24",
@@ -1468,7 +1468,7 @@
           "2001:db8:1:10::1/64",
           "2001:db8:1:20::1/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "br0",
             "type": "bridge",
@@ -1577,14 +1577,14 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           1,
           10,
           20,
           30,
           99
         ],
-        "netgraph_vlans": [
+        "netviz_vlans": [
           {
             "id": 10,
             "name": "staff"
@@ -1605,22 +1605,22 @@
       },
       "sw-south-acc-01.access.south.sites": {
         "ansible_host": "10.2.99.11",
-        "netgraph_element": "sites/south/access/sw-south-acc-01",
-        "netgraph_name": "sw-south-acc-01",
-        "netgraph_kind": "switch",
-        "netgraph_namespace": "sites/south/access",
-        "netgraph_description": "Access switch 01, South campus. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n",
-        "netgraph_vendor": "Cisco",
-        "netgraph_model": "C9200L-48P",
-        "netgraph_labels": {
+        "netviz_element": "sites/south/access/sw-south-acc-01",
+        "netviz_name": "sw-south-acc-01",
+        "netviz_kind": "switch",
+        "netviz_namespace": "sites/south/access",
+        "netviz_description": "Access switch 01, South campus. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n",
+        "netviz_vendor": "Cisco",
+        "netviz_model": "C9200L-48P",
+        "netviz_labels": {
           "env": "prod",
           "role": "access",
           "site": "south"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.2.99.11/24"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "br0",
             "type": "bridge",
@@ -1692,14 +1692,14 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           1,
           10,
           20,
           30,
           99
         ],
-        "netgraph_vlans": [
+        "netviz_vlans": [
           {
             "id": 10,
             "name": "staff"
@@ -1720,22 +1720,22 @@
       },
       "sw-south-acc-02.access.south.sites": {
         "ansible_host": "10.2.99.12",
-        "netgraph_element": "sites/south/access/sw-south-acc-02",
-        "netgraph_name": "sw-south-acc-02",
-        "netgraph_kind": "switch",
-        "netgraph_namespace": "sites/south/access",
-        "netgraph_description": "Access switch 02, South campus - second floor riser.",
-        "netgraph_vendor": "Cisco",
-        "netgraph_model": "C9200L-24P",
-        "netgraph_labels": {
+        "netviz_element": "sites/south/access/sw-south-acc-02",
+        "netviz_name": "sw-south-acc-02",
+        "netviz_kind": "switch",
+        "netviz_namespace": "sites/south/access",
+        "netviz_description": "Access switch 02, South campus - second floor riser.",
+        "netviz_vendor": "Cisco",
+        "netviz_model": "C9200L-24P",
+        "netviz_labels": {
           "env": "prod",
           "role": "access",
           "site": "south"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.2.99.12/24"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "br0",
             "type": "bridge",
@@ -1795,14 +1795,14 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           1,
           10,
           20,
           30,
           99
         ],
-        "netgraph_vlans": [
+        "netviz_vlans": [
           {
             "id": 10,
             "name": "staff"
@@ -1823,19 +1823,19 @@
       },
       "sw-south-dist-01.distribution.south.sites": {
         "ansible_host": "10.2.99.1",
-        "netgraph_element": "sites/south/distribution/sw-south-dist-01",
-        "netgraph_name": "sw-south-dist-01",
-        "netgraph_kind": "switch",
-        "netgraph_namespace": "sites/south/distribution",
-        "netgraph_description": "Distribution switch for the South campus. It aggregates the access-layer\ntrunks, hosts the SVI gateway for every campus VLAN, and reaches the core\nrouter over a routed (untagged) fibre uplink.\n",
-        "netgraph_vendor": "Arista",
-        "netgraph_model": "7050SX3-48YC8",
-        "netgraph_labels": {
+        "netviz_element": "sites/south/distribution/sw-south-dist-01",
+        "netviz_name": "sw-south-dist-01",
+        "netviz_kind": "switch",
+        "netviz_namespace": "sites/south/distribution",
+        "netviz_description": "Distribution switch for the South campus. It aggregates the access-layer\ntrunks, hosts the SVI gateway for every campus VLAN, and reaches the core\nrouter over a routed (untagged) fibre uplink.\n",
+        "netviz_vendor": "Arista",
+        "netviz_model": "7050SX3-48YC8",
+        "netviz_labels": {
           "env": "prod",
           "role": "distribution",
           "site": "south"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.2.0.2/30",
           "10.2.10.1/24",
           "10.2.20.1/24",
@@ -1844,7 +1844,7 @@
           "2001:db8:2:10::1/64",
           "2001:db8:2:20::1/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "br0",
             "type": "bridge",
@@ -1937,14 +1937,14 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           1,
           10,
           20,
           30,
           99
         ],
-        "netgraph_vlans": [
+        "netviz_vlans": [
           {
             "id": 10,
             "name": "staff"
@@ -1965,22 +1965,22 @@
       },
       "sw-west-acc-01.access.west.sites": {
         "ansible_host": "10.3.99.11",
-        "netgraph_element": "sites/west/access/sw-west-acc-01",
-        "netgraph_name": "sw-west-acc-01",
-        "netgraph_kind": "switch",
-        "netgraph_namespace": "sites/west/access",
-        "netgraph_description": "Access switch 01, West annexe. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n",
-        "netgraph_vendor": "Cisco",
-        "netgraph_model": "C9200L-48P",
-        "netgraph_labels": {
+        "netviz_element": "sites/west/access/sw-west-acc-01",
+        "netviz_name": "sw-west-acc-01",
+        "netviz_kind": "switch",
+        "netviz_namespace": "sites/west/access",
+        "netviz_description": "Access switch 01, West annexe. Layer-2 only: the ports are untagged access\nports, and the switch's own management address lives on the Vlan99 SVI\nrather than on a port (NG-V009).\n",
+        "netviz_vendor": "Cisco",
+        "netviz_model": "C9200L-48P",
+        "netviz_labels": {
           "env": "prod",
           "role": "access",
           "site": "west"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.3.99.11/24"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "br0",
             "type": "bridge",
@@ -2052,14 +2052,14 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           1,
           10,
           20,
           30,
           99
         ],
-        "netgraph_vlans": [
+        "netviz_vlans": [
           {
             "id": 10,
             "name": "staff"
@@ -2080,22 +2080,22 @@
       },
       "sw-west-acc-02.access.west.sites": {
         "ansible_host": "10.3.99.12",
-        "netgraph_element": "sites/west/access/sw-west-acc-02",
-        "netgraph_name": "sw-west-acc-02",
-        "netgraph_kind": "switch",
-        "netgraph_namespace": "sites/west/access",
-        "netgraph_description": "Access switch 02, West annexe - second floor riser.",
-        "netgraph_vendor": "Cisco",
-        "netgraph_model": "C9200L-24P",
-        "netgraph_labels": {
+        "netviz_element": "sites/west/access/sw-west-acc-02",
+        "netviz_name": "sw-west-acc-02",
+        "netviz_kind": "switch",
+        "netviz_namespace": "sites/west/access",
+        "netviz_description": "Access switch 02, West annexe - second floor riser.",
+        "netviz_vendor": "Cisco",
+        "netviz_model": "C9200L-24P",
+        "netviz_labels": {
           "env": "prod",
           "role": "access",
           "site": "west"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.3.99.12/24"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "br0",
             "type": "bridge",
@@ -2155,14 +2155,14 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           1,
           10,
           20,
           30,
           99
         ],
-        "netgraph_vlans": [
+        "netviz_vlans": [
           {
             "id": 10,
             "name": "staff"
@@ -2183,19 +2183,19 @@
       },
       "sw-west-dist-01.distribution.west.sites": {
         "ansible_host": "10.3.99.1",
-        "netgraph_element": "sites/west/distribution/sw-west-dist-01",
-        "netgraph_name": "sw-west-dist-01",
-        "netgraph_kind": "switch",
-        "netgraph_namespace": "sites/west/distribution",
-        "netgraph_description": "Distribution switch for the West annexe. It aggregates the access-layer\ntrunks, hosts the SVI gateway for every campus VLAN, and reaches the core\nrouter over a routed (untagged) fibre uplink.\n",
-        "netgraph_vendor": "Arista",
-        "netgraph_model": "7050SX3-48YC8",
-        "netgraph_labels": {
+        "netviz_element": "sites/west/distribution/sw-west-dist-01",
+        "netviz_name": "sw-west-dist-01",
+        "netviz_kind": "switch",
+        "netviz_namespace": "sites/west/distribution",
+        "netviz_description": "Distribution switch for the West annexe. It aggregates the access-layer\ntrunks, hosts the SVI gateway for every campus VLAN, and reaches the core\nrouter over a routed (untagged) fibre uplink.\n",
+        "netviz_vendor": "Arista",
+        "netviz_model": "7050SX3-48YC8",
+        "netviz_labels": {
           "env": "prod",
           "role": "distribution",
           "site": "west"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "10.3.0.2/30",
           "10.3.10.1/24",
           "10.3.20.1/24",
@@ -2204,7 +2204,7 @@
           "2001:db8:3:10::1/64",
           "2001:db8:3:20::1/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "br0",
             "type": "bridge",
@@ -2297,14 +2297,14 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           1,
           10,
           20,
           30,
           99
         ],
-        "netgraph_vlans": [
+        "netviz_vlans": [
           {
             "id": 10,
             "name": "staff"
@@ -2345,7 +2345,7 @@
       "vendor_lenovo"
     ],
     "vars": {
-      "netgraph_generated_by": "netgraph <version>"
+      "netviz_generated_by": "netviz <version>"
     }
   },
   "kind_computer": {

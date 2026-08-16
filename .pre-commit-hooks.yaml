@@ -1,25 +1,25 @@
 # Hooks this repository offers to other repositories.
 #
 # Not to be confused with .pre-commit-config.yaml, which is the set of hooks
-# netgraph runs on *itself*. This file is the public one: it is what
+# netviz runs on *itself*. This file is the public one: it is what
 #
 #   repos:
 #     - repo: https://github.com/blechschmidt/netgraph
 #       rev: v0.1.0
 #       hooks:
-#         - id: netgraph-validate
+#         - id: netviz-validate
 #
 # resolves to in somebody else's inventory repository.
 #
 # ``docs/ci.md`` has the full write-up, including how to point the hook at an
 # inventory that does not sit at the repository root.
 
-- id: netgraph-validate
-  name: netgraph validate
+- id: netviz-validate
+  name: netviz validate
   description: >-
-    Check a netgraph YAML inventory for schema and semantic problems before the
-    commit lands, with the same rules ``netgraph validate`` applies in CI.
-  entry: netgraph validate
+    Check a netviz YAML inventory for schema and semantic problems before the
+    commit lands, with the same rules ``netviz validate`` applies in CI.
+  entry: netviz validate
   language: python
   # The hook validates the tree as a whole -- a cable is only dangling when
   # compared against the devices in the other files -- so it takes no
@@ -31,31 +31,31 @@
   # several workers, each loading the whole tree to report the same findings.
   require_serial: true
 
-- id: netgraph-test
-  name: netgraph test
+- id: netviz-test
+  name: netviz test
   description: >-
-    Grade the assertions a netgraph inventory declares about itself, so a
+    Grade the assertions a netviz inventory declares about itself, so a
     commit that quietly removes somebody's second path fails before it lands.
-  entry: netgraph test
+  entry: netviz test
   language: python
-  # Like netgraph-validate, and for the same reason: an assertion is about the
+  # Like netviz-validate, and for the same reason: an assertion is about the
   # whole tree, so the pattern decides *whether* to run and not what to run on.
   files: \.ya?ml$
   pass_filenames: false
   require_serial: true
 
-- id: netgraph-fmt
-  name: netgraph fmt
+- id: netviz-fmt
+  name: netviz fmt
   description: >-
-    Rewrite netgraph YAML into the canonical form of ``docs/format.md``, so
+    Rewrite netviz YAML into the canonical form of ``docs/format.md``, so
     that how a file is laid out is never what a review is spent on.
-  entry: netgraph fmt
+  entry: netviz fmt
   language: python
   files: \.ya?ml$
-  # Unlike netgraph-validate, this hook *does* take filenames. Formatting is a
+  # Unlike netviz-validate, this hook *does* take filenames. Formatting is a
   # per-file operation, so a commit touching one document has no reason to walk
   # the whole tree, and ``fmt`` accepts a list of paths exactly as it accepts a
-  # folder. Discovery still applies to each: a path a ``.netgraphignore``
+  # folder. Discovery still applies to each: a path a ``.netvizignore``
   # excludes is skipped even when it is named outright.
   pass_filenames: true
   # ``fmt`` rewrites in place, which is the point of running it here: the files
@@ -64,13 +64,13 @@
   # reformatted can slip through unreviewed.
   require_serial: true
 
-- id: netgraph-fmt-check
-  name: netgraph fmt --check
+- id: netviz-fmt-check
+  name: netviz fmt --check
   description: >-
-    Report netgraph YAML that is not in canonical form, changing nothing. For
+    Report netviz YAML that is not in canonical form, changing nothing. For
     repositories that would rather see the failure than have files rewritten
     underneath them.
-  entry: netgraph fmt --check
+  entry: netviz fmt --check
   language: python
   files: \.ya?ml$
   pass_filenames: true

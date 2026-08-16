@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-rtr-sw
@@ -19,7 +19,7 @@ spec:
   connector: rj45
   label: C-001
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-sw-pp07
@@ -40,7 +40,7 @@ spec:
   connector: rj45
   label: P-007A
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-tie-07
@@ -62,7 +62,7 @@ spec:
   connector: rj45
   label: T-007
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-pp-app07
@@ -81,7 +81,7 @@ spec:
   connector: rj45
   label: P-007B
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-sw-pp08
@@ -102,7 +102,7 @@ spec:
   connector: rj45
   label: P-008A
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-tie-08
@@ -122,7 +122,7 @@ spec:
   connector: rj45
   label: T-008
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-pp-db08
@@ -141,7 +141,7 @@ spec:
   connector: rj45
   label: P-008B
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-sw-pp24
@@ -162,7 +162,7 @@ spec:
   connector: rj45
   label: P-024A
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-tie-24
@@ -182,7 +182,7 @@ spec:
   connector: rj45
   label: T-024
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-pp-access24
@@ -201,7 +201,7 @@ spec:
   connector: rj45
   label: P-024B
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-access-pp09
@@ -222,7 +222,7 @@ spec:
   connector: rj45
   label: P-009A
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-pp-ap09
@@ -244,7 +244,7 @@ spec:
   connector: rj45
   label: T-009
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-access-cam
@@ -263,7 +263,7 @@ spec:
   connector: rj45
   label: P-010
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: air-lobby

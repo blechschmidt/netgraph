@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate ``docs/example-report/``: one committed, browsable as-built report.
 
-``netgraph report`` produces a document, and a document is the one kind of output
+``netviz report`` produces a document, and a document is the one kind of output
 a reader cannot judge from a flag list — so one is committed, generated from
 ``examples/patch-room`` because that inventory is the one with patch panels,
 racks, PDUs, PoE and a wireless access point in it, which is what an as-built
@@ -18,7 +18,7 @@ Two stamps are pinned rather than discovered:
   revision that is wrong by the time it is pushed. A report of a real inventory
   names the real commit; see ``docs/commands/report.md``.
 
-Every page also carries the netgraph version, so a version bump is one of the two
+Every page also carries the netviz version, so a version bump is one of the two
 reasons to regenerate this — the release checklist in ``docs/releasing.md`` says
 so, and ``tests/test_report.py`` fails until it is done.
 
@@ -43,10 +43,10 @@ from typing import Final
 REPO_ROOT: Final = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from netgraph.diagnostics import build_report as build_diagnostics  # noqa: E402
-from netgraph.loader import load_tree  # noqa: E402
-from netgraph.report import Bundle, Options, generate  # noqa: E402
-from netgraph.validate import validate  # noqa: E402
+from netviz.diagnostics import build_report as build_diagnostics  # noqa: E402
+from netviz.loader import load_tree  # noqa: E402
+from netviz.report import Bundle, Options, generate  # noqa: E402
+from netviz.validate import validate  # noqa: E402
 
 #: The inventory the committed report documents.
 INVENTORY: Final = REPO_ROOT / "examples" / "patch-room"

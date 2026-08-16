@@ -25,8 +25,8 @@ import click
 import pytest
 import yaml
 
-from netgraph.cli import cli
-from netgraph.watch.server import STATUS_PATH
+from netviz.cli import cli
+from netviz.watch.server import STATUS_PATH
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 COMPOSE_FILE = REPO_ROOT / "docker-compose.yml"
@@ -67,7 +67,7 @@ MOUNT = "/inventory"
 #: Every service, and whether it is a server. Adding one means adding it here,
 #: to ``.github/workflows/ci.yml`` and to ``docs/docker.md`` -- which the tests
 #: below insist on.
-SERVICES = ["netgraph", "web", "watch"]
+SERVICES = ["netviz", "web", "watch"]
 SERVERS = ["web", "watch"]
 
 #: ``${NAME}`` or ``${NAME:-default}``.
@@ -129,7 +129,7 @@ def env_example() -> dict[str, str]:
 
 
 def command_of(services: dict[str, dict[str, Any]], name: str) -> list[str]:
-    """A service's ``command``, expanded, as the argument list netgraph receives."""
+    """A service's ``command``, expanded, as the argument list netviz receives."""
     words = services[name]["command"]
     assert isinstance(words, list), f"{name}: spell the command as a list, not a shell string"
     return [expand(str(word)) for word in words]
@@ -163,9 +163,9 @@ def flags_and_values(words: list[str]) -> list[tuple[str, str | None]]:
 def test_the_compose_file_declares_exactly_the_documented_services(
     compose: dict[str, Any], services: dict[str, dict[str, Any]]
 ) -> None:
-    # The project name decides the container names (netgraph-web-1), which
+    # The project name decides the container names (netviz-web-1), which
     # docs/docker.md quotes.
-    assert compose["name"] == "netgraph"
+    assert compose["name"] == "netviz"
     assert sorted(services) == sorted(SERVICES)
 
 
@@ -177,7 +177,7 @@ def test_the_one_shot_service_is_the_only_one_behind_a_profile(
     ``compose run`` enables a service's own profiles, so putting the CLI behind
     one costs nothing at the point of use and keeps ``up`` to the two servers.
     """
-    assert services["netgraph"]["profiles"] == ["cli"]
+    assert services["netviz"]["profiles"] == ["cli"]
     for name in SERVERS:
         assert "profiles" not in services[name], f"{name} must start with 'docker compose up'"
 
@@ -185,20 +185,20 @@ def test_the_one_shot_service_is_the_only_one_behind_a_profile(
 def test_the_cli_service_defaults_to_help(services: dict[str, dict[str, Any]]) -> None:
     """Run with no arguments it must explain itself, not act.
 
-    A container that guessed what "run netgraph" meant would write a file
+    A container that guessed what "run netviz" meant would write a file
     nobody asked for.
     """
-    assert command_of(services, "netgraph") == ["--help"]
+    assert command_of(services, "netviz") == ["--help"]
 
 
 @pytest.mark.parametrize("name", SERVERS)
 def test_every_server_command_is_a_command_the_cli_has(
     services: dict[str, dict[str, Any]], name: str
 ) -> None:
-    """The image's entrypoint is ``netgraph``, so ``command`` is its argv."""
+    """The image's entrypoint is ``netviz``, so ``command`` is its argv."""
     words = command_of(services, name)
     subcommand = cli.commands.get(words[0])
-    assert subcommand is not None, f"{name}: 'netgraph {words[0]}' is not a command"
+    assert subcommand is not None, f"{name}: 'netviz {words[0]}' is not a command"
 
     known = parameters(subcommand)
     for flag, _ in flags_and_values(words[1:]):
@@ -209,7 +209,7 @@ def test_every_server_command_is_a_command_the_cli_has(
 def test_every_enumerated_value_is_one_the_cli_accepts(
     services: dict[str, dict[str, Any]], name: str
 ) -> None:
-    """``--layer l1``, ``--icons none``: the defaults of NETGRAPH_LAYER and friends.
+    """``--layer l1``, ``--icons none``: the defaults of NETVIZ_LAYER and friends.
 
     A value dropped from a Choice would otherwise only be found by starting the
     container and reading why it exited 2.
@@ -228,7 +228,7 @@ def test_every_server_binds_every_interface_inside_the_container(
 ) -> None:
     """A container's loopback is its own.
 
-    netgraph binds 127.0.0.1 by default so that a diagram of internal topology
+    netviz binds 127.0.0.1 by default so that a diagram of internal topology
     is not published by accident; inside a container that default would make the
     server unreachable from the machine running Docker, and the published port
     below is what actually decides who can reach it.
@@ -257,9 +257,9 @@ def test_the_preview_actually_serves_something(services: dict[str, dict[str, Any
 def test_the_published_port_is_the_port_the_command_binds(
     services: dict[str, dict[str, Any]], name: str
 ) -> None:
-    """``127.0.0.1:8081:8081`` -- and 8081 is what ``netgraph web`` defaults to.
+    """``127.0.0.1:8081:8081`` -- and 8081 is what ``netviz web`` defaults to.
 
-    The compose file passes no ``--port``, so the container side is netgraph's
+    The compose file passes no ``--port``, so the container side is netviz's
     own default. If that default moved, the mapping would publish a port nothing
     listens on.
     """
@@ -273,7 +273,7 @@ def test_the_published_port_is_the_port_the_command_binds(
     # Equal on both sides so that a URL from the container's own log -- or from
     # this page's documentation -- is one the host can open.
     assert host_port == container_port
-    assert host_ip == "127.0.0.1", "publish to loopback by default; NETGRAPH_BIND opts out"
+    assert host_ip == "127.0.0.1", "publish to loopback by default; NETVIZ_BIND opts out"
 
 
 def test_the_two_servers_do_not_share_a_port(services: dict[str, dict[str, Any]]) -> None:
@@ -328,7 +328,7 @@ def test_the_servers_cannot_write_to_the_inventory_and_the_cli_can(
     -o``, ``init`` and ``import`` do, which is the one service mounted rw.
     """
     modes = {name: expand(str(services[name]["volumes"][0])).rsplit(":", 1)[1] for name in SERVICES}
-    assert modes == {"netgraph": "rw", "web": "ro", "watch": "ro"}
+    assert modes == {"netviz": "rw", "web": "ro", "watch": "ro"}
 
 
 @pytest.mark.parametrize("name", SERVICES)
@@ -347,7 +347,7 @@ def test_every_service_runs_unprivileged(services: dict[str, dict[str, Any]], na
 def test_every_service_gets_an_init(services: dict[str, dict[str, Any]], name: str) -> None:
     """Without one, ``docker compose down`` takes the full grace period.
 
-    netgraph is PID 1 in the container, and a Python process that installed no
+    netviz is PID 1 in the container, and a Python process that installed no
     SIGTERM handler ignores the signal when it is PID 1; the daemon then waits
     ten seconds and kills it. tini forwards it to a child instead, where the
     default disposition applies.
@@ -369,11 +369,11 @@ def test_every_interpolated_variable_has_a_default() -> None:
 
 def test_the_default_inventory_is_an_example_that_exists() -> None:
     """A clone with no network of its own described still draws something."""
-    default = expand("${NETGRAPH_INVENTORY:-./examples/home-lab}")
+    default = expand("${NETVIZ_INVENTORY:-./examples/home-lab}")
     assert (REPO_ROOT / default).is_dir()
     text = COMPOSE_FILE.read_text(encoding="utf-8")
     for match in _INTERPOLATION.finditer(text):
-        if match["name"] == "NETGRAPH_INVENTORY":
+        if match["name"] == "NETVIZ_INVENTORY":
             assert (REPO_ROOT / match["default"]).is_dir(), match["default"]
 
 
@@ -416,15 +416,15 @@ def test_the_dockerfile_builds_in_two_stages(dockerfile: str) -> None:
     """The shipped stage must carry no build tooling and no source tree."""
     stages = re.findall(r"^FROM\s+\S+\s+AS\s+(\w+)", dockerfile, re.MULTILINE)
     assert stages == ["build", "runtime"]
-    assert "COPY --from=build /opt/netgraph /opt/netgraph" in dockerfile
+    assert "COPY --from=build /opt/netviz /opt/netviz" in dockerfile
     assert "pip install ." in dockerfile
 
 
 def test_the_image_carries_graphviz_and_a_font(dockerfile: str) -> None:
-    """``dot`` is the one dependency netgraph cannot vendor.
+    """``dot`` is the one dependency netviz cannot vendor.
 
     A slim image has no fonts either, and Graphviz without one draws every label
-    as a row of boxes -- which is the kind of failure that looks like a netgraph
+    as a row of boxes -- which is the kind of failure that looks like a netviz
     bug.
     """
     assert "graphviz" in dockerfile
@@ -435,7 +435,7 @@ def test_the_image_carries_graphviz_and_a_font(dockerfile: str) -> None:
 
 
 def test_the_image_is_the_cli(dockerfile: str) -> None:
-    assert 'ENTRYPOINT ["netgraph"]' in dockerfile
+    assert 'ENTRYPOINT ["netviz"]' in dockerfile
     assert 'CMD ["--help"]' in dockerfile
 
 
@@ -732,9 +732,9 @@ def test_the_image_is_run_before_it_is_published(container_workflow: dict[Any, A
     # the exact shell word and ``yaml.dump`` re-escapes every quote in it into
     # something no assertion can read. Same reasoning as tests/test_release.py.
     text = CONTAINER_WORKFLOW.read_text(encoding="utf-8")
-    assert "netgraph:smoke --version" in text
-    assert "netgraph:smoke version --json" in text
-    assert f'-v "$PWD/examples/{EXAMPLE_INVENTORY}:{MOUNT}:ro" netgraph:smoke' in text, (
+    assert "netviz:smoke --version" in text
+    assert "netviz:smoke version --json" in text
+    assert f'-v "$PWD/examples/{EXAMPLE_INVENTORY}:{MOUNT}:ro" netviz:smoke' in text, (
         "the smoke test never renders a real inventory through the entrypoint"
     )
 
@@ -811,7 +811,7 @@ _IMAGE_REFERENCE = re.compile(re.escape(IMAGE) + r":([A-Za-z0-9][\w.-]*)")
 def test_no_documented_command_pulls_a_tag_that_does_not_exist(page: Path) -> None:
     """A command in the docs has to work when it is pasted into a terminal.
 
-    Both pages told the reader to ``docker run ghcr.io/…/netgraph:latest``, and
+    Both pages told the reader to ``docker run ghcr.io/…/netviz:latest``, and
     ``latest`` has never been pushed: it is set only by ``release.yml``, and no
     version has been released. So the first thing anybody following the README
     typed came back ``manifest unknown``.

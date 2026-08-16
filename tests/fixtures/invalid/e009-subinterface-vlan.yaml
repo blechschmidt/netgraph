@@ -2,7 +2,7 @@
 #
 # 'eth0.20' expects tagged VLAN 20, but 'eth0' trunks only VLAN 10, so no frame
 # for the sub-interface can ever arrive.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -24,7 +24,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -36,7 +36,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

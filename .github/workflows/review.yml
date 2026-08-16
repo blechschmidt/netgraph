@@ -1,12 +1,12 @@
 name: review
 
-# netgraph reviewing its own inventories. Every example under examples/ is a
+# netviz reviewing its own inventories. Every example under examples/ is a
 # real inventory, so a pull request that touches one gets exactly what an
 # inventory repository gets from this workflow: the changeset, the diff drawn,
 # and the findings the change introduced -- in one comment per inventory, edited
 # in place rather than added to.
 #
-# This is the dogfooding of .github/workflows/netgraph-review.yml. It is written
+# This is the dogfooding of .github/workflows/netviz-review.yml. It is written
 # the way a caller would write it, one `uses:` and a `with:` block, so that the
 # reusable workflow cannot grow a requirement nobody outside this repository
 # could meet without this file noticing.
@@ -20,9 +20,9 @@ on:
   pull_request:
     paths:
       - examples/**
-      - src/netgraph/review/**
-      - .github/actions/netgraph-review/**
-      - .github/workflows/netgraph-review.yml
+      - src/netviz/review/**
+      - .github/actions/netviz-review/**
+      - .github/workflows/netviz-review.yml
       - .github/workflows/review.yml
   # On demand, against whatever base you name. There is no pull request to
   # comment on, so the review lands in the job summary -- which is also how a
@@ -96,18 +96,18 @@ jobs:
       pull-requests: write
       security-events: write
 
-    uses: ./.github/workflows/netgraph-review.yml
+    uses: ./.github/workflows/netviz-review.yml
     with:
       inventory: examples/${{ matrix.inventory }}
       # Empty on a pull request, where the reusable workflow uses the pull
       # request's own base commit; named on a manual run, which has none.
       base: ${{ inputs.base }}
-      title: netgraph (examples/${{ matrix.inventory }})
+      title: netviz (examples/${{ matrix.inventory }})
       # One category per inventory: uploads that share a category replace each
       # other, so five inventories under one category would leave one review's
       # findings and lose the other four.
-      sarif-category: netgraph-review-${{ matrix.inventory }}
-      artifact-name: netgraph-review-${{ matrix.inventory }}
+      sarif-category: netviz-review-${{ matrix.inventory }}
+      artifact-name: netviz-review-${{ matrix.inventory }}
       layer: l2
       # The examples are the documentation, so they are held to the standard the
       # documentation recommends: no warnings either.

@@ -2,7 +2,7 @@
 #
 # 'eth1' is listed by both 'bond0' and 'bond1'. A physical port belongs to one
 # aggregate; whichever LACP session wins, the other bond is short a lane.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -32,7 +32,7 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -44,7 +44,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

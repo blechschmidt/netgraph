@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-rtr-sw
@@ -16,7 +16,7 @@ spec:
   connector: rj45
   label: H-001
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-sw-desk
@@ -33,7 +33,7 @@ spec:
   connector: rj45
   label: H-002
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-sw-dongle
@@ -53,7 +53,7 @@ spec:
   connector: rj45
   label: H-004
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-sw-ap
@@ -71,7 +71,7 @@ spec:
   connector: rj45
   label: H-005
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: wl-ap-phone

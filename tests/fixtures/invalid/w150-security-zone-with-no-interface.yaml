@@ -3,7 +3,7 @@
 # A zone is a partition of the device's interfaces. One holding none is empty in
 # the strongest sense: no packet can ever be in it, so the rule below -- however
 # carefully written -- matches nothing.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: firewall
 metadata:
   name: fw-a
@@ -26,7 +26,7 @@ spec:
         dst_zone: wan
         action: accept
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-b
@@ -38,7 +38,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

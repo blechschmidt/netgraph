@@ -1,17 +1,17 @@
 # Editing an inventory
 
-netgraph reads a folder of YAML and draws a network. This page is about the
+netviz reads a folder of YAML and draws a network. This page is about the
 other direction: how it *writes* that folder, and why writing it is a harder
 problem than reading it.
 
-Everything netgraph is growing towards — a diagram you can drag things around in,
+Everything netviz is growing towards — a diagram you can drag things around in,
 an undo stack, a `plan`/`apply` pair that shows a changeset before it lands —
 needs one thing first: a way to change the files that is as safe and as lossless
-as the way it reads them. That way is `netgraph.edit`, and
-[`netgraph edit`](commands/edit.md) is its command-line face.
+as the way it reads them. That way is `netviz.edit`, and
+[`netviz edit`](commands/edit.md) is its command-line face.
 
-[`netgraph apply`](commands/apply.md) is the first of those callers to arrive: it
-takes a changeset computed by [`netgraph plan`](commands/plan.md) and turns each
+[`netviz apply`](commands/apply.md) is the first of those callers to arrive: it
+takes a changeset computed by [`netviz plan`](commands/plan.md) and turns each
 entry into the operations described here, which is why a plan applied to a tree
 leaves every comment in it alone.
 
@@ -102,7 +102,7 @@ hundred `set` operations would be a hundred trips through the round-trip parser
 for one user gesture. Each section it names is *replaced* and each section it
 leaves out is *left alone*, and the replacement is a keyed merge — an entry that
 survives keeps the comment somebody wrote above it. It is the operation
-[`netgraph layout`](commands/layout.md) writes through, and the one a canvas will
+[`netviz layout`](commands/layout.md) writes through, and the one a canvas will
 write through when a node is dragged.
 
 `SetLinkGeometry` is the opposite unit for the opposite reason. A whole view is
@@ -113,7 +113,7 @@ arranging one diagram is the case that makes that load-bearing. The entry is
 **replaced** rather than merged, so straightening a cable is this operation with
 no waypoints, and a link left with nothing pinned at all has its entry removed
 rather than left saying `{}`. It is what every link-routing gesture in
-[`netgraph web`](commands/web.md#the-keyboard) ends in — dropping a bend,
+[`netviz web`](commands/web.md#the-keyboard) ends in — dropping a bend,
 dragging one, setting a routing style, putting a nudged label back on the line —
 and [`docs/rendering.md`](rendering.md#links-are-geometry-too) is what the
 stored result draws as.
@@ -148,10 +148,10 @@ A document nobody edited comes back as the exact bytes it was read as, byte-orde
 mark and CRLF line endings included. Inside a document that *was* edited,
 `ruamel` keeps the comments, blank lines, quoting and key order, and the emitter
 is [probed](#a-note-on-indent-probing) against the source so that its indent
-style matches the file rather than netgraph's preference.
+style matches the file rather than netviz's preference.
 
 **A canonical file stays canonical.** If a document was already in the form
-[`netgraph fmt`](commands/fmt.md) writes, the edited version is put back through
+[`netviz fmt`](commands/fmt.md) writes, the edited version is put back through
 the formatter — so a key added to a mapping lands where the schema order puts it
 rather than at the end. If the document was *not* canonical, it is left alone:
 reformatting it would bury the edit under a diff nobody asked for.
@@ -164,12 +164,12 @@ to the state the operation found.
 ### A note on indent probing
 
 `ruamel` has to be told how a file indents its sequences before it can reproduce
-them. Rather than guess, `netgraph.edit.roundtrip` dumps the *unmodified*
+them. Rather than guess, `netviz.edit.roundtrip` dumps the *unmodified*
 document with each candidate style and keeps the first that reproduces the source
 byte for byte. The canonical form and the other common style are both matched. A
 document no candidate reproduces is still editable — the edit lands and is
 correct — but its diff is wider than one hunk, which is one of the arguments for
-running `netgraph fmt` over a tree once and then leaving it alone.
+running `netviz fmt` over a tree once and then leaving it alone.
 
 ## Inverses
 
@@ -201,7 +201,7 @@ not write:
 
 `move` carries a condition of its own. A move that takes the last document out of
 a file deletes the file, so the inverse has to *make* it again — and a file
-netgraph makes is plain UTF-8 with `\n` line endings that starts at its first
+netviz makes is plain UTF-8 with `\n` line endings that starts at its first
 document. A CRLF checkout, a byte-order mark or a licence header above the first
 `---` is none of those, so a move that emptied such a file is inverted with the
 pre-images instead. (This is not hypothetical: it is what made the property tests
@@ -241,7 +241,7 @@ the *models* rather than found by looking for colons in strings:
 ### Renaming keeps the spelling its author chose
 
 `sw-home` and `switches/sw-home` may name the same switch, and which one a
-document wrote was a choice. netgraph keeps it: a short name stays short where a
+document wrote was a choice. netviz keeps it: a short name stays short where a
 short name still resolves to the right element, and a qualified name stays
 qualified in the same relative-or-absolute shape. Only when the author's form
 would now resolve to something else — or to nothing — is it escalated to the
@@ -266,7 +266,7 @@ box. The key moves with the name, in every view of every layout document, so an
 element arranged on the L1 and the L2 diagram keeps both arrangements. A rename
 that left the key behind produced a
 [`W138`](validation-rules.md#w138--stale-diagram-geometry) and an arrangement
-lost silently: the element was redrawn wherever the engine put it, and `netgraph
+lost silently: the element was redrawn wherever the engine put it, and `netviz
 layout --prune` then dropped the coordinates rather than moving them.
 
 **Annotations (§21).** A note's `spec.anchor` and an area's `spec.members[]`
@@ -276,7 +276,7 @@ Both are re-spelled by the rule above, so a member list written short stays
 short.
 
 An area's `selector` is deliberately left alone. It names a *pattern* rather than
-an element, and netgraph cannot tell whether the pattern was meant to match the
+an element, and netviz cannot tell whether the pattern was meant to match the
 old name or merely happened to — rewriting one would be guessing.
 
 ### Deleting asks first
@@ -285,7 +285,7 @@ Deleting a device with cables on it is refused, and the cables are named:
 
 <!-- norun: writes to the working tree -->
 ```console
-$ netgraph -i examples/home-lab edit delete sw-home
+$ netviz -i examples/home-lab edit delete sw-home
 error: switches/sw-home is referred to by cables/cbl-rtr-sw, cables/cbl-sw-ap, …
 ```
 
@@ -326,13 +326,13 @@ boxes that placed what is being deleted are dropped without being asked about,
 because coordinates for something that is gone are not a claim about the network
 — they are litter, and the diagnostic for them
 ([`W138`](validation-rules.md#w138--stale-diagram-geometry)) exists precisely
-because deletes used to leave them. A `netgraph edit delete` of one switch used
+because deletes used to leave them. A `netviz edit delete` of one switch used
 to hand back a tree with
 a warning per cable it took; it now hands back the tree it found, minus the
 switch. A section, a view, a document and a file left empty by the last entry are
 each dropped in turn.
 
-This is deliberately *not* `netgraph layout --prune`, which drops every key the
+This is deliberately *not* `netviz layout --prune`, which drops every key the
 current drawing lacks — including the position of a device merely filtered out of
 the view. A cascade removes the geometry of what it is itself removing. Derived
 keys spelled `subnet:` and `rack:` are left alone for the same reason: those nodes
@@ -373,7 +373,7 @@ worse is.
 
 **Conflict.** Every file the session reads carries the SHA-256 of the bytes it
 was read as, and each is checked again immediately before the write. A file that
-moved in between — your editor, a `git checkout`, a second netgraph — is a typed
+moved in between — your editor, a `git checkout`, a second netviz — is a typed
 `ConflictError` and the edit is dropped. `--force` does not skip this: it
 overrides a judgement about *your* change, not a fact about somebody else's.
 
@@ -395,7 +395,7 @@ asked for and nobody can undo in one step.
 `Batch` is that grain:
 
 ```python
-from netgraph.edit import Batch, DeleteElement, EditSession
+from netviz.edit import Batch, DeleteElement, EditSession
 
 session = EditSession(root=Path("inventory"))
 batch = Batch(session, label="retire the old access layer")
@@ -430,8 +430,8 @@ The most-used gesture in any diagram editor, and the one that is least like a
 diagram gesture underneath: a copy of a switch is a *second document*, and a
 second document that says the same thing as the first one does not load.
 
-So a copy is three decisions, all of them made in `netgraph.edit.clipboard` and
-none of them in JavaScript — the browser, `netgraph edit copy` and a script all
+So a copy is three decisions, all of them made in `netviz.edit.clipboard` and
+none of them in JavaScript — the browser, `netviz edit copy` and a script all
 get the same answer.
 
 ### The name
@@ -504,11 +504,11 @@ placed in, so a site's arrangement stays in the site's own file.
 
 <!-- norun: illustrative one-liners over elements that are not in this repository -->
 ```bash
-netgraph edit copy sw1                      # -> sw1-copy, beside it
-netgraph edit copy sw1 --to sites/lab       # -> sites/lab/sw1
-netgraph edit copy sw1 --name sw2           # -> sw2
-netgraph edit copy sites/hq --to sites/dr   # the whole subtree, cables and all
-netgraph edit duplicate sw1 --view l1       # and place it in the l1 diagram
+netviz edit copy sw1                      # -> sw1-copy, beside it
+netviz edit copy sw1 --to sites/lab       # -> sites/lab/sw1
+netviz edit copy sw1 --name sw2           # -> sw2
+netviz edit copy sites/hq --to sites/dr   # the whole subtree, cables and all
+netviz edit duplicate sw1 --view l1       # and place it in the l1 diagram
 ```
 
 `duplicate` *is* `copy` with no `--to`: one operation, two spellings, because
@@ -527,11 +527,11 @@ text editor where it reads as data:
 
 ```json
 {
-  "format": "netgraph.dev/clipboard/v1",
+  "format": "netviz.dev/clipboard/v1",
   "root": "devices",
   "documents": [
     {"address": "devices/sw-access", "namespace": "",
-     "document": {"apiVersion": "netgraph.dev/v1alpha1", "kind": "switch", "…": "…"}}
+     "document": {"apiVersion": "netviz.dev/v1alpha1", "kind": "switch", "…": "…"}}
   ],
   "geometry": {"devices/sw-access": {"position": {"x": 277, "y": 43}}},
   "dropped": []
@@ -556,14 +556,14 @@ reading a fragment out of one tree to paste into another is a read.
 ## Arranging a selection
 
 Align, distribute and snap-to-grid are the three gestures a diagram editor has
-that mean nothing about a single shape. They live in `netgraph.edit.arrange`,
+that mean nothing about a single shape. They live in `netviz.edit.arrange`,
 not in the browser, for the same reason every other mutation does: an
 arrangement is `kind: layout` documents (§18), and deciding which document holds
 which node — then writing back only the entries that moved, keeping the comments
 and the key spellings of the ones that did not — is the mutation layer's job.
 
 ```python
-from netgraph.edit import Batch, EditSession, arrange_operations
+from netviz.edit import Batch, EditSession, arrange_operations
 
 session = EditSession(root=Path("inventory"))
 operations = arrange_operations(
@@ -596,7 +596,7 @@ node whose entry stores no `size` is treated as a point, which is the honest
 reading — the size is a consequence of the label, and the arrangement did not
 decide it.
 
-The grid pitch is the inventory's, in `netgraph.toml`:
+The grid pitch is the inventory's, in `netviz.toml`:
 
 ```toml
 [editor]
@@ -614,17 +614,17 @@ A namespace is a folder and a folder is a namespace
 ([§2](inventory-layout.md#folders-are-namespaces)). That one fact is what lets
 the editor draw a namespace as a box and *mean* it: the rectangle round
 `sites/north/racks/r1` is the boundary of a directory, so dragging a switch into
-it is not a picture of a move — it is `netgraph edit move`, and the file moves.
+it is not a picture of a move — it is `netviz edit move`, and the file moves.
 
 ```
-netgraph edit move sites/north/access/sw-north-acc-01 sites/north/racks/r1/sw-north-acc-01.yaml
+netviz edit move sites/north/access/sw-north-acc-01 sites/north/racks/r1/sw-north-acc-01.yaml
 ```
 
 is the command line for the same gesture, and the two go through the same
 operation. What the editor adds is *which file*: you point at a namespace, and
 [placement](#placement) decides whether the document joins a `switches.yaml`
 that is already there or gets a file of its own — the same answer
-`netgraph edit create` gives, so a dragged tree and a typed one do not diverge.
+`netviz edit create` gives, so a dragged tree and a typed one do not diverge.
 
 ### The gestures
 
@@ -679,12 +679,12 @@ unchanged — and then two rewrites happen around it:
 
 Cables, tunnels, adapters, group memberships, PDU outlets, layouts and
 annotations are all covered, because they are all read off the models by
-`netgraph.edit.references` rather than by a list kept here.
+`netviz.edit.references` rather than by a list kept here.
 
 ### Making a namespace
 
 There is no operation that creates an empty one, and that is not an oversight: a
-folder netgraph reads is one holding a document, so an empty directory is not
+folder netviz reads is one holding a document, so an empty directory is not
 something the inventory can record. **New namespace…** therefore makes the
 folder by putting something in it — a new element created there, or the current
 selection moved there — and the directory comes into existence with the write.
@@ -738,7 +738,7 @@ drag of an unplaced note sends `spec.geometry` as a mapping, and every drag afte
 that sends a field at a time, which is what a reviewer wants to read in the
 changes drawer. It is the same rule
 [the draw.io round trip](drawio.md) applies to a diagram coming home changed, and
-it is why `netgraph.edit.apply` lets a *coherence* failure through to the commit
+it is why `netviz.edit.apply` lets a *coherence* failure through to the commit
 gate while refusing a *value* failure on the spot: one gesture is several writes,
 and the document is briefly incoherent and finally correct.
 
@@ -761,13 +761,13 @@ would write a number nobody could see the effect of — the same bargain
 [link routing](commands/web.md#the-keyboard) makes. Selecting, retyping and
 deleting work either way, because none of the three is about coordinates. One
 caveat on resizing a note: the SVG renderer sizes a note to its text, so the box
-is written for `netgraph export drawio` rather than for the picture on screen.
+is written for `netviz export drawio` rather than for the picture on screen.
 
 ## Using it from Python
 
 ```python
 from pathlib import Path
-from netgraph.edit import Connect, EditSession, SetField
+from netviz.edit import Connect, EditSession, SetField
 
 session = EditSession(root=Path("inventory"))
 session.apply(SetField(address="sites/hq/core-sw", path="spec.model", value="C9300"))
@@ -794,23 +794,23 @@ are built on the parts above rather than on a fourth notion of what changed.
 
 ### As a diagram
 
-[`netgraph diff`](commands/diff.md) draws two inventory states as one picture:
+[`netviz diff`](commands/diff.md) draws two inventory states as one picture:
 added elements green, removed ones red and dashed but still in place, changed
 ones amber with a badge naming the fields that moved, everything untouched
 faded.
 
 <!-- run: cwd=. -->
 ```console
-$ netgraph -i tests/fixtures/diff/home-lab-proposed diff --from examples/home-lab -f json -o /dev/null
+$ netviz -i tests/fixtures/diff/home-lab-proposed diff --from examples/home-lab -f json -o /dev/null
 diff at layer l1: 2 added, 4 changed, 2 removed
 ```
 
-The comparison is [`netgraph plan`](commands/plan.md)'s and the drawing is the
+The comparison is [`netviz plan`](commands/plan.md)'s and the drawing is the
 renderer's; nothing between them decides what changed.
 
 ### In the editor
 
-[`netgraph web DIR --write`](commands/web.md) has a **changes** drawer. It lists
+[`netviz web DIR --write`](commands/web.md) has a **changes** drawer. It lists
 every gesture made in the session — one entry per gesture, not per operation, so
 deleting a switch is one line rather than five — and each entry carries:
 
@@ -833,25 +833,25 @@ behaviour: the alternative is a rewind that silently discards work.
 ### As a script
 
 The drawer's **Copy commands** button hands the session over as a list of
-[`netgraph edit`](commands/edit.md) invocations, in the order they happened.
+[`netviz edit`](commands/edit.md) invocations, in the order they happened.
 Paste it into a pull-request description, a runbook, or a colleague's terminal.
 
 ```text
-netgraph -i net edit set pc-desk spec.model 'OptiPlex 7020'
-netgraph -i net edit rename ap-home ap-attic
-netgraph -i net edit delete srv-nas --cascade
+netviz -i net edit set pc-desk spec.model 'OptiPlex 7020'
+netviz -i net edit rename ap-home ap-attic
+netviz -i net edit delete srv-nas --cascade
 ```
 
 The rendering is never lossy. An operation a subcommand takes exactly becomes
 that subcommand; one it does not — a whole-file write, a stored arrangement, an
-interface richer than `--field` can carry — becomes `netgraph edit apply -f -`
+interface richer than `--field` can carry — becomes `netviz edit apply -f -`
 with the operation's own JSON on standard input. There is deliberately no third
 case where the rendering *approximates* the operation: a command list that
 quietly drops the length of a cable is worse than one with a JSON blob in it.
 
 ## What it deliberately does not do
 
-**It does not repair documents.** Like `netgraph fmt`, it changes what you asked
+**It does not repair documents.** Like `netviz fmt`, it changes what you asked
 it to change. A document that does not parse cannot be edited through it — the
 error says so, and names the file.
 
@@ -867,19 +867,19 @@ for the tool that already does it well, and the files are text.
 **It does not lay diagrams out.** It *stores* where a node sits and which bends
 a cable goes through — `SetGeometry` and `SetLinkGeometry` are first-class
 operations and geometry is inventory data like anything else — but deciding
-where a node should sit is [`netgraph layout`](commands/layout.md)'s job, and
+where a node should sit is [`netviz layout`](commands/layout.md)'s job, and
 turning a bend into a line is the renderer's.
 
 ## See also
 
-- [`netgraph edit`](commands/edit.md) — the command reference.
+- [`netviz edit`](commands/edit.md) — the command reference.
 - [`docs/inventory-layout.md`](inventory-layout.md) — the conventions placement follows.
 - [`docs/format.md`](format.md) — the canonical form an edited canonical file keeps.
 - [`docs/validation.md`](validation.md) — what the write gate runs.
-- [`netgraph layout`](commands/layout.md) — the first caller to write through it that is
+- [`netviz layout`](commands/layout.md) — the first caller to write through it that is
   not a person: it stores a diagram's arrangement as `set-geometry` operations.
-- [`netgraph plan`](commands/plan.md) and [`netgraph apply`](commands/apply.md) — a
+- [`netviz plan`](commands/plan.md) and [`netviz apply`](commands/apply.md) — a
   changeset between two inventory states, and its execution through these operations.
-- [`netgraph diff`](commands/diff.md) — the same changeset, drawn.
-- [`netgraph web`](commands/web.md) — the editor, and the changes drawer over a session.
+- [`netviz diff`](commands/diff.md) — the same changeset, drawn.
+- [`netviz web`](commands/web.md) — the editor, and the changes drawer over a session.
 - [`docs/architecture.md`](architecture.md) — where the write path sits in the pipeline.

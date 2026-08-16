@@ -1,8 +1,8 @@
-# `netgraph watch`
+# `netviz watch`
 
-`netgraph watch` re-renders whenever a file in the inventory changes, optionally
+`netviz watch` re-renders whenever a file in the inventory changes, optionally
 serving the result on a page that reloads itself. Every cycle is the same load,
-validate and render [`netgraph render`](render.md) performs, followed by a
+validate and render [`netviz render`](render.md) performs, followed by a
 timestamped status line and any findings. It is the command to leave running in
 a second terminal while you edit YAML in the first.
 
@@ -10,7 +10,7 @@ a second terminal while you edit YAML in the first.
 
 <!-- generated: synopsis watch -->
 ```text
-netgraph [GLOBAL OPTIONS] watch [OPTIONS]
+netviz [GLOBAL OPTIONS] watch [OPTIONS]
 ```
 <!-- /generated -->
 
@@ -44,7 +44,7 @@ not what you meant.
 
 ## What triggers a render
 
-Only YAML documents, `netgraph.toml` and `.netgraphignore` trigger a render; an
+Only YAML documents, `netviz.toml` and `.netvizignore` trigger a render; an
 editor swap file or a rendered diagram does not, and neither does anything under
 a directory the loader skips (`.git/`, `_drafts/`, …) — the same rule the loader
 itself applies, so what the watcher reacts to is what the inventory contains. A
@@ -70,7 +70,7 @@ you and do not mind the occasional double render.
 
 ## Every render option applies
 
-Every filter and display option of `netgraph render` applies here too —
+Every filter and display option of `netviz render` applies here too —
 `--tooltips`, `--link-template` and `--element-ids` included, which is what makes
 `watch -f svg -o topology.svg` keep an *interactive* diagram up to date. `-f
 html` works the same way, repeated `--layer` included, so `watch -f html -o
@@ -103,10 +103,10 @@ actually bound is printed.
 
 <!-- norun: every one of these starts a server or a loop and never exits -->
 ```bash
-netgraph watch --serve                                   # preview at http://127.0.0.1:8080/
-netgraph watch -f svg -o topology.svg                    # just keep a file up to date
-netgraph watch --serve --layer l2 --vlan 10 --title vlan10
-netgraph watch --serve --host 0.0.0.0 --port 9000        # deliberate, and warned about
+netviz watch --serve                                   # preview at http://127.0.0.1:8080/
+netviz watch -f svg -o topology.svg                    # just keep a file up to date
+netviz watch --serve --layer l2 --vlan 10 --title vlan10
+netviz watch --serve --host 0.0.0.0 --port 9000        # deliberate, and warned about
 ```
 
 ## Arguments
@@ -128,7 +128,7 @@ netgraph watch --serve --host 0.0.0.0 --port 9000        # deliberate, and warne
 | `--name` | `GLOB` | — | Keep only elements whose name matches this glob. Repeatable. |
 | `--neighbors-of` | `NAME` | — | Keep only the neighbourhood of this element. |
 | `--depth` | `INTEGER, >= 0` | `1` | How many hops --neighbors-of reaches. |
-| `--select` | `QUERY` | — | Keep only the elements this query selects, e.g. "kind = switch and not has vrf". The flags above are sugar for the equivalent query and are combined with it; 'netgraph query --explain' prints which. See docs/query.md. |
+| `--select` | `QUERY` | — | Keep only the elements this query selects, e.g. "kind = switch and not has vrf". The flags above are sugar for the equivalent query and are combined with it; 'netviz query --explain' prints which. See docs/query.md. |
 | `--collapse` | `NS` | — | Replace this namespace and everything under it with one node, labelled with what it holds. Links crossing the boundary attach to it; links inside it are counted rather than drawn. Repeatable. |
 | `--collapse-depth` | `N` | — | Collapse every namespace N levels deep, counted from the shallowest one that branches: '--collapse-depth 1' is the site-level overview of a tree laid out as sites/<site>/<tier>. |
 | `--bundle-links`, `--no-bundle-links` | — | — | Draw parallel links between the same pair of elements as one edge, with the count in the label. Members of a declared 'lag' interface are bundled either way unless --no-bundle-links is given, since the inventory already says they are one logical link. |
@@ -144,13 +144,13 @@ netgraph watch --serve --host 0.0.0.0 --port 9000        # deliberate, and warne
 | `--element-ids` | — | off | Give every node, edge and namespace a stable id derived from its name, so the diagram can be deep-linked and styled from outside. dot and svg only. |
 | `--max-addresses` | `N` | `4` | Longest address list spelled out under a node before it is abbreviated to 'and N more'. 0 prints the count alone. |
 | `--rankdir` | `[tb\|lr\|bt\|rl]` | TB, top to bottom | Layout direction. A wide network reads better left to right; a deep one top to bottom. Honoured by the Graphviz backends and by mermaid. |
-| `--routing` | `[spline\|orthogonal\|straight]` | whatever the inventory's layout documents say, else spline | How links are drawn between the bends they are pinned through: 'spline' is the curve Graphviz draws, 'orthogonal' right angles, 'straight' segment to segment. A default: a link that pins a style of its own keeps it. Honoured by the Graphviz backends, the JSON export and the editor. 'netgraph layout --write' records it in the view it arranges, so the choice is the inventory's rather than the command line's from then on. |
+| `--routing` | `[spline\|orthogonal\|straight]` | whatever the inventory's layout documents say, else spline | How links are drawn between the bends they are pinned through: 'spline' is the curve Graphviz draws, 'orthogonal' right angles, 'straight' segment to segment. A default: a link that pins a style of its own keeps it. Honoured by the Graphviz backends, the JSON export and the editor. 'netviz layout --write' records it in the view it arranges, so the choice is the inventory's rather than the command line's from then on. |
 | `--avoid`, `--no-avoid` | — | avoid | Route orthogonal links around the boxes they are not attached to instead of straight across them. Only applies to an arranged diagram drawn with '--routing orthogonal': a spline has nothing to route around, and an unarranged one is routed by Graphviz, which already avoids nodes. A bend you placed yourself is never moved — routing fills the segments between them. '--no-avoid' is the local Z-and-L every orthogonal diagram was drawn with before this existed. |
 | `--title` | `TEXT` | — | Caption for the diagram. |
 | `--layer` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | `l1` | l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets and the elements addressed in them; overlay draws the tunnels; routing draws the BGP sessions and OSPF adjacencies, clustered by VRF; physical adds the patch panels l1 splices out; rack draws a front elevation per rack; power draws the PDUs and the feeds into everything they power; identity draws the users and groups; netns opens each machine up into the network stacks inside it, joined by their veth pairs; security draws the firewall zones and what the policy lets cross between them. Repeatable for -f html, which draws each layer and puts a switcher over them. |
 | `--strict` | — | off | Treat warnings as errors. |
 | `--force` | — | off | Proceed even when validation failed. The result may not match the files. |
-| `--profile` | `NAME` | — | Apply the [profile.NAME] block of netgraph.toml on top of its [render] table. Explicit flags still win over both. |
+| `--profile` | `NAME` | — | Apply the [profile.NAME] block of netviz.toml on top of its [render] table. Explicit flags still win over both. |
 | `--show-config` | — | off | Print the settings this invocation resolves to, and where each one came from, then exit without doing any work. |
 | `--serve` | — | off | Also host the render over HTTP, on a page that reloads itself. |
 | `--host` | `ADDRESS` | `127.0.0.1` | Address --serve binds to. The default keeps the preview on this machine; an inventory describes internal topology, so publishing it is an explicit act. |
@@ -167,14 +167,14 @@ status.
 | Code | Meaning |
 |---|---|
 | 0 | The loop ran and was stopped with Ctrl-C. |
-| 2 | Usage error: `--host` or `--port` without `--serve`, an unusable `netgraph.toml`. |
+| 2 | Usage error: `--host` or `--port` without `--serve`, an unusable `netviz.toml`. |
 | 6 | `--serve` could not bind its address — usually a preview already running on that port. |
 
 ## See also
 
-* [`netgraph render`](render.md) and [`docs/rendering.md`](../rendering.md) — the
+* [`netviz render`](render.md) and [`docs/rendering.md`](../rendering.md) — the
   render every cycle performs, and every option this command inherits.
-* [`netgraph web`](web.md) — the same live feedback for a document stream you
+* [`netviz web`](web.md) — the same live feedback for a document stream you
   edit in the browser rather than a tree you edit on disk.
 * [`docs/validation.md`](../validation.md) — the findings a cycle reports, and
   what `--strict` promotes.

@@ -1,6 +1,6 @@
 """Notes, areas and legends through the draw.io round trip (§21).
 
-The three kinds of annotation are the first thing netgraph exports that a
+The three kinds of annotation are the first thing netviz exports that a
 stakeholder is *meant* to edit rather than merely to read: a note is the reason
 somebody was sent the diagram at all. So the properties asserted here are the
 ones that decide whether that edit is worth anything, in descending order of how
@@ -38,7 +38,7 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from netgraph.drawio import (
+from netviz.drawio import (
     ATTRIBUTES,
     BuildOptions,
     Cell,
@@ -53,22 +53,22 @@ from netgraph.drawio import (
     reconcile,
     write_mxfile,
 )
-from netgraph.drawio.markup import escape_html
-from netgraph.drawio.model import Diagram, absolute_geometry
-from netgraph.drawio.notes import Notes
-from netgraph.edit import EditSession
-from netgraph.edit.operations import CreateAnnotation, DeleteAnnotation, SetAnnotation
-from netgraph.loader import Inventory, load_tree
-from netgraph.render import FilterSpec, build_graph, filter_graph
-from netgraph.render.annotations import parse_markup
-from netgraph.render.graph import Layer
+from netviz.drawio.markup import escape_html
+from netviz.drawio.model import Diagram, absolute_geometry
+from netviz.drawio.notes import Notes
+from netviz.edit import EditSession
+from netviz.edit.operations import CreateAnnotation, DeleteAnnotation, SetAnnotation
+from netviz.loader import Inventory, load_tree
+from netviz.render import FilterSpec, build_graph, filter_graph
+from netviz.render.annotations import parse_markup
+from netviz.render.graph import Layer
 
 # --------------------------------------------------------------------------- #
 # Fixtures
 # --------------------------------------------------------------------------- #
 
 TOPOLOGY = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata: {name: sw-core}
 spec:
@@ -76,13 +76,13 @@ spec:
     - {name: eth0, type: ethernet, ipv4: [10.0.0.1/24]}
     - {name: eth1, type: ethernet}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata: {name: srv-proxy}
 spec:
   interfaces: [{name: eth0, type: ethernet, ipv4: [10.0.0.2/24]}]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-fibre}
 spec: {endpoints: [sw-core:eth0, srv-proxy:eth0], medium: fiber}
@@ -93,7 +93,7 @@ spec: {endpoints: [sw-core:eth0, srv-proxy:eth0], medium: fiber}
 #: a rectangle of its own, which is the case where the exported box is computed
 #: and must therefore not come home as a change.
 ANNOTATIONS = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata: {name: dmz}
 spec:
@@ -101,7 +101,7 @@ spec:
   members: [edge/sw-core, edge/srv-proxy]
   color: "#fee2e2"
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata: {name: why-orange}
 spec:
@@ -114,7 +114,7 @@ spec:
   anchor: {element: edge/sw-core}
   color: "#fef3c7"
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: legend
 metadata: {name: key}
 spec:
@@ -144,7 +144,7 @@ PLACED = ANNOTATIONS.replace(
 #: than ones the grid invented. An area following its members is only a real
 #: test when the members are somewhere in particular.
 LAYOUT = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: layout
 metadata: {name: layout}
 spec:
@@ -221,7 +221,7 @@ def edited(payload: str, before: str, after: str) -> str:
 
 def dropped(payload: str, role: str) -> str:
     """``payload`` without the cells of one role — a stakeholder pressing delete."""
-    pattern = re.compile(rf'\s*<object [^>]*netgraph:role="{role}".*?</object>', re.DOTALL)
+    pattern = re.compile(rf'\s*<object [^>]*netviz:role="{role}".*?</object>', re.DOTALL)
     edited_payload, count = pattern.subn("", payload)
     assert count, f"the fixture holds no {role} cell to delete"
     return edited_payload
@@ -237,9 +237,9 @@ def test_the_export_is_well_formed_xml_a_strict_parser_accepts(annotated: Invent
     payload = exported(annotated)
     root = ElementTree.fromstring(payload)
     assert root.tag == "mxfile"
-    # Not a rediscovery of the parser above: netgraph's own reader is stricter,
+    # Not a rediscovery of the parser above: netviz's own reader is stricter,
     # and a document it refuses is one no round trip can begin.
-    assert parse_mxfile(payload).is_netgraph
+    assert parse_mxfile(payload).is_netviz
 
 
 def test_the_export_is_byte_stable(annotated: Inventory) -> None:
@@ -406,7 +406,7 @@ def test_a_full_round_trip_over_all_three_kinds_proposes_nothing(
     result = reconciled(inventory, exported(inventory))
     assert result.operations == (), [operation.describe() for operation in result.operations]
     assert result.summary() == "nothing to change"
-    assert result.unmapped == 0, "an annotation cell netgraph wrote is never 'unmapped'"
+    assert result.unmapped == 0, "an annotation cell netviz wrote is never 'unmapped'"
 
 
 def test_the_operations_an_edited_diagram_asks_for_actually_apply(tmp_path: Path) -> None:
@@ -480,7 +480,7 @@ def test_a_diagram_from_before_annotations_existed_deletes_nothing(annotated: In
     deleted, but because nothing ever wrote them — so the absence must not be
     read as a gesture.
     """
-    payload = exported(annotated).replace(' netgraph:annotated="1"', "")
+    payload = exported(annotated).replace(' netviz:annotated="1"', "")
     payload = dropped(dropped(dropped(payload, "note"), "area"), "leader")
     result = reconciled(annotated, payload)
     assert not any(isinstance(operation, DeleteAnnotation) for operation in result.operations)
@@ -535,7 +535,7 @@ def test_the_first_drag_of_an_unplaced_note_writes_one_whole_geometry_block(
     is checked against the schema the moment it lands — so ``spec.geometry.x``
     on its own would be rejected before ``spec.geometry.y`` could arrive. The
     block goes in as one write, which is what
-    :class:`~netgraph.edit.operations.SetAnnotation` says the first drag does.
+    :class:`~netviz.edit.operations.SetAnnotation` says the first drag does.
     """
     (operation,) = reconciled(annotated, moved_note(exported(annotated))).operations
     assert isinstance(operation, SetAnnotation)
@@ -544,7 +544,7 @@ def test_the_first_drag_of_an_unplaced_note_writes_one_whole_geometry_block(
 
 
 def test_the_position_written_is_the_one_the_note_was_dragged_to(placed: Inventory) -> None:
-    """draw.io's y runs downwards and its origin is the page's; netgraph's do not."""
+    """draw.io's y runs downwards and its origin is the page's; netviz's do not."""
     payload = exported(placed)
     before = only(payload, CellRole.NOTE)
     operations = reconciled(placed, moved_note(payload, right=40.0, down=25.0)).operations
@@ -596,7 +596,7 @@ def test_a_retyped_note_comes_back_as_the_markdown_subset(annotated: Inventory) 
 
 
 def test_markup_draw_io_cannot_express_keeps_its_words(annotated: Inventory) -> None:
-    """A tag netgraph did not write loses the tag and never the text."""
+    """A tag netviz did not write loses the tag and never the text."""
     payload = edited(
         exported(annotated),
         "&lt;b&gt;Orange&lt;/b&gt;",
@@ -642,7 +642,7 @@ def test_a_deleted_note_is_a_deletion_of_the_note_and_of_nothing_else(
 
 
 def test_a_sticky_note_somebody_added_becomes_a_note_document(annotated: Inventory) -> None:
-    """The one vertex a draw.io user can add that netgraph is willing to write."""
+    """The one vertex a draw.io user can add that netviz is willing to write."""
     payload = edited(
         exported(annotated),
         "        </root>",
@@ -661,7 +661,7 @@ def test_a_sticky_note_somebody_added_becomes_a_note_document(annotated: Invento
 
 
 def test_an_ordinary_rectangle_somebody_added_is_still_left_alone(annotated: Inventory) -> None:
-    """netgraph does not invent documents from shapes. The note is the exception."""
+    """netviz does not invent documents from shapes. The note is the exception."""
     payload = edited(
         exported(annotated),
         "        </root>",
@@ -677,7 +677,7 @@ def test_an_ordinary_rectangle_somebody_added_is_still_left_alone(annotated: Inv
 
 
 def test_the_annotation_switch_turns_the_whole_thing_off(annotated: Inventory) -> None:
-    """Off must still not report netgraph's own cells as things it cannot place."""
+    """Off must still not report netviz's own cells as things it cannot place."""
     payload = moved_note(exported(annotated))
     result = reconciled(annotated, payload, annotations=False)
     assert result.operations == ()

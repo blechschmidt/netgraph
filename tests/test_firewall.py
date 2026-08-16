@@ -34,15 +34,15 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.errors import SchemaError
-from netgraph.export.config import CONFIG_DIALECTS, CONFIG_LAYERS, generate
-from netgraph.export.config.model import UnsupportedConfigError
-from netgraph.export.context import ExportContext, ExportOptions
-from netgraph.export.manifest import Recorder
-from netgraph.importer.config import sniff
-from netgraph.loader import Inventory, load_tree
-from netgraph.models import (
+from netviz.cli import cli
+from netviz.errors import SchemaError
+from netviz.export.config import CONFIG_DIALECTS, CONFIG_LAYERS, generate
+from netviz.export.config.model import UnsupportedConfigError
+from netviz.export.context import ExportContext, ExportOptions
+from netviz.export.manifest import Recorder
+from netviz.importer.config import sniff
+from netviz.loader import Inventory, load_tree
+from netviz.models import (
     API_VERSION,
     LOCAL_ZONE,
     FirewallAction,
@@ -53,11 +53,11 @@ from netgraph.models import (
     Zone,
     parse_document,
 )
-from netgraph.models.firewall import normalise_port_range
-from netgraph.models.routing import AddressFamily
-from netgraph.render.details import build_details, detail_text
-from netgraph.render.dot import to_dot
-from netgraph.render.graph import (
+from netviz.models.firewall import normalise_port_range
+from netviz.models.routing import AddressFamily
+from netviz.render.details import build_details, detail_text
+from netviz.render.dot import to_dot
+from netviz.render.graph import (
     ANY_ZONE,
     EdgeKind,
     FilterSpec,
@@ -66,12 +66,12 @@ from netgraph.render.graph import (
     filter_graph,
     zone_node_id,
 )
-from netgraph.render.ids import element_ids
-from netgraph.render.jsonexport import graph_to_dict
-from netgraph.render.mermaid import to_mermaid
-from netgraph.render.options import RenderOptions
-from netgraph.render.palette import edge_palette_key
-from netgraph.validate import validate
+from netviz.render.ids import element_ids
+from netviz.render.jsonexport import graph_to_dict
+from netviz.render.mermaid import to_mermaid
+from netviz.render.options import RenderOptions
+from netviz.render.palette import edge_palette_key
+from netviz.validate import validate
 
 from platform_marks import NFT, requires_nft  # isort: skip -- tests/ is on sys.path
 
@@ -846,8 +846,8 @@ def ruleset(inventory: Inventory) -> str:
 
 def test_the_ruleset_states_the_zones_the_chains_and_the_defaults(campus: Inventory) -> None:
     text = ruleset(campus)
-    assert "destroy table inet netgraph" in text
-    assert "table inet netgraph {" in text
+    assert "destroy table inet netviz" in text
+    assert "table inet netviz {" in text
     assert "set zone_campus {" in text and 'elements = { "xe-0/0/0" }' in text
     # The default is written *and* attributed, because it is the most
     # consequential word in the file.
@@ -983,7 +983,7 @@ def test_the_cli_exports_the_ruleset() -> None:
         catch_exceptions=False,
     )
     assert result.exit_code == 0, result.output
-    assert "table inet netgraph {" in result.stdout
+    assert "table inet netviz {" in result.stdout
 
 
 # --------------------------------------------------------------------------- #
@@ -1163,7 +1163,7 @@ def test_the_policy_database_is_named_with_the_emitter_that_writes_it(campus: In
     context = context_for(campus)
     generate("nftables", context)
     skips = context.recorder.sealed("nftables").skipped
-    assert any("netgraph export routes" in entry.detail for entry in skips)
+    assert any("netviz export routes" in entry.detail for entry in skips)
 
 
 def test_a_zone_name_is_folded_into_an_nftables_identifier(tmp_path: Path) -> None:
@@ -1183,8 +1183,8 @@ def test_a_zone_name_is_folded_into_an_nftables_identifier(tmp_path: Path) -> No
 
 
 def test_the_importer_reads_the_ruleset_back_and_says_what_it_dropped(campus: Inventory) -> None:
-    from netgraph.importer.config import read_nftables
-    from netgraph.importer.draft import Draft
+    from netviz.importer.config import read_nftables
+    from netviz.importer.draft import Draft
 
     draft = Draft()
     read_nftables(ruleset(campus), source="nftables.conf", host="fw", draft=draft)
@@ -1197,8 +1197,8 @@ def test_the_importer_reads_the_ruleset_back_and_says_what_it_dropped(campus: In
 
 
 def test_the_importer_says_nothing_about_a_ruleset_with_nothing_in_it() -> None:
-    from netgraph.importer.config import read_nftables
-    from netgraph.importer.draft import Draft
+    from netviz.importer.config import read_nftables
+    from netviz.importer.draft import Draft
 
     draft = Draft()
     read_nftables("", source="empty.conf", host="fw", draft=draft)
@@ -1289,7 +1289,7 @@ def test_a_half_stated_closer_shadows_what_it_covers(tmp_path: Path) -> None:
 # --------------------------------------------------------------------------- #
 
 #: ``nft --check``, which parses a ruleset without committing it. The one gate
-#: here that is not netgraph reading its own output: every assertion above says
+#: here that is not netviz reading its own output: every assertion above says
 #: the file holds what the inventory states, and this one says the file is a file
 #: nftables would take. It caught two real defects when it was written — a NAT
 #: chain at the wrong hook priority, and a translation nft refuses in an ``inet``
@@ -1364,7 +1364,7 @@ def test_every_construct_this_emitter_writes_parses(tmp_path: Path) -> None:
                         src="10.0.0.0/8",
                         dst="192.0.2.0/24",
                         action="log",
-                        log_prefix="netgraph: ",
+                        log_prefix="netviz: ",
                     ),
                     rule(80, src="2001:db8::/32", protocol="gre", action="drop"),
                     rule(90, iif="eth0", oif="eth1", action="reject"),

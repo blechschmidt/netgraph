@@ -24,11 +24,11 @@ import click
 import pytest
 from click.testing import CliRunner, Result
 
-from netgraph.cli import cli
-from netgraph.completion import complete_namespace
-from netgraph.errors import count_text
-from netgraph.loader import Inventory, load_tree
-from netgraph.render import (
+from netviz.cli import cli
+from netviz.completion import complete_namespace
+from netviz.errors import count_text
+from netviz.loader import Inventory, load_tree
+from netviz.render import (
     AGGREGATE_ID_PREFIX,
     AGGREGATE_KIND,
     AggregateSpec,
@@ -145,7 +145,7 @@ def test_a_tree_with_one_namespace_collapses_to_nothing(tmp_path: Path) -> None:
     _write(
         tmp_path,
         "only/one.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\nkind: computer\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: computer\n"
         "metadata: {name: pc}\nspec: {interfaces: [{name: eno1, type: ethernet}]}\n",
     )
     graph = build_graph(_load(tmp_path))
@@ -201,7 +201,7 @@ def test_a_collapsed_node_carries_the_census_of_what_is_inside(campus: Inventory
     assert view.vlans == frozenset({1, 10, 20, 30, 99})
     assert "10.1.10.0/24" in view.subnets
     # Ordered by family, then network address, then prefix length — the order
-    # ``netgraph list subnets`` prints, so the two never disagree.
+    # ``netviz list subnets`` prints, so the two never disagree.
     networks = [ip_network(prefix) for prefix in view.subnets]
     assert networks == sorted(
         networks, key=lambda net: (net.version, int(net.network_address), net.prefixlen)
@@ -283,20 +283,20 @@ def test_a_self_link_inside_a_collapsed_namespace_disappears_into_it(tmp_path: P
     _write(
         tmp_path,
         "sites/east/sw.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata: {name: sw}\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata: {name: sw}\n"
         "spec:\n  interfaces:\n"
         "    - {name: p1, type: ethernet}\n    - {name: p2, type: ethernet}\n",
     )
     _write(
         tmp_path,
         "sites/west/pc.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\nkind: computer\nmetadata: {name: pc}\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: computer\nmetadata: {name: pc}\n"
         "spec: {interfaces: [{name: eno1, type: ethernet}]}\n",
     )
     _write(
         tmp_path,
         "cables/loop.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\nkind: cable\nmetadata: {name: cbl-loop}\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: cable\nmetadata: {name: cbl-loop}\n"
         "spec: {endpoints: [sw:p1, sw:p2], medium: copper}\n",
     )
     graph = aggregate_graph(build_graph(_load(tmp_path)), AggregateSpec(collapse_depth=1))
@@ -420,7 +420,7 @@ def test_two_port_channels_between_one_pair_stay_two_edges(tmp_path: Path) -> No
         _write(
             tmp_path,
             f"{name}.yaml",
-            "apiVersion: netgraph.dev/v1alpha1\nkind: switch\n"
+            "apiVersion: netviz.dev/v1alpha1\nkind: switch\n"
             f"metadata: {{name: {name}}}\nspec:\n  interfaces:\n"
             "    - {name: Po1, type: lag, members: [e1, e2]}\n"
             "    - {name: Po2, type: lag, members: [e3, e4]}\n" + ports,
@@ -429,7 +429,7 @@ def test_two_port_channels_between_one_pair_stay_two_edges(tmp_path: Path) -> No
         tmp_path,
         "cables.yaml",
         "---\n".join(
-            "apiVersion: netgraph.dev/v1alpha1\nkind: cable\n"
+            "apiVersion: netviz.dev/v1alpha1\nkind: cable\n"
             f"metadata: {{name: cbl-{n}}}\n"
             f"spec: {{endpoints: [sw-a:e{n}, sw-b:e{n}], medium: copper}}\n"
             for n in (1, 2, 3, 4)
@@ -447,21 +447,21 @@ def test_an_aggregate_declared_on_one_end_only_still_bundles(tmp_path: Path) -> 
     _write(
         tmp_path,
         "sw-a.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata: {name: sw-a}\nspec:\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata: {name: sw-a}\nspec:\n"
         "  interfaces:\n    - {name: Po1, type: lag, members: [e1, e2]}\n"
         "    - {name: e1, type: ethernet}\n    - {name: e2, type: ethernet}\n",
     )
     _write(
         tmp_path,
         "sw-b.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata: {name: sw-b}\nspec:\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata: {name: sw-b}\nspec:\n"
         "  interfaces:\n    - {name: e1, type: ethernet}\n    - {name: e2, type: ethernet}\n",
     )
     _write(
         tmp_path,
         "cables.yaml",
         "---\n".join(
-            "apiVersion: netgraph.dev/v1alpha1\nkind: cable\n"
+            "apiVersion: netviz.dev/v1alpha1\nkind: cable\n"
             f"metadata: {{name: cbl-{n}}}\n"
             f"spec: {{endpoints: [sw-a:e{n}, sw-b:e{n}], medium: copper}}\n"
             for n in (1, 2)
@@ -482,7 +482,7 @@ def test_a_mixed_bundle_reports_the_most_physical_kind_and_no_medium(
         _write(
             tmp_path,
             f"{name}.yaml",
-            "apiVersion: netgraph.dev/v1alpha1\nkind: router\n"
+            "apiVersion: netviz.dev/v1alpha1\nkind: router\n"
             f"metadata: {{name: {name}}}\nspec:\n  interfaces:\n"
             "    - {name: e1, type: ethernet, ipv4: {addresses: [10.0.0.%s/30]}}\n"
             "    - {name: wg0, type: tunnel, parent: e1}\n" % ("1" if name == "sw-a" else "2"),
@@ -490,9 +490,9 @@ def test_a_mixed_bundle_reports_the_most_physical_kind_and_no_medium(
     _write(
         tmp_path,
         "links.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\nkind: cable\nmetadata: {name: cbl-1}\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: cable\nmetadata: {name: cbl-1}\n"
         "spec: {endpoints: [sw-a:e1, sw-b:e1], medium: copper, speed: 1Gbps}\n"
-        "---\napiVersion: netgraph.dev/v1alpha1\nkind: tunnel\nmetadata: {name: vpn}\n"
+        "---\napiVersion: netviz.dev/v1alpha1\nkind: tunnel\nmetadata: {name: vpn}\n"
         "spec:\n  type: wireguard\n  endpoints: [sw-a:wg0, sw-b:wg0]\n",
     )
     graph = aggregate_graph(build_graph(_load(tmp_path)), AggregateSpec(bundle=BundleMode.ALL))
@@ -548,7 +548,7 @@ def test_a_long_kind_census_is_bounded(campus: Inventory) -> None:
 
 
 def test_an_empty_namespace_summary_says_only_its_size() -> None:
-    from netgraph.render.aggregate import AggregateView
+    from netviz.render.aggregate import AggregateView
 
     assert AggregateView(namespace="sites/north").summary == "0 elements"
 
@@ -802,7 +802,7 @@ def test_render_help_documents_both_transforms() -> None:
 
 def test_namespaces_are_offered_for_completion() -> None:
     """``--collapse sites/<TAB>`` is the affordance that makes the flag usable."""
-    context = click.Context(cli, info_name="netgraph")
+    context = click.Context(cli, info_name="netviz")
     context.params["inventory"] = EXAMPLES / "campus"
     offered = [
         item.value for item in complete_namespace(context, click.Option(["--collapse"]), "sites/no")

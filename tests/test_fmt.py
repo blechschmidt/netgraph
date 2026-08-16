@@ -1,4 +1,4 @@
-"""``netgraph fmt``: the canonical form, and the two properties that make it safe.
+"""``netviz fmt``: the canonical form, and the two properties that make it safe.
 
 The suite is in three parts.
 
@@ -28,9 +28,9 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.errors import NetgraphError
-from netgraph.fmt import (
+from netviz.cli import cli
+from netviz.errors import NetvizError
+from netviz.fmt import (
     INDENT,
     SEQUENCE_INDENT,
     SEQUENCE_OFFSET,
@@ -42,11 +42,11 @@ from netgraph.fmt import (
     format_source,
     format_stream,
 )
-from netgraph.fmt.order import ENVELOPE_ORDER, LOADER_KEYS, check_order, document_shape, order_keys
-from netgraph.fmt.scalars import looks_like_mac, quote_style
-from netgraph.fmt.verify import comments, meaning, verify
-from netgraph.fsio import write_text
-from netgraph.scaffold import build_scaffold
+from netviz.fmt.order import ENVELOPE_ORDER, LOADER_KEYS, check_order, document_shape, order_keys
+from netviz.fmt.scalars import looks_like_mac, quote_style
+from netviz.fmt.verify import comments, meaning, verify
+from netviz.fsio import write_text
+from netviz.scaffold import build_scaffold
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -69,7 +69,7 @@ def fmt(text: str) -> str:
 
 
 DEVICE = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw1
@@ -90,7 +90,7 @@ def test_a_canonical_document_is_left_alone() -> None:
 
 
 def test_mappings_are_indented_two_spaces() -> None:
-    formatted = fmt("apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n      name: sw1\n")
+    formatted = fmt("apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n      name: sw1\n")
     assert "\n" + " " * INDENT + "name: sw1\n" in formatted
 
 
@@ -162,7 +162,7 @@ def test_an_empty_document_keeps_its_place_in_the_stream() -> None:
 
 
 def test_the_envelope_comes_first_in_schema_order() -> None:
-    scrambled = "spec:\n  interfaces: []\nmetadata:\n  name: sw1\nkind: switch\napiVersion: netgraph.dev/v1alpha1\n"
+    scrambled = "spec:\n  interfaces: []\nmetadata:\n  name: sw1\nkind: switch\napiVersion: netviz.dev/v1alpha1\n"
     formatted = fmt(scrambled)
     keys = [line.split(":")[0] for line in formatted.splitlines() if not line.startswith(" ")]
     assert keys == list(ENVELOPE_ORDER)
@@ -170,7 +170,7 @@ def test_the_envelope_comes_first_in_schema_order() -> None:
 
 def test_a_device_spec_follows_the_documented_field_order() -> None:
     scrambled = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw1
@@ -193,7 +193,7 @@ spec:
 
 def test_an_interface_follows_the_documented_field_order() -> None:
     scrambled = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw1
@@ -217,7 +217,7 @@ spec:
 def test_metadata_labels_keep_the_order_they_were_written_in() -> None:
     """The keys are the user's; YAML gives their order no meaning."""
     source = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw1
@@ -232,7 +232,7 @@ spec:
 
 def test_an_unknown_key_keeps_its_value_and_moves_to_the_end() -> None:
     source = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw1
@@ -249,7 +249,7 @@ spec:
 def test_the_loader_only_keys_are_placed_where_the_schema_documents_them() -> None:
     """``spec.from`` after ``interfaces``; ``interfaces[].range`` after ``name``."""
     source = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw1
@@ -267,7 +267,7 @@ spec:
 
 
 def test_a_document_of_unknown_kind_gets_the_envelope_ordered_and_nothing_else() -> None:
-    source = "spec:\n  zulu: 1\n  alpha: 2\nkind: wat\napiVersion: netgraph.dev/v1alpha1\n"
+    source = "spec:\n  zulu: 1\n  alpha: 2\nkind: wat\napiVersion: netviz.dev/v1alpha1\n"
     formatted = fmt(source)
     assert formatted.startswith("apiVersion:")
     assert formatted.index("zulu:") < formatted.index("alpha:")
@@ -292,7 +292,7 @@ def test_every_ordered_key_comes_from_a_model_or_is_a_documented_loader_key() ->
 
 @pytest.mark.parametrize("value", ["yes", "no", "on", "off", "Yes", "OFF", "Off", "YES"])
 def test_a_yaml_11_boolean_is_quoted_so_both_readers_agree(value: str) -> None:
-    """netgraph reads these as strings; nearly every other reader does not."""
+    """netviz reads these as strings; nearly every other reader does not."""
     assert fmt(f"a: {value}\n") == f"a: '{value}'\n"
 
 
@@ -313,7 +313,7 @@ def test_a_mac_address_is_quoted(mac: str) -> None:
         "10Gbps",
         "GigabitEthernet1/0/1",
         "1.2.3",
-        "netgraph.dev/v1alpha1",
+        "netviz.dev/v1alpha1",
         "cat6a",
     ],
 )
@@ -332,8 +332,8 @@ def test_a_quoted_float_keeps_its_quotes() -> None:
     assert fmt("version: '1.0'\n") == "version: '1.0'\n"
 
 
-def test_a_scalar_netgraph_already_misreads_is_left_exactly_as_written() -> None:
-    """``1:02`` is the integer 62 to netgraph's loader. Quoting it would be a repair."""
+def test_a_scalar_netviz_already_misreads_is_left_exactly_as_written() -> None:
+    """``1:02`` is the integer 62 to netviz's loader. Quoting it would be a repair."""
     assert fmt("a: 1:02\n") == "a: 1:02\n"
     assert quote_style("1:02") is None
 
@@ -382,7 +382,7 @@ def test_width_is_measured_from_where_the_value_actually_starts() -> None:
     assert fmt(flat) == flat
     assert len(flat.rstrip()) <= WIDTH
     nested = (
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: s\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n  name: s\n"
         "spec:\n  interfaces:\n    - name: e0\n      type: ethernet\n"
         f"      ipv4:\n        addresses: [{items}]\n"
     )
@@ -397,7 +397,7 @@ def test_width_is_measured_from_where_the_value_actually_starts() -> None:
 def test_comments_survive_a_round_trip() -> None:
     source = """\
 # a leading comment
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw1  # trailing
@@ -412,7 +412,7 @@ spec:
 
 def test_blank_line_grouping_survives_a_round_trip() -> None:
     source = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw1
@@ -435,7 +435,7 @@ def test_a_mapping_with_comments_between_its_keys_keeps_its_order() -> None:
     Leaving the order alone is the lesser of the two edits.
     """
     source = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw1
@@ -454,7 +454,7 @@ spec:
 def test_an_end_of_line_comment_does_travel_with_its_key() -> None:
     """The case ruamel files under the key itself, so reordering is safe."""
     source = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw1
@@ -472,12 +472,12 @@ spec:
 
 
 def test_a_stream_of_nothing_but_comments_keeps_them() -> None:
-    """What ``netgraph init --minimal`` writes.
+    """What ``netviz init --minimal`` writes.
 
     ruamel yields no documents for it and has nowhere to hang the comments, so
     a round trip through the emitter would return an empty file.
     """
-    source = "# the envelope every document shares\n#\n# apiVersion: netgraph.dev/v1alpha1\n"
+    source = "# the envelope every document shares\n#\n# apiVersion: netviz.dev/v1alpha1\n"
     assert fmt(source) == source
 
 
@@ -533,7 +533,7 @@ def test_the_property_corpus_is_the_size_it_should_be() -> None:
 
 @pytest.mark.parametrize("path", ALL_DOCUMENTS, ids=DOCUMENT_IDS)
 def test_formatting_preserves_meaning(path: Path) -> None:
-    """What netgraph reads from the file is identical before and after.
+    """What netviz reads from the file is identical before and after.
 
     A document that validates is compared as its model's JSON; one that does not
     is compared as its raw parsed data. :func:`format_source` already refuses to
@@ -555,7 +555,7 @@ def test_formatting_is_idempotent(path: Path) -> None:
 
 
 @pytest.mark.parametrize("minimal", [False, True], ids=["example", "minimal"])
-def test_what_netgraph_init_writes_is_already_canonical(minimal: bool) -> None:
+def test_what_netviz_init_writes_is_already_canonical(minimal: bool) -> None:
     """Otherwise a brand-new inventory fails ``fmt --check`` on its first commit."""
     scaffold = build_scaffold(minimal=minimal)
     stale = {
@@ -574,7 +574,7 @@ def test_the_shipped_examples_are_already_canonical() -> None:
         if format_source(path.read_text(encoding="utf-8-sig"), name=str(path))
         != path.read_text(encoding="utf-8-sig")
     ]
-    assert stale == [], f"run 'netgraph fmt examples'; not canonical: {stale}"
+    assert stale == [], f"run 'netviz fmt examples'; not canonical: {stale}"
 
 
 # --------------------------------------------------------------------------- #
@@ -601,11 +601,11 @@ def test_a_scalar_the_round_trip_parser_chokes_on_is_a_diagnostic(scalar: str) -
     ``float("-.")``, a bare ``ValueError`` out of the standard library rather
     than a ``YAMLError`` anything was catching.
 
-    netgraph's own loader resolves the same scalar as the string it plainly is,
+    netviz's own loader resolves the same scalar as the string it plainly is,
     so ``validate`` accepts the document and ``fmt`` used to answer it with a
     traceback. A formatter may refuse a file; it may not crash on one.
     """
-    document = f"apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: {scalar}\n"
+    document = f"apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n  name: {scalar}\n"
     with pytest.raises(FormatSyntaxError, match="could not read this document"):
         format_stream(document)
 
@@ -614,10 +614,10 @@ def test_a_file_whose_meaning_moved_is_never_written(tmp_path: Path, monkeypatch
     """The safety net, forced: a formatter that corrupts a file writes nothing."""
     path = tmp_path / "d.yaml"
     path.write_text(DEVICE, encoding="utf-8")
-    monkeypatch.setattr("netgraph.fmt.runner.format_stream", lambda text: "apiVersion: wrong\n")
+    monkeypatch.setattr("netviz.fmt.runner.format_stream", lambda text: "apiVersion: wrong\n")
     summary = format_paths([path], mode=Mode.WRITE)
     assert [result.outcome for result in summary.results] == [Outcome.FAILED]
-    assert "bug in netgraph" in (summary.results[0].error or "")
+    assert "bug in netviz" in (summary.results[0].error or "")
     assert path.read_text(encoding="utf-8") == DEVICE
 
 
@@ -658,7 +658,7 @@ def _tree(root: Path) -> None:
     (root / "skip" / "b.yaml").write_text("kind: switch\napiVersion: x\n", encoding="utf-8")
     (root / "_private.yaml").write_text("kind: switch\napiVersion: x\n", encoding="utf-8")
     (root / "notes.txt").write_text("kind: switch\n", encoding="utf-8")
-    (root / ".netgraphignore").write_text("skip/\n", encoding="utf-8")
+    (root / ".netvizignore").write_text("skip/\n", encoding="utf-8")
 
 
 def test_discovery_is_the_loader_s_so_ignore_rules_apply(tmp_path: Path) -> None:
@@ -701,10 +701,10 @@ def test_an_unreadable_encoding_is_reported_not_raised(tmp_path: Path) -> None:
 def messy(tmp_path: Path) -> Path:
     """A tree with one file that needs formatting and one that does not.
 
-    Written through :func:`netgraph.fsio.write_text`, which translates no line
+    Written through :func:`netviz.fsio.write_text`, which translates no line
     endings, rather than through :meth:`Path.write_text`, which on Windows turns
     every ``\\n`` into ``\\r\\n``. The canonical form is defined in bytes and LF
-    is part of it (see :func:`netgraph.fmt.runner._format_file`), so the
+    is part of it (see :func:`netviz.fmt.runner._format_file`), so the
     convenient spelling would have made ``ok.yaml`` genuinely non-canonical on
     that platform and the fixture would have been asserting the opposite of its
     own name.
@@ -712,21 +712,21 @@ def messy(tmp_path: Path) -> Path:
     write_text(tmp_path / "ok.yaml", DEVICE)
     write_text(
         tmp_path / "messy.yaml",
-        "kind: switch\napiVersion: netgraph.dev/v1alpha1\nmetadata:\n  name: sw2\n"
+        "kind: switch\napiVersion: netviz.dev/v1alpha1\nmetadata:\n  name: sw2\n"
         "spec:\n  interfaces:\n    - name: e0\n      type: ethernet\n",
     )
     return tmp_path
 
 
 def run(*args: str, stdin: str | None = None) -> Result:
-    """Invoke the CLI the way ``main`` does, so a NetgraphError becomes a status.
+    """Invoke the CLI the way ``main`` does, so a NetvizError becomes a status.
 
-    ``catch_exceptions`` has to be on: ``cli`` lets :class:`NetgraphError` out
-    and it is ``netgraph.cli.main`` that turns one into its exit code, which is
+    ``catch_exceptions`` has to be on: ``cli`` lets :class:`NetvizError` out
+    and it is ``netviz.cli.main`` that turns one into its exit code, which is
     the behaviour these tests are about.
     """
     result = CliRunner().invoke(cli, list(args), input=stdin, catch_exceptions=True)
-    if isinstance(result.exception, NetgraphError):
+    if isinstance(result.exception, NetvizError):
         return Result(result.output, result.exception.exit_code)
     if result.exception is not None and not isinstance(result.exception, SystemExit):
         raise result.exception
@@ -767,7 +767,7 @@ def test_diff_mode_writes_nothing_and_prints_a_patch(messy: Path) -> None:
     result = run("fmt", "--diff", str(messy))
     assert result.exit_code == 1
     assert "--- " in result.output and "+++ " in result.output
-    assert "+apiVersion: netgraph.dev/v1alpha1" in result.output
+    assert "+apiVersion: netviz.dev/v1alpha1" in result.output
     assert (messy / "messy.yaml").read_text(encoding="utf-8") == before
 
 
@@ -777,9 +777,9 @@ def test_check_and_diff_cannot_be_combined(messy: Path) -> None:
 
 
 def test_stdin_formats_a_stream_onto_stdout() -> None:
-    result = run("fmt", "--stdin", stdin="kind: switch\napiVersion: netgraph.dev/v1alpha1\n")
+    result = run("fmt", "--stdin", stdin="kind: switch\napiVersion: netviz.dev/v1alpha1\n")
     assert result.exit_code == 0
-    assert result.output == "apiVersion: netgraph.dev/v1alpha1\nkind: switch\n"
+    assert result.output == "apiVersion: netviz.dev/v1alpha1\nkind: switch\n"
 
 
 def test_the_path_dash_means_stdin() -> None:

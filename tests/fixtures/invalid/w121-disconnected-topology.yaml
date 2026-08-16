@@ -3,7 +3,7 @@
 # 'pc-a'/'pc-b' and 'pc-c'/'pc-d' are each cabled internally and never meet, so
 # every device looks connected while the inventory describes two networks.
 # Islands of one element are left to W103, which is why both have two.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -15,7 +15,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -27,7 +27,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-c
@@ -39,7 +39,7 @@ spec:
       ipv4:
         addresses: [10.0.1.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-d
@@ -51,7 +51,7 @@ spec:
       ipv4:
         addresses: [10.0.1.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b
@@ -61,7 +61,7 @@ spec:
     - pc-b:eth0
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-c-d

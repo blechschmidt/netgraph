@@ -5,11 +5,11 @@
     ],
     "labels": {
       "instance": "pc-north-01.hosts.north.sites",
-      "netgraph_element": "sites/north/hosts/pc-north-01",
-      "netgraph_name": "pc-north-01",
-      "netgraph_namespace": "sites/north/hosts",
-      "netgraph_kind": "computer",
-      "netgraph_vendor": "Dell",
+      "netviz_element": "sites/north/hosts/pc-north-01",
+      "netviz_name": "pc-north-01",
+      "netviz_namespace": "sites/north/hosts",
+      "netviz_kind": "computer",
+      "netviz_vendor": "Dell",
       "env": "prod"
     }
   },
@@ -19,11 +19,11 @@
     ],
     "labels": {
       "instance": "pc-north-02.hosts.north.sites",
-      "netgraph_element": "sites/north/hosts/pc-north-02",
-      "netgraph_name": "pc-north-02",
-      "netgraph_namespace": "sites/north/hosts",
-      "netgraph_kind": "computer",
-      "netgraph_vendor": "Lenovo",
+      "netviz_element": "sites/north/hosts/pc-north-02",
+      "netviz_name": "pc-north-02",
+      "netviz_namespace": "sites/north/hosts",
+      "netviz_kind": "computer",
+      "netviz_vendor": "Lenovo",
       "env": "prod"
     }
   },
@@ -33,11 +33,11 @@
     ],
     "labels": {
       "instance": "pc-south-01.hosts.south.sites",
-      "netgraph_element": "sites/south/hosts/pc-south-01",
-      "netgraph_name": "pc-south-01",
-      "netgraph_namespace": "sites/south/hosts",
-      "netgraph_kind": "computer",
-      "netgraph_vendor": "Dell",
+      "netviz_element": "sites/south/hosts/pc-south-01",
+      "netviz_name": "pc-south-01",
+      "netviz_namespace": "sites/south/hosts",
+      "netviz_kind": "computer",
+      "netviz_vendor": "Dell",
       "env": "prod"
     }
   },
@@ -47,11 +47,11 @@
     ],
     "labels": {
       "instance": "pc-south-02.hosts.south.sites",
-      "netgraph_element": "sites/south/hosts/pc-south-02",
-      "netgraph_name": "pc-south-02",
-      "netgraph_namespace": "sites/south/hosts",
-      "netgraph_kind": "computer",
-      "netgraph_vendor": "Lenovo",
+      "netviz_element": "sites/south/hosts/pc-south-02",
+      "netviz_name": "pc-south-02",
+      "netviz_namespace": "sites/south/hosts",
+      "netviz_kind": "computer",
+      "netviz_vendor": "Lenovo",
       "env": "prod"
     }
   },
@@ -61,11 +61,11 @@
     ],
     "labels": {
       "instance": "pc-west-01.hosts.west.sites",
-      "netgraph_element": "sites/west/hosts/pc-west-01",
-      "netgraph_name": "pc-west-01",
-      "netgraph_namespace": "sites/west/hosts",
-      "netgraph_kind": "computer",
-      "netgraph_vendor": "Dell",
+      "netviz_element": "sites/west/hosts/pc-west-01",
+      "netviz_name": "pc-west-01",
+      "netviz_namespace": "sites/west/hosts",
+      "netviz_kind": "computer",
+      "netviz_vendor": "Dell",
       "env": "prod"
     }
   },
@@ -75,11 +75,11 @@
     ],
     "labels": {
       "instance": "pc-west-02.hosts.west.sites",
-      "netgraph_element": "sites/west/hosts/pc-west-02",
-      "netgraph_name": "pc-west-02",
-      "netgraph_namespace": "sites/west/hosts",
-      "netgraph_kind": "computer",
-      "netgraph_vendor": "Lenovo",
+      "netviz_element": "sites/west/hosts/pc-west-02",
+      "netviz_name": "pc-west-02",
+      "netviz_namespace": "sites/west/hosts",
+      "netviz_kind": "computer",
+      "netviz_vendor": "Lenovo",
       "env": "prod"
     }
   },
@@ -89,11 +89,11 @@
     ],
     "labels": {
       "instance": "rtr-north-core-01.core.north.sites",
-      "netgraph_element": "sites/north/core/rtr-north-core-01",
-      "netgraph_name": "rtr-north-core-01",
-      "netgraph_namespace": "sites/north/core",
-      "netgraph_kind": "router",
-      "netgraph_vendor": "Juniper",
+      "netviz_element": "sites/north/core/rtr-north-core-01",
+      "netviz_name": "rtr-north-core-01",
+      "netviz_namespace": "sites/north/core",
+      "netviz_kind": "router",
+      "netviz_vendor": "Juniper",
       "env": "prod"
     }
   },
@@ -103,11 +103,11 @@
     ],
     "labels": {
       "instance": "rtr-south-core-01.core.south.sites",
-      "netgraph_element": "sites/south/core/rtr-south-core-01",
-      "netgraph_name": "rtr-south-core-01",
-      "netgraph_namespace": "sites/south/core",
-      "netgraph_kind": "router",
-      "netgraph_vendor": "Juniper",
+      "netviz_element": "sites/south/core/rtr-south-core-01",
+      "netviz_name": "rtr-south-core-01",
+      "netviz_namespace": "sites/south/core",
+      "netviz_kind": "router",
+      "netviz_vendor": "Juniper",
       "env": "prod"
     }
   },
@@ -117,11 +117,11 @@
     ],
     "labels": {
       "instance": "rtr-west-core-01.core.west.sites",
-      "netgraph_element": "sites/west/core/rtr-west-core-01",
-      "netgraph_name": "rtr-west-core-01",
-      "netgraph_namespace": "sites/west/core",
-      "netgraph_kind": "router",
-      "netgraph_vendor": "Juniper",
+      "netviz_element": "sites/west/core/rtr-west-core-01",
+      "netviz_name": "rtr-west-core-01",
+      "netviz_namespace": "sites/west/core",
+      "netviz_kind": "router",
+      "netviz_vendor": "Juniper",
       "env": "prod"
     }
   },
@@ -131,11 +131,11 @@
     ],
     "labels": {
       "instance": "srv-north-01.hosts.north.sites",
-      "netgraph_element": "sites/north/hosts/srv-north-01",
-      "netgraph_name": "srv-north-01",
-      "netgraph_namespace": "sites/north/hosts",
-      "netgraph_kind": "server",
-      "netgraph_vendor": "HPE",
+      "netviz_element": "sites/north/hosts/srv-north-01",
+      "netviz_name": "srv-north-01",
+      "netviz_namespace": "sites/north/hosts",
+      "netviz_kind": "server",
+      "netviz_vendor": "HPE",
       "env": "prod"
     }
   },
@@ -145,11 +145,11 @@
     ],
     "labels": {
       "instance": "srv-south-01.hosts.south.sites",
-      "netgraph_element": "sites/south/hosts/srv-south-01",
-      "netgraph_name": "srv-south-01",
-      "netgraph_namespace": "sites/south/hosts",
-      "netgraph_kind": "server",
-      "netgraph_vendor": "HPE",
+      "netviz_element": "sites/south/hosts/srv-south-01",
+      "netviz_name": "srv-south-01",
+      "netviz_namespace": "sites/south/hosts",
+      "netviz_kind": "server",
+      "netviz_vendor": "HPE",
       "env": "prod"
     }
   },
@@ -159,11 +159,11 @@
     ],
     "labels": {
       "instance": "srv-west-01.hosts.west.sites",
-      "netgraph_element": "sites/west/hosts/srv-west-01",
-      "netgraph_name": "srv-west-01",
-      "netgraph_namespace": "sites/west/hosts",
-      "netgraph_kind": "server",
-      "netgraph_vendor": "HPE",
+      "netviz_element": "sites/west/hosts/srv-west-01",
+      "netviz_name": "srv-west-01",
+      "netviz_namespace": "sites/west/hosts",
+      "netviz_kind": "server",
+      "netviz_vendor": "HPE",
       "env": "prod"
     }
   },
@@ -173,11 +173,11 @@
     ],
     "labels": {
       "instance": "sw-north-acc-01.access.north.sites",
-      "netgraph_element": "sites/north/access/sw-north-acc-01",
-      "netgraph_name": "sw-north-acc-01",
-      "netgraph_namespace": "sites/north/access",
-      "netgraph_kind": "switch",
-      "netgraph_vendor": "Cisco",
+      "netviz_element": "sites/north/access/sw-north-acc-01",
+      "netviz_name": "sw-north-acc-01",
+      "netviz_namespace": "sites/north/access",
+      "netviz_kind": "switch",
+      "netviz_vendor": "Cisco",
       "env": "prod"
     }
   },
@@ -187,11 +187,11 @@
     ],
     "labels": {
       "instance": "sw-north-acc-02.access.north.sites",
-      "netgraph_element": "sites/north/access/sw-north-acc-02",
-      "netgraph_name": "sw-north-acc-02",
-      "netgraph_namespace": "sites/north/access",
-      "netgraph_kind": "switch",
-      "netgraph_vendor": "Cisco",
+      "netviz_element": "sites/north/access/sw-north-acc-02",
+      "netviz_name": "sw-north-acc-02",
+      "netviz_namespace": "sites/north/access",
+      "netviz_kind": "switch",
+      "netviz_vendor": "Cisco",
       "env": "prod"
     }
   },
@@ -201,11 +201,11 @@
     ],
     "labels": {
       "instance": "sw-north-acc-03.access.north.sites",
-      "netgraph_element": "sites/north/access/sw-north-acc-03",
-      "netgraph_name": "sw-north-acc-03",
-      "netgraph_namespace": "sites/north/access",
-      "netgraph_kind": "switch",
-      "netgraph_vendor": "Cisco",
+      "netviz_element": "sites/north/access/sw-north-acc-03",
+      "netviz_name": "sw-north-acc-03",
+      "netviz_namespace": "sites/north/access",
+      "netviz_kind": "switch",
+      "netviz_vendor": "Cisco",
       "env": "prod"
     }
   },
@@ -215,11 +215,11 @@
     ],
     "labels": {
       "instance": "sw-north-dist-01.distribution.north.sites",
-      "netgraph_element": "sites/north/distribution/sw-north-dist-01",
-      "netgraph_name": "sw-north-dist-01",
-      "netgraph_namespace": "sites/north/distribution",
-      "netgraph_kind": "switch",
-      "netgraph_vendor": "Arista",
+      "netviz_element": "sites/north/distribution/sw-north-dist-01",
+      "netviz_name": "sw-north-dist-01",
+      "netviz_namespace": "sites/north/distribution",
+      "netviz_kind": "switch",
+      "netviz_vendor": "Arista",
       "env": "prod"
     }
   },
@@ -229,11 +229,11 @@
     ],
     "labels": {
       "instance": "sw-south-acc-01.access.south.sites",
-      "netgraph_element": "sites/south/access/sw-south-acc-01",
-      "netgraph_name": "sw-south-acc-01",
-      "netgraph_namespace": "sites/south/access",
-      "netgraph_kind": "switch",
-      "netgraph_vendor": "Cisco",
+      "netviz_element": "sites/south/access/sw-south-acc-01",
+      "netviz_name": "sw-south-acc-01",
+      "netviz_namespace": "sites/south/access",
+      "netviz_kind": "switch",
+      "netviz_vendor": "Cisco",
       "env": "prod"
     }
   },
@@ -243,11 +243,11 @@
     ],
     "labels": {
       "instance": "sw-south-acc-02.access.south.sites",
-      "netgraph_element": "sites/south/access/sw-south-acc-02",
-      "netgraph_name": "sw-south-acc-02",
-      "netgraph_namespace": "sites/south/access",
-      "netgraph_kind": "switch",
-      "netgraph_vendor": "Cisco",
+      "netviz_element": "sites/south/access/sw-south-acc-02",
+      "netviz_name": "sw-south-acc-02",
+      "netviz_namespace": "sites/south/access",
+      "netviz_kind": "switch",
+      "netviz_vendor": "Cisco",
       "env": "prod"
     }
   },
@@ -257,11 +257,11 @@
     ],
     "labels": {
       "instance": "sw-south-dist-01.distribution.south.sites",
-      "netgraph_element": "sites/south/distribution/sw-south-dist-01",
-      "netgraph_name": "sw-south-dist-01",
-      "netgraph_namespace": "sites/south/distribution",
-      "netgraph_kind": "switch",
-      "netgraph_vendor": "Arista",
+      "netviz_element": "sites/south/distribution/sw-south-dist-01",
+      "netviz_name": "sw-south-dist-01",
+      "netviz_namespace": "sites/south/distribution",
+      "netviz_kind": "switch",
+      "netviz_vendor": "Arista",
       "env": "prod"
     }
   },
@@ -271,11 +271,11 @@
     ],
     "labels": {
       "instance": "sw-west-acc-01.access.west.sites",
-      "netgraph_element": "sites/west/access/sw-west-acc-01",
-      "netgraph_name": "sw-west-acc-01",
-      "netgraph_namespace": "sites/west/access",
-      "netgraph_kind": "switch",
-      "netgraph_vendor": "Cisco",
+      "netviz_element": "sites/west/access/sw-west-acc-01",
+      "netviz_name": "sw-west-acc-01",
+      "netviz_namespace": "sites/west/access",
+      "netviz_kind": "switch",
+      "netviz_vendor": "Cisco",
       "env": "prod"
     }
   },
@@ -285,11 +285,11 @@
     ],
     "labels": {
       "instance": "sw-west-acc-02.access.west.sites",
-      "netgraph_element": "sites/west/access/sw-west-acc-02",
-      "netgraph_name": "sw-west-acc-02",
-      "netgraph_namespace": "sites/west/access",
-      "netgraph_kind": "switch",
-      "netgraph_vendor": "Cisco",
+      "netviz_element": "sites/west/access/sw-west-acc-02",
+      "netviz_name": "sw-west-acc-02",
+      "netviz_namespace": "sites/west/access",
+      "netviz_kind": "switch",
+      "netviz_vendor": "Cisco",
       "env": "prod"
     }
   },
@@ -299,11 +299,11 @@
     ],
     "labels": {
       "instance": "sw-west-dist-01.distribution.west.sites",
-      "netgraph_element": "sites/west/distribution/sw-west-dist-01",
-      "netgraph_name": "sw-west-dist-01",
-      "netgraph_namespace": "sites/west/distribution",
-      "netgraph_kind": "switch",
-      "netgraph_vendor": "Arista",
+      "netviz_element": "sites/west/distribution/sw-west-dist-01",
+      "netviz_name": "sw-west-dist-01",
+      "netviz_namespace": "sites/west/distribution",
+      "netviz_kind": "switch",
+      "netviz_vendor": "Arista",
       "env": "prod"
     }
   }

@@ -5,7 +5,7 @@ Three properties are asserted here, and each one protects a different promise:
 * ``examples/`` loads with no schema error and validates with **no findings at
   all**. The README of each example says so; this makes the claim testable.
 * ``tests/fixtures/invalid/`` holds exactly one file per rule in
-  :data:`netgraph.rules.RULE_IDS`, and each file triggers exactly that one
+  :data:`netviz.rules.RULE_IDS`, and each file triggers exactly that one
   finding. A new rule without a fixture fails here rather than shipping
   untested.
 * Both examples reach a rendered SVG, so a topology that the validator likes
@@ -20,10 +20,10 @@ from pathlib import Path
 
 import pytest
 
-from netgraph.loader import Inventory, load_tree, namespace_of
-from netgraph.models import Adapter, Device, PatchPanel
-from netgraph.rules import RULE_IDS
-from netgraph.validate import validate
+from netviz.loader import Inventory, load_tree, namespace_of
+from netviz.models import Adapter, Device, PatchPanel
+from netviz.rules import RULE_IDS
+from netviz.validate import validate
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -147,7 +147,7 @@ def test_the_home_lab_covers_every_element_kind_it_advertises() -> None:
 
 def test_the_home_lab_nests_one_group_inside_another() -> None:
     """`admins` is in `household`, so `ana` is too without being listed twice."""
-    from netgraph.identity import identity_plan
+    from netviz.identity import identity_plan
 
     plan = identity_plan(load_example("home-lab"))
     assert plan.members_of("people/household") == ("people/admins", "people/kit")
@@ -297,7 +297,7 @@ def _render_svg(inventory: Inventory) -> str:
     """
     import graphviz
 
-    graph = graphviz.Graph("netgraph")
+    graph = graphviz.Graph("netviz")
     for fqn, element in inventory.elements.items():
         if fqn in inventory.cables or fqn in inventory.tunnels:
             continue

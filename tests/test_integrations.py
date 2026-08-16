@@ -29,11 +29,11 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.diagnostics import FORMATS
-from netgraph.render import FORMATS as RENDER_FORMATS
-from netgraph.render import TEXT_FORMATS, diff_formats, suffix_for, supports_diff
-from netgraph.review import MARKER_PREFIX
+from netviz.cli import cli
+from netviz.diagnostics import FORMATS
+from netviz.render import FORMATS as RENDER_FORMATS
+from netviz.render import TEXT_FORMATS, diff_formats, suffix_for, supports_diff
+from netviz.review import MARKER_PREFIX
 
 from platform_marks import (  # isort: skip -- tests/ is on sys.path, not a package
     ON_WINDOWS,
@@ -43,17 +43,17 @@ from platform_marks import (  # isort: skip -- tests/ is on sys.path, not a pack
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HOOKS_FILE = REPO_ROOT / ".pre-commit-hooks.yaml"
-ACTION_DIR = REPO_ROOT / ".github" / "actions" / "netgraph-validate"
+ACTION_DIR = REPO_ROOT / ".github" / "actions" / "netviz-validate"
 ACTION_FILE = ACTION_DIR / "action.yml"
 ACTION_README = ACTION_DIR / "README.md"
-RENDER_ACTION_DIR = REPO_ROOT / ".github" / "actions" / "netgraph-render"
+RENDER_ACTION_DIR = REPO_ROOT / ".github" / "actions" / "netviz-render"
 RENDER_ACTION_FILE = RENDER_ACTION_DIR / "action.yml"
 RENDER_ACTION_README = RENDER_ACTION_DIR / "README.md"
-REVIEW_ACTION_DIR = REPO_ROOT / ".github" / "actions" / "netgraph-review"
+REVIEW_ACTION_DIR = REPO_ROOT / ".github" / "actions" / "netviz-review"
 REVIEW_ACTION_FILE = REVIEW_ACTION_DIR / "action.yml"
 REVIEW_ACTION_README = REVIEW_ACTION_DIR / "README.md"
-PAGES_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "netgraph-pages.yml"
-REVIEW_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "netgraph-review.yml"
+PAGES_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "netviz-pages.yml"
+REVIEW_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "netviz-review.yml"
 DOGFOOD_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "review.yml"
 WORKFLOW = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 CI_DOC = REPO_ROOT / "docs" / "ci.md"
@@ -125,10 +125,10 @@ def action() -> dict[str, Any]:
 #: somebody else's ``.pre-commit-config.yaml`` names it -- so adding one is
 #: fine and renaming or removing one is a breaking change.
 PUBLISHED_HOOKS = [
-    "netgraph-validate",
-    "netgraph-test",
-    "netgraph-fmt",
-    "netgraph-fmt-check",
+    "netviz-validate",
+    "netviz-test",
+    "netviz-fmt",
+    "netviz-fmt-check",
 ]
 
 
@@ -156,10 +156,10 @@ def test_validation_takes_no_filenames_and_formatting_takes_them(
     """
     filenames = {hook["id"]: hook["pass_filenames"] for hook in hooks}
     assert filenames == {
-        "netgraph-validate": False,
-        "netgraph-test": False,
-        "netgraph-fmt": True,
-        "netgraph-fmt-check": True,
+        "netviz-validate": False,
+        "netviz-test": False,
+        "netviz-fmt": True,
+        "netviz-fmt-check": True,
     }
 
 
@@ -175,10 +175,10 @@ def test_every_hook_only_runs_when_yaml_changed(hooks: list[dict[str, Any]], hoo
 @pytest.mark.parametrize(
     ("hook_id", "command", "options"),
     [
-        ("netgraph-validate", "validate", ("--strict", "--disable", "--output-format")),
-        ("netgraph-test", "test", ("--output-format", "--list", "--max-hops")),
-        ("netgraph-fmt", "fmt", ("--check", "--diff", "--stdin")),
-        ("netgraph-fmt-check", "fmt", ("--check",)),
+        ("netviz-validate", "validate", ("--strict", "--disable", "--output-format")),
+        ("netviz-test", "test", ("--output-format", "--list", "--max-hops")),
+        ("netviz-fmt", "fmt", ("--check", "--diff", "--stdin")),
+        ("netviz-fmt-check", "fmt", ("--check",)),
     ],
 )
 def test_every_hook_entry_is_a_command_the_cli_actually_has(
@@ -187,7 +187,7 @@ def test_every_hook_entry_is_a_command_the_cli_actually_has(
     """An ``entry`` is run verbatim by pre-commit; it has to keep resolving."""
     hook = next(entry for entry in hooks if entry["id"] == hook_id)
     words = hook["entry"].split()
-    assert words[0] == "netgraph"
+    assert words[0] == "netviz"
     assert words[1] == command
 
     result = CliRunner().invoke(cli, [*words[1:], "--help"])
@@ -197,7 +197,7 @@ def test_every_hook_entry_is_a_command_the_cli_actually_has(
 
 
 def test_the_local_config_does_not_shadow_the_published_hooks() -> None:
-    """``.pre-commit-config.yaml`` is what netgraph runs on itself; a different file."""
+    """``.pre-commit-config.yaml`` is what netviz runs on itself; a different file."""
     config = load_yaml(REPO_ROOT / ".pre-commit-config.yaml")
     assert "repos" in config
     assert not isinstance(config, list), "the two files must not be confused for one another"
@@ -266,7 +266,7 @@ def test_the_action_readme_documents_every_input_and_output(action: dict[str, An
 
 def test_the_action_readme_shows_a_usable_snippet() -> None:
     readme = ACTION_README.read_text(encoding="utf-8")
-    assert "uses: blechschmidt/netgraph/.github/actions/netgraph-validate@" in readme
+    assert "uses: blechschmidt/netgraph/.github/actions/netviz-validate@" in readme
     assert "github/codeql-action/upload-sarif" in readme
     assert "actions/setup-python" in readme, "the action deliberately installs no interpreter"
 
@@ -277,7 +277,7 @@ def test_the_action_readme_shows_a_usable_snippet() -> None:
 
 
 #: The other half of the promise: what the README and ``docs/ci.md`` say a
-#: workflow may set on ``netgraph-render``.
+#: workflow may set on ``netviz-render``.
 EXPECTED_RENDER_INPUTS = {
     "inventory",
     "format",
@@ -339,7 +339,7 @@ def run_step(
     environment.update(environment_for(action, step_id, values))
     environment["RUNNER_TEMP"] = str(tmp_path / "runner-temp")
     environment["GITHUB_OUTPUT"] = str(tmp_path / "github-output")
-    # The action calls ``netgraph``, so the console script has to be findable.
+    # The action calls ``netviz``, so the console script has to be findable.
     # ``sysconfig`` is asked where it went rather than assuming "next to the
     # interpreter", because those are the same directory only on POSIX: Windows
     # puts console scripts in ``Scripts\`` beside ``python.exe``. The same
@@ -412,7 +412,7 @@ def test_the_render_action_knows_every_format_the_cli_has(render_action: dict[st
 def test_the_render_action_derives_the_suffix_the_renderer_would(
     render_action: dict[str, Any],
 ) -> None:
-    """The default output path is ``netgraph`` plus the format's own extension."""
+    """The default output path is ``netviz`` plus the format's own extension."""
     script = step_of(render_action, "render")["run"]
     odd = {name for name in RENDER_FORMATS if suffix_for(name) != f".{name}"}
     assert odd == {"mermaid"}, (
@@ -425,9 +425,9 @@ def test_the_render_action_derives_the_suffix_the_renderer_would(
 def test_the_render_action_installs_graphviz_for_exactly_the_formats_that_need_it(
     render_action: dict[str, Any],
 ) -> None:
-    """A format netgraph writes by itself must not pay for the install.
+    """A format netviz writes by itself must not pay for the install.
 
-    The text formats are emitted by netgraph directly — except ``html``, which
+    The text formats are emitted by netviz directly — except ``html``, which
     embeds an SVG that Graphviz laid out, and so needs ``dot`` as much as
     ``svg`` does.
     """
@@ -472,7 +472,7 @@ def test_the_render_action_readme_documents_every_input_and_output(
 
 def test_the_render_action_readme_shows_a_usable_snippet() -> None:
     readme = RENDER_ACTION_README.read_text(encoding="utf-8")
-    assert "uses: blechschmidt/netgraph/.github/actions/netgraph-render@" in readme
+    assert "uses: blechschmidt/netgraph/.github/actions/netviz-render@" in readme
     assert "actions/setup-python" in readme, "the action deliberately installs no interpreter"
     assert "upload-pages-artifact" in readme
 
@@ -485,7 +485,7 @@ def test_the_render_step_recognises_what_the_renderer_writes(
 ) -> None:
     """Every shape check has to match the thing it is checking.
 
-    The markers are literals in a shell script — ``<svg``, ``graph netgraph``,
+    The markers are literals in a shell script — ``<svg``, ``graph netviz``,
     ``%PDF`` — and the renderers they describe are free to change. Rendering
     each format and letting the step judge its own output is what ties the two
     together; a marker that stopped matching would otherwise turn into a step
@@ -545,7 +545,7 @@ def test_the_render_step_defaults_the_output_to_the_runner_temp(
     assert result.returncode == 0, result.stderr
 
     written = Path(outputs_of(tmp_path)["file"])
-    assert written == tmp_path / "runner-temp" / "netgraph.mmd"
+    assert written == tmp_path / "runner-temp" / "netviz.mmd"
     assert written.read_text(encoding="utf-8").startswith("flowchart")
 
 
@@ -580,7 +580,7 @@ def test_the_render_step_does_not_expand_a_glob_in_its_arguments(
     """A ``--name 'sw*'`` filter is a filter, not a file listing.
 
     Run in a directory that happens to hold a file called ``sw-…``, an
-    unprotected word split would hand netgraph that filename, which matches no
+    unprotected word split would hand netviz that filename, which matches no
     element — so the diagram would come back either empty or unfiltered rather
     than wrong in a way anybody notices.
     """
@@ -622,7 +622,7 @@ def test_the_render_step_fails_when_the_file_is_not_the_format_it_asked_for(
 ) -> None:
     """The shape check, provoked: a render that writes over a decoy.
 
-    ``--show-config`` makes ``netgraph render`` print its resolved settings and
+    ``--show-config`` makes ``netviz render`` print its resolved settings and
     exit without drawing, so the file it was told to write is left as it was —
     which is exactly the "exit 0, bytes on disk, no diagram" case the check
     exists for.
@@ -746,9 +746,9 @@ def test_only_the_deploy_job_of_the_pages_workflow_can_write(
 
 
 def test_the_pages_workflow_renders_through_the_action(pages_workflow: dict[str, Any]) -> None:
-    """One renderer, not two: the page is whatever ``netgraph render`` writes."""
+    """One renderer, not two: the page is whatever ``netviz render`` writes."""
     steps = pages_workflow["jobs"]["build"]["steps"]
-    render = next(step for step in steps if "netgraph-render" in step.get("uses", ""))
+    render = next(step for step in steps if "netviz-render" in step.get("uses", ""))
     assert render["with"]["format"] == "html", "only the self-contained page can be published as-is"
     for name in ("inventory", "layer", "title", "theme", "args", "strict", "graphviz", "version"):
         assert f"inputs.{name}" in str(render["with"][name]), f"{name} never reaches the action"
@@ -762,11 +762,11 @@ def test_the_pages_workflow_renders_through_the_action(pages_workflow: dict[str,
 def test_the_pages_workflow_renders_with_the_action_that_belongs_to_it(
     pages_workflow: dict[str, Any],
 ) -> None:
-    """The action is netgraph's own, at the commit the caller pinned the workflow at.
+    """The action is netviz's own, at the commit the caller pinned the workflow at.
 
     ``uses:`` takes no expression, so an action referenced by name would have to
     name a fixed ref — and a workflow called ``@v0.1.0`` that then reached for
-    the action on ``main`` would be pinned in name only. Checking netgraph out
+    the action on ``main`` would be pinned in name only. Checking netviz out
     at ``github.job_workflow_sha`` and using the local path is what keeps the
     two halves the same release.
     """
@@ -777,7 +777,7 @@ def test_the_pages_workflow_renders_with_the_action_that_belongs_to_it(
     assert checkout["with"]["ref"] == "${{ github.job_workflow_sha }}"
     assert checkout["with"]["persist-credentials"] is False
 
-    render = next(step for step in steps if "netgraph-render" in step["uses"])
+    render = next(step for step in steps if "netviz-render" in step["uses"])
     # Derived from where the action actually lives, so moving the directory
     # fails here rather than in somebody's deployment.
     inside = RENDER_ACTION_DIR.relative_to(REPO_ROOT).as_posix()
@@ -795,13 +795,13 @@ def test_ci_renders_an_example_through_the_render_action() -> None:
     workflow = load_yaml(WORKFLOW)
     steps = workflow["jobs"]["render-examples"]["steps"]
     used = [step.get("uses", "") for step in steps]
-    assert used.count("./.github/actions/netgraph-render") == 2, (
+    assert used.count("./.github/actions/netviz-render") == 2, (
         "the Graphviz path and a format that needs no Graphviz are both meant to be exercised"
     )
     formats = {
         step.get("with", {}).get("format", "html")
         for step in steps
-        if step.get("uses") == "./.github/actions/netgraph-render"
+        if step.get("uses") == "./.github/actions/netviz-render"
     }
     assert formats == {"html", "mermaid"}
 
@@ -812,7 +812,7 @@ def test_ci_runs_the_action_over_the_examples() -> None:
     job = workflow["jobs"]["validate-examples"]
     used = [step.get("uses", "") for step in job["steps"]]
 
-    assert used.count("./.github/actions/netgraph-validate") == 2, (
+    assert used.count("./.github/actions/netviz-validate") == 2, (
         "the sarif path and the annotation path are both meant to be exercised"
     )
     assert any(entry.startswith("github/codeql-action/upload-sarif") for entry in used)
@@ -860,7 +860,7 @@ def test_the_ci_documentation_covers_every_input_of_the_reusable_workflow(
 
 
 #: The third promise: what the README and ``docs/ci.md`` say a workflow may set
-#: on ``netgraph-review``.
+#: on ``netviz-review``.
 EXPECTED_REVIEW_INPUTS = {
     "inventory",
     "base",
@@ -950,8 +950,8 @@ def test_the_review_action_never_fails_before_it_has_written_the_review(
 ) -> None:
     """The one run with something to report must not be the one that reports nothing."""
     script = step_of(review_action, "review")["run"]
-    assert "--fail-on never" in script, "netgraph must not exit before the outputs are set"
-    assert script.index("GITHUB_OUTPUT") < script.index('NETGRAPH_FAIL}" = "true"')
+    assert "--fail-on never" in script, "netviz must not exit before the outputs are set"
+    assert script.index("GITHUB_OUTPUT") < script.index('NETVIZ_FAIL}" = "true"')
 
 
 def test_the_review_action_reads_the_summary_rather_than_the_prose(
@@ -997,7 +997,7 @@ def test_the_review_action_readme_documents_every_input_and_output(
 
 def test_the_review_action_readme_shows_a_usable_snippet() -> None:
     readme = REVIEW_ACTION_README.read_text(encoding="utf-8")
-    assert "uses: blechschmidt/netgraph/.github/actions/netgraph-review@" in readme
+    assert "uses: blechschmidt/netgraph/.github/actions/netviz-review@" in readme
     assert "actions/setup-python" in readme, "the action deliberately installs no interpreter"
     assert "github/codeql-action/upload-sarif" in readme
     assert "pull_request_target" in readme, "the trigger it must not be run under goes unsaid"
@@ -1062,7 +1062,7 @@ def test_a_base_that_is_not_in_the_clone_is_fetched_and_made_resolvable(
     """The shape of a pull-request checkout: one branch, one commit deep.
 
     A fetch by *name* leaves ``FETCH_HEAD`` and no ref called ``main``, so a
-    step that stopped at "the fetch succeeded" would hand netgraph a ref git
+    step that stopped at "the fetch succeeded" would hand netviz a ref git
     cannot read. This is that case, and it failed on a real runner before the
     step gave the commit the name it was asked for.
     """
@@ -1108,7 +1108,7 @@ def test_the_review_step_writes_the_bundle_and_reports_the_verdict(
     """
     build_repository(tmp_path)
     (tmp_path / "inventory" / "hosts" / "extra.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata:\n  name: pc-extra\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n      enabled: false\n",
@@ -1135,14 +1135,12 @@ def test_the_review_step_writes_the_bundle_and_reports_the_verdict(
     assert outputs["failed"] == "false"
 
     directory = Path(outputs["directory"])
-    assert (
-        (directory / "comment.md").read_text(encoding="utf-8").startswith("<!-- netgraph-review:")
-    )
+    assert (directory / "comment.md").read_text(encoding="utf-8").startswith("<!-- netviz-review:")
     assert json.loads((directory / "summary.json").read_text(encoding="utf-8"))["changed"] is True
     assert (
         json.loads((directory / "plan.json").read_text(encoding="utf-8"))["summary"]["total"] == 1
     )
-    assert (directory / "netgraph.sarif").is_file()
+    assert (directory / "netviz.sarif").is_file()
     assert outputs["diagrams"].endswith("diff.dot")
 
 
@@ -1153,7 +1151,7 @@ def test_the_review_step_fails_only_when_the_caller_asked_and_a_new_error_exists
 ) -> None:
     build_repository(tmp_path)
     (tmp_path / "inventory" / "cables" / "extra.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata:\n  name: cbl-nowhere\n"
         "spec:\n  endpoints:\n    - rtr-home:lan0\n    - nowhere:eth0\n  medium: copper\n",
@@ -1277,7 +1275,7 @@ def test_the_review_workflow_reviews_with_the_action_that_belongs_to_it(
     assert checkout["with"]["ref"] == "${{ github.job_workflow_sha }}"
     assert checkout["with"]["persist-credentials"] is False
 
-    review = next(step for step in steps if "netgraph-review" in step.get("uses", ""))
+    review = next(step for step in steps if "netviz-review" in step.get("uses", ""))
     inside = REVIEW_ACTION_DIR.relative_to(REPO_ROOT).as_posix()
     assert review["uses"] == f"./{checkout['with']['path']}/{inside}"
     assert steps.index(checkout) < steps.index(review)
@@ -1298,7 +1296,7 @@ def test_the_review_workflow_publishes_before_it_fails(review_workflow: dict[str
     """Every artefact is out before anything goes red, and the gate is last."""
     steps = steps_of(review_workflow)
     names = [step.get("name", "") for step in steps]
-    review = next(step for step in steps if "netgraph-review" in step.get("uses", ""))
+    review = next(step for step in steps if "netviz-review" in step.get("uses", ""))
     assert review["with"]["fail-on-new-errors"] == "false", "the action must only report"
 
     gate = names.index("Fail on errors this change introduced")

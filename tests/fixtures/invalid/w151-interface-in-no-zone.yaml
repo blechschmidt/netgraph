@@ -3,7 +3,7 @@
 # Once a device divides its interfaces into zones, one left outside is traffic
 # the policy cannot name: no rule saying 'from lan' reaches it, and what it gets
 # is the chain default.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: firewall
 metadata:
   name: fw-a
@@ -30,7 +30,7 @@ spec:
         dst_zone: local
         action: drop
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-b
@@ -47,7 +47,7 @@ spec:
       ipv4:
         addresses: [10.0.1.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b-0
@@ -57,7 +57,7 @@ spec:
     - rtr-b:eth0
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b-1

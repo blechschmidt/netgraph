@@ -2,7 +2,7 @@
 
 The loader reads whatever is on disk; the query parser reads whatever is on the
 command line, in an HTTP query string, or in a `query:` key of a document a
-colleague wrote. That makes it the second genuine trust boundary in netgraph,
+colleague wrote. That makes it the second genuine trust boundary in netviz,
 and the contract at it is the same four clauses ``tests/test_fuzz_loader.py``
 states for the first:
 
@@ -11,7 +11,7 @@ states for the first:
    construction — a finite tree and one bounded breadth-first search — and this
    is where that claim meets an adversary rather than a docstring.
 2. **It fails structurally.** Every rejection is a
-   :class:`~netgraph.query.QueryError` carrying a span, never a traceback out of
+   :class:`~netviz.query.QueryError` carrying a span, never a traceback out of
    :mod:`re`, :mod:`ipaddress`, :mod:`fnmatch` or a bare ``IndexError``.
 3. **It stays bounded.** A diagnostic echoes a window around the offending
    column rather than the query, so a 4096-character generated expression cannot
@@ -22,7 +22,7 @@ states for the first:
 
 And one clause the loader's fuzzing has no counterpart for:
 
-5. **Whatever parses, evaluates.** :func:`~netgraph.query.parser.parse` resolves
+5. **Whatever parses, evaluates.** :func:`~netviz.query.parser.parse` resolves
    every attribute and checks every value, so a query that survives it is a
    query that runs against *any* graph without raising. Every mutant that parses
    is therefore run against three real inventories.
@@ -44,11 +44,11 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from netgraph.loader import load_tree
-from netgraph.query import MAX_QUERY_LENGTH, QueryError, evaluate, parse
-from netgraph.query.errors import MAX_QUERY_ECHO
-from netgraph.query.lexer import tokenize
-from netgraph.render.graph import Layer, build_graph
+from netviz.loader import load_tree
+from netviz.query import MAX_QUERY_LENGTH, QueryError, evaluate, parse
+from netviz.query.errors import MAX_QUERY_ECHO
+from netviz.query.lexer import tokenize
+from netviz.render.graph import Layer, build_graph
 
 REPO_ROOT: Final = Path(__file__).resolve().parent.parent
 

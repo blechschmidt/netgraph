@@ -2,7 +2,7 @@
 #
 # One end is untagged in VLAN 10, the other in VLAN 20, so the link joins two
 # different broadcast domains.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -15,7 +15,7 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-b
@@ -28,7 +28,7 @@ spec:
         mode: access
         access_vlan: 20
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

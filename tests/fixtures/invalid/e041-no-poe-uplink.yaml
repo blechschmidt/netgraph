@@ -3,7 +3,7 @@
 # The camera has no power cord: 'powered_by: poe' says the run carrying its
 # traffic is its only power path. The switch port at the far end of that run
 # declares no 'poe' block, so the camera will not come up.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -16,7 +16,7 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: cam-door
@@ -32,7 +32,7 @@ spec:
     draw_watts: 8
     powered_by: poe
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-cam

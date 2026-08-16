@@ -6,7 +6,7 @@ It is the fixture behind the goldens in `tests/test_golden.py` and behind the
 worked example in [`docs/rendering.md`](../../../docs/rendering.md).
 
 It exists separately from [`arranged`](../arranged/) because the two pin down
-different halves of §18. `arranged` is what `netgraph layout --write` *produces*
+different halves of §18. `arranged` is what `netviz layout --write` *produces*
 — coordinates an engine chose, seeded and settled — and its numbers change
 whenever Graphviz's layout does. This one is what a **person** produces, and its
 numbers must not change at all: they are typed, round, and chosen so that a
@@ -32,8 +32,8 @@ together:
   orthogonal around it, is the whole point of a per-link style.
 
 The node positions and sizes were seeded from `arranged` and then left alone.
-The sizes are not decoration: a route netgraph computes has to stop at the shape
-it runs into, and netgraph cannot measure a label, so
-`netgraph layout --write --waypoints` records the box of every node a stored
+The sizes are not decoration: a route netviz computes has to stop at the shape
+it runs into, and netviz cannot measure a label, so
+`netviz layout --write --waypoints` records the box of every node a stored
 route leaves from. Without them the render falls back to a default box, says so,
 and clips the route early.

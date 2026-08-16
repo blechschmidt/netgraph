@@ -3,7 +3,7 @@
 # A warning, not an error: an eBGP session towards a transit provider points at
 # an address on their router, which is not an element of this inventory and
 # never will be. What it costs is the check - and the edge on the diagram.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-a
@@ -23,7 +23,7 @@ spec:
           remote_asn: 65002
           description: transit
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-b
@@ -35,7 +35,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

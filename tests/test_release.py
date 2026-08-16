@@ -18,7 +18,7 @@ Five things are checked:
 * ``.github/workflows/release.yml`` pins every action to a commit SHA, keeps its
   permissions per job, and names the environments the PyPI trusted publisher is
   scoped to.
-* ``netgraph --version`` and ``netgraph version --json`` report the package, the
+* ``netviz --version`` and ``netviz version --json`` report the package, the
   Python and the Graphviz actually in use, in the shapes the workflow and
   ``docs/commands/version.md`` promise.
 * The package still imports on the interpreters ``requires-python`` and the
@@ -46,10 +46,10 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-import netgraph
-from netgraph import __version__
-from netgraph.cli import cli
-from netgraph.version import (
+import netviz
+from netviz import __version__
+from netviz.cli import cli
+from netviz.version import (
     REPORT_SCHEMA_VERSION,
     as_dict,
     collect,
@@ -118,7 +118,7 @@ _Nothing yet._
 
 
 def pyproject_with(version: str) -> str:
-    return f'[project]\nname = "netgraph"\nversion = "{version}"\n'
+    return f'[project]\nname = "netviz"\nversion = "{version}"\n'
 
 
 # --------------------------------------------------------------------------- #
@@ -132,7 +132,7 @@ def test_the_packaged_version_is_read_from_pyproject() -> None:
 
 def test_a_pyproject_without_a_version_is_refused() -> None:
     with pytest.raises(release.ReleaseError, match="declares no"):
-        release.project_version('[project]\nname = "netgraph"\n')
+        release.project_version('[project]\nname = "netviz"\n')
 
 
 def test_two_top_level_versions_are_refused_rather_than_guessed_at() -> None:
@@ -335,17 +335,17 @@ def test_the_changelog_is_linked_from_the_documentation_index() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def netgraph_modules() -> list[ModuleType]:
+def netviz_modules() -> list[ModuleType]:
     """Every module of the installed package, imported."""
-    modules = [netgraph]
-    for info in pkgutil.walk_packages(netgraph.__path__, prefix="netgraph."):
+    modules = [netviz]
+    for info in pkgutil.walk_packages(netviz.__path__, prefix="netviz."):
         modules.append(importlib.import_module(info.name))
     return modules
 
 
 def test_the_whole_package_imports() -> None:
     """A module nothing imports is a module nothing has checked syntax of."""
-    assert len(netgraph_modules()) > 100
+    assert len(netviz_modules()) > 100
 
 
 def test_no_dataclass_default_is_a_mapping_proxy() -> None:
@@ -359,9 +359,9 @@ def test_no_dataclass_default_is_a_mapping_proxy() -> None:
     RUF009 has ``MappingProxyType`` on its known-immutable list, and mypy's
     ``--python-version 3.11`` does not model the check.
 
-    It has now happened twice: ``netgraph lsp`` in July, and
-    ``netgraph.render.styles`` on 2026-08-15, which took the whole 3.11 job with
-    it before a single test ran — and, on a 3.11 anybody had installed netgraph
+    It has now happened twice: ``netviz lsp`` in July, and
+    ``netviz.render.styles`` on 2026-08-15, which took the whole 3.11 job with
+    it before a single test ran — and, on a 3.11 anybody had installed netviz
     on, every command that draws anything. The first time it was answered with
     ``test_a_cursor_context_can_be_built_on_every_supported_python``, which
     covers one module; this is the one that covers the package. The spelling
@@ -370,7 +370,7 @@ def test_no_dataclass_default_is_a_mapping_proxy() -> None:
     """
     offenders = [
         f"{cls.__module__}.{cls.__qualname__}.{entry.name}"
-        for cls in dataclasses_of(netgraph_modules())
+        for cls in dataclasses_of(netviz_modules())
         for entry in dataclasses.fields(cls)
         if isinstance(entry.default, MappingProxyType)
     ]
@@ -381,14 +381,14 @@ def test_no_dataclass_default_is_a_mapping_proxy() -> None:
 
 
 def dataclasses_of(modules: Iterable[ModuleType]) -> list[type]:
-    """Every dataclass netgraph defines, once each."""
+    """Every dataclass netviz defines, once each."""
     found: dict[str, type] = {}
     for module in modules:
         for value in vars(module).values():
             if (
                 isinstance(value, type)
                 and dataclasses.is_dataclass(value)
-                and value.__module__.startswith("netgraph")
+                and value.__module__.startswith("netviz")
             ):
                 found[f"{value.__module__}.{value.__qualname__}"] = value
     return list(found.values())
@@ -617,12 +617,12 @@ def test_the_wheel_is_installed_and_run_on_all_three_platforms(
     # The raw text rather than the parsed steps: what matters is the exact shell
     # word, and ``yaml.dump`` re-escapes it into something no assertion can read.
     text = RELEASE_WORKFLOW.read_text(encoding="utf-8")
-    assert '"$bin/netgraph" --version' in text, (
+    assert '"$bin/netviz" --version' in text, (
         "the verify job never runs the installed console script by name"
     )
-    assert '"$bin/netgraph" version --json' in text
-    assert "netgraph-${VERSION}.tar.gz" in text, "the verify job never installs the sdist"
-    assert "netgraph-${VERSION}-py3-none-any.whl" in text
+    assert '"$bin/netviz" version --json' in text
+    assert "netviz-${VERSION}.tar.gz" in text, "the verify job never installs the sdist"
+    assert "netviz-${VERSION}-py3-none-any.whl" in text
 
 
 def test_the_release_image_is_the_one_every_commit_builds(
@@ -691,7 +691,7 @@ def test_every_push_triggered_workflow_names_the_branches_it_runs_on() -> None:
 
 def test_the_report_names_the_package_python_and_the_platform() -> None:
     report = collect()
-    assert report.netgraph == __version__
+    assert report.netviz == __version__
     assert re.match(r"^\d+\.\d+\.\d+", report.python)
     assert report.python_implementation
     assert report.platform
@@ -699,9 +699,9 @@ def test_the_report_names_the_package_python_and_the_platform() -> None:
 
 
 def test_the_first_line_is_the_version_and_nothing_else() -> None:
-    """``netgraph --version | cut -d' ' -f2`` has to keep working."""
+    """``netviz --version | cut -d' ' -f2`` has to keep working."""
     first = format_text(collect()).splitlines()[0]
-    assert first == f"netgraph {__version__}"
+    assert first == f"netviz {__version__}"
 
 
 def test_the_text_report_names_every_component() -> None:
@@ -711,7 +711,7 @@ def test_the_text_report_names_every_component() -> None:
 
 
 def test_the_report_names_the_runtime_dependencies() -> None:
-    """The versions that decide how netgraph behaves, for a bug report."""
+    """The versions that decide how netviz behaves, for a bug report."""
     dependencies = collect().dependencies
     for name in ("pydantic", "PyYAML", "click", "networkx", "jinja2"):
         assert name in dependencies, f"the report never names {name}"
@@ -720,7 +720,7 @@ def test_the_report_names_the_runtime_dependencies() -> None:
 def test_the_json_report_has_the_documented_shape() -> None:
     document = as_dict(collect())
     assert document["schemaVersion"] == REPORT_SCHEMA_VERSION
-    assert document["netgraph"] == __version__
+    assert document["netviz"] == __version__
     assert set(document["python"]) == {"version", "implementation", "executable"}
     # An object rather than a string: "absent" and "present but unaskable" are
     # different states and a consumer has to be able to tell them apart.
@@ -733,7 +733,7 @@ def test_absent_graphviz_is_reported_as_absent_not_as_an_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Every ``dot``, ``mermaid`` and ``json`` render works without it."""
-    monkeypatch.setattr("netgraph.render.dot.find_dot", lambda: None)
+    monkeypatch.setattr("netviz.render.dot.find_dot", lambda: None)
     report = collect()
     assert report.graphviz is None
     assert report.graphviz_path is None
@@ -742,7 +742,7 @@ def test_absent_graphviz_is_reported_as_absent_not_as_an_error(
 
 
 def test_a_dot_that_is_not_graphviz_is_reported_with_the_reason(tmp_path: Path) -> None:
-    """The usual cause is ``NETGRAPH_DOT`` pointing at the wrong thing."""
+    """The usual cause is ``NETVIZ_DOT`` pointing at the wrong thing."""
     missing = tmp_path / "not-dot"
     version, error = graphviz_version(str(missing))
     assert version is None
@@ -752,9 +752,9 @@ def test_a_dot_that_is_not_graphviz_is_reported_with_the_reason(tmp_path: Path) 
 def test_a_dot_that_prints_nonsense_is_reported_as_unknown(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr("netgraph.render.dot.find_dot", lambda: str(tmp_path / "dot"))
+    monkeypatch.setattr("netviz.render.dot.find_dot", lambda: str(tmp_path / "dot"))
     monkeypatch.setattr(
-        "netgraph.version.graphviz_version", lambda executable: (None, "printed 'hi'")
+        "netviz.version.graphviz_version", lambda executable: (None, "printed 'hi'")
     )
     report = collect()
     assert report.graphviz is None
@@ -834,7 +834,7 @@ def test_an_uninstalled_dependency_is_left_out_rather_than_crashing(
             raise metadata.PackageNotFoundError(name)
         return real(name)
 
-    monkeypatch.setattr("netgraph.version.metadata.version", absent)
+    monkeypatch.setattr("netviz.version.metadata.version", absent)
     dependencies = collect().dependencies
     assert "watchfiles" not in dependencies
     assert "pydantic" in dependencies
@@ -848,7 +848,7 @@ def test_an_uninstalled_dependency_is_left_out_rather_than_crashing(
 def test_the_version_flag_prints_the_report_and_exits() -> None:
     result = CliRunner().invoke(cli, ["--version"])
     assert result.exit_code == 0
-    assert result.output.splitlines()[0] == f"netgraph {__version__}"
+    assert result.output.splitlines()[0] == f"netviz {__version__}"
     assert "Graphviz" in result.output
 
 
@@ -856,7 +856,7 @@ def test_the_version_flag_needs_no_inventory(tmp_path: Path) -> None:
     """Eager, so it answers from a directory holding nothing at all."""
     result = CliRunner().invoke(cli, ["--inventory", str(tmp_path), "--version"])
     assert result.exit_code == 0
-    assert result.output.startswith("netgraph ")
+    assert result.output.startswith("netviz ")
 
 
 def test_the_short_flag_is_the_same_report() -> None:
@@ -873,7 +873,7 @@ def test_the_version_command_emits_parseable_json() -> None:
     result = CliRunner().invoke(cli, ["version", "--json"])
     assert result.exit_code == 0
     document = json.loads(result.output)
-    assert document["netgraph"] == __version__
+    assert document["netviz"] == __version__
     assert document["schemaVersion"] == REPORT_SCHEMA_VERSION
 
 

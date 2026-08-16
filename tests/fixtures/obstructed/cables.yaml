@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b
@@ -7,7 +7,7 @@ spec:
   endpoints: [sw-a:e1, sw-b:e1]
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-c-d-1
@@ -16,7 +16,7 @@ spec:
   endpoints: [sw-c:e1, sw-d:e1]
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-c-d-2
@@ -25,7 +25,7 @@ spec:
   endpoints: [sw-c:e2, sw-d:e2]
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-c-d-3
@@ -34,7 +34,7 @@ spec:
   endpoints: [sw-c:e3, sw-d:e3]
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-c
@@ -45,7 +45,7 @@ spec:
   endpoints: [sw-a:e2, sw-c:e4]
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-b-d
@@ -54,7 +54,7 @@ spec:
   endpoints: [sw-b:e2, sw-d:e4]
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-rtr-c

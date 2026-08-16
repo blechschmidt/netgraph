@@ -3,7 +3,7 @@
 # Identity is not a network fact, which is exactly why it is worth writing down
 # next to one: "who can log into the NAS" is a question the cabling cannot
 # answer and the spreadsheet nobody diffs usually does.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: user
 metadata:
   name: ana
@@ -15,7 +15,7 @@ spec:
   ssh_keys:
     - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyForTheDocsOnlyAAAAAAAAAAA ana@pc-desk
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: user
 metadata:
   name: kit
@@ -27,7 +27,7 @@ spec:
 # A service account, so it is exempt from NG-S016: an account nobody logs in as
 # belonging to no group is the normal shape of one, and saying so on each of
 # them would drown the people the rule is about.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: user
 metadata:
   name: backup

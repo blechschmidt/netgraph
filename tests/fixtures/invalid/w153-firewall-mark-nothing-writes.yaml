@@ -4,7 +4,7 @@
 # rule that routes by the mark is written, and the firewall rule that would have
 # marked the traffic is the line that never got typed. A mark does not leave the
 # machine, so nothing else can be writing it.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: firewall
 metadata:
   name: fw-a
@@ -36,7 +36,7 @@ spec:
       fwmark: '0x1'
       table: uplink-b
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-b
@@ -48,7 +48,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

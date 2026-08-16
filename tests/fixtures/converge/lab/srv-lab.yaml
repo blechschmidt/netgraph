@@ -1,4 +1,4 @@
-# A host shaped to exercise every remediation netgraph can derive: an interface
+# A host shaped to exercise every remediation netviz can derive: an interface
 # the capture will not find, an aggregate whose membership disagrees, an access
 # port in the wrong VLAN, and an address that is declared and not configured.
 #
@@ -6,7 +6,7 @@
 # management port outranks everything else -- so a change to anything else on
 # this host is safe and a change to mgmt0 is not. That is what makes the risk
 # classification testable without needing a second inventory.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-lab

@@ -1,4 +1,4 @@
-"""``netgraph watch``: the cycle, the loop, and the preview server.
+"""``netviz watch``: the cycle, the loop, and the preview server.
 
 The properties asserted here are the ones the command promises and the ones a
 user would only discover the hard way:
@@ -6,7 +6,7 @@ user would only discover the hard way:
 * **A failed cycle never destroys the good one.** The file on disk keeps its
   last valid contents and the preview keeps serving the last valid payload.
   This is the whole reason the command exists rather than a shell loop around
-  ``netgraph render``.
+  ``netviz render``.
 * **The loop survives anything the inventory can do to it.** A syntax error, a
   vanished root, a name that no longer resolves: each is a status, never an
   exception that ends the watch.
@@ -28,10 +28,10 @@ from typing import Any
 import pytest
 from click.testing import CliRunner, Result
 
-from netgraph.cli import cli
-from netgraph.errors import RenderError
-from netgraph.render import FORMATS, FilterSpec, Layer, RenderOptions, media_type_for, suffix_for
-from netgraph.watch import (
+from netviz.cli import cli
+from netviz.errors import RenderError
+from netviz.render import FORMATS, FilterSpec, Layer, RenderOptions, media_type_for, suffix_for
+from netviz.watch import (
     DEFAULT_HOST,
     CycleResult,
     InventoryFilter,
@@ -91,7 +91,7 @@ def test_a_clean_inventory_renders() -> None:
     result = run_cycle(RenderRequest(inventory=HOME_LAB, output_format="dot"))
     assert result.status is Status.OK
     assert result.payload is not None
-    assert b"graph netgraph" in result.payload
+    assert b"graph netviz" in result.payload
     assert result.nodes == 8
     assert result.edges == 7
     assert result.problems == ()
@@ -154,11 +154,11 @@ def test_an_unresolvable_filter_is_a_failure(tmp_path: Path) -> None:
 
 
 def test_the_configuration_file_is_re_read_every_cycle(inventory: Path) -> None:
-    """Editing ``netgraph.toml`` must take effect like editing any document."""
+    """Editing ``netviz.toml`` must take effect like editing any document."""
     request = RenderRequest(inventory=inventory, output_format="dot", strict=True)
     assert run_cycle(request).status is Status.OK
 
-    (inventory / "netgraph.toml").write_text(
+    (inventory / "netviz.toml").write_text(
         '[validate]\nseverity = { W103 = "error" }\n', encoding="utf-8"
     )
     (inventory / "orphan.yaml").write_text(
@@ -285,7 +285,7 @@ def test_an_unwritable_destination_is_reported(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     "relative",
-    ["sw.yaml", "sites/hq/sw.yml", "sites/HQ/SW.YAML", "netgraph.toml", ".netgraphignore"],
+    ["sw.yaml", "sites/hq/sw.yml", "sites/HQ/SW.YAML", "netviz.toml", ".netvizignore"],
 )
 def test_documents_and_configuration_trigger_a_render(tmp_path: Path, relative: str) -> None:
     assert InventoryFilter(root=tmp_path).accepts(tmp_path / relative)
@@ -326,7 +326,7 @@ def test_a_single_file_inventory_ignores_its_neighbours(tmp_path: Path) -> None:
     assert watcher.accepts(only)
     assert not watcher.accepts(tmp_path / "unrelated.yaml")
     # Configuration still applies to a single-file inventory.
-    assert watcher.accepts(tmp_path / "netgraph.toml")
+    assert watcher.accepts(tmp_path / "netviz.toml")
 
 
 def test_the_filter_is_callable_as_watchfiles_expects(tmp_path: Path) -> None:
@@ -456,7 +456,7 @@ def test_a_broken_edit_leaves_the_last_good_file_in_place(inventory: Path, tmp_p
     )
 
     assert statuses == [Status.OK, Status.INVALID]
-    assert b"graph netgraph" in output.read_bytes()
+    assert b"graph netviz" in output.read_bytes()
     snapshot = live.snapshot()
     assert snapshot.stale is True
     assert snapshot.payload == output.read_bytes()
@@ -635,7 +635,7 @@ def test_a_head_request_carries_the_headers_but_no_body(
 
 
 def test_writing_is_not_offered(preview: tuple[PreviewServer, LiveRender]) -> None:
-    # 405 rather than 501: the preview understands POST -- ``netgraph web``,
+    # 405 rather than 501: the preview understands POST -- ``netviz web``,
     # which shares this handler base, renders what a browser posts to it -- and
     # says which methods it will answer instead.
     server, _ = preview
@@ -733,7 +733,7 @@ def test_loopback_addresses_need_no_warning(host: str) -> None:
     assert describe_exposure(host) is None
 
 
-@pytest.mark.parametrize("host", ["0.0.0.0", "::", "10.1.2.3", "netgraph.example.com"])
+@pytest.mark.parametrize("host", ["0.0.0.0", "::", "10.1.2.3", "netviz.example.com"])
 def test_a_reachable_bind_is_called_out(host: str) -> None:
     assert not is_loopback(host)
     warning = describe_exposure(host)
@@ -777,7 +777,7 @@ def test_watch_renders_once_per_change_and_reports(
 ) -> None:
     """Drive the command with a canned change stream instead of a filesystem."""
     output = tmp_path / "diagram.dot"
-    monkeypatch.setattr("netgraph.cli.file_changes", lambda *a, **k: iter([["edited.yaml"]]))
+    monkeypatch.setattr("netviz.cli.file_changes", lambda *a, **k: iter([["edited.yaml"]]))
 
     result = invoke(
         runner, "-i", str(inventory), "watch", "-f", "dot", "-o", str(output), "--title", "live"
@@ -799,7 +799,7 @@ def test_watch_reports_a_broken_inventory_without_stopping(
         break_inventory(inventory)
         yield ["edited.yaml"]
 
-    monkeypatch.setattr("netgraph.cli.file_changes", changes)
+    monkeypatch.setattr("netviz.cli.file_changes", changes)
     result = invoke(runner, "-i", str(inventory), "watch", "-f", "dot", "-o", str(output))
 
     assert result.exit_code == 0
@@ -807,13 +807,13 @@ def test_watch_reports_a_broken_inventory_without_stopping(
     assert "keeping the render from before" in result.output
     # The findings are reported, not just counted.
     assert SYNTAX_PROBLEM in result.output
-    assert b"graph netgraph" in output.read_bytes()
+    assert b"graph netviz" in output.read_bytes()
 
 
 def test_watch_notes_that_a_render_goes_nowhere(
     runner: CliRunner, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("netgraph.cli.file_changes", lambda *a, **k: iter([]))
+    monkeypatch.setattr("netviz.cli.file_changes", lambda *a, **k: iter([]))
     result = invoke(runner, "-i", str(HOME_LAB), "watch", "-f", "dot")
     assert result.exit_code == 0
     assert "checked and discarded" in result.output
@@ -841,13 +841,13 @@ def test_watch_serves_the_render_while_it_runs(
         bodies.append(body)
         yield from ()
 
-    monkeypatch.setattr("netgraph.cli.PreviewServer.create", capture)
-    monkeypatch.setattr("netgraph.cli.file_changes", probe_while_watching)
+    monkeypatch.setattr("netviz.cli.PreviewServer.create", capture)
+    monkeypatch.setattr("netviz.cli.file_changes", probe_while_watching)
     result = invoke(runner, "-i", str(HOME_LAB), "watch", "-f", "dot", "--serve", "--port", "0")
 
     assert result.exit_code == 0
     assert "preview at http://127.0.0.1:" in result.output
-    assert b"graph netgraph" in bodies[0]
+    assert b"graph netviz" in bodies[0]
     # The port is released when the command returns.
     assert not _is_listening(started[0].port)
 
@@ -870,7 +870,7 @@ def test_a_quiet_watch_still_reports_problems(
 ) -> None:
     """--quiet drops the routine status lines, never the reason to look."""
     output = tmp_path / "diagram.dot"
-    monkeypatch.setattr("netgraph.cli.file_changes", lambda *a, **k: iter([]))
+    monkeypatch.setattr("netviz.cli.file_changes", lambda *a, **k: iter([]))
     clean = invoke(runner, "-q", "-i", str(inventory), "watch", "-f", "dot", "-o", str(output))
     assert clean.output == ""
 
@@ -886,7 +886,7 @@ def test_ctrl_c_ends_the_watch_cleanly(runner: CliRunner, monkeypatch: pytest.Mo
         yield ["edited.yaml"]
         raise KeyboardInterrupt
 
-    monkeypatch.setattr("netgraph.cli.file_changes", interrupt)
+    monkeypatch.setattr("netviz.cli.file_changes", interrupt)
     result = invoke(runner, "-i", str(HOME_LAB), "watch", "-f", "dot")
     assert result.exit_code == 0
     assert result.output.count("ok  ") == 2

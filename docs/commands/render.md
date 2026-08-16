@@ -1,7 +1,7 @@
-# `netgraph render`
+# `netviz render`
 
 Draw the inventory once and write the result somewhere. `render` is the
-one-shot form of netgraph's rendering pipeline: pick a layer, narrow or summarise
+one-shot form of netviz's rendering pipeline: pick a layer, narrow or summarise
 the topology, and hand back a DOT file, an SVG, a self-contained HTML page, a
 PNG, a PDF, a Mermaid flowchart or the resolved graph as JSON.
 
@@ -15,7 +15,7 @@ it. This page is the reference for the command itself.
 
 <!-- generated: synopsis render -->
 ```text
-netgraph [GLOBAL OPTIONS] render [OPTIONS]
+netviz [GLOBAL OPTIONS] render [OPTIONS]
 ```
 <!-- /generated -->
 
@@ -31,9 +31,9 @@ silently drawn from an inventory with a dangling cable is worse than no diagram.
   trust.
 
 Diagnostics go to **stderr**, always, because stdout may be the diagram itself.
-That is what makes `netgraph render -f svg > topology.svg` safe.
+That is what makes `netviz render -f svg > topology.svg` safe.
 
-See [`netgraph validate`](validate.md) for the checks and
+See [`netviz validate`](validate.md) for the checks and
 [`docs/validation.md`](../validation.md) for how they are graded.
 
 ## Choosing a layer and a format
@@ -62,7 +62,7 @@ usage error.
 
 `-o/--output` writes to a file instead of stdout and creates parent directories
 on the way. It is required for `png` and `pdf` when stdout is a terminal —
-netgraph will not spray a binary at your prompt.
+netviz will not spray a binary at your prompt.
 
 ## Worked examples
 
@@ -72,7 +72,7 @@ addressed in and never an empty one:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/home-lab render --layer l3 --kind router -f mermaid
+$ netviz -i examples/home-lab render --layer l3 --kind router -f mermaid
 flowchart TB
     n0(["rtr-home<br/>[router]<br/>vlans: 10"])
     n1("192.0.2.1/32<br/>[ipv4 subnet]")
@@ -99,7 +99,7 @@ the flag being dropped in silence:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/quickstart render --icons cisco -f mermaid
+$ netviz -i examples/quickstart render --icons cisco -f mermaid
 flowchart TB
 ...
 warning: --icons is ignored for mermaid output, which has no picture to put an icon in; the formats that draw icons are dot, svg, html, png, pdf
@@ -110,21 +110,21 @@ The everyday invocations, illustrative paths and all:
 
 <!-- norun: a shell pipeline, and the output paths are illustrative -->
 ```bash
-netgraph render -f json | jq '.nodes[].name'
-netgraph render -f mermaid -o docs/topology.mmd
-netgraph render --vlan 10 --layer l2 -f svg -o vlan-10.svg
-netgraph render --layer l3 -f svg -o subnets.svg
-netgraph render --layer power -f svg -o power.svg
-netgraph render --neighbors-of sw-dist-01 --depth 2 -f svg -o around-dist.svg
-netgraph render --kind switch --kind router --group-by-namespace -o core.dot
-netgraph render --collapse-depth 1 --group-by-namespace -f svg -o overview.svg
-netgraph render -f html --layer l1 --layer l2 --layer l3 -o topology.html
+netviz render -f json | jq '.nodes[].name'
+netviz render -f mermaid -o docs/topology.mmd
+netviz render --vlan 10 --layer l2 -f svg -o vlan-10.svg
+netviz render --layer l3 -f svg -o subnets.svg
+netviz render --layer power -f svg -o power.svg
+netviz render --neighbors-of sw-dist-01 --depth 2 -f svg -o around-dist.svg
+netviz render --kind switch --kind router --group-by-namespace -o core.dot
+netviz render --collapse-depth 1 --group-by-namespace -f svg -o overview.svg
+netviz render -f html --layer l1 --layer l2 --layer l3 -o topology.html
 ```
 
 ## Retyping none of it
 
 Every option except `-o/--output`, `--force` and `--show-config` can be given a
-default in `netgraph.toml`, so a team retypes none of them — see
+default in `netviz.toml`, so a team retypes none of them — see
 [`[render]`](../configuration.md#render--how-the-inventory-is-drawn) and the
 [full key list](../configuration.md#every-render-setting). A key is the long flag
 without its leading dashes.
@@ -155,7 +155,7 @@ not look the way you expected.
 | `--name` | `GLOB` | — | Keep only elements whose name matches this glob. Repeatable. |
 | `--neighbors-of` | `NAME` | — | Keep only the neighbourhood of this element. |
 | `--depth` | `INTEGER, >= 0` | `1` | How many hops --neighbors-of reaches. |
-| `--select` | `QUERY` | — | Keep only the elements this query selects, e.g. "kind = switch and not has vrf". The flags above are sugar for the equivalent query and are combined with it; 'netgraph query --explain' prints which. See docs/query.md. |
+| `--select` | `QUERY` | — | Keep only the elements this query selects, e.g. "kind = switch and not has vrf". The flags above are sugar for the equivalent query and are combined with it; 'netviz query --explain' prints which. See docs/query.md. |
 | `--collapse` | `NS` | — | Replace this namespace and everything under it with one node, labelled with what it holds. Links crossing the boundary attach to it; links inside it are counted rather than drawn. Repeatable. |
 | `--collapse-depth` | `N` | — | Collapse every namespace N levels deep, counted from the shallowest one that branches: '--collapse-depth 1' is the site-level overview of a tree laid out as sites/<site>/<tier>. |
 | `--bundle-links`, `--no-bundle-links` | — | — | Draw parallel links between the same pair of elements as one edge, with the count in the label. Members of a declared 'lag' interface are bundled either way unless --no-bundle-links is given, since the inventory already says they are one logical link. |
@@ -171,13 +171,13 @@ not look the way you expected.
 | `--element-ids` | — | off | Give every node, edge and namespace a stable id derived from its name, so the diagram can be deep-linked and styled from outside. dot and svg only. |
 | `--max-addresses` | `N` | `4` | Longest address list spelled out under a node before it is abbreviated to 'and N more'. 0 prints the count alone. |
 | `--rankdir` | `[tb\|lr\|bt\|rl]` | TB, top to bottom | Layout direction. A wide network reads better left to right; a deep one top to bottom. Honoured by the Graphviz backends and by mermaid. |
-| `--routing` | `[spline\|orthogonal\|straight]` | whatever the inventory's layout documents say, else spline | How links are drawn between the bends they are pinned through: 'spline' is the curve Graphviz draws, 'orthogonal' right angles, 'straight' segment to segment. A default: a link that pins a style of its own keeps it. Honoured by the Graphviz backends, the JSON export and the editor. 'netgraph layout --write' records it in the view it arranges, so the choice is the inventory's rather than the command line's from then on. |
+| `--routing` | `[spline\|orthogonal\|straight]` | whatever the inventory's layout documents say, else spline | How links are drawn between the bends they are pinned through: 'spline' is the curve Graphviz draws, 'orthogonal' right angles, 'straight' segment to segment. A default: a link that pins a style of its own keeps it. Honoured by the Graphviz backends, the JSON export and the editor. 'netviz layout --write' records it in the view it arranges, so the choice is the inventory's rather than the command line's from then on. |
 | `--avoid`, `--no-avoid` | — | avoid | Route orthogonal links around the boxes they are not attached to instead of straight across them. Only applies to an arranged diagram drawn with '--routing orthogonal': a spline has nothing to route around, and an unarranged one is routed by Graphviz, which already avoids nodes. A bend you placed yourself is never moved — routing fills the segments between them. '--no-avoid' is the local Z-and-L every orthogonal diagram was drawn with before this existed. |
 | `--title` | `TEXT` | — | Caption for the diagram. |
 | `--layer` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | `l1` | l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets and the elements addressed in them; overlay draws the tunnels; routing draws the BGP sessions and OSPF adjacencies, clustered by VRF; physical adds the patch panels l1 splices out; rack draws a front elevation per rack; power draws the PDUs and the feeds into everything they power; identity draws the users and groups; netns opens each machine up into the network stacks inside it, joined by their veth pairs; security draws the firewall zones and what the policy lets cross between them. Repeatable for -f html, which draws each layer and puts a switcher over them. |
 | `--strict` | — | off | Treat warnings as errors. |
 | `--force` | — | off | Proceed even when validation failed. The result may not match the files. |
-| `--profile` | `NAME` | — | Apply the [profile.NAME] block of netgraph.toml on top of its [render] table. Explicit flags still win over both. |
+| `--profile` | `NAME` | — | Apply the [profile.NAME] block of netviz.toml on top of its [render] table. Explicit flags still win over both. |
 | `--show-config` | — | off | Print the settings this invocation resolves to, and where each one came from, then exit without doing any work. |
 <!-- /generated -->
 
@@ -187,7 +187,7 @@ not look the way you expected.
 |---|---|
 | `0` | The diagram was produced. |
 | `1` | The inventory was rejected: validation found errors (or, under `--strict`, warnings) and `--force` was not given. |
-| `2` | Usage error, or an unusable `netgraph.toml` — including two `--layer` values for a format that holds one, and `--layer rack` with `-f mermaid`. |
+| `2` | Usage error, or an unusable `netviz.toml` — including two `--layer` values for a format that holds one, and `--layer rack` with `-f mermaid`. |
 | `3` | The inventory could not be discovered or read at all. |
 | `5` | The rendering could not be produced: Graphviz is missing, the output path is not writable, or a binary format was aimed at a terminal. |
 | `130` | Interrupted. |
@@ -197,11 +197,11 @@ not look the way you expected.
 
 * [`docs/rendering.md`](../rendering.md) — the layers, the filters, aggregation,
   icons, tooltips, the HTML page and the JSON shape, in full.
-* [`netgraph watch`](watch.md) and [`netgraph web`](web.md) — the same pipeline,
+* [`netviz watch`](watch.md) and [`netviz web`](web.md) — the same pipeline,
   redrawn on every save.
-* [`netgraph path --highlight`](../paths.md#drawing-the-answer---highlight) — one
+* [`netviz path --highlight`](../paths.md#drawing-the-answer---highlight) — one
   traced route drawn over the topology it crosses.
 * [`docs/configuration.md`](../configuration.md) — render defaults and named
   profiles.
-* [`netgraph export`](export.md) — the other artefacts one inventory can
+* [`netviz export`](export.md) — the other artefacts one inventory can
   produce.

@@ -1,4 +1,4 @@
-# `netgraph fmt`
+# `netviz fmt`
 
 Rewrite inventory YAML in its one canonical form — two-space indent, keys in
 schema order, one quoting rule, comments and blank lines untouched. The way
@@ -13,7 +13,7 @@ does not repair them. This page is the reference for the command.
 
 <!-- generated: synopsis fmt -->
 ```text
-netgraph [GLOBAL OPTIONS] fmt [OPTIONS] [PATHS]...
+netviz [GLOBAL OPTIONS] fmt [OPTIONS] [PATHS]...
 ```
 <!-- /generated -->
 
@@ -29,12 +29,12 @@ whether or not anything changed — the same as `gofmt -w`.
 
 **`--check`** is the CI mode. It writes nothing, lists the files that are not
 canonical on stdout, one per line, and exits 1 if there are any. The list is
-stdout and the tally is stderr, so `netgraph fmt --check | xargs $EDITOR` opens
+stdout and the tally is stderr, so `netviz fmt --check | xargs $EDITOR` opens
 the files and nothing else.
 
 <!-- run: -->
 ```console
-$ netgraph fmt --check examples/campus
+$ netviz fmt --check examples/campus
 0 file(s) would be reformatted, 19 already formatted
 ```
 
@@ -52,27 +52,27 @@ in-place rewriting, so this is the mode an editor's "format buffer" command want
 
 <!-- norun: shell redirections and a pipeline; the output paths are illustrative -->
 ```bash
-netgraph fmt                       # rewrite the inventory -i points at
-netgraph fmt inventory devices/    # rewrite these paths
-netgraph fmt --check inventory     # write nothing; exit 1 and list what differs
-netgraph fmt --diff inventory      # write nothing; print a unified diff
-netgraph fmt --diff examples | git apply -R
-netgraph fmt --stdin < devices/sw.yaml > devices/sw.formatted.yaml
+netviz fmt                       # rewrite the inventory -i points at
+netviz fmt inventory devices/    # rewrite these paths
+netviz fmt --check inventory     # write nothing; exit 1 and list what differs
+netviz fmt --diff inventory      # write nothing; print a unified diff
+netviz fmt --diff examples | git apply -R
+netviz fmt --stdin < devices/sw.yaml > devices/sw.formatted.yaml
 ```
 
 ## Which files are touched
 
 Exactly the files the loader would read, and no others. Discovery is the loader's,
-so `.netgraphignore` and the dot- and underscore-prefix rules apply exactly as
+so `.netvizignore` and the dot- and underscore-prefix rules apply exactly as
 they do to [`validate`](validate.md) — all of
 [`docs/schema.md` §2.1](../schema.md#21-discovery-rules):
 
 * only `*.yaml` and `*.yml`, compared case-insensitively (`NG-L001`);
 * nothing under a path component starting with `.` or `_` (`NG-L002`);
-* nothing a `.netgraphignore` excludes (`NG-L006`).
+* nothing a `.netvizignore` excludes (`NG-L006`).
 
 That is a deliberate limit rather than an incidental one. A file the inventory
-ignores may not be netgraph YAML at all, and rewriting it would be the formatter
+ignores may not be netviz YAML at all, and rewriting it would be the formatter
 exceeding its remit. A path named outright on the command line is still subject to
 the ignore rules of the tree it sits in.
 
@@ -83,7 +83,7 @@ and compared against what it said before — as its validated model where the
 document validates, and as its raw parsed data where it does not, because `fmt`
 has to work on files `validate` rejects and still may not change what they say. A
 file that fails that comparison is left exactly as it was, and the failure is
-reported as a bug in netgraph rather than in the file.
+reported as a bug in netviz rather than in the file.
 
 Two more properties come with it. **Comments are preserved**: the whole-line
 comments of the output are counted against the input's, and a format that lost one
@@ -130,7 +130,7 @@ or any error.
 
 * [`docs/format.md`](../format.md) — the canonical form clause by clause, what
   `fmt` will not do, and the pre-commit hooks.
-* [`netgraph validate`](validate.md) — the checks `fmt` deliberately leaves alone,
+* [`netviz validate`](validate.md) — the checks `fmt` deliberately leaves alone,
   such as a scalar YAML reads as a number.
 * [`docs/ci.md`](../ci.md) — `fmt --check` and `validate` in the same job.
 * [`docs/inventory-layout.md`](../inventory-layout.md) — discovery, namespaces and

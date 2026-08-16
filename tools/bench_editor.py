@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Open a thousand-device inventory in ``netgraph web`` and time what a person does.
+"""Open a thousand-device inventory in ``netviz web`` and time what a person does.
 
 Every other harness in this directory stops at the Python boundary.
 ``bench_pipeline.py`` times the load and the layout, ``bench_incremental.py``
@@ -14,8 +14,8 @@ this is the harness that drives one::
     python tools/bench_editor.py --sites 2 --racks 3   # something smaller
     python tools/bench_editor.py --json out.json       # for a guard to read
 
-It starts the real :class:`~netgraph.web.server.WebServer` over a real
-:class:`~netgraph.web.session.EditingSession` — the same objects ``netgraph web
+It starts the real :class:`~netviz.web.server.WebServer` over a real
+:class:`~netviz.web.session.EditingSession` — the same objects ``netviz web
 --write`` builds, with the same parse cache — points the Playwright Chromium
 from ``tests/test_browser.py`` at it, and measures what a person does with it:
 
@@ -32,7 +32,7 @@ from ``tests/test_browser.py`` at it, and measures what a person does with it:
 * **zoom, pan, and how much is drawn** — the gestures, and either side of them
   what the tab is holding up: elements drawn out of elements there are, DOM
   nodes, and whether the level of detail has dropped. See
-  ``netgraph/web/assets/cull.js``.
+  ``netviz/web/assets/cull.js``.
 * **memory** — heap after the first paint, and again after cycling layers,
   which is what fills the client-side view cache.
 
@@ -73,14 +73,14 @@ if str(REPO_ROOT / "tools") not in sys.path:  # pragma: no cover - importing the
 
 from bench_pipeline import Shape, generate, yaml_files  # noqa: E402
 
-from netgraph.errors import NetgraphError  # noqa: E402
-from netgraph.loader.cache import DocumentCache  # noqa: E402
-from netgraph.render import DETAIL_OPTIONS, build_details, build_graph, filter_graph  # noqa: E402
-from netgraph.render.dot import find_dot, layout_plan, to_image  # noqa: E402
-from netgraph.validate import validate  # noqa: E402
-from netgraph.web.preview import ViewOptions, graph_digest  # noqa: E402
-from netgraph.web.server import WebServer  # noqa: E402
-from netgraph.web.session import EditingSession  # noqa: E402
+from netviz.errors import NetvizError  # noqa: E402
+from netviz.loader.cache import DocumentCache  # noqa: E402
+from netviz.render import DETAIL_OPTIONS, build_details, build_graph, filter_graph  # noqa: E402
+from netviz.render.dot import find_dot, layout_plan, to_image  # noqa: E402
+from netviz.validate import validate  # noqa: E402
+from netviz.web.preview import ViewOptions, graph_digest  # noqa: E402
+from netviz.web.server import WebServer  # noqa: E402
+from netviz.web.session import EditingSession  # noqa: E402
 
 #: Rounds per measurement. The median of five, because the first touch of any of
 #: these paths is a cold cache somewhere — the page cache, Graphviz's font list,
@@ -454,7 +454,7 @@ def viewport(tab: Tab, report: Report) -> None:
     x, y = float(canvas[0]), float(canvas[1])
 
     def note() -> str:
-        stats = tab.page.evaluate("netgraphCull.stats()")
+        stats = tab.page.evaluate("netvizCull.stats()")
         return (
             f"{stats['drawn']} of {stats['total']} drawn, "
             f"{tab.dom_nodes()} elements, coarse={str(stats['coarse']).lower()}"
@@ -541,9 +541,9 @@ def routing_stages(session: EditingSession, report: Report) -> None:
     """
     from dataclasses import replace as _replace
 
-    from netgraph.layout.geometry import Placement, Routing
-    from netgraph.layout.seed import seed_geometry
-    from netgraph.render.routes import RouteCache, route_plan
+    from netviz.layout.geometry import Placement, Routing
+    from netviz.layout.seed import seed_geometry
+    from netviz.render.routes import RouteCache, route_plan
 
     options = ViewOptions()
     graph = filter_graph(build_graph(session.inventory(), layer=options.layer), options.filter_spec)
@@ -559,7 +559,7 @@ def routing_stages(session: EditingSession, report: Report) -> None:
         started = time.perf_counter()
         try:
             graph = _replace(graph, geometry=seed_geometry(graph, render_options))
-        except NetgraphError as exc:
+        except NetvizError as exc:
             # Graphviz's spline code has a fixed-size trapezoid table and falls
             # over on a large enough graph ("Trapezoid-table overflow"). That is
             # a limit of the *auto* layout, not of routing — which is only ever
@@ -716,7 +716,7 @@ def inventory_root(args: argparse.Namespace) -> Iterator[Path]:
         yield Path(args.inventory)
         return
     shape = Shape(sites=args.sites, racks_per_site=args.racks, hosts_per_rack=args.hosts)
-    target = Path(args.keep) if args.keep else Path(tempfile.mkdtemp(prefix="netgraph-editor-"))
+    target = Path(args.keep) if args.keep else Path(tempfile.mkdtemp(prefix="netviz-editor-"))
     if target.exists() and args.keep:
         shutil.rmtree(target)
     files, documents = generate(target, shape)
@@ -773,7 +773,7 @@ def run(args: argparse.Namespace) -> int:
         report.fact("files", len(files))
         report.fact("bytes", sum(path.stat().st_size for path in files))
 
-        cache = DocumentCache(Path(tempfile.mkdtemp(prefix="netgraph-editor-cache-")))
+        cache = DocumentCache(Path(tempfile.mkdtemp(prefix="netviz-editor-cache-")))
         session = EditingSession(root=root, writable=True, cache=cache)
         stack.callback(session.close)
         server = stack.enter_context(WebServer.create(session=session, host="127.0.0.1", port=0))

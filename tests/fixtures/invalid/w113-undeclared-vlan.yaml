@@ -2,7 +2,7 @@
 #
 # 'sw-a' knows about VLAN 10 only, but 'Gi0/1' is an access port in VLAN 20.
 # 'pc-b' declares no VLAN database at all, so the rule says nothing about it.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -18,7 +18,7 @@ spec:
         mode: access
         access_vlan: 20
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -33,7 +33,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

@@ -1,4 +1,4 @@
-netgraph plan: patch-room → patch-room (edited)
+netviz plan: patch-room → patch-room (edited)
 
   - cable.cables/cbl-access-cam  [cable]
       description: Patch lead, access switch straight to the lobby camera.

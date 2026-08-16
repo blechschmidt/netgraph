@@ -1,9 +1,9 @@
-# `netgraph review`
+# `netviz review`
 
-`netgraph review` writes up a change to the network the way a reviewer would
+`netviz review` writes up a change to the network the way a reviewer would
 want it: **what changed**, **what that broke that was not already broken**, and
-**the change drawn**. It is [`netgraph plan`](plan.md),
-[`netgraph diff`](diff.md) and [`netgraph validate`](validate.md) reduced to one
+**the change drawn**. It is [`netviz plan`](plan.md),
+[`netviz diff`](diff.md) and [`netviz validate`](validate.md) reduced to one
 Markdown document.
 
 The document is the body of a pull-request comment — that is what it was built
@@ -13,10 +13,10 @@ of a branch can be read before it is pushed:
 
 <!-- norun: needs a repository with two states to compare, which the docs build has no fixture for -->
 ```console
-$ netgraph --inventory inventory review --from origin/main
+$ netviz --inventory inventory review --from origin/main
 ```
 
-`netgraph review` writes nothing to the inventory and never talks to a device.
+`netviz review` writes nothing to the inventory and never talks to a device.
 
 ## Contents
 
@@ -37,7 +37,7 @@ $ netgraph --inventory inventory review --from origin/main
 
 <!-- generated: synopsis review -->
 ```text
-netgraph [GLOBAL OPTIONS] review [OPTIONS]
+netviz [GLOBAL OPTIONS] review [OPTIONS]
 ```
 <!-- /generated -->
 
@@ -46,7 +46,7 @@ netgraph [GLOBAL OPTIONS] review [OPTIONS]
 ## Where the two sides come from
 
 `--from` is required, because a review is a comparison and there is no sensible
-default for "before". Both sides are read exactly as [`netgraph
+default for "before". Both sides are read exactly as [`netviz
 plan`](plan.md#where-the-two-sides-come-from) reads them: a path that exists as
 a directory is a folder, anything else is handed to `git` and exported
 read-only.
@@ -73,7 +73,7 @@ Two cases that would be a mistake anywhere else are not mistakes here:
 whether to look further:
 
 ```text
-### ❌ netgraph — 3 elements change, 1 new error introduced
+### ❌ netviz — 3 elements change, 1 new error introduced
 ```
 
 **A table of what changed, grouped by kind.** Three cables and a switch is the
@@ -102,7 +102,7 @@ Both states are validated, and what the document reports is the difference. An
 inventory carrying three legacy warnings is reviewed green on the first change
 that touches it; the fourth warning, added by that change, is reported.
 
-Identity is the fingerprint `netgraph validate -F sarif` puts on each result —
+Identity is the fingerprint `netviz validate -F sarif` puts on each result —
 the rule, the file, the element, the pointer and the message, and deliberately
 **not** the line — so inserting a document above a broken one does not report
 everything below it as newly introduced, and the review agrees with GitHub's
@@ -113,24 +113,24 @@ differently would report a rule silenced in this very change as a wave of fixes.
 
 ## The drawing
 
-`netgraph review` draws nothing itself. It embeds a small **Mermaid** summary of
+`netviz review` draws nothing itself. It embeds a small **Mermaid** summary of
 the changeset — the changed elements, boxed by namespace, coloured by action —
 which renders natively in a GitHub comment, and it links whatever
-[`netgraph diff`](diff.md) has already written:
+[`netviz diff`](diff.md) has already written:
 
 <!-- norun: writes files into the reader's directory -->
 ```console
-$ netgraph -i inventory diff --from origin/main -f svg -o diff.svg
-$ netgraph -i inventory diff --from origin/main -f png -o diff.png
-$ netgraph -i inventory review --from origin/main --diagram diff.svg --diagram diff.png \
-      --artifact-url "$RUN_URL#artifacts" --artifact-name netgraph-review
+$ netviz -i inventory diff --from origin/main -f svg -o diff.svg
+$ netviz -i inventory diff --from origin/main -f png -o diff.png
+$ netviz -i inventory review --from origin/main --diagram diff.svg --diagram diff.png \
+      --artifact-url "$RUN_URL#artifacts" --artifact-name netviz-review
 ```
 
 `--diagram` takes `[LABEL=]PATH`; the label defaults to the suffix, upper-cased.
 A rendering given with `--diagram` alone is **linked**, through
 `--artifact-url`. One given with `--diagram-url` is **embedded** as an `<img>`.
 
-The distinction is GitHub's, not netgraph's: a comment body is sanitised, so an
+The distinction is GitHub's, not netviz's: a comment body is sanitised, so an
 inline `<svg>` element is stripped and an `<img src="data:...">` is refused by
 the image proxy. Only a URL a browser can fetch — a published page, an object
 store — can be embedded, and a run artifact is a zip behind an authenticated
@@ -144,7 +144,7 @@ everything else a pipeline wants, from the same load and the same validation:
 
 | Flag | What it writes |
 |---|---|
-| `--plan-out` | The changeset, byte-identical to `netgraph plan --json`. Not written when the head does not load. |
+| `--plan-out` | The changeset, byte-identical to `netviz plan --json`. Not written when the head does not load. |
 | `--sarif-out` | The head's findings as SARIF, for `github/codeql-action/upload-sarif`. |
 | `--summary-out` | The verdict and the counts, for a workflow step that gates on them. |
 
@@ -153,7 +153,7 @@ everything else a pipeline wants, from the same load and the same validation:
 ```json
 {
   "schemaVersion": 1,
-  "tool": {"name": "netgraph", "version": "0.1.0"},
+  "tool": {"name": "netviz", "version": "0.1.0"},
   "verdict": "failed",
   "broken": false,
   "changed": true,
@@ -186,16 +186,16 @@ it was set to, short of `never`.
 | `--from` | `REF\|DIR` | — | The state before the change: a git ref (origin/main) or a folder. This is the baseline every finding is measured against, so a problem it already had is not reported as one this change introduced. |
 | `--to` | `REF\|DIR` | — | The state after the change. Defaults to the inventory as it is on disk. |
 | `-o`, `--output` | `FILE` | — | Write the comment body here instead of to stdout. |
-| `--plan-out` | `FILE` | — | Also write the changeset as JSON, the document 'netgraph plan --json' writes. |
+| `--plan-out` | `FILE` | — | Also write the changeset as JSON, the document 'netviz plan --json' writes. |
 | `--summary-out` | `FILE` | — | Also write the verdict and the counts as a small JSON document, so a workflow can gate on them without reading the comment's prose. |
 | `--sarif-out` | `FILE` | — | Also write the head state's diagnostics as SARIF, for a code-scanning upload. It is the same validation the comment reports, so the two cannot disagree. |
-| `--diagram` | `[LABEL=]PATH` | — | A rendering of the visual diff to link, as 'netgraph diff -o' wrote it. The label defaults to the suffix, upper-cased. Repeatable. |
+| `--diagram` | `[LABEL=]PATH` | — | A rendering of the visual diff to link, as 'netviz diff -o' wrote it. The label defaults to the suffix, upper-cased. Repeatable. |
 | `--diagram-url` | `[LABEL=]URL` | — | Where a rendering is published, if it is somewhere a browser can fetch it. Those are embedded in the comment; a --diagram with no URL is only linked. Repeatable. |
 | `--artifact-url` | `URL` | — | Where the whole bundle can be downloaded -- in CI, the run that produced it. |
 | `--artifact-name` | `NAME` | — | What that bundle is called, for the link text. |
 | `--repository-url` | `URL` | — | Base URL of the repository, https://github.com/owner/repo. With --head-sha it turns every finding into a permalink to the line it is anchored at. |
 | `--head-sha` | `SHA` | — | Commit the head state is, so the links are permalinks rather than branch links. |
-| `--title` | `TEXT` | `netgraph` | Heading of the comment, and the key of its sticky marker. Two inventories reviewed in one repository need two titles, or they will overwrite each other's comment. |
+| `--title` | `TEXT` | `netviz` | Heading of the comment, and the key of its sticky marker. Two inventories reviewed in one repository need two titles, or they will overwrite each other's comment. |
 | `--strict` | — | off | Promote every warning to an error, on both sides of the comparison. |
 | `--disable` | `RULE` | — | Silence a rule by id, on both sides. Repeatable. |
 | `--no-renames` | — | off | Report every rename as a deletion beside a creation rather than as one move. |
@@ -217,8 +217,8 @@ uploads it always has something to upload.
 
 ## See also
 
-- [`netgraph plan`](plan.md) — the changeset on its own, as text or JSON.
-- [`netgraph diff`](diff.md) — the changeset as a picture.
-- [`netgraph validate`](validate.md) — the findings on their own, in four formats.
+- [`netviz plan`](plan.md) — the changeset on its own, as text or JSON.
+- [`netviz diff`](diff.md) — the changeset as a picture.
+- [`netviz validate`](validate.md) — the findings on their own, in four formats.
 - [`docs/ci.md`](../ci.md#workflow-review-a-pull-request) — the action, the reusable workflow, and the sticky comment.
 - [`docs/validation-rules.md`](../validation-rules.md) — what each rule id means.

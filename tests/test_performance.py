@@ -14,14 +14,14 @@ things in the same process, back to back, on the same tree:
 
 ``floor``
     Reading and parsing every document and throwing the result away:
-    :func:`~netgraph.loader.documents.read_documents` over the whole tree. This
-    is PyYAML's cost, which netgraph does not own.
+    :func:`~netviz.loader.documents.read_documents` over the whole tree. This
+    is PyYAML's cost, which netviz does not own.
 
 ``full``
-    The same tree through :func:`~netgraph.loader.load_tree`: the parse, plus
+    The same tree through :func:`~netviz.loader.load_tree`: the parse, plus
     pydantic model validation, plus the loader's own bookkeeping.
 
-``full / floor`` is then how much netgraph adds on top of parsing, expressed in
+``full / floor`` is then how much netviz adds on top of parsing, expressed in
 units of the parse itself. Machine speed cancels out of the ratio, and so does
 most of the noise, because both halves are slow or fast together.
 
@@ -196,12 +196,12 @@ from types import ModuleType
 import coverage
 import pytest
 
-from netgraph.loader import Inventory, load_tree
-from netgraph.loader.cache import DocumentCache
-from netgraph.loader.documents import HAVE_LIBYAML, StrictSafeLoader, read_documents
-from netgraph.loader.tree import InventoryFile, iter_inventory_files
-from netgraph.models import Adapter, Device
-from netgraph.validate import validate
+from netviz.loader import Inventory, load_tree
+from netviz.loader.cache import DocumentCache
+from netviz.loader.documents import HAVE_LIBYAML, StrictSafeLoader, read_documents
+from netviz.loader.tree import InventoryFile, iter_inventory_files
+from netviz.models import Adapter, Device
+from netviz.validate import validate
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 HARNESS = REPO_ROOT / "tools" / "bench_pipeline.py"
@@ -318,7 +318,7 @@ def benchmark_tree(tmp_path_factory: pytest.TempPathFactory) -> Path:
 def tracing_paused() -> Iterator[None]:
     """Stop coverage's line tracer for the duration of a measurement.
 
-    Every ratio in this file compares two pieces of netgraph against each other
+    Every ratio in this file compares two pieces of netviz against each other
     so that the machine cancels out. Coverage breaks that: it costs time *per
     line executed*, so it taxes a hundred small functions far more heavily than
     one tight loop, and the two halves of a ratio are rarely shaped alike. The
@@ -396,7 +396,7 @@ def interleaved_best(
 
 
 def parse_floor(files: list[InventoryFile]) -> None:
-    """Parse every document and discard it: the cost netgraph does not own."""
+    """Parse every document and discard it: the cost netviz does not own."""
     for entry in files:
         for _ in read_documents(entry.path, relative=entry.relative):
             pass
@@ -408,7 +408,7 @@ def address_walk_floor(inventory: Inventory) -> int:
 
     The floor for ``validate``: five of its rules are statements about
     addresses, so none of them can cost less than one of these passes, and
-    anything the ratio measures above the floor is work netgraph chose to do.
+    anything the ratio measures above the floor is work netviz chose to do.
     Deliberately touches no :mod:`ipaddress` object — a floor that warmed the
     caches entry 7 added would move whenever they did.
     """
@@ -486,7 +486,7 @@ def test_validating_costs_no_more_than_its_budget_above_an_address_walk(
     for _ in range(SAMPLES):
         # A fresh inventory per round: entry 7 caches each address's prefix on
         # the model, so the second validate over one inventory is not the
-        # measurement anybody's `netgraph validate` pays for. The walk is timed
+        # measurement anybody's `netviz validate` pays for. The walk is timed
         # first because it is the half that must stay cold-independent.
         inventory = load_tree(benchmark_tree)
         floors.append(milliseconds(lambda tree=inventory: address_walk_floor(tree)))
@@ -553,6 +553,6 @@ def test_a_warm_load_costs_a_fraction_of_a_cold_one(benchmark_tree: Path, tmp_pa
     assert memory_ms / cold_ms <= MAX_WARM_MEMORY_FRACTION, (
         f"a second load in one process is {memory_ms / cold_ms:.2f} of a cold one "
         f"({memory_ms:.1f} ms against {cold_ms:.1f} ms), over the budget of "
-        f"{MAX_WARM_MEMORY_FRACTION:.2f}. This is the tier 'netgraph watch' reloads "
+        f"{MAX_WARM_MEMORY_FRACTION:.2f}. This is the tier 'netviz watch' reloads "
         f"through; see entry 14 of docs/follow-ups.md."
     )

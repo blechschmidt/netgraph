@@ -3,7 +3,7 @@
 # VLAN 20 is carried untagged on the port whether or not it is listed, so the
 # document reads as one VLAN narrower than the port actually is. Only 'sw-a' is
 # a trunk, so only one end can report it.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -17,7 +17,7 @@ spec:
         trunk_vlans: [10]
         native_vlan: 20
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -29,7 +29,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

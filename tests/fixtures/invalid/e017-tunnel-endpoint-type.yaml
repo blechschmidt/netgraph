@@ -3,7 +3,7 @@
 # 'pc-b:eth0' is the physical port the outer packets leave by, not the virtual
 # interface the tunnel presents. Only one of the two ends is wrong, so exactly
 # one finding is reported.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -20,7 +20,7 @@ spec:
       ipv4:
         addresses: [10.9.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -32,7 +32,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b
@@ -42,7 +42,7 @@ spec:
     - pc-b:eth0
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: tunnel
 metadata:
   name: tun-a-b

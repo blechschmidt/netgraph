@@ -1,7 +1,7 @@
 # Membership is written here and nowhere else: a 'user' does not list its
 # groups, because two spellings of one fact are how an inventory starts
 # disagreeing with itself (§19.2).
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata:
   name: admins
@@ -12,9 +12,9 @@ spec:
   gid: 100
 ---
 # Nesting: everyone in 'admins' is in 'household' too, without being listed
-# twice. 'netgraph list groups' expands it — HOLDS says what this document
+# twice. 'netviz list groups' expands it — HOLDS says what this document
 # names, PEOPLE says who it actually reaches.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata:
   name: household

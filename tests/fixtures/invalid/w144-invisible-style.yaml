@@ -10,7 +10,7 @@
 # decision: an element that genuinely should not appear belongs behind a filter
 # (`--kind`, `--name`), which takes it out of the topology as well as out of
 # the picture, rather than behind a transparent fill.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -24,7 +24,7 @@ spec:
       ipv4:
         - 10.0.0.1/24
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-b
@@ -36,7 +36,7 @@ spec:
       ipv4:
         - 10.0.0.2/24
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

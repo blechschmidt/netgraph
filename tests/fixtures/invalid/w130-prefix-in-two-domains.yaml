@@ -3,7 +3,7 @@
 # 10.0.0.0/24 is configured on VLAN 10 and again on VLAN 20. Each host believes
 # the whole prefix is on-link, so it ARPs for the other half and never hears an
 # answer; and no router will forward between two ports it considers one subnet.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-core
@@ -27,7 +27,7 @@ spec:
         mode: access
         access_vlan: 20
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-users
@@ -42,7 +42,7 @@ spec:
       ipv4:
         addresses: [10.0.0.10/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-iot
@@ -57,7 +57,7 @@ spec:
       ipv4:
         addresses: [10.0.0.20/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-users
@@ -67,7 +67,7 @@ spec:
     - pc-users:eth0
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-iot

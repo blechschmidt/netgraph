@@ -4,7 +4,7 @@
 # cabled, so W103 does not pile onto the same mistake. The address sits in a
 # point-to-point prefix, which W105 exempts: the peer that would fill it is the
 # very device this cable fails to resolve.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -16,7 +16,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-dangling

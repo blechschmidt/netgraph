@@ -1,4 +1,4 @@
-netgraph plan: home-lab → home-lab (edited)
+netviz plan: home-lab → home-lab (edited)
 
   - cable.cables/cbl-sw-ap  [cable]
       description: PoE run into the hallway ceiling

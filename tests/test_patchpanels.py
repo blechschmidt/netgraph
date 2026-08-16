@@ -23,16 +23,16 @@ from pathlib import Path
 
 import pytest
 
-from netgraph.errors import RenderError, SchemaError
-from netgraph.loader import Inventory, load_tree
-from netgraph.models import (
+from netviz.errors import RenderError, SchemaError
+from netviz.loader import Inventory, load_tree
+from netviz.models import (
     API_VERSION,
     PatchPanel,
     parse_document,
     parse_port_range,
 )
-from netgraph.render import render_text
-from netgraph.render.graph import (
+from netviz.render import render_text
+from netviz.render.graph import (
     RACK_ID_PREFIX,
     Edge,
     EdgeKind,
@@ -44,15 +44,15 @@ from netgraph.render.graph import (
     filter_graph,
     rack_elevations,
 )
-from netgraph.trace import trace
-from netgraph.validate import validate
+from netviz.trace import trace
+from netviz.validate import validate
 
 # --------------------------------------------------------------------------- #
 # Building inventories
 # --------------------------------------------------------------------------- #
 
 _SWITCH = """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata: {{name: {name}}}
 spec:
@@ -62,7 +62,7 @@ spec:
 """
 
 _PANEL = """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: patchpanel
 metadata: {{name: {name}}}
 spec: {{ports: {ports}}}
@@ -80,7 +80,7 @@ def panel(name: str, ports: str = "1-4") -> str:
 def cable(name: str, left: str, right: str, **spec: str) -> str:
     extra = "".join(f"\n  {key}: {value}" for key, value in spec.items())
     return f"""
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {{name: {name}}}
 spec:
@@ -314,7 +314,7 @@ def test_a_cross_wired_panel_splices_through_its_own_coupling(tmp_path: Path) ->
         switch("sw-a"),
         switch("sw-b"),
         panel_yaml := """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: patchpanel
 metadata: {name: pp-a}
 spec:
@@ -433,7 +433,7 @@ def test_a_trace_crosses_a_panel_without_making_it_a_hop(tmp_path: Path) -> None
 
 
 def test_the_text_report_names_the_panels_on_the_link_line(tmp_path: Path) -> None:
-    from netgraph.trace import render_trace
+    from netviz.trace import render_trace
 
     inventory = inventory_of(
         tmp_path,
@@ -454,7 +454,7 @@ def test_the_text_report_names_the_panels_on_the_link_line(tmp_path: Path) -> No
 # --------------------------------------------------------------------------- #
 
 _PLACED = """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: {kind}
 metadata:
   name: {name}
@@ -497,7 +497,7 @@ def test_an_element_with_a_rack_but_no_position_is_not_on_the_elevation(
         tmp_path,
         placed("sw-a", rack="r1", position=1),
         """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-b
@@ -517,7 +517,7 @@ def test_a_rack_with_no_declared_height_is_sized_by_its_tallest_occupant(
     inventory = inventory_of(
         tmp_path,
         """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a

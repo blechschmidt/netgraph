@@ -8,7 +8,7 @@ of its own.
 
 ```text
 campus/
-├── netgraph.toml                       # per-inventory configuration (all defaults)
+├── netviz.toml                       # per-inventory configuration (all defaults)
 ├── annotations.yaml                    # the notes, areas and legends of §21
 ├── backbone/cables.yaml                # the three inter-site fibres
 ├── templates/access-switch.yaml        # a 48-port access switch, declared once
@@ -88,7 +88,7 @@ that span two sites.
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus list subnets
+$ netviz -i examples/campus list subnets
 VRF   SUBNET              IP  ADDRESSES  ELEMENTS  VLANS
 ----  ------------------  --  ---------  --------  -----
 -     10.1.0.0/30          4          2         2  -
@@ -102,7 +102,7 @@ mgmt  10.3.99.0/24         4          3         3  99
 
 <!-- norun: writes an SVG into the reader's directory -->
 ```bash
-netgraph -i examples/campus render --layer l3 --namespace sites/north -f svg -o north-l3.svg
+netviz -i examples/campus render --layer l3 --namespace sites/north -f svg -o north-l3.svg
 ```
 
 ## Routing
@@ -122,7 +122,7 @@ One IGP, one AS, and one VRF (§16):
 
 * **OSPF** runs in area `0.0.0.0` on the core loopbacks, the backbone fibres and
   the core-to-distribution uplinks; on the distribution switches it runs on the
-  uplink and the two user SVIs. Nobody declares an adjacency — netgraph derives
+  uplink and the two user SVIs. Nobody declares an adjacency — netviz derives
   them the way the protocol does, from two OSPF interfaces addressed in one
   subnet (§16.6), which is what produces the nine edges of the routing view.
 * **BGP** is a three-router iBGP mesh in AS 65001, peering on the loopbacks. The
@@ -157,16 +157,16 @@ One IGP, one AS, and one VRF (§16):
 
 <!-- norun: writes an SVG into the reader's directory -->
 ```bash
-netgraph -i examples/campus render --layer routing -f svg -o campus-routing.svg
+netviz -i examples/campus render --layer routing -f svg -o campus-routing.svg
 ```
 
-The same static routes, as a script to apply. `netgraph export routes` writes one
+The same static routes, as a script to apply. `netviz export routes` writes one
 shell function per device and a dispatcher over them; the north core's function is
 
 <!-- norun: an excerpt of a twelve-function script, quoted rather than piped -->
 ```sh
 # sites/north/core/rtr-north-core-01
-netgraph_routes_sites_north_core_rtr_north_core_01() {
+netviz_routes_sites_north_core_rtr_north_core_01() {
     ip -4 route replace blackhole 10.1.0.0/16 metric 250
     ip -4 route replace 10.2.99.0/24 via 198.51.100.2 dev xe-0/0/1 metric 200
 }
@@ -202,13 +202,13 @@ naming `Vlan99` adds an address to the template's SVI rather than replacing it.
 
 The template lives in the `templates/` namespace and is reached from
 `sites/north/access` by the ordinary reference rules (§2.2). It is **not** an
-element: it does not appear in `netgraph list devices`, in any diagram, or in
+element: it does not appear in `netviz list devices`, in any diagram, or in
 validation output. Read the merge either way round:
 
 <!-- norun: both lines carry a trailing shell comment, and each prints a document of its own -->
 ```bash
-netgraph -i examples/campus show sw-north-acc-03 --raw   # as written
-netgraph -i examples/campus show sw-north-acc-03         # as merged
+netviz -i examples/campus show sw-north-acc-03 --raw   # as written
+netviz -i examples/campus show sw-north-acc-03         # as merged
 ```
 
 ## What is said *about* the diagram
@@ -231,9 +231,9 @@ looking for "how do I write one of these" should be sent to.
 `spec.views` is why no two of them crowd one drawing: an annotation with no
 `views` appears in every picture, and one that lists them appears only in those.
 
-**None of the eight changes what netgraph concludes.** They add no node and no
-edge at any layer, move no hop in `netgraph path`, write no line of generated
-configuration and raise no finding — `netgraph -i examples/campus validate`
+**None of the eight changes what netviz concludes.** They add no node and no
+edge at any layer, move no hop in `netviz path`, write no line of generated
+configuration and raise no finding — `netviz -i examples/campus validate`
 still prints `no problems found`. That is asserted separately in
 `tests/test_annotations.py`; §21 of `docs/schema.md` says why it has to be.
 
@@ -242,8 +242,8 @@ commentary:
 
 <!-- norun: writes an SVG into the reader's directory -->
 ```bash
-netgraph -i examples/campus render --layer l3 -f svg -o campus-l3.svg
-netgraph -i examples/campus render --layer l3 --no-annotations -f svg -o plain.svg
+netviz -i examples/campus render --layer l3 -f svg -o campus-l3.svg
+netviz -i examples/campus render --layer l3 --no-annotations -f svg -o plain.svg
 ```
 
 ## Details worth copying

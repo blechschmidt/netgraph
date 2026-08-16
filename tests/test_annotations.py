@@ -1,6 +1,6 @@
 """Annotations are invisible to everything that is not a renderer (§21).
 
-:mod:`netgraph.models.annotation` promises this file exists and asserts each
+:mod:`netviz.models.annotation` promises this file exists and asserts each
 guarantee separately, because the central claim of §21 is a *negative* one: a
 ``note``, an ``area`` and a ``legend`` change the picture and nothing else. A
 decorative layer inside a file that also generates configuration and answers
@@ -43,29 +43,29 @@ from typing import Any, Final
 
 import pytest
 
-from netgraph.annotations import note_anchor
-from netgraph.console import Console
-from netgraph.drift import as_json as drift_as_json
-from netgraph.drift import compare
-from netgraph.edit import EditSession, SetField
-from netgraph.export import FORMATS as EXPORT_FORMATS
-from netgraph.export import ExportContext, ExportOptions, Recorder, export
-from netgraph.export.config import CONFIG_DIALECTS
-from netgraph.fmt import format_source
-from netgraph.importer.draft import Draft, DraftDevice, DraftInterface
-from netgraph.listing import LISTINGS, SUBJECTS
-from netgraph.loader import Inventory, load_stream, load_tree
-from netgraph.models.annotation import ANNOTATION_KINDS
-from netgraph.plan import ANNOTATION_TYPES, Plan, diff, render_plan, translate, write_plan
-from netgraph.render import Layer, RenderOptions, build_graph, graph_to_dict, render_text
-from netgraph.render.annotations import annotation_views
-from netgraph.report import Options as ReportOptions
-from netgraph.report import generate as report_generate
-from netgraph.rules import RULES
-from netgraph.testing import run_tests
-from netgraph.testing.report import as_json as verdicts_as_json
-from netgraph.trace import render_trace, trace, trace_to_dict
-from netgraph.validate import Severity, has_errors, validate
+from netviz.annotations import note_anchor
+from netviz.console import Console
+from netviz.drift import as_json as drift_as_json
+from netviz.drift import compare
+from netviz.edit import EditSession, SetField
+from netviz.export import FORMATS as EXPORT_FORMATS
+from netviz.export import ExportContext, ExportOptions, Recorder, export
+from netviz.export.config import CONFIG_DIALECTS
+from netviz.fmt import format_source
+from netviz.importer.draft import Draft, DraftDevice, DraftInterface
+from netviz.listing import LISTINGS, SUBJECTS
+from netviz.loader import Inventory, load_stream, load_tree
+from netviz.models.annotation import ANNOTATION_KINDS
+from netviz.plan import ANNOTATION_TYPES, Plan, diff, render_plan, translate, write_plan
+from netviz.render import Layer, RenderOptions, build_graph, graph_to_dict, render_text
+from netviz.render.annotations import annotation_views
+from netviz.report import Options as ReportOptions
+from netviz.report import generate as report_generate
+from netviz.rules import RULES
+from netviz.testing import run_tests
+from netviz.testing.report import as_json as verdicts_as_json
+from netviz.trace import render_trace, trace, trace_to_dict
+from netviz.validate import Severity, has_errors, validate
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -92,7 +92,7 @@ ANNOTATION_FILE: Final = "annotations.yaml"
 #: canvas, a generated key and a written-out one — and ``views`` on most of
 #: them, so no two crowd one drawing.
 HOME_LAB_ANNOTATIONS: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: poe-budget
@@ -104,7 +104,7 @@ spec:
   anchor:
     link: cables/cbl-sw-ap
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: laptop-via-dongle
@@ -122,7 +122,7 @@ spec:
     width: 220
   leader: true
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: house-rules
@@ -137,7 +137,7 @@ spec:
     y: 640
     width: 220
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: hallway
@@ -152,7 +152,7 @@ spec:
   border: solid
   padding: 20.0
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: the-desks
@@ -164,7 +164,7 @@ spec:
   selector:
     namespace: hosts
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: upstairs
@@ -180,7 +180,7 @@ spec:
     height: 360.0
   border: dotted
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: legend
 metadata:
   name: key
@@ -191,7 +191,7 @@ spec:
   corner: bottom-right
   auto: layers
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: legend
 metadata:
   name: media
@@ -214,7 +214,7 @@ spec:
 #: about a **tunnel** rather than a cable — a tunnel is a link too, and an
 #: anchor has to reach one.
 OVERLAY_ANNOTATIONS: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: why-nested
@@ -226,7 +226,7 @@ spec:
   anchor:
     link: tunnels/wg-mesh
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: one-public-address
@@ -244,7 +244,7 @@ spec:
     width: 220
   leader: true
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: no-split-tunnel
@@ -260,7 +260,7 @@ spec:
     y: 560
     width: 220
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: the-cores
@@ -275,7 +275,7 @@ spec:
   border: solid
   padding: 20.0
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: headquarters
@@ -287,7 +287,7 @@ spec:
   selector:
     namespace: sites/hq
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: the-public-internet
@@ -303,7 +303,7 @@ spec:
     height: 260.0
   border: dotted
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: legend
 metadata:
   name: key
@@ -314,7 +314,7 @@ spec:
   corner: bottom-right
   auto: layers
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: legend
 metadata:
   name: encapsulation
@@ -350,7 +350,7 @@ class Pair:
     bare: Path
     #: The same tree, plus a full complement of them.
     annotated: Path
-    #: Two elements far enough apart to make ``netgraph path`` do some work.
+    #: Two elements far enough apart to make ``netviz path`` do some work.
     source: str
     destination: str
     #: A device whose ``metadata.description`` is safe to rewrite, for the
@@ -488,7 +488,7 @@ def finding_keys(findings: Sequence[Any]) -> list[tuple[str, str, str, tuple[str
 #: that may add a finding, and the finding they add is named beside them.
 STALE: Final[dict[str, tuple[str, str]]] = {
     "note-about-a-ghost": (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: note\n"
         "metadata: {name: ng-stale-note}\n"
         "spec:\n"
@@ -497,7 +497,7 @@ STALE: Final[dict[str, tuple[str, str]]] = {
         "W142",
     ),
     "member-that-is-gone": (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: area\n"
         "metadata: {name: ng-stale-area}\n"
         "spec:\n"
@@ -505,7 +505,7 @@ STALE: Final[dict[str, tuple[str, str]]] = {
         "W142",
     ),
     "selector-that-matches-nothing": (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: area\n"
         "metadata: {name: ng-empty-area}\n"
         "spec:\n"
@@ -548,7 +548,7 @@ def test_no_rule_about_an_annotation_can_fail_a_build() -> None:
     """§21.4 in the catalogue: both annotation rules are warnings.
 
     The severity is what makes a stale note survivable, so it is asserted
-    against :data:`netgraph.rules.RULES` rather than inferred from an example
+    against :data:`netviz.rules.RULES` rather than inferred from an example
     that happens not to have one.
     """
     by_id = {rule.id: rule for rule in RULES}
@@ -567,7 +567,7 @@ def test_no_rule_about_an_annotation_can_fail_a_build() -> None:
 def test_the_graph_is_identical_at_every_layer(pair: Pair, layer: Layer) -> None:
     """No annotation contributes a node or an edge to any of the nine views.
 
-    Iterated over :class:`~netgraph.render.Layer` rather than over a chosen few,
+    Iterated over :class:`~netviz.render.Layer` rather than over a chosen few,
     because the layers differ in what they *build* — a subnet, a VRF, a rack
     slot — and an annotation leaking into one of the derived ones is exactly
     the failure a spot check would miss.
@@ -610,7 +610,7 @@ def test_the_json_export_differs_only_in_its_annotations_key(pair: Pair, layer: 
 
 
 # --------------------------------------------------------------------------- #
-# netgraph path
+# netviz path
 # --------------------------------------------------------------------------- #
 
 
@@ -625,7 +625,7 @@ def test_a_traced_path_is_identical(pair: Pair) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# netgraph plan / apply
+# netviz plan / apply
 # --------------------------------------------------------------------------- #
 
 
@@ -650,7 +650,7 @@ def test_a_plan_between_the_twins_is_annotations_and_nothing_else(pair: Pair) ->
 
 
 def written_plan(plan: Plan, capsys: pytest.CaptureFixture[str]) -> str:
-    """The changeset as ``netgraph plan`` prints it for a person to read."""
+    """The changeset as ``netviz plan`` prints it for a person to read."""
     capsys.readouterr()
     write_plan(Console(), plan, verbose=True)
     return capsys.readouterr().out
@@ -685,7 +685,7 @@ def test_an_infrastructure_diff_is_byte_identical_with_and_without_annotations(
 def test_applying_an_annotation_plan_rewrites_no_element_document(
     pair: Pair, tmp_path: Path
 ) -> None:
-    """``netgraph apply`` writes the picture without touching the network.
+    """``netviz apply`` writes the picture without touching the network.
 
     A changeset that added the annotations to the bare tree has to reach the
     same state as the annotated one, and it has to get there without rewriting
@@ -784,7 +784,7 @@ def test_the_drawing_export_is_the_one_that_does_differ(pair: Pair) -> None:
 
 
 def a_capture_of(inventory_: Inventory) -> Draft:
-    """One observed interface on the pair's device, for ``netgraph drift``.
+    """One observed interface on the pair's device, for ``netviz drift``.
 
     Hand-built rather than captured, and deliberately wrong about the MTU, so
     the comparison has a difference to report and the report has content to be
@@ -814,7 +814,7 @@ def listing(subject: str) -> Callable[[Inventory], Any]:
 
 
 def read_the_report(inventory_: Inventory) -> Any:
-    """The pages ``netgraph report`` writes, with the clock pinned.
+    """The pages ``netviz report`` writes, with the clock pinned.
 
     ``diagrams=False`` on purpose: a diagram *is* a drawing, and a drawing is
     the one thing an annotation is allowed to change. What is asserted here is
@@ -858,12 +858,12 @@ def test_a_reader_of_the_inventory_cannot_tell(pair: Pair, reader: str) -> None:
 
 
 def test_the_readers_table_covers_every_listing() -> None:
-    """A new ``netgraph list`` subject must not slip past this module."""
+    """A new ``netviz list`` subject must not slip past this module."""
     assert {f"list {subject}" for subject in SUBJECTS} <= set(READERS)
 
 
 # --------------------------------------------------------------------------- #
-# netgraph fmt
+# netviz fmt
 # --------------------------------------------------------------------------- #
 
 
@@ -878,7 +878,7 @@ def test_the_formatter_leaves_a_canonical_annotation_document_alone() -> None:
 #: order they were thought of, a double-quoted colour, a flow mapping, an
 #: upper-case hex colour. Nothing here is wrong — it is simply not canonical.
 UNTIDY: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 spec:
   anchor: {element: sw-a}
@@ -889,7 +889,7 @@ metadata:
   name: untidy-note
   labels: {owner: nobody}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata: {name: untidy-area}
 spec:
@@ -898,7 +898,7 @@ spec:
   label: A box
   views: [l2, l1]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: legend
 spec:
   entries:
@@ -941,19 +941,19 @@ def test_an_untidy_annotation_document_reaches_the_canonical_form_and_stays() ->
 #: annotations about the spare. Deleting one document is then a realistic
 #: decommissioning rather than a hand-written dangling reference.
 DECOMMISSIONABLE: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata: {name: sw-a}
 spec:
   interfaces: [{name: port1, type: ethernet, ipv4: [10.0.0.1/24]}]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata: {name: srv-b}
 spec:
   interfaces: [{name: eth0, type: ethernet, ipv4: [10.0.0.2/24]}]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-a-b}
 spec: {endpoints: [sw-a:port1, srv-b:eth0], medium: copper}
@@ -962,7 +962,7 @@ spec: {endpoints: [sw-a:port1, srv-b:eth0], medium: copper}
 #: The document that goes away.
 SPARE: Final = """\
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata: {name: srv-spare, labels: {role: spare}}
 spec:
@@ -972,21 +972,21 @@ spec:
 #: What was written about it, and outlives it.
 ABOUT_THE_SPARE: Final = """\
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata: {name: about-the-spare}
 spec:
   text: The spare is **cold**; it is racked and not patched.
   anchor: {element: srv-spare}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata: {name: the-spares}
 spec:
   label: Spares
   members: [srv-spare]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata: {name: by-role}
 spec:
@@ -1019,7 +1019,7 @@ def test_nothing_is_said_about_the_annotations_while_the_spare_is_there(
 def test_deleting_the_element_a_note_is_about_is_not_fatal(
     decommissioned: Inventory, still_there: Inventory
 ) -> None:
-    """Deleting a server must not stop ``netgraph validate``.
+    """Deleting a server must not stop ``netviz validate``.
 
     Three warnings, one per stale reference, and not one error — because
     somebody once wrote a note about it is not a reason to fail a build.
@@ -1046,7 +1046,7 @@ def test_a_stale_annotation_still_renders(decommissioned: Inventory, text_format
 
 @requires_dot
 def test_a_stale_annotation_still_lays_out(decommissioned: Inventory) -> None:
-    from netgraph.render.dot import to_image
+    from netviz.render.dot import to_image
 
     drawing = to_image(build_graph(decommissioned, layer=Layer.L1), format="svg")
     assert drawing.decode("utf-8").rstrip().endswith("</svg>")

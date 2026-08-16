@@ -10,8 +10,8 @@ from typing import Any
 import pytest
 import yaml
 
-from netgraph.errors import MAX_ECHOED_VALUE_LENGTH, LoaderError, SchemaError, echo_value
-from netgraph.models import (
+from netviz.errors import MAX_ECHOED_VALUE_LENGTH, LoaderError, SchemaError, echo_value
+from netviz.models import (
     ELEMENT_MODELS,
     KINDS,
     Adapter,
@@ -35,10 +35,10 @@ from netgraph.models import (
     parse_bitrate,
     parse_document,
 )
-from netgraph.models import interface as interface_module
-from netgraph.models.interface import AcceptableFrames, InterfaceType, VlanMode
+from netviz.models import interface as interface_module
+from netviz.models.interface import AcceptableFrames, InterfaceType, VlanMode
 
-API_VERSION = "netgraph.dev/v1alpha1"
+API_VERSION = "netviz.dev/v1alpha1"
 SCHEMA_DOC = Path(__file__).resolve().parents[1] / "docs" / "schema.md"
 
 
@@ -150,7 +150,7 @@ def test_unknown_kind_is_reported() -> None:
 
 def test_unknown_api_version_is_reported() -> None:
     doc = device()
-    doc["apiVersion"] = "netgraph.dev/v2"
+    doc["apiVersion"] = "netviz.dev/v2"
     error = parse_failure(doc)
     assert error.location == "apiVersion"
     assert error.issues[0].rule == "NG-D002"
@@ -205,7 +205,7 @@ def test_labels_accept_a_dns_prefix() -> None:
 @pytest.mark.parametrize(
     "labels",
     [
-        {"netgraph.dev/generated": "1"},
+        {"netviz.dev/generated": "1"},
         {"Site": "hq"},
         {"-site": "hq"},
         {"a/b/c": "x"},

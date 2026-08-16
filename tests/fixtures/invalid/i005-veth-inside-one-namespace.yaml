@@ -4,7 +4,7 @@
 # 'netns' was written on one end and forgotten on the other. Both ends here are
 # in the machine's initial namespace, which is exactly what that mistake looks
 # like.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-a
@@ -29,7 +29,7 @@ spec:
       ipv4:
         addresses: [10.2.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-b
@@ -41,7 +41,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

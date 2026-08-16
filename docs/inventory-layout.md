@@ -1,6 +1,6 @@
 # Laying out an inventory
 
-An inventory is a directory tree of YAML documents, and netgraph imposes almost
+An inventory is a directory tree of YAML documents, and netviz imposes almost
 nothing on its shape. This page is for the point just after the tutorial: you
 know what a document looks like, and now you have to decide how many files there
 are, what goes in each one, and which folder each one sits in — before the answer
@@ -51,7 +51,7 @@ gives every core and distribution device its own file and collects each site's
 cables and hosts into one apiece.
 
 Empty documents are skipped silently but still consume an index, which is why
-[`netgraph fmt`](commands/fmt.md) writes an empty document as an explicit `null`
+[`netviz fmt`](commands/fmt.md) writes an empty document as an explicit `null`
 rather than deleting it: dropping it would renumber every document after it and
 move the line every diagnostic points at.
 
@@ -68,12 +68,12 @@ the team already says out loud — cross-references work across any file in the
 tree, and the only thing a folder contributes is the namespace. Nothing about a
 folder changes how a device is validated or drawn.
 
-The qualified names are what `netgraph list` prints, and they are the names you
+The qualified names are what `netviz list` prints, and they are the names you
 give to any command that takes one:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus list devices
+$ netviz -i examples/campus list devices
 NAME                                       KIND      PORTS  ADDRESS        VLANS
 -----------------------------------------  --------  -----  -------------  -------------
 sites/north/access/sw-north-acc-01         switch        6  10.1.99.11/24  1,10,20,30,99
@@ -112,12 +112,12 @@ The walk is recursive from the inventory root and the rules are few
 ([§2.1](schema.md#21-discovery-rules)):
 
 * only `*.yaml` and `*.yml`, compared case-insensitively; every other file is
-  ignored (`NG-L001`). A `README.md` or a `netgraph.toml` beside your documents
+  ignored (`NG-L001`). A `README.md` or a `netviz.toml` beside your documents
   is not a problem.
 * nothing under a path component whose basename starts with `.` or `_`,
   directories included (`NG-L002`). `_drafts/` and `_scratch/` are the idiom for
   work in progress, and `.git/` costs nothing to skip.
-* nothing a `.netgraphignore` excludes (`NG-L006`).
+* nothing a `.netvizignore` excludes (`NG-L006`).
 * symbolic links are followed, but one that escapes the root, forms a cycle or
   reaches an already-loaded directory is an error (`NG-L003`).
 
@@ -129,11 +129,11 @@ Loading is *total*: an unreadable file, a YAML syntax error, a schema violation
 and a duplicate name are all reported with their location and the walk
 continues. One broken file cannot hide the rest of the inventory.
 
-### `.netgraphignore`
+### `.netvizignore`
 
 Optional, one per directory, applying to that directory and everything below it;
 a file in a subdirectory overrides its parents. The syntax is the `.gitignore`
-subset described in [§2.3](schema.md#23-netgraphignore):
+subset described in [§2.3](schema.md#23-netvizignore):
 
 ```text
 vendor/                 # a directory, anywhere below this file
@@ -175,7 +175,7 @@ thirteenth, `template`, is not.
 
 [`docs/schema-reference.md`](schema-reference.md#element-kinds) is the generated
 field-by-field table for each of them, and
-[`netgraph schema`](commands/schema.md) emits the JSON Schema an editor can
+[`netviz schema`](commands/schema.md) emits the JSON Schema an editor can
 check a document against as you type.
 
 There is no rule that one folder holds one kind, and no rule that it does not.
@@ -224,7 +224,7 @@ in that shape:
 
 ```text
 campus/
-├── netgraph.toml                       # per-inventory configuration
+├── netviz.toml                       # per-inventory configuration
 ├── backbone/cables.yaml                # the three inter-site fibres
 ├── templates/access-switch.yaml        # a 48-port access switch, declared once
 └── sites/
@@ -248,7 +248,7 @@ Read it as a set of decisions:
 * **Cables live in the site whose devices they join**, and the three that join
   two sites live in `backbone/` at the root, because they belong to neither.
 * **Shared things live at the root**, where every site can see them:
-  `templates/` here, and a `netgraph.toml` for the settings the whole inventory
+  `templates/` here, and a `netviz.toml` for the settings the whole inventory
   should share ([`docs/configuration.md`](configuration.md)).
 * **Room is a namespace too**, when a site is big enough to have them:
   `sites/hq/mdf/`, `sites/hq/idf-3/`. That is a different question from where the
@@ -293,7 +293,7 @@ A `kind: template` document is a named partial device `spec`; a device merges it
 in with `spec.from` ([§6.6](schema.md#66-template--reusable-partial-device-specs)):
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-north-acc-03
@@ -313,7 +313,7 @@ knowing in full, but in short: the device's own keys win, mappings merge key by
 key, `interfaces` merge by `name`, and every other list the device declares
 replaces the template's outright.
 
-Templates are not elements — they never appear in a graph, in `netgraph list`,
+Templates are not elements — they never appear in a graph, in `netviz list`,
 or in validation output. The one place a template does surface is as the source
 location of a field it contributed: a value the template got wrong is reported
 against the template's file and line, with a note naming the device that
@@ -327,13 +327,13 @@ templates/access-switch.yaml#0:52  NG-I011  spec.interfaces[2].mtu: mtu 1000 is 
 
 The file and the line are the template's; the note says who tripped over it.
 
-Use [`netgraph show NAME --raw`](commands/show.md) to read a device as written
-and `netgraph show NAME` to read it merged:
+Use [`netviz show NAME --raw`](commands/show.md) to read a device as written
+and `netviz show NAME` to read it merged:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus show sw-north-acc-03 --raw
-apiVersion: netgraph.dev/v1alpha1
+$ netviz -i examples/campus show sw-north-acc-03 --raw
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-north-acc-03
@@ -361,18 +361,18 @@ Without `--raw` the same command prints 51 interfaces.
 ## Annotations
 
 `metadata.labels` are yours and drive filtering and grouping —
-`netgraph render --select site=hq`, `--group-by rack` — so a small consistent key
+`netviz render --select site=hq`, `--group-by rack` — so a small consistent key
 set (`site`, `rack`, `role`, `env`, `owner`) pays off. `metadata.annotations` are
 the opposite: they are read by the tool, not by you, and never affect the graph.
 
-The one annotation this revision defines is `netgraph/ignore`, which suppresses
+The one annotation this revision defines is `netviz/ignore`, which suppresses
 validation rules on the element carrying it:
 
 ```yaml
 metadata:
   name: spare-switch
   annotations:
-    netgraph/ignore: "W103, E004"   # or "*" for every rule
+    netviz/ignore: "W103, E004"   # or "*" for every rule
 ```
 
 Ids may be separated by commas, semicolons or spaces, and `*` means every rule.
@@ -385,7 +385,7 @@ exception genuinely belongs to rather than the nearest one.
 ## Rearranging the tree, from the diagram
 
 Because a folder *is* a namespace, the tree has a picture: every namespace is a
-box, and every box is a directory. [`netgraph web`](commands/web.md) draws them
+box, and every box is a directory. [`netviz web`](commands/web.md) draws them
 — one frame per level, captioned with the namespace and how many elements are
 under it — whenever the diagram is grouped by namespace (the *group* box, or
 `Alt-G`).
@@ -405,11 +405,11 @@ So `sites/north/access/sw-north-acc-01` dropped into the `sites/north/racks/r1`
 box becomes `sites/north/racks/r1/sw-north-acc-01` — a new folder if there was
 none, the document moved verbatim into it, and every cable, tunnel, group,
 layout and annotation that referred to it re-spelled so it still resolves. It is
-exactly [`netgraph edit move`](commands/edit.md), and it is refused — before
+exactly [`netviz edit move`](commands/edit.md), and it is refused — before
 anything is written — when the target namespace already holds that name, because
 `NG-N002` says two elements in one namespace cannot share one.
 
-There is deliberately no way to make an *empty* namespace. A folder netgraph
+There is deliberately no way to make an *empty* namespace. A folder netviz
 reads is one holding a document ([which files](#which-files-the-loader-reads)),
 so an empty directory declares nothing and would not survive a `git clone`
 anyway. **New namespace…** makes the folder by putting the first document in it.
@@ -418,7 +418,7 @@ The frames themselves can be resized, and the rectangle is stored in the
 `groups` section of a [`kind: layout`](schema.md#18-layout-diagram-geometry)
 document keyed by namespace — the one place a folder acquires a coordinate.
 Folding a frame with the triangle on its header draws the whole namespace as a
-single node, which is `netgraph render --collapse` and writes nothing.
+single node, which is `netviz render --collapse` and writes nothing.
 
 [`docs/editing.md`](editing.md#containers-dragging-a-document-into-a-namespace)
 has the operations behind all of this, and what each one is refused for.
@@ -427,7 +427,7 @@ has the operations behind all of this, and what each one is refused for.
 
 Three habits stop a growing tree from becoming a review problem.
 
-**Format it.** [`netgraph fmt`](commands/fmt.md) rewrites every document in one
+**Format it.** [`netviz fmt`](commands/fmt.md) rewrites every document in one
 canonical form — two-space indent, keys in schema order, one quoting rule,
 comments and blank lines untouched — so a diff is never about layout. It uses the
 loader's discovery, so it rewrites exactly the files the inventory reads and
@@ -435,17 +435,17 @@ nothing else.
 
 <!-- run: -->
 ```console
-$ netgraph fmt --check examples/campus
+$ netviz fmt --check examples/campus
 0 file(s) would be reformatted, 19 already formatted
 ```
 
-**Let your editor check it.** `netgraph schema` writes a JSON Schema, and a
+**Let your editor check it.** `netviz schema` writes a JSON Schema, and a
 one-line modeline at the top of a file gives you completion and inline errors
 before you ever run the tool. See
 [Editor setup](getting-started.md#editor-setup-autocompletion-and-inline-errors)
 and [`docs/schema.md` §13](schema.md#13-editor-integration).
 
-**Validate it in CI.** [`netgraph validate`](commands/validate.md) is the check
+**Validate it in CI.** [`netviz validate`](commands/validate.md) is the check
 that a cable's far end exists, that two devices do not claim one address, that
 both ends of a link agree about VLANs — the things no per-file schema can see.
 [`docs/ci.md`](ci.md) has the workflow and the pre-commit hooks; the `--check`
@@ -457,7 +457,7 @@ form of `fmt` belongs in the same job.
   discovery, namespace and provenance rules this page paraphrases.
 * [`docs/getting-started.md`](getting-started.md) — the eight-step tutorial that
   builds the first tree.
-* [`netgraph show`](commands/show.md) — read one element as written, or as
-  netgraph resolved it.
+* [`netviz show`](commands/show.md) — read one element as written, or as
+  netviz resolved it.
 * [`docs/importing.md`](importing.md) — generating a first tree from LLDP, an
   `ip` dump, a CSV or a packet capture rather than typing one.

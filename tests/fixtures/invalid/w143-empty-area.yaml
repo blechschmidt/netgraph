@@ -6,10 +6,10 @@
 # really says is that the label was renamed and the area was not.
 #
 # A warning rather than an error, for the reason W142 is one. An annotation is
-# presentational and is barred from changing what netgraph concludes, so a rule
+# presentational and is barred from changing what netviz concludes, so a rule
 # about one can never fail a build; the selector is also the field most likely
 # to be right tomorrow, once the element it was written for is added.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -21,7 +21,7 @@ spec:
       ipv4:
         - 10.0.0.1/24
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-b
@@ -33,7 +33,7 @@ spec:
       ipv4:
         - 10.0.0.2/24
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b
@@ -43,7 +43,7 @@ spec:
     - sw-b:port1
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: dmz

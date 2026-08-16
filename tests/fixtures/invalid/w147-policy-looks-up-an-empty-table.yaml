@@ -3,7 +3,7 @@
 # The rule matches, the lookup finds nothing, and the packet falls through to
 # the next rule -- so the traffic somebody diverted goes exactly where it would
 # have gone without the rule. The failure that looks like it works.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-a
@@ -27,7 +27,7 @@ spec:
       src: 10.20.0.0/16
       table: lab-egress
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-b
@@ -39,7 +39,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

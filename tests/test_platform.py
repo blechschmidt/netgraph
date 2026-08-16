@@ -1,4 +1,4 @@
-"""What netgraph promises on Windows and macOS, asserted where it can be.
+"""What netviz promises on Windows and macOS, asserted where it can be.
 
 Every test here runs on all three platforms. That is deliberate and it is the
 whole point of the file: most of these behaviours are *about* Windows, and if
@@ -14,7 +14,7 @@ are for: run the real ``os.replace`` against a real open handle, and drive a rea
 ``ReadDirectoryChangesW`` / FSEvents watcher. See ``docs/testing.md``.
 
 The PowerShell completion script *is* checked for real, and everywhere: ``pwsh``
-is preinstalled on all three runner images, so the script netgraph generates is
+is preinstalled on all three runner images, so the script netviz generates is
 parsed, registered and then driven through PowerShell's own ``CompleteInput`` on
 Linux and macOS as well as on Windows.
 
@@ -36,12 +36,12 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.completion import PROG_NAME, SHELLS, PowerShellComplete, completion_script
-from netgraph.errors import RenderError
-from netgraph.fmt import Mode, format_paths
-from netgraph.fmt.runner import diff_text, display_path
-from netgraph.fsio import (
+from netviz.cli import cli
+from netviz.completion import PROG_NAME, SHELLS, PowerShellComplete, completion_script
+from netviz.errors import RenderError
+from netviz.fmt import Mode, format_paths
+from netviz.fmt.runner import diff_text, display_path
+from netviz.fsio import (
     RESERVED_FILE_STEMS,
     is_reserved_file_stem,
     replace_atomically,
@@ -50,10 +50,10 @@ from netgraph.fsio import (
     write_text,
     write_text_atomically,
 )
-from netgraph.httpserve import LocalServer, bind
-from netgraph.importer import build_files
-from netgraph.importer.draft import Draft
-from netgraph.render.dot import (
+from netviz.httpserve import LocalServer, bind
+from netviz.importer import build_files
+from netviz.importer.draft import Draft
+from netviz.render.dot import (
     _WELL_KNOWN_DIRS,
     DOT_ENV_VAR,
     DOT_EXECUTABLE,
@@ -61,8 +61,8 @@ from netgraph.render.dot import (
     graphviz_install_hint,
     missing_dot_message,
 )
-from netgraph.scaffold import build_scaffold, write_scaffold
-from netgraph.watch.loop import _DEBOUNCE_MS, DEFAULT_DEBOUNCE_MS
+from netviz.scaffold import build_scaffold, write_scaffold
+from netviz.watch.loop import _DEBOUNCE_MS, DEFAULT_DEBOUNCE_MS
 
 from platform_marks import (  # isort: skip -- tests/ is on sys.path, not a package
     HAVE_BASH_COMPLETION,
@@ -73,7 +73,7 @@ from platform_marks import (  # isort: skip -- tests/ is on sys.path, not a pack
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 DEVICE = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-1
@@ -112,8 +112,8 @@ def test_a_crlf_document_stays_crlf_until_fmt_rewrites_it(tmp_path: Path) -> Non
     """``fmt`` has an opinion about CRLF, and rewrites it to LF exactly once.
 
     This is the fixed point that matters: whatever the file arrived as, one run
-    of ``netgraph fmt`` leaves it in a state ``--check`` accepts. Without the
-    explicit ``newline=""`` in :mod:`netgraph.fsio` this would fail on Windows —
+    of ``netviz fmt`` leaves it in a state ``--check`` accepts. Without the
+    explicit ``newline=""`` in :mod:`netviz.fsio` this would fail on Windows —
     the rewrite would put the CRLF back, and ``--check`` would report the file as
     unformatted forever.
     """
@@ -127,7 +127,7 @@ def test_a_crlf_document_stays_crlf_until_fmt_rewrites_it(tmp_path: Path) -> Non
 
 
 def test_the_scaffold_is_written_with_lf(tmp_path: Path) -> None:
-    """``netgraph init`` output is committed, so it must not vary by platform."""
+    """``netviz init`` output is committed, so it must not vary by platform."""
     written = write_scaffold(build_scaffold(), tmp_path / "net")
     assert written
     for path in written:
@@ -140,26 +140,26 @@ def test_an_imported_tree_is_written_with_lf(tmp_path: Path) -> None:
     for relative, _ in build_files(draft).items():
         assert "\\" not in relative, "a draft path is POSIX, whatever wrote it"
     written = Path(tmp_path)
-    from netgraph.importer import write_files
+    from netviz.importer import write_files
 
     for path in write_files(build_files(draft), written):
         assert b"\r\n" not in path.read_bytes(), path
 
 
 def test_the_schema_file_is_written_with_lf(tmp_path: Path) -> None:
-    output = tmp_path / "netgraph.schema.json"
+    output = tmp_path / "netviz.schema.json"
     result = CliRunner().invoke(cli, ["schema", "-o", str(output)], catch_exceptions=False)
     assert result.exit_code == 0
     assert b"\r\n" not in output.read_bytes()
 
 
 def test_gitattributes_pins_the_files_whose_bytes_are_asserted() -> None:
-    """The other half of the newline policy, and the half netgraph cannot enforce.
+    """The other half of the newline policy, and the half netviz cannot enforce.
 
     ``core.autocrlf=true`` is the default on a Windows install of Git, and under
     it every YAML file and every golden would arrive CRLF — which would fail
-    ``netgraph fmt --check examples`` and every byte-for-byte golden comparison
-    before a line of netgraph ran. There is no fix in the code; the fix is this
+    ``netviz fmt --check examples`` and every byte-for-byte golden comparison
+    before a line of netviz ran. There is no fix in the code; the fix is this
     file, so the suite asserts it exists and says what it must cover.
     """
     text = (REPO_ROOT / ".gitattributes").read_text(encoding="utf-8")
@@ -316,7 +316,7 @@ def test_a_replacement_over_an_open_file_is_retried_on_windows(
 
     monkeypatch.setattr(os, "name", "nt")
     monkeypatch.setattr(os, "replace", flaky)
-    monkeypatch.setattr("netgraph.fsio._REPLACE_BACKOFF_SECONDS", 0.0)
+    monkeypatch.setattr("netviz.fsio._REPLACE_BACKOFF_SECONDS", 0.0)
 
     source = tmp_path / "new"
     source.write_bytes(b"x")
@@ -335,7 +335,7 @@ def test_a_permanently_locked_destination_is_reported_not_waited_out(
 
     monkeypatch.setattr(os, "name", "nt")
     monkeypatch.setattr(os, "replace", always_refuse)
-    monkeypatch.setattr("netgraph.fsio._REPLACE_BACKOFF_SECONDS", 0.0)
+    monkeypatch.setattr("netviz.fsio._REPLACE_BACKOFF_SECONDS", 0.0)
     with pytest.raises(PermissionError):
         replace_atomically(tmp_path / "new", tmp_path / "old")
 
@@ -384,14 +384,14 @@ def test_the_environment_variable_wins_over_path(monkeypatch: Any) -> None:
 def test_a_blank_environment_variable_is_not_a_path(monkeypatch: Any) -> None:
     """An unset variable exported empty by a wrapper script must not win."""
     monkeypatch.setenv(DOT_ENV_VAR, "   ")
-    monkeypatch.setattr("netgraph.render.dot.shutil.which", lambda *a, **k: None)
+    monkeypatch.setattr("netviz.render.dot.shutil.which", lambda *a, **k: None)
     assert find_dot() is None
 
 
 def test_path_is_consulted_before_the_well_known_directories(monkeypatch: Any) -> None:
     monkeypatch.delenv(DOT_ENV_VAR, raising=False)
     monkeypatch.setattr(
-        "netgraph.render.dot.shutil.which",
+        "netviz.render.dot.shutil.which",
         lambda name, path=None: None if path else f"/usr/bin/{name}",
     )
     assert find_dot() == f"/usr/bin/{DOT_EXECUTABLE}"
@@ -410,7 +410,7 @@ def test_a_graphviz_installed_but_not_on_path_is_still_found(monkeypatch: Any) -
 
     monkeypatch.delenv(DOT_ENV_VAR, raising=False)
     monkeypatch.setattr(os, "name", "nt")
-    monkeypatch.setattr("netgraph.render.dot.shutil.which", which)
+    monkeypatch.setattr("netviz.render.dot.shutil.which", which)
     assert find_dot() == f"{wanted}\\{DOT_EXECUTABLE}.exe"
 
 
@@ -425,7 +425,7 @@ def test_nothing_is_cached_between_lookups(monkeypatch: Any) -> None:
     monkeypatch.delenv(DOT_ENV_VAR, raising=False)
     answers = iter([None, "/usr/bin/dot"])
     monkeypatch.setattr(
-        "netgraph.render.dot.shutil.which", lambda *a, **k: next(answers, None) if not k else None
+        "netviz.render.dot.shutil.which", lambda *a, **k: next(answers, None) if not k else None
     )
     assert find_dot() is None
     assert find_dot() == "/usr/bin/dot"
@@ -457,8 +457,8 @@ def test_a_dot_that_cannot_be_executed_is_a_message_not_a_traceback(
 ) -> None:
     """The whole point of the check: never a bare ``FileNotFoundError``."""
     monkeypatch.setenv(DOT_ENV_VAR, str(tmp_path / "nowhere" / "dot"))
-    from netgraph.loader import load_stream
-    from netgraph.render import build_graph, render
+    from netviz.loader import load_stream
+    from netviz.render import build_graph, render
 
     with pytest.raises(RenderError) as caught:
         render(build_graph(load_stream(DEVICE)), "svg")
@@ -495,12 +495,12 @@ def test_exclusive_use_is_requested_when_the_platform_has_it() -> None:
 
 def test_a_second_bind_to_the_same_port_is_refused() -> None:
     """The behaviour the option choice above exists to preserve, on any platform."""
-    from netgraph.errors import NetgraphError
-    from netgraph.httpserve import LocalHandler
+    from netviz.errors import NetvizError
+    from netviz.httpserve import LocalHandler
 
     first = bind(LocalHandler, host="127.0.0.1", port=0)
     try:
-        with pytest.raises(NetgraphError, match="cannot serve"):
+        with pytest.raises(NetvizError, match="cannot serve"):
             bind(LocalHandler, host="127.0.0.1", port=first.server_address[1])
     finally:
         first.server_close()
@@ -552,7 +552,7 @@ def test_the_powershell_script_registers_a_native_completer() -> None:
     script = completion_script("powershell", cli)
     assert "Register-ArgumentCompleter -Native" in script
     assert f"-CommandName {PROG_NAME}, {PROG_NAME}.exe" in script
-    assert "_NETGRAPH_COMPLETE" in script
+    assert "_NETVIZ_COMPLETE" in script
     assert script.endswith("\n")
 
 
@@ -584,24 +584,24 @@ def test_powershell_completion_reads_the_words_it_is_given(monkeypatch: Any) -> 
     parser then rejects, which is how a path with a space in it would stop
     completing.
     """
-    monkeypatch.setenv("COMP_WORDS", "netgraph\n-i\nmy net\nrender\n--lay")
+    monkeypatch.setenv("COMP_WORDS", "netviz\n-i\nmy net\nrender\n--lay")
     monkeypatch.setenv("COMP_CWORD", "4")
-    complete = PowerShellComplete(cli, {}, PROG_NAME, "_NETGRAPH_COMPLETE")
+    complete = PowerShellComplete(cli, {}, PROG_NAME, "_NETVIZ_COMPLETE")
     assert complete.get_completion_args() == (["-i", "my net", "render"], "--lay")
 
 
 def test_powershell_completion_survives_a_missing_cursor(monkeypatch: Any) -> None:
     """A completer that raises is a traceback under the user's cursor."""
-    monkeypatch.setenv("COMP_WORDS", "netgraph\nrend")
+    monkeypatch.setenv("COMP_WORDS", "netviz\nrend")
     monkeypatch.delenv("COMP_CWORD", raising=False)
-    complete = PowerShellComplete(cli, {}, PROG_NAME, "_NETGRAPH_COMPLETE")
+    complete = PowerShellComplete(cli, {}, PROG_NAME, "_NETVIZ_COMPLETE")
     assert complete.get_completion_args() == ([], "rend")
 
 
 def test_powershell_completion_survives_a_nonsense_cursor(monkeypatch: Any) -> None:
-    monkeypatch.setenv("COMP_WORDS", "netgraph\nrend")
+    monkeypatch.setenv("COMP_WORDS", "netviz\nrend")
     monkeypatch.setenv("COMP_CWORD", "99")
-    complete = PowerShellComplete(cli, {}, PROG_NAME, "_NETGRAPH_COMPLETE")
+    complete = PowerShellComplete(cli, {}, PROG_NAME, "_NETVIZ_COMPLETE")
     assert complete.get_completion_args() == ([], "rend")
 
 
@@ -609,7 +609,7 @@ def test_powershell_completion_offers_the_same_candidates(monkeypatch: Any) -> N
     """The transport is new; the completers are the ones every shell uses."""
     monkeypatch.setenv("COMP_WORDS", f"{PROG_NAME}\nrender\n--layer\n")
     monkeypatch.setenv("COMP_CWORD", "3")
-    complete = PowerShellComplete(cli, {}, PROG_NAME, "_NETGRAPH_COMPLETE")
+    complete = PowerShellComplete(cli, {}, PROG_NAME, "_NETVIZ_COMPLETE")
     lines = complete.complete().splitlines()
     values = [line.split("\t")[1] for line in lines]
     assert "l2" in values and "rack" in values
@@ -619,7 +619,7 @@ def test_a_candidate_is_three_tab_separated_fields(monkeypatch: Any) -> None:
     """Tab, not comma: several of these summaries contain a comma."""
     monkeypatch.setenv("COMP_WORDS", f"{PROG_NAME}\nrender\n--layer\n")
     monkeypatch.setenv("COMP_CWORD", "3")
-    complete = PowerShellComplete(cli, {}, PROG_NAME, "_NETGRAPH_COMPLETE")
+    complete = PowerShellComplete(cli, {}, PROG_NAME, "_NETVIZ_COMPLETE")
     for line in complete.complete().splitlines():
         fields = line.split("\t")
         assert len(fields) == 3, line
@@ -630,7 +630,7 @@ def test_a_help_text_is_flattened_onto_one_line() -> None:
     """A newline in a tooltip would be read as the end of the candidate."""
     from click.shell_completion import CompletionItem
 
-    complete = PowerShellComplete(cli, {}, PROG_NAME, "_NETGRAPH_COMPLETE")
+    complete = PowerShellComplete(cli, {}, PROG_NAME, "_NETVIZ_COMPLETE")
     formatted = complete.format_completion(CompletionItem("sw-1", help="a switch\nover two lines"))
     assert formatted == "plain\tsw-1\ta switch over two lines"
 
@@ -659,7 +659,7 @@ Write-Output 'registered'
 
 def _powershell(tmp_path: Path, checker: str) -> subprocess.CompletedProcess[str]:
     """Run ``checker`` against a freshly generated completion script."""
-    script = tmp_path / "netgraph-completion.ps1"
+    script = tmp_path / "netviz-completion.ps1"
     write_text(script, completion_script("powershell", cli))
     path = tmp_path / "check.ps1"
     write_text(path, checker)
@@ -674,7 +674,7 @@ def _powershell(tmp_path: Path, checker: str) -> subprocess.CompletedProcess[str
 
 
 @requires_pwsh
-def test_powershell_parses_the_script_netgraph_generates(tmp_path: Path) -> None:
+def test_powershell_parses_the_script_netviz_generates(tmp_path: Path) -> None:
     """The only opinion worth having about generated PowerShell is PowerShell's.
 
     Python can assert what the script contains; it cannot assert that the shell
@@ -702,7 +702,7 @@ def test_powershell_accepts_the_completer_registration(tmp_path: Path) -> None:
 #: Register the completer, then ask PowerShell to complete a line through it —
 #: which is what the shell itself does on Tab. ``CompleteInput`` is the public
 #: entry point for that, so this exercises the whole round trip: the script block,
-#: the environment variables it sets, the ``netgraph`` re-invocation, and the
+#: the environment variables it sets, the ``netviz`` re-invocation, and the
 #: tab-separated candidates coming back.
 _COMPLETE_CHECK = """\
 $ErrorActionPreference = 'Stop'
@@ -719,7 +719,7 @@ foreach ($match in $result.CompletionMatches) {
 def _complete(tmp_path: Path, line: str) -> dict[str, str]:
     """What PowerShell offers for ``line``, as ``candidate -> tooltip``.
 
-    The completer re-invokes ``netgraph`` by name, so the console script has to be
+    The completer re-invokes ``netviz`` by name, so the console script has to be
     findable from inside PowerShell. It is put on ``PATH`` explicitly rather than
     assumed: ``pytest`` run as ``.venv/bin/pytest`` does not add the venv to
     ``PATH``, and a test that quietly returned no candidates because of that would
@@ -730,11 +730,11 @@ def _complete(tmp_path: Path, line: str) -> dict[str, str]:
     where console scripts are installed into ``Scripts\\`` beside ``python.exe``.
     """
     scripts = Path(sysconfig.get_path("scripts"))
-    assert (scripts / "netgraph").exists() or (scripts / "netgraph.exe").exists(), (
-        f"the netgraph console script is not in {scripts}; install with 'pip install -e .'"
+    assert (scripts / "netviz").exists() or (scripts / "netviz.exe").exists(), (
+        f"the netviz console script is not in {scripts}; install with 'pip install -e .'"
     )
 
-    script = tmp_path / "netgraph-completion.ps1"
+    script = tmp_path / "netviz-completion.ps1"
     write_text(script, completion_script("powershell", cli))
     checker = tmp_path / "complete.ps1"
     write_text(checker, _COMPLETE_CHECK)
@@ -758,11 +758,11 @@ def test_powershell_completes_a_static_value_space_with_its_descriptions(tmp_pat
     """The whole round trip, driven by PowerShell's own completion machinery.
 
     Everything above asserts one link of the chain. This asserts the chain: the
-    registered script block, the environment it sets, the ``netgraph``
+    registered script block, the environment it sets, the ``netviz``
     re-invocation, the tab-separated candidates, and the tooltip PowerShell shows
     beside each one — which is the half a ``click.Choice`` alone would not give.
     """
-    offered = _complete(tmp_path, "netgraph render --layer ")
+    offered = _complete(tmp_path, "netviz render --layer ")
     assert {"l1", "l2", "l3", "rack"} <= set(offered)
     assert offered["l2"] == "the same topology annotated with VLANs"
 
@@ -777,7 +777,7 @@ def test_powershell_completes_an_element_name_from_the_inventory(tmp_path: Path)
     """
     inventory = tmp_path / "my net"
     shutil.copytree(REPO_ROOT / "examples" / "home-lab", inventory)
-    offered = _complete(tmp_path, f"netgraph -i '{inventory}' show pc-")
+    offered = _complete(tmp_path, f"netviz -i '{inventory}' show pc-")
     assert offered == {"pc-desk": "computer"}
 
 
@@ -791,10 +791,10 @@ def test_an_unknown_shell_lists_the_ones_that_exist() -> None:
 def test_the_bash_capability_matches_what_click_actually_does() -> None:
     """:data:`HAVE_BASH_COMPLETION` predicts whether Click adds a line, or it is useless.
 
-    ``tests/test_docs.py`` skips the documented ``netgraph completion bash``
+    ``tests/test_docs.py`` skips the documented ``netviz completion bash``
     transcript on the strength of that prediction, and a prediction nothing
     checks is a silent skip: wrong in one direction it hides a real difference in
-    what netgraph prints, wrong in the other it fails a job for a line the
+    what netviz prints, wrong in the other it fails a job for a line the
     documentation is right not to show.
 
     Both halves are worth having on every runner. macOS is where the answer is
@@ -804,7 +804,7 @@ def test_the_bash_capability_matches_what_click_actually_does() -> None:
     """
     result = CliRunner().invoke(cli, ["completion", "bash"])
     assert result.exit_code == 0
-    assert "_netgraph_completion_setup;" in result.output, "the script itself is always emitted"
+    assert "_netviz_completion_setup;" in result.output, "the script itself is always emitted"
 
     warned = "shell completion is not supported" in result.output.lower()
     assert warned is not HAVE_BASH_COMPLETION, (
@@ -862,12 +862,12 @@ def test_every_shell_still_generates(shell: str) -> None:
     script = completion_script(shell, cli)
     assert script.strip()
     assert script.endswith("\n")
-    assert "_NETGRAPH_COMPLETE" in script
+    assert "_NETVIZ_COMPLETE" in script
 
 
 def test_the_subprocess_call_never_goes_through_a_shell() -> None:
     """``shell=True`` would give cmd.exe a say in what an inventory name means."""
-    source = (REPO_ROOT / "src" / "netgraph" / "render" / "dot.py").read_text(encoding="utf-8")
+    source = (REPO_ROOT / "src" / "netviz" / "render" / "dot.py").read_text(encoding="utf-8")
     assert "shell=True" not in source
     assert "subprocess.run(" in source
 
@@ -875,19 +875,18 @@ def test_the_subprocess_call_never_goes_through_a_shell() -> None:
 def test_nothing_in_the_package_writes_text_without_a_newline_policy() -> None:
     """``Path.write_text`` is the one call that silently varies by platform.
 
-    Every text artefact netgraph writes goes through :mod:`netgraph.fsio`, which
+    Every text artefact netviz writes goes through :mod:`netviz.fsio`, which
     passes ``newline=""``. This is the guard that keeps a new call site from
     reintroducing the CRLF bug in a file somebody then commits.
     """
-    package = REPO_ROOT / "src" / "netgraph"
+    package = REPO_ROOT / "src" / "netviz"
     offenders = []
     for path in sorted(package.rglob("*.py")):
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
             if ".write_text(" in line and "fsio" not in line:
                 offenders.append(f"{path.relative_to(package)}:{number}")
     assert not offenders, (
-        "use netgraph.fsio.write_text, which does not translate line endings: "
-        + ", ".join(offenders)
+        "use netviz.fsio.write_text, which does not translate line endings: " + ", ".join(offenders)
     )
 
 
@@ -898,10 +897,10 @@ def test_the_subprocess_timeout_is_honoured_the_same_way(monkeypatch: Any) -> No
         assert kwargs["timeout"] > 0
         raise subprocess.TimeoutExpired(cmd="dot", timeout=float(kwargs["timeout"]))
 
-    from netgraph.loader import load_stream
-    from netgraph.render import build_graph, render
+    from netviz.loader import load_stream
+    from netviz.render import build_graph, render
 
-    monkeypatch.setattr("netgraph.render.dot.find_dot", lambda: "dot")
-    monkeypatch.setattr("netgraph.render.dot.subprocess.run", timed_out)
+    monkeypatch.setattr("netviz.render.dot.find_dot", lambda: "dot")
+    monkeypatch.setattr("netviz.render.dot.subprocess.run", timed_out)
     with pytest.raises(RenderError, match="did not finish"):
         render(build_graph(load_stream(DEVICE)), "svg")

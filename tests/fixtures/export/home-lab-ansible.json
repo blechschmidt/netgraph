@@ -3,23 +3,23 @@
     "hostvars": {
       "adp-usb-eth.hosts": {
         "ansible_host": "192.168.10.30",
-        "netgraph_element": "hosts/adp-usb-eth",
-        "netgraph_name": "adp-usb-eth",
-        "netgraph_kind": "adapter",
-        "netgraph_namespace": "hosts",
-        "netgraph_description": "USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the\nlaptop - there is deliberately no cable between the two (NG-X005).\n",
-        "netgraph_vendor": "Anker",
-        "netgraph_model": "A83130A1",
-        "netgraph_serial": "AK2231007744",
-        "netgraph_labels": {
+        "netviz_element": "hosts/adp-usb-eth",
+        "netviz_name": "adp-usb-eth",
+        "netviz_kind": "adapter",
+        "netviz_namespace": "hosts",
+        "netviz_description": "USB 3.0 gigabit dongle. `upstream.attached_to` is what joins it to the\nlaptop - there is deliberately no cable between the two (NG-X005).\n",
+        "netviz_vendor": "Anker",
+        "netviz_model": "A83130A1",
+        "netviz_serial": "AK2231007744",
+        "netviz_labels": {
           "asset": "A-0001",
           "site": "home"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "192.168.10.30/24",
           "2001:db8:10::30/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "enx001122334455",
             "type": "ethernet",
@@ -33,27 +33,27 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           10
         ]
       },
       "ap-home.wireless": {
         "ansible_host": "192.168.10.3",
-        "netgraph_element": "wireless/ap-home",
-        "netgraph_name": "ap-home",
-        "netgraph_kind": "switch",
-        "netgraph_namespace": "wireless",
-        "netgraph_description": "Ceiling access point in the hallway, powered over the uplink. It is a\nswitch: the radio is a bridge port like any other, and the two SSIDs are\nwhat it bridges the air into.\n",
-        "netgraph_vendor": "Ubiquiti",
-        "netgraph_model": "U6-Lite",
-        "netgraph_labels": {
+        "netviz_element": "wireless/ap-home",
+        "netviz_name": "ap-home",
+        "netviz_kind": "switch",
+        "netviz_namespace": "wireless",
+        "netviz_description": "Ceiling access point in the hallway, powered over the uplink. It is a\nswitch: the radio is a bridge port like any other, and the two SSIDs are\nwhat it bridges the air into.\n",
+        "netviz_vendor": "Ubiquiti",
+        "netviz_model": "U6-Lite",
+        "netviz_labels": {
           "role": "wireless",
           "site": "home"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "192.168.10.3/24"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "br0",
             "type": "bridge",
@@ -95,11 +95,11 @@
             "mtu": 1500
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           10,
           20
         ],
-        "netgraph_vlans": [
+        "netviz_vlans": [
           {
             "id": 10,
             "name": "home"
@@ -113,23 +113,23 @@
       },
       "pc-desk.hosts": {
         "ansible_host": "192.168.10.20",
-        "netgraph_element": "hosts/pc-desk",
-        "netgraph_name": "pc-desk",
-        "netgraph_kind": "computer",
-        "netgraph_namespace": "hosts",
-        "netgraph_description": "Desktop workstation in the study",
-        "netgraph_vendor": "Dell",
-        "netgraph_model": "OptiPlex 7010",
-        "netgraph_labels": {
+        "netviz_element": "hosts/pc-desk",
+        "netviz_name": "pc-desk",
+        "netviz_kind": "computer",
+        "netviz_namespace": "hosts",
+        "netviz_description": "Desktop workstation in the study",
+        "netviz_vendor": "Dell",
+        "netviz_model": "OptiPlex 7010",
+        "netviz_labels": {
           "owner": "sam",
           "role": "workstation",
           "site": "home"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "192.168.10.20/24",
           "2001:db8:10::20/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "lo",
             "type": "loopback",
@@ -159,29 +159,29 @@
             "mac": "3c:97:0e:20:01:02"
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           10
         ]
       },
       "phone.hosts": {
         "ansible_host": "192.168.10.40",
-        "netgraph_element": "hosts/phone",
-        "netgraph_name": "phone",
-        "netgraph_kind": "computer",
-        "netgraph_namespace": "hosts",
-        "netgraph_description": "Wireless-only client. It reaches the network through its association to\nap-home, which is declared as a `medium: wireless` cable - the association\nis the link.\n",
-        "netgraph_vendor": "Apple",
-        "netgraph_model": "iPhone 15",
-        "netgraph_labels": {
+        "netviz_element": "hosts/phone",
+        "netviz_name": "phone",
+        "netviz_kind": "computer",
+        "netviz_namespace": "hosts",
+        "netviz_description": "Wireless-only client. It reaches the network through its association to\nap-home, which is declared as a `medium: wireless` cable - the association\nis the link.\n",
+        "netviz_vendor": "Apple",
+        "netviz_model": "iPhone 15",
+        "netviz_labels": {
           "owner": "sam",
           "role": "mobile",
           "site": "home"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "192.168.10.40/24",
           "2001:db8:10::40/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "en0",
             "type": "wifi",
@@ -195,30 +195,30 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": []
+        "netviz_vlan_ids": []
       },
       "rtr-home.routers": {
         "ansible_host": "192.0.2.1",
-        "netgraph_element": "routers/rtr-home",
-        "netgraph_name": "rtr-home",
-        "netgraph_kind": "router",
-        "netgraph_namespace": "routers",
-        "netgraph_description": "Home edge router. Terminates the ISP hand-off on wan0 and is the default\ngateway for the single home VLAN (10).\n",
-        "netgraph_vendor": "MikroTik",
-        "netgraph_model": "hEX S",
-        "netgraph_labels": {
+        "netviz_element": "routers/rtr-home",
+        "netviz_name": "rtr-home",
+        "netviz_kind": "router",
+        "netviz_namespace": "routers",
+        "netviz_description": "Home edge router. Terminates the ISP hand-off on wan0 and is the default\ngateway for the single home VLAN (10).\n",
+        "netviz_vendor": "MikroTik",
+        "netviz_model": "hEX S",
+        "netviz_labels": {
           "env": "prod",
           "role": "edge",
           "site": "home"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "192.0.2.1/32",
           "192.168.10.1/24",
           "203.0.113.2/30",
           "2001:db8::1/128",
           "2001:db8:10::1/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "lo0",
             "type": "loopback",
@@ -257,10 +257,10 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           10
         ],
-        "netgraph_vlans": [
+        "netviz_vlans": [
           {
             "id": 10,
             "name": "home",
@@ -270,23 +270,23 @@
       },
       "srv-nas.hosts": {
         "ansible_host": "192.168.10.10",
-        "netgraph_element": "hosts/srv-nas",
-        "netgraph_name": "srv-nas",
-        "netgraph_kind": "server",
-        "netgraph_namespace": "hosts",
-        "netgraph_description": "Backup and media server",
-        "netgraph_vendor": "Synology",
-        "netgraph_model": "DS923+",
-        "netgraph_labels": {
+        "netviz_element": "hosts/srv-nas",
+        "netviz_name": "srv-nas",
+        "netviz_kind": "server",
+        "netviz_namespace": "hosts",
+        "netviz_description": "Backup and media server",
+        "netviz_vendor": "Synology",
+        "netviz_model": "DS923+",
+        "netviz_labels": {
           "env": "prod",
           "role": "storage",
           "site": "home"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "192.168.10.10/24",
           "2001:db8:10::10/64"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "lo",
             "type": "loopback",
@@ -308,27 +308,27 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           10
         ]
       },
       "sw-home.switches": {
         "ansible_host": "192.168.10.2",
-        "netgraph_element": "switches/sw-home",
-        "netgraph_name": "sw-home",
-        "netgraph_kind": "switch",
-        "netgraph_namespace": "switches",
-        "netgraph_description": "Eight-port desktop switch in the hallway cabinet",
-        "netgraph_vendor": "TP-Link",
-        "netgraph_model": "TL-SG108E",
-        "netgraph_labels": {
+        "netviz_element": "switches/sw-home",
+        "netviz_name": "sw-home",
+        "netviz_kind": "switch",
+        "netviz_namespace": "switches",
+        "netviz_description": "Eight-port desktop switch in the hallway cabinet",
+        "netviz_vendor": "TP-Link",
+        "netviz_model": "TL-SG108E",
+        "netviz_labels": {
           "role": "access",
           "site": "home"
         },
-        "netgraph_addresses": [
+        "netviz_addresses": [
           "192.168.10.2/24"
         ],
-        "netgraph_interfaces": [
+        "netviz_interfaces": [
           {
             "name": "br0",
             "type": "bridge",
@@ -410,11 +410,11 @@
             ]
           }
         ],
-        "netgraph_vlan_ids": [
+        "netviz_vlan_ids": [
           10,
           20
         ],
-        "netgraph_vlans": [
+        "netviz_vlans": [
           {
             "id": 10,
             "name": "home"
@@ -453,7 +453,7 @@
       "vendor_ubiquiti"
     ],
     "vars": {
-      "netgraph_generated_by": "netgraph <version>"
+      "netviz_generated_by": "netviz <version>"
     }
   },
   "kind_adapter": {

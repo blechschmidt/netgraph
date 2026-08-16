@@ -1,26 +1,26 @@
-"""``netgraph converge``: does the remediation close the drift, and can it lock you out?
+"""``netviz converge``: does the remediation close the drift, and can it lock you out?
 
 The command generates commands somebody will run against real hardware, so the
 properties asserted here are ordered by how badly getting one wrong would hurt:
 
 * **A management-path change is refused.** Without ``--allow-disruptive``, a plan
-  that touches the interface netgraph would reach the box on -- or that shuts or
+  that touches the interface netviz would reach the box on -- or that shuts or
   deletes any interface -- is refused *whole*: nothing is printed, nothing is
   written, and the refusal names every offending change rather than the first.
 * **Nothing is proposed that no capture contradicted.** Every change carries the
-  provenance of a drift finding. A change with none would be netgraph having an
+  provenance of a drift finding. A change with none would be netviz having an
   opinion about a network with a root shell in its hand.
 * **The order is a dependency order.** VLANs before the ports that carry them,
   parents before the interfaces stacked on them, additions before removals, and
   removals in the mirror order of the additions.
 * **The plan actually converges.** Applying the generated commands to the
   captured state and re-running the comparison leaves nothing but the findings
-  netgraph deliberately refused to write a command for. This is the round trip,
+  netviz deliberately refused to write a command for. This is the round trip,
   and it is the test that would catch a command that is merely plausible.
 * **A rollback goes back to what was measured**, not to a state nobody observed.
 * **The exit code is the contract**: 0 converged, 2 pending, 4 refused.
 
-The captures in ``tests/fixtures/drift/`` are the same ones ``netgraph drift`` is
+The captures in ``tests/fixtures/drift/`` are the same ones ``netviz drift`` is
 tested with, taken against ``examples/home-lab`` -- a tree that is committed,
 validates and renders. The goldens in ``tests/fixtures/converge/`` are one per
 dialect over those captures, regenerated with ``pytest --regen-golden``.
@@ -35,8 +35,8 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner, Result
 
-from netgraph.cli import cli
-from netgraph.converge import (
+from netviz.cli import cli
+from netviz.converge import (
     CONVERGE_DIALECTS,
     Action,
     Command,
@@ -61,26 +61,26 @@ from netgraph.converge import (
     script_for,
     write_scripts,
 )
-from netgraph.converge.commands import describe, render, revert
-from netgraph.converge.files import strip_banner
-from netgraph.converge.intent import RANKS, article, prerequisites_of
-from netgraph.converge.model import Provenance
-from netgraph.converge.risk import ManagementPath
-from netgraph.drift import Change, Direction, DriftReport, compare, coverage_of
-from netgraph.export.config import UnsupportedConfigError
-from netgraph.fsio import write_text
-from netgraph.importer.draft import Draft, DraftDevice, DraftInterface, DraftVlan
-from netgraph.loader import load_tree
-from netgraph.loader.inventory import Inventory
-from netgraph.models.interface import InterfaceType
-from netgraph.render.graph import Layer, build_graph
+from netviz.converge.commands import describe, render, revert
+from netviz.converge.files import strip_banner
+from netviz.converge.intent import RANKS, article, prerequisites_of
+from netviz.converge.model import Provenance
+from netviz.converge.risk import ManagementPath
+from netviz.drift import Change, Direction, DriftReport, compare, coverage_of
+from netviz.export.config import UnsupportedConfigError
+from netviz.fsio import write_text
+from netviz.importer.draft import Draft, DraftDevice, DraftInterface, DraftVlan
+from netviz.loader import load_tree
+from netviz.loader.inventory import Inventory
+from netviz.models.interface import InterfaceType
+from netviz.render.graph import Layer, build_graph
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HOME_LAB = REPO_ROOT / "examples" / "home-lab"
 DRIFT_FIXTURES = REPO_ROOT / "tests" / "fixtures" / "drift"
 GOLDEN_DIR = REPO_ROOT / "tests" / "fixtures" / "converge"
 
-#: A single host shaped so that every remediation netgraph can derive appears in
+#: A single host shaped so that every remediation netviz can derive appears in
 #: one plan: an interface the capture cannot find, an aggregate whose membership
 #: disagrees on both sides, a VLAN sub-interface in the wrong VLAN, an address
 #: that is declared and not configured, and an extra address on the management
@@ -142,7 +142,7 @@ def test_the_refusal_names_every_disruptive_change_and_why(inputs: ConvergeInput
         assert change.risk_reason and change.risk_reason in message
 
 
-def test_the_management_interface_is_the_one_netgraph_would_reach_the_box_on(
+def test_the_management_interface_is_the_one_netviz_would_reach_the_box_on(
     inventory: Inventory,
 ) -> None:
     """One definition of "reach the box", shared with the export emitters."""
@@ -157,7 +157,7 @@ def test_the_management_interface_is_the_one_netgraph_would_reach_the_box_on(
 
 
 def test_a_device_with_no_address_has_no_management_path(inventory: Inventory) -> None:
-    """ "No path netgraph can name" is stated, not guessed at."""
+    """ "No path netviz can name" is stated, not guessed at."""
     graph = build_graph(inventory, layer=Layer.L1)
     node = next(entry for entry in graph.element_nodes if entry.fqn == "switches/sw-home")
     path = management_path(node, inventory["switches/sw-home"])
@@ -448,7 +448,7 @@ def test_the_plan_deletes_a_stacked_interface_before_the_one_underneath_it(
     tree.mkdir()
     write_text(
         tree / "srv-x.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\nkind: server\nmetadata:\n  name: srv-x\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: server\nmetadata:\n  name: srv-x\n"
         "spec:\n  interfaces:\n    - name: eno1\n      type: ethernet\n      mtu: 1500\n"
         "      ipv4:\n        addresses: [10.0.0.5/24]\n",
     )
@@ -580,7 +580,7 @@ def _apply(draft: Draft, plan: ConvergePlan, inventory: Inventory) -> Draft:
     """Run the plan's *intents* against the captured state.
 
     The simulation applies the intent vocabulary rather than parsing the
-    generated command text, and that is the honest boundary: netgraph has no
+    generated command text, and that is the honest boundary: netviz has no
     device, so what it can assert is that the changes it derived describe a state
     that agrees with the inventory. Parsing its own output back would test the
     formatter, not the plan.
@@ -676,7 +676,7 @@ def _addresses(interface: DraftInterface, address: str) -> list[str]:
 def test_applying_the_plan_to_the_captured_state_leaves_only_the_manual_findings(
     inventory: Inventory,
 ) -> None:
-    """The round trip: everything netgraph wrote a command for is closed.
+    """The round trip: everything netviz wrote a command for is closed.
 
     What is left is exactly the set it refused to write one for -- a cable in the
     wrong port, a device nobody declared, a physical port that is simply there --
@@ -784,7 +784,7 @@ def test_a_vlan_is_created_from_the_declaration_the_capture_never_saw(
 
 
 def test_a_vlan_nothing_declares_is_never_invented(lab: Inventory, lab_plan: ConvergePlan) -> None:
-    """VLAN 31 is on the wire and in no document: netgraph does not create it."""
+    """VLAN 31 is on the wire and in no document: netviz does not create it."""
     assert not any(change.id.endswith("#vlan.create/31") for change in lab_plan.changes)
     assert any(change.id.endswith("#vlan.untag/bond0/31") for change in lab_plan.changes)
 
@@ -895,8 +895,8 @@ def test_a_device_with_only_manual_findings_gets_no_script(plan: ConvergePlan) -
 def test_a_script_carries_its_provenance_and_its_warnings(plan: ConvergePlan) -> None:
     text = script_for(plan, plan.device("hosts/pc-desk"))
     assert text is not None
-    assert "netgraph-element: hosts/pc-desk" in text
-    assert "Not applied by netgraph" in text
+    assert "netviz-element: hosts/pc-desk" in text
+    assert "Not applied by netviz" in text
     assert "drift: hosts/pc-desk:eno1.mac" in text
     assert "[DISRUPTIVE]" in text
     assert text.endswith("\n")
@@ -908,7 +908,7 @@ def test_a_rollback_script_holds_the_inverse_commands(plan: ConvergePlan, tmp_pa
     assert forward is not None and inverse is not None
     assert "set interface eth0 mtu 1500" in forward
     assert "set interface eth0 mtu 9000" in inverse
-    assert "netgraph-script: rollback" in inverse
+    assert "netviz-script: rollback" in inverse
 
     written = write_scripts(plan, tmp_path, rollback=True)
     assert all(name.endswith("/rollback.txt") for name in written)
@@ -956,9 +956,9 @@ def test_a_written_file_becomes_a_quoted_heredoc() -> None:
     lines = list(command.script_lines())
     assert lines == [
         "install -d -m 0755 /etc",
-        "cat > /etc/x <<'NETGRAPH_EOF'",
+        "cat > /etc/x <<'NETVIZ_EOF'",
         "a=$b",
-        "NETGRAPH_EOF",
+        "NETVIZ_EOF",
     ]
 
 
@@ -969,21 +969,21 @@ def test_a_body_holding_the_delimiter_gets_a_longer_one() -> None:
     ``adopt`` -- a description, an SSID, a chassis string -- so "no generated
     file would ever hold that line" is a claim about somebody else's network.
     """
-    content = "a\nNETGRAPH_EOF\nrm -rf /\n"
+    content = "a\nNETVIZ_EOF\nrm -rf /\n"
     lines = list(Command(text="w", kind="write", path="/etc/x", content=content).script_lines())
     delimiter = lines[-1]
-    assert delimiter.startswith("NETGRAPH_EOF_")
+    assert delimiter.startswith("NETVIZ_EOF_")
     assert delimiter not in content.splitlines()
     assert lines[1] == f"cat > /etc/x <<'{delimiter}'"
     # The body is intact and every line of it is inside the document.
-    assert lines[2:-1] == ["a", "NETGRAPH_EOF", "rm -rf /"]
+    assert lines[2:-1] == ["a", "NETVIZ_EOF", "rm -rf /"]
 
 
 def test_a_written_body_is_split_on_newlines_and_nothing_else() -> None:
     """``splitlines`` also breaks on \x0b, \x0c and \u2028.
 
     The contract of this command is that the file the script writes is the file
-    ``netgraph export config`` would write, byte for byte, so a form feed in a
+    ``netviz export config`` would write, byte for byte, so a form feed in a
     description must stay a form feed rather than becoming a line break.
     """
     content = "first\x0bstill first\nsecond\n"
@@ -1278,15 +1278,15 @@ def test_a_virtual_interface_the_inventory_does_not_declare_is_deleted_and_recre
         ("loopback", False),
     ],
 )
-def test_only_an_interface_netgraph_could_have_made_is_ever_removed(
+def test_only_an_interface_netviz_could_have_made_is_ever_removed(
     inventory: Inventory, observed_type: str, removable: bool
 ) -> None:
-    """ "netgraph removes what netgraph makes" -- spelled as the model spells it.
+    """ "netviz removes what netviz makes" -- spelled as the model spells it.
 
     The list is parametrised over every :class:`InterfaceType` on purpose: it was
     written as ``bond``, which is what ``ip`` calls an aggregate and not what the
-    model does, so ``lag`` fell through to "a physical port netgraph will not
-    touch" -- a sentence that is false about a thing netgraph creates.
+    model does, so ``lag`` fell through to "a physical port netviz will not
+    touch" -- a sentence that is false about a thing netviz creates.
     """
     intents = _derive_one(
         inventory,
@@ -1306,7 +1306,7 @@ def test_only_an_interface_netgraph_could_have_made_is_ever_removed(
 
 def test_every_interface_type_is_accounted_for_by_the_removal_rule() -> None:
     """A type added to the model must be decided about, not silently physical."""
-    from netgraph.converge.derive import _VIRTUAL_TYPES
+    from netviz.converge.derive import _VIRTUAL_TYPES
 
     assert {member.value for member in InterfaceType} >= _VIRTUAL_TYPES
 
@@ -1443,7 +1443,7 @@ def test_a_script_lists_the_manual_items_it_could_not_carry(lab_plan: ConvergePl
     """A device with both kinds of finding must not lose the manual half.
 
     ``srv-lab`` has both: commands for everything the capture contradicted, and
-    one physical port netgraph will not touch. The port has to survive into the
+    one physical port netviz will not touch. The port has to survive into the
     script, as a comment, or the operator running it would believe the device was
     finished when it was not.
     """
@@ -1479,7 +1479,7 @@ def _assert_golden(rendered: str, name: str, regen_golden: bool) -> None:
     golden = GOLDEN_DIR / name
     if regen_golden:
         golden.parent.mkdir(parents=True, exist_ok=True)
-        # netgraph.fsio.write_text, not Path.write_text: a golden regenerated on
+        # netviz.fsio.write_text, not Path.write_text: a golden regenerated on
         # Windows must hold the same bytes as one regenerated on Linux, and the
         # default text mode would translate every newline. tests/test_golden.py
         # does the same, for the same reason.
@@ -1523,7 +1523,7 @@ def test_the_cli_exits_zero_when_the_network_already_matches(tmp_path: Path) -> 
 def test_the_cli_refuses_an_inventory_that_does_not_load(tmp_path: Path) -> None:
     broken = tmp_path / "inv"
     broken.mkdir()
-    (broken / "bad.yaml").write_text("apiVersion: netgraph.dev/v1alpha1\nkind: nope\n", "utf-8")
+    (broken / "bad.yaml").write_text("apiVersion: netviz.dev/v1alpha1\nkind: nope\n", "utf-8")
     result = CliRunner().invoke(cli, ["-i", str(broken), "converge", "plan", *CAPTURES])
     assert result.exit_code == 1
     assert "does not load" in result.output

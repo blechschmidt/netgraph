@@ -1,4 +1,4 @@
-"""The machine-readable output of ``netgraph validate``.
+"""The machine-readable output of ``netviz validate``.
 
 Four contracts are asserted here, because four different consumers depend on
 them and none of them can complain in prose:
@@ -29,10 +29,10 @@ import pytest
 import yaml
 from click.testing import CliRunner, Result
 
-from netgraph import __version__
-from netgraph.cli import cli
-from netgraph.config import ValidationConfig
-from netgraph.diagnostics import (
+from netviz import __version__
+from netviz.cli import cli
+from netviz.config import ValidationConfig
+from netviz.diagnostics import (
     FORMATS,
     LOAD_RULE,
     SARIF_SCHEMA_URL,
@@ -46,10 +46,10 @@ from netgraph.diagnostics import (
     build_report,
     render_report,
 )
-from netgraph.loader import load_tree
-from netgraph.models import API_VERSION
-from netgraph.rules import RULES, Severity
-from netgraph.validate import validate
+from netviz.loader import load_tree
+from netviz.models import API_VERSION
+from netviz.rules import RULES, Severity
+from netviz.validate import validate
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -149,7 +149,7 @@ def test_the_envelope_carries_the_documented_keys() -> None:
     envelope = as_json(report_for(BROKEN))
 
     assert envelope["schemaVersion"] == 1
-    assert envelope["tool"] == {"name": "netgraph", "version": __version__}
+    assert envelope["tool"] == {"name": "netviz", "version": __version__}
     assert envelope["inventory"]["root"] == str(BROKEN.parent)
     assert envelope["summary"] == {"error": 1, "warning": 0, "info": 0, "total": 1}
     assert envelope["failed"] is True
@@ -302,7 +302,7 @@ def test_a_diagnostic_without_a_file_is_reported_without_a_location() -> None:
 
 
 def test_a_load_error_is_reported_under_the_load_rule(tmp_path: Path) -> None:
-    write(tmp_path, broken="apiVersion: netgraph.dev/v1alpha1\nkind: switch\nspec: {}\n")
+    write(tmp_path, broken="apiVersion: netviz.dev/v1alpha1\nkind: switch\nspec: {}\n")
     findings = as_json(report_for(tmp_path))["findings"]
 
     assert findings, "a document missing 'metadata' is a load error, not a finding"
@@ -451,7 +451,7 @@ def test_a_result_carries_its_region_and_a_stable_fingerprint() -> None:
     assert location["artifactLocation"]["uri"].endswith(BROKEN.name)
     assert location["region"]["startLine"] >= 1
     assert location["region"]["startColumn"] >= 1
-    assert set(result["partialFingerprints"]) == {"netgraphFinding/v1"}
+    assert set(result["partialFingerprints"]) == {"netvizFinding/v1"}
     # Same problem, different line: the alert must not be closed and reopened.
     moved = as_sarif(report_for(BROKEN))["runs"][0]["results"][0]
     assert moved["partialFingerprints"] == result["partialFingerprints"]

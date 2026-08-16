@@ -1,4 +1,4 @@
-netgraph plan: home-lab → the live network (patch.csv)
+netviz plan: home-lab → the live network (patch.csv)
 
   ~ device.switches/sw-home  [switch]
       + spec.interfaces[name=port6]: {name: port6, type: ethernet, enabled: true}

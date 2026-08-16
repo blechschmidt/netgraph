@@ -1,6 +1,6 @@
-"""``netgraph lsp``, driven over the wire rather than through any one editor.
+"""``netviz lsp``, driven over the wire rather than through any one editor.
 
-Every test here talks JSON-RPC to a real :class:`~netgraph.lsp.LanguageServer`
+Every test here talks JSON-RPC to a real :class:`~netviz.lsp.LanguageServer`
 over real pipes: ``Content-Length`` frames in, framed responses and
 notifications out. That is deliberate. A language server is defined by what it
 puts on the socket, and a test that called the handlers directly would pass
@@ -26,17 +26,17 @@ from typing import Any, Final
 
 import pytest
 
-from netgraph.lsp import Connection, LanguageServer
-from netgraph.lsp.context import CursorContext, Slot, context_at, document_bounds
-from netgraph.lsp.jsonrpc import (
+from netviz.lsp import Connection, LanguageServer
+from netviz.lsp.context import CursorContext, Slot, context_at, document_bounds
+from netviz.lsp.jsonrpc import (
     METHOD_NOT_FOUND,
     SERVER_NOT_INITIALIZED,
     ProtocolError,
 )
-from netgraph.lsp.locate import scalar_span
-from netgraph.lsp.text import Encoding, Position, Range, TextDocument, full_range
-from netgraph.lsp.uri import path_to_uri, uri_to_path
-from netgraph.lsp.workspace import LONE_FILE_RULES
+from netviz.lsp.locate import scalar_span
+from netviz.lsp.text import Encoding, Position, Range, TextDocument, full_range
+from netviz.lsp.uri import path_to_uri, uri_to_path
+from netviz.lsp.workspace import LONE_FILE_RULES
 
 REPO_ROOT: Final = Path(__file__).resolve().parents[1]
 HOME_LAB: Final = REPO_ROOT / "examples" / "home-lab"
@@ -312,7 +312,7 @@ def test_a_cursor_context_can_be_built_on_every_supported_python() -> None:
 
 
 class TestFraming:
-    """:mod:`netgraph.lsp.jsonrpc` — the base protocol, on its own."""
+    """:mod:`netviz.lsp.jsonrpc` — the base protocol, on its own."""
 
     @staticmethod
     def _connection(payload: bytes) -> tuple[Connection, Any]:
@@ -463,7 +463,7 @@ class TestLifecycle:
         assert capabilities["renameProvider"]["prepareProvider"] is True
         assert "quickfix" in capabilities["codeActionProvider"]["codeActionKinds"]
         assert capabilities["textDocumentSync"]["change"] == 2
-        assert result["serverInfo"]["name"] == "netgraph"
+        assert result["serverInfo"]["name"] == "netviz"
         assert client.close() == 0
 
     def test_utf32_is_used_when_the_client_offers_it(self, inventory: Path) -> None:
@@ -509,7 +509,7 @@ class TestDiagnostics:
         diagnostics = driver.wait_for_diagnostics(uri)
         [problem] = [entry for entry in diagnostics if entry["severity"] == 1]
         assert problem["code"] == "NG-C002"
-        assert problem["source"] == "netgraph"
+        assert problem["source"] == "netviz"
         assert "port9" in problem["message"]
         assert problem["codeDescription"]["href"].endswith(
             "docs/validation-rules.md#e001--unknown-cable-endpoint"
@@ -611,7 +611,7 @@ def _has_code(code: str) -> Callable[[list[dict[str, Any]]], bool]:
 
 
 def _changed_event(path: Path) -> Any:
-    from netgraph.lsp.server import _Event
+    from netviz.lsp.server import _Event
 
     return _Event("changed", (str(path),))
 
@@ -636,7 +636,7 @@ class TestCompletion:
     ) -> None:
         path = inventory / "switches" / "new.yaml"
         text = (
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: switch\n"
             "metadata:\n"
             "  name: sw-new\n"
@@ -657,9 +657,7 @@ class TestCompletion:
 
     def test_an_enum_value_is_offered_with_its_prose(self, driver: Driver, inventory: Path) -> None:
         path = inventory / "switches" / "new.yaml"
-        text = (
-            "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nspec:\n  interfaces:\n    - type: \n"
-        )
+        text = "apiVersion: netviz.dev/v1alpha1\nkind: switch\nspec:\n  interfaces:\n    - type: \n"
         uri = driver.open(path, text)
         items = self._complete(driver, uri, 4, 12)
         labels = [item["label"] for item in items]
@@ -680,7 +678,7 @@ class TestCompletion:
         # tree, which is right and would make this test about nothing.
         path = inventory / "cables" / "new.yaml"
         text = (
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: cable\n"
             "metadata:\n"
             "  name: cbl-new\n"
@@ -703,7 +701,7 @@ class TestCompletion:
     ) -> None:
         path = inventory / "cables" / "new.yaml"
         text = (
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: cable\n"
             "metadata:\n"
             "  name: cbl-new\n"
@@ -728,7 +726,7 @@ class TestCompletion:
     ) -> None:
         path = inventory / "people" / "new.yaml"
         text = (
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: group\n"
             "metadata:\n"
             "  name: g\n"
@@ -1038,7 +1036,7 @@ class TestRename:
 
 class TestFormatting:
     def test_formatting_returns_what_fmt_would_write(self, driver: Driver, inventory: Path) -> None:
-        from netgraph.fmt import format_source
+        from netviz.fmt import format_source
 
         path = inventory / "switches" / "sw-home.yaml"
         text = "kind:    switch\nmetadata:\n    name:   sw-home\n"
@@ -1068,7 +1066,7 @@ class TestFormatting:
 class TestCodeActions:
     @staticmethod
     def _fixable(inventory: Path) -> tuple[Path, str, str]:
-        """A document with a finding :mod:`netgraph.fixes` can repair, and how.
+        """A document with a finding :mod:`netviz.fixes` can repair, and how.
 
         ``W108`` — a loopback declaring a MAC address — because it has exactly
         one repair, so the action is unambiguous and the assertion is about the
@@ -1102,7 +1100,7 @@ class TestCodeActions:
         assert isinstance(actions, list) and actions
         quick = [entry for entry in actions if entry["kind"] == "quickfix"]
         assert quick, [entry["title"] for entry in actions]
-        assert quick[0]["title"].startswith("netgraph: ")
+        assert quick[0]["title"].startswith("netviz: ")
         assert "edit" not in quick[0], "the edit is computed on resolve"
         resolved = driver.result("codeAction/resolve", quick[0])
         assert isinstance(resolved, Mapping)
@@ -1125,7 +1123,7 @@ class TestCodeActions:
             },
         )
         assert isinstance(actions, list)
-        assert [entry["kind"] for entry in actions] == ["source.fixAll.netgraph"]
+        assert [entry["kind"] for entry in actions] == ["source.fixAll.netviz"]
         resolved = driver.result("codeAction/resolve", actions[0])
         assert isinstance(resolved, Mapping)
         assert "edit" in resolved
@@ -1171,7 +1169,7 @@ class TestLoneFile:
     def test_a_file_opened_without_a_folder_is_still_checked(self, tmp_path: Path) -> None:
         path = tmp_path / "switch.yaml"
         path.write_text(
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: switch\n"
             "metadata:\n"
             "  name: sw\n"
@@ -1195,7 +1193,7 @@ class TestLoneFile:
     def test_the_rules_that_need_a_tree_are_held_back(self, tmp_path: Path) -> None:
         path = tmp_path / "cable.yaml"
         path.write_text(
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: cable\n"
             "metadata:\n"
             "  name: cbl\n"
@@ -1218,7 +1216,7 @@ class TestLoneFile:
     def test_renaming_needs_a_folder_and_says_so(self, tmp_path: Path) -> None:
         path = tmp_path / "switch.yaml"
         path.write_text(
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: switch\n"
             "metadata:\n"
             "  name: sw\n"
@@ -1250,7 +1248,7 @@ class TestLoneFile:
 
 
 class TestCursorContext:
-    """:mod:`netgraph.lsp.context` — the layout scan, without a server."""
+    """:mod:`netviz.lsp.context` — the layout scan, without a server."""
 
     @staticmethod
     def _at(text: str, line: int, character: int) -> Any:
@@ -1306,7 +1304,7 @@ class TestCommand:
     def test_the_command_serves_a_session_over_its_own_stdio(
         self, inventory: Path, tmp_path: Path
     ) -> None:
-        """End to end through ``netgraph lsp``, as an editor would spawn it."""
+        """End to end through ``netviz lsp``, as an editor would spawn it."""
         import subprocess
         import sys
 
@@ -1329,7 +1327,7 @@ class TestCommand:
             ]
         )
         completed = subprocess.run(
-            [sys.executable, "-m", "netgraph", "lsp", "--no-watch", "--log", str(log)],
+            [sys.executable, "-m", "netviz", "lsp", "--no-watch", "--log", str(log)],
             input=payload,
             capture_output=True,
             timeout=60,
@@ -1354,7 +1352,7 @@ class TestCommand:
         import sys
 
         proc = subprocess.Popen(
-            [sys.executable, "-m", "netgraph", "lsp", "--no-watch"],
+            [sys.executable, "-m", "netviz", "lsp", "--no-watch"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -1397,7 +1395,7 @@ class TestCommand:
         import sys
 
         completed = subprocess.run(
-            [sys.executable, "-m", "netgraph", "lsp", "--no-watch"],
+            [sys.executable, "-m", "netviz", "lsp", "--no-watch"],
             input=b"Content-Length: banana\r\n\r\n{}",
             capture_output=True,
             timeout=60,
@@ -1461,7 +1459,7 @@ class TestPowerAndPanels:
         client.initialize(patch_room)
         path = patch_room / "network" / "new.yaml"
         text = (
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: server\n"
             "metadata:\n"
             "  name: srv-new\n"
@@ -1490,7 +1488,7 @@ class TestPowerAndPanels:
         client.initialize(patch_room)
         path = patch_room / "network" / "new.yaml"
         text = (
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: server\n"
             "metadata:\n"
             "  name: srv-new\n"
@@ -1540,7 +1538,7 @@ class TestWorkspaceEdits:
 
     @staticmethod
     def _builder(before: Mapping[str, str], **kwargs: Any) -> Any:
-        from netgraph.lsp.edits import WorkspaceEditBuilder
+        from netviz.lsp.edits import WorkspaceEditBuilder
 
         return WorkspaceEditBuilder(
             uri_of=lambda relative: f"file:///inv/{relative}",
@@ -1593,7 +1591,7 @@ class TestTheWatcher:
     """The thread that reads the folder, and what happens when it cannot."""
 
     def test_a_watcher_that_cannot_start_is_reported_once(self, tmp_path: Path) -> None:
-        from netgraph.lsp.watcher import FolderWatcher
+        from netviz.lsp.watcher import FolderWatcher
 
         problems: list[str] = []
         watcher = FolderWatcher(
@@ -1607,7 +1605,7 @@ class TestTheWatcher:
         assert problems and "file watching is off" in problems[0]
 
     def test_stopping_a_watcher_that_never_started_is_harmless(self, tmp_path: Path) -> None:
-        from netgraph.lsp.watcher import FolderWatcher
+        from netviz.lsp.watcher import FolderWatcher
 
         watcher = FolderWatcher(tmp_path, on_change=lambda _: None)
         watcher.stop()

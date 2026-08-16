@@ -1,12 +1,12 @@
-# `netgraph log`
+# `netviz log`
 
-`netgraph log` is `git log` for the **network** rather than for the files. It
+`netviz log` is `git log` for the **network** rather than for the files. It
 lists the commits that touched the inventory, newest first, and beside each one a
 sentence saying what that commit did to the network:
 
 <!-- norun: the output is this repository's own history, which moves every commit -->
 ```console
-$ netgraph -i net log
+$ netviz -i net log
 a1b2c3d4e  2026-08-14  Ada Byrne   Bring the spine up to four members
            2 devices added, 4 links added
 9f8e7d6c5  2026-08-13  Sam Patel   Move the lab out of VLAN 10
@@ -16,7 +16,7 @@ a1b2c3d4e  2026-08-14  Ada Byrne   Bring the spine up to four members
 ```
 
 Each summary is a real changeset, computed by the same code
-[`netgraph plan`](plan.md) and [`netgraph diff`](diff.md) use: the revision on
+[`netviz plan`](plan.md) and [`netviz diff`](diff.md) use: the revision on
 either side of the commit is read, both are loaded, and the difference between
 the two *networks* is counted. A commit that reformatted a file, moved a
 document between files or added a comment says `no change to the network`,
@@ -45,7 +45,7 @@ safe to run in a dirty tree and safe to run while an editor has the folder open.
 
 <!-- generated: synopsis log -->
 ```text
-netgraph [GLOBAL OPTIONS] log [OPTIONS]
+netviz [GLOBAL OPTIONS] log [OPTIONS]
 ```
 <!-- /generated -->
 
@@ -92,7 +92,7 @@ Elements, by what sort of thing they are, and what happened to them:
 3 devices added, 1 link removed, 2 addresses moved
 ```
 
-Not actions — [`netgraph plan`](plan.md) already says `+ 3 to add, - 1 to
+Not actions — [`netviz plan`](plan.md) already says `+ 3 to add, - 1 to
 destroy`, and that is the right summary for a changeset somebody is about to
 apply. Reading a history, the question is what the network *gained and lost*, so
 the noun comes first and a cable is called a link.
@@ -145,7 +145,7 @@ Summarising a commit means loading two inventories, and drawing one — in
 as well. So there is a ceiling on how much history one invocation will read:
 
 ```toml
-# netgraph.toml
+# netviz.toml
 [history]
 max-revisions = 250
 ```
@@ -156,7 +156,7 @@ than the bound is refused **before anything is read**:
 ```text
 error: v1.0..HEAD holds 312 revisions of the inventory, more than the bound of
 100; narrow the range, pass a limit, or raise 'max-revisions' in the [history]
-table of netgraph.toml
+table of netviz.toml
 ```
 
 `-n/--limit` is not the same thing. A limit *narrows* the range and is always
@@ -211,8 +211,8 @@ was read to produce them.
 |---|---|---|---|
 | `--from` | `REV` | — | Oldest revision to list, exclusive — as 'git log a..b' means it. The revision itself is the state the oldest listed commit is drawn against, so it is not listed. |
 | `--to` | `REV` | `HEAD` | Newest revision to list, inclusive. |
-| `-n`, `--limit` | `INTEGER, >= 1` | `20` | List at most this many commits, newest first. 'netgraph log -n 1' is the last change. |
-| `--max-revisions` | `INTEGER, >= 1` | [history] max-revisions in netgraph.toml, or 100 | Refuse a range holding more revisions than this rather than reading them all. A limit narrows the range; this bounds what may be asked for. |
+| `-n`, `--limit` | `INTEGER, >= 1` | `20` | List at most this many commits, newest first. 'netviz log -n 1' is the last change. |
+| `--max-revisions` | `INTEGER, >= 1` | [history] max-revisions in netviz.toml, or 100 | Refuse a range holding more revisions than this rather than reading them all. A limit narrows the range; this bounds what may be asked for. |
 | `--summary`, `--no-summary` | — | `--summary` | Say what each commit did to the network, which means loading the inventory on both sides of it. --no-summary lists the commits alone and reads nothing. |
 | `--no-renames` | — | off | Count every rename as a removal and an addition rather than detecting it. |
 | `-F`, `--output-format` | `[text\|json]` | `text` | text is for reading; json is for a script. |
@@ -228,8 +228,8 @@ was read to produce them.
 
 ## See also
 
-- [`netgraph diff`](diff.md) — one pair of revisions, drawn.
-- [`netgraph plan`](plan.md) — one pair of revisions, in full.
-- [`netgraph web`](web.md#the-history-timeline) — the same list as a scrubber
+- [`netviz diff`](diff.md) — one pair of revisions, drawn.
+- [`netviz plan`](plan.md) — one pair of revisions, in full.
+- [`netviz web`](web.md#the-history-timeline) — the same list as a scrubber
   under the canvas, with the diagram repainting as you step.
-- [`netgraph config`](config.md) — where `[history] max-revisions` is read from.
+- [`netviz config`](config.md) — where `[history] max-revisions` is read from.

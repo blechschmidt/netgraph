@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Break the cost of ``netgraph.validate`` down by rule, not by function.
+"""Break the cost of ``netviz.validate`` down by rule, not by function.
 
 This is the harness behind the per-rule tables in ``docs/follow-ups.md``. It is
 not part of the test suite -- like ``tools/bench_pipeline.py`` it takes seconds
@@ -23,7 +23,7 @@ rule and reported separately.
 rules are timed once each, in report order, exactly as ``validate`` runs them.
 That matters since entry 7 of ``docs/follow-ups.md``: an address caches its
 prefix on first use, so the *first* rule to look at an address pays for it and a
-second ``validate`` over one inventory is not the run anybody's ``netgraph
+second ``validate`` over one inventory is not the run anybody's ``netviz
 validate`` pays for. A warm profile would move that cost between rules and
 flatter the total. The reported figure per item is the minimum over the samples.
 """
@@ -43,12 +43,12 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT / "src") not in sys.path:  # pragma: no cover - convenience for a checkout
     sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from netgraph import validate as validate_module  # noqa: E402
-from netgraph.config import ValidationConfig  # noqa: E402
-from netgraph.loader import load_tree  # noqa: E402
-from netgraph.loader.documents import HAVE_LIBYAML, StrictSafeLoader  # noqa: E402
-from netgraph.loader.inventory import Inventory  # noqa: E402
-from netgraph.validate import Finding, validate  # noqa: E402
+from netviz import validate as validate_module  # noqa: E402
+from netviz.config import ValidationConfig  # noqa: E402
+from netviz.loader import load_tree  # noqa: E402
+from netviz.loader.documents import HAVE_LIBYAML, StrictSafeLoader  # noqa: E402
+from netviz.loader.inventory import Inventory  # noqa: E402
+from netviz.validate import Finding, validate  # noqa: E402
 
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 from bench_pipeline import Shape, generate  # noqa: E402
@@ -187,7 +187,7 @@ def _inventory_root(args: argparse.Namespace) -> Iterator[Path]:
         yield Path(args.inventory)
         return
     shape = Shape(sites=args.sites, racks_per_site=args.racks, hosts_per_rack=args.hosts)
-    target = Path(args.keep) if args.keep else Path(tempfile.mkdtemp(prefix="netgraph-vprof-"))
+    target = Path(args.keep) if args.keep else Path(tempfile.mkdtemp(prefix="netviz-vprof-"))
     if target.exists() and args.keep:
         shutil.rmtree(target)
     files, documents = generate(target, shape)

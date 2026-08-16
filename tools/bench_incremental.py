@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Time the case ``netgraph watch`` actually runs: reload after one edit.
+"""Time the case ``netviz watch`` actually runs: reload after one edit.
 
 ``tools/bench_pipeline.py`` measures a *cold* pipeline — every file parsed, every
 rule run, the graph built from nothing. That is the right measurement for the
 first invocation and the wrong one for the loop that matters: an editor saves one
-file, and netgraph re-reads all 138 of them to draw a diagram that differs in one
+file, and netviz re-reads all 138 of them to draw a diagram that differs in one
 node. This harness measures that loop, and the pieces of it, so a claim about
 incremental cost can be checked rather than asserted::
 
@@ -50,10 +50,10 @@ if str(REPO_ROOT / "tools") not in sys.path:  # pragma: no cover - importing the
 
 from bench_pipeline import Shape, generate, yaml_files  # noqa: E402
 
-from netgraph.loader import load_tree  # noqa: E402
-from netgraph.loader.cache import DocumentCache  # noqa: E402
-from netgraph.render import build_graph, render  # noqa: E402
-from netgraph.validate import validate  # noqa: E402
+from netviz.loader import load_tree  # noqa: E402
+from netviz.loader.cache import DocumentCache  # noqa: E402
+from netviz.render import build_graph, render  # noqa: E402
+from netviz.validate import validate  # noqa: E402
 
 T = TypeVar("T")
 
@@ -186,7 +186,7 @@ def _inventory_root(args: argparse.Namespace) -> Iterator[Path]:
         yield Path(args.inventory)
         return
     shape = Shape(sites=args.sites, racks_per_site=args.racks, hosts_per_rack=args.hosts)
-    target = Path(args.keep) if args.keep else Path(tempfile.mkdtemp(prefix="netgraph-bench-"))
+    target = Path(args.keep) if args.keep else Path(tempfile.mkdtemp(prefix="netviz-bench-"))
     if target.exists() and args.keep:
         shutil.rmtree(target)
     files, documents = generate(target, shape)
@@ -221,7 +221,7 @@ def main(argv: list[str] | None = None) -> int:
     cache_root = (
         Path(args.cache_dir)
         if args.cache_dir
-        else Path(tempfile.mkdtemp(prefix="netgraph-bench-cache-"))
+        else Path(tempfile.mkdtemp(prefix="netviz-bench-cache-"))
     )
     try:
         for root in _inventory_root(args):

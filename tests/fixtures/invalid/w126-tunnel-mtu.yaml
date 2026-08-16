@@ -3,7 +3,7 @@
 # The OpenVPN tunnel asks for 1420 bytes inside a WireGuard tunnel that offers
 # 1420 minus 69 bytes of OpenVPN encapsulation. Both types encrypt, and both
 # terminate on the same two hosts, so W127 and W125 stay quiet.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -25,7 +25,7 @@ spec:
       ipv4:
         addresses: [10.10.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -47,7 +47,7 @@ spec:
       ipv4:
         addresses: [10.10.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b
@@ -55,7 +55,7 @@ spec:
   endpoints: [pc-a:eth0, pc-b:eth0]
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: tunnel
 metadata:
   name: wg-a-b
@@ -64,7 +64,7 @@ spec:
   endpoints: [pc-a:wg0, pc-b:wg0]
   mtu: 1420
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: tunnel
 metadata:
   name: ovpn-a-b

@@ -2,7 +2,7 @@
 
 Seven complete, self-consistent inventories. All of them load without a single
 schema error and validate clean against every rule in `docs/schema.md` §10 — no
-suppressions, no `netgraph.toml` exemptions. They double as the golden fixtures
+suppressions, no `netviz.toml` exemptions. They double as the golden fixtures
 exercised by `tests/test_examples.py`, so a change that silently breaks them
 fails the test suite.
 
@@ -18,13 +18,13 @@ fails the test suite.
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/home-lab validate
+$ netviz -i examples/home-lab validate
 no problems found
 ```
 
 <!-- norun: writes campus.svg into the reader's directory -->
 ```console
-$ netgraph -i examples/campus render -o campus.svg
+$ netviz -i examples/campus render -o campus.svg
 ```
 
 ## Reading them

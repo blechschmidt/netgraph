@@ -2,7 +2,7 @@
 #
 # 10.0.0.0 identifies 10.0.0.0/24 itself; it is not an address a host answers
 # on. 'pc-b' shares the prefix so that W105 has two elements and stays quiet.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -14,7 +14,7 @@ spec:
       ipv4:
         addresses: [10.0.0.0/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -26,7 +26,7 @@ spec:
       ipv4:
         addresses: [10.0.0.5/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

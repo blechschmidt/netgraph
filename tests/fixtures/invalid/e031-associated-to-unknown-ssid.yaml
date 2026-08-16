@@ -2,7 +2,7 @@
 #
 # The laptop is associated to 'labb'; the access point beacons 'lab'. The
 # association recorded here cannot happen.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: ap-a
@@ -18,7 +18,7 @@ spec:
         bss:
           - ssid: lab
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -34,7 +34,7 @@ spec:
         bss:
           - ssid: labb
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

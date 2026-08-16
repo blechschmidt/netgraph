@@ -1,4 +1,4 @@
-"""``netgraph web``, driven by a real browser.
+"""``netviz web``, driven by a real browser.
 
 Everything else in this suite stops at the HTTP boundary: ``tests/test_web.py``
 and ``tests/test_web_session.py`` prove the server answers correctly, and prove
@@ -50,7 +50,7 @@ Running it
 
 Without Playwright, or without the browser it drives, the whole module skips
 with the command to run — never a hard failure for a contributor who has neither.
-``NETGRAPH_INSTALL_BROWSER=1`` turns the second command into something the suite
+``NETVIZ_INSTALL_BROWSER=1`` turns the second command into something the suite
 does for itself, which is how the CI job is wired; see ``docs/testing.md``.
 """
 
@@ -73,13 +73,13 @@ from typing import TYPE_CHECKING, Any, Final
 import pytest
 import yaml
 
-from netgraph.layout.geometry import Routing
-from netgraph.layout.routing import Anchor, route
-from netgraph.models import KINDS
-from netgraph.render.icons import icon_theme
-from netgraph.render.theme import load_theme
-from netgraph.web.server import WebServer
-from netgraph.web.session import EditingSession, TreeWatcher
+from netviz.layout.geometry import Routing
+from netviz.layout.routing import Anchor, route
+from netviz.models import KINDS
+from netviz.render.icons import icon_theme
+from netviz.render.theme import load_theme
+from netviz.web.server import WebServer
+from netviz.web.session import EditingSession, TreeWatcher
 
 from conftest import failed  # isort: skip -- tests/ is on sys.path, not a package
 from platform_marks import requires_dot  # isort: skip
@@ -119,7 +119,7 @@ PROBE_S: Final = 4.0
 #: Where a failing test leaves its screenshot, page source and console log. The
 #: CI job points this at a directory it uploads afterwards.
 ARTIFACT_DIR: Final = Path(
-    os.environ.get("NETGRAPH_BROWSER_ARTIFACTS") or REPO_ROOT / ".browser-artifacts"
+    os.environ.get("NETVIZ_BROWSER_ARTIFACTS") or REPO_ROOT / ".browser-artifacts"
 )
 
 #: What to run when Playwright is installed but its browser is not.
@@ -128,7 +128,7 @@ INSTALL_COMMAND: Final = f"{Path(sys.executable).name} -m playwright install chr
 #: Set this to have the suite run :data:`INSTALL_COMMAND` itself rather than
 #: skip. Opt-in: downloading a browser is not something a test run should decide
 #: to do on somebody's laptop, and it is exactly what the CI job wants.
-INSTALL_ENV_VAR: Final = "NETGRAPH_INSTALL_BROWSER"
+INSTALL_ENV_VAR: Final = "NETVIZ_INSTALL_BROWSER"
 
 #: Why the two direct-manipulation tests below skip today. The gestures they
 #: perform — drag a node, drag from one node to another — are inert on the
@@ -144,7 +144,7 @@ DIRECT_MANIPULATION: Final = (
 #: A switch the history test adds in one of its commits, so that a frame of the
 #: timeline has one green box on it and not merely a faded diagram.
 NEW_SWITCH: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-lab
@@ -159,7 +159,7 @@ spec:
 #: report a stored geometry; the coordinates themselves are checked in
 #: ``tests/test_layout.py``.
 FIXED_LAYOUT: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: layout
 metadata:
   name: layout
@@ -184,7 +184,7 @@ AXE_TAGS: Final = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]
 #: terminates a cable -- so a test that must *connect* something needs somewhere
 #: for it to go that does not depend on the example never gaining a device.
 SPARE_HOST: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-spare
@@ -338,7 +338,7 @@ class Editor:
 
         ``grouped`` asks the way a page with the *group* box ticked asks, which
         is the only way the namespace containers come back at all — see
-        ``netgraph.web.preview._containers``.
+        ``netviz.web.preview._containers``.
         """
         query = PAGE_QUERY.replace("group_by_namespace=0", "group_by_namespace=1")
         return self.api("/api/graph?" + (query if grouped else PAGE_QUERY))
@@ -347,7 +347,7 @@ class Editor:
         """The SVG id of the shape drawn for ``address``.
 
         Asked of the server rather than derived, so this file does not grow a
-        second copy of :mod:`netgraph.render.ids` that could disagree with it.
+        second copy of :mod:`netviz.render.ids` that could disagree with it.
         """
         details: Mapping[str, Any] = self.graph()["details"]
         for key, record in details.items():
@@ -445,7 +445,7 @@ BROKEN_CABLE: Final = """\
 # A cable that names devices nobody declared.
 # Fixture for tests/test_browser.py: the diagnostic below points at line 4.
 
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-ghost
@@ -459,7 +459,7 @@ spec:
 #: A layout document placing a switch nobody declares: one ``W138``, which is
 #: the smallest diagnostic that has exactly one mechanical repair.
 STALE_GEOMETRY: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: layout
 metadata:
   name: default
@@ -474,7 +474,7 @@ spec:
 #: A trunk whose native VLAN is not in its ``trunk_vlans``: one ``W114``, the
 #: smallest diagnostic that has *two* repairs and no way to choose between them.
 AMBIGUOUS_TRUNK: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-spare
@@ -491,7 +491,7 @@ spec:
 
 #: The scratchpad's starting stream: two hosts and the cable between them.
 TWO_HOSTS: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -500,7 +500,7 @@ spec:
     - name: eth0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -509,7 +509,7 @@ spec:
     - name: eth0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b
@@ -521,7 +521,7 @@ spec:
 #: What a person types into the scratchpad to make the diagram grow a node.
 A_THIRD_HOST: Final = """
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-typed
@@ -602,7 +602,7 @@ def open_editor(
                 # so a test opts *in* to the first-run experience rather than
                 # every other test having to dismiss it.
                 context.add_init_script(
-                    "try { window.localStorage.setItem('netgraph.tour.seen', 'yes'); }"
+                    "try { window.localStorage.setItem('netviz.tour.seen', 'yes'); }"
                     " catch (error) { /* no storage, no invitation */ }"
                 )
             page = context.new_page()
@@ -806,7 +806,7 @@ def test_a_diagnostic_row_jumps_to_its_location(open_editor: OpenEditor) -> None
     row.click()
 
     expect(page.locator("#editor-title")).to_have_text("cables/broken.yaml")
-    assert editor.selection() == "apiVersion: netgraph.dev/v1alpha1"
+    assert editor.selection() == "apiVersion: netviz.dev/v1alpha1"
     assert BROKEN_CABLE.splitlines()[3] == editor.selection(), "line 4 is the document's first"
 
 
@@ -993,7 +993,7 @@ def test_drawing_a_link_produces_a_cable(open_editor: OpenEditor) -> None:
 
 #: The arranged home-lab, as a file to drop beside it. A route needs somewhere
 #: to be routed *from*, so every test below runs against a fully placed diagram
-#: -- which is also the only kind netgraph offers handles on, for the good
+#: -- which is also the only kind netviz offers handles on, for the good
 #: reason that a bend pinned on a drawing Graphviz is still laying out is a bend
 #: the next render throws away.
 ARRANGED_LAYOUT: Final = (REPO_ROOT / "tests" / "fixtures" / "arranged" / "layout.yaml").read_text(
@@ -1128,7 +1128,7 @@ def test_straightening_a_link_clears_every_bend_from_the_keyboard(
 
 
 #: A layout that is arranged, orthogonal, and puts a device squarely between the
-#: two ends of one cable, so that the route netgraph computes to get past it is
+#: two ends of one cable, so that the route netviz computes to get past it is
 #: something ``link.pin-route`` has to have to pin. Built from the arranged
 #: fixture rather than hand-typed so the coordinates cannot drift from it.
 def _obstructed_layout() -> str:
@@ -1161,7 +1161,7 @@ def test_pinning_the_computed_route_writes_it_as_bends(open_editor: OpenEditor) 
     # centre is nowhere near the line, so a click at it would land on the canvas
     # behind. Which key reaches which command is settled by test_web.py; what
     # this test is here for is what the command does once it is reached.
-    editor.page.evaluate("id => window.netgraphLinks.select(id)", link)
+    editor.page.evaluate("id => window.netvizLinks.select(id)", link)
     editor.page.locator("#canvas").focus()
     editor.press("Shift+R")
 
@@ -1177,7 +1177,7 @@ def test_pinning_the_computed_route_writes_it_as_bends(open_editor: OpenEditor) 
     # it, and a grab handle on every bend.
     after = editor.api(f"/api/graph?view={ARRANGED_LAYER}")["geometry"]["links"][link]
     assert after["routed"] == [], "a pinned route must not be recomputed on top of itself"
-    editor.page.evaluate("id => window.netgraphLinks.select(id)", link)
+    editor.page.evaluate("id => window.netvizLinks.select(id)", link)
     expect(editor.page.locator(".ng-handle-bend")).to_have_count(len(published["routed"]))
 
 
@@ -1196,7 +1196,7 @@ def test_the_canvas_and_the_renderer_route_a_link_identically(
 ) -> None:
     """The one duplicated algorithm in the codebase, checked against itself.
 
-    ``web/assets/links.js`` mirrors :mod:`netgraph.layout.routing` because a
+    ``web/assets/links.js`` mirrors :mod:`netviz.layout.routing` because a
     line that only moved when the server answered would lag the cursor. A mirror
     is a liability exactly as long as nothing compares the two, so this runs a
     table of cases through both and asserts they agree to the last decimal
@@ -1232,7 +1232,7 @@ def test_the_canvas_and_the_renderer_route_a_link_identically(
     def drawn(payload: Sequence[Mapping[str, Any]], ends: tuple[Anchor, Anchor]) -> Any:
         return editor.page.evaluate(
             """([cases, source, target]) => cases.map(function (one) {
-                 return window.netgraphLinks.routeOf(
+                 return window.netvizLinks.routeOf(
                    source, target,
                    one.waypoints.map(function (p) { return { x: p[0], y: p[1] }; }),
                    one.style, one.fan
@@ -1274,7 +1274,7 @@ def _anchor(anchor: Anchor) -> dict[str, float]:
 #: a zone pinned beside it, and a zone that follows two of its devices. The
 #: coordinates keep all three clear of the nodes, whose ``y`` runs 0..440.
 ANNOTATIONS: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: why-here
@@ -1283,7 +1283,7 @@ spec:
     The **switch** is in the cupboard.
   geometry: {x: 900, y: -300}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: on-the-ups
@@ -1291,7 +1291,7 @@ spec:
   label: On the UPS
   geometry: {x: 300, y: -300, width: 400, height: 200}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: the-desk
@@ -1300,7 +1300,7 @@ spec:
   members: [switches/sw-home, hosts/pc-desk]
 """
 
-#: The SVG id the renderer gives that note; see netgraph.render.annotations.
+#: The SVG id the renderer gives that note; see netviz.render.annotations.
 A_NOTE: Final = "note-why-here"
 
 
@@ -1591,7 +1591,7 @@ def test_a_read_only_session_shows_the_commentary_and_offers_no_handle(
 #
 # The other door into the commands, and the only one somebody who has never
 # pressed Ctrl-K will find. Everything asserted here is about the *wiring*: the
-# menu draws itself from netgraph.web.bindings, aims at what was clicked, and
+# menu draws itself from netviz.web.bindings, aims at what was clicked, and
 # hands off to the same handlers the keyboard runs. What each of those handlers
 # then does is already tested above, once.
 
@@ -1670,7 +1670,7 @@ def test_creating_from_the_canvas_menu_writes_the_document(open_editor: OpenEdit
     """Resource creation, the way somebody who has never read the docs finds it.
 
     Right-click the paper, pick a kind, name it — and a file appears, through
-    the same ``netgraph edit create`` the palette and ``n`` reach.
+    the same ``netviz edit create`` the palette and ``n`` reach.
     """
     editor = open_editor(writable=True)
     assert editor.session is not None
@@ -1680,7 +1680,7 @@ def test_creating_from_the_canvas_menu_writes_the_document(open_editor: OpenEdit
     expect(menu_row(editor, "element.create")).to_be_visible()
     menu_row(editor, "element.create").click()
 
-    # The submenu is the kinds, from netgraph.models.KINDS by way of the API.
+    # The submenu is the kinds, from netviz.models.KINDS by way of the API.
     kinds = editor.page.locator(".menu-sub .menu-item")
     expect(kinds).to_have_count(len(KINDS))
     editor.page.locator('.menu-sub .menu-item[data-kind="router"]').click()
@@ -1810,7 +1810,7 @@ def test_clicking_off_the_menu_closes_it(open_editor: OpenEditor) -> None:
 #: A switch rather than a patch panel, because the physical layer splices panels
 #: out — and a namespace whose only member is not drawn is not a box on screen.
 A_RACK: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-rack
@@ -1826,7 +1826,7 @@ spec:
 #: cable writes ambiguous, which the validation gate rightly refuses — that is a
 #: property of copying, tested where copying is, and not what this is about.
 A_SPARE: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: spare-pc
@@ -1840,7 +1840,7 @@ spec:
 #: each hold a ``pc-01`` — and exactly what makes dropping the first one in
 #: illegal, which is the refusal the drop has to make before it writes.
 TWIN_DESK: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-desk
@@ -1855,7 +1855,7 @@ def grouped(open_editor: OpenEditor, **kwargs: Any) -> Editor:
     """A writable session drawing namespace containers.
 
     The container layer is off unless the drawing groups by namespace, which is
-    the contract ``netgraph.web.preview._containers`` states and the reason this
+    the contract ``netviz.web.preview._containers`` states and the reason this
     helper exists: without the checkbox there are no frames, no drop targets and
     no gesture, and a plain drag pans the canvas as it always did.
     """
@@ -2228,7 +2228,7 @@ def _open(editor: Editor, relative: str) -> None:
 #: A spare switch nothing else in the home lab refers to, so that deleting it is
 #: a delete rather than a refusal — see the cascade test below for the other half.
 SPARE_SWITCH: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-spare
@@ -2366,7 +2366,7 @@ def test_a_change_from_the_diagram_does_not_discard_unsaved_typing(
 ) -> None:
     """A canvas gesture is applied to the *file*, and the pane may not be it.
 
-    ``netgraph edit set`` runs against the tree on disk, so a page with unsaved
+    ``netviz edit set`` runs against the tree on disk, so a page with unsaved
     text in the same file has two different documents in hand. Adopting the
     file — which is what the page used to do — threw the typing away without
     anybody being asked. This is the one thing session.js does not do to unsaved
@@ -2681,8 +2681,8 @@ def test_the_handover_copies_the_equivalent_edit_commands(open_editor: OpenEdito
     copied = str(page.evaluate("() => navigator.clipboard.readText()"))
     # A whole-file save has no subcommand of its own, so it hands over as the
     # exact JSON form. What matters is that it is runnable and complete.
-    assert copied.startswith("echo ") or copied.startswith("netgraph ")
-    assert "netgraph" in copied and "edit" in copied
+    assert copied.startswith("echo ") or copied.startswith("netviz ")
+    assert "netviz" in copied and "edit" in copied
 
 
 def test_a_read_only_session_offers_the_drawer_but_no_revert(
@@ -3054,14 +3054,14 @@ def a_crowd(count: int = CROWD) -> str:
     documents = []
     for index in range(count):
         documents.append(
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: computer\n"
             f"metadata:\n  name: crowd-{index:03d}\n"
             "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n"
         )
     for index in range(0, count - 1, 2):
         documents.append(
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: cable\n"
             f"metadata:\n  name: cbl-{index:03d}\n"
             f"spec:\n  endpoints: [crowd-{index:03d}:eth0, crowd-{index + 1:03d}:eth0]\n"
@@ -3074,14 +3074,14 @@ def crowded(open_editor: OpenEditor) -> Editor:
     """A session over an inventory big enough that the canvas culls."""
     editor = open_editor(extra={"crowd/hosts.yaml": a_crowd()})
     editor.page.wait_for_function(
-        "() => window.netgraphCull && netgraphCull.stats().total > netgraphCull.CULL_ABOVE",
+        "() => window.netvizCull && netvizCull.stats().total > netvizCull.CULL_ABOVE",
         timeout=TIMEOUT_MS,
     )
     return editor
 
 
 def cull_stats(editor: Editor) -> dict[str, Any]:
-    stats = editor.page.evaluate("() => netgraphCull.stats()")
+    stats = editor.page.evaluate("() => netvizCull.stats()")
     assert isinstance(stats, dict)
     return stats
 
@@ -3129,7 +3129,7 @@ def test_zooming_into_a_crowd_stops_drawing_what_is_off_screen(
 
     zoom(editor, 30)
     editor.page.wait_for_function(
-        "total => netgraphCull.stats().drawn < total", arg=whole["total"], timeout=TIMEOUT_MS
+        "total => netvizCull.stats().drawn < total", arg=whole["total"], timeout=TIMEOUT_MS
     )
     culled = cull_stats(editor)
     assert culled["drawn"] < whole["total"]
@@ -3154,7 +3154,7 @@ def test_an_element_off_screen_is_still_findable_and_selectable(
     page = editor.page
     zoom(editor, 30)
     page.wait_for_function(
-        "() => netgraphCull.stats().drawn < netgraphCull.stats().total", timeout=TIMEOUT_MS
+        "() => netvizCull.stats().drawn < netvizCull.stats().total", timeout=TIMEOUT_MS
     )
     parked = page.evaluate(
         """() => {
@@ -3167,7 +3167,7 @@ def test_an_element_off_screen_is_still_findable_and_selectable(
     )
     assert parked, "nothing was culled, so this test would prove nothing"
 
-    page.evaluate("id => netgraphA11y.focus(id, { quiet: true })", parked)
+    page.evaluate("id => netvizA11y.focus(id, { quiet: true })", parked)
     # Materialised by being focused, and wearing the ring.
     expect(page.locator(f'#viewport svg g[id="{parked}"].focused')).to_be_attached(
         timeout=TIMEOUT_MS
@@ -3196,14 +3196,14 @@ def test_the_keyboard_crosses_a_culled_diagram(open_editor: OpenEditor) -> None:
     page = editor.page
     zoom(editor, 30)
     page.wait_for_function(
-        "() => netgraphCull.stats().drawn < netgraphCull.stats().total", timeout=TIMEOUT_MS
+        "() => netvizCull.stats().drawn < netvizCull.stats().total", timeout=TIMEOUT_MS
     )
     page.locator("#canvas").focus()
-    page.evaluate("() => netgraphA11y.first({ quiet: true })")
+    page.evaluate("() => netvizA11y.first({ quiet: true })")
     visited = set()
     for _ in range(12):
         page.keyboard.press("ArrowRight")
-        here = page.evaluate("() => { const f = netgraphA11y.focused(); return f && f.element; }")
+        here = page.evaluate("() => { const f = netvizA11y.focused(); return f && f.element; }")
         if here:
             visited.add(here)
     assert len(visited) > 1, "the keyboard did not move"
@@ -3217,7 +3217,7 @@ def test_zooming_out_drops_the_detail_and_frames_the_namespaces(
     editor = crowded(open_editor)
     page = editor.page
     zoom(editor, -40)
-    page.wait_for_function("() => netgraphCull.stats().coarse", timeout=TIMEOUT_MS)
+    page.wait_for_function("() => netvizCull.stats().coarse", timeout=TIMEOUT_MS)
     expect(page.locator("#canvas.coarse")).to_be_attached(timeout=TIMEOUT_MS)
     # One frame per namespace with more than one member: the crowd, and the
     # home lab's own folders.
@@ -3237,7 +3237,7 @@ def test_zooming_out_drops_the_detail_and_frames_the_namespaces(
     # something again. Sixty notches from the floor, not forty: the drawing
     # starts at a thirtieth of life size, so the ceiling is a long way up.
     zoom(editor, 60)
-    page.wait_for_function("() => !netgraphCull.stats().coarse", timeout=TIMEOUT_MS)
+    page.wait_for_function("() => !netvizCull.stats().coarse", timeout=TIMEOUT_MS)
     expect(page.locator("#viewport svg .ng-lod-frame")).to_have_count(0, timeout=TIMEOUT_MS)
 
 
@@ -3251,9 +3251,9 @@ def test_a_crowd_can_be_zoomed_in_far_enough_to_read(open_editor: OpenEditor) ->
     """
     editor = crowded(open_editor)
     zoom(editor, -40)
-    editor.page.wait_for_function("() => netgraphCull.stats().coarse", timeout=TIMEOUT_MS)
+    editor.page.wait_for_function("() => netvizCull.stats().coarse", timeout=TIMEOUT_MS)
     zoom(editor, 90)
-    editor.page.wait_for_function("() => !netgraphCull.stats().coarse", timeout=TIMEOUT_MS)
+    editor.page.wait_for_function("() => !netvizCull.stats().coarse", timeout=TIMEOUT_MS)
     assert cull_stats(editor)["coarse"] is False
 
 
@@ -3747,7 +3747,7 @@ def icon_count(editor: Editor) -> int:
 
     Counted as the ``<use>`` elements, not the ``<image>`` ones: each distinct
     picture is stored once as a ``<symbol>`` and referred to at every site that
-    draws it (see ``netgraph.render.fragment.IconLibrary``), so the images say
+    draws it (see ``netviz.render.fragment.IconLibrary``), so the images say
     how many *kinds* are drawn and these say how many *nodes* are.
     """
     return editor.page.locator("#viewport svg use").count()
@@ -3809,7 +3809,7 @@ def test_an_icon_is_still_a_node_you_can_point_at(open_editor: OpenEditor) -> No
 
 
 def test_the_command_line_decides_where_the_switch_starts(open_editor: OpenEditor) -> None:
-    """``netgraph web --icons cisco`` opens with icons on, and can turn them off.
+    """``netviz web --icons cisco`` opens with icons on, and can turn them off.
 
     The flag is not overridden by the page, it is where the page starts — which
     is what makes a bookmarked ``--icons`` setup still a setup, and the switch
@@ -3897,7 +3897,7 @@ def _tree(root: Path) -> dict[str, bytes]:
 
     Two things are deliberately tolerated, and both are the same thing: this is
     read *while the server is writing*, because a test polls it to find out when
-    a write has landed. :func:`netgraph.fsio.write_bytes_atomically` writes a
+    a write has landed. :func:`netviz.fsio.write_bytes_atomically` writes a
     hidden sibling and renames it, so a walk can catch that sibling in the act —
     see it in the listing, and then find it gone by the time it is read. It is
     not part of the tree either way, so it is skipped by name, and anything else
@@ -3905,7 +3905,7 @@ def _tree(root: Path) -> dict[str, bytes]:
     """
     found: dict[str, bytes] = {}
     for path in sorted(root.rglob("*")):
-        if path.name.endswith(".netgraph.tmp"):
+        if path.name.endswith(".netviz.tmp"):
             continue
         try:
             if path.is_file():
@@ -3918,7 +3918,7 @@ def _tree(root: Path) -> dict[str, bytes]:
 def _documents(root: Path) -> dict[str, bytes]:
     """The same, narrowed to what the loader reads — and therefore what is copied.
 
-    ``netgraph.web.tour`` copies the inventory, not the folder: a README beside
+    ``netviz.web.tour`` copies the inventory, not the folder: a README beside
     it is not part of the tree and is deliberately left behind.
     """
     return {name: text for name, text in _tree(root).items() if name.endswith((".yaml", ".yml"))}
@@ -3960,7 +3960,7 @@ def test_the_first_run_offers_the_tour_and_takes_no_for_an_answer(
 
     editor.press("Escape")
     expect(invitation).to_have_count(0)
-    assert page.evaluate("() => localStorage.getItem('netgraph.tour.seen')") == "yes"
+    assert page.evaluate("() => localStorage.getItem('netviz.tour.seen')") == "yes"
 
     page.reload(wait_until="domcontentloaded")
     expect(page.locator("#viewport svg")).to_be_visible()
@@ -4110,7 +4110,7 @@ def test_a_tour_whose_copy_has_gone_does_not_resume_on_the_inventory(
 def test_a_read_only_session_can_still_take_the_tour(open_editor: OpenEditor) -> None:
     """The session most likely to be somebody's first is the one that cannot write.
 
-    ``netgraph web DIR`` without ``--write`` refuses every mutating route, and
+    ``netviz web DIR`` without ``--write`` refuses every mutating route, and
     the tour writes — to files of its own. So it is offered here, it works here,
     and the refusal the palette shows for every *other* edit command is still
     the refusal for those.
@@ -4176,7 +4176,7 @@ def test_the_tour_has_no_accessibility_violations(open_editor: OpenEditor) -> No
 
 def selected(editor: Editor) -> list[str]:
     """What the page says is selected, read out of select.js itself."""
-    return list(editor.page.evaluate("() => window.netgraphSelect.addresses()"))
+    return list(editor.page.evaluate("() => window.netvizSelect.addresses()"))
 
 
 def halos(editor: Editor) -> int:
@@ -4621,7 +4621,7 @@ def search(editor: Editor, expression: str) -> None:
 
 def search_hits(editor: Editor) -> list[str]:
     """The addresses the page is highlighting, read out of search.js itself."""
-    return list(editor.page.evaluate("() => window.netgraphSearch.matches()"))
+    return list(editor.page.evaluate("() => window.netvizSearch.matches()"))
 
 
 def test_the_search_box_takes_a_query_and_highlights_the_matches(
@@ -4702,7 +4702,7 @@ def test_the_filter_toggle_narrows_the_drawing_itself(open_editor: OpenEditor) -
     """Highlighting paints; filtering is a different picture.
 
     And it is the *server's* different picture: the query goes into the view's
-    `select`, which is the same FilterSpec `netgraph render --select` narrows
+    `select`, which is the same FilterSpec `netviz render --select` narrows
     one with, rather than the browser hiding shapes it was sent.
     """
     editor = arranged(open_editor)
@@ -4939,7 +4939,7 @@ def test_the_inspector_works_while_a_diff_is_on_screen(open_editor: OpenEditor) 
 
 def fragment(editor: Editor) -> dict[str, Any] | None:
     """What this page is holding on its clipboard, read out of clipboard.js."""
-    held = editor.page.evaluate("() => window.netgraphClipboard.held()")
+    held = editor.page.evaluate("() => window.netvizClipboard.held()")
     assert held is None or isinstance(held, dict)
     return held
 
@@ -4977,7 +4977,7 @@ def test_copy_paste_and_undo_writes_documents_and_takes_them_back(
     )
     held = fragment(editor)
     assert held is not None
-    assert held["format"] == "netgraph.dev/clipboard/v1"
+    assert held["format"] == "netviz.dev/clipboard/v1"
     assert sorted(copied_names(editor)) == ["hosts/pc-desk", "switches/sw-home"]
     assert _tree(editor.root) == before, "a copy must write nothing"
 
@@ -5087,7 +5087,7 @@ def test_a_fragment_pastes_into_a_second_session(open_editor: OpenEditor) -> Non
     assert target.session is not source.session, "a second session, not a second tab"
     assert fragment(target) is None, "the second page has copied nothing"
     before = _tree(target.root)
-    target.page.evaluate("payload => window.netgraphClipboard.remember(payload)", payload)
+    target.page.evaluate("payload => window.netvizClipboard.remember(payload)", payload)
     target.page.locator("#canvas").focus()
     target.press("Control+v")
 

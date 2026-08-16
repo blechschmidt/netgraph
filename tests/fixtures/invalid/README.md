@@ -1,10 +1,10 @@
 # Invalid fixtures
 
-One minimal YAML file per semantic rule of `netgraph.validate`. Each file is
+One minimal YAML file per semantic rule of `netviz.validate`. Each file is
 **schema-valid** — it loads without a single `LoadError` — and produces
 **exactly one** finding, of exactly the rule its name carries. That property is
 asserted by `tests/test_examples.py`, together with the requirement that every
-id in `netgraph.rules.RULE_IDS` has a file here.
+id in `netviz.rules.RULE_IDS` has a file here.
 
 | File | Rule | Schema id | Trigger |
 |---|---|---|---|

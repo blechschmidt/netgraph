@@ -2,7 +2,7 @@
 
 The property under test is *byte-for-byte stability*. The other render tests
 assert that particular facts reach the output; these assert that nothing else
-moved. That is what makes ``netgraph render -f dot > topology.dot`` a file worth
+moved. That is what makes ``netviz render -f dot > topology.dot`` a file worth
 committing: a diff in it means the inventory changed, not that the renderer
 reshuffled its attribute order.
 
@@ -28,9 +28,9 @@ from pathlib import Path
 
 import pytest
 
-from netgraph.fsio import write_text
-from netgraph.loader import Inventory, load_tree
-from netgraph.render import (
+from netviz.fsio import write_text
+from netviz.loader import Inventory, load_tree
+from netviz.render import (
     GRAPH_KIND,
     AggregateSpec,
     BundleMode,
@@ -43,7 +43,7 @@ from netgraph.render import (
     render_text,
     suffix_for,
 )
-from netgraph.render.dot import find_dot
+from netviz.render.dot import find_dot
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -75,7 +75,7 @@ class Case:
     #: byte-identical copies of a Mermaid and a JSON golden per case.
     formats: tuple[str, ...] = FORMATS
     #: The aggregation applied between building the graph and rendering it, as
-    #: ``netgraph render`` applies it. ``None`` renders the graph as built,
+    #: ``netviz render`` applies it. ``None`` renders the graph as built,
     #: which is what every case predating ``--collapse`` does.
     aggregate: AggregateSpec | None = None
     #: Is ``example`` a test fixture rather than a published example? A tree
@@ -402,7 +402,7 @@ def inventories() -> dict[str, Inventory]:
 
 def _render(case: Case, inventories: dict[str, Inventory], format: str) -> str:
     graph = build_graph(inventories[case.example], layer=case.layer)
-    # The same order ``netgraph render`` uses: resolve, then summarise, then
+    # The same order ``netviz render`` uses: resolve, then summarise, then
     # draw. A golden produced any other way would pin a pipeline nobody runs.
     graph = aggregate_graph(graph, case.aggregate)
     return render_text(graph, format, case.options)
@@ -433,7 +433,7 @@ def test_rendering_matches_its_golden_file(
 
     if regen_golden:
         golden.parent.mkdir(parents=True, exist_ok=True)
-        # ``netgraph.fsio.write_text`` rather than ``Path.write_text``: a golden
+        # ``netviz.fsio.write_text`` rather than ``Path.write_text``: a golden
         # is a byte-for-byte artefact, and regenerating one on Windows through
         # Python's text mode would rewrite every line ending in the file. See
         # ``.gitattributes``, which keeps the committed copy at LF for the same

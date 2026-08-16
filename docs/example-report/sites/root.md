@@ -158,7 +158,7 @@ What an installer would carry into the room.
 | — | — | air-lobby | — | wireless | — | 1200Mbps | — | [ap-ceiling-01](../devices/hosts_ap-ceiling-01.md) | wlan0 | — | [laptop-lobby](../devices/hosts_laptop-lobby.md) | wlan0 | — |
 | — | — | cbl-access-cam | P-010 | copper | cat6 | 1Gbps | 12m | [cam-lobby-01](../devices/hosts_cam-lobby-01.md) | eth0 | — | [sw-access-01](../devices/network_sw-access-01.md) | GigabitEthernet1/0/2 | hq / mdf / r2 U8 |
 
-One row per cable document, which is one run somebody pulls: a link through a patch panel is several. RUN names the end-to-end link and SEGMENT which leg of it this is. 'netgraph export cable-list' writes the same rows as CSV, with the full location of both ends.
+One row per cable document, which is one run somebody pulls: a link through a patch panel is several. RUN names the end-to-end link and SEGMENT which leg of it this is. 'netviz export cable-list' writes the same rows as CSV, with the full location of both ends.
 
 <a id="table-panel-panels_pp-r1-a"></a>
 
@@ -343,4 +343,4 @@ Findings anchored to an element of this site.
 
 ---
 
-netgraph 0.1.0, generated 2026-07-30T00:00:00Z.
+netviz 0.1.0, generated 2026-07-30T00:00:00Z.

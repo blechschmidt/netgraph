@@ -1,6 +1,6 @@
-# `netgraph web`
+# `netviz web`
 
-`netgraph web` opens an inventory in the browser and draws it as you edit it,
+`netviz web` opens an inventory in the browser and draws it as you edit it,
 with an info box on every node and link. It has two faces, and which one you get
 is decided by what you point it at:
 
@@ -15,11 +15,11 @@ is decided by what you point it at:
 
 <!-- generated: synopsis web -->
 ```text
-netgraph [GLOBAL OPTIONS] web [OPTIONS] [SOURCE]
+netviz [GLOBAL OPTIONS] web [OPTIONS] [SOURCE]
 ```
 <!-- /generated -->
 
-![The netgraph web interface: the YAML document stream on the left, the rendered layer-2 diagram on the right, and the info box open on a switch showing its interfaces, addresses, VLANs and links](../images/web.png)
+![The netviz web interface: the YAML document stream on the left, the rendered layer-2 diagram on the right, and the info box open on a switch showing its interfaces, addresses, VLANs and links](../images/web.png)
 
 <sub>Hovering `sw-home` in [`examples/home-lab`](../../examples/home-lab): every
 port, its addresses and VLAN mode, and what each one is cabled to.</sub>
@@ -28,8 +28,8 @@ port, its addresses and VLAN mode, and what each one is cabled to.</sub>
 
 <!-- norun: every one of these starts a server and never exits -->
 ```bash
-netgraph web ./inventory                # read-only: browse the tree and its diagram
-netgraph web ./inventory --write        # read-write: save, undo and redo from the page
+netviz web ./inventory                # read-only: browse the tree and its diagram
+netviz web ./inventory --write        # read-write: save, undo and redo from the page
 ```
 
 The window is three panes. On the left is the **inventory**: every file the
@@ -49,14 +49,14 @@ The panes are wired to each other, which is the point of the command:
 * **A problem with a mechanical repair grows a `fix` button**, which applies it
   as one logged, undoable gesture. Where a rule admits two repairs there are two
   buttons and no default, because choosing between them is not the tool's to
-  make. It is the same catalogue `netgraph validate --fix` uses, under the same
+  make. It is the same catalogue `netviz validate --fix` uses, under the same
   gate: the repair is thrown away unless re-validating shows the finding gone and
   no rule reporting more than it did.
   [Fixing a finding](../validation-rules.md#fixing-a-finding) lists them.
 
 **Every file's state is shown as it is, not as it would be convenient.** A file
 you have typed into is `unsaved`. A file that changed on disk while you had
-unsaved edits in it is `conflict`, and netgraph will not resolve that for you: it
+unsaved edits in it is `conflict`, and netviz will not resolve that for you: it
 says so and leaves both versions alone until you decide. A file that was deleted
 underneath you says `deleted on disk`.
 
@@ -92,9 +92,9 @@ cannot appear without a file appearing, and undoing the gesture brings the bytes
 back.
 
 **It never touches your inventory.** Starting the tour copies the tree — only
-the documents the loader reads, plus `netgraph.toml` — into a temporary
+the documents the loader reads, plus `netviz.toml` — into a temporary
 directory and points the page at a second session over the copy. That session is
-always writable, so a read-only `netgraph web DIR` can take the tour too; the
+always writable, so a read-only `netviz web DIR` can take the tour too; the
 panel names both directories so there is no doubt which one is being written.
 Finishing, skipping or closing the tab deletes the copy, and so does stopping
 the server.
@@ -122,12 +122,12 @@ With it:
   every document a rename rewrote.
 * **A change that would break the tree is refused**, listing the problems, and
   can then be written anyway. This is the same gate
-  [`netgraph edit`](edit.md) applies: an inventory that already fails
+  [`netviz edit`](edit.md) applies: an inventory that already fails
   `validate` can still be edited, one that would gain a *new* error cannot
   without saying so.
 
-Every write goes through `netgraph.edit` — the same typed, reversible,
-comment-preserving operations [`netgraph edit`](edit.md) applies from the command
+Every write goes through `netviz.edit` — the same typed, reversible,
+comment-preserving operations [`netviz edit`](edit.md) applies from the command
 line. The server constructs no YAML of its own, so untouched lines are not
 rewritten and a diff of an edit shows the edit.
 
@@ -160,11 +160,11 @@ chooses what it is drawn against —
 | `this session started` | the tree as this page first saw it. The default: "what have I done this afternoon" is the question, and neither git nor the undo stack answers it. |
 | `git HEAD` | `HEAD` as the inventory root looks in it. Offered only when the root is in a repository, because an option that always fails is not an option. |
 
-It is the same overlay [`netgraph diff`](diff.md) draws, from the same
+It is the same overlay [`netviz diff`](diff.md) draws, from the same
 changeset — the drawer and the diagram are two views of one answer.
 
 **Copy commands** hands the whole session over as a list of
-[`netgraph edit`](edit.md) invocations, in the order they happened, for a
+[`netviz edit`](edit.md) invocations, in the order they happened, for a
 pull-request description or somebody else's terminal. The rendering is never
 lossy; see [`docs/editing.md`](../editing.md#as-a-script).
 
@@ -172,7 +172,7 @@ lossy; see [`docs/editing.md`](../editing.md#as-a-script).
 
 The inventory is a folder of YAML in a repository, so its whole history is
 renderable. **History**, above the canvas, opens a scrubber along the bottom of
-it, over the commits [`netgraph log`](log.md) lists — and the diagram becomes
+it, over the commits [`netviz log`](log.md) lists — and the diagram becomes
 the diff each one carries against its parent as you step:
 
 ```text
@@ -212,7 +212,7 @@ the same four things in both.
 * **A repository with more history than the bound** is truncated to the newest,
   and the bar says "the newest 100 of 312 revisions" rather than implying that
   is all there ever was. The bound is `[history] max-revisions` in
-  `netgraph.toml`, 100 by default; see [`netgraph log`](log.md#the-bound), where
+  `netviz.toml`, 100 by default; see [`netviz log`](log.md#the-bound), where
   an explicit range wider than it is refused outright rather than truncated.
 * **A tree that is not in a repository** says so where the commit would be,
   rather than offering a control that does nothing.
@@ -239,8 +239,8 @@ and a frame already drawn comes back in about 13 ms.
 ### Reconciliation
 
 The session does not own the files. `watchfiles` watches the folder exactly as
-[`netgraph watch`](watch.md) does, so an edit made in `$EDITOR`, a `git
-checkout`, or a second netgraph process bumps the tree revision — and the page is
+[`netviz watch`](watch.md) does, so an edit made in `$EDITOR`, a `git
+checkout`, or a second netviz process bumps the tree revision — and the page is
 **told**, over a server-sent-events stream, the moment it happens. If the watch
 cannot start, the command says so rather than leaving a page that is quietly
 stale.
@@ -293,17 +293,17 @@ is on loopback and none of the write routes exist unless `--write` was given.
 
 | Route | What it answers |
 |---|---|
-| `GET /api/bindings` | Every command the page has, its section, its keys, what it needs and what it does — plus the element kinds this build knows. Answered in both faces; it is `netgraph.web.bindings`, which is also what the table [below](#the-bindings) is generated from. |
+| `GET /api/bindings` | Every command the page has, its section, its keys, what it needs and what it does — plus the element kinds this build knows. Answered in both faces; it is `netviz.web.bindings`, which is also what the table [below](#the-bindings) is generated from. |
 | `GET /api/state` | The tree revision, whether this session writes, the undo/redo depth, and who else is connected. `?since=<id>` adds the events published after that id — the polling client's half of the push channel. `?client=<id>` keeps that client's presence alive. |
 | `GET /api/events` | A `text/event-stream` of `tree-changed`, `file-changed`, `history-changed`, `disk-changed`, `presence`, opening with `hello` and beating every 15 s. Resumes from `Last-Event-ID`; a resume point older than the ring buffer opens with `resync`, meaning refetch. |
 | `POST /api/presence` | `{"client": …, "selection": [ … ], "editing": [ … ]}` — what this client is looking at and has unsaved edits in; answers with everybody. `{"leaving": true}` drops it at once. Advisory, and the one route here that a read-only session still accepts, because it writes nothing. |
 | `GET /api/tree` | Every file, its content hash, its documents, and each document's kind, name, address and line. `?path=a.yaml&path=b.yaml` answers for those files only, with `partial: true` and a `missing` list; `?diagnostics=0` leaves out the findings, which cost a validation of the whole tree either way. |
-| `GET /api/graph?view=l2` | The resolved graph as an embeddable SVG, its info-box records, its problems, its stored [geometry](../editing.md) and its [`annotations`](../schema.md#21-diagram-annotations-notes-areas-and-legends) — the same payload `netgraph render -f json` publishes, which is how the canvas knows where a note or a zone is, an arranged drawing having painted the zone into the background with no id on it. `&annotations=0` leaves both the drawing and the payload without them. `graphHash` fingerprints the drawing; passing it back as `?known=` answers `unchanged: true` with no SVG when this revision would draw the same picture, having skipped the layout. |
+| `GET /api/graph?view=l2` | The resolved graph as an embeddable SVG, its info-box records, its problems, its stored [geometry](../editing.md) and its [`annotations`](../schema.md#21-diagram-annotations-notes-areas-and-legends) — the same payload `netviz render -f json` publishes, which is how the canvas knows where a note or a zone is, an arranged drawing having painted the zone into the background with no id on it. `&annotations=0` leaves both the drawing and the payload without them. `graphHash` fingerprints the drawing; passing it back as `?known=` answers `unchanged: true` with no SVG when this revision would draw the same picture, having skipped the layout. |
 | `GET /api/file/<path>` | One file's text and the hash a write of it must quote. |
 | `PUT /api/file/<path>` | That file back: `{"text": …, "hash": …}`. A stale `hash` is `409`; a new error is `422`, listing them; `"force": true` overrides the second, never the first. |
 | `POST /api/ops` | `{"revision": …, "ops": [ … ]}` — a batch of [edit operations](../editing.md), applied atomically. Answers with the applied operations, their inverses, the files changed and the tree's diagnostics. |
 | `POST /api/undo`, `POST /api/redo` | Move the server-side history one step. |
-| `GET /api/changes` | The session's log — one entry per gesture, with its hunk, the files and addresses it touched, and the `netgraph edit` lines that replay it — plus the whole session as one command list and the baselines this tree can be diffed against. |
+| `GET /api/changes` | The session's log — one entry per gesture, with its hunk, the files and addresses it touched, and the `netviz edit` lines that replay it — plus the whole session as one command list and the baselines this tree can be diffed against. |
 | `GET /api/diff?against=session` | The same payload `/api/graph` answers, drawn as a diff, with `diff` holding the marks per node and edge and `diff.changeset` the whole [plan](plan.md). `against=git` compares with `HEAD`. |
 | `GET /api/history` | The commits that changed this inventory, newest first, each with its hash, parents, author, date, subject and the hash of the inventory tree at it. `bound` is the ceiling, `total` how many there are and `truncated` whether the list is the newest of more. `?limit=` asks for fewer. |
 | `GET /api/frame?rev=<commit>` | One of them, drawn as the diff against its parent: the `/api/diff` payload plus the commit's own facts and the one-line `summary` of what it did. `?known=` works as it does on `/api/graph`. A revision that will not load answers `200` with `status: failed` and the reason — it is a fact about the history, not a bad request. |
@@ -438,7 +438,7 @@ menu, untouched.
 
 `New ▸` opens one row per element kind, and picking one opens the create form
 with that answer already filled in — the same form `n` opens, writing the same
-document through the same [`netgraph edit create`](edit.md).
+document through the same [`netviz edit create`](edit.md).
 
 ## The keyboard
 
@@ -502,7 +502,7 @@ costs, before the fact and once:
 > This is one change: Ctrl-Z puts all of it back.
 
 That list is **not** read off the picture. `GET /api/cascade` asks
-[`netgraph.edit`](../editing.md#deleting-asks-first) for the set it will
+[`netviz.edit`](../editing.md#deleting-asks-first) for the set it will
 actually remove, so it includes the things a diagram cannot show you: the tunnel
 three levels up that runs over a cable that runs to the switch, the note
 anchored to it in a view you are not looking at, the group that lists it as a
@@ -578,7 +578,7 @@ The first layout of an inventory that size is a real Graphviz run and takes a
 second or two; the status line counts while it happens rather than sitting
 still. If a redraw after dragging a node feels slow, it is: a diagram with
 *some* positions stored has to be laid out twice, and
-[`netgraph layout --write`](layout.md) places the rest and takes the redraw to a
+[`netviz layout --write`](layout.md) places the rest and takes the redraw to a
 fraction of it. The measured ceilings are in
 [`docs/follow-ups.md`](../follow-ups.md) entry 20.
 
@@ -597,17 +597,17 @@ mouse is a bend somebody working from the keyboard cannot place at all: `b` adds
 one half way along the selected link, `Shift-B` straightens it, `r` sets its
 routing style — spline, orthogonal or straight, on this link alone — and the
 palette puts a moved label back on the line. On a view that is not arranged they
-refuse with the fix, `netgraph layout --write`, rather than doing nothing: a
+refuse with the fix, `netviz layout --write`, rather than doing nothing: a
 diagram Graphviz is still routing has nowhere to keep a bend.
 
 Nothing here is a browser-side model of the arrangement. Letting go of a handle
 posts one `set-link-geometry` operation
 ([`docs/editing.md`](../editing.md#the-operations)), the server rewrites the
 `kind: layout` document through the same comment-preserving path
-[`netgraph layout`](layout.md) uses, and the canvas repaints from the render
-that follows — so what you see here is what `netgraph render` draws, and the
+[`netviz layout`](layout.md) uses, and the canvas repaints from the render
+that follows — so what you see here is what `netviz render` draws, and the
 gesture is one entry in the changes drawer with a YAML hunk under it. The line
-*under the cursor* is drawn by a port of netgraph's own router, which
+*under the cursor* is drawn by a port of netviz's own router, which
 `tests/test_browser.py` runs against the Python it mirrors on every CI run, so a
 drag cannot land somewhere the render would not.
 
@@ -703,29 +703,29 @@ cable it, undo both — without dispatching a single mouse event.
 
 | Keys | Command | Where | Needs | What it does |
 |---|---|---|---|---|
-| `n` | Create an element… | the diagram | `--write` | Asks for a kind and a name, and writes the document. 'netgraph edit create'. |
-| `c` | Connect this element… | the diagram | `--write` | Cables the focused element to another, port to port. 'netgraph edit connect'. |
-| `Delete` / `Backspace` | Delete the selection | the diagram | `--write` | Removes everything selected, or the focused element when nothing is, and everything that cannot survive it: the cables, the tunnels over them, the notes anchored to them, the coordinates that placed them. Asks once when that is more than you named, and writes the lot as one change. 'netgraph edit delete --cascade' / 'disconnect'. |
-| `Ctrl-C` | Copy the selection | the diagram | a folder | Puts the selected elements on the system clipboard as JSON — the documents themselves, plus any cable whose two ends are both selected. Paste it into another netgraph window, or into a text editor to read it. 'netgraph edit copy'. |
+| `n` | Create an element… | the diagram | `--write` | Asks for a kind and a name, and writes the document. 'netviz edit create'. |
+| `c` | Connect this element… | the diagram | `--write` | Cables the focused element to another, port to port. 'netviz edit connect'. |
+| `Delete` / `Backspace` | Delete the selection | the diagram | `--write` | Removes everything selected, or the focused element when nothing is, and everything that cannot survive it: the cables, the tunnels over them, the notes anchored to them, the coordinates that placed them. Asks once when that is more than you named, and writes the lot as one change. 'netviz edit delete --cascade' / 'disconnect'. |
+| `Ctrl-C` | Copy the selection | the diagram | a folder | Puts the selected elements on the system clipboard as JSON — the documents themselves, plus any cable whose two ends are both selected. Paste it into another netviz window, or into a text editor to read it. 'netviz edit copy'. |
 | `Ctrl-X` | Cut the selection | the diagram | `--write` | Copy, and then delete what was copied — as one change, so one Ctrl-Z puts the documents back. Asks first, listing what goes. |
 | `Ctrl-V` | Paste | the diagram | `--write` | Writes the clipboard fragment into this inventory: new documents, with free names, the internal cables rewired to the copies, and positions offset from the originals — or dropped where you last right-clicked. A fragment from another inventory pastes the same way. |
-| `Ctrl-D` | Duplicate the selection | the diagram | `--write` | Copy and paste in one keystroke, without touching the system clipboard: each selected element gets a sibling called 'sw1-copy' beside it. 'netgraph edit duplicate'. |
-| `F2` | Rename the focused element… | the diagram | `--write` | Renames it and every reference to it. 'netgraph edit rename'. |
-| `e` | Set a field… | the diagram | `--write` | A dotted path and a YAML value, on every selected element at once — or on the focused one when nothing is selected. 'netgraph edit set'. |
-| *palette only* | Remove a field… | anywhere | `--write` | 'netgraph edit unset', across the whole selection as one change. |
-| *palette only* | Move to another file… | anywhere | `--write` | Moves the selected documents into a different file, together. 'netgraph edit move'. |
-| *palette only* | New namespace… | anywhere | `--write` | Makes a namespace by putting something in it — the selection, moved there, or a new element created there. A namespace *is* a folder and a folder netgraph would read is one holding a document, so an empty one is not a thing the inventory can record. |
-| *palette only* | Move into a namespace… | anywhere | `--write` | Re-homes the selection into another namespace: the typed form of dragging it into that container's box. The documents are rewritten into the folder and every reference to them is re-spelled. 'netgraph edit move'. |
-| *palette only* | Disconnect a cable… | anywhere | `--write` | Removes a cable, leaving both devices. 'netgraph edit disconnect'. |
+| `Ctrl-D` | Duplicate the selection | the diagram | `--write` | Copy and paste in one keystroke, without touching the system clipboard: each selected element gets a sibling called 'sw1-copy' beside it. 'netviz edit duplicate'. |
+| `F2` | Rename the focused element… | the diagram | `--write` | Renames it and every reference to it. 'netviz edit rename'. |
+| `e` | Set a field… | the diagram | `--write` | A dotted path and a YAML value, on every selected element at once — or on the focused one when nothing is selected. 'netviz edit set'. |
+| *palette only* | Remove a field… | anywhere | `--write` | 'netviz edit unset', across the whole selection as one change. |
+| *palette only* | Move to another file… | anywhere | `--write` | Moves the selected documents into a different file, together. 'netviz edit move'. |
+| *palette only* | New namespace… | anywhere | `--write` | Makes a namespace by putting something in it — the selection, moved there, or a new element created there. A namespace *is* a folder and a folder netviz would read is one holding a document, so an empty one is not a thing the inventory can record. |
+| *palette only* | Move into a namespace… | anywhere | `--write` | Re-homes the selection into another namespace: the typed form of dragging it into that container's box. The documents are rewritten into the folder and every reference to them is re-spelled. 'netviz edit move'. |
+| *palette only* | Disconnect a cable… | anywhere | `--write` | Removes a cable, leaving both devices. 'netviz edit disconnect'. |
 | `b` | Add a bend to the focused link | the diagram | `--write` | Drops a waypoint half way along the link, which the route then passes through. Double-clicking the line does the same at the point clicked. |
 | `Shift-B` | Straighten the focused link | the diagram | `--write` | Clears every bend, leaving the link to run directly between its two devices. The routing style and the label position are kept. |
-| `r` | Change how the link is routed… | the diagram | `--write` | Spline, orthogonal or straight, on this link alone. Clearing it takes the view's default back. Honoured by 'netgraph render' as well as here. |
-| `Shift-R` | Pin the route the renderer worked out | the diagram | `--write` | Writes the bends netgraph computed to keep this link clear of the boxes it passes into the layout document, so they become bends you placed: they stop being recomputed, they get a grab handle each, and moving a device no longer moves them. Refuses on a link that needed no detour, since there would be nothing to pin. |
+| `r` | Change how the link is routed… | the diagram | `--write` | Spline, orthogonal or straight, on this link alone. Clearing it takes the view's default back. Honoured by 'netviz render' as well as here. |
+| `Shift-R` | Pin the route the renderer worked out | the diagram | `--write` | Writes the bends netviz computed to keep this link clear of the boxes it passes into the layout document, so they become bends you placed: they stop being recomputed, they get a grab handle each, and moving a device no longer moves them. Refuses on a link that needed no detour, since there would be nothing to pin. |
 | *palette only* | Put the link's label back on the line | anywhere | `--write` | Undoes a nudged label, leaving it half way along the route where the renderer puts one nobody has moved. |
-| `Shift-N` | Add a note to the diagram… | the diagram | `--write` | Drops a note where the pointer is — or in the middle of the view when the keyboard asks — and opens it for typing. Right-clicking an element or a link anchors the note to it instead, so it follows what it is about. 'netgraph edit create-annotation'. |
+| `Shift-N` | Add a note to the diagram… | the diagram | `--write` | Drops a note where the pointer is — or in the middle of the view when the keyboard asks — and opens it for typing. Right-clicking an element or a link anchors the note to it instead, so it follows what it is about. 'netviz edit create-annotation'. |
 | `Shift-E` | Edit the note's text… | the diagram | `--write` | A text box over the note itself, in the markdown subset §21 defines. Ctrl-Enter or clicking away writes 'spec.text'; Escape abandons it and writes nothing. Double-clicking the note does the same. |
-| `i` | Add an interface… | the diagram | `--write` | 'netgraph edit add-interface'. |
-| *palette only* | Remove an interface… | anywhere | `--write` | 'netgraph edit remove-interface'. |
+| `i` | Add an interface… | the diagram | `--write` | 'netviz edit add-interface'. |
+| *palette only* | Remove an interface… | anywhere | `--write` | 'netviz edit remove-interface'. |
 | `Ctrl-Shift-Y` | Style inspector | anywhere | a folder | How the selection is drawn (§22), which layer each value came from, and the controls to change it. A change is written to spec.style, so the picture and the YAML stay one thing. |
 | *palette only* | Restyle the selection | anywhere | `--write` | Open the style inspector on what is selected. |
 
@@ -741,22 +741,22 @@ cable it, undo both — without dispatching a single mouse event.
 | *palette only* | Align bottom | anywhere | `--write` | Onto the bottommost one's bottom edge. |
 | *palette only* | Distribute horizontally | anywhere | `--write` | Equal gaps between the boxes, left to right, with the two outermost left where they are. Needs three. |
 | *palette only* | Distribute vertically | anywhere | `--write` | The same, top to bottom. |
-| *palette only* | Snap to the grid | anywhere | `--write` | Rounds each selected element's position to the pitch this inventory sets in 'netgraph.toml' ([editor] grid, 20 points by default). |
+| *palette only* | Snap to the grid | anywhere | `--write` | Rounds each selected element's position to the pitch this inventory sets in 'netviz.toml' ([editor] grid, 20 points by default). |
 
 **The view**
 
 | Keys | Command | Where | Needs | What it does |
 |---|---|---|---|---|
-| `Ctrl-Shift-F` | Draw only what the query selects | anywhere | — | Narrows the drawing itself rather than highlighting inside it — the same narrowing 'netgraph render --select' does. |
+| `Ctrl-Shift-F` | Draw only what the query selects | anywhere | — | Narrows the drawing itself rather than highlighting inside it — the same narrowing 'netviz render --select' does. |
 | *palette only* | Switch layer… | anywhere | — | Physical, l1, l2, l3, overlay, routing, rack, power, identity. |
 | `]` | Next layer | anywhere | — | The next entry of the layer menu. |
 | `[` | Previous layer | anywhere | — | The previous entry of the layer menu. |
 | `Alt-I` | Toggle IP addresses | anywhere | — | Whether the picture prints addresses. The inspector shows them either way. |
 | `Alt-V` | Toggle VLANs | anywhere | — | Whether the picture prints VLAN membership. |
 | `Alt-G` | Toggle namespace grouping | anywhere | — | Collapse each namespace into one box. |
-| `f` | Fold or unfold this namespace | the diagram | — | Draws a namespace box as the single node it stands for, or opens it again — the container the pointer picked, or the one holding the focused element. The same folding 'netgraph render --collapse' does. A view, not an edit: nothing is written, and how much of a diagram somebody wants to look at is not a fact about the network. |
+| `f` | Fold or unfold this namespace | the diagram | — | Draws a namespace box as the single node it stands for, or opens it again — the container the pointer picked, or the one holding the focused element. The same folding 'netviz render --collapse' does. A view, not an edit: nothing is written, and how much of a diagram somebody wants to look at is not a fact about the network. |
 | `Alt-N` | Toggle annotations | anywhere | — | Whether the notes, areas and legends of §21 are drawn. They are commentary, never topology, so hiding them changes nothing the tool concludes — only how much of the picture is somebody's explanation. |
-| `Alt-K` | Toggle icons | anywhere | — | Whether each device is drawn as its icon or as a plain shape. The theme is the one 'netgraph web --icons' named, or the set that ships with netgraph; which of them exist is the command line's to say, because a theme is a directory, but whether this drawing uses one is a question about the picture. |
+| `Alt-K` | Toggle icons | anywhere | — | Whether each device is drawn as its icon or as a plain shape. The theme is the one 'netviz web --icons' named, or the set that ships with netviz; which of them exist is the command line's to say, because a theme is a directory, but whether this drawing uses one is a question about the picture. |
 | `Alt-S` | Toggle strict | anywhere | — | Report warnings as errors. |
 | *palette only* | Filter by VLAN… | anywhere | — | Keep only elements participating in the VLANs given. |
 | `Alt-F` | Failure mode | anywhere | a folder | Click an element and everything it would isolate from the gateways greys out; the status line names the count. Reads only — nothing is written, and Escape or the same key puts the diagram back. |
@@ -772,7 +772,7 @@ cable it, undo both — without dispatching a single mouse event.
 | `Ctrl-Z` | Undo | anywhere | `--write` | The session's stack, not the browser's: it puts files back on disk. |
 | `Ctrl-Shift-Z` / `Ctrl-Y` | Redo | anywhere | `--write` | Applies the last undone change again. |
 | `Ctrl-B` | Changes drawer | anywhere | a folder | This session's changes, and the diagram repainted as the diff they add up to. |
-| *palette only* | Copy the equivalent commands | anywhere | a folder | The session as a 'netgraph edit' script somebody else can review or run. |
+| *palette only* | Copy the equivalent commands | anywhere | a folder | The session as a 'netviz edit' script somebody else can review or run. |
 | `Ctrl-Shift-H` | History timeline | anywhere | a folder | A scrubber over the commits that changed this inventory. The diagram becomes the diff the selected commit carries against its parent, arranged as that revision arranged it. |
 | `Alt-ArrowLeft` | Older revision | anywhere | a folder | One commit back along the timeline. Stops the playback if it is running. |
 | `Alt-ArrowRight` | Newer revision | anywhere | a folder | One commit forward along the timeline. |
@@ -783,9 +783,9 @@ cable it, undo both — without dispatching a single mouse event.
 
 <!-- norun: every one of these starts a server and never exits -->
 ```bash
-netgraph web                                  # opens on the netgraph init example
-netgraph web devices/sw-office.yaml           # seeded from one file
-kubectl get cm topology -o jsonpath={..yaml} | netgraph web   # or from a pipe
+netviz web                                  # opens on the netviz init example
+netviz web devices/sw-office.yaml           # seeded from one file
+kubectl get cm topology -o jsonpath={..yaml} | netviz web   # or from a pipe
 ```
 
 The left pane holds a document stream — one or more documents separated by `---`
@@ -805,7 +805,7 @@ instead.
 room for: every interface with its type, MAC, MTU, addresses and VLAN mode; every
 link that terminates on the element, what it runs to and over which port; and, at
 layer 3, the prefix a subnet node stands for and who is addressed in it.
-Everything it shows is the same data `netgraph render -f json` exports — the
+Everything it shows is the same data `netviz render -f json` exports — the
 records *are* that export — so the two cannot drift apart, and they are the same
 records a committed SVG carries as tooltips
 ([`docs/rendering.md`](../rendering.md)). The element under the pointer and
@@ -816,17 +816,17 @@ Beyond that: the layer, the VLAN filter and the display toggles are in the heade
 and apply on the next render; the canvas pans with a drag and zooms with the
 wheel; and the splitter between the panes moves.
 
-**Broken text still draws.** `netgraph render` refuses an inventory with errors
+**Broken text still draws.** `netviz render` refuses an inventory with errors
 unless `--force`, because a diagram that disagrees with the files misinforms
 whoever is shown it. Here the diagram *is* the feedback and text being edited is
 wrong most of the time, so every problem is listed with its file and line and
 whatever resolved is drawn anyway.
 
-`netgraph.toml` decides how this machine *draws*: the `[render]` table and
+`netviz.toml` decides how this machine *draws*: the `[render]` table and
 `--profile` of the inventory named by `-i` — the current directory by default —
 supply the settings this command has, `--icons` above all. A session also reads
 the `[validate]` table of the folder it has open, so the problems it lists are
-the ones [`netgraph validate`](validate.md) would list in that tree; a stream has
+the ones [`netviz validate`](validate.md) would list in that tree; a stream has
 no folder of its own to look in and uses the built-in defaults plus the `strict`
 toggle in the header.
 
@@ -841,7 +841,7 @@ The split is deliberate, and it is the same one `--write` makes. *Which* themes
 exist is the command line's to say, because a theme is a directory of images on
 this machine and a page has no business naming one: `--icons DIR` puts your own
 directory on the list, and `--icons cisco` — or nothing at all — leaves the set
-that ships with netgraph. *Whether this drawing uses one* is the browser's,
+that ships with netviz. *Whether this drawing uses one* is the browser's,
 because that is a fact about the picture and about nobody's filesystem. So the
 switch offers exactly what the server was started with, `/api/state` says what
 that is, and a request naming anything else is refused with the list it could
@@ -911,7 +911,7 @@ from them.
   argument list, and `git log --output=<file>` writes a file while
   `--upload-pack=<cmd>` runs a program. A revision that begins with `-` is
   refused by name before any git process starts, on every path that takes one —
-  the route, the timeline, `netgraph log` and `netgraph diff --from` alike.
+  the route, the timeline, `netviz log` and `netviz diff --from` alike.
 
 The default port is 8081, one above the `watch` preview's, so a watch run and an
 editing session can be open at the same time. `--port 0` lets the operating system
@@ -938,7 +938,7 @@ browser alone, which is what you want over SSH.
 | `--icons` | `THEME\|DIR` | — | Draw each element as an icon instead of a plain shape, and start the toolbar's icon switch on. Built in: cisco, none. Which themes exist is named here rather than in the browser, because a theme is a directory on this machine; whether a drawing uses one is the switch's, and it can turn this theme off and back on. |
 | `--theme` | `NAME\|PATH` | — | Apply a stylesheet to the diagram (§22). The style inspector shows the resolved appearance and which layer each value came from. Built in: blueprint, mono, none. Chosen here rather than in the browser, because it names a file on this machine. |
 | `--write`, `--read-only` | — | --read-only | Let the browser change the inventory. Only for a SOURCE folder, only on a loopback bind, and never by default: an editor that can write is a decision. |
-| `--profile` | `NAME` | — | Apply the [profile.NAME] block of netgraph.toml on top of its [render] table. Explicit flags still win over both. |
+| `--profile` | `NAME` | — | Apply the [profile.NAME] block of netviz.toml on top of its [render] table. Explicit flags still win over both. |
 | `--show-config` | — | off | Print the settings this invocation resolves to, and where each one came from, then exit without doing any work. |
 <!-- /generated -->
 
@@ -950,17 +950,17 @@ Text that does not parse is reported in the page, not by the process.
 | Code | Meaning |
 |---|---|
 | 0 | The server ran and was stopped with Ctrl-C. |
-| 2 | Usage error, an unusable `netgraph.toml`, or `--write` where it cannot be given. |
+| 2 | Usage error, an unusable `netviz.toml`, or `--write` where it cannot be given. |
 | 3 | A `SOURCE` folder could not be read. |
 | 6 | The address could not be bound — usually something else on port 8081. |
 
 ## See also
 
-* [`netgraph edit`](edit.md) — the same operations from the command line, and the
+* [`netviz edit`](edit.md) — the same operations from the command line, and the
   layer every write in the browser goes through.
-* [`netgraph diff`](diff.md) — the same overlay from the command line, over two
+* [`netviz diff`](diff.md) — the same overlay from the command line, over two
   folders, a git ref or a saved plan.
-* [`netgraph watch`](watch.md) — the same live diagram without an editor, for a
+* [`netviz watch`](watch.md) — the same live diagram without an editor, for a
   second screen.
 * [`docs/editing.md`](../editing.md) — what an operation is, what an inverse
   promises, and how geometry is stored.

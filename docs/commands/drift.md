@@ -1,13 +1,13 @@
-# `netgraph drift`
+# `netviz drift`
 
-`netgraph drift` reads the same live-device output [`netgraph import`](import.md)
+`netviz drift` reads the same live-device output [`netviz import`](import.md)
 does — LLDP neighbour tables, `ip -j` captures, cabling lists — but the other way
 round. `import` turns a network into an inventory; `drift` treats the inventory
 as an **assertion about the network** and reports where reality disagrees. It is
 the command that keeps a committed inventory honest once the first one exists.
 
 No host is contacted and no credential is read: you run the collection command
-and hand netgraph what it printed, exactly as for `import`, so the check works
+and hand netviz what it printed, exactly as for `import`, so the check works
 from a laptop with no route to the network it is checking.
 
 ---
@@ -34,7 +34,7 @@ from a laptop with no route to the network it is checking.
 
 <!-- generated: synopsis drift -->
 ```text
-netgraph [GLOBAL OPTIONS] drift [OPTIONS] [NAME=]INPUT...
+netviz [GLOBAL OPTIONS] drift [OPTIONS] [NAME=]INPUT...
 ```
 <!-- /generated -->
 
@@ -82,7 +82,7 @@ manufacture differences rather than find them:
 ## Drift and unobserved
 
 A capture is always partial. `lldpctl` never reports an address; `ip -j link
-show` does not either, though `ip -j addr show` does; no dialect netgraph reads
+show` does not either, though `ip -j addr show` does; no dialect netviz reads
 prints the VLAN set of a trunk. If absence were read as deletion, the first run
 against one host's output would announce that the rest of the network had been
 unplugged.
@@ -123,7 +123,7 @@ two dialects gets the union of both:
 | `wireguard` | no | no | no | no |
 
 The last six are the configuration dialects
-[`netgraph export`](export.md#the-fourteen-formats) writes, read back, and they
+[`netviz export`](export.md#the-fourteen-formats) writes, read back, and they
 split into two groups for one reason: **does this file describe the whole device,
 or a part of it?**
 
@@ -160,7 +160,7 @@ Three consequences worth knowing:
 Two refinements go beyond the table. `ip -j addr show` and `ip -j link show` are
 the same dialect and only one of them carries addresses, so address coverage
 additionally requires that an address really was observed on the device. And a
-trunk's VLAN set is always a *lower bound*: netgraph derives the minimum implied
+trunk's VLAN set is always a *lower bound*: netviz derives the minimum implied
 by the sub-interfaces stacked on the port, so a VLAN there and not in the
 inventory is drift, while the converse is unobserved.
 
@@ -169,34 +169,34 @@ inventory is drift, while the converse is unobserved.
 ## Generate, then compare
 
 Six of the dialects above are the ones
-[`netgraph export`](export.md#a-configuration-dialect-writes-a-tree) writes, which
+[`netviz export`](export.md#a-configuration-dialect-writes-a-tree) writes, which
 makes the loop symmetric: what the emitter writes is exactly what this command
 reads. Two commands, and no bespoke collection script:
 
 <!-- norun: writes want.yaml into the reader's directory -->
 ```console
-$ netgraph -q -i examples/home-lab export netplan --name pc-desk -o want.yaml
-$ netgraph -i examples/home-lab drift --only pc-desk want.yaml
+$ netviz -q -i examples/home-lab export netplan --name pc-desk -o want.yaml
+$ netviz -i examples/home-lab drift --only pc-desk want.yaml
 drift of examples/home-lab against 1 input (netplan)
 
 unobserved (3)
   declared, but outside what these dialects see; never counted as drift
-  cables/cbl-sw-desk hosts/pc-desk:eno1, switches/sw-home:port2: no input reported the neighbours of either end; 'lldp', 'csv' do, and nothing else netgraph reads does — a configuration says what a box does with a port, never what is plugged into it
+  cables/cbl-sw-desk hosts/pc-desk:eno1, switches/sw-home:port2: no input reported the neighbours of either end; 'lldp', 'csv' do, and nothing else netviz reads does — a configuration says what a box does with a port, never what is plugged into it
   hosts/pc-desk:eno1 enabled: the capture reports no value for these fields, so the declared ones could not be checked
   hosts/pc-desk:lo: a loopback interface is not something iproute lists, so its absence from the capture says nothing
 
 no drift: 1 element compared, 3 unobserved
 ```
 
-Neither `--from` nor `--host` was given, and neither was needed: a file netgraph
-generated carries `netgraph-dialect:` and `netgraph-element:` in its banner, so it
+Neither `--from` nor `--host` was given, and neither was needed: a file netviz
+generated carries `netviz-dialect:` and `netviz-element:` in its banner, so it
 names its own dialect and its own device. A configuration collected off a real
 box has neither, and then the sniffer decides from the shape of the file and
 `--host` names the device — which is the form the check actually runs in:
 
 <!-- norun: needs the file that is really running on pc-desk -->
 ```console
-$ ssh pc-desk 'cat /etc/netplan/*.yaml' | netgraph -i examples/home-lab drift --host pc-desk -
+$ ssh pc-desk 'cat /etc/netplan/*.yaml' | netviz -i examples/home-lab drift --host pc-desk -
 ```
 
 Two things follow from comparing against a *configuration* rather than against a
@@ -214,7 +214,7 @@ they never report a declared interface, address or member as missing — only
 something configured that the inventory does not declare. Use one of them to
 catch an address or a neighbour somebody added to a router by hand; do not expect
 either to notice that something was removed. For that, pass both files in one run
-— `netgraph drift --host rtr-edge frr.conf 10-netgraph.yaml`. Coverage is the
+— `netviz drift --host rtr-edge frr.conf 10-netviz.yaml`. Coverage is the
 union over every dialect that saw a device, so the netplan file supplies the
 interface, address and membership coverage the `frr.conf` cannot.
 
@@ -230,7 +230,7 @@ sub-interface carrying a VLAN 30 nobody declared.
 
 <!-- run: cwd=. rc=1 -->
 ```console
-$ netgraph -i examples/home-lab drift --only pc-desk tests/fixtures/drift/pc-desk.addr.json
+$ netviz -i examples/home-lab drift --only pc-desk tests/fixtures/drift/pc-desk.addr.json
 drift of examples/home-lab against 1 input (iproute)
 
 hosts/pc-desk (computer)
@@ -240,7 +240,7 @@ hosts/pc-desk (computer)
 
 unobserved (2)
   declared, but outside what these dialects see; never counted as drift
-  cables/cbl-sw-desk hosts/pc-desk:eno1, switches/sw-home:port2: no input reported the neighbours of either end; 'lldp', 'csv' do, and nothing else netgraph reads does — a configuration says what a box does with a port, never what is plugged into it
+  cables/cbl-sw-desk hosts/pc-desk:eno1, switches/sw-home:port2: no input reported the neighbours of either end; 'lldp', 'csv' do, and nothing else netviz reads does — a configuration says what a box does with a port, never what is plugged into it
   hosts/pc-desk:lo: a loopback interface is not something iproute lists, so its absence from the capture says nothing
 
 3 differences across 1 element (+2 undeclared, ~1 disagrees); 2 unobserved
@@ -253,16 +253,16 @@ was checked. Neither is counted in the tally.
 
 `wlp1s0` is in the capture and in the inventory and agrees — the inventory
 declares it as `wifi` and `ip` says `link_type: ether`, which is what `ip` says
-about every NIC, so netgraph treats the two as consistent rather than as a
+about every NIC, so netviz treats the two as consistent rather than as a
 difference.
 
-A switch is not a Linux host, so its configuration reaches netgraph as a
+A switch is not a Linux host, so its configuration reaches netviz as a
 neighbour table or a patch list rather than as `ip` output. Run the same command
 over `sw-home.lldp.json` and the shape of the answer is the same:
 
 <!-- run: cwd=. rc=1 -->
 ```console
-$ netgraph -i examples/home-lab drift --only 'sw-home' --only 'prn-*' tests/fixtures/drift/sw-home.lldp.json
+$ netviz -i examples/home-lab drift --only 'sw-home' --only 'prn-*' tests/fixtures/drift/sw-home.lldp.json
 drift of examples/home-lab against 1 input (lldp)
 
 cbl-prn-hall-sw-home (cable)
@@ -313,15 +313,15 @@ makes a run of six devices show six rows rather than only the broken ones.
 
 <!-- run: cwd=. rc=1 -->
 ```console
-$ netgraph -i examples/home-lab drift --only pc-desk -F junit tests/fixtures/drift/pc-desk.addr.json
+$ netviz -i examples/home-lab drift --only pc-desk -F junit tests/fixtures/drift/pc-desk.addr.json
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="netgraph drift" tests="2" failures="1" errors="0" skipped="1">
-  <testsuite name="netgraph drift" tests="2" failures="1" errors="0" skipped="1">
+<testsuites name="netviz drift" tests="2" failures="1" errors="0" skipped="1">
+  <testsuite name="netviz drift" tests="2" failures="1" errors="0" skipped="1">
 ...
-    <testcase classname="netgraph.drift.cable" name="cables/cbl-sw-desk">
-      <skipped message="no input reported the neighbours of either end; 'lldp', 'csv' do, and nothing else netgraph reads does — a configuration says what a box does with a port, never what is plugged into it"/>
+    <testcase classname="netviz.drift.cable" name="cables/cbl-sw-desk">
+      <skipped message="no input reported the neighbours of either end; 'lldp', 'csv' do, and nothing else netviz reads does — a configuration says what a box does with a port, never what is plugged into it"/>
     </testcase>
-    <testcase classname="netgraph.drift.computer" name="hosts/pc-desk">
+    <testcase classname="netviz.drift.computer" name="hosts/pc-desk">
       <failure message="3 differences from the captured network" type="drift">
 ~ hosts/pc-desk:eno1.mac: declared as 3c:97:0e:20:01:01; the capture reports 3c:97:0e:20:01:ff
 + hosts/pc-desk:eno1.vlan: VLAN 30 is carried on this port; the inventory declares no VLAN here
@@ -334,7 +334,7 @@ $ netgraph -i examples/home-lab drift --only pc-desk -F junit tests/fixtures/dri
 3 differences between the inventory and the capture, 2 unobserved items
 ```
 
-The last line is on stderr, so `netgraph … -F junit > drift.xml` writes a file a
+The last line is on stderr, so `netviz … -F junit > drift.xml` writes a file a
 JUnit reader accepts while a person watching the run still sees what happened.
 `-q` drops that summary; it never drops the document.
 
@@ -348,7 +348,7 @@ optional key does not count, a renamed one does.
 | Key | Contents |
 |---|---|
 | `schemaVersion` | `1`. |
-| `tool` | `{"name": "netgraph", "version": …}`. |
+| `tool` | `{"name": "netviz", "version": …}`. |
 | `inventory.root` | Absolute path of the tree the assertion came from. |
 | `capture.inputs` | Input names, in command-line order. |
 | `capture.dialects` | The dialects they were read as, sorted. |
@@ -382,7 +382,7 @@ keeps `veth*` and `docker*` out of the observed side, where they would otherwise
 read as undeclared interfaces.
 
 `--from` and `--host` behave exactly as they do for
-[`netgraph import`](import.md#naming-the-host-a-capture-came-from): `auto`
+[`netviz import`](import.md#naming-the-host-a-capture-came-from): `auto`
 sniffs each input on its own, and an `lldp` or `iproute` capture takes its host
 from `NAME=PATH`, from `--host`, or from the file name, in that order.
 
@@ -403,11 +403,11 @@ from `NAME=PATH`, from `--host`, or from the file name, in that order.
 <!-- generated: options drift -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
-| `--from` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|nftables\|wireguard\|interfaces]` | `auto` | Input dialect, as for 'netgraph import'. 'auto' sniffs each input on its own: lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', csv is 'device,port,device,port' cabling rows, and netplan, networkd, ifupdown, frr, nftables, wireguard and interfaces are the running configuration in the same dialects 'netgraph export' writes. |
+| `--from` | `[auto\|lldp\|iproute\|csv\|netplan\|networkd\|ifupdown\|frr\|nftables\|wireguard\|interfaces]` | `auto` | Input dialect, as for 'netviz import'. 'auto' sniffs each input on its own: lldp is 'lldpctl -f json', iproute is 'ip -j link show' or 'ip -j addr show', csv is 'device,port,device,port' cabling rows, and netplan, networkd, ifupdown, frr, nftables, wireguard and interfaces are the running configuration in the same dialects 'netviz export' writes. |
 | `--host` | `NAME` | — | Device every input was captured on. An lldp or iproute capture never names its own host. Without this the name comes from the file name, or from a 'NAME=path' argument. |
 | `--only` | `GLOB` | — | Compare only elements whose fully-qualified or short name matches this glob. Repeatable. |
 | `--exclude` | `GLOB` | — | Leave elements whose name matches this glob out of the comparison. Repeatable. |
-| `--exclude-interface` | `PATTERN` | — | Leave out interfaces whose name matches this glob, as 'netgraph import --exclude' does. A declared interface it matches can never be reported as missing. Repeatable. |
+| `--exclude-interface` | `PATTERN` | — | Leave out interfaces whose name matches this glob, as 'netviz import --exclude' does. A declared interface it matches can never be reported as missing. Repeatable. |
 | `-F`, `--output-format` | `[text\|json\|junit]` | `text` | text is for reading; json is for a script, junit for a CI test report. |
 | `--fail-on` | `[drift\|none]` | `drift` | Exit 1 when the network disagrees with the inventory, or never. An unobserved field is not a disagreement and never fails the run. |
 <!-- /generated -->
@@ -420,7 +420,7 @@ from `NAME=PATH`, from `--host`, or from the file name, in that order.
 |---|---|
 | 0 | The comparison ran. Either nothing drifted, or `--fail-on none` was given. |
 | 1 | The network disagrees with the inventory and `--fail-on drift` (the default) was in force — or the inventory itself does not load, in which case nothing was compared. |
-| 2 | Usage error, or an unusable `netgraph.toml`. |
+| 2 | Usage error, or an unusable `netviz.toml`. |
 | 3 | An input was missing, unreadable, not UTF-8, oversized, or not the dialect it was given as. |
 
 `--fail-on` is what makes the command a gate. The default `drift` exits 1 on any
@@ -431,16 +431,16 @@ unobserved section.
 An inventory that does not load is refused before any comparison happens: a
 document the loader rejected is absent from the comparison entirely, so every
 element in it would be reported as something the network has and the inventory
-does not. Fix it with [`netgraph validate`](validate.md) first.
+does not. Fix it with [`netviz validate`](validate.md) first.
 
 ---
 
 ## See also
 
-* [netgraph in CI](../ci.md#workflow-a-scheduled-drift-check) — running this on
+* [netviz in CI](../ci.md#workflow-a-scheduled-drift-check) — running this on
   a schedule, and what to do with the result.
-* [`netgraph import`](import.md) — the same captures, read the other way round.
+* [`netviz import`](import.md) — the same captures, read the other way round.
 * [Importing a live network](../importing.md) — what to collect for each dialect,
   and the exact collection command.
-* [`netgraph validate`](validate.md) — the inventory checked against itself
+* [`netviz validate`](validate.md) — the inventory checked against itself
   rather than against the network.

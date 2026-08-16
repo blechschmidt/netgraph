@@ -2,7 +2,7 @@
 #
 # 'rtr-a' is addressed only in 10.0.0.0/30, so nothing resolves 10.9.9.1: the
 # router would have to route to reach the next hop that tells it how to route.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-a
@@ -17,7 +17,7 @@ spec:
     - prefix: 192.168.0.0/16
       via: 10.9.9.1
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-b
@@ -29,7 +29,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

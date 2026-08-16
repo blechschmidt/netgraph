@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-north-acc-01
@@ -89,7 +89,7 @@ spec:
       rd: '65001:99'
       description: In-band management
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-north-acc-02
@@ -172,9 +172,9 @@ spec:
 # forty-eight access ports, the VLAN database, the bridge and the uplink, and
 # this document carries only what is particular to *this* switch.
 #
-#   netgraph show sites/north/access/sw-north-acc-03 --raw   # as written
-#   netgraph show sites/north/access/sw-north-acc-03         # as merged
-apiVersion: netgraph.dev/v1alpha1
+#   netviz show sites/north/access/sw-north-acc-03 --raw   # as written
+#   netviz show sites/north/access/sw-north-acc-03         # as merged
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-north-acc-03

@@ -1,9 +1,9 @@
 """The two YAML parsers must be the same loader.
 
-:mod:`netgraph.loader.documents` mixes netgraph's strictness over PyYAML's
+:mod:`netviz.loader.documents` mixes netviz's strictness over PyYAML's
 pure-Python parser *and* over the libyaml bindings, and picks one at import
 time. That is a performance change to the one component every safety property of
-this tool rests on, so nothing here is parameterised over "the loader netgraph
+this tool rests on, so nothing here is parameterised over "the loader netviz
 happens to have chosen": every guarantee is asserted against **both** bases, and
 the libyaml cases skip -- rather than silently vanish -- on a PyYAML build
 without the bindings.
@@ -11,7 +11,7 @@ without the bindings.
 The four safety guarantees are ``yes``/``no`` staying strings, duplicate keys
 being rejected, ``!!python/object/apply`` and unknown tags being refused, and
 merge keys keeping their non-duplicate status. The fifth property is not about
-safety but about every diagnostic netgraph prints: node ``start_mark`` line and
+safety but about every diagnostic netviz prints: node ``start_mark`` line and
 column must agree exactly, or an error message would point at a different line
 depending on how PyYAML was compiled.
 
@@ -31,9 +31,9 @@ from typing import Any
 import pytest
 import yaml
 
-from netgraph.errors import LoaderError
-from netgraph.loader import documents
-from netgraph.loader.documents import (
+from netviz.errors import LoaderError
+from netviz.loader import documents
+from netviz.loader.documents import (
     HAVE_LIBYAML,
     LOADER_ENV_VAR,
     NodeLoader,
@@ -291,11 +291,11 @@ def test_a_custom_tag_on_a_mapping_is_refused(base: type[NodeLoader]) -> None:
     ],
 )
 def test_a_surrogate_escape_is_refused(base: type[NodeLoader], escape: str) -> None:
-    """Not encodable as UTF-8, so every artefact netgraph writes would raise on it.
+    """Not encodable as UTF-8, so every artefact netviz writes would raise on it.
 
     Parametrised over both bases because they refuse it in different places and at
     different depths: libyaml while scanning the escape, the pure-Python parser
-    not at all until netgraph's own constructor looks at the result. What matters
+    not at all until netviz's own constructor looks at the result. What matters
     is that *neither* returns a value, so which wheel is installed cannot decide
     whether an inventory loads.
     """
@@ -354,7 +354,7 @@ def test_an_alias_resolves_to_the_same_object_not_a_copy(base: type[NodeLoader])
 
 
 MARK_SAMPLE = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw1
@@ -572,7 +572,7 @@ def test_the_environment_variable_is_honoured_at_import(mode: str, expected: str
         [
             sys.executable,
             "-c",
-            "from netgraph.loader import StrictSafeLoader as L; print(L.__name__)",
+            "from netviz.loader import StrictSafeLoader as L; print(L.__name__)",
         ],
         capture_output=True,
         text=True,
@@ -590,7 +590,7 @@ def test_the_environment_variable_is_honoured_at_import(mode: str, expected: str
 def test_a_bad_environment_value_fails_loudly() -> None:
     env = dict(os.environ, **{LOADER_ENV_VAR: "cyaml"})
     result = subprocess.run(
-        [sys.executable, "-c", "import netgraph.loader"],
+        [sys.executable, "-c", "import netviz.loader"],
         capture_output=True,
         text=True,
         env=env,

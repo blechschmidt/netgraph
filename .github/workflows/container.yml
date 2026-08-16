@@ -172,36 +172,36 @@ jobs:
           platforms: linux/amd64
           load: true
           push: false
-          tags: netgraph:smoke
+          tags: netviz:smoke
           cache-from: type=gha,scope=${{ env.CACHE_SCOPE }}
           cache-to: type=gha,scope=${{ env.CACHE_SCOPE }},mode=max
 
       # An image that builds is not an image that works, and each of the three
       # checks below is one the build alone cannot make: the console script is on
       # PATH and reports the version the source claims, Graphviz is present and
-      # findable by netgraph rather than merely installed, and a real inventory
+      # findable by netviz rather than merely installed, and a real inventory
       # renders end to end through the entrypoint from a read-only mount.
       - name: Run the image
         run: |
           set -euo pipefail
 
-          # The entrypoint is netgraph itself, so this is ``netgraph --version``.
-          reported="$(docker run --rm netgraph:smoke --version | head -n 1)"
+          # The entrypoint is netviz itself, so this is ``netviz --version``.
+          reported="$(docker run --rm netviz:smoke --version | head -n 1)"
           echo "$reported"
           # Against pyproject.toml rather than a literal: this workflow runs on
           # every commit, including the one that bumps the version, and a check
           # that had to be edited in the same commit is a check nobody trusts.
           # ``tool.hatch`` reads the same line, so the grep cannot drift from it.
           version="$(grep -m1 '^version = ' pyproject.toml | cut -d'"' -f2)"
-          if [ "$reported" != "netgraph ${version}" ]; then
+          if [ "$reported" != "netviz ${version}" ]; then
             echo "::error::the image reports '${reported}', but pyproject says '${version}'"
             exit 1
           fi
 
           # An image that cannot draw is not worth publishing, and ``--version``
-          # alone would not notice: netgraph installs and runs perfectly well
+          # alone would not notice: netviz installs and runs perfectly well
           # with no ``dot`` on the machine, it just cannot produce an SVG.
-          docker run --rm netgraph:smoke version --json >image-version.json
+          docker run --rm netviz:smoke version --json >image-version.json
           python - <<'PY'
           import json
 
@@ -215,7 +215,7 @@ jobs:
           # Read-only mount, because that is how the published image is meant to
           # be used and a build stage that left something writable-only would
           # pass every other check here.
-          docker run --rm -v "$PWD/examples/home-lab:/inventory:ro" netgraph:smoke \
+          docker run --rm -v "$PWD/examples/home-lab:/inventory:ro" netviz:smoke \
             render --layer l2 -f svg >topology.svg
           grep -q "<svg" topology.svg
           echo "ok: $(wc -c <topology.svg) bytes of SVG"
@@ -280,7 +280,7 @@ jobs:
     # a copy-paste that drifted would leave a tag describing itself one way to
     # ``docker inspect`` and another to anything reading the registry.
     env:
-      DESCRIPTION: ${{ inputs.version != '' && format('netgraph {0}.', inputs.version) || format('Development build of netgraph from {0}. Not a release; see the X.Y.Z tags for those.', github.ref_name) }}
+      DESCRIPTION: ${{ inputs.version != '' && format('netviz {0}.', inputs.version) || format('Development build of netviz from {0}. Not a release; see the X.Y.Z tags for those.', github.ref_name) }}
       DOCUMENTATION: https://github.com/${{ github.repository }}/blob/${{ github.ref_name }}/docs/docker.md
 
     permissions:
@@ -413,8 +413,8 @@ jobs:
         with:
           image: ${{ env.IMAGE }}@${{ steps.push.outputs.digest }}
           format: spdx-json
-          artifact-name: netgraph-${{ inputs.version }}-image.spdx.json
-          output-file: sbom/netgraph-${{ inputs.version }}-image.spdx.json
+          artifact-name: netviz-${{ inputs.version }}-image.spdx.json
+          output-file: sbom/netviz-${{ inputs.version }}-image.spdx.json
           upload-artifact: false
           upload-release-assets: false
 

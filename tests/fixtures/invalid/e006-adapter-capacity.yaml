@@ -2,7 +2,7 @@
 #
 # The hardware has one port; the document describes two. Each address sits in its
 # own point-to-point prefix: W105 exempts those, and W111 has no overlap to find.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: adapter
 metadata:
   name: adp-a

@@ -1,5 +1,5 @@
 # The arrangement still places 'sw-gone', which no document declares (W138).
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: layout
 metadata:
   name: default

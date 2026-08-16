@@ -9,7 +9,7 @@
 # Every MTU is the underlay's minus this tunnel's overhead (docs/schema.md
 # §14.1), which is what keeps NG-T011 quiet. There is nowhere here to put a key:
 # 'auth' names the method and nothing else (§14.2).
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: tunnel
 metadata:
   name: wg-mesh
@@ -26,7 +26,7 @@ spec:
   auth: public-key
   label: MESH
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: tunnel
 metadata:
   name: ipsec-hq-b
@@ -42,7 +42,7 @@ spec:
   cipher: aes-256-gcm
   auth: certificate
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: tunnel
 metadata:
   name: vx-100
@@ -56,7 +56,7 @@ spec:
   vni: 100
   mtu: 1377
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: tunnel
 metadata:
   name: gre-mgmt
@@ -69,7 +69,7 @@ spec:
   over: ipsec-hq-b
   mtu: 1403
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: tunnel
 metadata:
   name: ovpn-admin

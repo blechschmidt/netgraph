@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-core
@@ -23,7 +23,7 @@ spec:
       type: ethernet
       ipv4: [10.0.1.1/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-hq-a
@@ -38,7 +38,7 @@ spec:
       enabled: false
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-hq-b
@@ -54,7 +54,7 @@ spec:
       enabled: false
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-desk

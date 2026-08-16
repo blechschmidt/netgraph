@@ -1,6 +1,6 @@
 # Validation rules
 
-`netgraph validate` answers one question: **is this inventory usable?** It
+`netviz validate` answers one question: **is this inventory usable?** It
 answers it in three passes, and this document lists every rule each pass can
 report, why the rule is worth having, and how to switch it off when your
 network is the exception.
@@ -20,7 +20,7 @@ most severe first:
 
 <!-- norun: 'inventory' is an illustrative tree, and the findings are two rules shown together -->
 ```console
-$ netgraph -i inventory validate
+$ netviz -i inventory validate
 errors (1):
   cables/links.yaml#2:8   E001  cable 'cbl-sw-desk' endpoint 'sw-home:port9': 'sw-home' has no interface 'port9'; it declares 'port1', 'port2', …
 
@@ -59,7 +59,7 @@ because "my file is not being loaded" is a validation question in practice.
 | ID | Severity | Rule | Why it matters |
 |---|---|---|---|
 | `NG-L001` | — | Only `*.yaml` and `*.yml` (case-insensitive) are loaded. | A `README.md` or a `.j2` template next to the inventory is not an element. |
-| `NG-L002` | — | Path components starting with `.` or `_`, and anything matched by a `.netgraphignore`, are skipped. | Keeps `.git/`, editor backups and work-in-progress drafts out of the graph without moving them elsewhere. |
+| `NG-L002` | — | Path components starting with `.` or `_`, and anything matched by a `.netvizignore`, are skipped. | Keeps `.git/`, editor backups and work-in-progress drafts out of the graph without moving them elsewhere. |
 | `NG-L003` | error | Symlinks are followed, but one that leaves the inventory root or revisits a directory is an error. | A symlink loop would hang the walk; one pointing outside the root would silently pull in documents nobody reviewing the tree can see. |
 | `NG-L004` | — | A file may hold several documents separated by `---`; empty ones are skipped but still consume a document index. | The index in `links.yaml#2` keeps pointing at the third `---` block even after one is emptied. |
 | `NG-L005` | — | Files load in byte-wise order of their relative path, documents in file order. | Makes every later stage deterministic, so a diagram only changes when the inventory does. |
@@ -89,13 +89,13 @@ does not, the column reads `load` and the message carries the field path
 
 | ID | Rule | Why it matters |
 |---|---|---|
-| `NG-D001` | The document is a mapping carrying `apiVersion`, `kind`, `metadata` and `spec`. | Anything else is not a netgraph document; guessing at its intent would be worse than refusing it. |
-| `NG-D002` | `apiVersion` is a version this build understands (`netgraph.dev/v1alpha1`). | A document written for a later schema may mean something different by the same keys. |
+| `NG-D001` | The document is a mapping carrying `apiVersion`, `kind`, `metadata` and `spec`. | Anything else is not a netviz document; guessing at its intent would be worse than refusing it. |
+| `NG-D002` | `apiVersion` is a version this build understands (`netviz.dev/v1alpha1`). | A document written for a later schema may mean something different by the same keys. |
 | `NG-D003` | `kind` is one of the ten element kinds or `template`, lower-case. | `kind` selects the shape of `spec`; an unknown kind has no shape to check against. |
 | `NG-D004` | `spec` matches the shape required by `kind`. | The whole point of declaring the kind. |
 | `NG-D005` | No unknown keys anywhere in the document. | The one failure mode this tool exists to prevent: a misspelt `mtu:`/`mut:` that was silently ignored would produce a diagram that disagrees with the file. |
 | `NG-N001` | `metadata.name` matches the name grammar. | Names end up as graph node ids and as the left half of every `device:interface` reference. |
-| `NG-N003` | Label and annotation keys match the Kubernetes key grammar; label keys may not use the reserved `netgraph.dev/` prefix. | Labels are user vocabulary that selectors match on; the tool keeps its own prefix so a future built-in label cannot collide with yours. |
+| `NG-N003` | Label and annotation keys match the Kubernetes key grammar; label keys may not use the reserved `netviz.dev/` prefix. | Labels are user vocabulary that selectors match on; the tool keeps its own prefix so a future built-in label cannot collide with yours. |
 
 ### Interfaces
 
@@ -218,7 +218,7 @@ They live here rather than in [pass 2](#pass-2--schema) because they are
 judgements: a network can be built that way, badly, and an inventory that means
 to describe it must be able to say so.
 
-`netgraph rules` prints this table from the same source the validator uses.
+`netviz rules` prints this table from the same source the validator uses.
 
 ### Errors
 
@@ -588,7 +588,7 @@ An IPv6 link-local gateway is exempt: `fe80::1` is on-link by definition, and
 the interface's own link-local address is autoconfigured rather than written
 down, so there is no declared prefix for it to be inside of.
 
-Reported by [`netgraph ipam`](ipam.md) as well as by `netgraph validate`; the
+Reported by [`netviz ipam`](ipam.md) as well as by `netviz validate`; the
 IPAM report calls this rule rather than re-deriving it.
 
 **Suppress with** `E020` / `NG-A013`, or an annotation on the element. The
@@ -954,8 +954,8 @@ The draws landing on a PDU's outlets add up to more than its `capacity_watts`.
 The sum is the **normal-operation share**: a dual-corded server draws its load
 through both cords, so it contributes half its `draw_watts` to each of its two
 PDUs. The other figure — the whole draw of everything corded to the unit, which
-is what it carries when its partner fails — is printed by `netgraph list power`
-and `netgraph export power`, and is deliberately not graded here.
+is what it carries when its partner fails — is printed by `netviz list power`
+and `netviz export power`, and is deliberately not graded here.
 
 **Why it matters.** A strip carrying more than it is rated for trips its breaker
 and takes down everything on it, in a rack where no single document is wrong.
@@ -1093,7 +1093,7 @@ include, and nothing about reading the file says so. This is the one place the
 mistake is visible.
 
 **Suppress with** `E043` / `NG-S010`, or an annotation on the group. There is no
-good reason to: a member netgraph cannot resolve is a member no consumer of the
+good reason to: a member netviz cannot resolve is a member no consumer of the
 inventory can resolve either.
 
 #### `E044` — group member is not an identity
@@ -1126,13 +1126,13 @@ naming *itself* is refused earlier, by the model, which needs no inventory to se
 it and can therefore point at the line.
 
 **Why it matters.** A cyclic group has no membership. Expanding it does not
-terminate, so no consumer can answer "who is in this?" — not netgraph, not the
+terminate, so no consumer can answer "who is in this?" — not netviz, not the
 directory the inventory is applied to, not the person reading the file. Nesting
 is the whole point of groups and the loop is its one failure mode, so it is
 checked rather than hoped for.
 
 **Suppress with** `E045` / `NG-S012`, or an annotation on any group in the loop.
-Suppressing it does not make the membership computable; it only stops netgraph
+Suppressing it does not make the membership computable; it only stops netviz
 saying so.
 
 #### `E046` — duplicate account identifier
@@ -1157,7 +1157,7 @@ exist. Neither shows up as a conflict anywhere except here.
 
 **Suppress with** `E046` / `NG-S013`, or an annotation on either claimant. The
 one defensible case is an estate that deliberately reuses a uid across two
-disjoint systems netgraph models as one tree; naming the two accounts apart is
+disjoint systems netviz models as one tree; naming the two accounts apart is
 the better fix, because every export of this inventory has the same problem.
 
 ### Warnings
@@ -1166,7 +1166,7 @@ the better fix, because every export of this inventory has the same problem.
 
 *Severity: error.*
 
-An element carries `netgraph/redundancy: gateway` — a promise that no *single*
+An element carries `netviz/redundancy: gateway` — a promise that no *single*
 failure can cut it off from its default gateway — and the topology does not keep
 it. The finding names every failure that would: each cut vertex and each bridge
 lying between the element and the gateway, by the name a person would use for
@@ -1199,7 +1199,7 @@ removed it.
 
 **How it is decided.** "Survives any single failure" is exactly "two-connected",
 so the check is a search for the separators between the two elements
-([`netgraph.connectivity.separators`](../src/netgraph/connectivity.py)) rather
+([`netviz.connectivity.separators`](../src/netviz/connectivity.py)) rather
 than a simulation — an exact answer in one pass over the graph instead of an
 approximate one in a thousand. Two cables between the same pair of devices count
 as two: cutting one leaves the other. A run through a patch panel is one path,
@@ -1210,15 +1210,15 @@ usually to drop the expectation: an annotation claiming redundancy that does not
 exist is worse than no annotation, because it reads in review as though somebody
 checked.
 
-**See also.** [`netgraph impact`](commands/impact.md), which reports this rule
-alongside the simulation that explains it, and `netgraph impact --spof`, which
+**See also.** [`netviz impact`](commands/impact.md), which reports this rule
+alongside the simulation that explains it, and `netviz impact --spof`, which
 finds the same separators without being asked about a particular element.
 
 #### `E048` — declared power redundancy is not met
 
 *Severity: error.*
 
-An element carries `netgraph/redundancy: power` — a promise that no *single*
+An element carries `netviz/redundancy: power` — a promise that no *single*
 failure can switch it off — and the feeds do not keep it. The finding names
 every source whose loss would take the element with it.
 
@@ -1717,7 +1717,7 @@ endpoint is not. Either the underlay is missing an endpoint or the overlay has
 one too many.
 
 **Suppress with** `W125` / `NG-T006`, or an annotation on either tunnel or on
-the stranded element. The legitimate case is an underlay that netgraph only
+the stranded element. The legitimate case is an underlay that netviz only
 partly models — a provider MPLS cloud declared as a two-ended tunnel between the
 sites that matter.
 
@@ -1733,11 +1733,11 @@ off the payload the overlay can carry. VXLAN costs 50 bytes, WireGuard 80, IPsec
 about 73, GRE 24. An overlay MTU that ignores them produces packets the underlay
 has to fragment or drop, which is the classic "small transfers work, large ones
 hang" failure — invisible until someone copies a big file, and by then nobody
-suspects the diagram. `netgraph list tunnels` prints the stack the budget is
+suspects the diagram. `netviz list tunnels` prints the stack the budget is
 computed over.
 
 **Suppress with** `W126` / `NG-T011`, or an annotation on either tunnel. The
-overheads netgraph uses are the widely published worst case over IPv4; a
+overheads netviz uses are the widely published worst case over IPv4; a
 deployment that has measured its own and knows it fits is the legitimate case.
 
 #### `W127` — tunnel carries traffic in the clear
@@ -1759,7 +1759,7 @@ some other way.
 
 **Suppress with** `W127` / `NG-T012`, or an annotation on the tunnel. An
 inventory that is entirely one data centre fabric will want
-`ignore = ["W127"]` in `netgraph.toml`.
+`ignore = ["W127"]` in `netviz.toml`.
 
 #### `W128` — tunnel interface named by no tunnel
 
@@ -1825,7 +1825,7 @@ that is one address claimed twice, and
 [`E004`](#e004--duplicate-ip-address) say it more sharply, with the offending
 address named.
 
-Reported by [`netgraph ipam`](ipam.md) as the overlapping-prefix conflict.
+Reported by [`netviz ipam`](ipam.md) as the overlapping-prefix conflict.
 
 **Suppress with** `W130` / `NG-A010`, or an annotation on any element addressed
 in the prefix. The legitimate case is a deliberately duplicated plan — two
@@ -1848,7 +1848,7 @@ takes: a `/16` where a `/24` was meant.
 As with [`W130`](#w130--prefix-claimed-by-two-broadcast-domains), only
 interfaces that declare a `vlan` block are compared.
 
-Reported by [`netgraph ipam`](ipam.md) as the nested-prefix conflict.
+Reported by [`netviz ipam`](ipam.md) as the nested-prefix conflict.
 
 **Suppress with** `W131` / `NG-A011`, or an annotation on any element addressed
 in either prefix. The legitimate case is a summary address deliberately
@@ -1874,7 +1874,7 @@ IPv4 is still reported: the IPv4 half is still broken. Both ends are resolved
 through the LAG master first (§10.6), and a cable landing on an interface with
 no socket is left to [`E012`](#e012--cable-terminates-on-an-interface-with-no-socket).
 
-Reported by [`netgraph ipam`](ipam.md) as the outside-every-declared-prefix
+Reported by [`netviz ipam`](ipam.md) as the outside-every-declared-prefix
 conflict.
 
 **Suppress with** `W132` / `NG-A012`, or an annotation on either element. The
@@ -1913,7 +1913,7 @@ overlap. "One broadcast domain" is read as both halves of the phrase: the two
 elements are joined by the topology, *and* the radios put a common VLAN on the
 air — an SSID with no `vlan` counting as the untagged domain. VLAN 10 on two
 unconnected islands is two domains that share a number, exactly as in
-`netgraph.graph.broadcast_domains`.
+`netviz.graph.broadcast_domains`.
 
 **Why it matters.** Two access points bridging one domain are there to extend
 each other's coverage, and that only works if they are on different
@@ -1925,7 +1925,7 @@ prints both frequency spans so the gap, or the lack of one, is visible.
 
 A warning rather than an error, for two reasons. A deliberate same-channel
 deployment exists — a repeater has no choice but to sit on its parent's channel
-— and the schema records no geometry, so netgraph cannot know whether the two
+— and the schema records no geometry, so netviz cannot know whether the two
 are three metres or three floors apart.
 
 Overlap is computed by centring `width_mhz` on the primary channel; the true
@@ -1944,7 +1944,7 @@ end of the session cannot be found.
 **Why it matters.** A warning rather than an error, deliberately: a perfectly
 correct eBGP session towards a transit provider points at an address on *their*
 router, which is not an element of this inventory and never will be. What the
-warning says is what is lost — netgraph cannot check the AS numbers or the
+warning says is what is lost — netviz cannot check the AS numbers or the
 reachability of the far end (`E035`), and the routing view has nothing to draw
 the edge to, so the session is listed in the graph's dropped-link report instead.
 
@@ -2016,7 +2016,7 @@ line inside the layout document that holds it.
 Only *element addresses* are judged. A derived node has an id no document
 declares — `subnet:10.0.0.0/24`, `tunnel:site/wg0`, `rack:hq/comms/r1` — and
 whether one still exists is a question about a particular drawing rather than
-about the inventory, so those are left alone here. `netgraph layout --prune`
+about the inventory, so those are left alone here. `netviz layout --prune`
 builds the drawing and answers it, which is why a prune removes a little more
 than this reports. A group key is a namespace, and the inventory does know every
 namespace it has, so those are checked.
@@ -2029,12 +2029,12 @@ and they accumulate — a layout file that is half history is one nobody trusts 
 say where anything is.
 
 A warning rather than an error, deliberately, and this one is not a close call:
-deleting a switch must not make `netgraph validate` fail. The whole point of
+deleting a switch must not make `netviz validate` fail. The whole point of
 keeping geometry in a sidecar is that the model can be changed without asking
 the diagram's permission.
 
 **Suppress with** `W138` / `NG-Y001`, or an annotation on the layout document.
-The fix is normally `netgraph layout --prune`, which drops exactly these
+The fix is normally `netviz layout --prune`, which drops exactly these
 entries and writes nothing else.
 
 #### `W139` — group with no members
@@ -2082,27 +2082,27 @@ who was on a project — rather than a grant of access.
 
 *Severity: warning.*
 
-A `netgraph/redundancy` annotation names something this build does not grade, or
+A `netviz/redundancy` annotation names something this build does not grade, or
 names it on an element there is nothing to grade. Two shapes:
 
-* an **unrecognised token** — a typo, or an expectation a newer netgraph
+* an **unrecognised token** — a typo, or an expectation a newer netviz
   understands. The finding echoes the token verbatim and lists what is accepted;
 * an expectation on an element that **owns no interfaces and takes no power** — a
   cable, a tunnel, a user, a group. There is no topology and no feed to hold it
   to, so the annotation grades nothing.
 
 A warning rather than an error on purpose. An annotation is where a newer
-netgraph will put things this build has never heard of, and refusing to load an
+netviz will put things this build has never heard of, and refusing to load an
 inventory because of a word in a comment-shaped field would make the annotation
 useless for exactly the forward compatibility it exists for.
 
 **Why it matters.** An expectation nothing grades is a promise nobody is
 keeping, and it is worse than silence: it reads in review as though the property
 were being checked. The failure mode is a pull request approved because
-`netgraph/redundancy: gatway` was in the diff.
+`netviz/redundancy: gatway` was in the diff.
 
 **Suppress with** `W141`, or an annotation on the element — appropriate when the
-inventory is shared with a newer netgraph that does understand the token.
+inventory is shared with a newer netviz that does understand the token.
 
 #### `W142` — annotation about something that is gone
 
@@ -2115,7 +2115,7 @@ The finding names the annotation, the reference it could not resolve, and the
 line inside the document that holds it.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: why-two-uplinks
@@ -2138,15 +2138,15 @@ reader who needs it is the one who will act on it.
 
 A warning rather than an error, and this one is not a close call. An annotation
 is presentational, and §21's central promise is that it is **barred from
-changing what the tool concludes**: adding a note cannot move a hop in `netgraph
+changing what the tool concludes**: adding a note cannot move a hop in `netviz
 path`, cannot appear in a generated configuration, and cannot fail a build. A
 rule about one that could fail a build would be exactly the leak that promise
-exists to prevent. Deleting a switch must not stop `netgraph validate` because
+exists to prevent. Deleting a switch must not stop `netviz validate` because
 somebody once wrote a note about it.
 
 **Suppress with** `W142` / `NG-G001`, or an annotation on the note or area
 itself — an annotation document carries `metadata.annotations` like any other,
-and `netgraph/ignore` on one silences findings about it. The legitimate case is
+and `netviz/ignore` on one silences findings about it. The legitimate case is
 a note about equipment that has been removed and whose removal is the point:
 "the old core switch sat here; the fibre it used is still in the duct". The fix
 otherwise is to re-point the anchor or drop the member.
@@ -2159,7 +2159,7 @@ An `area` whose `selector` matches no element of the inventory. The box would be
 drawn round an empty set, so it is not drawn at all.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: dmz
@@ -2203,7 +2203,7 @@ The element is drawn fully transparent, so nothing appears where it is — while
 every cable that lands on it is still drawn to the empty space it occupies.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-annexe
@@ -2247,7 +2247,7 @@ are compared after the names are resolved, so `navy` and `#1e3a8a` are one
 colour written two ways and are reported as such.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-core
@@ -2272,7 +2272,7 @@ it can be read.
 keeps its shape, its icon, its position and its links, so the diagram looks
 complete and one box is simply anonymous — and the reader who cannot name it has
 no way to tell whether the label failed or the element never had one. Nothing
-downstream repairs it, either: netgraph draws the colours the document asks for
+downstream repairs it, either: netviz draws the colours the document asks for
 and never picks a contrasting one on your behalf, so the mistake survives every
 render until somebody looks at the picture.
 
@@ -2311,7 +2311,7 @@ end of a veth pair and forgotten on the other — which is
 
 **Suppress with** `W146` / `NG-N026`, or an annotation on the device. An
 inventory that declares namespaces before their contents should say
-`ignore = ["W146"]` in `netgraph.toml` once.
+`ignore = ["W146"]` in `netviz.toml` once.
 
 #### `W147` — policy rule looks up an empty table
 
@@ -2526,7 +2526,7 @@ hand-written address is the kind that gets duplicated into
 
 **Suppress with** `I001` / `NG-I010`, or an annotation on the element. If an
 inventory uses locally administered addresses throughout, `ignore = ["I001"]`
-in `netgraph.toml` is the right place to say so once.
+in `netviz.toml` is the right place to say so once.
 
 #### `I002` — enabled interface terminates no cable
 
@@ -2549,10 +2549,10 @@ possible without walking to the rack.
 still, say `enabled: false` on the port: the finding goes away *and* the next
 reader learns that the port is spare on purpose. That is what the example
 inventories do for their spare switch ports; their WAN interfaces, which face an
-ISP that is not an element, carry a `netgraph/ignore` annotation instead.
+ISP that is not an element, carry a `netviz/ignore` annotation instead.
 
 An inventory that models patch panels or fully populated switches will see a lot
-of these. `ignore = ["I002"]` in `netgraph.toml` turns the whole rule off for
+of these. `ignore = ["I002"]` in `netviz.toml` turns the whole rule off for
 that inventory in one line.
 
 #### `I003` — tunnel on a non-standard port
@@ -2570,7 +2570,7 @@ likely to have been copied from the tunnel next to it in the file.
 
 **Suppress with** `I003` / `NG-T015`, or an annotation on the tunnel. An
 inventory that moves every tunnel off its default port should say
-`ignore = ["I003"]` in `netgraph.toml` once.
+`ignore = ["I003"]` in `netviz.toml` once.
 
 #### `I004` — person in no group
 
@@ -2589,7 +2589,7 @@ that was *meant* to be in a group and is not looks exactly like this.
 
 **Suppress with** `I004` / `NG-S016`, or an annotation on the user. An inventory
 that models people without modelling groups at all should say
-`ignore = ["I004"]` in `netgraph.toml` once.
+`ignore = ["I004"]` in `netviz.toml` once.
 
 #### `I005` — veth pair crosses no boundary
 
@@ -2608,18 +2608,18 @@ a link, and leaves a namespace nothing reaches (which is then
 
 **Suppress with** `I005` / `NG-N027`, or an annotation on the device. A host that
 joins bridges this way as a matter of course should say `ignore = ["I005"]` in
-`netgraph.toml` once.
+`netviz.toml` once.
 
 ## Fixing a finding
 
 Some of these rules describe a problem whose repair the inventory already
 determines. A layout document places a switch that has been deleted; there is
-nothing to decide, the entry is dead. `netgraph validate --fix` applies exactly
+nothing to decide, the entry is dead. `netviz validate --fix` applies exactly
 those repairs and reports everything else:
 
 <!-- norun: 'inventory' is an illustrative tree, chosen to show one fix and one refusal -->
 ```console
-$ netgraph -i inventory validate --fix
+$ netviz -i inventory validate --fix
 fixed 2 problems:
   W108  remove the MAC address from loopback sw-a:lo0
   W138  drop 'ghost-device' from the l1 view of layout 'layout'
@@ -2631,7 +2631,7 @@ wrote 1 file: net.yaml
 ```
 
 `--fix --dry-run` prints the unified diff instead and writes nothing. Writes go
-through [the same path as `netgraph edit`](editing.md), so comments, key order
+through [the same path as `netviz edit`](editing.md), so comments, key order
 and quoting survive: only the lines the repair is about change.
 
 **A fix never makes an inventory worse.** Each one is applied on its own and the
@@ -2651,7 +2651,7 @@ the same operations as one logged, revertible gesture.
 
 ### What is fixable
 
-Generated from `netgraph.fixes.FIXES`, so this table cannot drift from the code.
+Generated from `netviz.fixes.FIXES`, so this table cannot drift from the code.
 
 <!-- generated: fix-index -->
 | Rule | Severity | What `--fix` does | `--choose` |
@@ -2661,11 +2661,11 @@ Generated from `netgraph.fixes.FIXES`, so this table cannot drift from the code.
 | [`W113`](#w113--undeclared-vlan-referenced) | warning | Adds the VLANs the port is a member of to the device's 'vlans' database. | — |
 | [`W114`](#w114--native-vlan-missing-from-trunk_vlans) | warning | Lists the native VLAN in 'trunk_vlans', or removes the 'native_vlan'. | `list` — adds the native VLAN to the trunk's VLAN set<br>`drop` — removes 'native_vlan', so the port tags everything it carries |
 | [`W136`](#w136--vrf-with-no-interface-bound-to-it) | warning | Removes the VRF declaration, when nothing at all references it. | — |
-| [`W138`](#w138--stale-diagram-geometry) | warning | Drops the stale entry from the layout document, as 'netgraph layout --prune' would. | — |
+| [`W138`](#w138--stale-diagram-geometry) | warning | Drops the stale entry from the layout document, as 'netviz layout --prune' would. | — |
 | [`W140`](#w140--departed-user-still-in-a-group) | warning | Removes the departed account from the group, unless it is the last member. | — |
 <!-- /generated -->
 
-`netgraph rules --fixable` prints the same table.
+`netviz rules --fixable` prints the same table.
 
 ### What is not, and why
 
@@ -2682,7 +2682,7 @@ Three kinds of problem look mechanical and are not:
   read. Those are reported with the rule column `load` and repaired by hand.
 * **A spelling the loader has already normalised.** A MAC written `00-11-22-…`
   or a prefix written `10.0.0.1/255.255.255.0` is canonicalised on load, so no
-  finding is ever raised about it. [`netgraph fmt`](commands/fmt.md) rewrites the
+  finding is ever raised about it. [`netviz fmt`](commands/fmt.md) rewrites the
   file itself.
 
 ## Suppressing a rule
@@ -2693,7 +2693,7 @@ schema rule is a usage error:
 
 <!-- run: rc=2 -->
 ```console
-$ netgraph validate --disable NG-D005
+$ netviz validate --disable NG-D005
 error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, W147, W148, W149, W150, W151, W152, W153, W154, I001, I002, I003, I004, I005, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
@@ -2704,15 +2704,15 @@ the same rule — plus the wildcards `*`, `all` and `any`.
 
 <!-- norun: flag forms with trailing shell comments, and neither line names an inventory -->
 ```bash
-netgraph validate --disable W103 --disable NG-C010   # repeatable
-netgraph validate --strict                           # warnings become errors
+netviz validate --disable W103 --disable NG-C010   # repeatable
+netviz validate --strict                           # warnings become errors
 ```
 
-`--disable` adds to whatever `netgraph.toml` already ignores; it cannot
+`--disable` adds to whatever `netviz.toml` already ignores; it cannot
 re-enable a rule the file disabled. `--strict` can only turn strictness on —
 the file decides otherwise.
 
-### 2. Per inventory, in `netgraph.toml`
+### 2. Per inventory, in `netviz.toml`
 
 The file sits at the root of the inventory tree and is entirely optional.
 
@@ -2734,7 +2734,7 @@ to `warning` is still promoted to `error` under `--strict`.
 An unknown rule id in this file is an error, and so is an unknown key inside
 `[validate]`: a suppression that silently applies to nothing would send you
 hunting for a setting that never took effect. Unknown *top-level* tables are
-left alone, so a file shared with a later netgraph version still loads.
+left alone, so a file shared with a later netviz version still loads.
 
 ### 3. Per element, with an annotation
 
@@ -2742,11 +2742,11 @@ left alone, so a file shared with a later netgraph version still loads.
 metadata:
   name: spare-switch
   annotations:
-    netgraph/ignore: "W103, E004"      # or "*" for every rule
+    netviz/ignore: "W103, E004"      # or "*" for every rule
 ```
 
-Ids may be separated by commas, semicolons or spaces. `netgraph.dev/ignore` is
-accepted as well as `netgraph/ignore`.
+Ids may be separated by commas, semicolons or spaces. `netviz.dev/ignore` is
+accepted as well as `netviz/ignore`.
 
 Because a finding names every element it involves, annotating **either end** of
 a cable suppresses a finding about that cable, and annotating the cable
@@ -2781,7 +2781,7 @@ suggest, following §10.10:
   warning, because a multicast source address is not a design decision at all —
   no interface can have one.
 
-Re-grade any of them in `netgraph.toml` if your inventory is the exception.
+Re-grade any of them in `netviz.toml` if your inventory is the exception.
 
 Seven further rules carry a carve-out that §10 does not spell out, in each case
 because the rule as written would fire on the configuration everybody has:

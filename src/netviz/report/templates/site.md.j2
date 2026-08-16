@@ -1,0 +1,14 @@
+{% import "macros.md.j2" as m %}
+# {{ page.title | md }}
+
+{{ page.summary | md }}
+
+[← {{ meta.title | md }}]({{ link(page.parent) }})
+
+
+{% for section in page.sections %}
+{{ m.section(section, link) }}
+{% endfor %}
+---
+
+netviz {{ meta.version }}{% if meta.generated_at %}, generated {{ meta.generated_at }}{% endif %}{% if meta.revision %}, inventory revision {{ meta.revision }} ({{ meta.revision_state }}){% endif %}.

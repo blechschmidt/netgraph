@@ -3,7 +3,7 @@
 # The chain is walked from the lowest priority upwards and the first terminal
 # match decides. Rule 100 names no selector and drops, so it closes the forward
 # chain; rule 200 was meant to open a hole in it and is never consulted.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: firewall
 metadata:
   name: fw-a
@@ -30,7 +30,7 @@ spec:
         dst_ports: ['22']
         action: accept
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-b
@@ -42,7 +42,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

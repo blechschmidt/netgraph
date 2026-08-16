@@ -1,12 +1,12 @@
 # Drawing the inventory
 
-Every diagram netgraph produces comes out of one pipeline: a layer decides which
+Every diagram netviz produces comes out of one pipeline: a layer decides which
 question the picture answers, filters and aggregation decide how much of the
 network is in it, and a format decides what the artefact is. This page describes
-that pipeline once. [`netgraph render`](commands/render.md) writes a file with
-it, [`netgraph watch`](commands/watch.md) keeps that file current while you edit,
-[`netgraph web`](commands/web.md) serves it, and
-[`netgraph path --highlight`](paths.md#drawing-the-answer---highlight) draws a
+that pipeline once. [`netviz render`](commands/render.md) writes a file with
+it, [`netviz watch`](commands/watch.md) keeps that file current while you edit,
+[`netviz web`](commands/web.md) serves it, and
+[`netviz path --highlight`](paths.md#drawing-the-answer---highlight) draws a
 traced route over it — all four take the same options and mean the same things by
 them.
 
@@ -76,9 +76,9 @@ two is a usage error rather than a silently discarded flag:
 
 <!-- run: rc=2 -->
 ```console
-$ netgraph -i examples/home-lab render --layer l1 --layer l2 -f svg
-Usage: netgraph render [OPTIONS]
-Try 'netgraph render --help' for help.
+$ netviz -i examples/home-lab render --layer l1 --layer l2 -f svg
+Usage: netviz render [OPTIONS]
+Try 'netviz render --help' for help.
 
 Error: --layer was given 2 times, but svg output holds one layer; render each one to its own file, or use a format that holds several (html)
 ```
@@ -99,13 +99,13 @@ which is what makes a panel free to model.
 
 The splice is not a loss of information. [`-f json`](#the-json-export) exports a
 `patch` object naming the segments and the positions,
-[`netgraph path`](paths.md#patch-panels) names the panels on the link line — as a
+[`netviz path`](paths.md#patch-panels) names the panels on the link line — as a
 pass-through, never as a hop, because a panel takes no decision — and an SVG
 tooltip lists the same record:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/patch-room path sw-core-01 srv-app-01
+$ netviz -i examples/patch-room path sw-core-01 srv-app-01
 ...
    1  network/sw-core-01  [switch]
       out GigabitEthernet1/0/7
@@ -133,7 +133,7 @@ prefixes they are addressed in, each edge labelled with the interface and its
 address](images/home-lab-l3.svg)
 
 <sub>The same inventory as the diagram at the top of this page, at layer 3:
-`netgraph -i examples/home-lab render --layer l3 --title "home-lab — layer 3" -f svg -o docs/images/home-lab-l3.svg`.
+`netviz -i examples/home-lab render --layer l3 --title "home-lab — layer 3" -f svg -o docs/images/home-lab-l3.svg`.
 The router's loopback and its ISP hand-off are prefixes of their own; the switch
 and the access point appear only because their management SVIs hold an
 address.</sub>
@@ -155,7 +155,7 @@ What layer 3 leaves out is deliberate:
   table are two nodes, each labelled with its instance
   ([`docs/schema.md` §16.1](schema.md#161-vrfs--routing-instances)).
 
-Two problems are visible only from the derived layers, and `netgraph validate`
+Two problems are visible only from the derived layers, and `netviz validate`
 reports both:
 
 | Rule | Fires when |
@@ -163,8 +163,8 @@ reports both:
 | [`W105`](validation-rules.md#w105--subnet-with-a-single-member) | Exactly one element is addressed in a prefix — a typo'd prefix length, or a neighbour nobody wrote down. Host routes and point-to-point prefixes are exempt. |
 | [`W106`](validation-rules.md#w106--one-address-claimed-twice-in-a-subnet) | Two elements claim the same address in one prefix from different VLANs, so the layer-3 view cannot tell which of them answers. |
 
-[`netgraph list subnets`](commands/list.md) prints the same grouping as a table,
-[`netgraph ipam`](ipam.md) sizes it and reports what conflicts, and
+[`netviz list subnets`](commands/list.md) prints the same grouping as a table,
+[`netviz ipam`](ipam.md) sizes it and reports what conflicts, and
 `render --layer l3 -f json` exports it with a `type` discriminator on every node
 (`element` or `subnet`) so a consumer can tell a derived prefix from a declared
 device.
@@ -179,7 +179,7 @@ joined to five tunnel nodes, with the VXLAN and GRE tunnels each drawn running
 inside the IPsec tunnel](images/overlay.svg)
 
 <sub>Produced from [`examples/overlay`](../examples/overlay) with
-`netgraph -i examples/overlay render --layer overlay --group-by-namespace --title "overlay — encapsulation" -f svg -o docs/images/overlay.svg`.</sub>
+`netviz -i examples/overlay render --layer overlay --group-by-namespace --title "overlay — encapsulation" -f svg -o docs/images/overlay.svg`.</sub>
 
 A tunnel has to become a node there because nesting is a relation between two
 *links*, and a link cannot end on a link — which is why `vxlan over ipsec` is
@@ -196,7 +196,7 @@ id their peers know them by; edges are the sessions and adjacencies between them
 
 <!-- norun: an excerpt of the flowchart, elided in the middle -->
 ```console
-$ netgraph -i examples/campus render --layer routing -f mermaid
+$ netviz -i examples/campus render --layer routing -f mermaid
 n3(["rtr-north-core-01<br/>[router]<br/>AS 65001<br/>id 192.0.2.1<br/>…"])
 …
 n3 -- "iBGP 65001 · iBGP to rtr-south-core-01" --- n7
@@ -213,7 +213,7 @@ differently:
   dropped link rather than drawn to a node that does not exist, and as
   [`W135`](validation-rules.md#w135--bgp-neighbour-is-not-in-the-inventory) by
   the validator.
-* an **OSPF adjacency** is *discovered*, so netgraph derives it the way the
+* an **OSPF adjacency** is *discovered*, so netviz derives it the way the
   protocol does: two interfaces that run OSPF in the same area and are addressed
   in one subnet form one, drawn dotted and labelled with the area. Deriving it
   from the addressing rather than from the cables is what makes it right for two
@@ -261,9 +261,9 @@ with an error naming the formats that can:
 
 <!-- run: rc=2 -->
 ```console
-$ netgraph -i examples/patch-room render --layer rack -f mermaid
-Usage: netgraph render [OPTIONS]
-Try 'netgraph render --help' for help.
+$ netviz -i examples/patch-room render --layer rack -f mermaid
+Usage: netviz render [OPTIONS]
+Try 'netviz render --help' for help.
 
 Error: --layer rack draws a front elevation — one row per rack unit, empty units included — and mermaid output has no way to express one; render it as dot, svg, html, png, pdf, json
 ```
@@ -318,7 +318,7 @@ every output format can draw it, Mermaid included:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/patch-room render --layer power -f mermaid
+$ netviz -i examples/patch-room render --layer power -f mermaid
 flowchart TB
     n0["ap-ceiling-01<br/>[switch]<br/>22 W (max 25.5 W)<br/>powered over PoE"]
 ...
@@ -363,7 +363,7 @@ and drawing both graphs at once produces a picture in which neither is readable.
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/home-lab render --layer identity -f mermaid
+$ netviz -i examples/home-lab render --layer identity -f mermaid
 flowchart TB
     n0(("ana<br/>[user]<br/>Ana Brandt<br/>ana@example.invalid<br/>uid 1000<br/>1 ssh key"))
     n1(("kit<br/>[user]<br/>Kit Brandt<br/>kit@example.invalid<br/>uid 1001"))
@@ -384,7 +384,7 @@ rendered 5 node(s) and 3 edge(s) as mermaid at layer identity
 
 `household` holds `admins`, so `ana` is in it without being listed twice — which
 is what the nesting is for, and what
-[`netgraph list groups`](commands/list.md#the-subject-argument) puts a number on.
+[`netviz list groups`](commands/list.md#the-subject-argument) puts a number on.
 
 ### `netns`: the stacks inside a machine
 
@@ -422,7 +422,7 @@ has somewhere to arrive.
 
 <!-- norun: writes containers.svg into the reader's directory -->
 ```console
-$ netgraph -i examples/containers render --layer netns -o containers.svg
+$ netviz -i examples/containers render --layer netns -o containers.svg
 ```
 
 [`examples/docker`](../examples/docker/) is the same view at the scale a
@@ -473,7 +473,7 @@ leaving a router's behind.
 
 <!-- norun: writes policy.svg into the reader's directory -->
 ```console
-$ netgraph -i examples/campus render --layer security -o policy.svg
+$ netviz -i examples/campus render --layer security -o policy.svg
 ```
 
 ## Filters: drawing less of the network
@@ -495,7 +495,7 @@ themselves.
 | `--select QUERY` | no | Elements a [selector query](query.md) matches. |
 
 `--select` is the general case, and the six options above are **sugar** for it —
-each denotes a query, and `netgraph query --explain` with the flags prints which:
+each denotes a query, and `netviz query --explain` with the flags prints which:
 
 | Flag | Query |
 |---|---|
@@ -511,7 +511,7 @@ cannot say "every access switch with no uplink", and `--select` can:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus render --select 'label.role = access and label.site = north' -f mermaid --no-annotations
+$ netviz -i examples/campus render --select 'label.role = access and label.site = north' -f mermaid --no-annotations
 flowchart TB
     n0["sw-north-acc-01<br/>[switch]<br/>10.1.99.11/24<br/>vlans: 1,10,20,30,99"]
     n1["sw-north-acc-02<br/>[switch]<br/>10.1.99.12/24<br/>vlans: 1,10,20,30,99"]
@@ -524,7 +524,7 @@ rendered 3 node(s) and 0 edge(s) as mermaid at layer l1
 
 A query and the flags are combined with AND, exactly as two flags are. The same
 expression narrows `watch`, `show`, `list`, `export` and `report`, and is what
-`netgraph query` answers and the editor's search box takes —
+`netviz query` answers and the editor's search box takes —
 [`docs/query.md`](query.md) is the grammar, the attribute vocabulary and a
 cookbook.
 
@@ -539,7 +539,7 @@ neither.
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/home-lab render --neighbors-of sw-home --depth 1 --kind switch --kind server -f mermaid
+$ netviz -i examples/home-lab render --neighbors-of sw-home --depth 1 --kind switch --kind server -f mermaid
 flowchart TB
     n0[("srv-nas<br/>[server]<br/>192.168.10.10/24<br/>2001:db8:10::10/64<br/>vlans: 10")]
     n1["sw-home<br/>[switch]<br/>192.168.10.2/24<br/>vlans: 10,20"]
@@ -573,7 +573,7 @@ all get the same answer.
 
 <!-- norun: writes an SVG into the reader's directory -->
 ```bash
-netgraph -i examples/campus render --collapse-depth 1 --group-by-namespace \
+netviz -i examples/campus render --collapse-depth 1 --group-by-namespace \
   --title "campus — one node per site" -f svg -o campus-collapsed.svg
 ```
 
@@ -589,7 +589,7 @@ tier inside each site.
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus render --collapse-depth 1 -f mermaid
+$ netviz -i examples/campus render --collapse-depth 1 -f mermaid
 flowchart TB
     n0[/"sites/north<br/>[namespace]<br/>8 elements: 2 computers, 1 router, 1 server, 4 switches<br/>7 links inside<br/>vlans: 1,10,20,30,99<br/>10.1.0.0/30<br/>10.1.10.0/24<br/>10.1.20.0/24<br/>10.1.99.0/24<br/>(+9 more)"\]
 ...
@@ -611,7 +611,7 @@ Nothing is thrown away, only folded:
 
 <!-- norun: a shell pipeline -->
 ```console
-$ netgraph -i examples/campus render --collapse-depth 1 -f json |
+$ netviz -i examples/campus render --collapse-depth 1 -f json |
     jq '.nodes[0].aggregate | {namespace, elementCount, countsByKind}'
 {
   "namespace": "sites/north",
@@ -647,10 +647,10 @@ configuration, so it is opt-in and the resulting edge is *not* called a LAG.
 
 <!-- norun: the output paths are illustrative -->
 ```bash
-netgraph render --collapse-depth 1 -f svg -o overview.svg      # sites only
-netgraph render --collapse sites/north --collapse sites/south  # two of three
-netgraph render --collapse-depth 1 --bundle-links -f svg       # one line per pair
-netgraph render --no-bundle-links -f dot -o cabling.dot        # every cable
+netviz render --collapse-depth 1 -f svg -o overview.svg      # sites only
+netviz render --collapse sites/north --collapse sites/south  # two of three
+netviz render --collapse-depth 1 --bundle-links -f svg       # one line per pair
+netviz render --no-bundle-links -f dot -o cabling.dot        # every cable
 ```
 
 Filters and aggregation compose, in that order: the filter decides what exists,
@@ -665,31 +665,31 @@ the shape for a picture:
 
 <!-- norun: writes an SVG into the reader's directory -->
 ```bash
-netgraph render --icons cisco --layer l2 -f svg -o topology.svg
+netviz render --icons cisco --layer l2 -f svg -o topology.svg
 ```
 
 ![The home-lab example drawn with the bundled cisco theme: a router cylinder,
 two switch slabs, three monitors, a server tower and a dongle, joined by
 labelled links](images/home-lab-icons.svg)
 
-<sub>`netgraph -i examples/home-lab render --layer l2 --icons cisco --title "home-lab — layer 2, cisco icons" -f svg -o docs/images/home-lab-icons.svg`.</sub>
+<sub>`netviz -i examples/home-lab render --layer l2 --icons cisco --title "home-lab — layer 2, cisco icons" -f svg -o docs/images/home-lab-icons.svg`.</sub>
 
 Only *how* a node is drawn changes. The labels, the addresses, the VLANs, the
 edges and every filter behave exactly as they do without a theme, and a kind the
 theme has no picture for keeps its plain shape rather than disappearing.
 
-**`cisco`** ships with netgraph and covers every kind that becomes a node: the
+**`cisco`** ships with netviz and covers every kind that becomes a node: the
 eight hardware kinds — `pdu` included, so [`--layer power`](#power-the-pdus-and-what-they-feed)
 draws strips rather than boxes — the subnet clouds of `--layer l3`, and the tunnel
 conduit of `--layer overlay`. The artwork is drawn in the topology idiom Cisco made the
-industry convention and is netgraph's own, under the same MIT licence as the
+industry convention and is netviz's own, under the same MIT licence as the
 rest of the package — Cisco's published icon library is copyrighted and is not
 redistributed here.
 
 The tunnel glyph is a **conduit**: a bore with a payload going in one end and
 coming out the other. There is one for every tunnel type, because encapsulation
 is what they have in common and the type is on the label anyway, and it says
-nothing at all about confidentiality — a lock would put netgraph's guess about a
+nothing at all about confidentiality — a lock would put netviz's guess about a
 security property into a picture, and a reader who did not recognise the glyph
 would read its absence as "nothing to say". That stays a colour and a word: a
 cleartext tunnel is drawn crimson and labelled `cleartext`, and
@@ -707,40 +707,40 @@ with an `.svg`,
 <!-- norun: the paths are illustrative -->
 ```bash
 ls my-icons/          # router.png  switch.png  server.png
-netgraph render --icons ./my-icons -f svg -o topology.svg
+netviz render --icons ./my-icons -f svg -o topology.svg
 ```
 
 Files for kinds you do not cover are simply absent; those nodes keep their plain
 shape, so a set of three icons is a usable theme. `--icons none` turns a theme
 back off, for a wrapper script that always passes the option. When the theme is
-named in [`netgraph.toml`](configuration.md#every-render-setting), a **relative**
+named in [`netviz.toml`](configuration.md#every-render-setting), a **relative**
 directory resolves against the configuration file rather than the working
-directory, so a colleague who runs `netgraph` from a parent folder gets the same
+directory, so a colleague who runs `netviz` from a parent folder gets the same
 icons.
 
 Two details are worth knowing:
 
-* **SVG output is self-contained.** Graphviz references an icon by path; netgraph
+* **SVG output is self-contained.** Graphviz references an icon by path; netviz
   embeds the file into the SVG it hands back, so the diagram still draws in a
   README, an email or the `watch` preview.
 * **`png` and `pdf` want raster icons.** Graphviz reads an SVG image only when it
   was built against librsvg, and those two outputs go through cairo. The bundled
   theme therefore ships each icon as both an SVG and a PNG and picks per format.
   A theme of your own that holds only SVGs still renders `dot` and `svg`; if
-  `png` fails, netgraph says exactly that rather than drawing a diagram with
+  `png` fails, netviz says exactly that rather than drawing a diagram with
   holes in it.
 
 `--icons` is ignored, with a warning, by `-f mermaid` and `-f json`: neither has
 a picture to put an icon in.
 
 **In the editor it is a switch, not a flag.**
-[`netgraph web`](commands/web.md#icons) has an **icons** box in its header:
+[`netviz web`](commands/web.md#icons) has an **icons** box in its header:
 tick it and the diagram redraws as pictures, untick it and the shapes come back,
 without restarting the server. `--icons` still chooses *which* theme — a
 directory is named on the command line and never by a browser — and now also
 says where the switch starts.
 
-[`src/netgraph/render/iconsets/README.md`](../src/netgraph/render/iconsets/README.md)
+[`src/netviz/render/iconsets/README.md`](../src/netviz/render/iconsets/README.md)
 documents the bundled themes from the other side — the naming rule, why each
 kind is present twice, and how to regenerate a PNG after editing its SVG.
 
@@ -785,7 +785,7 @@ is the right default — a diagram nobody has arranged should still be readable 
 but it means the diagram cannot be *arranged*: move a node and the next render
 moves it back.
 
-[`netgraph layout`](commands/layout.md) turns the arrangement into data. It runs
+[`netviz layout`](commands/layout.md) turns the arrangement into data. It runs
 the automatic layout once and stores the coordinates as a `kind: layout`
 document ([`docs/schema.md` §18](schema.md#18-layout-diagram-geometry)); from
 then on the arrangement is the source of truth, and `render` honours it with no
@@ -793,8 +793,8 @@ flag of its own — it is a fact about the inventory, not an option of the drawi
 
 <!-- norun: the first command writes to the inventory -->
 ```bash
-netgraph layout --write          # store the arrangement of the l1 view
-netgraph render -f svg           # ... and it comes back exactly
+netviz layout --write          # store the arrangement of the l1 view
+netviz render -f svg           # ... and it comes back exactly
 ```
 
 What "honours it" means depends on how much is stored, per view:
@@ -809,7 +809,7 @@ A partial arrangement costs **two** Graphviz runs per render — one to place wh
 unplaced, one to draw the completed result — because a single pinned run returns the whole
 drawing scaled onto Graphviz's own canvas, which would move the nodes you placed by hand.
 That is the transient state while an arrangement is being built; a `fixed` view is one run,
-and so is an `auto` one. `netgraph layout --write` closes the gap.
+and so is an `auto` one. `netviz layout --write` closes the gap.
 
 **All four backends agree, by construction.** `svg`, `png` and `pdf` are the same
 Graphviz run; `html` embeds that SVG; and `json` publishes the same coordinates
@@ -822,7 +822,7 @@ stored), a `layout` object per edge (below), and a top-level `layout` carrying
 the mode, the units, the effective `routing` and the group boxes — enough for a
 browser to draw the graph itself without running Graphviz.
 
-**Namespace frames in a fixed layout are drawn by netgraph.** `neato` does not
+**Namespace frames in a fixed layout are drawn by netviz.** `neato` does not
 draw clusters, so when the whole view is arranged the frames come from the stored
 group boxes instead of from the engine — which is more faithful, not less: the
 frame is where you put it. The caption sits centred *above* its frame rather than
@@ -850,15 +850,15 @@ hand-routed cable worth placing — drag a device and it carries its cables alon
 rather than stranding them, and the bends somebody chose stay where they were
 put.
 
-`netgraph layout --write --waypoints` seeds them, which gives a route to drag
+`netviz layout --write --waypoints` seeds them, which gives a route to drag
 rather than a decision to keep, and it also records the `size` of every node a
-stored route leaves from. Those sizes are not decoration: a route netgraph
-computes has to stop at the shape it runs into, and netgraph cannot measure a
+stored route leaves from. Those sizes are not decoration: a route netviz
+computes has to stop at the shape it runs into, and netviz cannot measure a
 label. Without them the route is clipped against a default box — Graphviz's own
 0.75 × 0.5 inch node — so it may stop short of the shape, and the render says
 so.
 
-In [`netgraph web`](commands/web.md) the same thing is a gesture. Click a link
+In [`netviz web`](commands/web.md) the same thing is a gesture. Click a link
 to select it; **double-click** the line to drop a bend where you clicked; drag a
 bend to move it; drag the hollow **midpoint handle** to insert a bend and place
 it in one motion; **right-click** a bend to remove it. From the keyboard, `b`
@@ -882,15 +882,15 @@ the default; `orthogonal` is right angles, the way a patch schedule is drawn;
 A link that pins a style of its own beats the view, which beats the inventory.
 `--routing` on [`render`](commands/render.md), [`watch`](commands/watch.md) and
 [`diff`](commands/diff.md), and `routing` in the `[render]` table of
-[`netgraph.toml`](configuration.md#every-render-setting), set a *default* — so
+[`netviz.toml`](configuration.md#every-render-setting), set a *default* — so
 they change what unpinned links do and leave a link that has decided for itself
-alone. `netgraph layout --write --routing STYLE` records the view's default in
+alone. `netviz layout --write --routing STYLE` records the view's default in
 the document.
 
 How much of that a render can deliver depends on how much of the view is
 arranged, because the two paths to Graphviz are not equally expressive:
 
-* For a **fully arranged** view netgraph computes each route itself — from the
+* For a **fully arranged** view netviz computes each route itself — from the
   node positions, the stored bends and the style — and writes it into the
   Graphviz `pos` attribute. That is the only way a *per-link* style can be
   expressed at all: Graphviz has a graph-wide `splines` and nothing per edge.
@@ -898,14 +898,14 @@ arranged, because the two paths to Graphviz are not equally expressive:
   available (`true`, `ortho`, `line`), so the default reaches the drawing and
   nothing else can.
 
-Rather than emit something broken, netgraph says what it could not honour. Each
+Rather than emit something broken, netviz says what it could not honour. Each
 advisory is phrased as the thing that fixes it, and each is advisory rather than
 fatal — a diagram that is nearly right is worth drawing, and a warning that
 stops a render is a warning nobody leaves turned on:
 
 | When | What it says |
 |---|---|
-| bends are pinned but the view is not fully placed | Graphviz has to route the whole diagram and the bends are lost; `netgraph layout --write` places the rest |
+| bends are pinned but the view is not fully placed | Graphviz has to route the whole diagram and the bends are lost; `netviz layout --write` places the rest |
 | links pin a style the engine-laid-out drawing cannot give them | they are drawn in the graph-wide style like everything else, until the arrangement is pinned |
 | the drawing is orthogonal, Graphviz is laying it out, and the links are labelled | Graphviz will not put a real edge label on an orthogonal route it routed itself, so the labels become `xlabel`s floated near their links |
 
@@ -929,7 +929,7 @@ number.
 **Parallel links are fanned apart, and a self-link is a ring.** Two cables
 between the same pair of devices land on exactly the same line once both ends
 are pinned — Graphviz's own nudging is part of *its* routing, and a fixed
-drawing does none of it. So netgraph fans them itself, 14 points between
+drawing does none of it. So netviz fans them itself, 14 points between
 neighbours, centred: a lone link is not moved at all, and an odd-numbered bundle
 keeps one cable on the direct line between the two devices, which is the one a
 reader traces first. Each member ends up with a line of its own to hover, to
@@ -946,7 +946,7 @@ four VLANs terminating on one switch are four rings rather than one thick one.
 Under `layout`, `waypoints`, `routing` and `label` are what the *inventory
 pinned* — the decisions somebody made, which is what an editor round-trips —
 while `route` (the polyline), `controls` (the same line as cubic Bézier control
-points) and `drawnAs` (the style it came out in) are the line netgraph actually
+points) and `drawnAs` (the style it came out in) are the line netviz actually
 drew. The second group appears only for a fully arranged drawing, because
 anywhere else Graphviz decides it and the export does not know the answer.
 
@@ -955,9 +955,9 @@ anywhere else Graphviz decides it and the export does not know the answer.
 An orthogonal link runs at right angles between the points it is pinned
 through. Left at that it will happily run *across* a switch it is not connected
 to, which is the single most visible thing wrong with a hand-arranged diagram —
-and for a while it was exactly what netgraph did
+and for a while it was exactly what netviz did
 ([`docs/follow-ups.md` §19](follow-ups.md)). It no longer does. For a fully
-arranged, orthogonal drawing, netgraph routes each link **around** the boxes it
+arranged, orthogonal drawing, netviz routes each link **around** the boxes it
 is not attached to.
 
 Three promises, and they are what make this safe to have on by default:
@@ -973,7 +973,7 @@ Three promises, and they are what make this safe to have on by default:
 * **Nothing is written to your files.** A computed route is recomputed on every
   render. It is published beside the authored bends — as `layout.routed` in
   `-f json`, and to the editor canvas — but it stays computed until you say
-  otherwise. In [`netgraph web`](commands/web.md), `Shift-R` (**Pin the computed
+  otherwise. In [`netviz web`](commands/web.md), `Shift-R` (**Pin the computed
   route**) writes it into the layout document as waypoints, at which point it is
   an authored route like any other: handles on every bend, never recomputed.
 
@@ -1004,7 +1004,7 @@ the clearance) — each make the link fall back to the local Z or L and each are
 before, and you are told which link and why.
 
 `--no-avoid`, or `avoid = false` in the `[render]` table of
-[`netgraph.toml`](configuration.md#every-render-setting), turns the whole thing
+[`netviz.toml`](configuration.md#every-render-setting), turns the whole thing
 off and gives back the local rule: faster, entirely predictable, and the right
 answer for a deliberately schematic drawing. `tools/route_crossings.py` prints
 the number of crossings in any inventory with and without it, which is how the
@@ -1050,15 +1050,15 @@ spec:
           routing: straight
 ```
 
-Every node is placed, so the view is `fixed`, so netgraph routes the links
-itself. `netgraph -i tests/fixtures/routed render -f dot` produces
+Every node is placed, so the view is `fixed`, so netviz routes the links
+itself. `netviz -i tests/fixtures/routed render -f dot` produces
 [`tests/fixtures/golden/routed-l1-orthogonal.dot`](../tests/fixtures/golden/routed-l1-orthogonal.dot),
 of which these are the two interesting edges, with the colours and the tooltips
 elided:
 
 <!-- norun: an excerpt of the golden DOT, with most of each attribute list elided -->
 ```console
-$ netgraph -i tests/fixtures/routed render -f dot
+$ netviz -i tests/fixtures/routed render -f dot
 ...
   "routers/rtr-home" -- "switches/sw-home" [..., pos="640,345 640,356.67 640,368.33 640,380 726.67,380 813.33,380 900,380 920.5,380 941,380 961.5,380 961.5,272 961.5,164 961.5,56 951.83,56 942.17,56 932.5,56", lp="817.85,394", label="lan0 -- port1\nH-001\n1Gbps\nvlan 10", ...];
 ...
@@ -1134,7 +1134,7 @@ mxGraph file have to very different degrees:
 | `drawio` | a `container` rectangle behind the nodes | draw.io's own `shape=note` | a frame of swatch rows |
 
 The last row is not a `-f` of `render`: it is
-[`netgraph export drawio`](drawio.md), listed here because it is the fourth
+[`netviz export drawio`](drawio.md), listed here because it is the fourth
 vocabulary the same three kinds have to be said in.
 
 What is *not* per backend is the resolution behind them. Which members survive a
@@ -1164,7 +1164,7 @@ put a rectangle that is not around something.
 
 **In a fixed arrangement it is a background rectangle instead**, exactly as a
 namespace frame is and for the same reason: `neato -n2` draws no clusters, so
-netgraph draws the zone itself, into the graph's `_background`. The rectangle is
+netviz draws the zone itself, into the graph's `_background`. The rectangle is
 `spec.geometry` when the area pins one and otherwise the box enclosing wherever
 the members were actually drawn, grown by the area's `padding` — which is the
 whole difference between naming members and pinning a box: the first follows the
@@ -1191,7 +1191,7 @@ because a missing `pos` reads to the no-op engine as the origin and puts the
 callout on top of whatever the arrangement left in the corner.
 
 **A legend is a cluster holding one `plaintext` table**, so the key gets a frame
-and a grid of swatches without netgraph measuring any text. The title goes
+and a grid of swatches without netviz measuring any text. The title goes
 inside the table rather than on the cluster, because a fixed drawing has no
 cluster to put it on and a caption that vanished from the arranged diagram would
 be a caption that vanished from the drawing somebody had taken most care over.
@@ -1203,7 +1203,7 @@ and it will generally set the key beside the drawing rather than in the corner
 asked for. Nothing in Graphviz pins a cluster to a corner, and the tricks that
 come close — a rank constraint, an invisible edge — move the key by distorting
 the topology, which is a worse trade than a key in the wrong corner. Run
-`netgraph layout --write` to pin the arrangement, after which the corner is
+`netviz layout --write` to pin the arrangement, after which the corner is
 exact.
 
 ### Mermaid: what it cannot say, said in the source
@@ -1238,8 +1238,8 @@ elided:
     ...
     note0 -.- n0
 
-    classDef netgraphNote fill:#fef3c7,stroke:#8b856d,stroke-width:1px,stroke-dasharray:3 2
-    class note0 netgraphNote
+    classDef netvizNote fill:#fef3c7,stroke:#8b856d,stroke-width:1px,stroke-dasharray:3 2
+    class note0 netvizNote
 %% areas are drawn as subgraphs: their colour, border style and padding are not expressible in mermaid
 %% legend 'key' (3 entries) is not drawn: mermaid has no construct for a key that is not part of the graph
 ```
@@ -1277,7 +1277,7 @@ parsing the markdown subset again in the browser.
 
 ### draw.io: shapes that survive a round trip
 
-[`netgraph export drawio`](drawio.md) is the one format that is *edited and
+[`netviz export drawio`](drawio.md) is the one format that is *edited and
 handed back*, so an annotation has to arrive there as **what it is** rather than
 as a picture of it: a note is draw.io's own `shape=note` with an HTML label, an
 area is a `container` rectangle behind the nodes, and a legend is a frame
@@ -1287,7 +1287,7 @@ somebody can edit and one they can only look at. A stakeholder retypes a note in
 place, drags the DMZ and carries the DMZ, and corrects a colour with a click.
 
 Because the cells are native they survive the round trip. Every one carries the
-same identity block a device cell carries, so `netgraph import drawio`
+same identity block a device cell carries, so `netviz import drawio`
 reconciles a dragged note by the machinery that reconciles a dragged switch: a
 move comes back as `spec.geometry` on the note's own document, a retyped label
 as its `spec.text`, a deleted cell as the annotation being deleted. A generated
@@ -1295,7 +1295,7 @@ legend is the deliberate exception — it carries identity so that it can be
 recognised and *ignored*, because writing back a key that was derived from the
 drawing would be writing back the drawing.
 
-Placement happens in netgraph's coordinates before the page frame is computed,
+Placement happens in netviz's coordinates before the page frame is computed,
 so a note pinned above the topmost switch and a legend outside its corner
 enlarge the page instead of being clipped at the margin. Areas are written
 before the nodes, because z-order in mxGraph is document order and a zone
@@ -1315,7 +1315,7 @@ somebody wrote down *about this diagram* and leaving it out has to be asked for.
 Turned off, no backend emits any of them and the output is byte-identical to the
 same inventory with no annotation documents in it — which is what makes it a
 display option and not a filter. It is a rendering-pipeline option today rather
-than a flag on [`netgraph render`](commands/render.md), so the way to draw the
+than a flag on [`netviz render`](commands/render.md), so the way to draw the
 network without its commentary from the command line is to render an inventory
 that does not carry it.
 
@@ -1327,7 +1327,7 @@ none of which changes the drawing:
 
 <!-- norun: writes an SVG into the reader's directory -->
 ```bash
-netgraph render -f svg --element-ids \
+netviz render -f svg --element-ids \
     --link-template 'https://git.example.com/net/blob/main/{file}#L{line}' \
     -o docs/topology.svg
 ```
@@ -1340,11 +1340,11 @@ netgraph render -f svg --element-ids \
 
 `-f dot` writes the attributes because a DOT file is the input to somebody
 else's `dot`; `-f svg` is where they reach a reader. `png` and `pdf` are
-pictures and drop them silently — netgraph warns when you asked for one of the
+pictures and drop them silently — netviz warns when you asked for one of the
 three and picked a format that cannot carry it. `mermaid` and `json` have
 interaction models of their own and ignore all three.
 
-**Tooltips** are the same per-element records [`netgraph web`](commands/web.md)
+**Tooltips** are the same per-element records [`netviz web`](commands/web.md)
 shows in its info boxes, rendered as plain text — one builder, so a committed
 diagram and the live preview cannot disagree. Hovering the switch of the
 [quickstart](getting-started.md) inventory gives:
@@ -1366,7 +1366,7 @@ links (2):
 Every port, including the two the label had no room to annotate, and both
 cables — with the far end, its interface, the medium, the rate and the VLAN.
 
-They work in any browser with no JavaScript: netgraph puts the text in the SVG
+They work in any browser with no JavaScript: netviz puts the text in the SVG
 `<title>` element of each shape, which is the construct browsers have popped up
 since SVG 1.1. The text is bounded — long lists are counted off (`(+12 more)`)
 and the whole is clipped — so a tooltip never covers the diagram it explains.
@@ -1446,10 +1446,10 @@ a terminal. `-o` creates parent directories.
 The usual state of Graphviz on Windows — neither the installer nor
 `choco install graphviz` reliably adds `bin` to `PATH` — and a common one on
 macOS, where a process started outside a login shell does not inherit
-`/opt/homebrew/bin`. netgraph therefore looks in three places, most explicit
+`/opt/homebrew/bin`. netviz therefore looks in three places, most explicit
 first:
 
-1. `NETGRAPH_DOT`, if set, is taken as the full path to the binary.
+1. `NETVIZ_DOT`, if set, is taken as the full path to the binary.
 2. `PATH`, which resolves `dot.exe` on Windows and `dot` elsewhere.
 3. The default install locations for the platform — `C:\Program Files\Graphviz\bin`,
    `/opt/homebrew/bin`, `/usr/local/bin`, `/opt/local/bin`, `/usr/bin`.
@@ -1458,21 +1458,21 @@ So step 3 usually means it works with no configuration at all. When it does not,
 set the variable rather than editing `PATH`:
 
 ```bash
-export NETGRAPH_DOT=/opt/homebrew/bin/dot          # macOS
+export NETVIZ_DOT=/opt/homebrew/bin/dot          # macOS
 ```
 
 ```powershell
-$env:NETGRAPH_DOT = 'C:\Program Files\Graphviz\bin\dot.exe'   # Windows
+$env:NETVIZ_DOT = 'C:\Program Files\Graphviz\bin\dot.exe'   # Windows
 ```
 
-Nothing is cached, so installing Graphviz while `netgraph watch` is running is
+Nothing is cached, so installing Graphviz while `netviz watch` is running is
 enough — the next re-render finds it. And when it genuinely is not there, the
 error names the install command **for your platform** and says what to do
 instead; it is never a `FileNotFoundError` traceback.
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/quickstart render -f mermaid
+$ netviz -i examples/quickstart render -f mermaid
 flowchart TB
     n0[/"pc-alice<br/>[computer]<br/>192.168.10.20/24<br/>vlans: 10"/]
     n1(["rtr-gw<br/>[router]<br/>203.0.113.2/30<br/>192.168.10.1/24<br/>vlans: 10"])
@@ -1492,7 +1492,7 @@ rendered 3 node(s) and 2 edge(s) as mermaid at layer l1
 
 Mermaid's renderer refuses a diagram of more than 500 edges, and that ceiling is
 a secure config a document is not allowed to raise for itself — so GitHub,
-GitLab and `mmdc` will not draw one, however valid it is. netgraph warns when it
+GitLab and `mmdc` will not draw one, however valid it is. netviz warns when it
 crosses the line and names the filters that would bring it back down; `-f dot`
 and `-f svg` have no such limit.
 
@@ -1503,7 +1503,7 @@ with nothing to install and nothing to fetch:
 
 <!-- norun: writes an HTML file into the reader's directory -->
 ```bash
-netgraph render -f html --layer l1 --layer l2 --layer l3 \
+netviz render -f html --layer l1 --layer l2 --layer l3 \
     --title "home-lab — every layer" -o docs/home-lab.html
 ```
 
@@ -1526,7 +1526,7 @@ you get:
 * **a detail panel** — click an element for its full resolved configuration:
   every interface, its addresses and VLANs, its MTU and MAC, every cable and
   tunnel that lands on it, and where it sits in an encapsulation stack. These
-  are the same records `-f json` exports and [`netgraph web`](commands/web.md)
+  are the same records `-f json` exports and [`netviz web`](commands/web.md)
   shows, rendered by the same code;
 * **toggles** — the addresses and the VLAN annotations off and on, and a
   namespace to focus while the rest of the network dims;
@@ -1540,7 +1540,7 @@ you get:
 kind — no CDN, no web font, no stylesheet, no analytics, no image URL. The style
 sheet and the client are hand-written vanilla CSS and JavaScript that ship
 inside the package and are inlined at render time; there is no bundler, and
-netgraph gained no runtime dependency for any of it. The only URLs a page can
+netviz gained no runtime dependency for any of it. The only URLs a page can
 hold are the ones `--link-template` was asked for, and those are links a reader
 clicks rather than resources the page loads.
 
@@ -1576,7 +1576,7 @@ Two consequences of there being no layout engine in a browser are worth knowing:
 and every filter behave exactly as they do for `-f svg`, because it *is* the
 `-f svg` pipeline underneath.
 
-[`netgraph watch`](commands/watch.md) with `-f html -o topology.html` keeps the
+[`netviz watch`](commands/watch.md) with `-f html -o topology.html` keeps the
 file current while you edit, and `--serve` shows the page itself in the preview.
 
 ### The JSON export
@@ -1590,7 +1590,7 @@ meaningful.
 
 ```json
 {
-  "apiVersion": "netgraph.dev/v1alpha1",
+  "apiVersion": "netviz.dev/v1alpha1",
   "kind": "NetworkGraph",
   "layer": "l1",
   "nodes": [
@@ -1635,22 +1635,22 @@ exported, because it is topology rather than decoration.
 
 For the other machine-readable artefacts an inventory can produce — a CSV cable
 schedule, a power load schedule, a DNS zone, an SVG rack elevation — see
-[`netgraph export`](commands/export.md).
+[`netviz export`](commands/export.md).
 
 ---
 
 ## See also
 
-* [`netgraph render`](commands/render.md) — the command reference: synopsis,
+* [`netviz render`](commands/render.md) — the command reference: synopsis,
   every flag, exit codes.
 * [`docs/styling.md`](styling.md) — `spec.style` and `--theme`: the colour and
   shape vocabulary, the selectors, and which rule wins when two of them disagree.
-* [`netgraph.toml`](configuration.md#render--how-the-inventory-is-drawn) — give
+* [`netviz.toml`](configuration.md#render--how-the-inventory-is-drawn) — give
   any of these options a default, and collect variations into
   [named profiles](configuration.md#profilename--named-variations).
-* [`netgraph watch`](commands/watch.md) and [`netgraph web`](commands/web.md) —
+* [`netviz watch`](commands/watch.md) and [`netviz web`](commands/web.md) —
   the same pipeline, redrawn on every save.
-* [`netgraph path --highlight`](paths.md#drawing-the-answer---highlight) — one
+* [`netviz path --highlight`](paths.md#drawing-the-answer---highlight) — one
   traced route drawn over the topology it crosses.
 * [`docs/ci.md`](ci.md#the-render-action) — the same render as a GitHub Action,
   and the reusable workflow that

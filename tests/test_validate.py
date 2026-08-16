@@ -8,17 +8,17 @@ from typing import Any
 import pytest
 import yaml
 
-from netgraph.config import (
+from netviz.config import (
     CONFIG_FILE_NAME,
     Config,
     ValidationConfig,
     load_config,
     parse_config,
 )
-from netgraph.errors import ConfigurationError
-from netgraph.loader import Inventory, load_tree
-from netgraph.models import API_VERSION, IPv4Address, IPv6Address
-from netgraph.rules import (
+from netviz.errors import ConfigurationError
+from netviz.loader import Inventory, load_tree
+from netviz.models import API_VERSION, IPv4Address, IPv6Address
+from netviz.rules import (
     RULE_IDS,
     RULES,
     WILDCARD,
@@ -27,7 +27,7 @@ from netgraph.rules import (
     resolve_rule_id,
     rule_for,
 )
-from netgraph.validate import (
+from netviz.validate import (
     Finding,
     _reserved_role,
     errors_only,
@@ -2873,23 +2873,23 @@ def orphan(name: str = "spare", **metadata: Any) -> str:
     ["W103", "NG-C016", "w103", "*", "all", "any", "E001, W103", "E001 W103", "E001;W103"],
 )
 def test_annotation_suppresses_a_rule(tmp_path: Path, value: str) -> None:
-    inventory = load(tmp_path, net=orphan(annotations={"netgraph/ignore": value}))
+    inventory = load(tmp_path, net=orphan(annotations={"netviz/ignore": value}))
     assert only(validate(inventory), "W103") == []
 
 
 def test_the_reserved_prefix_spelling_is_accepted_too(tmp_path: Path) -> None:
-    inventory = load(tmp_path, net=orphan(annotations={"netgraph.dev/ignore": "W103"}))
+    inventory = load(tmp_path, net=orphan(annotations={"netviz.dev/ignore": "W103"}))
     assert only(validate(inventory), "W103") == []
 
 
 def test_an_annotation_only_silences_the_rules_it_names(tmp_path: Path) -> None:
-    inventory = load(tmp_path, net=orphan(annotations={"netgraph/ignore": "E001"}))
+    inventory = load(tmp_path, net=orphan(annotations={"netviz/ignore": "E001"}))
     assert rules_of(validate(inventory)) == ["W103"]
 
 
 def test_an_unknown_rule_id_in_an_annotation_silences_nothing(tmp_path: Path) -> None:
     """Failing open keeps a typo from hiding the finding it was aimed at."""
-    inventory = load(tmp_path, net=orphan(annotations={"netgraph/ignore": "W1O3"}))
+    inventory = load(tmp_path, net=orphan(annotations={"netviz/ignore": "W1O3"}))
     assert rules_of(validate(inventory)) == ["W103"]
 
 
@@ -2901,7 +2901,7 @@ def test_either_element_of_a_finding_can_suppress_it(tmp_path: Path) -> None:
             "computer",
             "pc1",
             {"interfaces": [eth("eth0", mtu=1500, ipv4=["10.0.0.1/24"])]},
-            annotations={"netgraph/ignore": "W102"},
+            annotations={"netviz/ignore": "W102"},
         ),
         cable("c1", "sw1:Gi0/1", "pc1:eth0"),
     )
@@ -2910,12 +2910,12 @@ def test_either_element_of_a_finding_can_suppress_it(tmp_path: Path) -> None:
 
 def test_annotations_are_not_labels(tmp_path: Path) -> None:
     """Labels drive ``--select``; an ignore list there must not silence anything."""
-    inventory = load(tmp_path, net=orphan(labels={"netgraph-ignore": "W103"}))
+    inventory = load(tmp_path, net=orphan(labels={"netviz-ignore": "W103"}))
     assert rules_of(validate(inventory)) == ["W103"]
 
 
 # --------------------------------------------------------------------------- #
-# Suppression: netgraph.toml
+# Suppression: netviz.toml
 # --------------------------------------------------------------------------- #
 
 
@@ -3015,7 +3015,7 @@ def test_unusable_configuration_is_rejected(data: dict[str, Any], expected: str)
 
 
 def test_unknown_top_level_tables_are_left_alone(tmp_path: Path) -> None:
-    """A file shared with a newer netgraph must not break this one."""
+    """A file shared with a newer netviz must not break this one."""
     (tmp_path / CONFIG_FILE_NAME).write_text(
         "[experimental]\nengine = 'neato'\n[validate]\nstrict = true\n", encoding="utf-8"
     )
@@ -3086,7 +3086,7 @@ def test_validate_defaults_to_the_stock_configuration(tmp_path: Path) -> None:
 
 
 def test_every_rule_has_a_check_and_a_unique_id() -> None:
-    from netgraph.validate import _CHECKS
+    from netviz.validate import _CHECKS
 
     assert [rule_id for rule_id, _ in _CHECKS] == list(RULE_IDS)
     assert len(set(RULE_IDS)) == len(RULES)

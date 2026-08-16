@@ -30,9 +30,9 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.errors import SchemaError
-from netgraph.loader import (
+from netviz.cli import cli
+from netviz.errors import SchemaError
+from netviz.loader import (
     MAX_INTERFACES_PER_DOCUMENT,
     Inventory,
     Provenance,
@@ -42,14 +42,14 @@ from netgraph.loader import (
     parse_range,
     substitute,
 )
-from netgraph.loader.documents import parse_documents
-from netgraph.loader.ranges import expand_interfaces
-from netgraph.models import TEMPLATE_SPEC_KEYS, Template, parse_template
-from netgraph.render import Layer, RenderOptions, build_graph, render_text
-from netgraph.schema import build_schema
-from netgraph.validate import validate
+from netviz.loader.documents import parse_documents
+from netviz.loader.ranges import expand_interfaces
+from netviz.models import TEMPLATE_SPEC_KEYS, Template, parse_template
+from netviz.render import Layer, RenderOptions, build_graph, render_text
+from netviz.schema import build_schema
+from netviz.validate import validate
 
-API = "netgraph.dev/v1alpha1"
+API = "netviz.dev/v1alpha1"
 
 
 # --------------------------------------------------------------------------- #

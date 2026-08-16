@@ -1,0 +1,117 @@
+{#-
+  The self-contained page ``netviz render -f html`` writes.
+
+  Escaping contract — read this before adding a variable
+  ------------------------------------------------------
+  The environment renders with ``autoescape=True``, so a bare ``{{ value }}``
+  is HTML-escaped and is the right spelling for every free-form string: a
+  device name, a namespace, a title, a description. An inventory can hold
+  anything at all, and none of it may become markup.
+
+  Five values are *already* complete documents and are passed as Markup so that
+  autoescape leaves them alone: ``style`` and ``script`` (files in the package,
+  written by hand and holding no inventory text), ``view.svg`` and ``icons``
+  (both parsed, sanitised and re-serialised by ``netviz.render.fragment``;
+  ``icons`` is the shared ``<defs>`` the drawings' ``<use>`` elements name, and
+  is empty unless ``--icons`` was given) and ``data`` (JSON, with ``<``, ``>``
+  and ``&`` escaped as ``\uXXXX`` so that nothing in it can close the script
+  element it sits in — see ``html._script_json``). Everything else in this
+  file is a bare interpolation on purpose.
+
+  The Content-Security-Policy is a hash of the two inline blocks, computed in
+  ``html.py`` from the exact bytes written here. Change how ``style`` or
+  ``script`` is emitted — an indent, a newline — and the hash must be computed
+  over the same change, or the browser will refuse to run the page.
+-#}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="{{ csp }}">
+<meta name="generator" content="{{ generator }}">
+<title>{{ title }}</title>
+<link rel="icon" href="data:,">
+<style>{{ style }}</style>
+</head>
+<body>
+<header>
+  <h1>{{ title }}</h1>
+  <span id="ng-counts" class="counts"></span>
+  <span class="spacer"></span>
+{% if layers | length > 1 %}
+  <label class="field">layer
+    <select id="ng-layer">
+{% for layer in layers %}
+      <option value="{{ loop.index0 }}">{{ layer.label }}</option>
+{% endfor %}
+    </select>
+  </label>
+{% endif %}
+{% if namespaces %}
+  <label class="field" title="Dim everything outside one namespace">namespace
+    <select id="ng-namespace">
+      <option value="">all</option>
+{% for namespace in namespaces %}
+      <option value="{{ namespace }}">{{ namespace }}</option>
+{% endfor %}
+    </select>
+  </label>
+{% endif %}
+{% if toggles.ips %}
+  <label class="check" title="Show the configured addresses"><input id="ng-ips" type="checkbox" checked> IPs</label>
+{% endif %}
+{% if toggles.vlans %}
+  <label class="check" title="Show VLAN membership"><input id="ng-vlans" type="checkbox" checked> VLANs</label>
+{% endif %}
+  <label class="sr-only" for="ng-search">Search by name, address, MAC or VLAN</label>
+  <input id="ng-search" type="search" placeholder="search  (/)" autocomplete="off"
+    spellcheck="false" aria-controls="ng-results" aria-describedby="ng-matches">
+  <button id="ng-fit" type="button" title="Fit the diagram in the window (f)">Fit</button>
+  <button id="ng-reset" type="button" title="Back to how the page opened">Reset</button>
+  <button id="ng-help" type="button" aria-expanded="false" aria-controls="ng-keys">Keys</button>
+</header>
+
+<main>
+  <div id="ng-stage" class="stage" tabindex="0" role="group"
+    aria-label="Network diagram. Drag to pan, scroll to zoom, arrow keys to move; search to find an element.">
+    <div id="ng-viewport" class="viewport">
+{% if icons %}
+      {{ icons }}
+{% endif %}
+{% for view in views %}
+      <div class="view" data-view="{{ view.id }}"{% if not view.first %} hidden{% endif %}>{{ view.svg }}</div>
+{% endfor %}
+    </div>
+    <p class="hint">drag to pan &middot; scroll to zoom &middot; click an element for its configuration</p>
+  </div>
+
+  <aside class="panel">
+    <div class="panel-head">
+      <span>details</span>
+      <span id="ng-matches" class="hint-count" aria-live="polite"></span>
+    </div>
+    <ul id="ng-results" class="results"></ul>
+    <div id="ng-detail" class="detail" aria-live="polite"></div>
+  </aside>
+</main>
+
+<div id="ng-card" class="card" hidden aria-hidden="true"></div>
+
+<div id="ng-keys" class="keys" hidden>
+  <dl>
+    <dt>/</dt><dd>search</dd>
+    <dt>arrows</dt><dd>pan (Shift: faster)</dd>
+    <dt>+ &minus;</dt><dd>zoom</dd>
+    <dt>f, 0</dt><dd>fit the diagram in the window</dd>
+    <dt>Esc</dt><dd>clear the search and the selection</dd>
+{% if links %}
+    <dt>Ctrl-click</dt><dd>open the document that declares an element</dd>
+{% endif %}
+  </dl>
+</div>
+
+<script id="netviz-data" type="application/json">{{ data }}</script>
+<script>{{ script }}</script>
+</body>
+</html>

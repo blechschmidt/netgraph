@@ -3,7 +3,7 @@
 # 'pc-a:eth1' is up and addressed but nothing is patched into it. Either the
 # port is spare - say 'enabled: false' and the note goes away - or a cable
 # document is missing. Both prefixes are /30, which W105 and W111 leave alone.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -20,7 +20,7 @@ spec:
       ipv4:
         addresses: [10.0.1.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -32,7 +32,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

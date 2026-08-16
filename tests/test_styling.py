@@ -35,19 +35,19 @@ import pytest
 from click.testing import CliRunner
 from pydantic import ValidationError
 
-from netgraph.cli import cli
-from netgraph.config import parse_config
-from netgraph.drawio.styles import MX_SHAPES, edge_style, node_style
-from netgraph.errors import ConfigurationError, RenderError, SchemaError
-from netgraph.loader import load_tree
-from netgraph.models import Style
-from netgraph.models.document import parse_document, parse_theme
-from netgraph.models.style import NAMED_COLOURS, SHAPES, hex_colour
-from netgraph.models.theme import THEME_KIND
-from netgraph.render import Layer, RenderOptions, build_graph
-from netgraph.render.dot import to_dot
-from netgraph.render.styles import PLAIN, ResolvedStyle, StyleMap, dot_shape, fade, resolve_style
-from netgraph.render.theme import BUNDLED_THEMES, StyleTarget, Theme, load_theme, resolve_theme
+from netviz.cli import cli
+from netviz.config import parse_config
+from netviz.drawio.styles import MX_SHAPES, edge_style, node_style
+from netviz.errors import ConfigurationError, RenderError, SchemaError
+from netviz.loader import load_tree
+from netviz.models import Style
+from netviz.models.document import parse_document, parse_theme
+from netviz.models.style import NAMED_COLOURS, SHAPES, hex_colour
+from netviz.models.theme import THEME_KIND
+from netviz.render import Layer, RenderOptions, build_graph
+from netviz.render.dot import to_dot
+from netviz.render.styles import PLAIN, ResolvedStyle, StyleMap, dot_shape, fade, resolve_style
+from netviz.render.theme import BUNDLED_THEMES, StyleTarget, Theme, load_theme, resolve_theme
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
@@ -62,7 +62,7 @@ def device(**style: Any) -> Any:
         spec["style"] = style
     return parse_document(
         {
-            "apiVersion": "netgraph.dev/v1alpha1",
+            "apiVersion": "netviz.dev/v1alpha1",
             "kind": "switch",
             "metadata": {"name": "sw"},
             "spec": spec,
@@ -74,7 +74,7 @@ def theme_of(*rules: dict[str, Any], name: str = "t") -> Theme:
     """A theme built from rule literals, through the real parser."""
     document = parse_theme(
         {
-            "apiVersion": "netgraph.dev/v1alpha1",
+            "apiVersion": "netviz.dev/v1alpha1",
             "kind": THEME_KIND,
             "metadata": {"name": name},
             "spec": {"rules": list(rules)},
@@ -182,7 +182,7 @@ def test_an_empty_style_block_is_refused() -> None:
 
 
 def test_a_colour_keeps_the_spelling_the_document_used() -> None:
-    """``netgraph fmt`` must not turn ``navy`` into ``#1e3a8a`` behind somebody."""
+    """``netviz fmt`` must not turn ``navy`` into ``#1e3a8a`` behind somebody."""
     assert Style(fill="navy").fill == "navy"
     assert hex_colour("navy") == "#1e3a8a"
     assert hex_colour(None) is None
@@ -202,7 +202,7 @@ def test_every_shape_has_a_spelling_in_both_backends() -> None:
         assert shape in MX_SHAPES, shape
 
 
-def test_a_shape_netgraph_does_not_know_falls_back_rather_than_passing_through() -> None:
+def test_a_shape_netviz_does_not_know_falls_back_rather_than_passing_through() -> None:
     """The table *is* the whole of what may reach a DOT file."""
     assert dot_shape("shape=none, label=") == "box"
     assert dot_shape(None) == "box"
@@ -348,7 +348,7 @@ def test_no_style_skips_the_two_top_rungs_and_keeps_the_two_below() -> None:
 
 
 def test_an_inline_theme_is_appended_so_it_wins_a_tie() -> None:
-    """A ``netgraph.toml`` has the last word without restating what it agrees with."""
+    """A ``netviz.toml`` has the last word without restating what it agrees with."""
     named = theme_of({"select": {"kind": "switch"}, "style": {"fill": "green"}}, name="named")
     inline = theme_of({"select": {"kind": "switch"}, "style": {"fill": "navy"}}, name="inline")
     combined = resolve_theme(named, inline=inline)
@@ -419,7 +419,7 @@ def test_a_theme_with_no_rules_is_refused() -> None:
     with pytest.raises(SchemaError) as caught:
         parse_theme(
             {
-                "apiVersion": "netgraph.dev/v1alpha1",
+                "apiVersion": "netviz.dev/v1alpha1",
                 "kind": THEME_KIND,
                 "metadata": {"name": "empty"},
                 "spec": {"rules": []},
@@ -460,7 +460,7 @@ def test_a_theme_that_is_a_directory_says_so_and_names_the_other_flag(tmp_path: 
 def test_a_theme_file_with_a_bad_colour_names_the_nearest_spelling(tmp_path: Path) -> None:
     path = tmp_path / "theme.yaml"
     path.write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: theme\n"
         "metadata: {name: t}\n"
         "spec:\n"
@@ -624,10 +624,10 @@ def test_a_drawio_export_preserves_every_colour_it_was_given(view: str) -> None:
     topology and geometry and *not* appearance, because a draw.io user recolouring
     a box has not changed the network. What has to hold is the half that a
     reader sees: every colour the resolver decided on is in the file, spelled
-    the same way, so opening it shows the diagram netgraph drew.
+    the same way, so opening it shows the diagram netviz drew.
     """
-    from netgraph.drawio.build import BuildOptions, build_diagram
-    from netgraph.drawio.mxfile import write_mxfile
+    from netviz.drawio.build import BuildOptions, build_diagram
+    from netviz.drawio.mxfile import write_mxfile
 
     inventory = load_tree(STYLED)
     graph = build_graph(inventory, layer=Layer(view))
@@ -665,7 +665,7 @@ def test_the_theme_and_style_settings_come_from_the_config_file(tmp_path: Path) 
         target = root / source.relative_to(STYLED)
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
-    (root / "netgraph.toml").write_text('[render]\ntheme = "theme.yaml"\n', encoding="utf-8")
+    (root / "netviz.toml").write_text('[render]\ntheme = "theme.yaml"\n', encoding="utf-8")
 
     runner = CliRunner()
     themed = runner.invoke(cli, ["-i", str(root), "render", "-f", "dot"])

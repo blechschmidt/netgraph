@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-north-01
@@ -26,7 +26,7 @@ spec:
       ipv4:
         addresses: [10.1.10.51/24]
         # The Vlan10 SVI on sw-north-dist-01. 'gateway' is checked against this
-        # interface's own prefixes by NG-A013; 'netgraph ipam' reports it.
+        # interface's own prefixes by NG-A013; 'netviz ipam' reports it.
         gateway: 10.1.10.1
       ipv6:
         addresses: [2001:db8:1:10::51/64]
@@ -34,7 +34,7 @@ spec:
         # definition, so NG-A013 exempts it.
         gateway: fe80::1
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-north-01
@@ -64,7 +64,7 @@ spec:
       ipv6:
         addresses: [2001:db8:1:20::11/64]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-north-02

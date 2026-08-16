@@ -43,16 +43,16 @@ quickstart/
   agree and `W102` stays quiet.
 * **The WAN port is annotated, not hidden.** `wan0` faces an ISP that is not an
   element here, so it terminates no cable — `I002` (`NG-C015`). A
-  `netgraph/ignore` annotation on `rtr-gw` says that is deliberate, which is
+  `netviz/ignore` annotation on `rtr-gw` says that is deliberate, which is
   what an exception should look like.
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/quickstart validate
+$ netviz -i examples/quickstart validate
 no problems found
 ```
 
 <!-- norun: writes an SVG into the reader's directory -->
 ```bash
-netgraph -i examples/quickstart render -f svg -o topology.svg
+netviz -i examples/quickstart render -f svg -o topology.svg
 ```

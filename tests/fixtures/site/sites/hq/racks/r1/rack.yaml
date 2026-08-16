@@ -1,6 +1,6 @@
 # A namespace below the site's own, so copying the site has to carry the shape
 # of its subtree and not just its top level.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-rack

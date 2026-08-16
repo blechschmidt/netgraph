@@ -1,8 +1,8 @@
-"""``netgraph diff``: the changeset, drawn.
+"""``netviz diff``: the changeset, drawn.
 
 Three layers of assertion, in order of how much they pin down:
 
-**The join.** :mod:`netgraph.diff` translates a changeset keyed by *address*
+**The join.** :mod:`netviz.diff` translates a changeset keyed by *address*
 into marks keyed by node and edge *id*. Most of what can go wrong here is a
 mistranslation — a subnet membership marked amber because the host's model
 string changed, a rename drawn as a deletion beside a creation — so those are
@@ -33,14 +33,14 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner, Result
 
-from netgraph.cli import cli
-from netgraph.diff import Drawing, draw, renamed_addresses, updated_fields
-from netgraph.fsio import write_text
-from netgraph.loader import Inventory, load_tree
-from netgraph.plan import diff as diff_states
-from netgraph.plan.address import parse_address
-from netgraph.render import Layer, RenderOptions, build_graph, render_text, suffix_for
-from netgraph.render.diffview import DiffOverlay, Mark, diff_overlay, union_graph
+from netviz.cli import cli
+from netviz.diff import Drawing, draw, renamed_addresses, updated_fields
+from netviz.fsio import write_text
+from netviz.loader import Inventory, load_tree
+from netviz.plan import diff as diff_states
+from netviz.plan.address import parse_address
+from netviz.render import Layer, RenderOptions, build_graph, render_text, suffix_for
+from netviz.render.diffview import DiffOverlay, Mark, diff_overlay, union_graph
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -53,7 +53,7 @@ ARRANGED = FIXTURES / "arranged"
 ARRANGED_PROPOSED = FIXTURES / "diff" / "arranged-proposed"
 
 #: The text formats a diff golden is kept for. Mermaid is deliberately absent:
-#: it cannot express a mark, and :func:`netgraph.render.supports_diff` says so.
+#: it cannot express a mark, and :func:`netviz.render.supports_diff` says so.
 FORMATS = ("dot", "json")
 
 
@@ -168,9 +168,9 @@ def test_an_annotation_change_marks_nothing_even_under_a_device_name() -> None:
     would let the note's edit paint the switch amber — claiming the network
     moved because somebody reworded a callout — which is exactly the leak an
     annotation is barred from causing. Built by hand rather than loaded: the
-    point is what :mod:`netgraph.diff` does with the address *type*.
+    point is what :mod:`netviz.diff` does with the address *type*.
     """
-    from netgraph.plan.model import Action, Change, Plan
+    from netviz.plan.model import Action, Change, Plan
 
     plan = Plan(
         changes=(
@@ -196,7 +196,7 @@ def test_an_annotation_change_marks_nothing_even_under_a_device_name() -> None:
 
 def test_an_element_change_beside_an_annotation_is_still_marked() -> None:
     """The skip is by address type, not a blanket silence on the name."""
-    from netgraph.plan.model import Action, Change, Plan
+    from netviz.plan.model import Action, Change, Plan
 
     plan = Plan(
         changes=(

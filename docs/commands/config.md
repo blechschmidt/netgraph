@@ -1,13 +1,13 @@
-# `netgraph config`
+# `netviz config`
 
-`netgraph config show` prints the settings a command resolves to, with the place
-each value came from — a profile, the `[render]` table, or netgraph's own default.
+`netviz config show` prints the settings a command resolves to, with the place
+each value came from — a profile, the `[render]` table, or netviz's own default.
 It is the command to reach for when a diagram does not look the way you asked
 for, because it separates "the file does not say what I think it says" from "the
 setting does not do what I think it does".
 
 `config` is a group, and `show` is its only subcommand today. There is nothing to
-`config set`: `netgraph.toml` is a file you edit and commit, not state a tool
+`config set`: `netviz.toml` is a file you edit and commit, not state a tool
 keeps for you.
 
 ---
@@ -16,7 +16,7 @@ keeps for you.
 
 <!-- generated: synopsis config show -->
 ```text
-netgraph [GLOBAL OPTIONS] config show [OPTIONS] [render|watch|path|web]
+netviz [GLOBAL OPTIONS] config show [OPTIONS] [render|watch|path|web]
 ```
 <!-- /generated -->
 
@@ -40,7 +40,7 @@ shape, and then the settings of the command you named.
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus config show render
+$ netviz -i examples/campus config show render
 SETTING   VALUE   SOURCE
 --------  ------  -------
 strict    false   default
@@ -55,17 +55,17 @@ format              dot      default
 ...
 title               (unset)  default
 validation
-settings for 'netgraph render'
+settings for 'netviz render'
 ...
 ```
 
 The three headings are commentary and go to stderr, which is why they arrive
 after the tables when the two streams are captured separately, as above; on a
-terminal `validation` sits above the first table and `settings for 'netgraph
+terminal `validation` sits above the first table and `settings for 'netviz
 render'` above the second, and `-q` leaves you the tables alone.
 
-The last elided line names the `netgraph.toml` that was found, or reads
-`configuration: none (netgraph.toml not found; built-in defaults in use)` when
+The last elided line names the `netviz.toml` that was found, or reads
+`configuration: none (netviz.toml not found; built-in defaults in use)` when
 there is none — that line alone answers "is my file even being read?". A tree
 that declares profiles lists them next, so a mistyped `--profile` is visible
 before you go looking for the block.
@@ -81,13 +81,13 @@ there are four:
 
 | `SOURCE` | Meaning |
 |---|---|
-| `default` | Nobody said anything; this is netgraph's built-in value. |
-| `file [render]` | The `[render]` table of this inventory's `netgraph.toml`. |
+| `default` | Nobody said anything; this is netviz's built-in value. |
+| `file [render]` | The `[render]` table of this inventory's `netviz.toml`. |
 | `profile <name>` | The `[profile.<name>]` block, which outranks `[render]`. |
 | `flag --x` | The command line. **It never appears here**, because `config show` resolves a *bare* invocation. |
 
 That last row is the thing to understand about this command: no flags are in
-play, so what you are shown is what the file does to a bare `netgraph COMMAND`.
+play, so what you are shown is what the file does to a bare `netviz COMMAND`.
 To see one *invocation* resolved, flags included, pass `--show-config` to the
 command itself. The full ladder is
 [Precedence](../configuration.md#precedence).
@@ -99,9 +99,9 @@ which is how you check a profile without producing a diagram from it:
 
 <!-- norun: the inventory, its path and its profiles are illustrative -->
 ```console
-$ netgraph config show render --profile review
-settings for 'netgraph render'
-configuration: /net/inventory/netgraph.toml
+$ netviz config show render --profile review
+settings for 'netviz render'
+configuration: /net/inventory/netviz.toml
 profiles declared: poster, review
 
 SETTING             VALUE   SOURCE
@@ -116,10 +116,10 @@ settings the profile overrides say so by name. A profile the file does not
 declare is an error rather than a silent fallback, and the message says which are
 declared:
 
-<!-- norun: the message names the reader's own netgraph.toml -->
+<!-- norun: the message names the reader's own netviz.toml -->
 ```console
-$ netgraph -i examples/campus config show render --profile review
-error: examples/campus/netgraph.toml: no profile 'review': this inventory declares no [profile.<name>] block. Add one to netgraph.toml at the inventory root
+$ netviz -i examples/campus config show render --profile review
+error: examples/campus/netviz.toml: no profile 'review': this inventory declares no [profile.<name>] block. Add one to netviz.toml at the inventory root
 ```
 
 ## Debugging a setting that is not taking effect
@@ -127,12 +127,12 @@ error: examples/campus/netgraph.toml: no profile 'review': this inventory declar
 Work down the report, in this order:
 
 1. **Is the file being read?** The `configuration:` line names it. If it says
-   `none`, the file is not where netgraph looks — beside the inventory root, or
+   `none`, the file is not where netviz looks — beside the inventory root, or
    above it. See
    [Where the file is looked for](../configuration.md#where-the-file-is-looked-for).
 2. **Is the key spelled as a flag?** Every `[render]` key is a long option of
-   `netgraph render` without its leading dashes, so `--collapse-depth 1` is
-   `collapse-depth = 1` and `--no-show-ips` is `show-ips = false`. A key netgraph
+   `netviz render` without its leading dashes, so `--collapse-depth 1` is
+   `collapse-depth = 1` and `--no-show-ips` is `show-ips = false`. A key netviz
    does not know is an error, not a silent no-op, so a run that succeeds and
    still shows `default` means the key is right and something outranks it.
 3. **Does this command take the setting at all?** `config show path` lists ten
@@ -145,7 +145,7 @@ Work down the report, in this order:
    same column — see
    [Seeing what resolved, and why](../configuration.md#seeing-what-resolved-and-why).
 
-An unusable `netgraph.toml` — bad TOML, an unknown key, a value of the wrong
+An unusable `netviz.toml` — bad TOML, an unknown key, a value of the wrong
 type — fails every command including this one, with the line and what was
 expected. Those messages are catalogued in
 [Errors](../configuration.md#errors).
@@ -171,16 +171,16 @@ expected. Those messages are catalogued in
 | Code | Meaning |
 |---|---|
 | `0` | The settings were printed. |
-| `2` | Usage error — a `COMMAND` that is not configurable, an unusable `netgraph.toml`, or a `--profile` the file does not declare. |
+| `2` | Usage error — a `COMMAND` that is not configurable, an unusable `netviz.toml`, or a `--profile` the file does not declare. |
 | `3` | The inventory could not be discovered or read at all. |
 | `130` | Interrupted. |
 | `141` | The downstream end of a pipe closed first. |
 
 ## See also
 
-* [`docs/configuration.md`](../configuration.md) — every key of `netgraph.toml`,
+* [`docs/configuration.md`](../configuration.md) — every key of `netviz.toml`,
   the profile mechanism, the precedence ladder and the error messages.
-* [`netgraph render`](render.md) — the command whose settings this resolves, and
+* [`netviz render`](render.md) — the command whose settings this resolves, and
   the `--show-config` that resolves one invocation of it.
-* [`netgraph init`](init.md) — writes a fully commented `netgraph.toml` in which
+* [`netviz init`](init.md) — writes a fully commented `netviz.toml` in which
   every line is the default it would change.

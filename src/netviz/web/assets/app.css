@@ -1,0 +1,1603 @@
+/* netviz web interface.
+ *
+ * Three panes -- the inventory, the editor, the diagram -- a floating info box,
+ * and the overlays the keyboard puts up: the command palette, the shortcut
+ * reference and the prompt an edit gesture asks its arguments with. The first
+ * pane is hidden in the document-stream scratchpad, which has no files to list.
+ *
+ * Colour
+ * ------
+ *
+ * Every colour is a token, declared twice: once for a light scheme and once
+ * under `prefers-color-scheme: dark`. That is not a preference, it is a
+ * contrast requirement -- `--error: #bc1c25` reads at 6.4:1 on white and at
+ * 1.4:1 on a dark canvas, so a page that follows the system into dark mode
+ * without changing its palette is a page that stops being readable there.
+ * Every token below clears 4.5:1 against its own `--bg`.
+ *
+ * For the same reason nothing here dims text with `opacity`. A 55%-opaque
+ * label is a contrast failure computed from the blend, so "quieter" is spelled
+ * `color: var(--muted)`, which is a colour chosen to still be legible.
+ *
+ * The palette follows the diagram's own encoding -- green for what is fine, red
+ * for an error, amber for a warning -- so the status pill, a finding in the list
+ * and a file marked unsaved mean the same thing as the colours in the picture
+ * next to them. Where a colour carries meaning it is never alone: the diff
+ * legend prints `+`, `~` and `−`, the same sigils Graphviz draws into the
+ * picture, so the encoding survives a greyscale print and a red-green reader.
+ *
+ * Focus
+ * -----
+ *
+ * The focus ring and the selection ring are deliberately different things:
+ * focus is where the keyboard is, selection is what the user said they were
+ * working on, and a tool that draws them the same way cannot be driven without
+ * a pointer. Focus is a solid violet halo, this tab's selection is a long dash,
+ * somebody else's is a short one -- three patterns, not three hues.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  --bg: #ffffff;
+  --raised: #f6f7f9;
+  --fg: #1c2024;
+  /* Everything that used to be `opacity: .6`. Legible on --bg, on purpose. */
+  --muted: #5b6167;
+  --edge: #cbd1d7;
+  --line: #cbd1d7;
+
+  --ok: #0f6b2c;
+  --error: #bc1c25;
+  --warning: #7a5200;
+  --info: #0b5ed7;
+
+  /* Where the keyboard is, and what is selected. Never the same. */
+  --focus: #6b21a8;
+  --selected: #0b5ed7;
+
+  --diff-added: #15803d;
+  --diff-changed: #92400e;
+  --diff-removed: #b91c1c;
+  --diff-untouched: #5b6167;
+
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --pane: 40%;
+  --files: 15rem;
+  --shadow: rgba(0, 0, 0, .28);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1216;
+    --raised: #181c22;
+    --fg: #e6e9ee;
+    --muted: #a3acb8;
+    --edge: #333a42;
+    --line: #333a42;
+
+    --ok: #4ade80;
+    --error: #ff8189;
+    --warning: #e2b33c;
+    --info: #79b8ff;
+
+    --focus: #c4a2fc;
+    --selected: #79b8ff;
+
+    --diff-added: #4ade80;
+    --diff-changed: #e2b33c;
+    --diff-removed: #ff8189;
+    --diff-untouched: #a3acb8;
+
+    --shadow: rgba(0, 0, 0, .6);
+  }
+}
+
+/* Somebody who asked for less movement gets none. Declared once, over
+ * everything, because the alternative is remembering it at each new transition
+ * -- and the one that gets forgotten is the one that makes somebody ill. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  font: 13px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  overflow: hidden;
+}
+
+/* One ring, everywhere, and never removed without a replacement. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+::placeholder { color: var(--muted); opacity: 1; }
+
+/* For a screen reader and for nobody else -- until it is focused, at which
+ * point hiding it from the person who just navigated to it would be absurd. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 40;
+  padding: .4rem .7rem;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--focus);
+  border-radius: 0 0 4px 0;
+}
+
+.skip:focus { left: 0; }
+
+/* ---------------------------------------------------------------- header */
+
+header {
+  display: flex;
+  gap: .6rem;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: .45rem .7rem;
+  border-bottom: 1px solid var(--edge);
+}
+
+header h1 {
+  font: 600 14px/1 var(--mono);
+  margin: 0;
+  letter-spacing: .02em;
+}
+
+.spacer { flex: 1 1 auto; }
+
+.pill {
+  font: 600 11px/1 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  padding: .28rem .5rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+}
+
+.pill.ok { color: var(--ok); }
+.pill.invalid, .pill.failed { color: var(--error); }
+.pill.pending, .pill.rendering { color: var(--warning); }
+
+.summary { font-family: var(--mono); color: var(--muted); }
+
+.field, .check {
+  display: inline-flex;
+  gap: .35rem;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+/* A display of its own beats `hidden`, so a control that is only sometimes
+   offered has to say it again here. */
+.field[hidden], .check[hidden] { display: none; }
+
+/* A switch the server has not (yet) offered a theme to. Legible, so it reads as
+   "not available here" rather than as a rendering fault. */
+.check:has(input:disabled) { color: var(--muted); }
+
+select, input[type="text"], button {
+  font: inherit;
+  font-family: var(--mono);
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  padding: .2rem .35rem;
+}
+
+button { cursor: pointer; }
+button:hover { border-color: currentColor; }
+button.ghost { border-color: transparent; }
+button:disabled { cursor: default; color: var(--muted); }
+
+kbd {
+  font: 600 10px/1.4 var(--mono);
+  padding: .05rem .25rem;
+  border: 1px solid var(--edge);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: var(--raised);
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------------- panes */
+
+main {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.pane.editor { flex: 0 0 var(--pane); border-right: 1px solid var(--edge); }
+.pane.diagram { flex: 1 1 auto; }
+.pane.files { flex: 0 0 var(--files); border-right: 1px solid var(--edge); }
+.pane.files[hidden] { display: none; }
+
+.pane-head {
+  display: flex;
+  gap: .5rem;
+  align-items: baseline;
+  padding: .35rem .7rem;
+  border-bottom: 1px solid var(--edge);
+  font: 600 11px/1.6 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--muted);
+}
+
+.pane-head .hint {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+/* The search box. A query is an expression, so it is set in the monospace face
+ * the YAML pane is -- `label.role = access` read as prose is harder than it
+ * needs to be -- and it grows into whatever room the pane head has left. */
+.search {
+  flex: 1 1 14rem;
+  min-width: 8rem;
+  max-width: 34rem;
+  padding: .15rem .4rem;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  background: var(--bg);
+  color: var(--fg);
+  font: 400 11px/1.6 var(--mono);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.search:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+
+/* A half-typed query is the normal state of this box, so an unparseable one is
+ * marked and not shouted about: no toast, no dialog, one border. */
+.search.invalid { border-color: var(--error); }
+
+.search-status { white-space: nowrap; max-width: 22rem; overflow: hidden; text-overflow: ellipsis; }
+.search-status.bad { color: var(--error); }
+
+/* Highlighting, rather than filtering: everything the query did not select is
+ * dimmed and everything it did keeps its colour, so the answer is read against
+ * the diagram instead of instead of it. Opacity and not display, because what a
+ * query does *not* select is half of what makes its answer checkable. */
+.canvas.searching .node,
+.canvas.searching .edge,
+.canvas.searching .cluster { opacity: .22; transition: opacity .12s ease-out; }
+
+.canvas.searching .search-hit { opacity: 1; }
+
+.canvas.searching .search-hit > ellipse,
+.canvas.searching .search-hit > polygon,
+.canvas.searching .search-hit > path,
+.canvas.searching .search-hit > rect {
+  stroke: var(--focus);
+  stroke-width: 2.5;
+}
+
+#search-filter.on {
+  border-color: var(--selected);
+  color: var(--selected);
+  font-weight: 600;
+}
+
+.problems-head { border-top: 1px solid var(--edge); }
+
+#source {
+  flex: 1 1 auto;
+  min-height: 0;
+  resize: none;
+  border: 0;
+  padding: .6rem .7rem;
+  font: 12px/1.55 var(--mono);
+  tab-size: 2;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+#source:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+.splitter {
+  flex: 0 0 5px;
+  cursor: col-resize;
+  background: transparent;
+}
+
+.splitter:hover, .splitter:focus-visible { background: var(--edge); }
+
+/* ------------------------------------------------------------- problems */
+
+.problems {
+  flex: 0 0 28%;
+  overflow: auto;
+  padding: .3rem 0;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.problem {
+  display: grid;
+  grid-template-columns: 4.5rem 10rem 4.5rem 1fr;
+  gap: .5rem;
+  padding: .18rem .7rem;
+  align-items: start;
+  text-align: left;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+/* Every problem carries a line, and activating one puts the cursor on it. A
+ * locatable row is a real <button>, so it is in the tab order and Enter works
+ * on it without this file inventing a keyboard for it. */
+.problem.locatable { cursor: pointer; }
+.problem:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.problem .severity { font-weight: 700; }
+.problem.error .severity, .problem.error .rule { color: var(--error); }
+.problem.warning .severity, .problem.warning .rule { color: var(--warning); }
+.problem.info .severity, .problem.info .rule { color: var(--info); }
+.problem .where { color: var(--muted); overflow-wrap: anywhere; }
+
+/* A diagnostic with a mechanical repair. The row keeps its own grid and the
+ * buttons sit beside it, so a fixable problem reads as the same line as every
+ * other one with something offered at the end of it. */
+.problem-entry { display: flex; align-items: flex-start; gap: .3rem; }
+.problem-entry .problem { flex: 1 1 auto; min-width: 0; }
+.fixes { display: flex; gap: .2rem; padding: .18rem .5rem .18rem 0; flex: 0 0 auto; }
+.fixes .fix {
+  font: inherit;
+  cursor: pointer;
+  padding: 0 .4rem;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  background: none;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.fixes .fix:hover { color: var(--fg); border-color: var(--fg); }
+
+.empty { color: var(--muted); padding: .6rem .7rem; margin: 0; }
+
+/* ------------------------------------------------------------ file list */
+
+.file-list {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: .2rem 0 .8rem;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.file-list .ns {
+  padding: .5rem .7rem .1rem;
+  font: 600 10px/1.6 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--muted);
+}
+
+.file-list .file, .file-list .doc {
+  display: flex;
+  gap: .4rem;
+  align-items: baseline;
+  padding: .12rem .7rem;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+.file-list .file { font-weight: 600; }
+.file-list .doc { padding-left: 1.5rem; }
+.file-list .file:hover, .file-list .doc:hover {
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+}
+.file-list .file.current { background: color-mix(in srgb, var(--info) 18%, transparent); }
+.file-list .file.broken .name { color: var(--error); }
+.file-list .doc .kind { color: var(--muted); font-size: 11px; }
+.file-list .name { overflow: hidden; text-overflow: ellipsis; }
+
+/* The honest per-file state. Two different things, two different colours:
+ * "unsaved" is the browser's doing and "conflict" is somebody else's. */
+.badge {
+  font: 600 10px/1.5 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding: 0 .3rem;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+}
+
+.badge.dirty { color: var(--warning); }
+.badge.conflict, .badge.gone { color: var(--error); }
+/* Somebody else has unsaved edits here. Deliberately quieter than the two
+ * above -- it is advisory, it blocks nothing, and a badge that shouts would
+ * suggest otherwise -- but quieter by line style, not by fading the text. */
+.badge.elsewhere { color: var(--info); border-style: dashed; }
+.hint.ro { color: var(--info); }
+.hint.rw { color: var(--ok); }
+
+/* Which channel this page is on. Only worth reading when it is not "live". */
+.hint.link { text-transform: lowercase; letter-spacing: 0; }
+.hint.link.live { color: var(--ok); }
+.hint.link.polling { color: var(--warning); }
+.hint.link.reconnecting { color: var(--warning); }
+
+/* Who else has this inventory open. */
+.clients {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .25rem;
+  padding: .35rem .7rem;
+  border-bottom: 1px solid var(--line);
+}
+.clients[hidden] { display: none; }
+.clients .client {
+  font: 600 10px/1.6 var(--mono);
+  padding: 0 .35rem;
+  border: 1px solid color-mix(in srgb, var(--info) 60%, transparent);
+  border-radius: 999px;
+  color: var(--info);
+  cursor: default;
+}
+.clients .client.lagging { border-style: dashed; }
+
+.actions { display: inline-flex; gap: .3rem; }
+.actions[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- toast */
+
+/* Visual only: `aria-hidden` in the markup, because the same words go to the
+ * live region below and hearing them twice is worse than not seeing them. */
+.toast {
+  position: fixed;
+  z-index: 20;
+  left: 50%;
+  bottom: 1.2rem;
+  transform: translateX(-50%);
+  max-width: 60vw;
+  padding: .4rem .8rem;
+  border: 1px solid var(--edge);
+  border-radius: 999px;
+  background: var(--bg);
+  box-shadow: 0 4px 18px var(--shadow);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.toast.ok { border-color: var(--ok); color: var(--ok); }
+.toast.error { border-color: var(--error); color: var(--error); }
+
+/* -------------------------------------------------------------- diagram */
+
+.canvas {
+  position: relative;
+  flex: 1 1 auto;
+  overflow: hidden;
+  cursor: grab;
+  background:
+    radial-gradient(circle at 1px 1px, var(--edge) 1px, transparent 0) 0 0 / 22px 22px;
+}
+
+.canvas.panning { cursor: grabbing; }
+
+/* The rubber band. A plain <div> over the canvas rather than a rectangle inside
+ * the SVG: it is a gesture, not part of the drawing, so it lives in client
+ * pixels and needs no transform to follow the pointer. */
+.rubber {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  border: 1px dashed var(--selected);
+  background: color-mix(in srgb, var(--selected) 12%, transparent);
+}
+
+/* The canvas is one tab stop and says so. Inside it the arrow keys move, which
+ * is why the ring here is on the container and the ring below is on a shape. */
+.canvas:focus-visible { outline: 2px solid var(--focus); outline-offset: -3px; }
+
+.viewport {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+
+.viewport svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The hit area of a node is its shape; of an edge, its stroke -- which is a
+ * couple of pixels wide, so the pointer needs help finding it. */
+.viewport svg g.edge path { stroke-linecap: round; }
+.viewport svg g.edge { pointer-events: visibleStroke; }
+.viewport svg g.node, .viewport svg g.edge { cursor: pointer; }
+
+/* Routing a cable: the overlay links.js appends inside the drawing.
+ *
+ * The band is a wide, invisible stroke over every routable link, so that a
+ * click near a one-point line lands on it -- the same trick a mapping library
+ * uses for a road. It must not swallow hover, though: the info box is looked up
+ * from Graphviz's own <g class="edge">, and a transparent band on top of that
+ * would silently blank it. Hence `stroke` and not `fill`, and pointer events
+ * only where the stroke is. */
+.viewport svg .ng-link-hit {
+  stroke: transparent;
+  fill: none;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+/* The route of the selected link, drawn over Graphviz's own line. Visible only
+ * while a bend is being dragged, when Graphviz's line is a frame behind. */
+.viewport svg .ng-link-route {
+  stroke: var(--selected);
+  stroke-width: 1.6;
+  stroke-dasharray: 6 3;
+  fill: none;
+  pointer-events: none;
+}
+
+/* A grab handle. Big enough to hit at a normal zoom, and cheap enough to draw
+ * one per bend on a link with sixty-four of them. */
+.viewport svg .ng-handle {
+  fill: var(--bg);
+  stroke: var(--selected);
+  stroke-width: 1.6;
+  cursor: grab;
+}
+
+.viewport svg .ng-handle:hover { fill: var(--selected); }
+.viewport svg .ng-handle:active { cursor: grabbing; }
+
+/* The midpoint handle is hollow and a size smaller: it is not a bend yet, it is
+ * where one would go. */
+.viewport svg .ng-handle-add {
+  fill: var(--bg);
+  stroke-dasharray: 3 2;
+  opacity: .75;
+}
+
+/* A nudged label's handle, in the colour a label is drawn in rather than the
+ * selection's, so "this moves the words" needs no explaining. */
+.viewport svg .ng-handle-label {
+  stroke: var(--info);
+  fill: var(--bg);
+}
+
+.canvas.panning svg .ng-handle { cursor: grabbing; }
+
+/* The namespace containers of §2: the overlay containers.js appends *behind*
+ * the drawing, so that a frame is the paper its members sit on rather than a
+ * rectangle you cannot click a switch through.
+ *
+ * The frame itself takes events on its outline only, the same trick the
+ * annotation band and the link band use, so the middle of a site stays
+ * clickable for the racks inside it. The header does take them across its whole
+ * width, because that is what it is for. */
+.viewport svg .ng-container {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+  pointer-events: stroke;
+  cursor: default;
+  rx: 4;
+}
+
+.viewport svg .ng-container-picked {
+  stroke: var(--selected);
+  stroke-width: 1.6;
+  stroke-dasharray: 10 4;
+}
+
+/* A shallower namespace is drawn fainter, so three nested frames read as three
+ * levels rather than as one thick border. */
+.viewport svg .ng-container[data-depth="1"] { opacity: 0.45; }
+.viewport svg .ng-container[data-depth="2"] { opacity: 0.7; }
+
+.viewport svg .ng-container-header {
+  fill: color-mix(in srgb, var(--line) 25%, transparent);
+  stroke: none;
+  pointer-events: all;
+  cursor: move;
+}
+
+.viewport svg .ng-container-label {
+  fill: var(--muted);
+  pointer-events: all;
+  cursor: move;
+  user-select: none;
+}
+
+/* The fold triangle. Bigger hit area than it looks, because it is a glyph a
+ * few points across and a target nobody can hit is a command nobody has. */
+.viewport svg .ng-container-toggle {
+  fill: var(--fg);
+  cursor: pointer;
+  pointer-events: all;
+  user-select: none;
+  paint-order: stroke;
+  stroke: transparent;
+  stroke-width: 10;
+}
+
+.viewport svg .ng-container-toggle:hover { fill: var(--selected); }
+
+/* The container a drag is currently over. Filled rather than outlined: while
+ * something is in the air, "it would land here" is the only question. */
+.viewport svg .ng-container-drop {
+  fill: color-mix(in srgb, var(--selected) 12%, transparent);
+  stroke: var(--selected);
+  stroke-width: 2;
+  pointer-events: none;
+  rx: 4;
+}
+
+/* A corner handle on a container. Drawn like an annotation's -- it means the
+ * same thing -- under its own class for the same reason that one has one. */
+.viewport svg .ng-container-handle {
+  fill: var(--bg);
+  stroke: var(--selected);
+  stroke-width: 1.6;
+  cursor: nwse-resize;
+}
+
+.viewport svg .ng-container-handle:hover { fill: var(--selected); }
+.canvas.panning svg .ng-container-handle { cursor: grabbing; }
+
+/* The commentary of §21: the overlay notes.js appends inside the drawing.
+ *
+ * An area in an arranged drawing is a rectangle painted into the graph's
+ * background with nothing to click, so this band is its hit area -- a stroke
+ * along its outline, the same trick the link band uses, so that the middle of a
+ * zone stays clickable for the devices inside it. */
+.viewport svg .ng-anno-band {
+  stroke: transparent;
+  fill: none;
+  pointer-events: stroke;
+  cursor: move;
+}
+
+/* One that follows its members has no box to move. Saying so with the cursor
+ * costs nothing and means the refusal is not the first anybody hears of it. */
+.viewport svg .ng-anno-band[data-follows] { cursor: not-allowed; }
+
+/* What the canvas is acting on. A long dash, like the element halo, because it
+ * means the same thing -- and no fill, because an area already has one. */
+.viewport svg .ng-anno-picked {
+  fill: none;
+  stroke: var(--selected);
+  stroke-width: 1.6;
+  stroke-dasharray: 10 4;
+  pointer-events: none;
+  rx: 3;
+}
+
+/* A grab handle on a note or a zone. Drawn like a bend's -- it means the same
+ * thing -- but under a class of its own, because links.js claims `.ng-handle`
+ * for itself the moment one is pressed. */
+.viewport svg .ng-anno-handle {
+  fill: var(--bg);
+  stroke: var(--selected);
+  stroke-width: 1.6;
+  cursor: nwse-resize;
+}
+
+.viewport svg .ng-anno-handle:hover { fill: var(--selected); }
+.canvas.panning svg .ng-anno-handle { cursor: grabbing; }
+
+/* Typing a note's text, over the note itself. In client pixels rather than
+ * inside the SVG: it is a text box, not part of the drawing, and it belongs to
+ * the same overlay stack the palette and the context menu are in -- so Escape
+ * leaves it and the page's own chords do not fire into it. */
+.note-edit {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--selected);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: 0 6px 24px rgb(0 0 0 / 28%);
+}
+
+.note-edit-text {
+  width: 24rem;
+  min-height: 5rem;
+  padding: 6px;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  resize: both;
+}
+
+.note-edit-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.viewport svg g.hot { filter: drop-shadow(0 0 3px currentColor); }
+.viewport svg g.hot > * { stroke-width: 2.4; }
+.viewport svg g.faded { opacity: .28; }
+
+/* What *this* tab has selected. A long dash: a different pattern from the focus
+ * ring below and from the short dash above, so the three are told apart without
+ * relying on the three colours. */
+.viewport svg g.selected > *:not(text) {
+  stroke: var(--selected);
+  stroke-width: 2.5;
+  stroke-dasharray: 10 4;
+}
+
+/* The multi-selection: one rectangle per selected element, drawn into an
+ * overlay of its own rather than as a class on each shape. That is what lets an
+ * element whose contents cull.js has parked still show a ring -- there is no
+ * shape left to put a class on, and it is still selected. See select.js. */
+.viewport svg g.ng-selection { pointer-events: none; }
+
+.viewport svg .ng-halo {
+  fill: color-mix(in srgb, var(--selected) 10%, transparent);
+  stroke: var(--selected);
+  stroke-width: 1.5;
+  stroke-dasharray: 10 4;
+  rx: 3;
+}
+
+/* What somebody *else* has selected. Short dash, and their attention, not
+ * mine -- so it must never look like either of the other two. */
+.viewport svg g.remote > *:not(text) {
+  stroke: var(--info);
+  stroke-width: 2;
+  stroke-dasharray: 3 3;
+}
+
+/* Failure mode. The canvas is answering "what breaks if this dies", so the
+ * drawing is re-read as a casualty list: what died, what it took with it, and
+ * what survived.
+ *
+ * The survivors are dimmed rather than the casualties highlighted, because the
+ * question is about the casualties and there are usually far fewer of them --
+ * highlighting thirty things and leaving four hundred at full strength makes
+ * the answer harder to see, not easier. Nothing here changes a single file:
+ * the whole overlay is two class names, put on by app.js and taken off again
+ * when the mode is left. */
+.canvas.failing .viewport svg g.node,
+.canvas.failing .viewport svg g.edge {
+  opacity: 0.35;
+}
+
+.canvas.failing .viewport svg g.isolated,
+.canvas.failing .viewport svg g.failed {
+  opacity: 1;
+}
+
+/* What was clicked: gone, and drawn as gone. */
+.canvas.failing .viewport svg g.failed > *:not(text) {
+  stroke: var(--diff-removed);
+  stroke-width: 3;
+  stroke-dasharray: 2 3;
+}
+
+.canvas.failing .viewport svg g.failed text { fill: var(--diff-removed); }
+
+/* What it isolates: still there, and no longer reachable. */
+.canvas.failing .viewport svg g.isolated > *:not(text) {
+  stroke: var(--diff-changed);
+  stroke-width: 2.5;
+}
+
+.canvas.failing .viewport svg g.isolated text { fill: var(--diff-changed); }
+
+/* Where the keyboard is. Solid, heavy and haloed -- and violet, which is not a
+ * hue this diagram uses for anything else, so it cannot be read as a state of
+ * the network.
+ *
+ * Last of the three on purpose. An element is very often focused *and*
+ * selected, and of the two the focus ring is the one that has to survive: the
+ * user can always see what they selected, and cannot see where the keyboard
+ * went if this rule loses the cascade. */
+.viewport svg g.focused > *:not(text) {
+  stroke: var(--focus);
+  stroke-width: 3.5;
+  stroke-dasharray: none;
+}
+.viewport svg g.focused { filter: drop-shadow(0 0 4px var(--focus)); }
+
+/* --------------------------------------------------- level of detail */
+
+/* Zoomed far enough out that a node's label is a smudge. The words and the
+ * icons come off — at this scale they cost a repaint each and say nothing —
+ * and the namespace frames cull.js draws take over as the legend. The shapes
+ * stay: the point of being this far out is seeing where things are.
+ *
+ * The focus ring and both selection marks are deliberately *not* suppressed.
+ * "Where is the thing I selected" is exactly the question somebody zooms out
+ * to answer. */
+.canvas.coarse .viewport svg g.node text,
+.canvas.coarse .viewport svg g.edge text,
+.canvas.coarse .viewport svg g.node image {
+  display: none;
+}
+
+/* The stroke width, the dash and the font size are set per frame by cull.js,
+ * in drawing units worked back from the current zoom, so that they come out the
+ * same size on screen however far the diagram has been shrunk. Everything that
+ * does *not* depend on the zoom is here. */
+.viewport svg .ng-lod-frame {
+  fill: none;
+  stroke: var(--muted);
+  opacity: .7;
+}
+
+/* The one thing that stays legible when the labels go: which namespace this
+ * block of shapes is, and how much is in it. */
+.viewport svg .ng-lod-label {
+  fill: var(--muted);
+  font-family: Helvetica, Arial, sans-serif;
+  font-weight: 600;
+}
+
+/* ------------------------------------------------------- diagram outline */
+
+/* The drawing as a list. Off screen until focused; a real panel once it is,
+ * because a keyboard user who navigates here should be able to see where they
+ * are, and because it is the fastest way to find an element by name. */
+.outline {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.outline:focus, .outline:focus-within {
+  left: 0;
+  top: 0;
+  width: min(30rem, 60%);
+  height: auto;
+  max-height: 100%;
+  overflow: auto;
+  z-index: 9;
+  padding: .5rem .7rem 1rem;
+  background: var(--bg);
+  border-right: 1px solid var(--edge);
+  border-bottom: 1px solid var(--edge);
+  box-shadow: 6px 0 24px var(--shadow);
+}
+
+.outline h2 { font: 600 12px/1.6 var(--mono); margin: 0; text-transform: uppercase; }
+.outline p { margin: .1rem 0 .4rem; color: var(--muted); font: 11px/1.5 var(--mono); }
+.outline ul { list-style: none; margin: 0; padding: 0; }
+
+.outline-entry {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  padding: .1rem .2rem;
+  font: 12px/1.5 var(--mono);
+}
+
+.outline-entry:hover { background: color-mix(in srgb, var(--fg) 8%, transparent); }
+
+/* The outline is the selection said in text, so an entry in it is marked the
+ * same way the halo marks a shape. `aria-pressed` is what carries it to a
+ * screen reader; this is the sighted half of the same fact. */
+.outline-entry[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--selected) 18%, transparent);
+  box-shadow: inset 2px 0 0 var(--selected);
+}
+
+/* ------------------------------------------------------------- info box */
+
+.info {
+  position: fixed;
+  z-index: 10;
+  max-width: min(34rem, 46vw);
+  max-height: 70vh;
+  overflow: auto;
+  padding: .55rem .7rem .65rem;
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: 0 6px 24px var(--shadow);
+  font-family: var(--mono);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.info.pinned { pointer-events: auto; }
+
+.info h2 {
+  font: 600 13px/1.3 var(--mono);
+  margin: 0;
+  display: flex;
+  gap: .4rem;
+  align-items: baseline;
+}
+
+.info h2 .kind {
+  font-weight: 400;
+  color: var(--muted);
+  text-transform: lowercase;
+}
+
+.info .pinhint { float: right; font-weight: 400; color: var(--muted); font-size: 11px; }
+/* A table is allowed to be wider than the box and scroll: breaking "ethernet"
+ * across two lines to save a few pixels costs more than the scrollbar does. */
+.info section { margin-top: .5rem; overflow-x: auto; }
+.info h3 {
+  font: 600 10px/1.6 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--muted);
+  margin: 0 0 .15rem;
+}
+
+.info dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: .05rem .6rem;
+  margin: 0;
+}
+
+.info dt { color: var(--muted); }
+.info dd { margin: 0; overflow-wrap: anywhere; }
+
+.info table { border-collapse: collapse; width: 100%; }
+.info th {
+  text-align: left;
+  font: 600 10px/1.6 var(--mono);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  padding-right: .6rem;
+}
+.info td {
+  vertical-align: top;
+  padding: .05rem .6rem .05rem 0;
+  white-space: nowrap;
+}
+.info tr.off td { color: var(--muted); text-decoration: line-through solid; }
+.info .tag {
+  display: inline-block;
+  padding: 0 .3rem;
+  margin-right: .2rem;
+  border: 1px solid var(--edge);
+  border-radius: 3px;
+  font-size: 11px;
+}
+.info .note { color: var(--muted); }
+
+/* --------------------------------------------------------- style inspector */
+
+/* One row per field of §22: the name, a control, where the value came from, and
+ * a reset. A four-column grid rather than a flex row so that every provenance
+ * line starts at the same x -- the column is meant to be *scanned* ("which of
+ * these did I set?"), and a ragged left edge is the one thing that would stop
+ * it being scannable. */
+.style-body {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: .5rem .7rem 1rem;
+  font-size: 12px;
+}
+
+.style-row {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) auto auto;
+  gap: .45rem;
+  align-items: center;
+  padding: .3rem 0;
+  border-bottom: 1px solid var(--edge);
+}
+
+.style-label {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.style-input {
+  min-width: 0;
+  font: inherit;
+  padding: .2rem .3rem;
+}
+
+/* A colour well is a fixed square. Left to the grid it would stretch to the
+ * whole column and read as a filled bar rather than as a swatch. */
+.style-color {
+  width: 2.4rem;
+  height: 1.5rem;
+  padding: 0;
+  justify-self: start;
+  cursor: pointer;
+}
+
+/* Where the value came from. Small and grey: it is what you look at *after*
+ * deciding something is the wrong colour, never before. */
+.style-from {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.style-reset {
+  padding: 0 .35rem;
+  line-height: 1.4;
+}
+
+/* Disabled rather than hidden: the column keeps its width, so rows do not jump
+ * sideways as a selection changes what is and is not resettable. */
+.style-reset:disabled { opacity: .3; cursor: default; }
+
+.style-note {
+  margin: .6rem 0 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+#style-subject {
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* -------------------------------------------------------- changes drawer */
+
+/* Over the diagram rather than beside it: the drawer is opened to *read* the
+ * change and closed to carry on editing, and a fourth column would take a
+ * quarter of the canvas away permanently for something wanted occasionally.
+ * The pane it sits in is the positioning context; see `.pane.diagram`. */
+.pane.diagram { position: relative; }
+
+.drawer {
+  position: absolute;
+  z-index: 8;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(30rem, 55%);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-left: 1px solid var(--edge);
+  box-shadow: -8px 0 24px var(--shadow);
+}
+
+.drawer[hidden] { display: none; }
+.drawer .pane-head { align-items: center; flex-wrap: wrap; row-gap: .3rem; }
+.drawer .pane-head .field { text-transform: none; letter-spacing: 0; }
+
+.changes-list {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding: .2rem 0 1rem;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.change {
+  border-bottom: 1px solid var(--edge);
+  padding: .45rem .7rem .55rem;
+}
+
+/* A reverted entry is struck through rather than faded: it still has to be
+ * readable, because "what did I put back" is exactly the question being asked
+ * of it. */
+.change.reverted .label { text-decoration: line-through solid; color: var(--muted); }
+
+.change-head {
+  display: flex;
+  gap: .45rem;
+  align-items: baseline;
+}
+
+.change .n { color: var(--muted); }
+.change .label { flex: 1 1 auto; overflow-wrap: anywhere; }
+.change .label.revealable {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding: 0;
+}
+.change .where { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+
+/* The hunk is the point of the entry: it is what was written, in the form a
+ * reviewer already reads. The `+` and `-` in column one are the encoding; the
+ * colour agrees with it rather than replacing it. */
+.change pre {
+  margin: .35rem 0 0;
+  padding: .35rem .5rem;
+  max-height: 18rem;
+  overflow: auto;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  font: 11px/1.45 var(--mono);
+  white-space: pre;
+  background: var(--raised);
+}
+
+.change pre .add { color: var(--diff-added); }
+.change pre .del { color: var(--diff-removed); }
+.change pre .at { color: var(--info); }
+.change pre .file { font-weight: 600; }
+
+.change .commands { color: var(--muted); }
+
+/* --------------------------------------------------------------- legend */
+
+/* Only shown while a diff is on the canvas. A permanent key would be four
+ * words of furniture explaining a colour scheme that is not in use. */
+.legend {
+  position: absolute;
+  left: .7rem;
+  bottom: .7rem;
+  display: flex;
+  gap: .7rem;
+  padding: .3rem .5rem;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  background: var(--bg);
+  font: 11px/1.4 var(--mono);
+}
+
+.legend[hidden] { display: none; }
+
+/* Swatch *and* sigil *and* line style: three carriers for one distinction, so
+ * losing any one of them still leaves the legend readable. The sigils are the
+ * ones netviz.render.dot draws into the picture itself. */
+.legend .key::before {
+  content: "";
+  display: inline-block;
+  width: .6rem;
+  height: .6rem;
+  margin-right: .3rem;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+  vertical-align: -1px;
+}
+
+.legend .sigil { font-weight: 700; margin-right: .15rem; }
+.legend .added { color: var(--diff-added); }
+.legend .changed { color: var(--diff-changed); }
+.legend .changed::before { border-style: dashed; }
+.legend .removed { color: var(--diff-removed); }
+.legend .removed::before { border-style: dotted; }
+.legend .untouched { color: var(--diff-untouched); }
+.legend .untouched::before { border-style: solid; border-width: 1px; }
+
+.count { color: var(--muted); }
+
+/* ------------------------------------------------------ history timeline */
+
+/* Along the bottom of the diagram rather than over it: the scrubber and the
+ * picture it selects are read together, so the picture must not be the thing
+ * it covers. It takes its height out of the pane, which is why the canvas is
+ * a flex child and this is not absolutely positioned like the drawer. */
+.timeline {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--edge);
+  background: var(--raised);
+  padding: .35rem .7rem .45rem;
+  font-size: 12px;
+}
+
+.timeline[hidden] { display: none; }
+
+.timeline-controls {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+}
+
+.timeline-controls input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 6rem;
+  accent-color: var(--selected);
+}
+
+.timeline-controls button { padding: 0 .45rem; }
+.timeline-controls button[aria-pressed="true"] { color: var(--selected); font-weight: 700; }
+
+/* One line, four facts, in the order they answer "which commit is this": the
+ * hash to name it, the subject to recognise it, who and when to place it, and
+ * what it did to the network. The subject is the one allowed to take the room.
+ */
+.timeline-meta {
+  display: flex;
+  align-items: baseline;
+  gap: .5rem;
+  margin: .3rem 0 0;
+  min-height: 1.3em;
+  white-space: nowrap;
+}
+
+.timeline-meta .hash { flex: 0 0 auto; font-family: var(--mono); color: var(--warning); }
+
+/* The subject wins the room and the summary yields it: which commit this is
+ * has to be readable, and what it did is legible from the diagram itself. */
+.timeline-meta .subject {
+  flex: 1 1 12rem;
+  min-width: 4rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 600;
+}
+.timeline-meta .who { flex: 0 0 auto; color: var(--muted); }
+.timeline-meta .summary {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+/* A revision that does not load is shown, not skipped: the frame says why in
+ * the place the changeset would have gone. */
+.timeline.broken .timeline-meta .summary { color: var(--error); font-weight: 600; }
+
+/* -------------------------------------------------------------- overlays */
+
+/* One shell for the palette, the reference and the prompt: one focus trap, one
+ * Escape, one place the focus is returned to. See keys.js. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 8vh 1rem 1rem;
+  background: color-mix(in srgb, var(--fg) 35%, transparent);
+}
+
+/* The panel slides, the backdrop does not fade. A fade is an opacity, an
+ * opacity blends the text it contains, and text blended towards its background
+ * is text that fails contrast for as long as the animation lasts -- which is
+ * both a real (if brief) problem and one axe-core is right to report. */
+@keyframes panel-in {
+  from { transform: translateY(-6px); }
+  to { transform: none; }
+}
+
+.palette, .sheet, .prompt {
+  animation: panel-in 120ms ease-out;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  box-shadow: 0 12px 40px var(--shadow);
+  max-height: 84vh;
+  overflow: auto;
+}
+
+/* ------------------------------------------------------------- palette */
+
+.palette {
+  width: min(44rem, 100%);
+  padding: .5rem;
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+
+.palette-input {
+  width: 100%;
+  padding: .5rem .6rem;
+  font: 14px/1.4 var(--mono);
+  border: 1px solid var(--edge);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 50vh;
+  overflow: auto;
+}
+
+.palette-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: .6rem;
+  align-items: baseline;
+  padding: .25rem .5rem;
+  border-radius: 4px;
+  font: 12px/1.6 var(--mono);
+  cursor: pointer;
+}
+
+.palette-item.current { background: color-mix(in srgb, var(--focus) 18%, transparent); }
+/* Out of reach, and the row says why rather than disappearing: "where did that
+ * command go" is a worse question than "why is it greyed". */
+.palette-item.unavailable { cursor: not-allowed; }
+.palette-item.unavailable .palette-title { color: var(--muted); }
+.palette-group { color: var(--muted); text-transform: lowercase; }
+.palette-chord { font-weight: 600; color: var(--info); white-space: nowrap; }
+.palette-why { color: var(--warning); }
+.palette-status { margin: 0; padding: 0 .5rem; color: var(--muted); font: 11px/1.6 var(--mono); }
+
+/* ------------------------------------------------------------ reference */
+
+.sheet {
+  width: min(52rem, 100%);
+  padding: 1rem 1.2rem 1.2rem;
+}
+
+.sheet h2 { margin: 0 0 .2rem; font: 600 15px/1.4 var(--mono); }
+.sheet-lede { margin: 0 0 .8rem; color: var(--muted); font-size: 12px; }
+.sheet h3 {
+  margin: .9rem 0 .3rem;
+  font: 600 11px/1.6 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--muted);
+}
+
+.sheet dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: .2rem .8rem;
+  margin: 0;
+  font-size: 12px;
+}
+
+.sheet dt { white-space: nowrap; }
+.sheet dd { margin: 0; }
+.sheet-why { color: var(--warning); }
+.palette-only { color: var(--muted); font: 11px/1.5 var(--mono); }
+.sheet-close { margin-top: 1rem; }
+
+/* --------------------------------------------------------------- prompt */
+
+.prompt {
+  width: min(32rem, 100%);
+  padding: 1rem 1.2rem 1.2rem;
+}
+
+.prompt h2 { margin: 0 0 .3rem; font: 600 14px/1.4 var(--mono); }
+.prompt-detail { margin: 0 0 .7rem; color: var(--muted); font-size: 12px; }
+.prompt-field { display: flex; flex-direction: column; gap: .15rem; margin: 0 0 .6rem; }
+.prompt-field label { font: 600 11px/1.6 var(--mono); text-transform: uppercase; }
+.prompt-field input, .prompt-field select { padding: .35rem .45rem; }
+.prompt-hint { color: var(--muted); font-size: 11px; }
+.prompt-error { margin: 0 0 .6rem; color: var(--error); font-size: 12px; min-height: 1.2em; }
+.prompt-actions { display: flex; gap: .4rem; margin: 0; }
+.prompt-actions button { padding: .3rem .8rem; }
+
+/* --------------------------------------------------------- context menu */
+
+/* The layer is what makes a click anywhere else close the menu, and it is the
+ * only reason it exists: no backdrop, no dimming. The palette dims the page
+ * because it is asking a question; a context menu is answering one, and the
+ * diagram it was opened on has to stay readable behind it. */
+.menu-layer { position: fixed; inset: 0; z-index: 30; }
+
+.menu {
+  position: fixed;
+  min-width: 14rem;
+  max-width: 24rem;
+  max-height: 80vh;
+  overflow: auto;
+  padding: .25rem;
+  animation: panel-in 120ms ease-out;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--edge);
+  border-radius: 6px;
+  box-shadow: 0 12px 40px var(--shadow);
+}
+
+.menu-list { margin: 0; padding: 0; list-style: none; }
+/* The kinds are one word each, and a submenu as wide as the menu it hangs off
+ * covers the thing the menu was opened on. */
+.menu-sub { min-width: 9rem; }
+
+/* What the menu is about to act on, in the element's own address. A menu that
+ * does not say what it will delete is a menu nobody should press Delete in. */
+.menu-head {
+  margin: 0;
+  padding: .3rem .5rem .35rem;
+  color: var(--muted);
+  font: 11px/1.5 var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu-sep {
+  height: 0;
+  margin: .25rem .35rem;
+  border-top: 1px solid var(--line);
+}
+
+.menu-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1.2rem;
+  align-items: baseline;
+  width: 100%;
+  padding: .3rem .5rem;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: 12px/1.5 var(--mono);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-item:hover, .menu-item:focus { background: color-mix(in srgb, var(--focus) 18%, transparent); }
+.menu-item:focus { outline: none; }
+/* Out of reach, and the row says why rather than disappearing — the same
+ * bargain the palette makes, for the same reason. */
+.menu-item.unavailable { cursor: not-allowed; }
+.menu-item.unavailable .menu-title { color: var(--muted); }
+.menu-chord { font-weight: 600; color: var(--info); white-space: nowrap; }
+.menu-why { color: var(--warning); font-size: 11px; }
+.menu-more { color: var(--muted); }
+
+/* ---------------------------------------------------------- guided tour */
+
+/* The tour's card. Not a backdrop and not `position: fixed` over the middle:
+ * the whole point is that the page behind it is doing the things the card is
+ * describing, so it sits in a corner and leaves the diagram, the file list and
+ * the changes drawer visible. It is still an overlay in keys.js's stack, so
+ * Escape leaves it and Tab stays inside it. */
+.tour {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 40;
+  width: min(26rem, calc(100vw - 2rem));
+  padding: .8rem .9rem;
+  animation: panel-in 120ms ease-out;
+  background: var(--bg);
+  color: var(--fg);
+  border: 1px solid var(--focus);
+  border-left: 4px solid var(--focus);
+  border-radius: 8px;
+  box-shadow: 0 12px 40px var(--shadow);
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.tour-invite { border-color: var(--edge); border-left-color: var(--info); }
+
+.tour-progress {
+  margin: 0 0 .2rem;
+  font: 600 11px/1.6 var(--mono);
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tour h2 { margin: 0 0 .4rem; font: 600 15px/1.4 var(--mono); }
+.tour-body { font-size: 13px; line-height: 1.5; }
+.tour-body code { font: 12px/1.4 var(--mono); }
+
+.tour-note { margin: .5rem 0 0; font-size: 12px; color: var(--muted); min-height: 1.2em; }
+.tour-note.done { color: var(--ok); }
+.tour-note.done::before { content: "\2713\00a0"; }
+.tour-note.failed { color: var(--error); }
+
+.tour-actions { display: flex; gap: .4rem; margin: .7rem 0 0; }
+.tour-actions button { padding: .3rem .8rem; }
+.tour-actions button[disabled] { cursor: progress; }
+
+.tour-safe {
+  margin: .6rem 0 0;
+  padding-top: .5rem;
+  border-top: 1px solid var(--edge);
+  font-size: 11px;
+  color: var(--muted);
+  word-break: break-all;
+}
+
+.tour-sigil { font: 600 12px/1 var(--mono); color: var(--diff-added); }
+
+/* What the current card is talking about. A halo rather than a mask: masking
+ * the rest of the page would hide the diagram redrawing, which is the evidence
+ * the card is offering. */
+.tour-spot {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
+/* --------------------------------------------------------- high contrast */
+
+/* Windows high-contrast mode replaces every colour with the user's own. The
+ * one thing that must survive it is the *distinction* between the rings, which
+ * is why it is drawn with line style as well as with hue. */
+@media (forced-colors: active) {
+  .viewport svg g.focused > *:not(text) { stroke: Highlight; }
+  .palette-item.current { background: Highlight; color: HighlightText; forced-color-adjust: none; }
+  .tour-spot { outline-color: Highlight; }
+  kbd { border-color: CanvasText; }
+}
+
+@media (max-width: 720px) {
+  .drawer { width: 100%; }
+  .outline:focus, .outline:focus-within { width: 100%; }
+
+  main { flex-direction: column; }
+  .pane.editor { flex: 0 0 45%; border-right: 0; border-bottom: 1px solid var(--edge); }
+  .pane.files { flex: 0 0 20%; border-right: 0; border-bottom: 1px solid var(--edge); }
+  .splitter { display: none; }
+}

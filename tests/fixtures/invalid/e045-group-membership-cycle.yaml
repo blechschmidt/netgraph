@@ -2,9 +2,9 @@
 #
 # 'everyone' holds 'engineering', which holds 'everyone' back. Neither group has
 # a membership that can be listed: expanding either one does not terminate, so
-# no consumer of this inventory -- netgraph, a directory, or a reader -- can
+# no consumer of this inventory -- netviz, a directory, or a reader -- can
 # answer "who is in this?".
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata:
   name: everyone
@@ -12,7 +12,7 @@ spec:
   members:
     - engineering
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata:
   name: engineering

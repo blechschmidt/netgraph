@@ -21,11 +21,11 @@ from typing import Any
 import pytest
 from click.testing import CliRunner, Result
 
-from netgraph.cli import cli
-from netgraph.edit import EditSession, SetGeometry
-from netgraph.edit.errors import OperationError
-from netgraph.layout.document import canonical_geometry, geometry_sections, inline_entry
-from netgraph.layout.geometry import (
+from netviz.cli import cli
+from netviz.edit import EditSession, SetGeometry
+from netviz.edit.errors import OperationError
+from netviz.layout.document import canonical_geometry, geometry_sections, inline_entry
+from netviz.layout.geometry import (
     Box,
     Geometry,
     LabelPlacement,
@@ -35,7 +35,7 @@ from netgraph.layout.geometry import (
     Routing,
     round_coordinate,
 )
-from netgraph.layout.graphviz import (
+from netviz.layout.graphviz import (
     Drawing,
     Transform,
     fit_transform,
@@ -43,23 +43,23 @@ from netgraph.layout.graphviz import (
     realign,
     separate,
 )
-from netgraph.layout.resolve import conflicts_in, resolve_geometry, resolve_key
-from netgraph.layout.routing import FAN_GAP, Anchor, fan_offsets, label_position, route
-from netgraph.layout.seed import (
+from netviz.layout.resolve import conflicts_in, resolve_geometry, resolve_key
+from netviz.layout.routing import FAN_GAP, Anchor, fan_offsets, label_position, route
+from netviz.layout.seed import (
     LAYOUT_ENGINES,
     live_keys,
     seed_geometry,
     views_for,
     write_operations,
 )
-from netgraph.loader import load_tree
-from netgraph.models import LAYOUT_VIEWS, parse_layout
-from netgraph.models.layout import MAX_COORDINATE
-from netgraph.render import Layer, RenderOptions, build_graph, filter_graph
-from netgraph.render.dot import complete_layout, layout_plan, run_graphviz, to_dot
-from netgraph.render.graph import FilterSpec
-from netgraph.render.jsonexport import to_json
-from netgraph.render.routes import fans_of
+from netviz.loader import load_tree
+from netviz.models import LAYOUT_VIEWS, parse_layout
+from netviz.models.layout import MAX_COORDINATE
+from netviz.render import Layer, RenderOptions, build_graph, filter_graph
+from netviz.render.dot import complete_layout, layout_plan, run_graphviz, to_dot
+from netviz.render.graph import FilterSpec
+from netviz.render.jsonexport import to_json
+from netviz.render.routes import fans_of
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path
 
@@ -82,7 +82,7 @@ def write(root: Path, name: str, text: str) -> Path:
 #: Two switches and the cable between them: the smallest inventory that draws
 #: more than one node, so an arrangement of it has something to arrange.
 PAIR = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -93,7 +93,7 @@ spec:
       mtu: 1500
       ipv4: [10.0.0.1/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-b
@@ -104,7 +104,7 @@ spec:
       mtu: 1500
       ipv4: [10.0.0.2/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b
@@ -116,7 +116,7 @@ spec:
 
 def layout_document(body: str, *, name: str = "layout") -> str:
     return (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: layout\n"
         "metadata:\n"
         f"  name: {name}\n"
@@ -800,7 +800,7 @@ def test_a_routing_style_is_written_whether_or_not_waypoints_were_asked_for() ->
 
 
 def test_stale_geometry_is_a_warning_that_names_the_key(pair: Path) -> None:
-    from netgraph.validate import validate
+    from netviz.validate import validate
 
     write(
         pair,
@@ -815,7 +815,7 @@ def test_stale_geometry_is_a_warning_that_names_the_key(pair: Path) -> None:
 
 def test_a_derived_node_id_is_never_called_stale(pair: Path) -> None:
     """Only a drawing can judge one, and the validator does not build drawings."""
-    from netgraph.validate import validate
+    from netviz.validate import validate
 
     write(
         pair,
@@ -827,7 +827,7 @@ def test_a_derived_node_id_is_never_called_stale(pair: Path) -> None:
 
 def test_a_synthetic_edge_id_is_never_called_stale(pair: Path) -> None:
     """An adapter attachment is a fact about a drawing; no element declares it."""
-    from netgraph.validate import validate
+    from netviz.validate import validate
 
     write(
         pair,
@@ -842,17 +842,17 @@ def test_a_synthetic_edge_id_is_never_called_stale(pair: Path) -> None:
 
 
 def test_an_annotation_on_the_layout_suppresses_the_warning(pair: Path) -> None:
-    from netgraph.validate import validate
+    from netviz.validate import validate
 
     write(
         pair,
         "arrange.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: layout\n"
         "metadata:\n"
         "  name: layout\n"
         "  annotations:\n"
-        '    netgraph/ignore: "W138"\n'
+        '    netviz/ignore: "W138"\n'
         "spec:\n"
         "  views:\n"
         "    l1:\n      nodes:\n        sw-gone: {position: [1, 2]}\n",
@@ -887,7 +887,7 @@ def test_the_json_export_publishes_the_coordinates(pair: Path) -> None:
     assert placed["sw-b"] == {"position": {"x": 54.0, "y": 126.0}}
     (edge,) = document["edges"]
     assert edge["layout"]["waypoints"] == [{"x": 54.0, "y": 72.0}]
-    # The route netgraph draws is published beside what the inventory pinned, so
+    # The route netviz draws is published beside what the inventory pinned, so
     # a client can reproduce the picture without reimplementing the routing.
     assert {"x": 54.0, "y": 72.0} in edge["layout"]["route"]
     assert edge["layout"]["drawnAs"] == "spline"
@@ -913,7 +913,7 @@ def _within(anchor: Anchor, point: tuple[float, float]) -> bool:
     """Is this point *strictly* inside the box, rather than on its border?
 
     A clipped route ends exactly on the border, which
-    :meth:`~netgraph.layout.routing.Anchor.contains` counts as inside — rightly,
+    :meth:`~netviz.layout.routing.Anchor.contains` counts as inside — rightly,
     since that is the test for which points to drop. What a route must not do is
     go *through* the shape, which is this.
     """
@@ -1017,12 +1017,12 @@ def test_self_links_on_one_node_are_spread_outwards_rather_than_centred(pair: Pa
     write(
         pair,
         "loops.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata: {name: lp1}\n"
         "spec: {endpoints: [sw-a:port1, sw-a:port2], medium: copper}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata: {name: lp2}\n"
         "spec: {endpoints: [sw-a:port3, sw-a:port4], medium: copper}\n",
@@ -1132,7 +1132,7 @@ def test_seeded_waypoints_belong_to_the_links_they_were_read_from(tmp_path: Path
         for point, end in zip((link.waypoints[0], link.waypoints[-1]), ends, strict=True):
             assert abs(point[0] - end.x) < 300 and abs(point[1] - end.y) < 300, edge.id
         # And the size of every node a stored route leaves from is recorded with
-        # it, because the route has to stop at the shape and netgraph cannot
+        # it, because the route has to stop at the shape and netviz cannot
         # measure a label.
         assert all(end.width is not None for end in ends), edge.id
 
@@ -1181,7 +1181,7 @@ def test_an_arrangement_is_seeded_with_the_engine_that_was_asked_for(tmp_path: P
 
 @requires_dot
 def test_an_unknown_engine_is_refused() -> None:
-    from netgraph.errors import RenderError
+    from netviz.errors import RenderError
 
     graph = build_graph(load_tree(EXAMPLES / "home-lab"))
     with pytest.raises(RenderError, match="is not a layout engine"):
@@ -1303,7 +1303,7 @@ def test_clear_and_prune_together_is_a_usage_error(pair: Path) -> None:
 
 
 def test_an_inventory_that_does_not_load_is_refused(tmp_path: Path) -> None:
-    write(tmp_path, "broken.yaml", "apiVersion: netgraph.dev/v1alpha1\nkind: nonsense\n")
+    write(tmp_path, "broken.yaml", "apiVersion: netviz.dev/v1alpha1\nkind: nonsense\n")
     result = run(tmp_path, "layout")
     assert result.exit_code == 1
     assert "refusing to arrange" in result.output
@@ -1368,5 +1368,5 @@ def test_live_keys_reports_what_a_drawing_contains(pair: Path) -> None:
 
 
 def test_every_engine_offered_is_one_graphviz_has() -> None:
-    assert LAYOUT_ENGINES[0] == "dot", "the default is the layout netgraph draws with"
+    assert LAYOUT_ENGINES[0] == "dot", "the default is the layout netviz draws with"
     assert set(LAYOUT_ENGINES) <= {"dot", "neato", "fdp", "sfdp", "circo", "twopi", "patchwork"}

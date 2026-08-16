@@ -10,7 +10,7 @@ depends on:
   theme has no picture for keeps its plain shape rather than vanishing.
 * An SVG rendering stays a single self-contained file: the icons are embedded,
   not referenced by a path that only exists on the machine that drew it.
-* The bundled theme covers every kind netgraph can draw, in both an SVG and a
+* The bundled theme covers every kind netviz can draw, in both an SVG and a
   raster form, because Graphviz's ability to read the two differs by output.
 """
 
@@ -25,9 +25,9 @@ from pathlib import Path
 
 import pytest
 
-from netgraph.errors import RenderError
-from netgraph.loader import Inventory, load_tree
-from netgraph.render import (
+from netviz.errors import RenderError
+from netviz.loader import Inventory, load_tree
+from netviz.render import (
     BUNDLED_THEMES,
     FORMATS,
     ICON_KINDS,
@@ -42,8 +42,8 @@ from netgraph.render import (
     theme_choices,
     to_dot,
 )
-from netgraph.render.dot import _dot_string
-from netgraph.render.icons import CISCO, ICON_SUFFIXES, NO_ICONS, suffix_order
+from netviz.render.dot import _dot_string
+from netviz.render.icons import CISCO, ICON_SUFFIXES, NO_ICONS, suffix_order
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -165,7 +165,7 @@ def test_a_theme_with_only_one_format_is_used_for_every_output(tmp_path: Path) -
 # --------------------------------------------------------------------------- #
 
 
-def test_the_bundled_theme_draws_every_kind_netgraph_has() -> None:
+def test_the_bundled_theme_draws_every_kind_netviz_has() -> None:
     """Including the derived layer-3 subnet node, which is not an element kind."""
     assert CISCO.kinds() == ICON_KINDS
     assert SUBNET_KIND in ICON_KINDS
@@ -201,7 +201,7 @@ def test_the_committed_rasters_are_what_the_vectors_would_produce() -> None:
     """The PNGs are generated from the SVGs, so an edited SVG must not orphan one.
 
     Skipped where cairosvg is absent, which is most machines and CI: it is
-    deliberately not a netgraph dependency, and every other property of the
+    deliberately not a netviz dependency, and every other property of the
     committed files is asserted above without it.
     """
     pytest.importorskip("cairosvg", reason="only tools/render_icons.py needs it")

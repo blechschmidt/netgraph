@@ -12,7 +12,7 @@ Four kinds of test, and they check four different things:
 * **The semantics** — worked queries against ``examples/campus``, and the
   properties the docstrings claim: that a query and its negation partition the
   inventory, that the flags are sugar for the query
-  :func:`~netgraph.query.sugar.as_query` renders, that ``interface[X]`` and
+  :func:`~netviz.query.sugar.as_query` renders, that ``interface[X]`` and
   ``not interface[X]`` are complements.
 * **The wiring** — that ``--select``, ``assert: query`` and ``/api/query`` all
   reach the same implementation, which is the whole point of there being one.
@@ -32,9 +32,9 @@ from click.testing import CliRunner
 from hypothesis import given
 from hypothesis import strategies as st
 
-from netgraph.cli import cli
-from netgraph.loader import load_stream, load_tree
-from netgraph.query import (
+from netviz.cli import cli
+from netviz.loader import load_stream, load_tree
+from netviz.query import (
     ATTRIBUTES,
     MAX_DEPTH,
     MAX_TERMS,
@@ -47,11 +47,11 @@ from netgraph.query import (
     parse,
     select,
 )
-from netgraph.query.apply import narrow
-from netgraph.query.errors import MAX_QUERY_LENGTH
-from netgraph.query.facts import Facts, element_values
-from netgraph.query.lexer import TokenKind, tokenize
-from netgraph.render.graph import FilterSpec, Layer, build_graph, filter_graph
+from netviz.query.apply import narrow
+from netviz.query.errors import MAX_QUERY_LENGTH
+from netviz.query.facts import Facts, element_values
+from netviz.query.lexer import TokenKind, tokenize
+from netviz.render.graph import FilterSpec, Layer, build_graph, filter_graph
 
 REPO_ROOT: Final = Path(__file__).resolve().parent.parent
 CAMPUS: Final = REPO_ROOT / "examples" / "campus"
@@ -265,7 +265,7 @@ def test_nesting_and_term_budgets_are_enforced() -> None:
 
 def test_and_binds_tighter_than_or() -> None:
     """`a or b and c` is `a or (b and c)`, which is what everybody expects."""
-    from netgraph.query.ast import And, Or
+    from netviz.query.ast import And, Or
 
     expr = parse("kind = switch or kind = router and has vrf").expr
     assert isinstance(expr, Or)
@@ -279,7 +279,7 @@ def test_the_legal_corpus_exercises_every_node_of_the_grammar() -> None:
     the whole grammar — so a form added to the parser without a case here
     fails, rather than sitting untested behind a docstring.
     """
-    from netgraph.query.ast import All, And, Comparison, Exists, Not, Or, Scope, Traversal, walk
+    from netviz.query.ast import All, And, Comparison, Exists, Not, Or, Scope, Traversal, walk
 
     seen = {type(node) for text in LEGAL for node in walk(parse(text).expr)}
     assert seen == {All, And, Comparison, Exists, Not, Or, Scope, Traversal}, sorted(
@@ -289,7 +289,7 @@ def test_the_legal_corpus_exercises_every_node_of_the_grammar() -> None:
 
 def test_a_traversal_binds_tighter_than_and() -> None:
     """`within 2 hops of X and Y` is `(the neighbourhood) and Y`."""
-    from netgraph.query.ast import And, Traversal
+    from netviz.query.ast import And, Traversal
 
     expr = parse("within 2 hops of sw-core and kind = switch").expr
     assert isinstance(expr, And)
@@ -399,7 +399,7 @@ def test_a_worked_query_selects_what_it_says(text: str, count: int, campus) -> N
 
 
 def test_the_result_is_in_graph_order(campus) -> None:
-    """Not sorted order: every other netgraph listing is in load order."""
+    """Not sorted order: every other netviz listing is in load order."""
     order = list(campus.nodes)
     picked = evaluate(parse("kind = switch"), campus).nodes
     assert list(picked) == [fqn for fqn in order if fqn in set(picked)]
@@ -488,7 +488,7 @@ PARTITIONED: Final[tuple[str, ...]] = (
 
 @pytest.mark.parametrize("text", PARTITIONED, ids=PARTITIONED)
 def test_a_query_and_its_negation_partition_the_inventory(text: str, campus) -> None:
-    """The claim :mod:`netgraph.query.evaluate` makes, checked.
+    """The claim :mod:`netviz.query.evaluate` makes, checked.
 
     `not X` is the complement of `X` within the graph, so the two are disjoint
     and together are everything. There is no third answer for a node that lacks
@@ -530,7 +530,7 @@ def test_an_element_with_no_values_matches_neither_a_comparison_nor_its_negation
     and does catch it. Conflating the two is the mistake this pins down.
     """
     stream = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: bare
@@ -733,12 +733,12 @@ def test_select_narrows_a_report(run, tmp_path) -> None:
 def test_select_narrows_a_watch_cycle() -> None:
     """``watch`` draws through its own pipeline, so it has to be checked there.
 
-    Not through the CLI: ``netgraph watch`` blocks. What it shares with
+    Not through the CLI: ``netviz watch`` blocks. What it shares with
     ``render`` is the spec and the narrowing, and this is the seam where a
     pipeline that had kept calling ``filter_graph`` directly would show up — as
     a ValueError, by design, rather than as the whole inventory.
     """
-    from netgraph.watch.pipeline import RenderRequest, run_cycle
+    from netviz.watch.pipeline import RenderRequest, run_cycle
 
     result = run_cycle(
         RenderRequest(
@@ -798,7 +798,7 @@ def _suite(body: str, tmp_path: Path) -> Path:
     root.mkdir()
     (root / "net.yaml").write_text(
         """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -811,7 +811,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-a
@@ -825,7 +825,7 @@ spec:
         encoding="utf-8",
     )
     (root / "tests.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: testsuite\nmetadata:\n  name: s\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: testsuite\nmetadata:\n  name: s\n"
         f"spec:\n  assertions:\n{body}",
         encoding="utf-8",
     )
@@ -893,7 +893,7 @@ def test_a_malformed_query_in_an_assertion_is_reported_with_its_caret(run, tmp_p
 def test_an_assertion_may_not_carry_a_query_it_has_no_use_for(tmp_path) -> None:
     from pydantic import ValidationError as PydanticError
 
-    from netgraph.models.testsuite import Assertion
+    from netviz.models.testsuite import Assertion
 
     with pytest.raises(PydanticError, match="not a key of a reachable assertion"):
         Assertion.model_validate({"assert": "reachable", "from": "a", "to": "b", "query": "*"})
@@ -902,7 +902,7 @@ def test_an_assertion_may_not_carry_a_query_it_has_no_use_for(tmp_path) -> None:
 def test_a_query_assertion_needs_a_query(tmp_path) -> None:
     from pydantic import ValidationError as PydanticError
 
-    from netgraph.models.testsuite import Assertion
+    from netviz.models.testsuite import Assertion
 
     with pytest.raises(PydanticError, match="needs 'query'"):
         Assertion.model_validate({"assert": "query"})

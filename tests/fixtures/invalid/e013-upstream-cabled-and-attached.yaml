@@ -2,7 +2,7 @@
 #
 # 'adp-a' says it is plugged into 'laptop' with 'attached_to', and a cable says
 # the same thing again. The hardware has one plug; the two spellings can drift.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: laptop
@@ -13,7 +13,7 @@ spec:
       enabled: false
       mtu: 1500
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: adapter
 metadata:
   name: adp-a
@@ -29,7 +29,7 @@ spec:
       enabled: false
       mtu: 1500
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-dock

@@ -5,7 +5,7 @@
 # draws before recording outlets is the order an as-built document gets written
 # in, and refusing the half-finished state would make the model unusable while
 # it is being adopted.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-a
@@ -20,7 +20,7 @@ spec:
   power:
     draw_watts: 400
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -33,7 +33,7 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-srv

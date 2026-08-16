@@ -23,9 +23,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from netgraph.errors import RenderError
-from netgraph.loader import Inventory, load_tree
-from netgraph.render import (
+from netviz.errors import RenderError
+from netviz.loader import Inventory, load_tree
+from netviz.render import (
     FORMATS,
     MERMAID_MAX_EDGES,
     RENDERERS,
@@ -58,8 +58,8 @@ from netgraph.render import (
     to_json,
     to_mermaid,
 )
-from netgraph.render.dot import DOT_ENV_VAR, find_dot, graphviz_install_hint
-from netgraph.render.registry import DEFAULT_MEDIA_TYPE
+from netviz.render.dot import DOT_ENV_VAR, find_dot, graphviz_install_hint
+from netviz.render.registry import DEFAULT_MEDIA_TYPE
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -123,13 +123,13 @@ def test_node_order_follows_inventory_load_order(campus: Inventory) -> None:
 def test_an_unresolvable_endpoint_drops_the_edge_and_is_recorded(tmp_path: Path) -> None:
     """``--force`` must still produce a picture, so this cannot raise."""
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc}\n"
         "spec:\n"
         "  interfaces: [{name: eth0, type: ethernet, ipv4: [10.0.0.1/24]}]\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata: {name: cbl}\n"
         "spec: {endpoints: [pc:eth0, ghost:eth0], medium: copper}\n"
@@ -193,7 +193,7 @@ def l3(tmp_path: Path, *documents: str) -> Graph:
 def host(name: str, *interfaces: str, kind: str = "computer") -> str:
     """One element document whose interfaces are given as flow mappings."""
     return (
-        f"apiVersion: netgraph.dev/v1alpha1\n"
+        f"apiVersion: netviz.dev/v1alpha1\n"
         f"kind: {kind}\n"
         f"metadata: {{name: {name}}}\n"
         f"spec:\n"
@@ -344,7 +344,7 @@ def test_l3_keeps_the_layer_1_dangling_report(tmp_path: Path) -> None:
     graph = l3(
         tmp_path,
         host("pc", "{name: eth0, type: ethernet, ipv4: [10.0.0.1/24]}"),
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata: {name: cbl}\n"
         "spec: {endpoints: [pc:eth0, ghost:eth0], medium: copper}\n",
@@ -601,17 +601,17 @@ def test_a_links_medium_decides_its_line_style(campus: Inventory) -> None:
 
 def test_a_wireless_link_is_dashed(tmp_path: Path) -> None:
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc}\n"
         "spec: {interfaces: [{name: wlan0, type: wifi}]}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: router\n"
         "metadata: {name: ap}\n"
         "spec: {interfaces: [{name: wlan0, type: wifi}]}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata: {name: air}\n"
         "spec: {endpoints: [pc:wlan0, ap:wlan0], medium: wireless}\n"
@@ -642,17 +642,17 @@ def test_link_speed_is_encoded_as_pen_width(campus: Inventory) -> None:
 def test_a_link_of_unknown_rate_gets_no_pen_width(tmp_path: Path) -> None:
     """An undeclared rate must not be drawn as though it were the slowest."""
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc-a}\n"
         "spec: {interfaces: [{name: eth0, type: ethernet}]}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc-b}\n"
         "spec: {interfaces: [{name: eth0, type: ethernet}]}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata: {name: cbl}\n"
         "spec: {endpoints: [pc-a:eth0, pc-b:eth0], medium: copper}\n"
@@ -665,17 +665,17 @@ def test_a_link_of_unknown_rate_gets_no_pen_width(tmp_path: Path) -> None:
 def test_a_sub_gigabit_link_is_the_thinnest_step(tmp_path: Path) -> None:
     """Below the slowest threshold the width is stated, not left to the default."""
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc-a}\n"
         "spec: {interfaces: [{name: eth0, type: ethernet}]}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: hub\n"
         "metadata: {name: hub-old}\n"
         "spec: {interfaces: [{name: p1, type: ethernet}]}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata: {name: cbl}\n"
         "spec: {endpoints: [pc-a:eth0, hub-old:p1], medium: copper, speed: 100Mbps}\n"
@@ -693,7 +693,7 @@ def test_an_interface_with_many_addresses_is_abbreviated(tmp_path: Path) -> None
     """``max_addresses`` bounds one interface's row, not just a node's list."""
     addresses = ", ".join(f"10.0.0.{index}/24" for index in range(1, 7))
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: server\n"
         "metadata: {name: srv}\n"
         f"spec: {{interfaces: [{{name: eth0, type: ethernet, ipv4: [{addresses}]}}]}}\n"
@@ -708,7 +708,7 @@ def test_an_interface_with_many_addresses_is_abbreviated(tmp_path: Path) -> None
 def test_a_run_of_vlans_is_drawn_as_a_range(tmp_path: Path) -> None:
     """A trunk carrying 10..13 reads as ``10-13``, not as four numbers."""
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata: {name: sw}\n"
         "spec:\n"
@@ -768,7 +768,7 @@ def test_a_node_with_many_interfaces_counts_the_rest_off(tmp_path: Path) -> None
         for index in range(1, 21)
     )
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata: {name: sw-big}\n"
         "spec:\n"
@@ -783,7 +783,7 @@ def test_a_node_with_many_interfaces_counts_the_rest_off(tmp_path: Path) -> None
 
 def test_dot_is_an_undirected_graph_naming_every_node(home_lab: Inventory) -> None:
     source = render_dot(build_graph(home_lab))
-    assert source.startswith("graph netgraph {")
+    assert source.startswith("graph netviz {")
     assert source.rstrip().endswith("}")
     assert " -- " in source
     assert "->" not in source
@@ -794,7 +794,7 @@ def test_dot_is_an_undirected_graph_naming_every_node(home_lab: Inventory) -> No
 def test_dot_escapes_quotes_and_newlines_in_a_label(tmp_path: Path) -> None:
     """A description carrying a quote must not end the attribute early."""
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         'metadata: {name: pc, description: "a \\"quoted\\" name\\nsecond line"}\n'
         "spec:\n"
@@ -818,7 +818,7 @@ def test_a_device_name_carrying_quotes_or_braces_is_refused_by_the_schema(
 ) -> None:
     """First line of defence: such a name never survives loading (§4.1)."""
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: 'pc-\"quoted\"-{braced}'}\n"
         "spec:\n"
@@ -838,19 +838,19 @@ def _hostile_graph(tmp_path: Path) -> Graph:
     that a future refactor could move or relax.
     """
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc-a}\n"
         "spec:\n"
         "  interfaces: [{name: eth0, type: ethernet, ipv4: [10.0.0.1/24]}]\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc-b}\n"
         "spec:\n"
         "  interfaces: [{name: eth0, type: ethernet, ipv4: [10.0.0.2/24]}]\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata: {name: cbl}\n"
         "spec: {endpoints: [pc-a:eth0, pc-b:eth0], medium: copper}\n"
@@ -972,7 +972,7 @@ def _html_hostile_graph(tmp_path: Path) -> Graph:
     upstream validator.
     """
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: server\n"
         "metadata: {name: srv}\n"
         "spec:\n"
@@ -1124,7 +1124,7 @@ def _node_label(source: str, fqn: str) -> str:
     """The record label of ``fqn`` alone — what the diagram actually draws.
 
     A node statement also carries a tooltip, and the tooltip deliberately says
-    more than the label does (:mod:`netgraph.render.details`). A test about what
+    more than the label does (:mod:`netviz.render.details`). A test about what
     is *drawn* has to look at the label, or it passes on the strength of hover
     text nobody can see in a PNG.
     """
@@ -1244,7 +1244,7 @@ def test_mermaid_groups_namespaces_into_subgraphs(campus: Inventory) -> None:
 
 def test_mermaid_escapes_a_label_that_would_break_the_parser(tmp_path: Path) -> None:
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         'metadata: {name: pc, description: "a \\"quoted\\" <name> & more"}\n'
         "spec:\n"
@@ -1297,7 +1297,7 @@ def test_json_export_is_valid_and_carries_the_resolved_topology(home_lab: Invent
     graph = build_graph(home_lab)
     document = json.loads(render_json(graph))
 
-    assert document["apiVersion"] == "netgraph.dev/v1alpha1"
+    assert document["apiVersion"] == "netviz.dev/v1alpha1"
     assert document["kind"] == "NetworkGraph"
     assert document["layer"] == "l1"
     assert [node["id"] for node in document["nodes"]] == list(graph.nodes)
@@ -1312,13 +1312,13 @@ def test_json_export_is_valid_and_carries_the_resolved_topology(home_lab: Invent
 
 def test_json_export_reports_what_it_had_to_drop(tmp_path: Path) -> None:
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc}\n"
         "spec:\n"
         "  interfaces: [{name: eth0, type: ethernet, ipv4: [10.0.0.1/24]}]\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata: {name: cbl}\n"
         "spec: {endpoints: [pc:eth0, ghost:eth0], medium: copper}\n"
@@ -1354,14 +1354,14 @@ def test_a_missing_graphviz_executable_is_explained(
     home_lab: Inventory, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The message has to name the fix; a bare FileNotFoundError does not."""
-    monkeypatch.setattr("netgraph.render.dot.find_dot", lambda: None)
+    monkeypatch.setattr("netviz.render.dot.find_dot", lambda: None)
     with pytest.raises(RenderError, match="Install Graphviz") as caught:
         render(build_graph(home_lab), "svg")
-    # It must say what is missing, how to get it, where to point netgraph when it
+    # It must say what is missing, how to get it, where to point netviz when it
     # is installed somewhere the search cannot reach, and what to do meanwhile.
     #
     # The install command is asked for rather than spelled out: it is chosen for
-    # the platform (netgraph.render.dot._INSTALL_HINTS), and a hard-coded
+    # the platform (netviz.render.dot._INSTALL_HINTS), and a hard-coded
     # ``apt install`` asserts the Debian answer on Windows, where it is the wrong
     # one and the message deliberately does not give it.
     message = str(caught.value)
@@ -1422,7 +1422,7 @@ def test_an_empty_graph_still_renders(tmp_path: Path) -> None:
     """A filter that selects nothing produces an empty diagram, not a crash."""
     graph = build_graph(load_tree(tmp_path))
     assert graph.is_empty
-    assert render_dot(graph).startswith("graph netgraph {")
+    assert render_dot(graph).startswith("graph netviz {")
     assert render_mermaid(graph).startswith("flowchart TB")
     assert json.loads(render_json(graph))["nodes"] == []
 

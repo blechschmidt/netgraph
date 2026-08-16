@@ -18,7 +18,7 @@
 #
 # Nothing here is committed and no table of this name is created: --check stops
 # before the transaction. Keep it to constructs every nft since 0.9 accepts.
-table inet netgraph_probe {
+table inet netviz_probe {
 	chain c {
 		type filter hook input priority 0;
 	}

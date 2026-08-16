@@ -23,7 +23,7 @@ gestures a draw.io user can perform has somewhere to land:
 Regenerate the arrangement with:
 
 ```bash
-netgraph -i tests/fixtures/drawio/inventory layout --write --layer l1
+netviz -i tests/fixtures/drawio/inventory layout --write --layer l1
 ```
 
 ## The diagrams
@@ -32,7 +32,7 @@ All three are written by `python tools/gen_drawio_fixtures.py`:
 
 | File | What it is |
 |---|---|
-| `arranged-l1.drawio` | What `netgraph export drawio` produces from `inventory/`. A golden: a byte-for-byte diff of it is the review of a change to the emitter. |
+| `arranged-l1.drawio` | What `netviz export drawio` produces from `inventory/`. A golden: a byte-for-byte diff of it is the review of a change to the emitter. |
 | `arranged-l1-compressed.drawio` | The same model in the deflate+base64 encoding draw.io's desktop app writes by default, so the reader is exercised against both. |
 | `arranged-edited.drawio` | `arranged-l1.drawio` with the four gestures applied by hand: `pc-1` moved 120 points, `srv-app` relabelled `srv-web`, `pc-2`'s cell deleted, and an edge drawn from `pc-1` to `sw-access`. |
 
@@ -51,4 +51,4 @@ pytest tests/test_drawio.py --regen-golden
 
 The state digest is elided from it: it names the temporary directory the test
 copies the inventory into, and what it asserts — that a plan is only applied to
-the tree it was made from — is `netgraph apply`'s to test.
+the tree it was made from — is `netviz apply`'s to test.

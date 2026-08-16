@@ -1,10 +1,10 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: testsuite
 metadata:
   name: connectivity
   description: |
     What the campus is for. Every assertion here is a sentence somebody would
-    say out loud in a design review, written down so that `netgraph test` can
+    say out loud in a design review, written down so that `netviz test` can
     fail a pull request that quietly stops it being true.
 spec:
   description: staff, servers and management reach what they are supposed to

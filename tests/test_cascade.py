@@ -20,17 +20,17 @@ from pathlib import Path
 import pytest
 import yaml
 
-from netgraph.edit import (
+from netviz.edit import (
     CascadeRequired,
     DeleteElement,
     Disconnect,
     EditSession,
     ValidationRefused,
 )
-from netgraph.edit import cascade as cascade_module
-from netgraph.edit.cascade import describe, plan_cascade
-from netgraph.loader import load_tree
-from netgraph.validate import validate
+from netviz.edit import cascade as cascade_module
+from netviz.edit.cascade import describe, plan_cascade
+from netviz.loader import load_tree
+from netviz.validate import validate
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -146,23 +146,23 @@ def test_an_element_an_annotation_and_a_layout_in_one_file_all_go(tmp_path: Path
     write(
         root,
         "everything.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata:\n  name: sw\n"
         "spec:\n  interfaces:\n    - name: port1\n      type: ethernet\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: note\n"
         "metadata:\n  name: about-it\n"
         "spec:\n  text: gone with it\n  anchor:\n    element: sw\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: layout\n"
         "metadata:\n  name: layout\n"
         "spec:\n  views:\n    l1:\n      nodes:\n        sw:\n"
         "          position: {x: 1, y: 2}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata:\n  name: sw-other\n"
         "spec:\n  interfaces:\n    - name: port1\n      type: ethernet\n",
@@ -204,7 +204,7 @@ def test_a_disconnect_refuses_a_note_it_would_take_and_cascades_over_it(
     write(
         arranged,
         "notes.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: note\n"
         "metadata:\n  name: why-this-run\n"
         "spec:\n  text: the uplink\n  anchor:\n    link: cables/cbl-rtr-sw\n",
@@ -250,7 +250,7 @@ def test_a_note_that_is_only_anchored_cannot_survive_and_says_so(arranged: Path)
     write(
         arranged,
         "notes.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: note\n"
         "metadata:\n"
         "  name: about-the-switch\n"
@@ -277,7 +277,7 @@ def test_a_note_anchored_to_a_link_goes_with_the_device_that_link_ends_on(
     write(
         arranged,
         "notes.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: note\n"
         "metadata:\n"
         "  name: why-this-run\n"
@@ -299,7 +299,7 @@ def test_an_area_drops_a_doomed_member_and_keeps_the_rest(arranged: Path) -> Non
     write(
         arranged,
         "areas.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: area\n"
         "metadata:\n"
         "  name: the-rack\n"
@@ -320,7 +320,7 @@ def test_an_area_left_enclosing_nothing_goes(arranged: Path) -> None:
     write(
         arranged,
         "areas.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: area\n"
         "metadata:\n"
         "  name: just-the-switch\n"
@@ -339,7 +339,7 @@ def test_an_area_with_a_rectangle_of_its_own_survives_losing_every_member(
     write(
         arranged,
         "areas.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: area\n"
         "metadata:\n"
         "  name: zone\n"
@@ -381,17 +381,17 @@ def test_deleting_one_of_two_feeds_drops_the_redundancy_it_claimed(tmp_path: Pat
     write(
         root,
         "net.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: pdu\n"
         "metadata:\n  name: pdu-a\n"
         "spec:\n  outlets: 4\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: pdu\n"
         "metadata:\n  name: pdu-b\n"
         "spec:\n  outlets: 4\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: server\n"
         "metadata:\n  name: srv\n"
         "spec:\n"
@@ -426,12 +426,12 @@ def test_the_last_feed_takes_the_power_block_only_if_that_was_all_it_said(
     write(
         root,
         "net.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: pdu\n"
         "metadata:\n  name: pdu-a\n"
         "spec:\n  outlets: 4\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: server\n"
         "metadata:\n  name: srv\n"
         "spec:\n"
@@ -455,17 +455,17 @@ def test_a_group_loses_the_member_and_not_the_group(tmp_path: Path) -> None:
     write(
         root,
         "net.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: user\n"
         "metadata:\n  name: ada\n"
         "spec: {}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: user\n"
         "metadata:\n  name: grace\n"
         "spec: {}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: group\n"
         "metadata:\n  name: admins\n"
         "spec:\n  members: [ada, grace]\n",
@@ -487,7 +487,7 @@ def test_all_three_layers_are_one_change_and_one_undo_restores_them(arranged: Pa
     write(
         arranged,
         "notes.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: note\n"
         "metadata:\n"
         "  name: about-the-switch\n"
@@ -576,7 +576,7 @@ def test_a_tunnel_over_a_tunnel_goes_three_levels_up(tmp_path: Path) -> None:
 def _switch(name: str, interfaces: list[str]) -> str:
     ports = "".join(f"    - name: {one}\n      type: ethernet\n" for one in interfaces)
     return (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         f"metadata:\n  name: {name}\n"
         f"spec:\n  interfaces:\n{ports}---"
@@ -585,7 +585,7 @@ def _switch(name: str, interfaces: list[str]) -> str:
 
 def _link(kind: str, name: str, a: str, b: str, extra: str) -> str:
     return (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         f"kind: {kind}\n"
         f"metadata:\n  name: {name}\n"
         f"spec:\n{extra}  endpoints: [{a}, {b}]\n---"
@@ -599,7 +599,7 @@ def _link(kind: str, name: str, a: str, b: str, extra: str) -> str:
 
 def test_the_tunnel_node_prefix_is_still_the_renderers() -> None:
     """cascade.py spells it out rather than importing the renderer; hold them equal."""
-    from netgraph.render.graph import TUNNEL_ID_PREFIX as drawn
+    from netviz.render.graph import TUNNEL_ID_PREFIX as drawn
 
     assert drawn == cascade_module.TUNNEL_ID_PREFIX
 
@@ -631,7 +631,7 @@ def test_deleting_anything_from_a_clean_tree_leaves_a_clean_tree(
     A delete the validation gate *refuses* counts as passing, and is checked to
     have written nothing at all. That is not a loophole: cutting the only cable
     to a camera that declares ``powered_by: poe`` leaves a device claiming power
-    over a run that no longer exists, and there is no repair netgraph could make
+    over a run that no longer exists, and there is no repair netviz could make
     without inventing a fact — so it says so and stops, which is the behaviour
     ``--force`` exists to override. What it must never do is write half of it.
     """

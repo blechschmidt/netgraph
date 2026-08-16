@@ -1,9 +1,9 @@
-# netgraph in your editor
+# netviz in your editor
 
-`netgraph lsp` is a Language Server Protocol 3.17 server for inventory YAML. It
-gives an editor the things netgraph knows and a YAML mode cannot:
+`netviz lsp` is a Language Server Protocol 3.17 server for inventory YAML. It
+gives an editor the things netviz knows and a YAML mode cannot:
 
-* **Diagnostics** — everything [`netgraph validate`](commands/validate.md) reports,
+* **Diagnostics** — everything [`netviz validate`](commands/validate.md) reports,
   on the line and column that caused it, as you type. Each carries its `NG-*`
   rule id as the diagnostic code and a link to that rule's own section of
   [`docs/validation-rules.md`](validation-rules.md).
@@ -17,16 +17,16 @@ gives an editor the things netgraph knows and a YAML mode cannot:
   lands on, or ask a switch which cables terminate on it, across the whole
   folder.
 * **Rename** — through the same write path as
-  [`netgraph edit rename`](commands/edit.md), so every reference in every file is
+  [`netviz edit rename`](commands/edit.md), so every reference in every file is
   rewritten, in the spelling its author chose, with comments preserved.
-* **Format** — [`netgraph fmt`](commands/fmt.md), as format-on-save.
+* **Format** — [`netviz fmt`](commands/fmt.md), as format-on-save.
 * **Quick fixes** — the repairs from
-  [`netgraph validate --fix`](validation-rules.md#fixing-a-finding), offered on
+  [`netviz validate --fix`](validation-rules.md#fixing-a-finding), offered on
   the finding they repair.
 
-There is no separate install: the server is part of netgraph, and the command is
-`netgraph lsp`. There is also no new dependency — LSP's transport is JSON-RPC in
-`Content-Length` frames, and netgraph speaks it directly.
+There is no separate install: the server is part of netviz, and the command is
+`netviz lsp`. There is also no new dependency — LSP's transport is JSON-RPC in
+`Content-Length` frames, and netviz speaks it directly.
 
 * [Before you start](#before-you-start)
 * [VS Code](#vs-code)
@@ -39,21 +39,21 @@ There is no separate install: the server is part of netgraph, and the command is
 
 ## Before you start
 
-netgraph has to be on the `PATH` of the process your editor spawns, which is not
+netviz has to be on the `PATH` of the process your editor spawns, which is not
 always the shell you tested it in.
 
 <!-- run: -->
 ```console
-$ netgraph lsp --help
-Usage: netgraph lsp [OPTIONS]
+$ netviz lsp --help
+Usage: netviz lsp [OPTIONS]
 
   Serve inventory YAML to an editor over the Language Server Protocol.
 ...
 ```
 
 If your editor cannot find it, give the absolute path to the executable in the
-configuration below — `command = "/home/you/.venvs/netgraph/bin/netgraph"` — or
-run it as `python -m netgraph lsp`.
+configuration below — `command = "/home/you/.venvs/netviz/bin/netviz"` — or
+run it as `python -m netviz lsp`.
 
 ## VS Code
 
@@ -70,10 +70,10 @@ copy into your workspace's `.vscode/settings.json`:
 {
   "files.associations": { "**/*.yaml": "yaml" },
   "yaml.schemas": {
-    "./schema/netgraph.schema.json": ["**/*.yaml", "**/*.yml"]
+    "./schema/netviz.schema.json": ["**/*.yaml", "**/*.yml"]
   },
-  "netgraph.lsp.command": "netgraph",
-  "netgraph.lsp.args": ["lsp"]
+  "netviz.lsp.command": "netviz",
+  "netviz.lsp.args": ["lsp"]
 }
 ```
 
@@ -89,16 +89,16 @@ npm install
 code --extensionDevelopmentPath="$PWD" /path/to/your/inventory
 ```
 
-It contributes one setting, `netgraph.server.path`, for a netgraph that is not
-on the `PATH`, and one command, **netgraph: Restart language server**.
+It contributes one setting, `netviz.server.path`, for a netviz that is not
+on the `PATH`, and one command, **netviz: Restart language server**.
 
-Turn on format-on-save for YAML and `netgraph fmt` runs on every save:
+Turn on format-on-save for YAML and `netviz fmt` runs on every save:
 
 ```json
 {
   "[yaml]": {
     "editor.formatOnSave": true,
-    "editor.defaultFormatter": "netgraph.netgraph"
+    "editor.defaultFormatter": "netviz.netviz"
   }
 }
 ```
@@ -108,20 +108,20 @@ Turn on format-on-save for YAML and `netgraph fmt` runs on every save:
 Neovim 0.11 or newer, using the built-in client. No plugin is required.
 
 ```lua
--- ~/.config/nvim/lsp/netgraph.lua
+-- ~/.config/nvim/lsp/netviz.lua
 return {
-  cmd = { 'netgraph', 'lsp' },
+  cmd = { 'netviz', 'lsp' },
   filetypes = { 'yaml' },
   -- An inventory is a folder, and the folder is what makes cross-document
-  -- checks mean anything. netgraph.toml marks the root when there is one;
+  -- checks mean anything. netviz.toml marks the root when there is one;
   -- otherwise the repository is a good guess.
-  root_markers = { 'netgraph.toml', '.netgraphignore', '.git' },
+  root_markers = { 'netviz.toml', '.netvizignore', '.git' },
 }
 ```
 
 ```lua
 -- ~/.config/nvim/init.lua
-vim.lsp.enable('netgraph')
+vim.lsp.enable('netviz')
 
 vim.api.nvim_create_autocmd('BufWritePre', {
   pattern = { '*.yaml', '*.yml' },
@@ -133,14 +133,14 @@ On Neovim 0.10 and earlier, register it with `lspconfig` instead:
 
 ```lua
 local configs = require('lspconfig.configs')
-configs.netgraph = {
+configs.netviz = {
   default_config = {
-    cmd = { 'netgraph', 'lsp' },
+    cmd = { 'netviz', 'lsp' },
     filetypes = { 'yaml' },
-    root_dir = require('lspconfig.util').root_pattern('netgraph.toml', '.netgraphignore', '.git'),
+    root_dir = require('lspconfig.util').root_pattern('netviz.toml', '.netvizignore', '.git'),
   },
 }
-require('lspconfig').netgraph.setup({})
+require('lspconfig').netviz.setup({})
 ```
 
 `gd` goes to a definition, `grr` lists references, `grn` renames and `gra` offers
@@ -149,39 +149,39 @@ the quick fixes; those are Neovim's own defaults for a server that provides them
 ## Helix, Emacs, and everything else
 
 Any client that can spawn a process and speak LSP over stdio works. The command
-is `netgraph lsp` and the language id is `yaml`.
+is `netviz lsp` and the language id is `yaml`.
 
 Helix, in `languages.toml`:
 
 ```toml
-[language-server.netgraph]
-command = "netgraph"
+[language-server.netviz]
+command = "netviz"
 args = ["lsp"]
 
 [[language]]
 name = "yaml"
-language-servers = ["netgraph", "yaml-language-server"]
+language-servers = ["netviz", "yaml-language-server"]
 ```
 
-Listing netgraph alongside a general YAML server is deliberate and works: the two
+Listing netviz alongside a general YAML server is deliberate and works: the two
 answer different questions, and Helix merges what they return.
 
 Emacs, with `eglot`:
 
 ```elisp
-(add-to-list 'eglot-server-programs '(yaml-mode . ("netgraph" "lsp")))
+(add-to-list 'eglot-server-programs '(yaml-mode . ("netviz" "lsp")))
 ```
 
 ## The JSON Schema, and when to use it instead
 
-netgraph publishes [`schema/netgraph.schema.json`](../schema/netgraph.schema.json),
-and [`netgraph schema`](commands/schema.md) regenerates it. Point a YAML language
+netviz publishes [`schema/netviz.schema.json`](../schema/netviz.schema.json),
+and [`netviz schema`](commands/schema.md) regenerates it. Point a YAML language
 server at it and you get key completion and structural validation without running
-netgraph at all.
+netviz at all.
 
 That is a real option, and it is strictly less than the server gives you:
 
-| | JSON Schema | `netgraph lsp` |
+| | JSON Schema | `netviz lsp` |
 |---|---|---|
 | Keys, types, enums, field documentation | yes | yes |
 | One document is well-formed | yes | yes |
@@ -210,7 +210,7 @@ against a document that has no way to satisfy them:
 | `W103`, `W121`, `I002` | whether anything is cabled to this at all |
 | `W125`, `W128`, `W133`, `W135`, `W137`, `W138` | whether the other end of something is declared anywhere |
 
-Everything else is reported in full. Rename needs the folder too — netgraph will
+Everything else is reported in full. Rename needs the folder too — netviz will
 not rewrite references it cannot see — and says so rather than renaming half of
 them.
 
@@ -230,14 +230,14 @@ the first time something surprised it. Diagnostics are recomputed when the queue
 of incoming messages runs dry, so a burst of keystrokes costs one reload rather
 than one per character.
 
-**It watches the folder** exactly as [`netgraph watch`](commands/watch.md) does,
-with the same filter and the same debounce, so `git checkout`, `netgraph fmt` or a
+**It watches the folder** exactly as [`netviz watch`](commands/watch.md) does,
+with the same filter and the same debounce, so `git checkout`, `netviz fmt` or a
 colleague's `rsync` refreshes the diagnostics without your editor noticing
 anything. `--no-watch` turns it off.
 
-**It respects `netgraph.toml`.** The `[validate]` section — `ignore`, `severity`,
+**It respects `netviz.toml`.** The `[validate]` section — `ignore`, `severity`,
 `strict` — grades the findings the same way it does for
-[`netgraph validate`](commands/validate.md), so a rule your inventory has decided
+[`netviz validate`](commands/validate.md), so a rule your inventory has decided
 not to care about is not squiggled at you either.
 [`docs/configuration.md`](configuration.md) has the file.
 
@@ -248,17 +248,17 @@ it did before. An action that would make things worse is not offered.
 ## When it is not working
 
 **Nothing at all happens.** The server is started by the editor, so the first
-question is whether the editor could start it. Run `netgraph lsp --log
-/tmp/netgraph-lsp.log` from your editor's configuration and look at the file; if
+question is whether the editor could start it. Run `netviz lsp --log
+/tmp/netviz-lsp.log` from your editor's configuration and look at the file; if
 it is not created, the command never ran. In VS Code the *Output* panel has a
-`netgraph` channel; in Neovim, `:LspLog` and `:checkhealth vim.lsp`.
+`netviz` channel; in Neovim, `:LspLog` and `:checkhealth vim.lsp`.
 
 **Diagnostics appear but references do not resolve.** The client opened a file
 rather than a folder. `:lua =vim.lsp.get_clients()[1].root_dir` in Neovim, or the
 `rootUri` in the log, says which. See [the lone file](#the-lone-file).
 
 **Diagnostics are for the wrong lines.** A client and a server have to agree on
-how a column is counted. netgraph negotiates `positionEncoding` and implements
+how a column is counted. netviz negotiates `positionEncoding` and implements
 UTF-8, UTF-16 and UTF-32; if your client advertises none of them the protocol's
 default, UTF-16, is used. This is only ever visible on a line with a character
 outside the basic multilingual plane.
@@ -266,7 +266,7 @@ outside the basic multilingual plane.
 **It is slow on a large inventory.** Every keystroke reloads the tree. The parse
 cache does not apply while a buffer is open — the bytes being validated are not
 the bytes on disk — so the cost is a full parse of the folder. On a tree where
-that is noticeable, `netgraph --no-cache validate` is the same measurement from
+that is noticeable, `netviz --no-cache validate` is the same measurement from
 the command line, and
 [`tools/bench_incremental.py`](../tools/bench_incremental.py) is the benchmark it
 came from.
@@ -278,10 +278,10 @@ type anything.
 
 ## See also
 
-* [`netgraph lsp`](commands/lsp.md) — the command's own reference page.
+* [`netviz lsp`](commands/lsp.md) — the command's own reference page.
 * [`docs/validation.md`](validation.md) — what the diagnostics mean and how to
   silence one.
 * [`docs/editing.md`](editing.md) — the write path the rename and the quick fixes
   go through.
-* [`netgraph web`](commands/web.md) — the other editor, where the diagram is the
+* [`netviz web`](commands/web.md) — the other editor, where the diagram is the
   thing you edit.

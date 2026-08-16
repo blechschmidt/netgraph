@@ -4,7 +4,7 @@
 # the mark in the policy database. The marking half is here; the routing half
 # was written by source prefix instead and never grew a 'fwmark'. So the marked
 # traffic goes out the default uplink, and every command applies cleanly.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: firewall
 metadata:
   name: fw-a
@@ -40,7 +40,7 @@ spec:
       src: 10.20.0.0/16
       table: uplink-b
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-b
@@ -52,7 +52,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

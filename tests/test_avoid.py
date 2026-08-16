@@ -10,7 +10,7 @@ cause exactly that. Everything after that is the fix and its promises:
 * several links between the same two devices route as one bundle in lanes;
 * the cut-offs are hit, reported, and fall back rather than truncating.
 
-The counting is done by :func:`netgraph.layout.avoid.crossings`, which is also
+The counting is done by :func:`netviz.layout.avoid.crossings`, which is also
 what ``tools/route_crossings.py`` prints, so the number in the follow-up entry
 and the number this file asserts are the same number.
 """
@@ -22,18 +22,18 @@ from pathlib import Path
 
 import pytest
 
-from netgraph.layout.avoid import (
+from netviz.layout.avoid import (
     Budget,
     Obstacle,
     Router,
     crossings,
     offset_polyline,
 )
-from netgraph.layout.geometry import Routing
-from netgraph.layout.routing import Anchor, route
-from netgraph.loader import load_tree
-from netgraph.render import Layer, RenderOptions, build_graph
-from netgraph.render.routes import RouteCache, obstacles_of, route_plan
+from netviz.layout.geometry import Routing
+from netviz.layout.routing import Anchor, route
+from netviz.loader import load_tree
+from netviz.render import Layer, RenderOptions, build_graph
+from netviz.render.routes import RouteCache, obstacles_of, route_plan
 
 FIXTURES = Path(__file__).parent / "fixtures"
 OBSTRUCTED = FIXTURES / "obstructed"
@@ -326,8 +326,8 @@ def test_a_link_routing_gave_up_on_is_reported_by_the_renderer() -> None:
     """
     from dataclasses import replace
 
-    from netgraph.layout.geometry import Placement
-    from netgraph.render.dot import routing_advisories
+    from netviz.layout.geometry import Placement
+    from netviz.render.dot import routing_advisories
 
     graph = build_graph(load_tree(OBSTRUCTED), layer=Layer.L1)
     assert routing_advisories(graph, RenderOptions(routing=Routing.ORTHOGONAL)) == ()
@@ -422,7 +422,7 @@ def test_moving_a_node_onto_a_cable_re_routes_that_cable_and_no_other() -> None:
     """The interaction the cache exists for, and the one it must get right."""
     from dataclasses import replace
 
-    from netgraph.layout.geometry import Placement
+    from netviz.layout.geometry import Placement
 
     inventory = load_tree(OBSTRUCTED)
     graph = build_graph(inventory, layer=Layer.L1)

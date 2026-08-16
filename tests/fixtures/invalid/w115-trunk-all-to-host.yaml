@@ -3,7 +3,7 @@
 # 'trunk_vlans: all' expands to 1-4094. Between switches that is ordinary;
 # pointed at a workstation it hands the whole VLAN estate to a machine that
 # needs one of them.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -16,7 +16,7 @@ spec:
         mode: trunk
         trunk_vlans: all
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -28,7 +28,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

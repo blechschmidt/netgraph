@@ -5,13 +5,13 @@
 
 # Schema reference
 
-Every field netgraph accepts, read directly off the models in `src/netgraph/models/`.
+Every field netviz accepts, read directly off the models in `src/netviz/models/`.
 This is the lookup table; [`docs/schema.md`](schema.md) is the specification that
 explains the design, and [`docs/yang-mapping.md`](yang-mapping.md) explains how the
 YANG column relates to RFC 8343, RFC 8344 and IEEE 802.1Q.
 
 **Reading the tables.** *Required* means the key must be present in the document.
-*Default* is the value netgraph uses when it is absent — `—` for a required field,
+*Default* is the value netviz uses when it is absent — `—` for a required field,
 *unset* when the field simply has no value and nothing downstream supplies one. Several
 defaults are filled in at load time from elsewhere in the document (an interface's MTU
 becomes the address families' MTU, the device's `forwarding` becomes each family's
@@ -37,8 +37,8 @@ the field maps to, with `…` standing for
 | `user` | [UserSpec](#spec-of-a-user-document) | One identity: a person, a service account or a shared login. Owns no interfaces and terminates no cable; it is drawn only in the `identity` view. |
 | `group` | [GroupSpec](#spec-of-a-group-document) | A named set of identities. `members` may name a `user` or another `group`, which is what makes a hierarchy expressible; the nesting must not loop (`NG-S012`). |
 | `template` | partial [DeviceSpec](#spec--switch-router-firewall-hub-computer-server) | A named partial device spec, merged into every device that names it in `spec.from`. Not an element: never drawn, never listed, never validated on its own. |
-| `layout` | [LayoutSpec](#spec-of-a-layout-document) | Diagram geometry for elements declared elsewhere, scoped by view. Not an element: it carries no network facts and is never drawn as a node. See `netgraph layout`. |
-| `testsuite` | [TestSuiteSpec](#spec-of-a-testsuite-document) | Named assertions about the network the other documents describe, graded by `netgraph test`. Not an element: it declares no device and is never drawn. |
+| `layout` | [LayoutSpec](#spec-of-a-layout-document) | Diagram geometry for elements declared elsewhere, scoped by view. Not an element: it carries no network facts and is never drawn as a node. See `netviz layout`. |
+| `testsuite` | [TestSuiteSpec](#spec-of-a-testsuite-document) | Named assertions about the network the other documents describe, graded by `netviz test`. Not an element: it declares no device and is never drawn. |
 | `note` | [NoteSpec](#spec-of-a-note-document) | One free-text callout on the diagram, pinned to a point or anchored to an element or a link. Presentational: it declares no network fact and never changes what `validate`, `path`, `export` or `plan` conclude. |
 | `area` | [AreaSpec](#spec-of-an-area-document) | A labelled box drawn behind the nodes, enclosing the elements it names, matches or encircles. The declarative form of `--collapse` grouping: the same set of elements, boxed rather than folded. |
 | `legend` | [LegendSpec](#spec-of-a-legend-document) | A key: what the colours and line styles of the drawing mean, placed by corner rather than by coordinate. `auto: layers` derives the entries from what the view drew. |
@@ -49,7 +49,7 @@ Every document, whatever its kind, carries these three keys plus a `spec` whose 
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `apiVersion` | `netgraph.dev/v1alpha1` | **yes** | — | Schema version of the document. Only `netgraph.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`. | — |
+| `apiVersion` | `netviz.dev/v1alpha1` | **yes** | — | Schema version of the document. Only `netviz.dev/v1alpha1` is understood by this release; an unknown value is `NG-D002`. | — |
 | `kind` | string | **yes** | — | Which element this document declares. Selects the shape of `spec`, and is the discriminator of the model union. | — |
 | `metadata` | [Metadata](#metadata) | **yes** | — | Identity, description, labels and annotations. | — |
 
@@ -65,8 +65,8 @@ Identity and free-form annotation, shared by every kind.
 | `name` | element name | **yes** | — | Element name, unique within its namespace across all kinds (`NG-N002`). The namespace is the directory the document was found in. | — |
 | `description` | string | no | *unset* | Free text, may be multi-line. Rendered as the node's tooltip in SVG output. | — |
 | `location` | [Location](#metadatalocation) | no | *unset* | Where the hardware physically is: site, room, rack and the rack units it occupies. Drives `--layer rack` and the placement rules `NG-U001` to `NG-U004`. | — |
-| `labels` | map string → string | no | `{}` | Selector-friendly key/value pairs. Keys follow the Kubernetes label grammar; the `netgraph.dev/` prefix is reserved for the tool. | — |
-| `annotations` | map string → string | no | `{}` | Per-element input to the tooling, not selectable. `netgraph/ignore` suppresses validation rules on this element. | — |
+| `labels` | map string → string | no | `{}` | Selector-friendly key/value pairs. Keys follow the Kubernetes label grammar; the `netviz.dev/` prefix is reserved for the tool. | — |
+| `annotations` | map string → string | no | `{}` | Per-element input to the tooling, not selectable. `netviz/ignore` suppresses validation rules on this element. | — |
 
 ## `metadata.location`
 
@@ -83,7 +83,7 @@ Where the hardware physically is. Optional, and shared by every kind: a patch pa
 
 * `position` is the **lowest** rack unit the element occupies and `height` how many it takes, counting upwards; units are numbered from 1 at the bottom of the cabinet, which is how a rack is labelled.
 * `site`, `room` and `rack` together identify a rack (`NG-U001`). Two elements that name the same three share a cabinet and may not overlap; naming `position` or `rack_height` without `rack` is `NG-U004`.
-* `netgraph render --layer rack` draws one front elevation per rack, empty units included.
+* `netviz render --layer rack` draws one front elevation per rack, empty units included.
 
 ## `spec` — switch, router, firewall, hub, computer, server
 
@@ -140,7 +140,7 @@ The device VLAN database. A port may reference a VLAN this list does not declare
 |---|---|---|---|---|---|
 | `id` | integer, 1–4094 | **yes** | — | VLAN identifier. Unique within the device (`NG-V001`). | `…/dot1q:bridge-vlan/dot1q:vlan/dot1q:vid` |
 | `name` | string, ≤ 32 characters | no | *unset* | Human name of the VLAN. 802.1Q caps it at 32 characters. | `…/dot1q:bridge-vlan/dot1q:vlan/dot1q:name` |
-| `description` | string | no | *unset* | Free text. netgraph-only; 802.1Q has no such node. | — |
+| `description` | string | no | *unset* | Free text. netviz-only; 802.1Q has no such node. | — |
 
 ## `spec.interfaces[]`
 
@@ -196,7 +196,7 @@ One IPv4 address. Addresses are unique within the interface (`NG-A002`).
 | `prefix_length` | integer, 0–32 | **yes** | — | Prefix length. May be written as a dotted-quad `netmask` instead, which is normalised to a prefix length on load; a non-contiguous mask is rejected (`NG-A003`). | `…/ip:ipv4/ip:address/ip:prefix-length` |
 
 * `10.0.0.1/24` is shorthand for the mapping form.
-* `netmask: 255.255.255.0` may be written instead of `prefix_length`, but not as well as; it is normalised away on load and never appears in `netgraph show` output.
+* `netmask: 255.255.255.0` may be written instead of `prefix_length`, but not as well as; it is normalised away on load and never appears in `netviz show` output.
 
 ## `spec.interfaces[].ipv6`
 
@@ -225,7 +225,7 @@ The 802.1Q bridge-port configuration of one interface.
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `mode` | `access` \| `trunk` | **yes** | — | Access or trunk. 802.1Q has neither concept; netgraph expands the mode into a PVID, an acceptable-frame filter and VLAN membership (see docs/yang-mapping.md). | — |
+| `mode` | `access` \| `trunk` | **yes** | — | Access or trunk. 802.1Q has neither concept; netviz expands the mode into a PVID, an acceptable-frame filter and VLAN membership (see docs/yang-mapping.md). | — |
 | `access_vlan` | integer, 1–4094 | no | *unset* | The VLAN an access port belongs to, and the encapsulation VID of a `type: vlan` sub-interface. Required in access mode — it defaults to 1 — and forbidden in trunk mode (`NG-V002`). | `…/dot1q:bridge-port/dot1q:pvid` |
 | `trunk_vlans` | VLAN set | no | *unset* | The tagged VLAN set of a trunk port. Required in trunk mode, forbidden in access mode. | `…/dot1q:vlan/dot1q:egress-ports (tagged)` |
 | `native_vlan` | integer, 1–4094 | no | *unset* | The untagged VLAN on a trunk. Trunk mode only (`NG-V003`); it is implicitly a member of the port's VLAN set. | `…/dot1q:bridge-port/dot1q:pvid` |
@@ -246,7 +246,7 @@ The radio configuration of a `type: wifi` interface: which side of the associati
 | `band` | `2.4GHz` \| `5GHz` \| `6GHz` | no | *unset* | The band the radio operates in: `2.4GHz`, `5GHz` or `6GHz`. Required alongside `channel` and `width_mhz`, because both mean different frequencies in different bands. | `…/dot11:phy/dot11:channel-starting-factor` |
 | `channel` | integer, 1–233 | no | *unset* | The primary 20 MHz channel, as the band numbers it (`NG-W003`). | `…/dot11:phy/dot11:current-channel-number` |
 | `width_mhz` | `20` \| `40` \| `80` \| `160` \| `320` | no | *unset* | Total channel width in MHz. 40 is the most 2.4 GHz can bond and 320 is 6 GHz only (`NG-W004`). | `…/dot11:phy/dot11:current-channel-width` |
-| `tx_power_dbm` | number, -30.0–40.0 | no | *unset* | Radiated power in dBm. The MIB counts abstract power *levels* per PHY, so the unit is netgraph's own. | `…/dot11:phy/dot11:current-tx-power-level` |
+| `tx_power_dbm` | number, -30.0–40.0 | no | *unset* | Radiated power in dBm. The MIB counts abstract power *levels* per PHY, so the unit is netviz's own. | `…/dot11:phy/dot11:current-tx-power-level` |
 | `bss` | [Bss](#specinterfaceswirelessbss) list | no | `[]` | The basic service sets this radio beacons (`ap`) or is associated to (`station`, `mesh`, at most one — `NG-W006`). | `…/dot11:bss` |
 
 * `channel` and `width_mhz` both require `band`: channel numbers repeat between the 2.4 GHz and 6 GHz plans, and 320 MHz exists only at 6 GHz (`NG-W003`, `NG-W004`).
@@ -314,12 +314,12 @@ One configured static route (§16.3).
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
-| `prefix` | IPv4 prefix \| IPv6 prefix | **yes** | — | Destination prefix, either family, in canonical CIDR form. Host bits are rejected: a destination with them set is a typo or a host route, and netgraph will not guess which. | `…/rt:static-routes/v4ur:ipv4/v4ur:route/v4ur:destination-prefix` |
+| `prefix` | IPv4 prefix \| IPv6 prefix | **yes** | — | Destination prefix, either family, in canonical CIDR form. Host bits are rejected: a destination with them set is a typo or a host route, and netviz will not guess which. | `…/rt:static-routes/v4ur:ipv4/v4ur:route/v4ur:destination-prefix` |
 | `via` | IPv4 address \| IPv6 address | no | *unset* | Next-hop address. Same family as `prefix` (`NG-F003`), and on a prefix the device configures (`NG-F008`). | `…/v4ur:route/v4ur:next-hop/v4ur:next-hop-address` |
 | `dev` | interface name | no | *unset* | Egress interface, for an unnumbered next hop or a route pointed at an interface. Names an interface of this device (`NG-F009`). | `…/v4ur:route/v4ur:next-hop/v4ur:outgoing-interface` |
 | `vrf` | element name | no | *unset* | The routing instance holding the route. Names an entry of `spec.vrfs` (`NG-F005`); unset means the global instance. | `/ni:network-instances/ni:network-instance/ni:name` |
 | `table` | element name | no | *unset* | The routing table holding the route; `main` when unset. Names an entry of `spec.route_tables` or a reserved table (`NG-F019`). A VRF is a table of its own, so `vrf` and `table` are alternatives, not a pair (`NG-F018`). | — |
-| `metric` | integer, 0–4294967295 | no | *unset* | Administrative distance or cost, as this device counts it. Documentation only: netgraph does not compute a best path. | — |
+| `metric` | integer, 0–4294967295 | no | *unset* | Administrative distance or cost, as this device counts it. Documentation only: netviz does not compute a best path. | — |
 | `blackhole` | boolean | no | `false` | Discard matching packets. Excludes `via` and `dev` (`NG-F004`). | `…/v4ur:route/v4ur:next-hop/v4ur:special-next-hop` |
 
 * At least one of `via`, `dev` and `blackhole` is required, and `blackhole` excludes the other two (`NG-F004`).
@@ -547,7 +547,7 @@ A tunnel is an undirected logical link between two or more interfaces of `type: 
 | `mtu` | integer, 68–65535 | no | *unset* | MTU of the tunnel interface. Compared with what the underlay leaves after the encapsulation overhead of the whole stack (`NG-T011`). | — |
 | `encrypted` | boolean | no | *unset* | Whether the payload is protected. Defaults to what the type does — true for WireGuard, IPsec and OpenVPN, false for GRE, VXLAN, Geneve, L2TP and PPTP, whose MPPE is broken. Set it to true to record that the deployment protects an otherwise cleartext type some other way. | — |
 | `cipher` | string | no | *unset* | Negotiated cipher suite, free text (`chacha20-poly1305`, `aes-256-gcm`). Only on a tunnel that encrypts (`NG-T009`). | — |
-| `auth` | `psk` \| `certificate` \| `public-key` \| `password` | no | *unset* | How the endpoints authenticate each other: `psk`, `certificate`, `public-key` or `password`. The *method*, never the material — netgraph stores no secrets (`NG-T010`). | — |
+| `auth` | `psk` \| `certificate` \| `public-key` \| `password` | no | *unset* | How the endpoints authenticate each other: `psk`, `certificate`, `public-key` or `password`. The *method*, never the material — netviz stores no secrets (`NG-T010`). | — |
 | `label` | string | no | *unset* | Free-text identifier printed on the edge, as a cable's `label` is. | — |
 | `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
@@ -571,7 +571,7 @@ A patch panel is a passive cross-connect: numbered positions on the front, the s
 | `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
 * `ports` is the only required key. Each position it names becomes two interfaces, `front/<n>` and `rear/<n>`, which a cable terminates on exactly as it terminates on a device port (`NG-P001`).
-* A panel is not a hop. `netgraph render --layer physical` draws it and both cable segments; every other layer splices the run into the single edge it electrically is, between the two active ports.
+* A panel is not a hop. `netviz render --layer physical` draws it and both cable segments; every other layer splices the run into the single edge it electrically is, between the two active ports.
 * `couplers` is only needed for a panel that is cross-wired. The default is the identity mapping, which is what the numbering printed on a real panel promises.
 
 ## `spec` — pdu
@@ -590,7 +590,7 @@ A power distribution unit: numbered outlets, a rated capacity, and the supply th
 | `style` | [Style](#specstyle) | no | *unset* | How this element is drawn (§22): fill, stroke, shape, icon and five more. Every field is optional, and an absent one inherits from the theme, then the icon set, then the built-in palette. | — |
 
 * `outlets` is the only required key, and takes the same count-or-range shorthand `ports` does. An outlet is **not** an interface: a power cord is not a `cable`, so nothing is cabled to a PDU — a device names an outlet in `power.inputs` instead.
-* A PDU is placed on a rack elevation through `metadata.location`, exactly as a switch is, and `netgraph render --layer rack` annotates it with its utilisation.
+* A PDU is placed on a rack elevation through `metadata.location`, exactly as a switch is, and `netviz render --layer rack` annotates it with its utilisation.
 * `input_feed` is free text and is compared only for equality. It is what makes A/B redundancy checkable: two units on one feed fail together (`NG-E015`).
 
 ## `spec.power`
@@ -650,7 +650,7 @@ One identity: a person, a service account or a shared login. Owns no interfaces 
 |---|---|---|---|---|---|
 | `login` | string, 1–64 characters | no | *unset* | The account name, when it differs from `metadata.name`; absent means the two are the same. Estate-wide, so two users claiming one login is `NG-S013`. | `/ietf-system:system/authentication/user/name` |
 | `full_name` | string, ≤ 253 characters | no | *unset* | The person's name as they write it. Free text: a real name is not a grammar. | — |
-| `email` | string, 3–254 characters | no | *unset* | Where mail reaches them, `local@domain.tld`. Also what ties the identity to a directory without netgraph having to model the directory. | — |
+| `email` | string, 3–254 characters | no | *unset* | Where mail reaches them, `local@domain.tld`. Also what ties the identity to a directory without netviz having to model the directory. | — |
 | `uid` | integer, 0–4294967294 | no | *unset* | POSIX user id, when the estate assigns one. 0 to 4294967294; two users claiming one is `NG-S013`. | `/ietf-system:system/authentication/user` |
 | `type` | `person` \| `service` \| `shared` | no | `person` | `person`, `service` or `shared`. Decides whether `NG-S015` and `NG-S016` have anything to say: only a person can depart, and only a person is expected in a group. | — |
 | `status` | `active` \| `suspended` \| `departed` | no | `active` | `active`, `suspended` or `departed`. A departed account is kept rather than deleted so the memberships still to be revoked stay visible (`NG-S015`). | — |
@@ -678,7 +678,7 @@ A named set of identities. `members` may name a `user` or another `group`, which
 
 ## `spec` of a `layout` document
 
-Where things are drawn, per view. A sidecar: it carries no network facts, and the elements it places know nothing about it. `netgraph layout` writes it.
+Where things are drawn, per view. A sidecar: it carries no network facts, and the elements it places know nothing about it. `netviz layout` writes it.
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
@@ -687,11 +687,11 @@ Where things are drawn, per view. A sidecar: it carries no network facts, and th
 
 * Coordinates are **points** (1/72 inch), `y` upwards, origin at the bottom left, and a `position` is the **centre** of what it places — Graphviz's system, so a stored arrangement can be handed straight back to it.
 * A key is an address, resolved like any other reference. A node the inventory does not declare is keyed by its graph id instead: `subnet:10.0.0.0/24`, `tunnel:site/wg0`, `rack:hq/comms/r1`.
-* A key naming something the inventory no longer has is `NG-Y001`, a warning; `netgraph layout --prune` drops it.
+* A key naming something the inventory no longer has is `NG-Y001`, a warning; `netviz layout --prune` drops it.
 
 ## `spec.views.<view>`
 
-One view's arrangement. The view name is a layer netgraph draws — `physical`, `l1`, `l2`, `l3`, `overlay`, `routing`, `rack`, `power` — because the same device sits somewhere different in each.
+One view's arrangement. The view name is a layer netviz draws — `physical`, `l1`, `l2`, `l3`, `overlay`, `routing`, `rack`, `power` — because the same device sits somewhere different in each.
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
@@ -709,11 +709,11 @@ Where one node is drawn.
 | `position` | [Point](#a-point) | **yes** | — | Centre of the node, in points. | — |
 | `size` | [Size](#a-size) | no | *unset* | Box the node occupies, in points. Omitted means the label decides, which is what keeps an arrangement valid when a device grows a port. | — |
 
-* `size` is optional and is not seeded by `netgraph layout --write`: Graphviz derives the same box from the same label on every run. It is honoured on read, for an editor that lets somebody resize a box on purpose.
+* `size` is optional and is not seeded by `netviz layout --write`: Graphviz derives the same box from the same label on every run. It is honoured on read, for an editor that lets somebody resize a box on purpose.
 
 ## `spec.views.<view>.edges.<address>`
 
-How one link is drawn: the bends it goes through, the style it is routed in and where its label sits. Bends are not seeded unless `netgraph layout --write --waypoints` is asked for — a computed spline is noise, a hand-placed bend is a decision — but a `routing` or a `label` is always written, neither being derivable.
+How one link is drawn: the bends it goes through, the style it is routed in and where its label sits. Bends are not seeded unless `netviz layout --write --waypoints` is asked for — a computed spline is noise, a hand-placed bend is a decision — but a `routing` or a `label` is always written, neither being derivable.
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
@@ -761,7 +761,7 @@ Two positive numbers, in points. `{width: 220, height: 90}` or `[220, 90]`.
 
 ## `spec` of a `testsuite` document
 
-Named claims about the network the other documents describe. `netgraph test` grades them and exits non-zero when one does not hold.
+Named claims about the network the other documents describe. `netviz test` grades them and exits non-zero when one does not hold.
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
@@ -780,13 +780,13 @@ Named claims about the network the other documents describe. `netgraph test` gra
 | `assert` | `reachable` \| `not-reachable` \| `path-shorter-than` \| `same-vlan` \| `distinct-vlan` \| `within-prefix` \| `has-interface` \| `port-count-at-least` \| `unique` \| `count` \| `no-single-point-of-failure` \| `query` | **yes** | — | What is being claimed: `reachable`, `not-reachable`, `path-shorter-than`, `same-vlan`, `distinct-vlan`, `within-prefix`, `has-interface`, `port-count-at-least`, `unique`, `count` or `no-single-point-of-failure`. Every other key is read in its light. | — |
 | `name` | string, ≤ 200 characters | no | *unset* | How the claim is reported — a sentence a reader who has never seen the inventory can act on. Defaults to a description built from the other keys. | — |
 | `description` | string | no | *unset* | Why the claim is made. Printed under a failure, so it is where the ticket number or the standard that demands it belongs. | — |
-| `from` | string, ≥ 1 character | no | *unset* | Where the trace starts: an element, `element:interface`, an IP address, or a selector matching several of them. The spellings `netgraph path` accepts. | — |
+| `from` | string, ≥ 1 character | no | *unset* | Where the trace starts: an element, `element:interface`, an IP address, or a selector matching several of them. The spellings `netviz path` accepts. | — |
 | `to` | string, ≥ 1 character | no | *unset* | Where the trace ends, in the same four spellings as `from`. | — |
 | `max_hops` | integer, 1–64 | no | *unset* | Abandon a route that crosses more links than this. Defaults to the trace engine's own limit of 16. | — |
 | `hops` | integer, 1–64 | no | *unset* | `path-shorter-than`: the exclusive upper bound on the hop count of the shortest path. | — |
 | `vlan` | integer, 1–4094 | no | *unset* | Restrict a trace to one VLAN, or pin which VLAN `same-vlan` means. | — |
 | `layer` | `any` \| `l1` \| `l2` \| `l3` \| `power` | no | *unset* | Which view the claim is about: `any`, `l2` or `l3` for a trace; `any`, `l1`, `l2`, `l3` or `power` for `no-single-point-of-failure`. | — |
-| `select` | string, ≥ 1 character | no | *unset* | Which elements the claim is about, in `netgraph render`'s filter vocabulary: `kind=switch, namespace=sites/north, name=sw-*`. A bare word is a name glob. | — |
+| `select` | string, ≥ 1 character | no | *unset* | Which elements the claim is about, in `netviz render`'s filter vocabulary: `kind=switch, namespace=sites/north, name=sw-*`. A bare word is a name glob. | — |
 | `query` | string, ≥ 1 character | no | *unset* | The same thing said in the selector language (`docs/query.md`), which can express what the vocabulary above cannot: `kind in (switch, router) and not interface[name ~ 'Vlan*' and has address]`. Either key supplies the elements a selector assertion is graded over, and both together are ANDed. An `assert: query` takes this one and grades how much it matches against `equals` / `at_least` / `at_most`, defaulting — with none of them — to the claim that it matches nothing. | — |
 | `prefix` | string, ≥ 1 character | no | *unset* | `within-prefix`: the CIDR every routable address on a selected element must lie inside. | — |
 | `interface` | string, ≥ 1 character | no | *unset* | `has-interface`: the interface name every selected element must declare, or a glob matching it. | — |
@@ -797,13 +797,13 @@ Named claims about the network the other documents describe. `netgraph test` gra
 | `at_most` | integer, ≥ 0 | no | *unset* | `count` and `query`: the inclusive upper bound on how many elements the selector matches. | — |
 | `min_isolated` | integer, ≥ 1 | no | *unset* | `no-single-point-of-failure`: ignore a candidate that isolates fewer endpoints than this. 1, the default, reports every one of them. | — |
 
-* `reachable`, `not-reachable` and `path-shorter-than` take `from` and `to` in the spellings `netgraph path` accepts: an element, `element:interface`, an IP address, or a selector matching several of them.
-* `same-vlan`, `distinct-vlan`, `within-prefix`, `has-interface`, `port-count-at-least`, `unique` and `count` take `select`, in `netgraph render`'s filter vocabulary.
+* `reachable`, `not-reachable` and `path-shorter-than` take `from` and `to` in the spellings `netviz path` accepts: an element, `element:interface`, an IP address, or a selector matching several of them.
+* `same-vlan`, `distinct-vlan`, `within-prefix`, `has-interface`, `port-count-at-least`, `unique` and `count` take `select`, in `netviz render`'s filter vocabulary.
 * `no-single-point-of-failure` takes neither, and optionally narrows the candidates with `select` and the views with `layer`.
 
 ## `spec` of a `note` document
 
-One callout on the diagram. Presentational throughout: a note cannot make `netgraph validate` fail, cannot move a hop in `netgraph path`, and never reaches an exported configuration.
+One callout on the diagram. Presentational throughout: a note cannot make `netviz validate` fail, cannot move a hop in `netviz path`, and never reaches an exported configuration.
 
 | Field | Type | Required | Default | Description | YANG |
 |---|---|---|---|---|---|
@@ -932,7 +932,7 @@ Only `ethernet`, `wifi` and `lag` can terminate a cable (`NG-C009`).
 
 ### `vlan.mode`
 
-A netgraph abstraction; 802.1Q has no equivalent leaf.
+A netviz abstraction; 802.1Q has no equivalent leaf.
 
 | Value |
 |---|
@@ -1107,7 +1107,7 @@ Which IEEE 802.3 amendment the port implements, and therefore which classes exis
 
 ### `tunnel.auth`
 
-The authentication *method*. netgraph never stores key material (`NG-T010`).
+The authentication *method*. netviz never stores key material (`NG-T010`).
 
 | Value |
 |---|
@@ -1139,7 +1139,7 @@ Decides which identity rules apply: only a `person` can depart (`NG-S015`), and 
 ## Scalar formats
 
 Values that are normalised on load: what you write and what
-`netgraph show` prints back may differ.
+`netviz show` prints back may differ.
 
 | Type | Accepted | Stored as |
 |---|---|---|
@@ -1154,5 +1154,5 @@ Values that are normalised on load: what you write and what
 
 Booleans are strict on purpose: a quoted `"true"` or a YAML 1.1 `yes` is an error,
 not a silently accepted truth value. A MAC address written unquoted can be parsed by
-YAML as a sexagesimal integer, which loses the original digits — netgraph detects the
+YAML as a sexagesimal integer, which loses the original digits — netviz detects the
 case and tells you to quote it.

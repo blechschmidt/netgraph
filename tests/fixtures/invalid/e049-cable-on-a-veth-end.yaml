@@ -2,7 +2,7 @@
 #
 # A veth end is 'ethernet' by type, so the type check of E012 waves it through;
 # what it does not have is a socket, because its far side is the peer it names.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-a
@@ -27,7 +27,7 @@ spec:
       ipv4:
         addresses: [10.1.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-b
@@ -44,7 +44,7 @@ spec:
       ipv4:
         addresses: [10.1.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b
@@ -54,7 +54,7 @@ spec:
     - srv-b:eth0
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-veth

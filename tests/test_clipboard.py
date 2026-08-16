@@ -10,7 +10,7 @@ produces ``sw1-copy-copy`` has stopped thinking.
 **A copy drops what two elements cannot share.** A second document carrying the
 first one's MAC address *loads*, and is wrong; the inventory only says so at
 ``validate`` time, on a line nobody typed. So the fields go on the way out, per
-the table in :data:`~netgraph.edit.clipboard.UNIQUE_FIELDS`, and everything else
+the table in :data:`~netviz.edit.clipboard.UNIQUE_FIELDS`, and everything else
 — vendor, model, VLANs, comments — comes across.
 
 **A copied set keeps its internal shape.** Both ends of a cable in the selection
@@ -34,7 +34,7 @@ from typing import Any, Final
 import pytest
 import yaml
 
-from netgraph.edit import (
+from netviz.edit import (
     UNIQUE_FIELDS,
     Batch,
     CopyElement,
@@ -48,11 +48,11 @@ from netgraph.edit import (
     paste_plan,
     strip_unique,
 )
-from netgraph.edit.clipboard import CLIPBOARD_FORMAT
-from netgraph.edit.references import NameIndex
-from netgraph.loader import load_tree
-from netgraph.loader.inventory import namespace_of
-from netgraph.validate import validate
+from netviz.edit.clipboard import CLIPBOARD_FORMAT
+from netviz.edit.references import NameIndex
+from netviz.loader import load_tree
+from netviz.loader.inventory import namespace_of
+from netviz.validate import validate
 
 REPO_ROOT: Final = Path(__file__).resolve().parent.parent
 EXAMPLES: Final = REPO_ROOT / "examples"
@@ -345,17 +345,17 @@ def test_copying_a_namespace_copies_its_subtree(tmp_path: Path) -> None:
 
 def _two_switches_and_a_cable() -> str:
     return (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata:\n  name: sw-a\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata:\n  name: sw-b\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata:\n  name: cbl-a-b\n"
         "spec:\n  endpoints:\n    - sw-a:eth0\n    - sw-b:eth0\n  medium: copper\n"
@@ -422,7 +422,7 @@ def test_a_copy_is_placed_beside_the_original(arranged: Path) -> None:
     assert set(before) < set(after), "the originals must keep their entries"
     for key, point in before.items():
         assert after[key] == point
-    # Right and down: `y` grows upwards in netgraph's coordinates.
+    # Right and down: `y` grows upwards in netviz's coordinates.
     original = before["devices/sw-access"]
     assert after["devices/sw-access-copy"] == (original[0] + 20, original[1] - 20)
 
@@ -508,11 +508,11 @@ def test_pasting_a_fragment_into_the_tree_it_came_from_renames_it(arranged: Path
 
 def test_a_clipboard_that_is_not_a_fragment_is_refused_by_name(home: Path) -> None:
     inventory = load_tree(home)
-    with pytest.raises(EditError, match="not a netgraph fragment"):
+    with pytest.raises(EditError, match="not a netviz fragment"):
         paste_plan(inventory, {"format": "application/x-something", "documents": []})
     with pytest.raises(EditError, match="no 'documents' list"):
         paste_plan(inventory, {"format": CLIPBOARD_FORMAT})
-    with pytest.raises(EditError, match="holds no netgraph documents"):
+    with pytest.raises(EditError, match="holds no netviz documents"):
         paste_plan(inventory, {"format": CLIPBOARD_FORMAT, "documents": []})
 
 
@@ -607,7 +607,7 @@ def test_a_copy_is_undone_by_deleting_it(home: Path) -> None:
 
 
 def test_the_operation_round_trips_through_its_json_form() -> None:
-    from netgraph.edit import operation_from_dict
+    from netviz.edit import operation_from_dict
 
     operation = CopyElement(
         address="sites/hq/sw1",

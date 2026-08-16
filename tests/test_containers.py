@@ -1,14 +1,14 @@
 """Containers: a namespace box you can drop things into, and what that writes.
 
 The gesture this file is about is draw.io's defining one — drag a shape into a
-box and it belongs to the box — mapped onto the one structure netgraph already
+box and it belongs to the box — mapped onto the one structure netviz already
 has for belonging: the folder a document sits in (§2). So the properties tested
 here are all really the same property said at four levels:
 
-* **A drop is a move.** :func:`~netgraph.edit.containers.move_plan` turns a drop
+* **A drop is a move.** :func:`~netviz.edit.containers.move_plan` turns a drop
   payload into ``move`` operations, the document is rewritten into the target
   directory, and every reference to it is re-spelled by
-  :mod:`netgraph.edit.references` — the tree still resolves afterwards.
+  :mod:`netviz.edit.references` — the tree still resolves afterwards.
 * **A drop that cannot be a move is refused before anything is written.** A name
   already taken in the target, two dragged documents that would collide with
   each other, a folder the loader would skip: each is a sentence naming both
@@ -35,7 +35,7 @@ from typing import Any, Final
 
 import pytest
 
-from netgraph.edit import (
+from netviz.edit import (
     EditError,
     EditSession,
     MoveElement,
@@ -44,13 +44,13 @@ from netgraph.edit import (
     containers,
     move_plan,
 )
-from netgraph.edit.containers import MAX_MOVES
-from netgraph.loader import load_tree
-from netgraph.render import Layer, build_graph
-from netgraph.validate import validate
-from netgraph.web.preview import MAX_COLLAPSED, RequestError, ViewOptions, render_inventory
-from netgraph.web.server import WebServer
-from netgraph.web.session import Conflict, EditingSession, ReadOnly
+from netviz.edit.containers import MAX_MOVES
+from netviz.loader import load_tree
+from netviz.render import Layer, build_graph
+from netviz.validate import validate
+from netviz.web.preview import MAX_COLLAPSED, RequestError, ViewOptions, render_inventory
+from netviz.web.server import WebServer
+from netviz.web.session import Conflict, EditingSession, ReadOnly
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -61,7 +61,7 @@ EXAMPLES: Final = REPO_ROOT / "examples"
 #: with it — two racks may each hold an ``sw-01`` — right up until somebody
 #: drops one into the other's namespace, which is the refusal this file pins.
 TWIN: Final = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-north-acc-01
@@ -82,14 +82,14 @@ def _write_shadowed(root: Path) -> None:
         directory = root / namespace
         directory.mkdir(parents=True, exist_ok=True)
         (directory / f"{name}.yaml").write_text(
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             f"kind: {kind}\n"
             f"metadata:\n  name: {name}\n"
             "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n",
             encoding="utf-8",
         )
     (root / "a" / "cables.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata:\n  name: link\n"
         "spec:\n  medium: copper\n  endpoints:\n    - sw1:eth0\n    - pc1:eth0\n",
@@ -127,7 +127,7 @@ def drop(root: Path, addresses: list[str], namespace: str) -> EditSession:
 
 
 # --------------------------------------------------------------------------- #
-# The plan: a drop payload becomes `netgraph edit move`
+# The plan: a drop payload becomes `netviz edit move`
 # --------------------------------------------------------------------------- #
 
 
@@ -364,7 +364,7 @@ def test_a_drop_larger_than_a_gesture_is_refused(
         "the real bound is meant to be well above a real drop"
     )
     monkeypatch.setattr(containers, "MAX_MOVES", 2)
-    with pytest.raises(EditError, match="netgraph edit move"):
+    with pytest.raises(EditError, match="netviz edit move"):
         move_plan(session.inventory, ["sites/north"], namespace="estate")
 
 

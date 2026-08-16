@@ -3,7 +3,7 @@
 # The inventory declares exactly one device and no cable at all, so 'pc-a' is
 # drawn as an isolated node. Its address sits in a point-to-point prefix, which
 # W105 exempts, so the lone device is reported once rather than twice.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a

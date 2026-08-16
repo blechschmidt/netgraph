@@ -2,7 +2,7 @@
 #
 # A router id names the router itself: OSPF drops an adjacency with a neighbour
 # claiming the local id (RFC 2328 section 10.5), so this pair never forms one.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-a
@@ -19,7 +19,7 @@ spec:
       router_id: 192.0.2.1
       interfaces: [eth0]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-b
@@ -36,7 +36,7 @@ spec:
       router_id: 192.0.2.1
       interfaces: [eth0]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

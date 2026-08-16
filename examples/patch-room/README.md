@@ -41,7 +41,7 @@ A patch panel is not a hop, so the same seven cables have two honest readings.
 
 <!-- norun: writes an SVG into the reader's directory -->
 ```console
-$ netgraph -i examples/patch-room render --layer physical -o cabling.svg
+$ netviz -i examples/patch-room render --layer physical -o cabling.svg
 ```
 
 draws six nodes and seven edges: the panels are there and each segment is its
@@ -50,7 +50,7 @@ would find.
 
 <!-- norun: writes an SVG into the reader's directory -->
 ```console
-$ netgraph -i examples/patch-room render --layer l1 -o topology.svg
+$ netviz -i examples/patch-room render --layer l1 -o topology.svg
 ```
 
 draws four nodes and three edges. Each run is **spliced** into the single link
@@ -63,12 +63,12 @@ produce if `sw-core-01` were cabled straight to `srv-app-01`. That is what makes
 a panel free to model — adding one to a correct inventory changes no layer but
 `physical`.
 
-`netgraph path` uses the spliced reading and still names the panels, because
+`netviz path` uses the spliced reading and still names the panels, because
 "which position is this run in?" is the first question when the link is down:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/patch-room path sw-core-01 srv-app-01
+$ netviz -i examples/patch-room path sw-core-01 srv-app-01
 ...
    1  network/sw-core-01  [switch]
       out GigabitEthernet1/0/7
@@ -81,7 +81,7 @@ $ netgraph -i examples/patch-room path sw-core-01 srv-app-01
 
 <!-- norun: writes an SVG into the reader's directory -->
 ```console
-$ netgraph -i examples/patch-room render --layer rack -o racks.svg
+$ netviz -i examples/patch-room render --layer rack -o racks.svg
 ```
 
 One box per rack, one row per unit, from U42 at the top down to U1. Occupied

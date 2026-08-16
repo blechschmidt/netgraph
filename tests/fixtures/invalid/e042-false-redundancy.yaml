@@ -2,14 +2,14 @@
 #
 # Two cords, two outlets -- one strip. The strip, its breaker and its own feed
 # are the single point of failure the second cord was bought to remove.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: pdu
 metadata:
   name: pdu-r1-a
 spec:
   outlets: 8
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-a
@@ -32,7 +32,7 @@ spec:
         psu: psu2
     redundant: true
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -45,7 +45,7 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-srv

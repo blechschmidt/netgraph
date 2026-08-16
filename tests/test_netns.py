@@ -26,12 +26,12 @@ from typing import Any
 import pytest
 import yaml
 
-from netgraph.errors import SchemaError
-from netgraph.export import ExportContext, ExportOptions
-from netgraph.export.config import CONFIG_LAYERS, generate
-from netgraph.export.manifest import Recorder
-from netgraph.loader import Inventory, load_tree
-from netgraph.models import (
+from netviz.errors import SchemaError
+from netviz.export import ExportContext, ExportOptions
+from netviz.export.config import CONFIG_LAYERS, generate
+from netviz.export.manifest import Recorder
+from netviz.loader import Inventory, load_tree
+from netviz.models import (
     API_VERSION,
     ROOT_NETNS,
     InterfaceType,
@@ -41,7 +41,7 @@ from netgraph.models import (
     parse_document,
     resolve_netns_tree,
 )
-from netgraph.render.graph import (
+from netviz.render.graph import (
     NETNS_ID_PREFIX,
     NETNS_KIND,
     EdgeKind,
@@ -52,8 +52,8 @@ from netgraph.render.graph import (
     filter_graph,
     netns_node_id,
 )
-from netgraph.subnets import subnets_of
-from netgraph.validate import validate
+from netviz.subnets import subnets_of
+from netviz.validate import validate
 
 # --------------------------------------------------------------------------- #
 # Building inventories
@@ -763,7 +763,7 @@ def test_the_neutral_dialect_carries_the_namespaces_and_the_pairs(tmp_path: Path
 
     A dialect that quietly dropped `spec.netns` would still say "I refuse
     nothing", which is the one thing this format is not allowed to get wrong —
-    and `netgraph drift` reads the file back, so what it loses it also stops
+    and `netviz drift` reads the file back, so what it loses it also stops
     comparing.
     """
     inventory = inventory_of(
@@ -785,8 +785,8 @@ def test_the_neutral_dialect_carries_the_namespaces_and_the_pairs(tmp_path: Path
 
 def test_the_importer_reads_back_what_the_dialect_wrote(tmp_path: Path) -> None:
     """The pairing and the nesting both survive; neither is guessable."""
-    from netgraph.importer.config.neutral import read_interfaces
-    from netgraph.importer.draft import Draft
+    from netviz.importer.config.neutral import read_interfaces
+    from netviz.importer.draft import Draft
 
     inventory = inventory_of(
         tmp_path,
@@ -833,7 +833,7 @@ def test_a_dialect_with_no_namespace_syntax_refuses_rather_than_lying(tmp_path: 
     container's address on the machine, and on a host running two containers out
     of one image the two would collide where the inventory says they do not.
     """
-    from netgraph.export.config import UnsupportedConfigError
+    from netviz.export.config import UnsupportedConfigError
 
     inventory = inventory_of(
         tmp_path,

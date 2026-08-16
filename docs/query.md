@@ -1,12 +1,12 @@
 # The selector language
 
-Every part of netgraph that has to answer "which elements?" answers it with the
+Every part of netviz that has to answer "which elements?" answers it with the
 same expression. One grammar, one vocabulary, one implementation
-(`netgraph/query/`), used by:
+(`netviz/query/`), used by:
 
 | Where | How |
 |---|---|
-| [`netgraph query`](commands/query.md) | `netgraph query 'kind = switch and not has vrf'` |
+| [`netviz query`](commands/query.md) | `netviz query 'kind = switch and not has vrf'` |
 | `render`, `watch`, `show`, `list`, `export`, `report` | `--select '<query>'` |
 | [`kind: testsuite`](schema.md#20-test-suites-executable-assertions) | `assert: query` / `query:` on any selector assertion |
 | [the editor](commands/web.md) | the search box, and the command palette |
@@ -67,7 +67,7 @@ neighbourhood of switches. Write the parentheses when it is not what you meant.
 Keywords are case-insensitive (`AND` works); values are not (`name = SW-01` does
 not match `sw-01`).
 
-`netgraph query --explain` prints this grammar and the whole attribute
+`netviz query --explain` prints this grammar and the whole attribute
 vocabulary, generated from the tables rather than written out, so it cannot
 drift from what the parser accepts.
 
@@ -80,7 +80,7 @@ what the editor's search box used to do on its own and what anybody types
 first. A word that already has a wildcard in it is left as written: `sw-*`
 means `name ~ sw-*`.
 
-**`*` matches everything.** Useful as the identity — `netgraph query '*'` lists
+**`*` matches everything.** Useful as the identity — `netviz query '*'` lists
 the inventory — and as the left-hand side of a difference: `* and not kind =
 cable`.
 
@@ -192,7 +192,7 @@ two are negations of one another.
 A scope may not contain another scope, and a traversal may not be written inside
 one: the graph is walked between elements, and an interface has no interfaces.
 
-`netgraph query --print interfaces` prints the interfaces that satisfied a
+`netviz query --print interfaces` prints the interfaces that satisfied a
 scope rather than the elements holding them, so the query above answers the
 question it was asked in.
 
@@ -251,12 +251,12 @@ still work everywhere they always did, and each denotes a query:
 | `--neighbors-of N --depth D` | `within D hops of (fqn = N or name = N)` |
 
 Repeats within one flag are alternatives; different flags are combined with
-`and`. `netgraph query --explain` with the flags prints exactly the query they
+`and`. `netviz query --explain` with the flags prints exactly the query they
 mean:
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query --explain --kind switch --namespace sites/north --vlan 99
+$ netviz query --explain --kind switch --namespace sites/north --vlan 99
 # the filter flags, as the query they are sugar for
 (kind = switch and namespace under sites/north and vlan = 99)
 ...
@@ -272,9 +272,9 @@ A parse error names the column and underlines it:
 
 <!-- run: cwd=examples/campus rc=2 -->
 ```console
-$ netgraph query 'kind = swtch and vlna = 99'
-Usage: netgraph query [OPTIONS] QUERY
-Try 'netgraph query --help' for help.
+$ netviz query 'kind = swtch and vlna = 99'
+Usage: netviz query [OPTIONS] QUERY
+Try 'netviz query --help' for help.
 
 Error: Invalid value for 'QUERY': query:1:18: 'vlna' is not an attribute of element
   kind = swtch and vlna = 99
@@ -283,7 +283,7 @@ Error: Invalid value for 'QUERY': query:1:18: 'vlna' is not an attribute of elem
 ```
 
 The location line is the loader's own shape (`<source>:<line>:<column>:
-<message>`, the same as a `LoadError`), so a reader who has seen one netgraph
+<message>`, the same as a `LoadError`), so a reader who has seen one netviz
 diagnostic recognises this one. Everything is bounded: an over-long query is
 echoed as a window around the span rather than reproduced whole.
 
@@ -316,7 +316,7 @@ sites, twenty-two elements, a backbone ring.
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query 'kind = switch and label.role = access'
+$ netviz query 'kind = switch and label.role = access'
 sites/north/access/sw-north-acc-01
 sites/north/access/sw-north-acc-02
 sites/north/access/sw-north-acc-03
@@ -333,7 +333,7 @@ you want — every access switch has its uplink.
 
 <!-- run: cwd=examples/campus rc=1 -->
 ```console
-$ netgraph query 'label.site = north and label.role = access and not neighbors of (label.role = distribution)' --count
+$ netviz query 'label.site = north and label.role = access and not neighbors of (label.role = distribution)' --count
 0
 ```
 
@@ -341,7 +341,7 @@ $ netgraph query 'label.site = north and label.role = access and not neighbors o
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query 'interface[address in 10.1.0.0/16 and not has vrf]' --print interfaces
+$ netviz query 'interface[address in 10.1.0.0/16 and not has vrf]' --print interfaces
 sites/north/core/rtr-north-core-01:xe-0/0/0
 sites/north/distribution/sw-north-dist-01:Vlan10
 sites/north/distribution/sw-north-dist-01:Vlan20
@@ -357,7 +357,7 @@ Drop `--print interfaces` for the five *elements* holding them.
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query 'within 2 hops of rtr-north-core-01' --count
+$ netviz query 'within 2 hops of rtr-north-core-01' --count
 9
 ```
 
@@ -365,7 +365,7 @@ $ netgraph query 'within 2 hops of rtr-north-core-01' --count
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query 'kind in (switch, router) and not has vrf'
+$ netviz query 'kind in (switch, router) and not has vrf'
 sites/north/core/rtr-north-core-01
 sites/south/core/rtr-south-core-01
 sites/west/core/rtr-west-core-01
@@ -375,7 +375,7 @@ sites/west/core/rtr-west-core-01
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query 'namespace under sites/north and vlan = 99' --count
+$ netviz query 'namespace under sites/north and vlan = 99' --count
 4
 ```
 
@@ -383,7 +383,7 @@ $ netgraph query 'namespace under sites/north and vlan = 99' --count
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query 'has asn' --count
+$ netviz query 'has asn' --count
 3
 ```
 
@@ -391,7 +391,7 @@ $ netgraph query 'has asn' --count
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query 'link[medium = fiber and peer-kind = router]' --count
+$ netviz query 'link[medium = fiber and peer-kind = router]' --count
 6
 ```
 
@@ -399,7 +399,7 @@ $ netgraph query 'link[medium = fiber and peer-kind = router]' --count
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query 'interface[mtu > 1500]' --count
+$ netviz query 'interface[mtu > 1500]' --count
 13
 ```
 
@@ -409,7 +409,7 @@ $ netgraph query 'interface[mtu > 1500]' --count
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query 'kind = router and label.site = west' --json
+$ netviz query 'kind = router and label.site = west' --json
 {
   "query": "kind = router and label.site = west",
   "count": 1,
@@ -446,7 +446,7 @@ See [`docs/testing.md`](testing.md) for how a suite is run and reported.
 
 ## See also
 
-- [`netgraph query`](commands/query.md) — the command, its flags and its exit codes.
+- [`netviz query`](commands/query.md) — the command, its flags and its exit codes.
 - [`docs/rendering.md`](rendering.md) — `--select` beside the other filters.
 - [`docs/testing.md`](testing.md) — `assert: query` among the assertions.
 - [`docs/commands/web.md`](commands/web.md) — the editor's search box.

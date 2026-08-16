@@ -91,14 +91,14 @@ jobs:
             coverage-floor: 85
 
     env:
-      NETGRAPH_YAML_LOADER: ${{ matrix.yaml-loader }}
+      NETVIZ_YAML_LOADER: ${{ matrix.yaml-loader }}
 
     defaults:
       run:
         # bash on all three runners, including Windows -- where it is Git Bash,
         # which the image ships. Without it every step below would have to be
         # written twice, once for POSIX ``sh`` and once for PowerShell, and the
-        # two copies would drift. The PowerShell that netgraph *generates* is
+        # two copies would drift. The PowerShell that netviz *generates* is
         # exercised by tests/test_platform.py, not by this shell choice.
         shell: bash
 
@@ -119,7 +119,7 @@ jobs:
           dot -V
 
       # ``nft --check`` parses a ruleset without committing it, and is the only
-      # gate on the generated ``etc/nftables.conf`` that is not netgraph reading
+      # gate on the generated ``etc/nftables.conf`` that is not netviz reading
       # its own writing. It still opens a netlink socket before it reads the
       # file, though, and that needs CAP_NET_ADMIN -- so on an unprivileged
       # runner every check failed with "cache initialization failed: Operation
@@ -169,11 +169,11 @@ jobs:
           # Files but does not add it to PATH in the *current* process -- so the
           # directory is found and exported for the steps that follow.
           #
-          # netgraph does not depend on this: find_dot() searches exactly these
-          # locations itself (netgraph/render/dot.py), which is the behaviour the
-          # "Confirm netgraph finds Graphviz" step below checks. PATH is set for
+          # netviz does not depend on this: find_dot() searches exactly these
+          # locations itself (netviz/render/dot.py), which is the behaviour the
+          # "Confirm netviz finds Graphviz" step below checks. PATH is set for
           # everything else in the job -- `dot -V`, and the handful of tests that
-          # shell out to `dot` directly rather than through netgraph.
+          # shell out to `dot` directly rather than through netviz.
           $dot = Get-ChildItem -Path 'C:\Program Files', 'C:\Program Files (x86)' `
               -Filter 'dot.exe' -Recurse -ErrorAction SilentlyContinue |
               Where-Object { $_.FullName -like '*Graphviz*' } |
@@ -194,7 +194,7 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
-      - name: Install netgraph and its dev extras
+      - name: Install netviz and its dev extras
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
@@ -202,23 +202,23 @@ jobs:
           python -m pip list
 
       # ``dot -V`` above proved the *shell* can find Graphviz. This proves
-      # netgraph can, which on Windows is a different question: the installer
+      # netviz can, which on Windows is a different question: the installer
       # frequently leaves ``bin`` off PATH, so find_dot() also looks in the
       # documented install locations. Without this step a broken lookup would show
       # up as fifty skipped tests and a green job -- which is exactly the failure
       # this whole matrix entry exists to prevent.
-      - name: Confirm netgraph finds Graphviz on this platform
+      - name: Confirm netviz finds Graphviz on this platform
         run: |
           set -euo pipefail
           python - <<'PY'
           import os
           import subprocess
-          from netgraph.render.dot import find_dot
+          from netviz.render.dot import find_dot
 
           found = find_dot()
           print(f"os.name={os.name} find_dot()={found!r}")
           if found is None:
-              raise SystemExit("::error::netgraph cannot find Graphviz; the image tests would skip")
+              raise SystemExit("::error::netviz cannot find Graphviz; the image tests would skip")
           print(subprocess.run([found, "-V"], capture_output=True, text=True).stderr.strip())
           PY
 
@@ -230,9 +230,9 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           import os
-          from netgraph.loader.documents import HAVE_LIBYAML, StrictSafeLoader
+          from netviz.loader.documents import HAVE_LIBYAML, StrictSafeLoader
 
-          mode = os.environ["NETGRAPH_YAML_LOADER"]
+          mode = os.environ["NETVIZ_YAML_LOADER"]
           chosen = StrictSafeLoader.__name__
           expected = {
               "python": "PureStrictSafeLoader",
@@ -274,10 +274,10 @@ jobs:
             echo "::endgroup::"
           done
 
-      - name: netgraph fmt --check
+      - name: netviz fmt --check
         # What ruff is to this repository's Python, ``fmt`` is to the YAML it
         # ships: ``examples/`` is documentation, and documentation that does not
-        # follow the format netgraph documents is documentation arguing with
+        # follow the format netviz documents is documentation arguing with
         # itself.
         #
         # ``--check`` lists what differs; the ``--diff`` afterwards turns that
@@ -286,11 +286,11 @@ jobs:
         # and its own exit status is discarded -- the verdict is already in.
         run: |
           set -euo pipefail
-          if ! netgraph fmt --check examples; then
-            echo "::group::netgraph fmt --diff examples"
-            netgraph fmt --diff examples || true
+          if ! netviz fmt --check examples; then
+            echo "::group::netviz fmt --diff examples"
+            netviz fmt --diff examples || true
             echo "::endgroup::"
-            echo "::error::examples/ is not in canonical form; run 'netgraph fmt examples'"
+            echo "::error::examples/ is not in canonical form; run 'netviz fmt examples'"
             exit 1
           fi
 
@@ -326,8 +326,8 @@ jobs:
           # small enough not to dominate a job that also lints and type-checks.
           # The nightly workflow runs the same properties at 1000; see
           # docs/testing.md.
-          NETGRAPH_HYPOTHESIS_PROFILE: ci
-        # ``--cov=netgraph`` and the coverage floor also live in pyproject.toml
+          NETVIZ_HYPOTHESIS_PROFILE: ci
+        # ``--cov=netviz`` and the coverage floor also live in pyproject.toml
         # (addopts / fail_under); they are repeated here so this command is
         # correct on its own and a local edit cannot silently lower the gate.
         #
@@ -420,7 +420,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  # ``netgraph web`` is fourteen hundred lines of CSS and JavaScript that no
+  # ``netviz web`` is fourteen hundred lines of CSS and JavaScript that no
   # other job executes: the ``test`` matrix asserts the HTTP boundary and stops
   # there, so a regression in app.js would ship green. This job is the only place
   # a real browser opens the page.
@@ -452,7 +452,7 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
-      - name: Install netgraph, its dev extras and Playwright
+      - name: Install netviz, its dev extras and Playwright
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
@@ -484,7 +484,7 @@ jobs:
         env:
           # Where a failing test leaves its screenshot, page source and console
           # log; the upload below is what makes them worth writing.
-          NETGRAPH_BROWSER_ARTIFACTS: ${{ github.workspace }}/browser-artifacts
+          NETVIZ_BROWSER_ARTIFACTS: ${{ github.workspace }}/browser-artifacts
         # ``--no-cov`` on purpose: this job must not contribute to -- or be
         # measured against -- the coverage gate the ``test`` matrix enforces.
         # ``-m browser`` selects the module; ``-p no:randomly`` is not needed
@@ -598,7 +598,7 @@ jobs:
       # the pull request that makes it rather than after the merge.
       - name: Validate, as SARIF
         id: sarif
-        uses: ./.github/actions/netgraph-validate
+        uses: ./.github/actions/netviz-validate
         with:
           inventory: examples/${{ matrix.inventory }}
           strict: "true"
@@ -616,7 +616,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: ${{ steps.sarif.outputs.report }}
-          category: netgraph-${{ matrix.inventory }}
+          category: netviz-${{ matrix.inventory }}
 
       - name: Check the SARIF document
         env:
@@ -632,7 +632,7 @@ jobs:
           rules = run["tool"]["driver"]["rules"]
           print(f"{len(rules)} rules described, {len(run['results'])} results")
 
-          from netgraph.rules import RULES
+          from netviz.rules import RULES
 
           missing = {rule.id for rule in RULES} - {entry["id"] for entry in rules}
           if missing:
@@ -644,7 +644,7 @@ jobs:
       # The annotation format is what a pull request actually sees, so it is run
       # for real rather than inspected: anything it reports lands on the diff.
       - name: Validate, as annotations
-        uses: ./.github/actions/netgraph-validate
+        uses: ./.github/actions/netviz-validate
         with:
           inventory: examples/${{ matrix.inventory }}
           strict: "true"
@@ -654,7 +654,7 @@ jobs:
       - name: Check the JSON envelope
         run: |
           set -euo pipefail
-          netgraph --quiet --inventory "examples/${{ matrix.inventory }}" \
+          netviz --quiet --inventory "examples/${{ matrix.inventory }}" \
             validate --strict --output-format json >report.json
           python - <<'PY'
           import json
@@ -669,7 +669,7 @@ jobs:
           PY
 
       # The examples are the documentation; one of them failing --strict means
-      # the README shows an inventory netgraph itself would reject.
+      # the README shows an inventory netviz itself would reject.
       - name: Fail if the example did not validate
         if: steps.sarif.outputs.failed == 'true'
         run: |
@@ -696,12 +696,12 @@ jobs:
         with:
           # The examples are rendered by the shipped console script, so this job
           # deliberately installs no dev extras -- it checks that a plain
-          # ``pip install netgraph`` can draw the documented inventories.
+          # ``pip install netviz`` can draw the documented inventories.
           python-version: "3.12"
           cache: pip
           cache-dependency-path: pyproject.toml
 
-      - name: Install netgraph
+      - name: Install netviz
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
@@ -728,10 +728,10 @@ jobs:
             echo "::group::render ${name}"
 
             rc=0
-            netgraph --inventory "$inventory" render --format svg --output "$svg" || rc=$?
+            netviz --inventory "$inventory" render --format svg --output "$svg" || rc=$?
 
             if [ "$rc" -ne 0 ]; then
-              echo "::error::${name}: netgraph render exited ${rc}"
+              echo "::error::${name}: netviz render exited ${rc}"
               status=1
             elif [ ! -s "$svg" ]; then
               echo "::error::${name}: render succeeded but ${svg} is empty"
@@ -751,17 +751,17 @@ jobs:
 
       # The composite action shipped for other people's repositories, run from
       # this very checkout: a change to it is tested by the pull request that
-      # makes it rather than by whoever pulls it next. ``netgraph-pages.yml``
+      # makes it rather than by whoever pulls it next. ``netviz-pages.yml``
       # is this step and an upload, so exercising it here is what keeps the
       # published-diagram path honest without deploying a second site over the
       # one ``pages.yml`` maintains.
       - name: Render a page through the action
         id: page
-        uses: ./.github/actions/netgraph-render
+        uses: ./.github/actions/netviz-render
         with:
           inventory: examples/campus
           layer: l1,l2,l3
-          title: campus (netgraph CI)
+          title: campus (netviz CI)
           output: out/campus.html
           strict: "true"
           # Both are already on this runner; the action's own installers are
@@ -774,7 +774,7 @@ jobs:
       # failing to find a package manager it did not need.
       - name: Render a Mermaid diagram through the action
         id: mermaid
-        uses: ./.github/actions/netgraph-render
+        uses: ./.github/actions/netviz-render
         with:
           inventory: examples/campus
           format: mermaid
@@ -812,7 +812,7 @@ jobs:
               sys.exit(f"::error::the page offers the layers {drawn}, not the three asked for")
           # The default is the inventory's own name, so a title that reached the
           # page is a title that says something the default does not.
-          if "<h1>campus (netgraph CI)</h1>" not in text:
+          if "<h1>campus (netviz CI)</h1>" not in text:
               sys.exit("::error::the page does not carry the title it was given")
 
           mermaid = pathlib.Path(os.environ["MERMAID"])
@@ -863,7 +863,7 @@ jobs:
         run: |
           set -euo pipefail
           docker compose build
-          docker image ls netgraph:local
+          docker image ls netviz:local
 
       # The inventory the services read is a copy, not the checkout: the CLI
       # service mounts it read-write and this job writes a render into it, which
@@ -876,18 +876,18 @@ jobs:
 
       - name: Run the CLI through the container
         env:
-          NETGRAPH_INVENTORY: ${{ runner.temp }}/inventory
+          NETVIZ_INVENTORY: ${{ runner.temp }}/inventory
         run: |
           set -euo pipefail
           # Files the container writes have to land owned by whoever asked for
           # them; the render below is checked for exactly that.
-          NETGRAPH_UID="$(id -u)" NETGRAPH_GID="$(id -g)" \
-            docker compose run --rm netgraph validate --strict
-          docker compose run --rm netgraph list devices
-          NETGRAPH_UID="$(id -u)" NETGRAPH_GID="$(id -g)" \
-            docker compose run --rm netgraph render --layer l2 -f svg -o topology.svg
+          NETVIZ_UID="$(id -u)" NETVIZ_GID="$(id -g)" \
+            docker compose run --rm netviz validate --strict
+          docker compose run --rm netviz list devices
+          NETVIZ_UID="$(id -u)" NETVIZ_GID="$(id -g)" \
+            docker compose run --rm netviz render --layer l2 -f svg -o topology.svg
 
-          svg="${NETGRAPH_INVENTORY}/topology.svg"
+          svg="${NETVIZ_INVENTORY}/topology.svg"
           if [ ! -s "$svg" ]; then
             echo "::error::the container reported a render but ${svg} is empty or absent"
             exit 1
@@ -907,7 +907,7 @@ jobs:
 
       - name: Start the two servers
         env:
-          NETGRAPH_INVENTORY: ${{ runner.temp }}/inventory
+          NETVIZ_INVENTORY: ${{ runner.temp }}/inventory
         run: |
           set -euo pipefail
           docker compose up --detach web watch
@@ -920,7 +920,7 @@ jobs:
         run: |
           set -euo pipefail
           for service in web watch; do
-            container="netgraph-${service}-1"
+            container="netviz-${service}-1"
             for attempt in $(seq 1 30); do
               state="$(docker inspect --format '{{.State.Health.Status}}' "$container")"
               if [ "$state" = "healthy" ]; then
@@ -940,7 +940,7 @@ jobs:
           set -euo pipefail
           # The editor's own page, which carries the document stream.
           curl --fail --silent --show-error http://127.0.0.1:8081/ >web.html
-          grep -q "netgraph" web.html
+          grep -q "netviz" web.html
 
           # The preview's status document. ``ok`` means the mounted tree loaded,
           # validated and rendered inside the container.
@@ -964,14 +964,14 @@ jobs:
       # stopped delivering filesystem events on the runner.
       - name: Change a file and watch it re-render
         env:
-          NETGRAPH_INVENTORY: ${{ runner.temp }}/inventory
+          NETVIZ_INVENTORY: ${{ runner.temp }}/inventory
         run: |
           set -euo pipefail
           before="$(curl --fail --silent http://127.0.0.1:8080/status.json |
             python -c 'import json,sys; print(json.load(sys.stdin)["revision"])')"
 
           printf '\n# touched by CI to trigger a re-render\n' \
-            >>"${NETGRAPH_INVENTORY}/switches/sw-home.yaml"
+            >>"${NETVIZ_INVENTORY}/switches/sw-home.yaml"
 
           for attempt in $(seq 1 20); do
             after="$(curl --fail --silent http://127.0.0.1:8080/status.json |
@@ -992,7 +992,7 @@ jobs:
         run: docker compose logs --timestamps
 
       # ``down`` rather than leaving it to the runner, because the time it takes
-      # is itself a check: netgraph is PID 1 in there, and without ``init: true``
+      # is itself a check: netviz is PID 1 in there, and without ``init: true``
       # a SIGTERM it ignores would cost the full ten-second grace period.
       - name: Stop everything
         if: ${{ !cancelled() }}

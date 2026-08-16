@@ -1,18 +1,18 @@
-# Bootstrapping from a live network with `netgraph import`
+# Bootstrapping from a live network with `netviz import`
 
-[`netgraph init`](commands/init.md) is for a network you are about to build.
-`netgraph import` is for the one you already have: it turns machine-readable
+[`netviz init`](commands/init.md) is for a network you are about to build.
+`netviz import` is for the one you already have: it turns machine-readable
 output collected from real devices into a starting inventory, so the first tree
 is a diff away from correct instead of a weekend of transcription. This page is
-the task — what to collect, how to name it, what netgraph concludes from it and
+the task — what to collect, how to name it, what netviz concludes from it and
 what it deliberately leaves for you. The option-by-option reference is
-[`netgraph import`](commands/import.md).
+[`netviz import`](commands/import.md).
 
-**No network access, ever.** netgraph opens no socket, reads no credential and
+**No network access, ever.** netviz opens no socket, reads no credential and
 runs nothing on a device. You run the collection command — the exact lines are
-[below](#collecting-the-input) — and hand netgraph what it printed, from a file
+[below](#collecting-the-input) — and hand netviz what it printed, from a file
 or from a pipe. The command works fine on a laptop with no route to the network
-it is documenting, and it keeps netgraph out of the business of holding switch
+it is documenting, and it keeps netviz out of the business of holding switch
 passwords.
 
 ---
@@ -39,7 +39,7 @@ passwords.
 
 ## Why bootstrap at all
 
-Every other netgraph command assumes the YAML tree exists, and typing the first
+Every other netviz command assumes the YAML tree exists, and typing the first
 one out by hand is the largest barrier the project has: a forty-port switch is
 forty interfaces nobody wants to transcribe, and the transcription is wrong by
 the time it is finished. The devices already know most of it. LLDP knows which
@@ -71,10 +71,10 @@ first attempt cheap to throw away:
 
 <!-- norun: the capture files are the reader's own, and the command writes a tree -->
 ```console
-$ netgraph import -o net --exclude 'veth*' collected/*.json collected/patch-panel.csv
+$ netviz import -o net --exclude 'veth*' collected/*.json collected/patch-panel.csv
 4 notes about what was not imported:
   srv-hyper.addr.json: 'lo' is the kernel loopback; it terminates no cable and holds only host-scope addresses, so it was not imported
-  srv-hyper.addr.json: 'wg0' is a wireguard tunnel; netgraph models a tunnel as its own document naming both ends (docs/schema.md §14) and 'ip' shows only this end, so it was not imported
+  srv-hyper.addr.json: 'wg0' is a wireguard tunnel; netviz models a tunnel as its own document naming both ends (docs/schema.md §14) and 'ip' shows only this end, so it was not imported
   ...
 
 wrote 9 files to net:
@@ -82,7 +82,7 @@ wrote 9 files to net:
   devices/pc-alice.yaml
   ...
   cables/links.yaml
-  schema/netgraph.schema.json
+  schema/netviz.schema.json
 
 imported 7 devices and 7 cables from 4 inputs
 
@@ -96,13 +96,13 @@ in by hand — they are not errors in what was imported.
 
 **3. Format it.** What `import` writes is valid but not canonical: it quotes
 every string that came off a device and leaves MACs plain, where [the canonical
-form](format.md) does the opposite. One `netgraph fmt` settles that, and it
+form](format.md) does the opposite. One `netviz fmt` settles that, and it
 keeps every comment the importer wrote.
 
 <!-- norun: operates on the tree the previous step wrote -->
 ```bash
-netgraph -i net fmt
-netgraph -i net validate
+netviz -i net fmt
+netviz -i net validate
 ```
 
 **4. Fix the gaps.** The report from step 2 already names them. Correct every
@@ -134,14 +134,14 @@ what the CSV dialect exists for.
 
 You do not have to say which file is which. `--from` defaults to `auto`, which
 sniffs each input on its own, so one run may mix all three dialects — that is
-what makes `netgraph import collected/*` work on a directory holding an LLDP
+what makes `netviz import collected/*` work on a directory holding an LLDP
 capture, two `ip` captures and a patch list.
 
 ### Why CSV and not NetJSON
 
 NetJSON's `NetworkGraph` describes nodes and links, but a link has no notion of
 a *port*: its ends are node ids. Importing it would have to drop the interface
-pair — the one thing that makes a netgraph `cable` a cable rather than a line on
+pair — the one thing that makes a netviz `cable` a cable rather than a line on
 a picture — or invent interface names to hang the link on, which is precisely
 what this command refuses to do. It would also cost several hundred lines of
 shape-guessing across the NetworkGraph, NetworkCollection and
@@ -160,10 +160,10 @@ hold.)
 
 ## Naming the host a capture came from
 
-An `lldpctl` or `ip` capture describes one host and never says which. netgraph
+An `lldpctl` or `ip` capture describes one host and never says which. netviz
 takes the name from the first of these that applies:
 
-1. `NAME=path` on the argument — `netgraph import sw-core=neighbors.json`. The
+1. `NAME=path` on the argument — `netviz import sw-core=neighbors.json`. The
    leading segment counts as a name only when it is already a legal
    [element name](schema.md#41-name-grammar), so a path that happens to hold an
    `=` is still read as a path;
@@ -183,7 +183,7 @@ because it is the one field the capture did not supply:
 ```
 
 A CSV needs none of this: every row names both of its devices. And a capture
-that reaches netgraph with no name at all — piped in as `-` without `--host` —
+that reaches netviz with no name at all — piped in as `-` without `--host` —
 is refused, with the three ways to fix it.
 
 ---
@@ -211,7 +211,7 @@ endpoints a cable joins.
 * **Shape tolerance.** lldpd has two JSON encodings and has changed both across
   releases: `-f json` keys objects by name and inlines scalars, `-f json0` wraps
   everything in single-element lists and every scalar in `{"value": …}`. Both are
-  read, and a shape netgraph does not recognise yields "not present", which is
+  read, and a shape netviz does not recognise yields "not present", which is
   reported, rather than a traceback.
 * **The neighbour's kind** comes from the system capabilities it advertises *and
   has enabled*: `Bridge` becomes a `switch`, `Router` a `router`, `Repeater` a
@@ -222,7 +222,7 @@ endpoints a cable joins.
   LLDP reported for it, with a comment saying so. That is an observed, stable
   identifier of that box; a counter would not be.
 * **`mgmt-ip` is not imported.** It is an observed address, but LLDP says neither
-  which interface holds it nor its prefix length, and a netgraph address needs
+  which interface holds it nor its prefix length, and a netviz address needs
   both. It becomes a comment on the device instead of an invented `/24`.
 
 Only ports with a neighbour are visible to LLDP, so every device an LLDP capture
@@ -234,9 +234,9 @@ it.
 `ip -j link show` and `ip -j addr show`, the only dialect that describes a
 device's *configuration* rather than its neighbours. One capture yields interface
 names, MAC addresses, MTUs, admin state, addresses and — through `linkinfo` — the
-three stacking constructs netgraph models:
+three stacking constructs netviz models:
 
-| `linkinfo` | netgraph | where the relationship comes from |
+| `linkinfo` | netviz | where the relationship comes from |
 |---|---|---|
 | `info_kind: bridge` | `type: bridge` | `members`, from the `master` field of every enslaved link |
 | `info_kind: bond`, `team` | `type: lag` | the same |
@@ -288,12 +288,12 @@ with the row number.
 
 <!-- run: cwd=tests/fixtures/import -->
 ```console
-$ netgraph import --dry-run --from csv patch-panel.csv
+$ netviz import --dry-run --from csv patch-panel.csv
 ...
 # ===== cables/links.yaml =====
 ...
 # listed in patch-panel.csv, row 4
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-srv-hyper-eno1-sw-core-01-GigabitEthernet1-0-1
@@ -308,7 +308,7 @@ imported 4 devices and 4 cables from 1 input
 ...
 ```
 
-(`tests/fixtures/import/` holds the captures netgraph's own tests import, so
+(`tests/fixtures/import/` holds the captures netviz's own tests import, so
 every example on this page can be run as it stands.)
 
 ---
@@ -318,7 +318,7 @@ every example on this page can be run as it stands.)
 The generated YAML is meant to be edited and committed, not regenerated, so it
 is formatted for a reader: fields in the order of [`docs/schema.md`](schema.md),
 a header explaining where the file came from, and a comment beside anything
-netgraph *concluded* rather than read. Interfaces are written physical ports
+netviz *concluded* rather than read. Interfaces are written physical ports
 first and stacked interfaces after them, so a bridge reads below the ports it is
 built from.
 
@@ -331,7 +331,7 @@ why, rather than promoting a box that happens to forward packets into a `router`
 
 ```yaml
 # inferred: nothing in the captured output states what this device is; 'computer'
-# is netgraph's neutral default — correct it by hand
+# is netviz's neutral default — correct it by hand
 kind: computer
 ```
 
@@ -352,7 +352,7 @@ Four things are concluded rather than observed, and each is commented in place:
   descriptions are not reported by anything, so add those by hand.
 
 Three smaller conclusions are commented in the same way. A name a device
-reported that is not a legal netgraph identifier is rewritten deterministically
+reported that is not a legal netviz identifier is rewritten deterministically
 and the original recorded beside it — LLDP happily reports `Port 1` or a chassis
 name with a trailing dot, and rejecting those inputs would defeat the point of
 the command. An address the kernel says came from DHCP or SLAAC is written as
@@ -371,7 +371,7 @@ Four things are deliberately left out, each reported on stderr rather than
 dropped silently: the kernel loopback, link- and host-scope addresses (`fe80::`,
 `127.0.0.1` — facts about a running kernel, not configuration), the MAC a
 bridge, bond or VLAN sub-interface borrows from what is underneath it, and
-tunnel interfaces, since netgraph models a tunnel as its own document naming
+tunnel interfaces, since netviz models a tunnel as its own document naming
 both ends ([`docs/schema.md`](schema.md#14-tunnels) §14) and `ip` shows only one
 end.
 
@@ -383,7 +383,7 @@ Linux host there is.
 Four further things cannot become a document and are reported for the same
 reason:
 
-* a bridge or bond whose members were not in the capture — netgraph requires at
+* a bridge or bond whose members were not in the capture — netviz requires at
   least one member, so the aggregate is left out and the device says so;
 * a VLAN interface whose parent link or VLAN id the capture does not report;
 * a device an input named but no interface of which was observed, which happens
@@ -391,7 +391,7 @@ reason:
   interface, so no document is written;
 * a cable one of whose devices was dropped for that reason.
 
-A link `ip` reports whose type maps onto no netgraph interface type is named in
+A link `ip` reports whose type maps onto no netviz interface type is named in
 the report with the type it actually was, rather than being turned into an
 `ethernet` port on a guess.
 
@@ -413,11 +413,11 @@ into an empty directory and merge the diff yourself. `--dry-run` prints the tree
 to stdout and writes nothing, which is the cheap way to see what a new capture
 set would produce.
 
-`--schema` (the default) points each document at `schema/netgraph.schema.json`
+`--schema` (the default) points each document at `schema/netviz.schema.json`
 with a modeline, writing the schema when the tree does not already hold one;
 `--no-schema` leaves the editor unwired. Two devices whose names differ only in
 case get two files, the second suffixed, because they are two elements to
-netgraph and one file name on macOS and Windows.
+netviz and one file name on macOS and Windows.
 
 One capture from one host is kilobytes, so an input over 32 MiB is refused: at
 that size it is a tarball or a log, not a command's output. A directory named as
@@ -467,18 +467,18 @@ what went wrong — but check them before building on them.
   are the first things to correct.
 * **It is a starting point, not a sync.** There is no reconciliation against an
   existing tree — see [re-running an import](#re-running-an-import). What there
-  *is*, once the tree exists, is [`netgraph drift`](commands/drift.md): the same
+  *is*, once the tree exists, is [`netviz drift`](commands/drift.md): the same
   captures read as a check on the inventory rather than as a replacement for it.
 
 ---
 
 ## See also
 
-* [`netgraph import`](commands/import.md) — the flags, the exit codes and a
+* [`netviz import`](commands/import.md) — the flags, the exit codes and a
   worked example.
-* [`netgraph drift`](commands/drift.md) — the same captures, compared against a
+* [`netviz drift`](commands/drift.md) — the same captures, compared against a
   tree that already exists instead of writing a new one.
-* [`netgraph init`](commands/init.md) — the other way to get a first tree, for a
+* [`netviz init`](commands/init.md) — the other way to get a first tree, for a
   network that does not exist yet.
 * [Inventory layout](inventory-layout.md) — what the loader makes of the tree
   `import` writes.

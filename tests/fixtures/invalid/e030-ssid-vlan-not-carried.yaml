@@ -3,7 +3,7 @@
 # The guest SSID is bridged into VLAN 20. VLAN 20 is declared in the device's
 # VLAN database - so W113 stays quiet - but no interface of 'ap-a' is a member
 # of it, so guest traffic arrives from the air and has nowhere to go.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: ap-a
@@ -27,7 +27,7 @@ spec:
     - id: 20
       name: guest
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -39,7 +39,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

@@ -52,12 +52,12 @@ hosts/srv-nas (server) [batch 0]
 prn-hall
   !    by hand: prn-hall is on the network and not in the tree
         from prn-hall: sw-home.lldp.json observed a device called 'prn-hall'; the inventory declares no element of that name
-        note: the capture found a device the inventory does not declare, so there is no declared state to converge it on. Run 'netgraph import' to adopt it, or take it off the network
+        note: the capture found a device the inventory does not declare, so there is no declared state to converge it on. Run 'netviz import' to adopt it, or take it off the network
 
 switches/sw-home (switch)
   !    by hand: port6 is a physical port the inventory does not declare
         from switches/sw-home:port6: the capture reports this interface as ethernet; the inventory does not declare it
-        note: the capture reports an ethernet interface 'port6' that the inventory does not declare. netgraph will not shut or remove a physical port it knows nothing about; declare it, or take it out of service by hand
+        note: the capture reports an ethernet interface 'port6' that the inventory does not declare. netviz will not shut or remove a physical port it knows nothing about; declare it, or take it out of service by hand
 
 maintenance batches
   batch 0: pc-desk, srv-nas

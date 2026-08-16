@@ -1,6 +1,6 @@
-# `netgraph path`
+# `netviz path`
 
-`netgraph path SRC DST` traces how one element reaches another, and what the
+`netviz path SRC DST` traces how one element reaches another, and what the
 traffic crosses on the way — hop by hop, layer-aware, over the topology the
 files declare. Nothing is pinged and no device is contacted, which is the point:
 it tells you what your documentation says should happen, and that is exactly the
@@ -30,7 +30,7 @@ what the JSON carries, and what the trace deliberately does not model.
 
 <!-- generated: synopsis path -->
 ```text
-netgraph [GLOBAL OPTIONS] path [OPTIONS] SRC DST
+netviz [GLOBAL OPTIONS] path [OPTIONS] SRC DST
 ```
 <!-- /generated -->
 
@@ -72,7 +72,7 @@ asking about one is asking a layer-2 question.
 
 *Layer 3* takes over when the two ends are in no common broadcast domain. Two
 elements are one hop apart when they hold an address in the same prefix — the
-same grouping `netgraph list subnets` prints and `render --layer l3` draws — and
+same grouping `netviz list subnets` prints and `render --layer l3` draws — and
 an element in the middle is only crossed when `spec.forwarding` says it
 forwards. The whole route stays in one address family, and each hop names the
 prefix and the address at both ends of it.
@@ -101,7 +101,7 @@ the forwarding rules, the tunnel labelling and how patch panels are spliced out.
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/home-lab path laptop srv-nas
+$ netviz -i examples/home-lab path laptop srv-nas
 hosts/laptop -> hosts/srv-nas: 1 path
   source       hosts/laptop  [computer]
   destination  hosts/srv-nas  [server]
@@ -131,7 +131,7 @@ crossed with its medium, rate, label and length.
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus path 10.1.10.51 10.1.20.11
+$ netviz -i examples/campus path 10.1.10.51 10.1.20.11
 sites/north/hosts/pc-north-01:eno1 -> sites/north/hosts/srv-north-01:eth0: 1 path
   source       sites/north/hosts/pc-north-01:eno1  [computer]  10.1.10.51/24
   destination  sites/north/hosts/srv-north-01:eth0  [server]  10.1.20.11/24
@@ -169,7 +169,7 @@ searched and how far each got, so the break is locatable, and the command exits
 
 <!-- run: rc=1 -->
 ```console
-$ netgraph -i examples/campus path pc-north-01 sw-north-acc-01:GigabitEthernet1/0/3
+$ netviz -i examples/campus path pc-north-01 sw-north-acc-01:GigabitEthernet1/0/3
 sites/north/hosts/pc-north-01 -> sites/north/access/sw-north-acc-01:GigabitEthernet1/0/3: no path
   source       sites/north/hosts/pc-north-01  [computer]
   destination  sites/north/access/sw-north-acc-01:GigabitEthernet1/0/3  [switch]
@@ -189,7 +189,7 @@ the break is between it and whatever should have come next.
 else. Nothing is removed — a traced path is visibly *one route through* a
 topology rather than the topology itself, which is what `--neighbors-of` cannot
 show you. The diagram is built at the layer the path was found at, and every
-display option [`netgraph render`](render.md) takes applies to it (`--show-ips`,
+display option [`netviz render`](render.md) takes applies to it (`--show-ips`,
 `--group-by-namespace`, `--icons`, `--tooltips`, `--link-template`,
 `--element-ids`, `--title`) — it is the same renderer, not a fork of it.
 
@@ -201,7 +201,7 @@ every reported route.
 
 <!-- norun: writes a diagram into the reader's directory -->
 ```bash
-netgraph -i examples/campus path pc-north-01 pc-south-01 --highlight -f svg -o path.svg
+netviz -i examples/campus path pc-north-01 pc-south-01 --highlight -f svg -o path.svg
 ```
 
 There is a picture of the result, and what emphasis does to node colour and line
@@ -220,12 +220,12 @@ in [JSON output](../paths.md#json-output).
 
 <!-- norun: the element names are illustrative and the last line is a shell pipeline -->
 ```bash
-netgraph path pc-alice srv-backup                        # the shortest route
-netgraph path 10.1.10.51 10.2.20.11 --all                # every route, by address
-netgraph path sw-hq:Ethernet49/1 sw-hq:Ethernet50/1      # can one switch bridge these?
-netgraph path rtr-hq rtr-branch-b --vlan 100             # inside one broadcast domain
-netgraph path pc-alice srv-backup --highlight -f svg -o path.svg
-netgraph path pc-alice srv-backup -F json | jq '.paths[0].links[].id'
+netviz path pc-alice srv-backup                        # the shortest route
+netviz path 10.1.10.51 10.2.20.11 --all                # every route, by address
+netviz path sw-hq:Ethernet49/1 sw-hq:Ethernet50/1      # can one switch bridge these?
+netviz path rtr-hq rtr-branch-b --vlan 100             # inside one broadcast domain
+netviz path pc-alice srv-backup --highlight -f svg -o path.svg
+netviz path pc-alice srv-backup -F json | jq '.paths[0].links[].id'
 ```
 
 ## Arguments
@@ -261,12 +261,12 @@ netgraph path pc-alice srv-backup -F json | jq '.paths[0].links[].id'
 | `--element-ids` | — | off | Give every node, edge and namespace a stable id derived from its name, so the diagram can be deep-linked and styled from outside. dot and svg only. |
 | `--max-addresses` | `N` | `4` | Longest address list spelled out under a node before it is abbreviated to 'and N more'. 0 prints the count alone. |
 | `--rankdir` | `[tb\|lr\|bt\|rl]` | TB, top to bottom | Layout direction. A wide network reads better left to right; a deep one top to bottom. Honoured by the Graphviz backends and by mermaid. |
-| `--routing` | `[spline\|orthogonal\|straight]` | whatever the inventory's layout documents say, else spline | How links are drawn between the bends they are pinned through: 'spline' is the curve Graphviz draws, 'orthogonal' right angles, 'straight' segment to segment. A default: a link that pins a style of its own keeps it. Honoured by the Graphviz backends, the JSON export and the editor. 'netgraph layout --write' records it in the view it arranges, so the choice is the inventory's rather than the command line's from then on. |
+| `--routing` | `[spline\|orthogonal\|straight]` | whatever the inventory's layout documents say, else spline | How links are drawn between the bends they are pinned through: 'spline' is the curve Graphviz draws, 'orthogonal' right angles, 'straight' segment to segment. A default: a link that pins a style of its own keeps it. Honoured by the Graphviz backends, the JSON export and the editor. 'netviz layout --write' records it in the view it arranges, so the choice is the inventory's rather than the command line's from then on. |
 | `--avoid`, `--no-avoid` | — | avoid | Route orthogonal links around the boxes they are not attached to instead of straight across them. Only applies to an arranged diagram drawn with '--routing orthogonal': a spline has nothing to route around, and an unarranged one is routed by Graphviz, which already avoids nodes. A bend you placed yourself is never moved — routing fills the segments between them. '--no-avoid' is the local Z-and-L every orthogonal diagram was drawn with before this existed. |
 | `--title` | `TEXT` | — | Caption for the diagram. |
 | `--strict` | — | off | Treat warnings as errors. |
 | `--force` | — | off | Proceed even when validation failed. The result may not match the files. |
-| `--profile` | `NAME` | — | Apply the [profile.NAME] block of netgraph.toml on top of its [render] table. Explicit flags still win over both. |
+| `--profile` | `NAME` | — | Apply the [profile.NAME] block of netviz.toml on top of its [render] table. Explicit flags still win over both. |
 | `--show-config` | — | off | Print the settings this invocation resolves to, and where each one came from, then exit without doing any work. |
 <!-- /generated -->
 
@@ -286,7 +286,7 @@ netgraph path pc-alice srv-backup -F json | jq '.paths[0].links[].id'
 
 * [`docs/paths.md`](../paths.md) — how each layer decides, more worked examples,
   the JSON contract, and what the trace does not model.
-* [`netgraph render`](render.md) and [`docs/rendering.md`](../rendering.md) — the
+* [`netviz render`](render.md) and [`docs/rendering.md`](../rendering.md) — the
   diagram `--highlight` emphasises a route on.
 * [`docs/validation.md`](../validation.md) — the checks that run before a trace,
   and what `--strict` changes.

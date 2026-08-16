@@ -5,7 +5,7 @@
 # so a second cable is what keeps I002 quiet about it, and 'eth0' keeps the pair
 # cabled so that W103 stays quiet too. 'pc-b:eth1' sits in a /30, which W105
 # exempts.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -19,7 +19,7 @@ spec:
     - name: eth1
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -36,7 +36,7 @@ spec:
       ipv4:
         addresses: [10.0.1.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b
@@ -46,7 +46,7 @@ spec:
     - pc-b:eth0
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-eth1-b

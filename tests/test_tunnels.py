@@ -4,9 +4,9 @@ The other test modules cover tunnels where they touch what was already there —
 a golden rendering, an invalid fixture, the completion list. This one covers
 what is new and has no home elsewhere:
 
-* the per-type facts of :class:`~netgraph.models.TunnelType`, which are what the
+* the per-type facts of :class:`~netviz.models.TunnelType`, which are what the
   renderer and the validator both reason about rather than about a string;
-* :func:`~netgraph.render.graph.resolve_tunnels`, and in particular the broken
+* :func:`~netviz.render.graph.resolve_tunnels`, and in particular the broken
   inventories it must survive because ``--force`` exists;
 * the shape a tunnel takes in a diagram — an edge when it joins two elements, a
   node when it joins more or when the overlay layer is asked for;
@@ -22,10 +22,10 @@ from typing import Any
 import pytest
 import yaml
 
-from netgraph.errors import SchemaError
-from netgraph.graph import LINK_EDGE_KINDS, PHYSICAL_EDGE_KINDS, broadcast_domains, to_networkx
-from netgraph.loader import Inventory, load_tree
-from netgraph.models import (
+from netviz.errors import SchemaError
+from netviz.graph import LINK_EDGE_KINDS, PHYSICAL_EDGE_KINDS, broadcast_domains, to_networkx
+from netviz.loader import Inventory, load_tree
+from netviz.models import (
     API_VERSION,
     MAX_VNI,
     InterfaceType,
@@ -36,7 +36,7 @@ from netgraph.models import (
     TunnelType,
     parse_document,
 )
-from netgraph.render.graph import (
+from netviz.render.graph import (
     TUNNEL_ID_PREFIX,
     EdgeKind,
     FilterSpec,
@@ -46,7 +46,7 @@ from netgraph.render.graph import (
     filter_graph,
     resolve_tunnels,
 )
-from netgraph.validate import validate
+from netviz.validate import validate
 
 # --------------------------------------------------------------------------- #
 # Building inventories
@@ -56,7 +56,7 @@ from netgraph.validate import validate
 #: below terminate their tunnels on. Deliberately not minimal: giving every
 #: router the same port set means a test can add any tunnel without editing it.
 _ROUTERS = """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata: {{name: {name}}}
 spec:
@@ -83,7 +83,7 @@ def routers(*names: str) -> str:
 
 def cable(name: str, left: str, right: str) -> str:
     return f"""
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {{name: {name}}}
 spec:
@@ -170,7 +170,7 @@ def test_every_tunnel_type_states_the_five_facts_the_rest_of_the_tool_uses() -> 
         ("wireguard", 3, 51820, True),
         ("ipsec", 3, None, True),
         ("openvpn", 3, 1194, True),
-        # PPTP's MPPE is broken, so netgraph calls it what it is.
+        # PPTP's MPPE is broken, so netviz calls it what it is.
         ("pptp", 3, None, False),
         ("l2tp", 2, 1701, False),
         ("gre", 3, None, False),
@@ -293,7 +293,7 @@ def test_the_vni_is_a_24_bit_field() -> None:
 def test_a_tunnel_interface_may_name_its_underlay_port_and_nothing_else_may() -> None:
     """``NG-I002``: ``parent`` is ``if:lower-layer-if``, not a free-form pointer."""
     document = yaml.safe_load("""
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata: {name: pc}
 spec:
@@ -311,7 +311,7 @@ spec:
 
 def test_a_tunnel_interface_must_not_be_its_own_parent() -> None:
     document = yaml.safe_load("""
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata: {name: pc}
 spec:

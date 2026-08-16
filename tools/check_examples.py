@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Run the ``netgraph`` examples in the documentation and diff what they print.
+"""Run the ``netviz`` examples in the documentation and diff what they print.
 
 A transcript in a document is a promise about the tool, and the only kind of
 promise that survives a refactor is one a test makes. So every fenced
-``console`` or ``bash`` block that invokes ``netgraph`` carries a marker on the
+``console`` or ``bash`` block that invokes ``netviz`` carries a marker on the
 line above it saying what should happen to it:
 
 ``<!-- run: cwd=examples/quickstart -->``
-    Executable. Each ``$ netgraph …`` line is run in ``cwd`` (relative to the
+    Executable. Each ``$ netviz …`` line is run in ``cwd`` (relative to the
     repository root, defaulting to the root itself) and the lines beneath it
     must be exactly what it prints. ``rc=1`` may be added to assert the exit
     code of the last command. A line consisting of ``...`` matches any run of
@@ -54,14 +54,14 @@ _FENCE_OPEN: Final = re.compile(r"^```(console|bash|sh|shell)\s*$")
 _FENCE_CLOSE: Final = re.compile(r"^```\s*$")
 _RUN_MARKER: Final = re.compile(r"^<!--\s*run:(?P<args>[^>]*?)-->\s*$")
 _NORUN_MARKER: Final = re.compile(r"^<!--\s*norun:\s*(?P<reason>[^>]*?)-->\s*$")
-#: ``netgraph`` at the start of a command, prompt or not.
-_INVOKES: Final = re.compile(r"(?:^|[|(]\s*|&&\s*|;\s*)(?:\$\s+)?netgraph\b")
+#: ``netviz`` at the start of a command, prompt or not.
+_INVOKES: Final = re.compile(r"(?:^|[|(]\s*|&&\s*|;\s*)(?:\$\s+)?netviz\b")
 
 #: Environment that makes output reproducible: no colour, a fixed width, and no
 #: inherited configuration.
 #:
 #: The environment is *built* rather than inherited, which is the point -- a
-#: reader's ``netgraph.toml`` or ``NO_COLOR`` must not change what the docs are
+#: reader's ``netviz.toml`` or ``NO_COLOR`` must not change what the docs are
 #: checked against. That makes the platform-specific entries below load-bearing
 #: rather than defensive: on Windows a process started without ``SYSTEMROOT``
 #: cannot initialise, and one started without ``PYTHONUTF8`` writes its output in
@@ -121,7 +121,7 @@ class Block:
 
 @dataclass
 class Unmarked:
-    """A block that invokes netgraph and says nothing about whether it runs."""
+    """A block that invokes netviz and says nothing about whether it runs."""
 
     path: Path
     line: int
@@ -145,12 +145,12 @@ def markdown_files() -> list[Path]:
     )
 
 
-def invokes_netgraph(lines: Sequence[str]) -> bool:
+def invokes_netviz(lines: Sequence[str]) -> bool:
     return any(_INVOKES.search(line) for line in lines)
 
 
 def scan(path: Path) -> tuple[list[Block], list[Unmarked]]:
-    """Every netgraph-invoking example in one file."""
+    """Every netviz-invoking example in one file."""
     text = path.read_text(encoding="utf-8").splitlines()
     blocks: list[Block] = []
     unmarked: list[Unmarked] = []
@@ -167,7 +167,7 @@ def scan(path: Path) -> tuple[list[Block], list[Unmarked]]:
             body.append(text[index])
             index += 1
         index += 1  # step over the closing fence
-        if not invokes_netgraph(body):
+        if not invokes_netviz(body):
             continue
 
         marker = _preceding_marker(text, start)
@@ -266,10 +266,10 @@ def steps_of(block: Block) -> list[Step]:
 
 
 def entry_point() -> list[str]:
-    """How to start netgraph so that it calls itself what the docs call it.
+    """How to start netviz so that it calls itself what the docs call it.
 
     Click takes the program name from ``sys.argv[0]``, so a usage error raised
-    under ``python -m netgraph`` would document a usage line no reader will ever
+    under ``python -m netviz`` would document a usage line no reader will ever
     see. The installed console script is therefore preferred, and the module form
     is the fallback for a checkout that has not been installed.
 
@@ -278,24 +278,24 @@ def entry_point() -> list[str]:
     installs console scripts into ``Scripts\\`` beside ``python.exe``, so the
     naive lookup found nothing there, fell through to the module form, and made
     every documented usage line fail the comparison on that platform alone --
-    which reads like a bug in netgraph rather than in this lookup. ``.exe`` is
+    which reads like a bug in netviz rather than in this lookup. ``.exe`` is
     tried as well as the bare name for the same reason.
     """
     directories = [Path(sysconfig.get_path("scripts")), Path(sys.executable).parent]
     for directory in directories:
         for suffix in ("", ".exe"):
-            script = directory / f"netgraph{suffix}"
+            script = directory / f"netviz{suffix}"
             if script.is_file():
                 return [str(script)]
-    return [sys.executable, "-m", "netgraph"]
+    return [sys.executable, "-m", "netviz"]
 
 
 def argv_for(command: str) -> list[str]:
-    """The argument vector for a documented ``netgraph …`` command line."""
+    """The argument vector for a documented ``netviz …`` command line."""
     parts = shlex.split(command)
-    if not parts or parts[0] != "netgraph":
+    if not parts or parts[0] != "netviz":
         raise ValueError(
-            f"only a bare 'netgraph …' invocation can be run; got {command!r}. "
+            f"only a bare 'netviz …' invocation can be run; got {command!r}. "
             "Use a '<!-- norun: … -->' marker for anything needing a shell."
         )
     return [*entry_point(), *parts[1:]]
@@ -424,7 +424,7 @@ def update(block: Block) -> bool:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Check the documented netgraph examples.")
+    parser = argparse.ArgumentParser(description="Check the documented netviz examples.")
     parser.add_argument("paths", nargs="*", type=Path, help="Markdown files; default all of them.")
     parser.add_argument("--list", action="store_true", help="List the blocks and their verdicts.")
     parser.add_argument(
@@ -443,7 +443,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     failures = 0
     for entry in unmarked:
         print(
-            f"{entry.id}: example invokes netgraph but carries no "
+            f"{entry.id}: example invokes netviz but carries no "
             "'<!-- run: … -->' or '<!-- norun: … -->' marker",
             file=sys.stderr,
         )

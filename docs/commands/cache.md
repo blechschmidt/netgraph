@@ -1,14 +1,14 @@
-# `netgraph cache`
+# `netviz cache`
 
-Every netgraph command re-reads the inventory from disk, because the files are the
+Every netviz command re-reads the inventory from disk, because the files are the
 only state it trusts. Turning those bytes back into validated models is the
 expensive half of that, and on a tree where one file changed it is also the
 *repeated* half — so a file that has been parsed once is remembered, keyed by its
 own contents.
 
-`netgraph cache` is the two things you can do to that cache from outside:
-[`info`](#netgraph-cache-info) says where it is and what is in it, and
-[`clear`](#netgraph-cache-clear) empties it. Neither is part of a normal
+`netviz cache` is the two things you can do to that cache from outside:
+[`info`](#netviz-cache-info) says where it is and what is in it, and
+[`clear`](#netviz-cache-clear) empties it. Neither is part of a normal
 workflow. The cache needs no maintenance: an entry is keyed by the file's bytes
 *and* by the code that read them, so it cannot go stale, and
 [`--no-cache`](#--no-cache) rules it out of an experiment without deleting
@@ -23,29 +23,29 @@ What is stored, where, and how to switch it off for a whole environment is in
 
 <!-- generated: synopsis cache info -->
 ```text
-netgraph [GLOBAL OPTIONS] cache info [OPTIONS]
+netviz [GLOBAL OPTIONS] cache info [OPTIONS]
 ```
 <!-- /generated -->
 
 <!-- generated: synopsis cache clear -->
 ```text
-netgraph [GLOBAL OPTIONS] cache clear [OPTIONS]
+netviz [GLOBAL OPTIONS] cache clear [OPTIONS]
 ```
 <!-- /generated -->
 
-## `netgraph cache info`
+## `netviz cache info`
 
 Nothing is loaded and nothing is written; this reads the cache directory and
 describes it.
 
 <!-- norun: the directory and the identity are per machine and per installation -->
 ```console
-$ netgraph -i examples/campus cache info
+$ netviz -i examples/campus cache info
 cache
 SETTING        VALUE
 -------------  -------------------------------------------------------
 enabled        true
-directory      /home/ada/.cache/netgraph/inventories/campus-9f21c0be44a1
+directory      /home/ada/.cache/netviz/inventories/campus-9f21c0be44a1
 location from  ~/.cache
 entries        15
 size           15.7 kB
@@ -56,8 +56,8 @@ identity (an entry is keyed by this and the file's contents)
 INPUT       VALUE
 ----------  ---------------------
 format      1
-netgraph    0.1.0
-apiVersion  netgraph.dev/v1alpha1
+netviz    0.1.0
+apiVersion  netviz.dev/v1alpha1
 parser      CStrictSafeLoader
 pydantic    2.13.4
 python      3.12
@@ -68,30 +68,30 @@ sources     6773bbaa227ef5a1
 The two tables answer different questions.
 
 **The first is about this inventory's cache.** `enabled` names the reason when it
-is off — `--no-cache`, `NETGRAPH_NO_CACHE`, or `[cache] enabled = false` in
-`netgraph.toml`. `location from` names the rung of the ladder that chose the
+is off — `--no-cache`, `NETVIZ_NO_CACHE`, or `[cache] enabled = false` in
+`netviz.toml`. `location from` names the rung of the ladder that chose the
 directory, which is the only thing worth knowing about a path that is not where
-you expected: `NETGRAPH_CACHE_DIR`, `netgraph.toml [cache] dir`,
+you expected: `NETVIZ_CACHE_DIR`, `netviz.toml [cache] dir`,
 `XDG_CACHE_HOME`, or the platform default. `stale entries` are the ones written
-by a netgraph that has since changed — they are never read, and the next sweep
+by a netviz that has since changed — they are never read, and the next sweep
 reclaims them first.
 
 **The second is the identity**: everything besides a file's own bytes that
 decides what that file means. If the cache keeps missing, one of these lines is
-changing between runs, and `sources` — a digest over netgraph's own source files
-— is the one that changes when you are editing netgraph itself. That is
+changing between runs, and `sources` — a digest over netviz's own source files
+— is the one that changes when you are editing netviz itself. That is
 deliberate: a cache keyed on the version number alone would serve conclusions
 drawn by code you have since rewritten.
 
 An inventory nothing has loaded yet reports zero entries and says so; the next
 command that loads it fills the cache.
 
-## `netgraph cache clear`
+## `netviz cache clear`
 
 <!-- norun: the count and the directory are the reader's own -->
 ```console
-$ netgraph -i examples/campus cache clear
-cleared this inventory: 15 entries under /home/ada/.cache/netgraph/inventories/campus-9f21c0be44a1
+$ netviz -i examples/campus cache clear
+cleared this inventory: 15 entries under /home/ada/.cache/netviz/inventories/campus-9f21c0be44a1
 15 entries, 15.7 kB freed
 ```
 
@@ -104,8 +104,8 @@ what to reach for when reclaiming space rather than investigating one tree:
 
 <!-- norun: the count is the reader's own -->
 ```console
-$ netgraph cache clear --all
-cleared every inventory: 214 entries under /home/ada/.cache/netgraph/inventories
+$ netviz cache clear --all
+cleared every inventory: 214 entries under /home/ada/.cache/netviz/inventories
 214 entries, 3.1 MB freed
 ```
 
@@ -120,19 +120,19 @@ about the run rather than about the command:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/home-lab --no-cache validate
+$ netviz -i examples/home-lab --no-cache validate
 no problems found
 ```
 
 It parses every file and remembers nothing, which is what to use when comparing a
 timing against a cold one, or to rule the cache out of a bug report. To switch the
 cache off for a whole environment — a CI job, a container image — set
-`NETGRAPH_NO_CACHE=1` instead of adding the flag to every invocation, and see
+`NETVIZ_NO_CACHE=1` instead of adding the flag to every invocation, and see
 [Turning it off](../configuration.md#turning-it-off).
 
 ## What is not cached
 
-Two shapes stay on the slow path forever, and `netgraph cache info`'s counters
+Two shapes stay on the slow path forever, and `netviz cache info`'s counters
 say how many files they cost:
 
 * A file declaring a **`kind: template`** (§6.6), because the template is used by
@@ -141,7 +141,7 @@ say how many files they cost:
   of this file with a template that may live anywhere in the tree.
 
 A cache keyed on one file's bytes cannot notice the other file changing, so it
-does not try. Neither is anything cached by `netgraph validate --format json`,
+does not try. Neither is anything cached by `netviz validate --format json`,
 `sarif` or `github`: those keep the per-field provenance that lets a finding be
 reported at the line that caused it, and that provenance *is* the YAML node tree
 a cache entry does not hold.
@@ -163,7 +163,7 @@ a cache entry does not hold.
 | Code | Meaning |
 |---|---|
 | `0` | The cache was described, or cleared. |
-| `2` | Usage error — an unknown flag, or an unusable `netgraph.toml`. |
+| `2` | Usage error — an unknown flag, or an unusable `netviz.toml`. |
 | `130` | Interrupted. |
 | `141` | The downstream end of a pipe closed first. |
 
@@ -171,7 +171,7 @@ a cache entry does not hold.
 
 * [`docs/configuration.md`](../configuration.md#cache--remembering-parsed-files) —
   the `[cache]` table, exactly what is stored, and how to disable it in CI.
-* [`netgraph watch`](watch.md) — the loop the cache exists for: only the files
+* [`netviz watch`](watch.md) — the loop the cache exists for: only the files
   that changed are parsed again.
 * [`docs/follow-ups.md`](../follow-ups.md) — entry 14, the measurement the cache
   was built from and what dominates a re-render now.

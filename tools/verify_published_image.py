@@ -12,8 +12,8 @@ check is everything that makes the image usable *by someone else*:
   machine says ``denied``. That is the one this script exists for.
 * the **tag** resolves. The workflow verifies ``@sha256:…``; a reader follows
   ``docs/docker.md`` and types ``:main`` or ``:edge``.
-* the **entrypoint** is netgraph with no arguments needed, the way
-  ``ENTRYPOINT ["netgraph"]`` promises, and bare ``docker run IMAGE`` prints
+* the **entrypoint** is netviz with no arguments needed, the way
+  ``ENTRYPOINT ["netviz"]`` promises, and bare ``docker run IMAGE`` prints
   help rather than doing something nobody asked for.
 * the image can **draw** -- Graphviz present and findable, an inventory
   rendered from a read-only mount, as an unprivileged user, in the working
@@ -168,7 +168,7 @@ def split_reference(reference: str) -> tuple[str, str, str] | None:
 
     A digest is accepted in place of a tag; ``@sha256:…`` is returned as the tag
     because that is what the manifest endpoint takes either way. ``None`` means
-    the reference names no registry -- ``netgraph:local``, an image that exists
+    the reference names no registry -- ``netviz:local``, an image that exists
     only in a daemon -- for which the registry half of this script has nothing
     to ask and the runtime half still has everything.
     """
@@ -408,17 +408,17 @@ def check_runtime(report: Report, reference: str, expect_version: str | None) ->
             raise Failure(f"expected usage text, got {output[:120]!r}")
         detail(f"{len(output.splitlines())} lines of help")
 
-    with checking(report, "the entrypoint is netgraph itself") as detail:
-        # No `netgraph` in the argument list: ENTRYPOINT supplies it, which is
+    with checking(report, "the entrypoint is netviz itself") as detail:
+        # No `netviz` in the argument list: ENTRYPOINT supplies it, which is
         # the whole claim being made by `docker run IMAGE validate`.
         reported = run_image(reference, "--version").strip().splitlines()[0]
-        if not reported.startswith("netgraph "):
+        if not reported.startswith("netviz "):
             raise Failure(f"`--version` reported {reported!r}")
-        if expect_version and reported != f"netgraph {expect_version}":
+        if expect_version and reported != f"netviz {expect_version}":
             raise Failure(f"reported {reported!r}, expected version {expect_version}")
         detail(reported)
 
-    with checking(report, "Graphviz is present and netgraph can find it") as detail:
+    with checking(report, "Graphviz is present and netviz can find it") as detail:
         report_json = json.loads(run_image(reference, "version", "--json"))
         graphviz = report_json.get("graphviz") or {}
         if not graphviz.get("version"):
@@ -427,7 +427,7 @@ def check_runtime(report: Report, reference: str, expect_version: str | None) ->
 
     with checking(report, "it runs unprivileged, in /inventory") as detail:
         # Read off the tool rather than by overriding the entrypoint with `id`:
-        # what matters is the context netgraph itself runs in.
+        # what matters is the context netviz itself runs in.
         env = json.loads(run_image(reference, "version", "--json"))
         detail(str(env.get("python", {}).get("version", "")).split()[0])
         inspected = docker(

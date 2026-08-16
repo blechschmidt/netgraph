@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: sw-dock-01-to-srv-dock-01-eno1
@@ -8,7 +8,7 @@ spec:
   speed: 1Gbps
   category: cat6
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: sw-dock-01-to-srv-dock-02-eno1
@@ -18,7 +18,7 @@ spec:
   speed: 1Gbps
   category: cat6
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: sw-dock-01-to-srv-dock-01-eno2
@@ -28,7 +28,7 @@ spec:
   speed: 1Gbps
   category: cat6
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: sw-dock-01-to-srv-dock-02-eno2
@@ -38,7 +38,7 @@ spec:
   speed: 1Gbps
   category: cat6
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: sw-dock-01-to-srv-dock-03-eno1

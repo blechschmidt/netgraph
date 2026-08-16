@@ -1,4 +1,4 @@
-"""``netgraph web DIR``: the editing session, its API, and its two preconditions.
+"""``netviz web DIR``: the editing session, its API, and its two preconditions.
 
 The properties asserted here are the ones that make the difference between a
 scratchpad and an editor, and the ones a user would otherwise discover by losing
@@ -40,11 +40,11 @@ from typing import Any, Final
 import pytest
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.edit import EditError, ValidationRefused
-from netgraph.web.preview import ViewOptions
-from netgraph.web.server import WebServer
-from netgraph.web.session import (
+from netviz.cli import cli
+from netviz.edit import EditError, ValidationRefused
+from netviz.web.preview import ViewOptions
+from netviz.web.server import WebServer
+from netviz.web.session import (
     MAX_FILE_BYTES,
     Conflict,
     EditingSession,
@@ -53,7 +53,7 @@ from netgraph.web.session import (
     TreeWatcher,
     relative_path,
 )
-from netgraph.web.tour import MAX_SCRATCHES, TooLarge, Tours, copy_inventory
+from netviz.web.tour import MAX_SCRATCHES, TooLarge, Tours, copy_inventory
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -333,7 +333,7 @@ def test_a_copy_serialises_the_selection_and_writes_nothing(session: EditingSess
     before = session.revision
     payload = session.copy(["sw-home", "cbl-rtr-sw"], view="l1")
 
-    assert payload["format"] == "netgraph.dev/clipboard/v1"
+    assert payload["format"] == "netviz.dev/clipboard/v1"
     # The cable has one end outside the selection, so it is left behind — and
     # said so rather than silently omitted.
     assert [entry["address"] for entry in payload["documents"]] == ["switches/sw-home"]
@@ -346,7 +346,7 @@ def test_a_read_only_session_still_copies(tree: Path) -> None:
     reader = EditingSession(root=tree, writable=False)
     assert reader.copy(["sw-home"])["documents"]
     with pytest.raises(ReadOnly):
-        reader.paste({"format": "netgraph.dev/clipboard/v1", "documents": []})
+        reader.paste({"format": "netviz.dev/clipboard/v1", "documents": []})
     with pytest.raises(ReadOnly):
         reader.duplicate(["sw-home"])
     with pytest.raises(ReadOnly):
@@ -445,7 +445,7 @@ def test_a_clipboard_write_decided_against_an_older_tree_is_refused(
         lambda: session.duplicate(["sw-home"], revision=stale),
         lambda: session.cut(["sw-home"], revision=stale),
         lambda: session.paste(
-            {"format": "netgraph.dev/clipboard/v1", "documents": []}, revision=stale
+            {"format": "netviz.dev/clipboard/v1", "documents": []}, revision=stale
         ),
     ):
         with pytest.raises(Conflict):
@@ -499,7 +499,7 @@ def test_dragging_an_unplaced_note_writes_the_whole_geometry_block(
     A note anchored to a switch pins no point. Writing ``spec.geometry.x`` onto
     it would leave a position with no ``y`` -- which §21 refuses -- so the first
     drag has to send the block whole. See ``SetAnnotation``'s docstring and
-    ``netgraph/drawio/reconcile.py``, which writes the same gesture the same way.
+    ``netviz/drawio/reconcile.py``, which writes the same gesture the same way.
     """
     session.apply(
         [
@@ -919,7 +919,7 @@ def test_the_graph_route_carries_the_annotations_and_the_query_turns_them_off(
     to a plainer picture is one somebody can type into an address bar.
     """
     (tree / "annotations.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: note\n"
         "metadata:\n"
         "  name: why-here\n"
@@ -1100,7 +1100,7 @@ def test_an_entry_carries_the_command_that_would_replay_it(session: EditingSessi
     # backslashes shlex.quote wraps, and pinning the unquoted spelling would
     # assert the renderer is broken on the one platform it says it is not.
     expected = shlex.join(
-        ["netgraph", "-i", str(session.root), "edit", "delete", "srv-nas", "--cascade"]
+        ["netviz", "-i", str(session.root), "edit", "delete", "srv-nas", "--cascade"]
     )
     assert session.journal()[0].commands == (expected,)
 
@@ -1425,7 +1425,7 @@ def test_a_finding_the_tree_no_longer_reports_is_refused(repairable: EditingSess
 
 def test_a_finding_with_no_repair_is_refused(session: EditingSession, tree: Path) -> None:
     (tree / "orphan.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: computer\nmetadata:\n  name: pc-lost\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: computer\nmetadata:\n  name: pc-lost\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n      mtu: 1500\n"
         "      ipv4:\n        - 10.9.9.9/24\n",
         encoding="utf-8",
@@ -1439,12 +1439,12 @@ def test_a_repair_that_would_make_things_worse_is_refused(tmp_path: Path) -> Non
     root = tmp_path / "orphan"
     root.mkdir()
     (root / "net.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: sw-a\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n  name: sw-a\n"
         "spec:\n  interfaces:\n    - name: port1\n      type: ethernet\n      mtu: 1500\n"
-        "---\napiVersion: netgraph.dev/v1alpha1\nkind: computer\nmetadata:\n  name: pc-a\n"
+        "---\napiVersion: netviz.dev/v1alpha1\nkind: computer\nmetadata:\n  name: pc-a\n"
         "spec:\n  interfaces:\n    - name: eno1\n      type: ethernet\n      mtu: 1500\n"
         "      ipv4:\n        - 10.0.0.9/24\n"
-        "---\napiVersion: netgraph.dev/v1alpha1\nkind: cable\nmetadata:\n  name: cbl-1\n"
+        "---\napiVersion: netviz.dev/v1alpha1\nkind: cable\nmetadata:\n  name: cbl-1\n"
         "spec:\n  endpoints:\n    - sw-a:missing\n    - pc-a:eno1\n  medium: copper\n",
         encoding="utf-8",
     )
@@ -1524,7 +1524,7 @@ def test_a_scratch_is_a_copy_of_the_documents_and_nothing_else(tmp_path: Path) -
     """
     source = tmp_path / "inventory"
     shutil.copytree(HOME_LAB, source)
-    (source / "netgraph.toml").write_text("[render]\nlayer = 'l2'\n", encoding="utf-8")
+    (source / "netviz.toml").write_text("[render]\nlayer = 'l2'\n", encoding="utf-8")
     (source / "notes.txt").write_text("not an inventory document\n", encoding="utf-8")
     (source / "diagram.svg").write_text("<svg/>\n", encoding="utf-8")
     (source / ".git").mkdir()
@@ -1540,7 +1540,7 @@ def test_a_scratch_is_a_copy_of_the_documents_and_nothing_else(tmp_path: Path) -
     assert _yaml(destination) == {
         name: text for name, text in _yaml(source).items() if not name.startswith((".", "_"))
     }
-    assert (destination / "netgraph.toml").is_file(), "the copy renders with other defaults"
+    assert (destination / "netviz.toml").is_file(), "the copy renders with other defaults"
     assert not (destination / "notes.txt").exists()
     assert not (destination / "diagram.svg").exists()
     assert not (destination / ".git").exists()
@@ -1651,7 +1651,7 @@ def test_a_stale_token_is_answered_from_the_tree_rather_than_refused(served: str
 
 
 def test_the_scratchpad_has_no_inventory_to_tour() -> None:
-    """``netgraph web`` on a stream copies nothing, and says why."""
+    """``netviz web`` on a stream copies nothing, and says why."""
     with WebServer.create(source="", host="127.0.0.1", port=0) as server:
         status, body = call(server.url.rstrip("/"), "/api/tour", "POST")
     assert status == 400
@@ -1683,7 +1683,7 @@ def test_an_inventory_too_big_to_copy_is_refused_rather_than_copied(
     a policy and the refusal is the behaviour, and only one of the two is worth
     two minutes of a test run.
     """
-    monkeypatch.setattr("netgraph.web.tour.MAX_FILES", 1)
+    monkeypatch.setattr("netviz.web.tour.MAX_FILES", 1)
     tours = Tours()
     with pytest.raises(TooLarge, match="too big to tour"):
         tours.open(EditingSession(root=tree))
@@ -1694,7 +1694,7 @@ def test_an_untouched_tour_expires(tree: Path, monkeypatch: Any) -> None:
     """The backstop for the tab that crashed instead of saying goodbye."""
     tours = Tours()
     scratch = tours.open(EditingSession(root=tree))
-    monkeypatch.setattr("netgraph.web.tour.TTL_SECONDS", -1.0)
+    monkeypatch.setattr("netviz.web.tour.TTL_SECONDS", -1.0)
     assert tours.open(EditingSession(root=tree)).token != scratch.token
     assert not scratch.root.exists()
     assert tours.get(scratch.token) is None
@@ -1702,7 +1702,7 @@ def test_an_untouched_tour_expires(tree: Path, monkeypatch: Any) -> None:
 
 
 def test_stopping_the_server_deletes_every_copy(session: EditingSession) -> None:
-    """Ctrl-C on ``netgraph web`` should not leave a tree in /tmp."""
+    """Ctrl-C on ``netviz web`` should not leave a tree in /tmp."""
     with WebServer.create(session=session, host="127.0.0.1", port=0) as server:
         base = server.url.rstrip("/")
         roots = [Path(call(base, "/api/tour", "POST")[1]["root"]) for _ in range(2)]
@@ -1721,7 +1721,7 @@ def test_stopping_the_server_deletes_every_copy(session: EditingSession) -> None
 #: The l1 view of the example inventory, arranged — three nodes ragged enough
 #: for an alignment to have something to do.
 RAGGED_LAYOUT = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: layout
 metadata:
   name: default
@@ -1767,9 +1767,9 @@ def test_aligning_something_already_aligned_writes_nothing(ragged: EditingSessio
     assert change.undo_depth == 1, "nor grow the undo stack"
 
 
-def test_snapping_uses_the_grid_from_netgraph_toml(tree: Path) -> None:
+def test_snapping_uses_the_grid_from_netviz_toml(tree: Path) -> None:
     (tree / "layout.yaml").write_text(RAGGED_LAYOUT, encoding="utf-8", newline="\n")
-    (tree / "netgraph.toml").write_text("[editor]\ngrid = 100\n", encoding="utf-8", newline="\n")
+    (tree / "netviz.toml").write_text("[editor]\ngrid = 100\n", encoding="utf-8", newline="\n")
     session = EditingSession(root=tree, writable=True)
     assert session.grid() == 100
     assert session.state()["grid"] == 100

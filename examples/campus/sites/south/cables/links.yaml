@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-south-core-dist
@@ -17,7 +17,7 @@ spec:
   connector: lc
   label: F-201
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-south-dist-acc01
@@ -36,7 +36,7 @@ spec:
   connector: lc
   label: F-202
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-south-dist-acc02
@@ -55,7 +55,7 @@ spec:
   connector: lc
   label: F-203
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-south-acc01-pc01
@@ -73,7 +73,7 @@ spec:
   connector: rj45
   label: C-201
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-south-acc01-srv01
@@ -91,7 +91,7 @@ spec:
   connector: rj45
   label: C-202
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-south-acc02-pc02

@@ -1,12 +1,12 @@
-"""``netgraph web``: the stream pipeline, the info-box records, and the server.
+"""``netviz web``: the stream pipeline, the info-box records, and the server.
 
 The properties asserted here are the ones the interface promises and the ones a
 user would otherwise discover the hard way:
 
 * **A stream is loaded exactly as a folder is.** Same parser, same schema, same
-  rules — so what the page reports and what ``netgraph validate`` reports about
+  rules — so what the page reports and what ``netviz validate`` reports about
   the same text cannot differ.
-* **Broken text still draws.** ``netgraph render`` refuses an inventory with
+* **Broken text still draws.** ``netviz render`` refuses an inventory with
   errors; this one draws what resolved and says what did not, because text
   being edited is wrong most of the time.
 * **Every drawn element is addressable.** Each ``<g>`` in the SVG carries an id
@@ -29,14 +29,14 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.errors import RenderError
-from netgraph.loader import load_stream
-from netgraph.render import Layer, build_graph, graph_to_dict
-from netgraph.render.icons import CISCO, icon_theme
-from netgraph.render.ids import element_ids
-from netgraph.watch import Status
-from netgraph.web import (
+from netviz.cli import cli
+from netviz.errors import RenderError
+from netviz.loader import load_stream
+from netviz.render import Layer, build_graph, graph_to_dict
+from netviz.render.icons import CISCO, icon_theme
+from netviz.render.ids import element_ids
+from netviz.watch import Status
+from netviz.web import (
     ASSETS,
     BINDINGS,
     BINDINGS_PATH,
@@ -53,14 +53,14 @@ from netgraph.web import (
     prepare,
     render_source,
 )
-from netgraph.web.bindings import (
+from netviz.web.bindings import (
     MENU_TARGETS,
     MENUS,
     markdown_menus,
     markdown_table,
 )
-from netgraph.web.bindings import payload as bindings_payload
-from netgraph.web.preview import graph_digest, icon_choices
+from netviz.web.bindings import payload as bindings_payload
+from netviz.web.preview import graph_digest, icon_choices
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -79,7 +79,7 @@ def home_lab() -> str:
 
 
 TWO_HOSTS = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -92,7 +92,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -104,7 +104,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b
@@ -136,7 +136,7 @@ def test_every_element_of_a_stream_lands_in_the_root_namespace() -> None:
 
 
 def test_a_syntax_error_is_recorded_with_its_line() -> None:
-    inventory = load_stream("apiVersion: netgraph.dev/v1alpha1\nkind: [computer\nmtu: 3\n")
+    inventory = load_stream("apiVersion: netviz.dev/v1alpha1\nkind: [computer\nmtu: 3\n")
     assert len(inventory.errors) == 1
     # The line the parser gave up on, which is where the unclosed sequence ran
     # into something that cannot be in it -- not where it was opened.
@@ -180,7 +180,7 @@ def test_a_valid_stream_renders(home_lab: str) -> None:
 def test_a_stream_with_errors_is_still_drawn() -> None:
     dangling = TWO_HOSTS + (
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata:\n"
         "  name: cbl-nowhere\n"
@@ -217,7 +217,7 @@ def test_strict_promotes_warnings_to_errors() -> None:
 
 LONE_HOST = """\
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-lonely
@@ -259,14 +259,14 @@ def test_a_failure_that_is_not_a_sentence_is_made_into_one(monkeypatch: Any) -> 
     def explode(*args: Any, **kwargs: Any) -> bytes:
         raise OSError(2, "No such file or directory", "/themes/router.svg")
 
-    monkeypatch.setattr("netgraph.web.preview.to_image", explode)
+    monkeypatch.setattr("netviz.web.preview.to_image", explode)
     preview = render_source(TWO_HOSTS)
     assert preview.status is Status.FAILED
     assert preview.message == "No such file or directory: /themes/router.svg"
 
 
 def test_a_missing_graphviz_is_reported_rather_than_raised(monkeypatch: Any) -> None:
-    monkeypatch.setattr("netgraph.render.dot.find_dot", lambda: None)
+    monkeypatch.setattr("netviz.render.dot.find_dot", lambda: None)
     preview = render_source(TWO_HOSTS)
     assert preview.status is Status.FAILED
     assert "Graphviz" in preview.message
@@ -281,7 +281,7 @@ def test_a_missing_graphviz_is_reported_rather_than_raised(monkeypatch: Any) -> 
 #: point, a zone that follows its members, and a generated key.
 ANNOTATED = """\
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: why-here
@@ -290,7 +290,7 @@ spec:
     **Two** of them, on purpose.
   geometry: {x: 40, y: 90, width: 200, height: 60}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: the-pair
@@ -298,7 +298,7 @@ spec:
   label: The pair
   members: [pc-a, pc-b]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: legend
 metadata:
   name: key
@@ -315,7 +315,7 @@ def test_the_preview_publishes_the_annotations_it_drew() -> None:
     An area in an arranged drawing is a rectangle in the graph's background with
     no id on it at all, so a canvas that hit-tested the DOM would find notes and
     silently nothing else. This payload is the same one
-    ``netgraph render -f json`` publishes: id, document, geometry, members.
+    ``netviz render -f json`` publishes: id, document, geometry, members.
     """
     preview = render_source(TWO_HOSTS + ANNOTATED)
     payload = preview.to_dict()["annotations"]
@@ -857,7 +857,7 @@ def test_a_seed_folder_opens_a_session_rather_than_a_stream(monkeypatch: Any) ->
     seeds: list[str] = []
     sessions: list[Any] = []
     monkeypatch.setattr(
-        "netgraph.cli.WebServer.create",
+        "netviz.cli.WebServer.create",
         _capture(seeds, sessions=sessions, port_error=SystemExit(0)),
     )
     result = run("web", str(HOME_LAB), "--no-open")
@@ -870,22 +870,22 @@ def test_a_seed_folder_opens_a_session_rather_than_a_stream(monkeypatch: Any) ->
 
 def test_a_seed_file_is_used_as_it_is(monkeypatch: Any) -> None:
     seeds: list[str] = []
-    monkeypatch.setattr("netgraph.cli.WebServer.create", _capture(seeds, port_error=SystemExit(0)))
+    monkeypatch.setattr("netviz.cli.WebServer.create", _capture(seeds, port_error=SystemExit(0)))
     run("web", str(HOME_LAB / "routers" / "rtr-home.yaml"), "--no-open")
     assert seeds[0] == (HOME_LAB / "routers" / "rtr-home.yaml").read_text(encoding="utf-8")
 
 
 def test_a_piped_stream_seeds_the_editor(monkeypatch: Any) -> None:
     seeds: list[str] = []
-    monkeypatch.setattr("netgraph.cli.WebServer.create", _capture(seeds, port_error=SystemExit(0)))
+    monkeypatch.setattr("netviz.cli.WebServer.create", _capture(seeds, port_error=SystemExit(0)))
     run("web", "--no-open", input=TWO_HOSTS)
     assert seeds[0] == TWO_HOSTS
 
 
 def test_with_nothing_to_seed_from_the_editor_opens_on_the_example(monkeypatch: Any) -> None:
     seeds: list[str] = []
-    monkeypatch.setattr("netgraph.cli.WebServer.create", _capture(seeds, port_error=SystemExit(0)))
-    monkeypatch.setattr("netgraph.cli._is_a_terminal", lambda stream: True)
+    monkeypatch.setattr("netviz.cli.WebServer.create", _capture(seeds, port_error=SystemExit(0)))
+    monkeypatch.setattr("netviz.cli._is_a_terminal", lambda stream: True)
     run("web", "--no-open")
     inventory = load_stream(seeds[0])
     assert not inventory.errors
@@ -999,14 +999,14 @@ def _registered() -> set[str]:
     found: set[str] = set()
     for name in _COMMAND_FILES:
         source = asset(name).decode("utf-8")
-        found.update(re.findall(r'(?:K|netgraphKeys)\.define\(\s*"([^"]+)"', source))
+        found.update(re.findall(r'(?:K|netvizKeys)\.define\(\s*"([^"]+)"', source))
     return found
 
 
 def test_every_binding_has_a_handler_and_every_handler_a_binding() -> None:
     """The one direction neither the table nor the docs can check for itself.
 
-    A command in :data:`netgraph.web.bindings.BINDINGS` with nothing behind it
+    A command in :data:`netviz.web.bindings.BINDINGS` with nothing behind it
     is a palette row that does nothing and a documented shortcut that is a lie;
     a handler with no entry is a feature with no key, no palette row and no
     line in ``docs/commands/web.md``. Both are silent, and both fail here.
@@ -1014,11 +1014,11 @@ def test_every_binding_has_a_handler_and_every_handler_a_binding() -> None:
     declared = {binding.id for binding in BINDINGS}
     registered = _registered()
     assert declared - registered == set(), (
-        "declared in netgraph/web/bindings.py with no handler in "
+        "declared in netviz/web/bindings.py with no handler in "
         f"{', '.join(_COMMAND_FILES)}: {sorted(declared - registered)}"
     )
     assert registered - declared == set(), (
-        "registered in the page with no entry in netgraph/web/bindings.py: "
+        "registered in the page with no entry in netviz/web/bindings.py: "
         f"{sorted(registered - declared)}"
     )
 

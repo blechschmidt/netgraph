@@ -50,13 +50,13 @@ jobs:
       matrix:
         # Both parsers. They differ in exactly the places a property test
         # notices -- what raises, at what depth, with which mark -- which is why
-        # the loader hardening in ``netgraph.loader.documents`` had to be
+        # the loader hardening in ``netviz.loader.documents`` had to be
         # written for both.
         yaml-loader: ["auto", "python"]
 
     env:
-      NETGRAPH_YAML_LOADER: ${{ matrix.yaml-loader }}
-      NETGRAPH_HYPOTHESIS_PROFILE: deep
+      NETVIZ_YAML_LOADER: ${{ matrix.yaml-loader }}
+      NETVIZ_HYPOTHESIS_PROFILE: deep
 
     steps:
       - name: Check out the repository
@@ -76,7 +76,7 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
-      - name: Install netgraph and its dev extras
+      - name: Install netviz and its dev extras
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip

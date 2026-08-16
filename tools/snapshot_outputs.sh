@@ -1,5 +1,5 @@
 #!/bin/sh
-# Capture every user-visible output netgraph produces over every inventory the
+# Capture every user-visible output netviz produces over every inventory the
 # repository owns, so a performance change can be proved to have altered none of
 # them: `snapshot_outputs.sh before && ...change... && snapshot_outputs.sh after
 # && diff -r before after`.
@@ -14,7 +14,7 @@ set -eu
 out=${1:?usage: snapshot_outputs.sh OUTDIR [BENCH_TREE]}
 bench=${2:-}
 root=$(cd "$(dirname "$0")/.." && pwd)
-netgraph=${NETGRAPH:-$root/.venv/bin/netgraph}
+netviz=${NETVIZ:-$root/.venv/bin/netviz}
 
 mkdir -p "$out"
 
@@ -28,12 +28,12 @@ capture() {
                    "list cables" "list tunnels" "list vlans"; do
             name=$(echo "$sub" | tr ' -' '__')
             # shellcheck disable=SC2086
-            NETGRAPH_YAML_LOADER=$loader "$netgraph" --no-color -i "$inventory" $sub \
+            NETVIZ_YAML_LOADER=$loader "$netviz" --no-color -i "$inventory" $sub \
                 >"$dir/$name.out" 2>"$dir/$name.err" || echo "exit=$?" >>"$dir/$name.out"
         done
         for fmt in dot mermaid json; do
             for layer in l1 l2 l3; do
-                NETGRAPH_YAML_LOADER=$loader "$netgraph" --no-color -i "$inventory" \
+                NETVIZ_YAML_LOADER=$loader "$netviz" --no-color -i "$inventory" \
                     render -f "$fmt" --layer "$layer" \
                     >"$dir/render_${fmt}_${layer}.out" 2>"$dir/render_${fmt}_${layer}.err" \
                     || echo "exit=$?" >>"$dir/render_${fmt}_${layer}.out"
@@ -43,13 +43,13 @@ capture() {
         # Which two they are does not matter -- what is being captured is that
         # the answer did not change -- but they must be picked the same way on
         # both runs, and load order is deterministic.
-        names=$(NETGRAPH_YAML_LOADER=$loader "$netgraph" --no-color -i "$inventory" \
+        names=$(NETVIZ_YAML_LOADER=$loader "$netviz" --no-color -i "$inventory" \
                 list devices 2>/dev/null | awk 'NR>2 {print $1}')
         first=$(echo "$names" | head -n 1)
         last=$(echo "$names" | tail -n 1)
         if [ -n "$first" ] && [ -n "$last" ] && [ "$first" != "$last" ]; then
             for fmt in text json; do
-                NETGRAPH_YAML_LOADER=$loader "$netgraph" --no-color -i "$inventory" \
+                NETVIZ_YAML_LOADER=$loader "$netviz" --no-color -i "$inventory" \
                     path --all --force -F "$fmt" "$first" "$last" \
                     >"$dir/path_${fmt}.out" 2>"$dir/path_${fmt}.err" \
                     || echo "exit=$?" >>"$dir/path_${fmt}.out"

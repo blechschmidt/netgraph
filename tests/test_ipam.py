@@ -1,4 +1,4 @@
-"""``netgraph ipam``: sizing, free space, aggregation and the conflict report.
+"""``netviz ipam``: sizing, free space, aggregation and the conflict report.
 
 The properties asserted here are the ones an operator's next action depends on:
 
@@ -30,9 +30,9 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.config import ValidationConfig
-from netgraph.ipam import (
+from netviz.cli import cli
+from netviz.config import ValidationConfig
+from netviz.ipam import (
     DEFAULT_SIZE,
     IPAM_RULES,
     Utilisation,
@@ -49,9 +49,9 @@ from netgraph.ipam import (
     usable_addresses,
     utilisation_of,
 )
-from netgraph.loader import Inventory, load_tree
-from netgraph.rules import RULE_IDS
-from netgraph.subnets import subnets_of
+from netviz.loader import Inventory, load_tree
+from netviz.rules import RULE_IDS
+from netviz.subnets import subnets_of
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -811,7 +811,7 @@ def test_quiet_silences_the_commentary_but_never_the_data(runner: CliRunner) -> 
 
 def test_a_tree_with_no_addresses_says_so(runner: CliRunner, tmp_path: Path) -> None:
     (tmp_path / "sw.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata:\n  name: sw\n"
         "spec:\n  interfaces:\n"

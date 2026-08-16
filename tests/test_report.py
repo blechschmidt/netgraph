@@ -1,4 +1,4 @@
-"""``netgraph report`` — the bundle, its links, its determinism and its stamp.
+"""``netviz report`` — the bundle, its links, its determinism and its stamp.
 
 Five properties are asserted here, in this order of importance:
 
@@ -19,10 +19,10 @@ an SVG is Graphviz's output and differs between Graphviz releases, so pinning it
 bytes would fail on a machine whose Graphviz is a version ahead.
 
 **One derivation.** The tables must be the ones the matching commands print, so
-they are compared against :mod:`netgraph.listing`, :mod:`netgraph.ipam` and
-:func:`netgraph.export.cables.schedule` rather than against a second expectation
+they are compared against :mod:`netviz.listing`, :mod:`netviz.ipam` and
+:func:`netviz.export.cables.schedule` rather than against a second expectation
 written out here. A per-site page is the same functions over
-:func:`netgraph.loader.inventory.subset`, and that narrowing is asserted directly.
+:func:`netviz.loader.inventory.subset`, and that narrowing is asserted directly.
 
 **Traceability.** The stamp, the version and the git revision reach every page,
 and the stamp can be pinned — which is what makes the byte stability above
@@ -51,17 +51,17 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 
-from netgraph import listing
-from netgraph.cli import cli
-from netgraph.diagnostics import build_report as build_diagnostics
-from netgraph.errors import NetgraphError, RenderError
-from netgraph.export import cables as cable_export
-from netgraph.fsio import write_text
-from netgraph.ipam import build_report as build_ipam_report
-from netgraph.loader import Inventory, load_tree, subset
-from netgraph.loader.inventory import short_name
-from netgraph.render.graph import Layer, build_graph
-from netgraph.report import (
+from netviz import listing
+from netviz.cli import cli
+from netviz.diagnostics import build_report as build_diagnostics
+from netviz.errors import NetvizError, RenderError
+from netviz.export import cables as cable_export
+from netviz.fsio import write_text
+from netviz.ipam import build_report as build_ipam_report
+from netviz.loader import Inventory, load_tree, subset
+from netviz.loader.inventory import short_name
+from netviz.render.graph import Layer, build_graph
+from netviz.report import (
     EPOCH_ENV_VAR,
     FORMATS,
     JSON_FILE,
@@ -77,7 +77,7 @@ from netgraph.report import (
     resolve_timestamp,
     site_groups,
 )
-from netgraph.report.stamp import NO_TIMESTAMP
+from netviz.report.stamp import NO_TIMESTAMP
 
 from platform_marks import ON_WINDOWS, requires_dot  # isort: skip -- tests/ is on sys.path
 
@@ -93,7 +93,7 @@ GOLDEN = Path(__file__).resolve().parent / "fixtures" / "report"
 EXAMPLE_NAMES = ("home-lab", "patch-room", "campus", "overlay", "containers")
 
 #: Pinned in every generated report here, so a golden is a function of the
-#: inventory alone. See ``netgraph.report.stamp``.
+#: inventory alone. See ``netviz.report.stamp``.
 STAMP = "2026-01-31T09:00:00Z"
 
 #: Pinned for the same reason: the real version changes at every release, and a
@@ -117,7 +117,7 @@ def options_for(export_format: str, **overrides: Any) -> Options:
 def report_of(name: str, export_format: str = "markdown", **overrides: Any) -> Bundle:
     """The bundle for one example inventory, findings included."""
     inventory = load_tree(EXAMPLES / name)
-    from netgraph.validate import validate
+    from netviz.validate import validate
 
     findings = validate(inventory)
     bundle, _ = generate(
@@ -216,7 +216,7 @@ def test_every_page_carries_the_version_and_the_stamp(name: str) -> None:
         if path.endswith(".svg"):
             continue
         text = bundle.text(path)
-        assert VERSION in text, f"{path} does not name the netgraph version"
+        assert VERSION in text, f"{path} does not name the netviz version"
         assert STAMP in text, f"{path} does not carry the generated-at stamp"
         assert "abc123def456" in text, f"{path} does not carry the inventory revision"
 
@@ -226,10 +226,10 @@ def test_every_page_carries_the_version_and_the_stamp(name: str) -> None:
 # --------------------------------------------------------------------------- #
 
 
-def test_the_element_table_is_the_one_netgraph_list_prints(
+def test_the_element_table_is_the_one_netviz_list_prints(
     inventories: dict[str, Inventory],
 ) -> None:
-    """The overview's element table is ``netgraph list devices``, cell for cell."""
+    """The overview's element table is ``netviz list devices``, cell for cell."""
     inventory = inventories["campus"]
     overview = report_of("campus").text("README.md")
     for row in listing.devices(inventory).rows:
@@ -237,7 +237,7 @@ def test_the_element_table_is_the_one_netgraph_list_prints(
             assert cell in overview, f"the overview is missing the cell {cell!r}"
 
 
-def test_the_address_plan_is_the_one_netgraph_ipam_prints(
+def test_the_address_plan_is_the_one_netviz_ipam_prints(
     inventories: dict[str, Inventory],
 ) -> None:
     """Every utilisation row reaches the overview with the same numbers."""
@@ -252,8 +252,8 @@ def test_the_cable_schedule_is_the_one_the_exporter_writes(
     inventories: dict[str, Inventory],
 ) -> None:
     """Every run of the pull list appears on the site page, in the same order."""
-    from netgraph.export.context import ExportContext, ExportOptions
-    from netgraph.export.manifest import Recorder
+    from netviz.export.context import ExportContext, ExportOptions
+    from netviz.export.manifest import Recorder
 
     inventory = inventories["patch-room"]
     context = ExportContext(
@@ -373,7 +373,7 @@ def test_the_site_pages_partition_the_elements(tmp_path: Path) -> None:
         (tmp_path / "sub" / "deeper" / "deep-sw.yaml", "deep-sw"),
     ):
         path.write_text(
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: switch\n"
             "metadata:\n"
             f"  name: {name}\n"
@@ -524,7 +524,7 @@ def test_a_device_without_namespaces_gets_no_namespace_section() -> None:
     assert "#netns" not in campus
 
 
-def test_the_wireless_plan_is_the_one_netgraph_list_bss_prints(
+def test_the_wireless_plan_is_the_one_netviz_list_bss_prints(
     inventories: dict[str, Inventory],
 ) -> None:
     page = report_of("home-lab").text("sites/root.md")
@@ -535,7 +535,7 @@ def test_the_wireless_plan_is_the_one_netgraph_list_bss_prints(
 def test_open_findings_are_carried_into_the_report(tmp_path: Path) -> None:
     """A report of an inventory with a warning in it says so, on the overview."""
     (tmp_path / "one.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata:\n"
         "  name: sw-1\n"
@@ -545,7 +545,7 @@ def test_open_findings_are_carried_into_the_report(tmp_path: Path) -> None:
         "      type: ethernet\n",
         encoding="utf-8",
     )
-    from netgraph.validate import validate
+    from netviz.validate import validate
 
     inventory = load_tree(tmp_path)
     findings = validate(inventory)
@@ -576,7 +576,7 @@ def test_two_runs_produce_identical_bytes(export_format: str) -> None:
 def test_the_json_document_holds_every_page_and_its_links() -> None:
     """``-f json`` is the whole document, not a summary of it."""
     document = json.loads(report_of("campus", "json").text(JSON_FILE))
-    assert document["meta"]["netgraph"] == VERSION
+    assert document["meta"]["netviz"] == VERSION
     assert document["meta"]["generatedAt"] == STAMP
     kinds = {page["kind"] for page in document["pages"]}
     assert kinds == {"overview", "site", "device"}
@@ -593,11 +593,11 @@ def test_the_json_document_holds_every_page_and_its_links() -> None:
     assert linked <= paths, f"the document links pages it does not hold: {linked - paths}"
 
 
-def test_an_unwritable_destination_is_a_netgraph_error(tmp_path: Path) -> None:
+def test_an_unwritable_destination_is_a_netviz_error(tmp_path: Path) -> None:
     """The bundle is a document; a failure to write it is not a traceback."""
     blocked = tmp_path / "file"
     blocked.write_text("not a directory\n", encoding="utf-8")
-    with pytest.raises(NetgraphError, match="cannot write the report"):
+    with pytest.raises(NetvizError, match="cannot write the report"):
         report_of("home-lab", diagrams=False).write(blocked)
 
 
@@ -699,7 +699,7 @@ def test_two_scopes_cannot_share_a_drawing(tmp_path: Path) -> None:
         directory = tmp_path / "sites" / namespace
         directory.mkdir(parents=True, exist_ok=True)
         (directory / f"{name}.yaml").write_text(
-            "apiVersion: netgraph.dev/v1alpha1\n"
+            "apiVersion: netviz.dev/v1alpha1\n"
             "kind: switch\n"
             "metadata:\n"
             f"  name: {name}\n"
@@ -753,7 +753,7 @@ def test_a_layer_that_cannot_be_laid_out_is_a_note_and_not_a_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Graphviz is optional for every other artefact, and for this one too."""
-    monkeypatch.setattr("netgraph.report.diagrams.find_dot", lambda: None)
+    monkeypatch.setattr("netviz.report.diagrams.find_dot", lambda: None)
     bundle, diagrams = generate(load_tree(EXAMPLES / "home-lab"), options=options_for("markdown"))
     overview = bundle.text("README.md")
     assert "Graphviz is not installed" in overview
@@ -769,8 +769,8 @@ def test_a_layout_that_fails_is_reported_once_and_costs_no_tables(
     def explode(*_arguments: object, **_keywords: object) -> bytes:
         raise RenderError("dot died")
 
-    monkeypatch.setattr("netgraph.report.diagrams.find_dot", lambda: "/usr/bin/dot")
-    monkeypatch.setattr("netgraph.report.diagrams.to_image", explode)
+    monkeypatch.setattr("netviz.report.diagrams.find_dot", lambda: "/usr/bin/dot")
+    monkeypatch.setattr("netviz.report.diagrams.to_image", explode)
     bundle, diagrams = generate(load_tree(EXAMPLES / "home-lab"), options=options_for("markdown"))
     overview = bundle.text("README.md")
     assert "could not be laid out" in overview
@@ -821,14 +821,14 @@ def test_an_unusable_timestamp_is_refused(value: str) -> None:
     """A typo must not fall back to the clock: the stamp would then be a lie."""
     if not value:
         pytest.skip("the empty string means 'not given', which is not an error")
-    with pytest.raises(NetgraphError, match="ISO-8601"):
+    with pytest.raises(NetvizError, match="ISO-8601"):
         resolve_timestamp(value)
 
 
 @pytest.mark.parametrize("value", ("tuesday", "99999999999999999999"))
 def test_an_unusable_source_date_epoch_is_refused(value: str) -> None:
     """Not a number, and a number no platform can turn into a date: one error."""
-    with pytest.raises(NetgraphError, match=EPOCH_ENV_VAR):
+    with pytest.raises(NetvizError, match=EPOCH_ENV_VAR):
         resolve_timestamp("", environ={EPOCH_ENV_VAR: value})
 
 
@@ -877,13 +877,13 @@ def test_a_template_directory_overrides_one_page(tmp_path: Path) -> None:
 def test_a_template_that_fails_is_reported_as_such(tmp_path: Path) -> None:
     (tmp_path / "overview.md.j2").write_text("{{ nope.missing }}\n", encoding="utf-8")
     inventory = load_tree(EXAMPLES / "home-lab")
-    with pytest.raises(NetgraphError, match=re.escape("overview.md.j2")):
+    with pytest.raises(NetvizError, match=re.escape("overview.md.j2")):
         generate(inventory, options=options_for("markdown", diagrams=False), templates=tmp_path)
 
 
 def test_a_missing_template_directory_is_refused(tmp_path: Path) -> None:
     inventory = load_tree(EXAMPLES / "home-lab")
-    with pytest.raises(NetgraphError, match="not a directory"):
+    with pytest.raises(NetvizError, match="not a directory"):
         generate(
             inventory,
             options=options_for("markdown", diagrams=False),
@@ -912,7 +912,7 @@ def test_a_namespace_cannot_smuggle_a_link_into_a_page(tmp_path: Path) -> None:
     directory = tmp_path / SMUGGLING_NAMESPACE
     directory.mkdir()
     (directory / "sw.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata:\n"
         "  name: sw-1\n"
@@ -962,7 +962,7 @@ def test_an_html_page_allows_exactly_the_style_it_inlines(tmp_path: Path) -> Non
 def test_inventory_text_cannot_become_markup(tmp_path: Path) -> None:
     """A description is data. A report is published. The two must not mix."""
     (tmp_path / "one.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata:\n"
         "  name: sw-1\n"
@@ -1026,7 +1026,7 @@ def test_the_bundle_matches_its_golden(name: str, export_format: str, regen_gold
     golden = GOLDEN / f"{name}-{export_format}.txt"
     if regen_golden:
         golden.parent.mkdir(parents=True, exist_ok=True)
-        # netgraph.fsio.write_text, not Path.write_text: a golden is a
+        # netviz.fsio.write_text, not Path.write_text: a golden is a
         # byte-for-byte artefact and Python's text mode would rewrite every line
         # ending on Windows. See .gitattributes.
         write_text(golden, actual)
@@ -1144,7 +1144,7 @@ def test_an_inventory_with_errors_is_refused_unless_forced(tmp_path: Path) -> No
     inventory = tmp_path / "inventory"
     inventory.mkdir()
     (inventory / "one.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata:\n"
         "  name: cbl-1\n"
@@ -1252,7 +1252,7 @@ def test_prune_is_reported_and_optional(tmp_path: Path) -> None:
 #: by an order of magnitude: this is a regression guard against an accidental
 #: quadratic — a per-device walk of every edge, or a graph rebuilt per page — and
 #: not a benchmark. The drawings are excluded because Graphviz dominates them and
-#: is not netgraph's cost to bound.
+#: is not netviz's cost to bound.
 COST_BUDGET_SECONDS = 20.0
 
 

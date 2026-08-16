@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-dock-03
@@ -16,7 +16,7 @@ metadata:
     # for exactly this reason - but the schema has no type that says "macvlan
     # slave" or "tap", so nothing here distinguishes them from a spare port.
     # See follow-up 26 in docs/follow-ups.md.
-    netgraph/ignore: NG-C015
+    netviz/ignore: NG-C015
 spec:
   vendor: Supermicro
   model: SYS-5019C-MR
@@ -141,7 +141,7 @@ spec:
     # these interfaces are moved into the container as slaves of eno1.22
     # rather than created as one end of a pair, which is why neither names
     # a peer and why the addresses are the lab's rather than a private
-    # pool's. netgraph has no type that says 'macvlan slave'; see
+    # pool's. netviz has no type that says 'macvlan slave'; see
     # follow-up 26.
     # ----------------------------------------------------------------- #
     - name: mv-eth0
@@ -258,7 +258,7 @@ spec:
       description: >-
         The second user's tap, carrying the address the first one carries. Two
         namespaces are two address spaces, so this is not a duplicate and
-        netgraph does not report one.
+        netviz does not report one.
       ipv4:
         addresses:
           - ip: 10.0.2.100

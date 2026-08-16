@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "tool": {
-    "name": "netgraph",
+    "name": "netviz",
     "version": "0.1.0"
   },
   "source": {
@@ -26,7 +26,7 @@
       "address": "device.hosts/pc-2",
       "kind": "computer",
       "document": {
-        "apiVersion": "netgraph.dev/v1alpha1",
+        "apiVersion": "netviz.dev/v1alpha1",
         "kind": "computer",
         "metadata": {
           "name": "pc-2",
@@ -72,7 +72,7 @@
       "address": "cable.cbl-pc-1-sw-access",
       "kind": "cable",
       "document": {
-        "apiVersion": "netgraph.dev/v1alpha1",
+        "apiVersion": "netviz.dev/v1alpha1",
         "kind": "cable",
         "metadata": {
           "name": "cbl-pc-1-sw-access"
@@ -145,7 +145,7 @@
         }
       ],
       "document": {
-        "apiVersion": "netgraph.dev/v1alpha1",
+        "apiVersion": "netviz.dev/v1alpha1",
         "kind": "layout",
         "metadata": {
           "name": "layout"

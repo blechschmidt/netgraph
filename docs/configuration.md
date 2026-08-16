@@ -1,11 +1,11 @@
-# `netgraph.toml`
+# `netviz.toml`
 
 One optional file at the root of an inventory, holding everything that is true
 of *this* network rather than of this invocation: which rules it is graded by,
 what its diagrams look like, and where its parse cache goes.
 
 ```toml
-# netgraph.toml
+# netviz.toml
 [validate]
 strict = false
 ignore = ["W103", "NG-C010"]
@@ -30,7 +30,7 @@ show-ips = false
 ```
 
 It is entirely optional. An inventory without one behaves exactly as if it
-declared the defaults, and `netgraph init` scaffolds a fully commented copy.
+declared the defaults, and `netviz init` scaffolds a fully commented copy.
 
 **Contents**
 
@@ -49,7 +49,7 @@ declared the defaults, and `netgraph init` scaffolds a fully commented copy.
 
 ## Where the file is looked for
 
-`netgraph.toml` is read from the inventory root — the directory `-i/--inventory`
+`netviz.toml` is read from the inventory root — the directory `-i/--inventory`
 names, or the containing directory when `-i` names a single YAML file. It is
 never searched for up the tree and never read from `$HOME`: a diagram is a
 property of the inventory, and one that changed depending on which directory you
@@ -83,7 +83,7 @@ reason.
 
 Rules are named by their short id (`E004`, `W103`, `I002`) or by the `NG-*`
 alias from [`docs/schema.md` §10](schema.md#10-validation-rules); the two are
-interchangeable. `netgraph rules` prints the catalogue and
+interchangeable. `netviz rules` prints the catalogue and
 [`docs/validation-rules.md`](validation-rules.md) explains each one.
 
 ```toml
@@ -96,8 +96,8 @@ E004 = "warning"            # duplicate address: a warning while we clean up
 NG-C010 = "info"
 ```
 
-`netgraph validate --disable RULE` adds to `ignore` for a single run, and a
-`netgraph/ignore` annotation silences a rule for one element;
+`netviz validate --disable RULE` adds to `ignore` for a single run, and a
+`netviz/ignore` annotation silences a rule for one element;
 [`docs/validation-rules.md`](validation-rules.md#suppressing-a-rule) covers the
 interaction of all three and what cannot be suppressed.
 
@@ -148,10 +148,10 @@ layer = "l3"
 max-addresses = 8
 ```
 
-<!-- norun: needs the netgraph.toml above, and both lines write a diagram into the reader's directory -->
+<!-- norun: needs the netviz.toml above, and both lines write a diagram into the reader's directory -->
 ```console
-$ netgraph render --profile poster -o docs/campus.html
-$ netgraph render --profile review -f svg -o review.svg
+$ netviz render --profile poster -o docs/campus.html
+$ netviz render --profile review -f svg -o review.svg
 ```
 
 `--profile` is available on `render`, `watch`, `web` and `path`. Naming a
@@ -164,7 +164,7 @@ letter or a digit. Shell completion offers the names of the current inventory:
 
 <!-- norun: a shell completion, which needs the completion hook and a terminal to press TAB in -->
 ```console
-$ netgraph render --profile <TAB>
+$ netviz render --profile <TAB>
 poster   -- sets layer, format, title
 review   -- sets collapse-depth, bundle-links, show-ips
 l3       -- sets layer, max-addresses
@@ -177,7 +177,7 @@ Strongest first:
 1. an explicit command-line flag,
 2. the `[profile.<name>]` block selected with `--profile`,
 3. the `[render]` table,
-4. netgraph's built-in default.
+4. netviz's built-in default.
 
 Rung 1 means *explicit*, not *different*. Passing a flag its own default value
 still beats the file:
@@ -187,14 +187,14 @@ still beats the file:
 depth = 3
 ```
 
-<!-- norun: needs the netgraph.toml above, and the element name is illustrative -->
+<!-- norun: needs the netviz.toml above, and the element name is illustrative -->
 ```console
-$ netgraph render --neighbors-of sw-core                 # depth 3, from the file
-$ netgraph render --neighbors-of sw-core --depth 1       # depth 1, from the flag
+$ netviz render --neighbors-of sw-core                 # depth 3, from the file
+$ netviz render --neighbors-of sw-core --depth 1       # depth 1, from the flag
 ```
 
-`--depth 1` wins even though `1` is also netgraph's built-in default, because
-netgraph asks Click *where a value came from* rather than comparing it against
+`--depth 1` wins even though `1` is also netviz's built-in default, because
+netviz asks Click *where a value came from* rather than comparing it against
 the default. There is no way to write a command line that means "use the file's
 value" other than leaving the flag out, and no value that is silently ignored
 because it happened to match a default.
@@ -205,12 +205,12 @@ empty.
 
 ## Seeing what resolved, and why
 
-`netgraph config show [COMMAND]` prints the settings a bare invocation of that
+`netviz config show [COMMAND]` prints the settings a bare invocation of that
 command resolves to, with the place each value came from:
 
-<!-- norun: the transcript is of the netgraph.toml above; no committed inventory declares these profiles -->
+<!-- norun: the transcript is of the netviz.toml above; no committed inventory declares these profiles -->
 ```console
-$ netgraph config show render --profile review
+$ netviz config show render --profile review
 validation
 SETTING   VALUE   SOURCE
 --------  ------  -------
@@ -218,8 +218,8 @@ strict    false   default
 ignore    W103    file [validate]
 severity  (none)  default
 
-settings for 'netgraph render'
-configuration: /net/inventory/netgraph.toml
+settings for 'netviz render'
+configuration: /net/inventory/netviz.toml
 profiles declared: poster, review, l3
 
 SETTING             VALUE    SOURCE
@@ -242,9 +242,9 @@ To see a *particular* invocation resolved — flags included — add `--show-con
 to the command itself. It prints the same table and exits without loading the
 inventory or drawing anything:
 
-<!-- norun: needs the 'poster' profile of the netgraph.toml above -->
+<!-- norun: needs the 'poster' profile of the netviz.toml above -->
 ```console
-$ netgraph render --profile poster --title "Q3 review" --show-config
+$ netviz render --profile poster --title "Q3 review" --show-config
 ...
 title               Q3 review   flag --title
 ```
@@ -291,7 +291,7 @@ Four keys are worth a note:
 **`icons`** takes a bundled theme name (`cisco`), `none`, or a directory of
 images named after element kinds. A **relative** directory resolves against the
 configuration file, not the working directory — the file lives with the
-inventory, so a colleague who runs `netgraph` from a parent folder gets the same
+inventory, so a colleague who runs `netviz` from a parent folder gets the same
 icons.
 
 **`theme`** is the same idea for the *stylesheet* rather than the pictures: a
@@ -367,7 +367,7 @@ Appending is also why the two are still tellable apart afterwards. The composed
 stylesheet calls itself `blueprint+theme`, and the inline rules keep their
 positions at the end of the list, so a `from` entry of `theme:blueprint+theme#16`
 in [`-f json`](rendering.md#the-json-export) — one past the last of the sixteen
-rules `blueprint` itself declares — names your file rather than netgraph's.
+rules `blueprint` itself declares — names your file rather than netviz's.
 
 Three consequences worth knowing:
 
@@ -380,7 +380,7 @@ Three consequences worth knowing:
   from the bottom two rungs of the ladder only.
 
 It is a **top-level table, not a render setting**: it is not one value with one
-source, so it does not appear in `netgraph config show` beside `theme` and it
+source, so it does not appear in `netviz config show` beside `theme` and it
 cannot be overridden from the command line. Turn it off by turning styling off.
 [`docs/styling.md`](styling.md#a-default-for-the-inventory) works the interaction
 of the two through with a rendered example.
@@ -388,23 +388,23 @@ of the two through with a rendered example.
 ## `[cache]` — remembering parsed files
 
 Every command re-reads the inventory from disk, because the files are the only
-state netgraph trusts. Turning those bytes back into validated models is the
+state netviz trusts. Turning those bytes back into validated models is the
 expensive half of that, so a file that has been parsed once is remembered:
 
 ```toml
 [cache]
 enabled = true          # the default; false opts this inventory out entirely
-dir = ".netgraph-cache" # relative to *this file*; default is the platform's cache dir
+dir = ".netviz-cache" # relative to *this file*; default is the platform's cache dir
 max-size = "64MB"       # least recently used entries are dropped past this
 ```
 
 | Key | Type | Default | Meaning |
 |---|---|---|---|
-| `enabled` | boolean | `true` | Use the cache. `--no-cache` and `NETGRAPH_NO_CACHE` can turn it off; nothing turns it back on, so an inventory that has opted out stays opted out. |
-| `dir` | string | platform cache directory | Base directory. A relative path resolves against this file, not the working directory. `NETGRAPH_CACHE_DIR` outranks it. |
+| `enabled` | boolean | `true` | Use the cache. `--no-cache` and `NETVIZ_NO_CACHE` can turn it off; nothing turns it back on, so an inventory that has opted out stays opted out. |
+| `dir` | string | platform cache directory | Base directory. A relative path resolves against this file, not the working directory. `NETVIZ_CACHE_DIR` outranks it. |
 | `max-size` | integer bytes, or a string like `"256MB"`, `"1GiB"` | `64MB` | Cap on what is kept for this inventory. `0` keeps nothing on disk. |
 
-This is the one table that configures *how* netgraph runs rather than what it
+This is the one table that configures *how* netviz runs rather than what it
 produces. It earns its place because it is the one thing a shared inventory may
 need to say about the machines it is used on — a CI runner whose home directory is
 read-only, a repository that wants the cache inside a directory it already
@@ -413,11 +413,11 @@ archives between builds.
 ### Exactly what is stored
 
 One file per inventory file, named after a SHA-256 of the file's **contents**, the
-path it has **within the inventory**, and the **identity** of the netgraph that
-read it (see `netgraph cache info`). Each holds, zlib-compressed:
+path it has **within the inventory**, and the **identity** of the netviz that
+read it (see `netviz cache info`). Each holds, zlib-compressed:
 
 * every element of that file as pydantic serialises it — the same JSON
-  `netgraph show -o json` prints, after ranges are expanded and defaults applied;
+  `netviz show -o json` prints, after ranges are expanded and defaults applied;
 * every diagnostic the file produced, with its line, column and rule id, so a
   broken document is reported identically without being parsed again.
 
@@ -427,21 +427,21 @@ Nothing is ever stored as a pickle: entries are reconstructed through the very
 same validators the document went through, so a tampered entry can be rejected
 but cannot execute anything or smuggle a model past the schema.
 
-**Where it goes**, strongest first: `NETGRAPH_CACHE_DIR`, then `[cache] dir`,
-then `XDG_CACHE_HOME/netgraph`, then the platform's own answer
-(`%LOCALAPPDATA%\netgraph\Cache` on Windows, `~/Library/Caches/netgraph` on
-macOS, `~/.cache/netgraph` elsewhere). Under it, one directory per inventory,
+**Where it goes**, strongest first: `NETVIZ_CACHE_DIR`, then `[cache] dir`,
+then `XDG_CACHE_HOME/netviz`, then the platform's own answer
+(`%LOCALAPPDATA%\netviz\Cache` on Windows, `~/Library/Caches/netviz` on
+macOS, `~/.cache/netviz` elsewhere). Under it, one directory per inventory,
 named after the tree and a digest of its absolute path.
 
 **What is not cached:** files declaring a `kind: template` and devices that
 inherit one with `spec.from`, because their meaning depends on another file's
-bytes; and anything at all under `netgraph validate --format json|sarif|github`,
+bytes; and anything at all under `netviz validate --format json|sarif|github`,
 which keeps the per-field provenance that a cache entry does not hold.
 
 A corrupt, truncated or half-written entry is not an error: it is a miss, and the
 file is parsed. So is an unwritable cache directory or a full disk.
-[`netgraph cache info`](commands/cache.md) reports the directory, the entry count
-and the identity; `netgraph cache clear` empties it; `-v` prints the hit and miss
+[`netviz cache info`](commands/cache.md) reports the directory, the entry count
+and the identity; `netviz cache clear` empties it; `-v` prints the hit and miss
 counts of a single run.
 
 ### Turning it off
@@ -450,28 +450,28 @@ Three ways, for three scopes:
 
 | Scope | How |
 |---|---|
-| One run | `netgraph --no-cache …` — the flag is global and goes before the subcommand. |
-| A whole environment: CI, a container image, a pre-commit hook | `NETGRAPH_NO_CACHE=1` in the environment. |
-| This inventory, for everybody | `[cache] enabled = false` in `netgraph.toml`. |
+| One run | `netviz --no-cache …` — the flag is global and goes before the subcommand. |
+| A whole environment: CI, a container image, a pre-commit hook | `NETVIZ_NO_CACHE=1` in the environment. |
+| This inventory, for everybody | `[cache] enabled = false` in `netviz.toml`. |
 
 **In CI, leaving it on is usually the wrong default** — not because it is unsafe
 but because it is pointless: a fresh runner starts with an empty cache and pays
 the ~20 % cost of *filling* one nobody will read. Either set
-`NETGRAPH_NO_CACHE=1`, or point `NETGRAPH_CACHE_DIR` at a directory the runner
+`NETVIZ_NO_CACHE=1`, or point `NETVIZ_CACHE_DIR` at a directory the runner
 restores between builds and get the hit instead:
 
 ```yaml
 # GitHub Actions: keep the cache between runs rather than disabling it
 - uses: actions/cache@v4
   with:
-    path: .netgraph-cache
-    key: netgraph-${{ hashFiles('**/*.yaml') }}
-- run: netgraph validate
+    path: .netviz-cache
+    key: netviz-${{ hashFiles('**/*.yaml') }}
+- run: netviz validate
   env:
-    NETGRAPH_CACHE_DIR: .netgraph-cache
+    NETVIZ_CACHE_DIR: .netviz-cache
 ```
 
-Container images that run one command and exit should set `NETGRAPH_NO_CACHE=1`;
+Container images that run one command and exit should set `NETVIZ_NO_CACHE=1`;
 this project's own image instead points `XDG_CACHE_HOME` at `/tmp`, so a
 read-only home directory is not a problem either way.
 
@@ -486,19 +486,19 @@ max-revisions = 100
 |---|---|---|---|
 | `max-revisions` | integer ≥ 1 | `100` | Most revisions of the inventory one range may hold before it is refused. |
 
-Read by [`netgraph log`](commands/log.md) and by the timeline in
-[`netgraph web`](commands/web.md#the-history-timeline). It exists because
+Read by [`netviz log`](commands/log.md) and by the timeline in
+[`netviz web`](commands/web.md#the-history-timeline). It exists because
 reading history is not free: summarising one commit means loading the inventory
 on both sides of it, and *drawing* one means a Graphviz layout as well. A
 hundred is already more history than a scrubber can address a pixel at a time,
 and a repository with a decade of commits would otherwise turn one command into
 several hundred renders.
 
-The two consumers spend it differently, on purpose. `netgraph log` **refuses** a
+The two consumers spend it differently, on purpose. `netviz log` **refuses** a
 range wider than this and says so, because a range is something you asked for by
 name. The editor **truncates** to the newest and says how many there are,
 because a scrubber that shows nothing is not a better answer than a scrubber
-that shows the recent past. `netgraph log --max-revisions` overrides the file
+that shows the recent past. `netviz log --max-revisions` overrides the file
 for one invocation.
 
 ## `[editor]` — the visual editor's grid
@@ -512,7 +512,7 @@ grid = 20
 |---|---|---|---|
 | `grid` | number > 0 | `20` | Pitch in points that **snap to grid** rounds a selection's positions to. |
 
-Read by [`netgraph web`](commands/web.md), which offers it as one of the
+Read by [`netviz web`](commands/web.md), which offers it as one of the
 [alignment commands](editing.md#arranging-a-selection) on a multi-selection.
 Points, because everything in a `kind: layout` document is points (§18); twenty
 is half of Graphviz's default rank separation and a little under a node's
@@ -528,21 +528,21 @@ to the same lattice, or the second person's tidy-up quietly undoes the first's.
 An unknown key inside a known table is an error, not a silent no-op, and the
 message names the file, the key, and the likely spelling:
 
-<!-- norun: the transcript is of a netgraph.toml with a misspelt key, at an illustrative path -->
+<!-- norun: the transcript is of a netviz.toml with a misspelt key, at an illustrative path -->
 ```console
-$ netgraph render
-error: /net/inventory/netgraph.toml: unknown key(s) in [render]: show_ips; did you mean 'show-ips'?
+$ netviz render
+error: /net/inventory/netviz.toml: unknown key(s) in [render]: show_ips; did you mean 'show-ips'?
 ```
 
 A value of the wrong type or outside its range says so in the same terms:
 
 ```console
-error: /net/inventory/netgraph.toml: render.collapse-depth must be at least 1, got 0
-error: /net/inventory/netgraph.toml: profile.poster.format must be one of dot, svg, html, png, pdf, mermaid, json, got 'jpeg'
+error: /net/inventory/netviz.toml: render.collapse-depth must be at least 1, got 0
+error: /net/inventory/netviz.toml: profile.poster.format must be one of dot, svg, html, png, pdf, mermaid, json, got 'jpeg'
 ```
 
 Unknown *top-level tables*, on the other hand, are left alone, so a file shared
-with a later netgraph version does not break this one. The asymmetry is
+with a later netviz version does not break this one. The asymmetry is
 deliberate: a misspelt key inside `[render]` is a typo that would leave you
 staring at a diagram wondering why the setting did nothing, while an unknown
 table is how a newer feature arrives.

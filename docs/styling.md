@@ -27,7 +27,7 @@ you actually get.
 blue on white, the router a diamond, the switches 3-D boxes, the dongle a dashed
 slate box](images/home-lab-blueprint.svg)
 
-<sub>`netgraph -i examples/home-lab render --layer l2 --theme blueprint --title "home-lab — layer 2, blueprint theme" -f svg -o docs/images/home-lab-blueprint.svg`.</sub>
+<sub>`netviz -i examples/home-lab render --layer l2 --theme blueprint --title "home-lab — layer 2, blueprint theme" -f svg -o docs/images/home-lab-blueprint.svg`.</sub>
 
 [`docs/schema.md` §22](schema.md#22-per-element-styling-and-themes) is the
 normative version of everything below: the field table, the selector table, the
@@ -67,7 +67,7 @@ the colour with it.
 
 The price is worth stating plainly, because you will meet it on the first
 repaint: **recolouring a switch is an edit to that switch's document.**
-[`netgraph plan`](commands/plan.md) will show it, a reviewer will see it in the
+[`netviz plan`](commands/plan.md) will show it, a reviewer will see it in the
 diff, and a pull request that changes forty fills changes forty files. A style
 is invisible to the network; it is not invisible to the changeset. If a change
 should not land in the elements' own documents, express it as a
@@ -80,10 +80,10 @@ What a style cannot reach, whatever it says:
   edges of the same view drawn without one, at every layer. Hiding something is
   what [`--kind`, `--name` and the other filters](rendering.md#filters-drawing-less-of-the-network)
   are for, and they take it out of the topology as well as out of the picture.
-* **[`netgraph path`](paths.md).** No colour moves a hop, adds one, or changes
+* **[`netviz path`](paths.md).** No colour moves a hop, adds one, or changes
   which route is shortest.
 * **generated device configuration.** Nothing
-  [`netgraph export`](export.md#device-configuration-the-seven-dialects) writes
+  [`netviz export`](export.md#device-configuration-the-seven-dialects) writes
   for a device — netplan, networkd, ifupdown, FRR, WireGuard — knows that a fill
   exists.
 * **a build.** The two things that can go wrong *semantically* with a style are
@@ -113,12 +113,12 @@ vocabulary to recolour the cable leaving it.
 | `opacity` | How opaque the element is drawn, `0` to `1`. |
 
 Take [`examples/home-lab`](../examples/home-lab/README.md) and paint its switch.
-[`netgraph edit`](commands/edit.md) writes the block for you, and `--dry-run`
+[`netviz edit`](commands/edit.md) writes the block for you, and `--dry-run`
 shows the hunk without touching anything:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/home-lab edit set sw-home spec.style.fill navy --dry-run
+$ netviz -i examples/home-lab edit set sw-home spec.style.fill navy --dry-run
 --- a/switches/sw-home.yaml
 +++ b/switches/sw-home.yaml
 @@ -85,3 +85,5 @@
@@ -137,7 +137,7 @@ new fill and the outline thickened because this is the switch everything hangs
 off:
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-home
@@ -157,7 +157,7 @@ spec:
 A link is styled the same way, out of the same nine fields:
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-sw-ap
@@ -175,7 +175,7 @@ spec:
 block has a default, deliberately: a default written into the document would pin
 the value to the element and defeat the inheritance it is meant to fall through.
 Setting only a fill keeps the theme's shape; *unsetting* a field
-(`netgraph edit unset sw-home spec.style.fill`) is how you go back to what the
+(`netviz edit unset sw-home spec.style.fill`) is how you go back to what the
 theme says, and it is the honest way to do it — writing the inherited value in
 by hand would freeze today's theme into the document.
 
@@ -185,7 +185,7 @@ half-finished edit or a key indented one level too far had done nothing.
 
 Three keys are camelCase — `strokeWidth`, `fontColor`, `fontSize` — which is the
 one exception to the schema's naming rule and is called out here rather than
-left for you to trip over. They are the spellings SVG, mxGraph and netgraph's
+left for you to trip over. They are the spellings SVG, mxGraph and netviz's
 own JSON already use, and this is the one part of a document read and written by
 *drawing* tools rather than by network ones.
 
@@ -219,7 +219,7 @@ Twenty-four cover a diagram's palette; anything more particular is hex, which is
 always accepted. The hues are the ones the built-in palette already draws with,
 so `fill: green` gives a switch the green it has by default rather than a
 second, slightly different one. Your spelling is kept — `navy` is what
-[`netgraph fmt`](format.md) leaves in the file, and the resolution to `#1e3a8a`
+[`netviz fmt`](format.md) leaves in the file, and the resolution to `#1e3a8a`
 happens once, on the way to a renderer.
 
 The rest of the vocabulary:
@@ -252,7 +252,7 @@ icon theme in use there is nothing to choose from and the field is inert.
 ### Why the vocabulary is closed
 
 Every value here ends up inside a Graphviz attribute, an mxGraph style string or
-an SVG attribute — three text formats netgraph *generates*. A free-form
+an SVG attribute — three text formats netviz *generates*. A free-form
 pass-through would mean a fill of `red", shape="none` reaching a DOT file, or
 `#fff;shape=image;image=data:...` reaching a draw.io style. Both are injection,
 and an inventory — pulled from a branch, merged from a contributor, emitted by
@@ -265,7 +265,7 @@ edit that would introduce it is refused before anything is written:
 
 <!-- run: rc=1 -->
 ```console
-$ netgraph -i examples/home-lab edit set sw-home spec.style.fill navvy
+$ netviz -i examples/home-lab edit set sw-home spec.style.fill navvy
 error: the edit would introduce 6 new problems; nothing has been written (use --force to write it anyway)
   switches/sw-home.yaml#0:89:11: NG-Z001: 'navvy' is not a colour; write '#rgb', '#rrggbb' or a named colour; did you mean 'navy'?
 ...
@@ -289,11 +289,11 @@ that keeps a consistent diagram from being forty copies of the same four lines �
 and, because it is not part of the inventory, the layer that lets you restyle
 the whole estate without touching a single element's document.
 
-A theme is a single YAML file in netgraph's usual envelope, holding an ordered
+A theme is a single YAML file in netviz's usual envelope, holding an ordered
 list of `select`/`style` rules:
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: theme
 metadata:
   name: house
@@ -384,9 +384,9 @@ usually what you want for a colour and never means anything for a `shape`;
 
 <!-- norun: the theme path is illustrative and the second command writes an SVG into the reader's directory -->
 ```bash
-netgraph render --theme blueprint -f svg -o topology.svg
-netgraph render --theme ./themes/house.yaml -f svg -o topology.svg
-netgraph render --theme none -f svg -o topology.svg      # override one from netgraph.toml
+netviz render --theme blueprint -f svg -o topology.svg
+netviz render --theme ./themes/house.yaml -f svg -o topology.svg
+netviz render --theme none -f svg -o topology.svg      # override one from netviz.toml
 ```
 
 Every command that draws takes it: [`render`](commands/render.md),
@@ -403,9 +403,9 @@ nothing:
 
 <!-- run: rc=2 -->
 ```console
-$ netgraph -i examples/home-lab render --theme houes -f dot
-Usage: netgraph render [OPTIONS]
-Try 'netgraph render --help' for help.
+$ netviz -i examples/home-lab render --theme houes -f dot
+Usage: netviz render [OPTIONS]
+Try 'netviz render --help' for help.
 
 Error: Invalid value for '--theme': unknown theme 'houes': it is neither a built-in theme (blueprint, mono) nor a file that exists
 ```
@@ -423,7 +423,7 @@ palettes:
   colour-blind reader.
 
 Both are short, commented and worth reading as worked examples; they live in
-[`src/netgraph/render/themes/`](../src/netgraph/render/themes/).
+[`src/netviz/render/themes/`](../src/netviz/render/themes/).
 
 ---
 
@@ -458,7 +458,7 @@ is `sw-home` of the home lab, under `blueprint`:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/home-lab render --theme blueprint -f json
+$ netviz -i examples/home-lab render --theme blueprint -f json
 ...
       "style": {
         "fill": "#e0eaf8",
@@ -479,7 +479,7 @@ rendered 8 node(s) and 7 edge(s) as json at layer l1
 ```
 
 Read that against
-[`blueprint.yaml`](../src/netgraph/render/themes/blueprint.yaml). `sw-home` is a
+[`blueprint.yaml`](../src/netviz/render/themes/blueprint.yaml). `sw-home` is a
 `switch`, in the namespace `switches`, labelled `role: access`, and three of the
 theme's rules match it:
 
@@ -511,7 +511,7 @@ beat a specific one states at least as many conditions as it does.
 
 **What the ladder does not decide is emphasis.** A
 [`path --highlight`](paths.md#drawing-the-answer---highlight) and a
-[`netgraph diff`](commands/diff.md) overlay are applied on top of a resolved
+[`netviz diff`](commands/diff.md) overlay are applied on top of a resolved
 style and win over it: a removed device drawn in your chosen navy instead of red
 would make the diff unreadable, and the point of an overlay is that it is louder
 than the drawing underneath it.
@@ -521,11 +521,11 @@ than the drawing underneath it.
 ## A default for the inventory
 
 Passing `--theme` on every invocation is how the colours end up depending on
-somebody's shell history. [`netgraph.toml`](configuration.md) is where they stop
+somebody's shell history. [`netviz.toml`](configuration.md) is where they stop
 depending on it — and it offers two levels, which compose:
 
 ```toml
-# netgraph.toml, at the root of the inventory
+# netviz.toml, at the root of the inventory
 [render]
 theme = "blueprint"          # or "./themes/house.yaml", relative to *this file*
 
@@ -541,13 +541,13 @@ style = {fill = "#f8fafc"}
 `[render] theme` names a theme, exactly as `--theme` does, and a **relative
 path resolves against the configuration file** rather than the working
 directory — the file lives with the inventory, and a colleague who runs
-`netgraph` from a parent folder has to get the same picture.
+`netviz` from a parent folder has to get the same picture.
 
 The `[theme]` table is the other half: rules written *inline*, for the inventory
 that wants three lines of house style and not a second file to keep beside the
 manifests. The entries under `[[theme.rules]]` are exactly the `spec.rules` of a
 theme document and go through the same models, so a mistyped colour in
-`netgraph.toml` is refused with the same wording it would get in a `theme.yaml`.
+`netviz.toml` is refused with the same wording it would get in a `theme.yaml`.
 
 The inline rules are **appended** to the named theme's rather than merged into
 them, and that is the entire mechanism: given later-wins on a tie, appending is
@@ -577,7 +577,7 @@ and theme alike, is ignored:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/home-lab render --theme blueprint --no-style -f json
+$ netviz -i examples/home-lab render --theme blueprint --no-style -f json
 ...
       "style": {
         "fill": "#dcf0dc",
@@ -624,7 +624,7 @@ reason.
 
 Mermaid is the one that needs an explanation. A flowchart has exactly one
 styling construct, `classDef`, and it is per *class* rather than per node —
-netgraph already spends it restating the built-in palette, one `classDef` per
+netviz already spends it restating the built-in palette, one `classDef` per
 node kind present, so that a diagram embedded in a pull request is coloured like
 the diagrams beside it. There is nowhere left to put a per-element style and no
 honest way to fake one. A Mermaid diagram is the palette's diagram; where the
@@ -640,7 +640,7 @@ YAML or the theme — which is the same rule as everywhere else on this page.
 
 ## In the editor
 
-[`netgraph web`](commands/web.md) has a docked **style inspector**: the resolved
+[`netviz web`](commands/web.md) has a docked **style inspector**: the resolved
 appearance of whatever is selected, field by field, with the rung each value
 came from named beside it — so the panel can say *this navy is the theme's, not
 yours* rather than leaving you to guess. Changes made there are ordinary
@@ -648,7 +648,7 @@ yours* rather than leaving you to guess. Changes made there are ordinary
 validation gate and the same undo stack as every other write; and **reset to
 theme** *unsets* the field rather than writing the inherited value into the
 document, which is the only version of that button that keeps working when the
-theme changes. `netgraph web --theme` picks the stylesheet the inspector
+theme changes. `netviz web --theme` picks the stylesheet the inspector
 resolves against, since it names a file on the machine running the server rather
 than in the browser.
 
@@ -712,5 +712,5 @@ did not load, and a theme that does not parse was applied to nothing.
   two gates between an edit and the disk.
 * [`docs/drawio.md`](drawio.md) — the round trip, and what a draw.io user may
   safely change.
-* [`src/netgraph/render/themes/`](../src/netgraph/render/themes/) — the two
+* [`src/netviz/render/themes/`](../src/netviz/render/themes/) — the two
   bundled themes, commented.

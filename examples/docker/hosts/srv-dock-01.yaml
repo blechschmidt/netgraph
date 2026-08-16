@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-dock-01
@@ -146,7 +146,7 @@ spec:
     # Docker calls all of them eth0 and eth1, and inside their own namespaces
     # that is what they are called: a namespace is a name space, and two
     # containers on one host both having an eth0 is the ordinary case rather
-    # than a collision. netgraph needs interface names to be unique within an
+    # than a collision. netviz needs interface names to be unique within an
     # element (NG-I001), so they are written here as <container>-eth<n>. See
     # follow-up 24 in docs/follow-ups.md.
     # ----------------------------------------------------------------- #
@@ -272,7 +272,7 @@ spec:
       description: >-
         The inner daemon's docker0. It picks 172.17.0.1/16 out of the default
         pool exactly as the outer one did, and both are written here: two
-        namespaces are two address spaces, so this is not a clash and netgraph
+        namespaces are two address spaces, so this is not a clash and netviz
         does not report one. It is also why the inner daemon must not be given
         --network host.
       ipv4:

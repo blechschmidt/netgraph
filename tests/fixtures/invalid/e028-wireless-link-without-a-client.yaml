@@ -2,7 +2,7 @@
 #
 # Both radios beacon. Neither will associate to the other, so the link the
 # document draws is two access points shouting past each other.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: ap-a
@@ -18,7 +18,7 @@ spec:
         bss:
           - ssid: lab
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: ap-b
@@ -34,7 +34,7 @@ spec:
         bss:
           - ssid: lab
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

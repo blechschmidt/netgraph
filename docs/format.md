@@ -1,4 +1,4 @@
-# The canonical form, and `netgraph fmt`
+# The canonical form, and `netviz fmt`
 
 An inventory is the source of truth for a network, and it lives in review. That
 makes the shape of a file everybody's problem: two people writing the same
@@ -6,11 +6,11 @@ switch will indent it differently, order its keys differently and quote its MAC
 differently, and every one of those differences shows up in a diff that is
 supposed to be about the network.
 
-`netgraph fmt` removes the question. There is one canonical form, defined below,
+`netviz fmt` removes the question. There is one canonical form, defined below,
 and the tool puts a file into it — the way `gofmt` and `ruff format` do for code.
 
 ```
-netgraph fmt [OPTIONS] [PATHS]...
+netviz fmt [OPTIONS] [PATHS]...
 ```
 
 Formatting **never changes what a document means.** Every file is read back with
@@ -57,7 +57,7 @@ was. See [Safety](#safety).
 So a device reads:
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-office
@@ -74,14 +74,14 @@ keys of each entry at column 6.
 The last two rows are also stated twice, because they are the two the comparison
 is made in **bytes** for. A byte-order mark and a CRLF line ending both decode to
 an identical `str`, so a formatter comparing text would declare such a file
-unchanged and let it keep them forever. `netgraph fmt` compares the encoded bytes
+unchanged and let it keep them forever. `netviz fmt` compares the encoded bytes
 instead, which is why it reports — and rewrites — both.
 
 That has one consequence on Windows worth knowing before it surprises you. Git's
 `core.autocrlf` defaults to `true` there, so every YAML file arrives CRLF, and
-`netgraph fmt` then rewrites it to LF: `--check` fails on a fresh clone, and
-`git status` reports every file as modified after a run. Neither is a netgraph
-bug and neither has a fix in netgraph — the fix is to stop Git translating, with a
+`netviz fmt` then rewrites it to LF: `--check` fails on a fresh clone, and
+`git status` reports every file as modified after a run. Neither is a netviz
+bug and neither has a fix in netviz — the fix is to stop Git translating, with a
 `.gitattributes` next to the inventory:
 
 ```gitattributes
@@ -154,13 +154,13 @@ a leading `-`, a `: `, a `#`, a leading or trailing space, an empty string.
 
 On top of that, two things are quoted because plain would be *misleading*:
 
-- **Values a stock YAML reader resolves differently than netgraph does.**
-  netgraph is YAML 1.2 about booleans, so `yes`, `no`, `on` and `off` are
+- **Values a stock YAML reader resolves differently than netviz does.**
+  netviz is YAML 1.2 about booleans, so `yes`, `no`, `on` and `off` are
   strings here and booleans nearly everywhere else. They are quoted, so that
   both agree.
 
   ```yaml
-  description: 'no'          # a string in netgraph; false to YAML 1.1
+  description: 'no'          # a string in netviz; false to YAML 1.1
   ```
 
 - **MAC addresses**, in all three spellings (`aa:bb:cc:dd:ee:ff`,
@@ -179,7 +179,7 @@ Everything else is written plain, including IP addresses and prefixes
 removed.
 
 Version numbers need no rule of their own, though it is worth saying why. `1.0`
-is a float to every YAML reader including netgraph's, so it is never a string to
+is a float to every YAML reader including netviz's, so it is never a string to
 begin with; `'1.0'` written with quotes keeps them, because dropping them would
 turn a string into a float. `1.2.3` is unambiguously a string to everyone. A
 shape rule for dotted numerals would be actively wrong — `10.1.10.1` is one
@@ -213,7 +213,7 @@ line separating one interface stanza from the next, are content.
       ipv4:
         addresses: [10.1.10.51/24]
         # The Vlan10 SVI on sw-north-dist-01. 'gateway' is checked against this
-        # interface's own prefixes by NG-A013; 'netgraph ipam' reports it.
+        # interface's own prefixes by NG-A013; 'netviz ipam' reports it.
         gateway: 10.1.10.1
 ```
 
@@ -283,11 +283,11 @@ the line every diagnostic points at.
 
 <!-- norun: the first four lines rewrite or gate the reader's own tree, and the last is a shell pipeline -->
 ```console
-$ netgraph fmt                       # rewrite the inventory -i points at
-$ netgraph fmt inventory devices/    # rewrite these paths
-$ netgraph fmt --check inventory     # write nothing; exit 1 and list what differs
-$ netgraph fmt --diff inventory      # write nothing; print a unified diff
-$ ... | netgraph fmt --stdin         # format a stream onto stdout
+$ netviz fmt                       # rewrite the inventory -i points at
+$ netviz fmt inventory devices/    # rewrite these paths
+$ netviz fmt --check inventory     # write nothing; exit 1 and list what differs
+$ netviz fmt --diff inventory      # write nothing; print a unified diff
+$ ... | netviz fmt --stdin         # format a stream onto stdout
 ```
 
 **In place** is the default, and the only mode that touches the disk. Each file
@@ -301,13 +301,13 @@ canonical on stdout, one per line, and exits 1 if there are any:
 
 <!-- norun: CI gates the committed examples/ tree on --check, so this failure listing cannot be reproduced from it -->
 ```console
-$ netgraph fmt --check examples
+$ netviz fmt --check examples
 examples/campus/sites/north/hosts/hosts.yaml
 examples/home-lab/switches/sw-home.yaml
 2 file(s) would be reformatted, 36 already formatted
 ```
 
-The list is stdout and the tally is stderr, so `netgraph fmt --check | xargs
+The list is stdout and the tally is stderr, so `netviz fmt --check | xargs
 $EDITOR` opens the files and nothing else.
 
 **`--diff`** writes nothing and prints a unified diff. Paths below the working
@@ -315,7 +315,7 @@ directory get git's `a/`/`b/` prefixes, so the output is a patch:
 
 <!-- norun: a shell pipeline into git apply -->
 ```console
-$ netgraph fmt --diff examples | git apply -R    # or just read it
+$ netviz fmt --diff examples | git apply -R    # or just read it
 ```
 
 It exits 1 when there is a diff, so it is usable as a gate too.
@@ -328,7 +328,7 @@ wants:
 
 <!-- norun: redirects both ways, over paths in the reader's directory -->
 ```console
-$ netgraph fmt --stdin < devices/sw.yaml > devices/sw.formatted.yaml
+$ netviz fmt --stdin < devices/sw.yaml > devices/sw.formatted.yaml
 ```
 
 ---
@@ -342,10 +342,10 @@ applies unchanged:
 
 - only `*.yaml` and `*.yml`, compared case-insensitively (`NG-L001`);
 - nothing under a path component starting with `.` or `_` (`NG-L002`);
-- nothing a [`.netgraphignore`](schema.md) excludes.
+- nothing a [`.netvizignore`](schema.md) excludes.
 
 That is a deliberate limit rather than an incidental one. A file the inventory
-ignores may not be netgraph YAML at all, and rewriting it would be the formatter
+ignores may not be netviz YAML at all, and rewriting it would be the formatter
 exceeding its remit. A path named outright on the command line is still subject
 to the ignore rules of the tree it sits in.
 
@@ -360,7 +360,7 @@ Two properties are tested over every document under `examples/` and
 `tests/fixtures/`, on every run of the suite (`tests/test_fmt.py`).
 
 **Formatting preserves meaning.** Before anything is written, the formatted text
-is parsed again — with `netgraph.loader.documents`, the strict loader, not the
+is parsed again — with `netviz.loader.documents`, the strict loader, not the
 round-trip parser that produced it — and compared against the original:
 
 - a document that validates is compared as its **model's JSON**, which is what
@@ -370,7 +370,7 @@ round-trip parser that produced it — and compared against the original:
   `validate` rejects and still may not change what they say.
 
 If the two differ, or the output does not parse, **nothing is written** and the
-file is reported as failed. That outcome is a bug in netgraph rather than in the
+file is reported as failed. That outcome is a bug in netviz rather than in the
 file, and the message says so.
 
 **Comments are preserved.** The whole-line comments of the output are counted
@@ -390,12 +390,12 @@ canonical means.
 
 It canonicalises documents; it does not repair them.
 
-The clearest case is a scalar netgraph already misreads. `1:02` is the integer
-62 to a YAML 1.1 resolver, and so it is to netgraph's — quoting it would make it
+The clearest case is a scalar netviz already misreads. `1:02` is the integer
+62 to a YAML 1.1 resolver, and so it is to netviz's — quoting it would make it
 the string `1:02`, which is very likely what the author meant and is
 categorically not `fmt`'s call to make. The same goes for a MAC that lands on
 the base-60 pattern. Those are findings for
-[`netgraph validate`](validation-rules.md), which can report them without
+[`netviz validate`](validation-rules.md), which can report them without
 silently rewriting them.
 
 It also does not:
@@ -439,8 +439,8 @@ This repository gates its own `examples/` tree on `--check`; the step is in
 --check`, and prints a `--diff` into the log when it fails.
 
 ```yaml
-      - run: pip install netgraph
-      - run: netgraph fmt --check inventory
+      - run: pip install netviz
+      - run: netviz fmt --check inventory
 ```
 
 Two pre-commit hooks are published, and they differ only in whether the files
@@ -452,26 +452,26 @@ repos:
   - repo: https://github.com/blechschmidt/netgraph
     rev: v0.1.0
     hooks:
-      - id: netgraph-fmt          # rewrites in place; git add and commit again
+      - id: netviz-fmt          # rewrites in place; git add and commit again
 ```
 
 ```yaml
-      - id: netgraph-fmt-check    # reports only; nothing is rewritten
+      - id: netviz-fmt-check    # reports only; nothing is rewritten
 ```
 
 Both take the staged filenames rather than walking the tree — formatting is
 per-file, unlike [validation](ci.md#pre-commit), where a cable is only dangling
 when compared against the devices in the *other* files.
 
-`netgraph-fmt` rewrites and then relies on pre-commit noticing the modification,
+`netviz-fmt` rewrites and then relies on pre-commit noticing the modification,
 which fails the commit regardless of the exit status. That is the intended
 loop: the files come back fixed, and `git add` is the whole remedy.
 
 For an inventory that does not sit at the repository root, restrict `files`
-rather than overriding `entry` — unlike `netgraph-validate`, this hook is given
+rather than overriding `entry` — unlike `netviz-validate`, this hook is given
 the paths to work on:
 
 ```yaml
-      - id: netgraph-fmt
+      - id: netviz-fmt
         files: ^inventory/.*\.ya?ml$
 ```

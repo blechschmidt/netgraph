@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: pdu
 metadata:
   name: pdu-r1-a
@@ -23,7 +23,7 @@ spec:
   capacity_watts: 3680
   input_feed: utility-a
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: pdu
 metadata:
   name: pdu-r1-b
@@ -45,7 +45,7 @@ spec:
   capacity_watts: 3680
   input_feed: ups-1
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: pdu
 metadata:
   name: pdu-r2-a
@@ -72,7 +72,7 @@ spec:
   capacity_watts: 1840
   input_feed: utility-a
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: pdu
 metadata:
   name: pdu-r2-b

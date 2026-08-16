@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-host-b
@@ -44,7 +44,7 @@ spec:
       description: Throwaway namespace for testing; routed off the host.
 
   # A namespace is a whole second stack, so it has its own routing table and its
-  # own policy database. netgraph places a route by the interface it leaves by:
+  # own policy database. netviz places a route by the interface it leaves by:
   # 'dev: veth-sbx' is inside the sandbox, 'dev: eno1' is the host's own stack.
   # Both entries below name 10.30.0.0/24 - the tenants over on srv-host-a - and
   # they are two different answers, which is exactly what two stacks means.

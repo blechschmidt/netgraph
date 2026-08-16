@@ -1,4 +1,4 @@
-# Testing netgraph
+# Testing netviz
 
 The suite is in three halves, and they answer different questions.
 
@@ -7,7 +7,7 @@ a feature *does*. Each one names an inventory somebody wrote, calls one thing,
 and asserts one outcome. When they fail, the failure is a sentence.
 
 **Property tests** — `tests/test_properties.py`, `tests/test_edit_properties.py`
-and `tests/test_fuzz_loader.py` — say what netgraph may *never* do, for every
+and `tests/test_fuzz_loader.py` — say what netviz may *never* do, for every
 input rather than for the ones somebody thought of. They are driven by
 [Hypothesis][hypothesis] and by the
 strategies in `tests/strategies.py`, which generate whole inventories the loader
@@ -40,15 +40,15 @@ Nothing is read from or written to your own cache.
 
 ## Platforms
 
-netgraph is published for Python 3.10–3.13 and is used on all three desktop
+netviz is published for Python 3.10–3.13 and is used on all three desktop
 platforms, so all three are in CI. They are not covered to the same depth, and
 the table says which is which rather than leaving it to be inferred from
 `.github/workflows/ci.yml`.
 
 | Platform | Python | What runs | Depth |
 |---|---|---|---|
-| `ubuntu-24.04` | 3.10, 3.11, 3.12 | the whole suite, both YAML parsers, `ruff`, `mypy`, `netgraph fmt --check`, the coverage gate at 85 % | **primary** — every gate, every version |
-| `macos-14` (Apple Silicon) | 3.12 | the whole suite, `ruff`, `mypy`, `netgraph fmt --check`, coverage at 85 % | **full** — one interpreter |
+| `ubuntu-24.04` | 3.10, 3.11, 3.12 | the whole suite, both YAML parsers, `ruff`, `mypy`, `netviz fmt --check`, the coverage gate at 85 % | **primary** — every gate, every version |
+| `macos-14` (Apple Silicon) | 3.12 | the whole suite, `ruff`, `mypy`, `netviz fmt --check`, coverage at 85 % | **full** — one interpreter |
 | `windows-latest` | 3.12 | the same, coverage at 80 % | **full minus the POSIX-only tests** — see below |
 
 One Python version each on macOS and Windows, and the middle of the supported
@@ -59,14 +59,14 @@ version would double the cost and check the same thing twice. The interpreter
 range is covered on Linux, where it is cheapest.
 
 Two more jobs run outside that matrix, on Linux only, because what they check is
-not a property of the platform: `browser` opens `netgraph web` in a real
+not a property of the platform: `browser` opens `netviz web` in a real
 Chromium ([below](#the-browser-layer)), and `docker` builds and drives the image.
 
 Three things are **not** covered anywhere, and are worth knowing:
 
 * **Python 3.13.** Claimed in the PyPI classifiers, not in the matrix.
 * **Docker.** The `docker` job is Linux-only; the image is a Linux image.
-* **A browser that is not Chromium**, and `netgraph watch`'s served page, which
+* **A browser that is not Chromium**, and `netviz watch`'s served page, which
   is still asserted through HTTP and through the DOM it emits rather than by
   something that renders it.
 
@@ -82,10 +82,10 @@ does not have**, never for a platform:
 | five symlink cases: escaping the root, a cycle, reached twice, followed, dangling | creating a symlink needs `SeCreateSymbolicLinkPrivilege`, which an unelevated CI process does not hold. *Measured*, not assumed, so these do run on a machine with Developer Mode on | `requires_symlinks` |
 | a FIFO is not loaded; a FIFO is not a valid root | `os.mkfifo` does not exist on Windows, and a Windows named pipe is not a filesystem entry the loader could walk into | `requires_mkfifo` |
 | the generated route script passes `sh -n` | no POSIX shell. The script's *content* is still asserted line by line there; only the second opinion from `sh` is missing | `requires_posix_shell` |
-| a glob in the render action's `args` reaches netgraph unexpanded | the MSYS runtime Git Bash is built on expands wildcards in the arguments it hands to a *native* program, after the shell has finished with them, so `set -f` in the step cannot keep a glob a glob. The action's README says where to put the filter instead; that `args` arrives at all is still asserted there | `requires_unexpanded_globs` |
+| a glob in the render action's `args` reaches netviz unexpanded | the MSYS runtime Git Bash is built on expands wildcards in the arguments it hands to a *native* program, after the shell has finished with them, so `set -f` in the step cannot keep a glob a glob. The action's README says where to put the filter instead; that `args` arrives at all is still asserted there | `requires_unexpanded_globs` |
 
 One more is skipped on **macOS** rather than on Windows, and by the same rule.
-`docs/commands/completion.md` documents what `netgraph completion bash` prints;
+`docs/commands/completion.md` documents what `netviz completion bash` prints;
 Click inspects the host's bash first and adds a warning on anything older than
 4.4, which is what Apple has shipped as `/bin/bash` since 2007. The transcript is
 correct, and so is the extra line — so the block is skipped where the shell adds
@@ -96,7 +96,7 @@ The marks live in `tests/platform_marks.py`, one per capability, with the reason
 in the mark rather than in a comment — so a skipped run says why in its own
 output. `tests/test_platform.py::test_no_test_module_skips_a_whole_platform`
 fails if a skip is ever written as `skipif(sys.platform == "win32")` instead,
-because that is how "the platform lacks this" quietly becomes "netgraph is
+because that is how "the platform lacks this" quietly becomes "netviz is
 broken here and nobody is looking".
 
 The Windows coverage floor is 80 rather than 85 for exactly those six tests: the
@@ -118,7 +118,7 @@ That leaves three things only a real runner can settle, which is what the two
 jobs buy: a real `os.replace` against a real open handle, a real
 `ReadDirectoryChangesW` / FSEvents watcher, and a checkout under
 `core.autocrlf=true` — which is what `.gitattributes` exists to neutralise, and
-what `netgraph fmt --check examples` on the Windows job proves it did.
+what `netviz fmt --check examples` on the Windows job proves it did.
 
 The PowerShell completion script is the one Windows-shaped thing checked *by the
 real shell* on every platform. `pwsh` is preinstalled on all three runner images,
@@ -137,8 +137,8 @@ The three runners install whatever their package manager has, and as of
 and the newer one spells the same layout more verbosely and prints a pinned
 coordinate to one decimal rather than two.
 
-Nothing netgraph *writes* depends on that: the DOT and Mermaid goldens are
-netgraph's own output, and the SVG tests assert structure rather than bytes. Two
+Nothing netviz *writes* depends on that: the DOT and Mermaid goldens are
+netviz's own output, and the SVG tests assert structure rather than bytes. Two
 guards do, because their subject is a drawing:
 
 * `tests/test_html.py`'s size budget, where 96 % of what a view costs is the
@@ -156,7 +156,7 @@ job goes green.
 ### `nft` can be installed and still unusable
 
 Two tests in `tests/test_firewall.py` hand the generated `etc/nftables.conf` to
-`nft --check`, which is the only gate on that file that is not netgraph reading
+`nft --check`, which is the only gate on that file that is not netviz reading
 its own writing. `--check` parses a ruleset without committing it — but before
 it reads a byte of the file it opens a netlink socket and populates its cache,
 and that needs `CAP_NET_ADMIN`.
@@ -183,7 +183,7 @@ shell, macOS and Windows get.
 
 ## The browser layer
 
-`netgraph web` is about fourteen hundred lines of CSS and JavaScript, and until
+`netviz web` is about fourteen hundred lines of CSS and JavaScript, and until
 `tests/test_browser.py` existed nothing executed any of it: `tests/test_web.py`,
 `tests/test_web_session.py` and `tests/test_web_events.py` stop at the HTTP
 boundary, so a regression in `app.js` shipped green. That file starts the real
@@ -211,7 +211,7 @@ wants everything else.
 Playwright is in the **`browser` extra rather than in `dev`**, so `pip install
 '.[dev]'` stays what it was. Without it — or with it but without the browser it
 drives — the whole module skips and says which command to run. It is never a hard
-failure for a contributor who has neither, and `NETGRAPH_INSTALL_BROWSER=1` turns
+failure for a contributor who has neither, and `NETVIZ_INSTALL_BROWSER=1` turns
 the second command above into something the suite does for itself, which is how
 the CI job is wired.
 
@@ -266,7 +266,7 @@ checker rather than fetching it, so the gate cannot change under you overnight.
 Without it those four tests skip and the rest of the module runs.
 
 Separately, `tests/test_web.py` holds the *keyboard* gate, and it needs no
-browser: every command in `netgraph.web.bindings` must have a handler registered
+browser: every command in `netviz.web.bindings` must have a handler registered
 in the page's JavaScript and every handler must have an entry in the table, no
 chord may be bound twice in one scope, and `docs/commands/web.md` must contain
 the table as generated. A shortcut that is documented and dead fails there, a
@@ -284,7 +284,7 @@ needed rather than global.
 
 **A failure leaves evidence.** A screenshot, the page's HTML and the whole console
 log are written under `.browser-artifacts/` for any test that fails —
-`NETGRAPH_BROWSER_ARTIFACTS` moves that, and the `browser` job in
+`NETVIZ_BROWSER_ARTIFACTS` moves that, and the `browser` job in
 `.github/workflows/ci.yml` points it at a directory it uploads. A browser failure
 nobody can reproduce is a browser failure nobody fixes.
 
@@ -307,10 +307,10 @@ whatever the test wrote is still there to look at afterwards.
 
 `tests/test_site.py` builds the whole of <https://blechschmidt.github.io/netgraph/>
 into a temporary directory — documentation, hero diagrams and every example
-rendered by `netgraph render -f html` — and asserts three things a look at the
+rendered by `netviz render -f html` — and asserts three things a look at the
 page would not catch:
 
-* **the anchors are GitHub's.** Every `NG-*` finding netgraph prints carries a
+* **the anchors are GitHub's.** Every `NG-*` finding netviz prints carries a
   help URL ending in an anchor derived from a heading. The builder's slug
   function and `tests/test_docs.py`'s are asserted equal over every heading in
   the repository, not merely written to look alike.
@@ -336,11 +336,11 @@ anything is published.
 ## The language server
 
 `tests/test_lsp.py` is the browser layer's opposite number for
-[`netgraph lsp`](lsp.md), and it is built on the same principle: a component
+[`netviz lsp`](lsp.md), and it is built on the same principle: a component
 defined by what it puts on a wire has to be tested through that wire.
 
 Every test drives a real
-[`LanguageServer`](../src/netgraph/lsp/server.py) over real pipes, in
+[`LanguageServer`](../src/netviz/lsp/server.py) over real pipes, in
 `Content-Length` frames, with a forty-line client in the module itself. Nothing
 calls a handler directly. That is not thoroughness for its own sake — the bugs
 that make a language server work in one editor and hang in the next all live in
@@ -361,10 +361,10 @@ Two of them are worth knowing about because they are easy to write badly:
   `cables/links.yaml` and then expects to complete against those cables a test
   about nothing. The completion tests open new paths for that reason.
 
-`TestCommand` runs the real `netgraph lsp` as a subprocess, once with the pipe
+`TestCommand` runs the real `netviz lsp` as a subprocess, once with the pipe
 closed and once with it deliberately left open. The second is there because a
 client is entitled to send `exit` and keep stdin open; before
-`netgraph.cli._exit_from_stdio` existed, that shut the interpreter down with a
+`netviz.cli._exit_from_stdio` existed, that shut the interpreter down with a
 thread inside a blocking read and aborted the process, which an editor reports
 as a crash immediately after a clean shutdown.
 
@@ -422,7 +422,7 @@ on, which are the reason it can be the only implementation of *selects*:
 
 `tests/test_fuzz_loader.py` and `tests/test_fuzz_query.py` cover the two
 components with a real trust boundary. The loader reads files a user did not
-write — `netgraph import` output, a third-party inventory, a generated tree — and
+write — `netviz import` output, a third-party inventory, a generated tree — and
 the query parser reads whatever is on a command line, in an HTTP query string or
 in a `query:` key. The contract at both is not "parses correct input" but
 *terminates, fails structurally, bounds its diagnostics, bounds its memory*. The
@@ -483,7 +483,7 @@ here should be re-measured with before it is changed.
 ## Profiles
 
 How hard the search works is a profile, chosen with
-`NETGRAPH_HYPOTHESIS_PROFILE`. The seed is pinned in `pyproject.toml`
+`NETVIZ_HYPOTHESIS_PROFILE`. The seed is pinned in `pyproject.toml`
 (`--hypothesis-seed=0`) so a run is reproducible whichever profile it uses.
 
 | Profile | Examples | For |
@@ -501,8 +501,8 @@ name only.
 
 ```console
 $ pytest tests/test_properties.py --no-cov                       # dev, the default
-$ NETGRAPH_HYPOTHESIS_PROFILE=deep pytest tests/test_properties.py --no-cov
-$ NETGRAPH_HYPOTHESIS_PROFILE=deep pytest tests/test_fuzz_loader.py --no-cov
+$ NETVIZ_HYPOTHESIS_PROFILE=deep pytest tests/test_properties.py --no-cov
+$ NETVIZ_HYPOTHESIS_PROFILE=deep pytest tests/test_fuzz_loader.py --no-cov
 ```
 
 Run the deep profile before trusting a property you have just written: a
@@ -514,7 +514,7 @@ searches the same region every time — pass one on the command line, where it
 overrides the pinned value:
 
 ```console
-$ NETGRAPH_HYPOTHESIS_PROFILE=deep pytest tests/test_properties.py --no-cov --hypothesis-seed=$RANDOM
+$ NETVIZ_HYPOTHESIS_PROFILE=deep pytest tests/test_properties.py --no-cov --hypothesis-seed=$RANDOM
 ```
 
 ## Reproducing a failure
@@ -527,7 +527,7 @@ properties that is an `InventoryPlan`, which is a list of plain mappings:
 ...     print(f"--- {path}\n{text}")
 ```
 
-Drop those files in a directory and every netgraph command reproduces the
+Drop those files in a directory and every netviz command reproduces the
 failure by hand.
 
 Hypothesis also writes the example to `.hypothesis/examples/` and replays it

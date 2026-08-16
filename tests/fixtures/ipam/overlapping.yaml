@@ -8,7 +8,7 @@
 # Every host hangs off one switch, so the topology is connected and each prefix
 # holds more than one element: W103, W105 and W121 stay out of the way and the
 # two conflicts above are the whole finding list.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-core
@@ -56,7 +56,7 @@ spec:
       mtu: 1500
       vlan: {mode: access, access_vlan: 40}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-pod-a-1
@@ -64,7 +64,7 @@ spec:
   interfaces:
     - {name: eth0, type: ethernet, mtu: 1500, vlan: {mode: access, access_vlan: 10}, ipv4: [10.20.0.11/24]}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-pod-a-2
@@ -72,7 +72,7 @@ spec:
   interfaces:
     - {name: eth0, type: ethernet, mtu: 1500, vlan: {mode: access, access_vlan: 10}, ipv4: [10.20.0.12/24]}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-pod-b-1
@@ -80,7 +80,7 @@ spec:
   interfaces:
     - {name: eth0, type: ethernet, mtu: 1500, vlan: {mode: access, access_vlan: 30}, ipv4: [10.20.0.21/24]}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-pod-b-2
@@ -88,7 +88,7 @@ spec:
   interfaces:
     - {name: eth0, type: ethernet, mtu: 1500, vlan: {mode: access, access_vlan: 30}, ipv4: [10.20.0.22/24]}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-summary-1
@@ -96,7 +96,7 @@ spec:
   interfaces:
     - {name: eth0, type: ethernet, mtu: 1500, vlan: {mode: access, access_vlan: 20}, ipv4: [10.30.1.11/16]}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-summary-2
@@ -104,7 +104,7 @@ spec:
   interfaces:
     - {name: eth0, type: ethernet, mtu: 1500, vlan: {mode: access, access_vlan: 20}, ipv4: [10.30.1.12/16]}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-nested-1
@@ -112,7 +112,7 @@ spec:
   interfaces:
     - {name: eth0, type: ethernet, mtu: 1500, vlan: {mode: access, access_vlan: 40}, ipv4: [10.30.7.11/24]}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-nested-2
@@ -120,56 +120,56 @@ spec:
   interfaces:
     - {name: eth0, type: ethernet, mtu: 1500, vlan: {mode: access, access_vlan: 40}, ipv4: [10.30.7.12/24]}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-pod-a-1}
 spec:
   endpoints: [sw-core:Ethernet1, pc-pod-a-1:eth0]
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-pod-a-2}
 spec:
   endpoints: [sw-core:Ethernet2, pc-pod-a-2:eth0]
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-pod-b-1}
 spec:
   endpoints: [sw-core:Ethernet3, pc-pod-b-1:eth0]
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-pod-b-2}
 spec:
   endpoints: [sw-core:Ethernet4, pc-pod-b-2:eth0]
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-summary-1}
 spec:
   endpoints: [sw-core:Ethernet5, pc-summary-1:eth0]
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-summary-2}
 spec:
   endpoints: [sw-core:Ethernet6, pc-summary-2:eth0]
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-nested-1}
 spec:
   endpoints: [sw-core:Ethernet7, srv-nested-1:eth0]
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-nested-2}
 spec:

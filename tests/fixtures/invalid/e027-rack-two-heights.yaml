@@ -3,7 +3,7 @@
 # 'sw-a' says the cabinet is 42U and 'sw-b' says 45U. Until that is settled
 # there is no bound 'NG-U002' can trust, and one of the two is probably in a
 # different cabinet than its 'rack' claims.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -22,7 +22,7 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-b
@@ -41,7 +41,7 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

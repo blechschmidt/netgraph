@@ -3,7 +3,7 @@
 ``tools/build_site.py`` writes what GitHub Pages serves. Three things about it
 are worth a test rather than a look, because all three fail silently:
 
-* **The anchors.** Every ``NG-*`` finding netgraph prints carries a help URL
+* **The anchors.** Every ``NG-*`` finding netviz prints carries a help URL
   ending in ``validation-rules.md#<anchor>``, and those anchors are GitHub's,
   derived from the heading text. A site that derived its own would answer every
   one of those links with the top of a very long page. So the builder's
@@ -102,7 +102,7 @@ def test_the_landing_page_offers_the_demos_above_the_readme(site: Path) -> None:
     """The first thing on the site is the thing that needs no install."""
     text = (site / "index.html").read_text(encoding="utf-8")
     strip = text.index("Try it without installing anything")
-    heading = text.index('<h1 id="netgraph">')
+    heading = text.index('<h1 id="netviz">')
     assert strip < heading, "the demo strip is below the README's own title"
     for demo in BUILD.DEMOS:
         assert f'href="demo/{demo.name}.html"' in text, demo.name
@@ -149,7 +149,7 @@ def test_every_example_inventory_is_published(site: Path) -> None:
 
 @requires_dot
 def test_every_demo_is_an_interactive_diagram(site: Path) -> None:
-    """What is published is ``netgraph render -f html``, not a screenshot of it."""
+    """What is published is ``netviz render -f html``, not a screenshot of it."""
     for demo in BUILD.DEMOS:
         raw = (site / "demo" / f"{demo.name}-diagram.html").read_text(encoding="utf-8")
         assert "<svg" in raw, f"{demo.name} has no diagram"
@@ -221,11 +221,11 @@ def test_the_anchors_are_the_ones_the_documentation_promises() -> None:
 def test_the_rule_help_anchors_resolve_on_the_site(site: Path) -> None:
     """Where a finding's ``--help-uri`` points, on the published copy.
 
-    ``netgraph.rules`` builds those URLs against GitHub, but the same anchors
+    ``netviz.rules`` builds those URLs against GitHub, but the same anchors
     have to exist here, because this is where a reader following the docs set
     ends up.
     """
-    from netgraph.rules import RULES
+    from netviz.rules import RULES
 
     page = (site / "docs" / "validation-rules.html").read_text(encoding="utf-8")
     anchors = set(re.findall(r'<h[1-6][^>]*\bid="([^"]+)"', page))
@@ -248,7 +248,7 @@ def test_a_link_into_the_source_tree_goes_to_github(site: Path) -> None:
     only correct if it actually happens.
     """
     text = (site / "docs" / "ipam.html").read_text(encoding="utf-8")
-    assert f'href="{BUILD.SOURCE_URL}/blob/main/src/netgraph/subnets.py"' in text
+    assert f'href="{BUILD.SOURCE_URL}/blob/main/src/netviz/subnets.py"' in text
     # A directory becomes a ``tree`` URL, not a ``blob`` one.
     rendering = (site / "docs" / "rendering.html").read_text(encoding="utf-8")
     assert f'href="{BUILD.SOURCE_URL}/tree/main/examples/overlay"' in rendering

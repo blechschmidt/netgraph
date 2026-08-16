@@ -1,6 +1,6 @@
 # Outside the site on purpose: copying `sites/hq` must not touch it, and the
 # cable below must not be pulled into the copy either.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-shared

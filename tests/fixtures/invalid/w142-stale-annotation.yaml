@@ -5,10 +5,10 @@
 # nowhere, while reading in the file as though it still explained a switch.
 #
 # A warning rather than an error, and not a close call. An annotation is
-# presentational and is barred from changing what netgraph concludes, so no
+# presentational and is barred from changing what netviz concludes, so no
 # rule about one may ever fail a build -- deleting a switch must not stop
-# 'netgraph validate' because somebody once wrote a note about it.
-apiVersion: netgraph.dev/v1alpha1
+# 'netviz validate' because somebody once wrote a note about it.
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -20,7 +20,7 @@ spec:
       ipv4:
         - 10.0.0.1/24
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-b
@@ -32,7 +32,7 @@ spec:
       ipv4:
         - 10.0.0.2/24
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b
@@ -42,7 +42,7 @@ spec:
     - sw-b:port1
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: why-two-uplinks

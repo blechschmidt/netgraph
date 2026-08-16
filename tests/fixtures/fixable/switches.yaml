@@ -8,7 +8,7 @@
 # 'sw-b' declares no 'vlans' at all, which says "not modelled here" rather than
 # "none exist", so W113 does not apply to it -- and its trunk lists every VLAN
 # the link carries, so the two ends agree.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -30,7 +30,7 @@ spec:
       ipv4:
         - 10.255.0.1/32
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-b
@@ -44,7 +44,7 @@ spec:
         trunk_vlans: "10,20,30"
         native_vlan: 30
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-sw-a-sw-b

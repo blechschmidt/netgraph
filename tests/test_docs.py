@@ -1,6 +1,6 @@
 """The documentation, checked the same way the code is.
 
-Docs rot when nothing verifies them, which is the exact failure mode netgraph
+Docs rot when nothing verifies them, which is the exact failure mode netviz
 exists to prevent — so these promises are asserted here:
 
 * ``docs/schema-reference.md`` is what ``tools/gen_schema_reference.py`` would
@@ -14,12 +14,12 @@ exists to prevent — so these promises are asserted here:
 * Every command has a page, and every flag of every command appears on it. No
   page names a flag that does not exist.
 * ``docs/validation-rules.md`` documents every rule in
-  :data:`netgraph.rules.RULES`, with the severity and the aliases the code
+  :data:`netviz.rules.RULES`, with the severity and the aliases the code
   actually uses, and every rule appears in the index in ``docs/validation.md``.
   A new rule that is never written up fails here.
 * Every relative link and image in the Markdown of this repository points at a
   file that exists, and at a heading that exists when it carries an anchor.
-* Every fenced ``console``/``bash`` example that invokes ``netgraph`` is either
+* Every fenced ``console``/``bash`` example that invokes ``netviz`` is either
   executed and compared against its transcript, or explicitly excused with a
   reason. See ``tools/check_examples.py``.
 """
@@ -35,8 +35,8 @@ from typing import Any
 
 import pytest
 
-from netgraph.diagnostics import LOAD_RULE
-from netgraph.rules import RULES
+from netviz.diagnostics import LOAD_RULE
+from netviz.rules import RULES
 
 from platform_marks import HAVE_BASH_COMPLETION  # isort: skip -- tests/ is on sys.path
 
@@ -272,14 +272,14 @@ def test_the_readme_is_short_enough_to_be_read() -> None:
     assert len(lines) <= 500, f"README.md is {len(lines)} lines; move a section into docs/"
 
 
-def test_the_tooltip_example_is_what_netgraph_produces() -> None:
+def test_the_tooltip_example_is_what_netviz_produces() -> None:
     """The worked example in the rendering guide, rendered rather than typed.
 
     A sample of output in a document is a promise about the tool, and the only
     kind of promise that survives a refactor is one a test makes.
     """
-    from netgraph.loader import load_tree
-    from netgraph.render import (
+    from netviz.loader import load_tree
+    from netviz.render import (
         RenderOptions,
         build_details,
         build_graph,
@@ -306,7 +306,7 @@ def test_the_tooltip_example_is_what_netgraph_produces() -> None:
 #: Every page that may hold a generated region.
 REGION_PAGES = [path for path in GEN_DOCS.pages() if "<!-- generated:" in path.read_text("utf-8")]
 
-#: Every command below ``netgraph``, ``config show`` included.
+#: Every command below ``netviz``, ``config show`` included.
 COMMAND_PATHS = sorted(GEN_DOCS.command_paths())
 
 #: Flag-shaped strings the command pages name on purpose although no command has
@@ -359,10 +359,10 @@ def test_every_flag_appears_on_its_command_page(command: str) -> None:
     """A flag the CLI accepts and the docs never mention does not exist to a reader."""
     page = COMMAND_DOCS / GEN_DOCS.PAGE[command]
     text = page.read_text(encoding="utf-8")
-    assert f"netgraph {command}" in text, f"{page.name} never names 'netgraph {command}'"
+    assert f"netviz {command}" in text, f"{page.name} never names 'netviz {command}'"
     for flag in GEN_DOCS.flags_of(command):
         assert re.search(rf"`{re.escape(flag)}`(?![-\w])", text), (
-            f"{page.name} does not document {flag} of 'netgraph {command}'"
+            f"{page.name} does not document {flag} of 'netviz {command}'"
         )
 
 
@@ -414,7 +414,7 @@ def test_every_example_declares_whether_it_runs() -> None:
     """Neither state is the silent default: checked, or excused with a reason."""
     offenders = [entry.id for entry in _UNMARKED]
     assert not offenders, (
-        "these examples invoke netgraph but carry no '<!-- run: … -->' or "
+        "these examples invoke netviz but carry no '<!-- run: … -->' or "
         f"'<!-- norun: … -->' marker: {offenders}"
     )
 
@@ -428,10 +428,10 @@ def test_the_examples_are_mostly_executed() -> None:
 
 
 #: A documented command whose *output* depends on the host's bash, not on
-#: netgraph. Click inspects ``bash --version`` before handing over the script it
+#: netviz. Click inspects ``bash --version`` before handing over the script it
 #: generates and prints a warning when it is older than 4.4, so the transcript
 #: gains a line on a machine that has an old one.
-_NEEDS_BASH_COMPLETION = "netgraph completion bash"
+_NEEDS_BASH_COMPLETION = "netviz completion bash"
 
 
 def _needs_a_modern_bash(block: Any) -> bool:
@@ -440,7 +440,7 @@ def _needs_a_modern_bash(block: Any) -> bool:
 
 
 @pytest.mark.parametrize("block", _BLOCKS, ids=[block.id for block in _BLOCKS])
-def test_the_documented_example_is_what_netgraph_prints(block: Any) -> None:
+def test_the_documented_example_is_what_netviz_prints(block: Any) -> None:
     """Run the transcript and diff it, or check the excuse gives a reason.
 
     A ``run`` block is executed through the installed console script, so a usage
@@ -462,19 +462,19 @@ def test_no_transcript_holds_the_path_this_checkout_happens_to_live_at(block: An
     """A transcript quoting an absolute path passes here and fails on CI.
 
     The test above diffs what a command prints against what the page says, so a
-    command that prints the inventory root as ``/root/Projects/netgraph/...``
+    command that prints the inventory root as ``/root/Projects/netviz/...``
     agrees with a transcript written on the machine that generated it — and with
     nothing else. It went red on ``ubuntu-24.04`` and ``macos-14`` for exactly
-    that on 2026-08-14, from a ``netgraph test -F junit`` ``<property>``.
+    that on 2026-08-14, from a ``netviz test -F junit`` ``<property>``.
 
     Asserting it separately is what makes the diagnosis immediate: "this page
     names your checkout" is a different problem from "the output changed", and
     the diff of the first reads exactly like the diff of the second.
 
-    The fix is always in the *command*, not the page: netgraph prints a path
+    The fix is always in the *command*, not the page: netviz prints a path
     relative to the working directory wherever a person reads it, and keeps the
     absolute form only in a JSON envelope a consumer resolves rather than reads
-    (:func:`netgraph.drift.report._root_text`).
+    (:func:`netviz.drift.report._root_text`).
     """
     text = "\n".join(block.lines)
     assert str(REPO_ROOT) not in text, (

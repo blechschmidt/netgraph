@@ -3,7 +3,7 @@
 # Both 'cbl-one' and 'cbl-two' are patched into 'pp-a:front/1'. A coupler takes
 # one plug per side, so one of the two runs is a patch record that never
 # happened.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -22,7 +22,7 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-b
@@ -35,14 +35,14 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: patchpanel
 metadata:
   name: pp-a
 spec:
   ports: 1-4
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-one
@@ -52,7 +52,7 @@ spec:
     - pp-a:front/1
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-two
@@ -62,7 +62,7 @@ spec:
     - pp-a:front/1
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-rear

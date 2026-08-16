@@ -3,7 +3,7 @@
 # Adapters hang off a host bus; a switch takes a cable. A media converter
 # between two switches is modelled with 'passthrough: false' and a cable each
 # side, which draws it as the distinct node it is.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -17,7 +17,7 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: adapter
 metadata:
   name: adp-a

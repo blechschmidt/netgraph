@@ -1,4 +1,4 @@
-"""Tests for the content-addressed parse cache (:mod:`netgraph.loader.cache`).
+"""Tests for the content-addressed parse cache (:mod:`netviz.loader.cache`).
 
 The cache exists to make a repeated load cheap, and every test here is about the
 one property that buys: **a hit must be indistinguishable from a parse.** Not
@@ -7,7 +7,7 @@ same order, the same source locations, and the same rendered bytes, over every
 inventory this repository commits.
 
 The rest are the failure modes a cache adds and nothing else has: an entry for
-bytes that have changed, an entry written by a netgraph that has since changed, an
+bytes that have changed, an entry written by a netviz that has since changed, an
 entry a killed process left half written, an entry somebody edited, two processes
 filling the cache at once, and a cache that would otherwise grow without limit.
 Each of them has to end as a *parse*, because the alternative to a cache hit is
@@ -29,12 +29,12 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 
-from netgraph.cli import cli
-from netgraph.config import CacheConfig, parse_cache, parse_config
-from netgraph.errors import ConfigurationError
-from netgraph.fsio import _temporary_for
-from netgraph.loader import Inventory, load_tree
-from netgraph.loader.cache import (
+from netviz.cli import cli
+from netviz.config import CacheConfig, parse_cache, parse_config
+from netviz.errors import ConfigurationError
+from netviz.fsio import _temporary_for
+from netviz.loader import Inventory, load_tree
+from netviz.loader.cache import (
     CACHE_DIR_ENV_VAR,
     DEFAULT_MAX_BYTES,
     DISABLE_ENV_VAR,
@@ -49,8 +49,8 @@ from netgraph.loader.cache import (
     resolve_cache_root,
     source_stamp,
 )
-from netgraph.render import Layer, build_graph, render
-from netgraph.watch import RenderRequest, run_cycle
+from netviz.render import Layer, build_graph, render
+from netviz.watch import RenderRequest, run_cycle
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO_ROOT / "examples"
@@ -59,7 +59,7 @@ EXAMPLES = REPO_ROOT / "examples"
 EXAMPLE_TREES = sorted(path for path in EXAMPLES.iterdir() if path.is_dir())
 
 SWITCH = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: {name}
@@ -133,7 +133,7 @@ def tree(tmp_path: Path) -> Path:
         root,
         "cables.yaml",
         """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: c1
@@ -196,7 +196,7 @@ def test_a_rejected_document_is_reported_identically_from_the_cache(tmp_path: Pa
     root = tmp_path / "inventory"
     write(root, "sw.yaml", SWITCH.format(name="sw1", mtu="not-a-number"))
     write(root, "bad.yaml", "kind: switch\n  bad indentation\n")
-    write(root, "unknown.yaml", "apiVersion: netgraph.dev/v1alpha1\nkind: toaster\nmetadata: {}\n")
+    write(root, "unknown.yaml", "apiVersion: netviz.dev/v1alpha1\nkind: toaster\nmetadata: {}\n")
 
     cold = load_tree(root)
     assert len(cold.errors) == 3
@@ -295,13 +295,13 @@ def test_touching_a_file_without_changing_it_still_hits(tree: Path, store: Docum
 
 
 def test_a_version_bump_invalidates_every_entry(tree: Path, tmp_path: Path) -> None:
-    """A new netgraph asks different questions, so it must not read old answers."""
+    """A new netviz asks different questions, so it must not read old answers."""
     directory = tmp_path / "cache"
     before = DocumentCache(directory)
     load_tree(tree, cache=before)
     assert len(entries(directory)) == 3
 
-    after = DocumentCache(directory, identity=replace(before.identity, netgraph="99.0.0"))
+    after = DocumentCache(directory, identity=replace(before.identity, netviz="99.0.0"))
     inventory = load_tree(tree, cache=after)
 
     assert after.stats.hits == 0
@@ -315,8 +315,8 @@ def test_a_version_bump_invalidates_every_entry(tree: Path, tmp_path: Path) -> N
     "change",
     [
         {"format_version": 99},
-        {"netgraph": "99.0.0"},
-        {"api_version": "netgraph.dev/v2"},
+        {"netviz": "99.0.0"},
+        {"api_version": "netviz.dev/v2"},
         {"parser": "SomeOtherStrictSafeLoader"},
         {"dependencies": (("pydantic", "0.0.0"),)},
         {"source_stamp": "0000000000000000"},
@@ -330,7 +330,7 @@ def test_every_input_of_the_identity_changes_the_fingerprint(change: dict[str, A
 
 
 def test_the_source_stamp_follows_the_installed_sources() -> None:
-    """It is a digest of netgraph's own files, so it is stable within a run."""
+    """It is a digest of netviz's own files, so it is stable within a run."""
     assert source_stamp() == source_stamp()
     assert len(source_stamp()) == 16
     assert source_stamp() in dict(Identity.current().describe()).values()
@@ -343,7 +343,7 @@ def test_a_template_file_is_never_cached(tmp_path: Path, store: DocumentCache) -
         root,
         "templates.yaml",
         """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: template
 metadata:
   name: access
@@ -358,7 +358,7 @@ spec:
         root,
         "sw.yaml",
         """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw1
@@ -384,7 +384,7 @@ def test_a_template_alongside_a_plain_document_leaves_both_uncached(
     write(
         root,
         "mixed.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: template\n"
         "metadata:\n  name: base\n"
         "spec:\n  vendor: Cisco\n"
@@ -414,9 +414,7 @@ def _corrupt(path: Path, payload: bytes) -> None:
         pytest.param(lambda blob: blob[:40], id="header-only"),
         pytest.param(lambda blob: b"garbage, not a cache entry at all\n", id="garbage"),
         pytest.param(lambda blob: os.urandom(len(blob)), id="random-bytes"),
-        pytest.param(
-            lambda blob: blob.replace(b"netgraph-cache/1", b"netgraph-cache/9"), id="magic"
-        ),
+        pytest.param(lambda blob: blob.replace(b"netviz-cache/1", b"netviz-cache/9"), id="magic"),
         pytest.param(
             lambda blob: blob.split(b"\n", 1)[0] + b"\n" + b"x" * (len(blob) - 40),
             id="body-not-zlib",
@@ -507,7 +505,7 @@ def test_an_entry_is_never_python_bytecode_or_a_pickle(tree: Path, store: Docume
     load_tree(tree, cache=store)
     for entry in entries(store.directory):
         blob = entry.read_bytes()
-        assert blob.startswith(b"netgraph-cache/1 ")
+        assert blob.startswith(b"netviz-cache/1 ")
         header, rest = blob.split(b"\n", 1)
         _, _, head_len, tail_len = header.split(b" ")
         assert int(head_len) + int(tail_len) == len(rest)
@@ -519,12 +517,12 @@ def test_an_entry_is_never_python_bytecode_or_a_pickle(tree: Path, store: Docume
 def test_an_unwritable_cache_directory_is_not_an_error(
     tree: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A cache that cannot be written is a slow netgraph, not a broken one."""
+    """A cache that cannot be written is a slow netviz, not a broken one."""
 
     def refuse(*_args: Any, **_kwargs: Any) -> None:
         raise PermissionError(13, "Permission denied")
 
-    monkeypatch.setattr("netgraph.loader.cache.write_bytes_atomically", refuse)
+    monkeypatch.setattr("netviz.loader.cache.write_bytes_atomically", refuse)
     store = DocumentCache(tmp_path / "cache")
 
     inventory = load_tree(tree, cache=store)
@@ -559,8 +557,8 @@ def test_an_unreadable_inventory_file_is_reported_not_cached(
 
 def _load_in_subprocess(root: str, directory: str) -> int:
     """Load ``root`` through a cache at ``directory``. Runs in a child process."""
-    from netgraph.loader import load_tree as load
-    from netgraph.loader.cache import DocumentCache as Store
+    from netviz.loader import load_tree as load
+    from netviz.loader.cache import DocumentCache as Store
 
     inventory = load(Path(root), cache=Store(Path(directory)))
     return len(inventory.elements)
@@ -615,7 +613,7 @@ def test_two_writers_of_one_destination_do_not_share_a_scratch_file(tmp_path: Pa
 def test_a_half_written_entry_is_not_visible(tree: Path, tmp_path: Path) -> None:
     """The temporary file a killed process leaves is not mistaken for an entry.
 
-    Named through :func:`~netgraph.fsio._temporary_for` rather than spelled out,
+    Named through :func:`~netviz.fsio._temporary_for` rather than spelled out,
     so this stages what a killed process would actually have left behind and not
     a name that used to be right.
     """
@@ -737,7 +735,7 @@ def test_inspecting_counts_the_current_and_the_stale_generation(tree: Path, tmp_
     directory = tmp_path / "cache"
     current = DocumentCache(directory)
     load_tree(tree, cache=current)
-    stale = DocumentCache(directory, identity=replace(current.identity, netgraph="0.0.1"))
+    stale = DocumentCache(directory, identity=replace(current.identity, netviz="0.0.1"))
     load_tree(tree, cache=stale)
 
     info = inspect_cache(directory, identity=current.identity)
@@ -776,13 +774,13 @@ def test_the_configuration_file_outranks_xdg(tmp_path: Path) -> None:
     )
 
     assert directory == tmp_path / "from-toml"
-    assert "netgraph.toml" in origin
+    assert "netviz.toml" in origin
 
 
 def test_xdg_cache_home_is_honoured(tmp_path: Path) -> None:
     directory, origin = resolve_cache_root(environ={"XDG_CACHE_HOME": str(tmp_path)})
 
-    assert directory == tmp_path / "netgraph"
+    assert directory == tmp_path / "netviz"
     assert origin == "XDG_CACHE_HOME"
 
 
@@ -790,7 +788,7 @@ def test_the_platform_default_is_used_when_nothing_says_otherwise() -> None:
     directory, origin = resolve_cache_root(environ={})
 
     assert directory.is_absolute()
-    assert "netgraph" in str(directory).lower()
+    assert "netviz" in str(directory).lower()
     assert origin
 
 
@@ -855,7 +853,7 @@ def test_the_default_table_is_the_default_cache() -> None:
 def test_the_table_is_read_from_the_configuration_file(tmp_path: Path) -> None:
     config = parse_config(
         {"cache": {"enabled": False, "dir": "cache", "max-size": "8MB"}},
-        path=tmp_path / "netgraph.toml",
+        path=tmp_path / "netviz.toml",
     )
 
     assert not config.cache.enabled
@@ -953,7 +951,7 @@ def test_the_disable_variable_reaches_the_command_line(
 
 
 def test_the_table_can_switch_the_cache_off(tree: Path, isolated: Path, runner: CliRunner) -> None:
-    (tree / "netgraph.toml").write_text("[cache]\nenabled = false\n", encoding="utf-8")
+    (tree / "netviz.toml").write_text("[cache]\nenabled = false\n", encoding="utf-8")
 
     result = runner.invoke(cli, ["-i", str(tree), "validate"])
 
@@ -1028,7 +1026,7 @@ def test_a_broken_configuration_file_does_not_break_an_uncached_command(
     tree: Path, isolated: Path, runner: CliRunner
 ) -> None:
     """The cache asking about a table must not add a failure mode to `list`."""
-    (tree / "netgraph.toml").write_text("[render]\nshow_ips = false\n", encoding="utf-8")
+    (tree / "netviz.toml").write_text("[render]\nshow_ips = false\n", encoding="utf-8")
 
     result = runner.invoke(cli, ["-i", str(tree), "list", "devices"])
 
@@ -1047,7 +1045,7 @@ def runner() -> CliRunner:
 
 
 def test_a_watch_cycle_reparses_only_what_changed(tree: Path, store: DocumentCache) -> None:
-    """The incremental claim, at the level ``netgraph watch`` runs it."""
+    """The incremental claim, at the level ``netviz watch`` runs it."""
     request = RenderRequest(inventory=tree, output_format="dot", cache=store)
 
     first = run_cycle(request)

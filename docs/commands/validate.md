@@ -1,4 +1,4 @@
-# `netgraph validate`
+# `netviz validate`
 
 Check the inventory for schema and semantic problems. It exits 1 when anything is
 reported as an error and 0 otherwise — so it drops straight into CI, into a
@@ -30,7 +30,7 @@ rule.
 
 <!-- generated: synopsis validate -->
 ```text
-netgraph [GLOBAL OPTIONS] validate [OPTIONS]
+netviz [GLOBAL OPTIONS] validate [OPTIONS]
 ```
 <!-- /generated -->
 
@@ -40,13 +40,13 @@ Nothing to say is said in one line, and the exit code is 0:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/quickstart validate
+$ netviz -i examples/quickstart validate
 no problems found
 ```
 
 There is no `--summary` and no verbosity level that turns this into a report of
 what was checked. If you want to know what the tool would have complained about,
-[`netgraph rules`](rules.md) prints the whole vocabulary.
+[`netviz rules`](rules.md) prints the whole vocabulary.
 
 ## An inventory with a problem
 
@@ -57,7 +57,7 @@ smallest honest examples available:
 
 <!-- run: rc=1 -->
 ```console
-$ netgraph -i tests/fixtures/invalid/e001-unknown-endpoint.yaml validate
+$ netviz -i tests/fixtures/invalid/e001-unknown-endpoint.yaml validate
 errors (1):
   e001-unknown-endpoint.yaml#1:19  E001  cable 'cbl-dangling' endpoint pc-ghost:eth0: no element named 'pc-ghost' is declared in this inventory
 
@@ -81,7 +81,7 @@ A warning is legal-but-probably-wrong, and it does **not** fail the run:
 
 <!-- run: -->
 ```console
-$ netgraph -i tests/fixtures/invalid/w103-orphan-device.yaml validate
+$ netviz -i tests/fixtures/invalid/w103-orphan-device.yaml validate
 warnings (1):
   w103-orphan-device.yaml#0:6  W103  device 'pc-a' terminates no cable and hosts no adapter; it is drawn as an isolated node
 
@@ -94,25 +94,25 @@ a warning nobody looks at:
 
 <!-- run: rc=1 -->
 ```console
-$ netgraph -i tests/fixtures/invalid/w103-orphan-device.yaml validate --strict
+$ netviz -i tests/fixtures/invalid/w103-orphan-device.yaml validate --strict
 errors (1):
   w103-orphan-device.yaml#0:6  W103  device 'pc-a' terminates no cable and hosts no adapter; it is drawn as an isolated node
 
 1 error
 ```
 
-`--strict` can only turn strictness *on*: `strict = true` in `netgraph.toml` makes
+`--strict` can only turn strictness *on*: `strict = true` in `netviz.toml` makes
 it the default for a tree and no command-line flag undoes that.
 
 `--disable RULE` silences a rule by id. It is repeatable, accepts the short id or
 either `NG-*` alias, and accepts `*` for all of them. It **adds** to whatever
-`netgraph.toml` already ignores and cannot re-enable a rule the file disabled. The
+`netviz.toml` already ignores and cannot re-enable a rule the file disabled. The
 two flags combine in the obvious way — be strict about everything except the
 exceptions you have decided are exceptions:
 
 <!-- run: -->
 ```console
-$ netgraph -i tests/fixtures/invalid/w103-orphan-device.yaml validate --strict --disable W103
+$ netviz -i tests/fixtures/invalid/w103-orphan-device.yaml validate --strict --disable W103
 no problems found
 ```
 
@@ -122,12 +122,12 @@ what you could have meant instead:
 
 <!-- run: rc=2 -->
 ```console
-$ netgraph -i examples/quickstart validate --disable NG-D005
+$ netviz -i examples/quickstart validate --disable NG-D005
 error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, W147, W148, W149, W150, W151, W152, W153, W154, I001, I002, I003, I004, I005, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
 A suppression that belongs to the inventory rather than to one command line
-belongs in `netgraph.toml` or in an element's `netgraph/ignore` annotation —
+belongs in `netviz.toml` or in an element's `netviz/ignore` annotation —
 [Saying "not here"](../validation.md#saying-not-here-the-four-suppressions) sets
 the four mechanisms side by side, and
 [Suppressing a rule](../validation-rules.md#suppressing-a-rule) gives each one in
@@ -140,7 +140,7 @@ everything else. `--dry-run` prints the unified diff instead of writing:
 
 <!-- run: -->
 ```console
-$ netgraph -i tests/fixtures/fixable validate --fix --dry-run
+$ netviz -i tests/fixtures/fixable validate --fix --dry-run
 would fix 3 problems:
   W138  drop 'sw-gone' from the l1 view of layout 'default'
   W108  remove the MAC address from loopback sw-a:Loopback0
@@ -189,7 +189,7 @@ out clean:
 
 <!-- run: -->
 ```console
-$ netgraph -i tests/fixtures/fixable validate --fix --dry-run --choose W114=list
+$ netviz -i tests/fixtures/fixable validate --fix --dry-run --choose W114=list
 would fix 4 problems:
   W138  drop 'sw-gone' from the l1 view of layout 'default'
   W108  remove the MAC address from loopback sw-a:Loopback0
@@ -234,13 +234,13 @@ did before. One that fails that test is rolled back to the byte and reported wit
 the findings it would have introduced, so `--fix` cannot make an inventory worse
 and never needs a `--force`.
 
-Writes go through the same path as [`netgraph edit`](edit.md): comments, key
+Writes go through the same path as [`netviz edit`](edit.md): comments, key
 order and quoting survive, and only the lines the repair is about change. `--fix`
 needs a *folder*, because an edit session resolves addresses across a whole tree;
 pointing `-i` at a single file is a usage error.
 
 [Fixing a finding](../validation-rules.md#fixing-a-finding) lists which rules are
-fixable and what each repair does, and `netgraph rules --fixable` prints the same
+fixable and what each repair does, and `netviz rules --fixable` prints the same
 table.
 
 ## Machine-readable output
@@ -260,8 +260,8 @@ that summary and never the document.
 
 <!-- norun: the first line redirects, and the second needs a GitHub Actions log to annotate -->
 ```bash
-netgraph -i inventory validate -F sarif --strict > netgraph.sarif
-netgraph -i inventory validate -F github
+netviz -i inventory validate -F sarif --strict > netviz.sarif
+netviz -i inventory validate -F github
 ```
 
 Text output locates a finding at its *document*; the structured formats carry the
@@ -287,7 +287,7 @@ composite GitHub Action and the pre-commit hook this repository ships.
 | `-F`, `--output-format` | `[text\|json\|sarif\|github]` | `text` | text is for reading; json, sarif and github are for CI. |
 | `--fix` | — | off | Repair every problem that has one unambiguous mechanical fix, then report what is left. A fix that would introduce a new finding is undone and reported instead. |
 | `-n`, `--dry-run` | — | off | With --fix: print the unified diff the repairs would apply, and write nothing. |
-| `--choose` | `RULE=FIX` | — | Pick which repair to use for a rule that offers several, e.g. --choose W114=list. Repeatable. 'netgraph rules --fixable' lists the keys. |
+| `--choose` | `RULE=FIX` | — | Pick which repair to use for a rule that offers several, e.g. --choose W114=list. Repeatable. 'netviz rules --fixable' lists the keys. |
 <!-- /generated -->
 
 The global options apply as everywhere else: `-i/--inventory` names the tree,
@@ -301,7 +301,7 @@ findings the validator produced.
 |---|---|
 | `0` | No errors. Warnings and infos may still have been reported. |
 | `1` | At least one **error**, or a document that could not be loaded at all. |
-| `2` | Usage error — an unknown option, an unknown rule id in `--disable` — or an unusable `netgraph.toml`. |
+| `2` | Usage error — an unknown option, an unknown rule id in `--disable` — or an unusable `netviz.toml`. |
 | `3` | The inventory could not be discovered or read at all. |
 | `130` | Interrupted. |
 | `141` | The downstream end of a pipe closed first. |
@@ -315,7 +315,7 @@ those are failures to run the check rather than results of it.
   suppression and the index of every rule.
 * [`docs/validation-rules.md`](../validation-rules.md) — one section per rule, why
   it exists and how to switch it off.
-* [`netgraph rules`](rules.md) — the vocabulary `--disable` accepts, printed from
+* [`netviz rules`](rules.md) — the vocabulary `--disable` accepts, printed from
   the build you are running.
 * [`docs/ci.md`](../ci.md) — the JSON and SARIF envelopes, the GitHub Action and
   the pre-commit hook.

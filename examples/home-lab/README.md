@@ -80,7 +80,7 @@ VLAN 10 (`home`) dual stack; VLAN 20 (`guest`) carries no addressed element.
 | `home` | `78:8a:20:aa:00:11` | 10 | `wpa3-psk` |
 | `home-guest` | `78:8a:20:aa:00:12` | 20 | `wpa2-psk` |
 
-`netgraph list bss` prints exactly that table, with the client radios in it too.
+`netviz list bss` prints exactly that table, with the client radios in it too.
 Both VLANs reach the uplink trunk `ap-home:eth0` ↔ `sw-home:port5`, which is
 what keeps `NG-W009` quiet: an SSID mapped to a VLAN the access point carries
 nowhere is an error, because clients would associate and reach nothing.
@@ -100,12 +100,12 @@ nowhere is an error, because clients would associate and reach nothing.
   spare capacity can be documented without generating warnings.
 * **`rtr-home:wan0` is annotated instead.** It is up, and it terminates no cable
   because the ISP at the far end is not an element of this inventory. The
-  `netgraph/ignore: "NG-C015"` annotation on the router says so once, where the
+  `netviz/ignore: "NG-C015"` annotation on the router says so once, where the
   next reader will look for the reason.
 * **Membership is written on the group and nowhere else.** `household` names
   `admins` rather than repeating `ana`, so she is in both without being listed
-  twice; `netgraph list groups` walks the nesting and says the group holds two
-  members and reaches two people. `netgraph list users` prints the reverse index,
+  twice; `netviz list groups` walks the nesting and says the group holds two
+  members and reaches two people. `netviz list users` prints the reverse index,
   which is the one fact about a person their own document cannot state.
 * **`backup` is `type: service`.** It belongs to no group, which for a robot is
   the normal shape rather than an oversight — so `I004` says nothing about it.

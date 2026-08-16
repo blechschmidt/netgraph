@@ -1,7 +1,7 @@
-# `netgraph show`
+# `netviz show`
 
 Print the fully resolved configuration of one element — ranges expanded, template
-merged, defaults materialised, values normalised. This is what netgraph actually
+merged, defaults materialised, values normalised. This is what netviz actually
 works with, rather than what was typed, and `--raw` prints the other half: the
 document exactly as it stands in the file.
 
@@ -29,7 +29,7 @@ command settles which.
 
 <!-- generated: synopsis show -->
 ```text
-netgraph [GLOBAL OPTIONS] show [OPTIONS] [NAME]
+netviz [GLOBAL OPTIONS] show [OPTIONS] [NAME]
 ```
 <!-- /generated -->
 
@@ -56,7 +56,7 @@ displays the result of all four:
   spelling, and a VLAN list is compacted.
 
 Everything downstream — the validator, the graph, every renderer,
-[`netgraph ipam`](ipam.md) — reads that resolved form and nothing else.
+[`netviz ipam`](ipam.md) — reads that resolved form and nothing else.
 
 ## Naming an element
 
@@ -64,7 +64,7 @@ Everything downstream — the validator, the graph, every renderer,
 such as `sites/north/access/sw-north-acc-03`, or a short name that is unique in
 the inventory. A short name that matches two elements is a usage error listing
 both candidates, and a name that matches nothing points you at
-[`netgraph list devices`](list.md). Shell completion completes `NAME` against the
+[`netviz list devices`](list.md). Shell completion completes `NAME` against the
 inventory, so the qualified names rarely need typing in full.
 
 Templates are not elements and cannot be shown: they have no name in the element
@@ -73,7 +73,7 @@ namespace at all. Read one through a device that inherits it.
 If some document in the tree failed to load, `show` says so on stderr and answers
 anyway — the question was about one element, and refusing because an unrelated
 file is broken would be unhelpful. Run
-[`netgraph validate`](validate.md) for the details.
+[`netviz validate`](validate.md) for the details.
 
 ## Reading a merge
 
@@ -86,8 +86,8 @@ Here is the templated campus switch as it stands in the file — nine lines of
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus show sw-north-acc-03 --raw
-apiVersion: netgraph.dev/v1alpha1
+$ netviz -i examples/campus show sw-north-acc-03 --raw
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-north-acc-03
@@ -117,8 +117,8 @@ is elided here, not by the command:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus show sw-north-acc-03
-apiVersion: netgraph.dev/v1alpha1
+$ netviz -i examples/campus show sw-north-acc-03
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-north-acc-03
@@ -180,7 +180,7 @@ With a shell that has process substitution, the diff is the merge:
 
 <!-- norun: a shell pipeline with process substitution -->
 ```bash
-diff <(netgraph show sw-north-acc-03 --raw) <(netgraph show sw-north-acc-03)
+diff <(netviz show sw-north-acc-03 --raw) <(netviz show sw-north-acc-03)
 ```
 
 ## Reading a default
@@ -191,8 +191,8 @@ address normalisation, which is the one that surprises people:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/quickstart show pc-alice --raw
-apiVersion: netgraph.dev/v1alpha1
+$ netviz -i examples/quickstart show pc-alice --raw
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-alice
@@ -211,8 +211,8 @@ spec:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/quickstart show pc-alice
-apiVersion: netgraph.dev/v1alpha1
+$ netviz -i examples/quickstart show pc-alice
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-alice
@@ -257,11 +257,11 @@ device respectively, which is why a router's interfaces come back with
 `-F/--output-format` chooses `yaml` (the default, for reading) or `json` (for
 piping). Both carry the same document, and `--raw` applies to either — the raw
 JSON of a document written in YAML is a convenient way to hand a single element to
-something that is not netgraph.
+something that is not netviz.
 
 <!-- norun: a shell pipeline -->
 ```bash
-netgraph -i examples/campus show sw-north-acc-03 -F json | jq '.spec.interfaces | length'
+netviz -i examples/campus show sw-north-acc-03 -F json | jq '.spec.interfaces | length'
 ```
 
 ## Arguments
@@ -302,7 +302,7 @@ stderr and the element you asked for is still printed.
   having.
 * [`docs/schema.md` §2.4](../schema.md#24-provenance) — how a field's file and line
   survive expansion and merging, so a template's mistake is reported once.
-* [`netgraph list`](list.md) — every element's qualified name, when you need to
+* [`netviz list`](list.md) — every element's qualified name, when you need to
   find out what to pass here.
-* [`netgraph validate`](validate.md) — the checks that run against the resolved
+* [`netviz validate`](validate.md) — the checks that run against the resolved
   form this command prints.

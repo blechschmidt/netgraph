@@ -1,6 +1,6 @@
-# `netgraph query`
+# `netviz query`
 
-`netgraph query` answers the selector language: it prints the elements a query
+`netviz query` answers the selector language: it prints the elements a query
 selects, and nothing else. It is the language's home, but not its only use —
 the same expression narrows a render with `--select`, grades a network with
 `assert: query`, and drives the editor's search box.
@@ -14,7 +14,7 @@ page is the command.
 
 <!-- generated: synopsis query -->
 ```text
-netgraph [GLOBAL OPTIONS] query [OPTIONS] QUERY
+netviz [GLOBAL OPTIONS] query [OPTIONS] QUERY
 ```
 <!-- /generated -->
 
@@ -26,11 +26,11 @@ Three questions, and they are different:
 
 **"Which elements are these?"** — the default. One fully-qualified name per
 line, in load order, so the output pipes into `xargs`, `grep -c` or another
-`netgraph` invocation.
+`netviz` invocation.
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query 'kind = router and label.site = north'
+$ netviz query 'kind = router and label.site = north'
 sites/north/core/rtr-north-core-01
 ```
 
@@ -38,22 +38,22 @@ sites/north/core/rtr-north-core-01
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query 'kind = switch' --count
+$ netviz query 'kind = switch' --count
 10
 ```
 
-**"Is this true?"** — the exit status. `netgraph query` exits **1** when nothing
+**"Is this true?"** — the exit status. `netviz query` exits **1** when nothing
 matched, so a query is a check:
 
 <!-- run: cwd=examples/campus rc=1 -->
 ```console
-$ netgraph query 'kind = switch and not has address' --count
+$ netviz query 'kind = switch and not has address' --count
 0
 ```
 
 An invariant is written as a search for its counterexamples, so *no match* is
 the passing case — and a shell that wants it that way inverts the status, or
-writes the claim as an [`assert: query`](../testing.md) and lets `netgraph test`
+writes the claim as an [`assert: query`](../testing.md) and lets `netviz test`
 report it.
 
 ---
@@ -67,7 +67,7 @@ scope instead:
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query 'interface[type = loopback and has address]' --print interfaces
+$ netviz query 'interface[type = loopback and has address]' --print interfaces
 sites/north/core/rtr-north-core-01:lo0
 sites/north/hosts/pc-north-01:lo
 sites/north/hosts/srv-north-01:lo
@@ -95,7 +95,7 @@ says what it is:
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query 'kind = router and label.site = south' --json
+$ netviz query 'kind = router and label.site = south' --json
 {
   "query": "kind = router and label.site = south",
   "count": 1,
@@ -127,7 +127,7 @@ which view `render` draws. It matters:
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query --layer l3 'kind = subnet and prefix in 10.1.0.0/16' --count
+$ netviz query --layer l3 'kind = subnet and prefix in 10.1.0.0/16' --count
 4
 ```
 
@@ -139,7 +139,7 @@ match came from.
 
 ## The filter flags scope the question
 
-`netgraph query` takes the same `--kind`, `--namespace`, `--name`, `--vlan`,
+`netviz query` takes the same `--kind`, `--namespace`, `--name`, `--vlan`,
 `--neighbors-of` and `--depth` every command that draws the whole inventory
 does. Here they narrow the graph the query is *answered against* — "among the
 switches, which match this" — rather than being AND-ed into the expression
@@ -148,7 +148,7 @@ the network the question is about.
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query --namespace sites/west 'has address' --count
+$ netviz query --namespace sites/west 'has address' --count
 7
 ```
 
@@ -163,7 +163,7 @@ for:
 
 <!-- run: cwd=examples/campus -->
 ```console
-$ netgraph query --explain --neighbors-of sw-north-acc-01 --depth 3
+$ netviz query --explain --neighbors-of sw-north-acc-01 --depth 3
 # the filter flags, as the query they are sugar for
 within 3 hops of (fqn = sw-north-acc-01 or name = sw-north-acc-01)
 ...
@@ -178,9 +178,9 @@ before the inventory is read, with the offending column underlined:
 
 <!-- run: cwd=examples/campus rc=2 -->
 ```console
-$ netgraph query 'kind = switch and interface[interface[x]]'
-Usage: netgraph query [OPTIONS] QUERY
-Try 'netgraph query --help' for help.
+$ netviz query 'kind = switch and interface[interface[x]]'
+Usage: netviz query [OPTIONS] QUERY
+Try 'netviz query --help' for help.
 
 Error: Invalid value for 'QUERY': query:1:29: a scope cannot be written inside another scope
   kind = switch and interface[interface[x]]
@@ -228,7 +228,7 @@ inventory is an answer about a network that is not the one described.
 | `--name` | `GLOB` | — | Keep only elements whose name matches this glob. Repeatable. |
 | `--neighbors-of` | `NAME` | — | Keep only the neighbourhood of this element. |
 | `--depth` | `INTEGER, >= 0` | `1` | How many hops --neighbors-of reaches. |
-| `--select` | `QUERY` | — | Keep only the elements this query selects, e.g. "kind = switch and not has vrf". The flags above are sugar for the equivalent query and are combined with it; 'netgraph query --explain' prints which. See docs/query.md. |
+| `--select` | `QUERY` | — | Keep only the elements this query selects, e.g. "kind = switch and not has vrf". The flags above are sugar for the equivalent query and are combined with it; 'netviz query --explain' prints which. See docs/query.md. |
 | `--strict` | — | off | Treat warnings as errors. |
 | `--force` | — | off | Proceed even when validation failed. The result may not match the files. |
 <!-- /generated -->
@@ -238,6 +238,6 @@ inventory is an answer about a network that is not the one described.
 ## See also
 
 - [`docs/query.md`](../query.md) — the grammar, the attributes and a cookbook.
-- [`netgraph list`](list.md) — the same `--select`, over the tabular subjects.
-- [`netgraph render`](render.md) — `--select` beside the other view filters.
-- [`netgraph test`](test.md) — the same query as an executable assertion.
+- [`netviz list`](list.md) — the same `--select`, over the tabular subjects.
+- [`netviz render`](render.md) — `--select` beside the other view filters.
+- [`netviz test`](test.md) — the same query as an executable assertion.

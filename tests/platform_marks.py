@@ -4,7 +4,7 @@ The suite runs on `ubuntu-24.04`, `windows-latest` and `macos-14`; see
 ``docs/testing.md`` for what each of those covers. The default is that a test
 runs everywhere — a test skipped on Windows is a behaviour nothing checks there,
 so each mark below has to name a *capability the platform does not have*, not a
-platform netgraph has not been made to work on.
+platform netviz has not been made to work on.
 
 That distinction is why these are six narrow marks rather than one
 ``skip_on_windows``. ``chmod(0o000)`` cannot make a directory unreadable on
@@ -38,7 +38,7 @@ from typing import Final
 
 import pytest
 
-from netgraph.render.dot import find_dot
+from netviz.render.dot import find_dot
 
 __all__ = [
     "HAVE_BASH_COMPLETION",
@@ -83,7 +83,7 @@ def _can_symlink() -> bool:
 
 #: An unreadable directory, staged with ``chmod(0o000)``. Windows has no POSIX
 #: mode bits, so the call succeeds and changes nothing but the read-only flag:
-#: the directory stays readable and the test would assert that netgraph fails to
+#: the directory stays readable and the test would assert that netviz fails to
 #: report a problem that is not there.
 requires_posix_permissions = pytest.mark.skipif(
     ON_WINDOWS,
@@ -136,7 +136,7 @@ def _bash_is_modern_enough_for_completion() -> bool:
 
     Click refuses to vouch for the script it generates on anything older than
     4.4 and says so on stderr — which is a line of output, and therefore part of
-    any transcript that runs ``netgraph completion bash``.
+    any transcript that runs ``netviz completion bash``.
 
     macOS is where this bites: Apple has shipped ``/bin/bash`` 3.2 since 2007,
     for licensing reasons that have nothing to do with the shell, so the warning
@@ -178,11 +178,11 @@ HAVE_BASH_COMPLETION: Final = _bash_is_modern_enough_for_completion()
 #: on every platform, and CI installs it on all three — but a test that shells
 #: out to it has to say what it needs.
 #:
-#: Asked through :func:`~netgraph.render.dot.find_dot` rather than
-#: :func:`shutil.which`, so the condition is the same one netgraph applies: on
+#: Asked through :func:`~netviz.render.dot.find_dot` rather than
+#: :func:`shutil.which`, so the condition is the same one netviz applies: on
 #: Windows Graphviz is frequently installed without being on ``PATH``, and a
 #: suite that skipped there while the tool renders happily would be measuring
-#: ``PATH`` rather than netgraph.
+#: ``PATH`` rather than netviz.
 requires_dot = pytest.mark.skipif(
     find_dot() is None, reason="the Graphviz 'dot' executable is not installed"
 )
@@ -218,7 +218,7 @@ def _nft_that_can_check() -> str | None:
     anything.
 
     If the probe comes back clean, nft can parse here and a later failure is
-    netgraph's; if it does not, nothing about the ruleset has been established
+    netviz's; if it does not, nothing about the ruleset has been established
     either way, and the tests that need it say so rather than failing. CI grants
     the capability so the gate runs there rather than skipping.
     """
@@ -238,7 +238,7 @@ def _nft_that_can_check() -> str | None:
 #: See :func:`_nft_that_can_check`.
 NFT: Final = _nft_that_can_check()
 
-#: ``nft --check``, the one gate in tests/test_firewall.py that is not netgraph
+#: ``nft --check``, the one gate in tests/test_firewall.py that is not netviz
 #: reading its own output.
 requires_nft = pytest.mark.skipif(
     NFT is None,
@@ -246,7 +246,7 @@ requires_nft = pytest.mark.skipif(
     "installed, or this process may not open the netlink socket '--check' needs",
 )
 
-#: The PowerShell binary that can parse the completion script netgraph generates,
+#: The PowerShell binary that can parse the completion script netviz generates,
 #: or ``None``. ``pwsh`` (PowerShell 7, cross-platform) is preferred over
 #: ``powershell`` (5.1, Windows only) because all three GitHub runner images carry
 #: it — so the generated script is checked by the shell it is *for* on Linux and
@@ -254,7 +254,7 @@ requires_nft = pytest.mark.skipif(
 PWSH: Final = shutil.which("pwsh") or shutil.which("powershell")
 
 #: PowerShell itself, for the one thing no Python assertion can establish: that
-#: what netgraph emits is script PowerShell accepts.
+#: what netviz emits is script PowerShell accepts.
 requires_pwsh = pytest.mark.skipif(
     PWSH is None,
     reason="neither 'pwsh' nor 'powershell' is installed; the generated completion "

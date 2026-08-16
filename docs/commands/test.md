@@ -1,8 +1,8 @@
-# `netgraph test`
+# `netviz test`
 
 Grade the assertions the inventory makes about itself. It exits 1 when one of
 them has stopped being true and 0 otherwise, so it drops into CI beside
-[`netgraph validate`](validate.md) without any wrapping. Nothing is probed and no
+[`netviz validate`](validate.md) without any wrapping. Nothing is probed and no
 device is contacted: every verdict comes from the files.
 
 `validate` says whether the files are *coherent* — a cable endpoint resolves, an
@@ -34,7 +34,7 @@ documents rather than in a rule catalogue.
 
 <!-- generated: synopsis test -->
 ```text
-netgraph [GLOBAL OPTIONS] test [OPTIONS] [SUITE]...
+netviz [GLOBAL OPTIONS] test [OPTIONS] [SUITE]...
 ```
 <!-- /generated -->
 
@@ -46,7 +46,7 @@ failed:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/home-lab test
+$ netviz -i examples/home-lab test
 ok    home  10 passed  (the house reaches the internet, and the guest VLAN stays guest)
 
 10 passed in 1 suite
@@ -60,12 +60,12 @@ writing them and not when you are reading a pipeline.
 A failure names four things: **which assertion**, **which elements**, **what the
 graph actually contained**, and **the file and line the assertion is written
 on** — so an editor and a CI annotation can both link straight to it.
-`tests/fixtures/testsuite` is a valid two-desk inventory (`netgraph validate` has
+`tests/fixtures/testsuite` is a valid two-desk inventory (`netviz validate` has
 nothing to say about it) that fails four of the five claims made about it:
 
 <!-- run: rc=1 -->
 ```console
-$ netgraph -i tests/fixtures/testsuite test
+$ netviz -i tests/fixtures/testsuite test
 FAIL  office  1 passed, 4 failed  (what the office is supposed to guarantee)
   FAIL  the two desks cannot see each other  [not-reachable]  tests.yaml:13
         1 route exists and should not
@@ -102,7 +102,7 @@ Eleven claims, listed in full in
 [§20.2 of the schema](../schema.md#202-an-assertion). The ones that come up most:
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: testsuite
 metadata:
   name: connectivity
@@ -140,7 +140,7 @@ answer "what does this inventory actually check?":
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/home-lab test --list
+$ netviz -i examples/home-lab test --list
 home  10 assertions  (the house reaches the internet, and the guest VLAN stays guest)
   the desktop reaches the NAS  [reachable]  tests.yaml:13
   the laptop reaches the router through its USB dongle  [reachable]  tests.yaml:20
@@ -156,7 +156,7 @@ home  10 assertions  (the house reaches the internet, and the guest VLAN stays g
 
 ## Selecting elements
 
-`select:` is the vocabulary [`netgraph render`](render.md) already filters with,
+`select:` is the vocabulary [`netviz render`](render.md) already filters with,
 written as one scalar:
 
 ```yaml
@@ -189,7 +189,7 @@ the short name, and it is repeatable:
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/campus test connect*
+$ netviz -i examples/campus test connect*
 ok    connectivity  20 passed  (staff, servers and management reach what they are supposed to)
 
 20 passed in 1 suite
@@ -200,7 +200,7 @@ assertions:
 
 <!-- run: rc=1 -->
 ```console
-$ netgraph -i examples/campus test segmentation
+$ netviz -i examples/campus test segmentation
 no test suite matches 'segmentation'
 ```
 
@@ -212,11 +212,11 @@ a script that wants to do something other than print it. The envelope is stable:
 
 <!-- norun: the envelope quotes an absolute inventory path, which differs per machine -->
 ```console
-$ netgraph -q -i inventory test -F json
+$ netviz -q -i inventory test -F json
 {
   "schemaVersion": 1,
   "kind": "TestReport",
-  "tool": { "name": "netgraph", "version": "0.1.0" },
+  "tool": { "name": "netviz", "version": "0.1.0" },
   "inventory": "/home/ops/net/inventory",
   "summary": {
     "suites": 1, "assertions": 10,
@@ -260,16 +260,16 @@ than a wall of log:
 
 <!-- run: rc=1 -->
 ```console
-$ netgraph -i tests/fixtures/testsuite test -F junit
+$ netviz -i tests/fixtures/testsuite test -F junit
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="netgraph test" tests="5" failures="4" errors="0" skipped="0">
-  <testsuite name="netgraph test" tests="5" failures="4" errors="0" skipped="0">
+<testsuites name="netviz test" tests="5" failures="4" errors="0" skipped="0">
+  <testsuite name="netviz test" tests="5" failures="4" errors="0" skipped="0">
     <properties>
       <property name="inventory" value="tests/fixtures/testsuite"/>
-      <property name="netgraph" value="0.1.0"/>
+      <property name="netviz" value="0.1.0"/>
     </properties>
-    <testcase classname="netgraph.test.office" name="both desks reach the router" file="tests.yaml" line="8"/>
-    <testcase classname="netgraph.test.office" name="the two desks cannot see each other" file="tests.yaml" line="13">
+    <testcase classname="netviz.test.office" name="both desks reach the router" file="tests.yaml" line="8"/>
+    <testcase classname="netviz.test.office" name="the two desks cannot see each other" file="tests.yaml" line="13">
       <failure message="1 route exists and should not" type="not-reachable">
 at tests.yaml:13
 why: Ticket NET-412 asked for client isolation on the office VLAN.
@@ -277,21 +277,21 @@ pc-a -&gt; pc-b at layer l2: pc-a -&gt; sw -&gt; pc-b
 elements: pc-a, pc-b
       </failure>
     </testcase>
-    <testcase classname="netgraph.test.office" name="the office switch has room to grow" file="tests.yaml" line="19">
+    <testcase classname="netviz.test.office" name="the office switch has room to grow" file="tests.yaml" line="19">
       <failure message="1 element has fewer than 24 interfaces" type="port-count-at-least">
 at tests.yaml:19
 sw declares 5
 elements: sw
       </failure>
     </testcase>
-    <testcase classname="netgraph.test.office" name="there is a second router for failover" file="tests.yaml" line="24">
+    <testcase classname="netviz.test.office" name="there is a second router for failover" file="tests.yaml" line="24">
       <failure message="the selector 'kind=router' matches 1 element: 1 is not at least 2" type="count">
 at tests.yaml:24
 rtr
 elements: rtr
       </failure>
     </testcase>
-    <testcase classname="netgraph.test.office" name="no single failure takes the office offline" file="tests.yaml" line="29">
+    <testcase classname="netviz.test.office" name="no single failure takes the office offline" file="tests.yaml" line="29">
       <failure message="5 single points of failure in the l1 view" type="no-single-point-of-failure">
 at tests.yaml:29
 l1: losing link cbl-rtr isolates 3 endpoints (sw, pc-a, pc-b)
@@ -310,10 +310,10 @@ elements: cbl-rtr, rtr, sw, cbl-a, cbl-b
 
 <!-- norun: writes into the working tree, and the path is the caller's to choose -->
 ```bash
-netgraph -i inventory test -F junit -o test-results.xml
+netviz -i inventory test -F junit -o test-results.xml
 ```
 
-[`docs/ci.md`](../ci.md#netgraph-test-assertions-as-a-gate) has the workflow
+[`docs/ci.md`](../ci.md#netviz-test-assertions-as-a-gate) has the workflow
 snippets for GitHub Actions and GitLab.
 
 ## Arguments
@@ -356,8 +356,8 @@ skipped everything cannot pass for a suite that checked everything.
 
 ## See also
 
-- [`netgraph validate`](validate.md) — the other CI gate: whether the files cohere.
-- [`netgraph path`](path.md) — trace one route interactively, hop by hop.
-- [`netgraph impact`](impact.md) — the failure simulation `no-single-point-of-failure` runs.
+- [`netviz validate`](validate.md) — the other CI gate: whether the files cohere.
+- [`netviz path`](path.md) — trace one route interactively, hop by hop.
+- [`netviz impact`](impact.md) — the failure simulation `no-single-point-of-failure` runs.
 - [§20 of the schema](../schema.md#20-test-suites-executable-assertions) — the document kind in full.
 - [`docs/ci.md`](../ci.md) — putting both gates in a pipeline.

@@ -32,32 +32,32 @@ hosts/pc-desk (computer) [batch 0]
         from hosts/pc-desk:eno1.30: the capture reports this interface as vlan; the inventory does not declare it
         disruptive: removes the interface eno1.30; anything configured on it goes with it
         note: realised by the netplan file(s) below: a declarative dialect has no command for one field
-  + !! install /etc/netplan/10-netgraph.yaml and reload netplan
+  + !! install /etc/netplan/10-netviz.yaml and reload netplan
         from hosts/pc-desk:eno1.mac: declared as 3c:97:0e:20:01:01; the capture reports 3c:97:0e:20:01:ff
         from hosts/pc-desk:eno1.vlan: VLAN 30 is carried on this port; the inventory declares no VLAN here
         from hosts/pc-desk:eno1.30: the capture reports this interface as vlan; the inventory does not declare it
         disruptive: applying this file changes mac on eno1, which bounces the interface; eno1 carries the management address 192.168.10.20/24
-        > /etc/netplan/10-netgraph.yaml (17 line(s))
+        > /etc/netplan/10-netviz.yaml (17 line(s))
         $ netplan apply
 
 hosts/srv-nas (server) [batch 0]
   ~    set mtu on eth0 to 1500
         from hosts/srv-nas:eth0.mtu: declared as 1500; the capture reports 9000
         note: realised by the netplan file(s) below: a declarative dialect has no command for one field
-  +    install /etc/netplan/10-netgraph.yaml and reload netplan
+  +    install /etc/netplan/10-netviz.yaml and reload netplan
         from hosts/srv-nas:eth0.mtu: declared as 1500; the capture reports 9000
-        > /etc/netplan/10-netgraph.yaml (17 line(s))
+        > /etc/netplan/10-netviz.yaml (17 line(s))
         $ netplan apply
 
 prn-hall
   !    by hand: prn-hall is on the network and not in the tree
         from prn-hall: sw-home.lldp.json observed a device called 'prn-hall'; the inventory declares no element of that name
-        note: the capture found a device the inventory does not declare, so there is no declared state to converge it on. Run 'netgraph import' to adopt it, or take it off the network
+        note: the capture found a device the inventory does not declare, so there is no declared state to converge it on. Run 'netviz import' to adopt it, or take it off the network
 
 switches/sw-home (switch)
   !    by hand: port6 is a physical port the inventory does not declare
         from switches/sw-home:port6: the capture reports this interface as ethernet; the inventory does not declare it
-        note: the capture reports an ethernet interface 'port6' that the inventory does not declare. netgraph will not shut or remove a physical port it knows nothing about; declare it, or take it out of service by hand
+        note: the capture reports an ethernet interface 'port6' that the inventory does not declare. netviz will not shut or remove a physical port it knows nothing about; declare it, or take it out of service by hand
 
 maintenance batches
   batch 0: pc-desk, srv-nas

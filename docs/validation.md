@@ -1,14 +1,14 @@
 # Validating an inventory
 
-`netgraph validate` answers one question: **is this inventory usable?** This page
+`netviz validate` answers one question: **is this inventory usable?** This page
 is about working with the answer — how the three passes fit together, what a
 finding's parts mean, how a severity becomes an exit code, and the four ways to
-tell netgraph that your network is the exception.
+tell netviz that your network is the exception.
 
 [`docs/validation-rules.md`](validation-rules.md) is the other half: one section
 per rule, why the rule is worth having, and how to switch that one off. Every
-report netgraph emits deep-links into it, so you rarely have to find a rule
-there by hand. [`netgraph validate`](commands/validate.md) is the flag-by-flag
+report netviz emits deep-links into it, so you rarely have to find a rule
+there by hand. [`netviz validate`](commands/validate.md) is the flag-by-flag
 reference for the command itself.
 
 ---
@@ -77,7 +77,7 @@ collision in pass 1:
 
 <!-- run: rc=1 -->
 ```console
-$ netgraph -i tests/fixtures/invalid validate
+$ netviz -i tests/fixtures/invalid validate
 ...
   e002-double-termination.yaml#0:4                NG-N002  metadata.name: duplicate element name 'pc-a' (first declared at e001-unknown-endpoint.yaml#0:7); this document is ignored
 ...
@@ -108,7 +108,7 @@ A text finding is three columns — location, rule, message:
 
 <!-- run: rc=1 -->
 ```console
-$ netgraph -i tests/fixtures/invalid/e001-unknown-endpoint.yaml validate
+$ netviz -i tests/fixtures/invalid/e001-unknown-endpoint.yaml validate
 errors (1):
   e001-unknown-endpoint.yaml#1:19  E001  cable 'cbl-dangling' endpoint pc-ghost:eth0: no element named 'pc-ghost' is declared in this inventory
 
@@ -124,7 +124,7 @@ because a code-scanning UI puts a squiggle under a character rather than
 scrolling you to a document.
 
 **The rule id.** `E001` is the id the validator uses everywhere a rule can be
-named: `--disable`, `[validate]` in `netgraph.toml`, the `netgraph/ignore`
+named: `--disable`, `[validate]` in `netviz.toml`, the `netviz/ignore`
 annotation. The letter is the severity the rule was *first assigned* — `E` error,
 `W` warning, `I` info — and it does not change when an inventory re-grades the
 rule, so `E004 = "warning"` is a perfectly ordinary line to write. Ids are
@@ -145,11 +145,11 @@ it.
 **The help URI.** In `json`, `sarif` and `github` output each finding carries a
 permanent link to its section of `docs/validation-rules.md`, built from the rule
 id and title in the code — so a stranger reading a CI annotation can open the
-write-up without knowing anything about netgraph's docs layout:
+write-up without knowing anything about netviz's docs layout:
 
 <!-- run: rc=1 -->
 ```console
-$ netgraph -q -i tests/fixtures/invalid/e001-unknown-endpoint.yaml validate -F github
+$ netviz -q -i tests/fixtures/invalid/e001-unknown-endpoint.yaml validate -F github
 ::error file=tests/fixtures/invalid/e001-unknown-endpoint.yaml,line=26,col=7,title=E001 unknown cable endpoint::cable 'cbl-dangling' endpoint pc-ghost:eth0: no element named 'pc-ghost' is declared in this inventory
 ```
 
@@ -178,14 +178,14 @@ The exit code answers the same question the command does:
 |---|---|
 | `0` | No errors. Warnings and infos may still have been reported. |
 | `1` | At least one **error**, or a document that could not be loaded at all. |
-| `2` | Usage error — an unknown option, or an unknown rule id in `--disable` — or an unusable `netgraph.toml`. |
+| `2` | Usage error — an unknown option, or an unknown rule id in `--disable` — or an unusable `netviz.toml`. |
 | `3` | The inventory could not be discovered or read at all. |
 
 `2` and `3` are failures to *run* the check rather than results of it, which is
 why no structured document is written for them.
 
 A severity is not fixed by the code. `[validate.severity]` in
-[`netgraph.toml`](configuration.md#validate--how-findings-are-graded) re-grades
+[`netviz.toml`](configuration.md#validate--how-findings-are-graded) re-grades
 any pass-3 rule, and a handful of rules are already graded more harshly than the
 specification proposes for reasons written up in
 [Where this differs from the specification](validation-rules.md#where-this-differs-from-the-specification).
@@ -198,7 +198,7 @@ with the same ids.
 
 <!-- run: -->
 ```console
-$ netgraph -i tests/fixtures/invalid/w103-orphan-device.yaml validate
+$ netviz -i tests/fixtures/invalid/w103-orphan-device.yaml validate
 warnings (1):
   w103-orphan-device.yaml#0:6  W103  device 'pc-a' terminates no cable and hosts no adapter; it is drawn as an isolated node
 
@@ -207,21 +207,21 @@ warnings (1):
 
 <!-- run: rc=1 -->
 ```console
-$ netgraph -i tests/fixtures/invalid/w103-orphan-device.yaml validate --strict
+$ netviz -i tests/fixtures/invalid/w103-orphan-device.yaml validate --strict
 errors (1):
   w103-orphan-device.yaml#0:6  W103  device 'pc-a' terminates no cable and hosts no adapter; it is drawn as an isolated node
 
 1 error
 ```
 
-**Want it in CI**, and want it off at your desk. A warning is netgraph's way of
+**Want it in CI**, and want it off at your desk. A warning is netviz's way of
 saying "this is legal, and it is usually a mistake" — which is a useful thing to
 be told while you are editing and a bad thing to have merged. The pattern that
 works is `--strict` in the pipeline plus explicit suppressions for the warnings
 your network really does trip, so the exceptions are written down in the
 inventory instead of tolerated by everybody's habit.
 
-`--strict` can only turn strictness *on*. `strict = true` in `netgraph.toml`
+`--strict` can only turn strictness *on*. `strict = true` in `netviz.toml`
 makes it the default for a tree, and there is deliberately no `--no-strict` to
 undo that from a command line: the file is where a decision about the inventory
 belongs. `--strict` is also taken by [`render`](commands/render.md),
@@ -235,15 +235,15 @@ Four mechanisms, all additive — a finding is silenced if any of them applies:
 
 1. **`--disable RULE` on the command line.** Repeatable, accepts either spelling
    of an id and the wildcards `*`, `all` and `any`. It *adds* to whatever
-   `netgraph.toml` already ignores and cannot re-enable something the file
+   `netviz.toml` already ignores and cannot re-enable something the file
    disabled. Best for a one-off: narrowing a noisy report while you work through
    the rest of it.
-2. **`ignore` and `[validate.severity]` in `netgraph.toml`.** The per-inventory
+2. **`ignore` and `[validate.severity]` in `netviz.toml`.** The per-inventory
    decision, versioned with the tree, and the only place that can *re-grade* a
    rule rather than silence it. See
    [`docs/configuration.md`](configuration.md#validate--how-findings-are-graded).
-3. **The `netgraph/ignore` annotation on an element.** The per-element
-   exception — `netgraph/ignore: "W103, E004"` in an element's
+3. **The `netviz/ignore` annotation on an element.** The per-element
+   exception — `netviz/ignore: "W103, E004"` in an element's
    `metadata.annotations`. Because a finding names every element it involves,
    annotating either end of a cable silences a finding about that cable, and so
    does annotating the cable. Put it on the element the exception genuinely
@@ -261,7 +261,7 @@ to nothing, and the message lists what you could have meant:
 
 <!-- run: rc=2 -->
 ```console
-$ netgraph -i examples/quickstart validate --disable NG-D005
+$ netviz -i examples/quickstart validate --disable NG-D005
 error: --disable: 'NG-D005' is not a known rule id; expected one of E001, E002, E003, E004, E005, E006, E007, E008, E009, E010, E011, E012, E013, E014, E015, E016, E017, E018, E019, E020, E021, E022, E023, E024, E025, E026, E027, E028, E029, E030, E031, E032, E033, E034, E035, E036, E037, E038, E039, E040, E041, E042, E043, E044, E045, E046, E047, E048, E049, E050, W101, W102, W103, W104, W105, W106, W107, W108, W109, W110, W111, W112, W113, W114, W115, W116, W117, W118, W119, W120, W121, W122, W123, W124, W125, W126, W127, W128, W129, W130, W131, W132, W133, W134, W135, W136, W137, W138, W139, W140, W141, W142, W143, W144, W145, W146, W147, W148, W149, W150, W151, W152, W153, W154, I001, I002, I003, I004, I005, an NG-* alias from docs/schema.md §10, or '*'
 ```
 
@@ -283,9 +283,9 @@ device's database does not declare, a VRF nothing is bound to.
 
 <!-- norun: three flag forms with trailing comments, and none names an inventory -->
 ```bash
-netgraph validate --fix                     # apply them, and report the rest
-netgraph validate --fix --dry-run           # ... printing the diff instead
-netgraph validate --fix --choose W114=list  # decide a rule that has two repairs
+netviz validate --fix                     # apply them, and report the rest
+netviz validate --fix --dry-run           # ... printing the diff instead
+netviz validate --fix --choose W114=list  # decide a rule that has two repairs
 ```
 
 Each repair is applied on its own and the tree is validated again; it is kept
@@ -296,7 +296,7 @@ same repairs on a button beside each diagnostic.
 
 [Fixing a finding](validation-rules.md#fixing-a-finding) lists which rules are
 repairable and what each repair does, generated from the table in
-`netgraph.fixes` so it cannot drift; `netgraph rules --fixable` prints it too.
+`netviz.fixes` so it cannot drift; `netviz rules --fixable` prints it too.
 
 ## Output for a machine
 
@@ -311,16 +311,16 @@ repairable and what each repair does, generated from the table in
 
 The three structured formats put their document on **stdout** and move the human
 summary to **stderr**, so the output stays pipeable:
-`netgraph validate -F sarif > netgraph.sarif` writes a file a code-scanning
+`netviz validate -F sarif > netviz.sarif` writes a file a code-scanning
 upload accepts while a person watching the run still sees what happened.
 `--quiet` drops that summary and never the document. All four honour `--strict`
-and `--disable`, and re-grading a rule in `netgraph.toml` changes the JSON
+and `--disable`, and re-grading a rule in `netviz.toml` changes the JSON
 `severity`, the SARIF `level` and the workflow command alike.
 
 <!-- norun: both lines redirect, and the second needs a GitHub Actions log to annotate -->
 ```bash
-netgraph -i inventory validate -F sarif --strict > netgraph.sarif
-netgraph -i inventory validate -F github
+netviz -i inventory validate -F sarif --strict > netviz.sarif
+netviz -i inventory validate -F github
 ```
 
 [`docs/ci.md`](ci.md) is the reference for all of this: the key-by-key JSON
@@ -330,8 +330,8 @@ findings can reach a pull request.
 
 ## Every rule
 
-The table below is generated from `netgraph.rules.RULES`, the same catalogue the
-validator and [`netgraph rules`](commands/rules.md) read, so it describes the
+The table below is generated from `netviz.rules.RULES`, the same catalogue the
+validator and [`netviz rules`](commands/rules.md) read, so it describes the
 build in this repository and cannot drift from it. Each id links to the rule's
 section in [`docs/validation-rules.md`](validation-rules.md), where the write-up
 says why the rule exists, what it deliberately exempts, and how to suppress it.
@@ -454,9 +454,9 @@ says why the rule exists, what it deliberately exempts, and how to suppress it.
 
 * [`docs/validation-rules.md`](validation-rules.md) — the normative catalogue,
   one section per rule, and the full treatment of suppression.
-* [`netgraph validate`](commands/validate.md) — the command reference, with the
+* [`netviz validate`](commands/validate.md) — the command reference, with the
   flag tables and worked transcripts.
 * [`docs/ci.md`](ci.md) — the machine-readable envelopes, the GitHub Action and
   the pre-commit hook.
 * [`docs/configuration.md`](configuration.md#validate--how-findings-are-graded) —
-  `[validate]` and `[validate.severity]` in `netgraph.toml`.
+  `[validate]` and `[validate.severity]` in `netviz.toml`.

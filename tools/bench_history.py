@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Time the history timeline: is stepping a frame of a 1056-device tree interactive?
 
-The scrubber in ``netgraph web`` repaints the canvas on every step, so the
+The scrubber in ``netviz web`` repaints the canvas on every step, so the
 question this harness exists to answer is not "can it render a large network" —
 ``tools/bench_pipeline.py`` answered that — but **what one step costs**, which is
 a different sum:
 
 * a ``git archive`` of the inventory at one revision, out of the object database,
 * a ``load_tree`` of what came out,
-* a :func:`~netgraph.plan.diff` against the revision before it,
+* a :func:`~netviz.plan.diff` against the revision before it,
 * two graph builds and one Graphviz layout.
 
 Of those, only the first three are per-*revision*; the second and third are
@@ -58,11 +58,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT / "src") not in sys.path:  # pragma: no cover - convenience for a checkout
     sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from netgraph.history import Timeline  # noqa: E402
-from netgraph.loader import load_tree  # noqa: E402
-from netgraph.render.dot import DOT_EXECUTABLE  # noqa: E402
-from netgraph.web.preview import ViewOptions, render_inventory  # noqa: E402
-from netgraph.web.session import EditingSession  # noqa: E402
+from netviz.history import Timeline  # noqa: E402
+from netviz.loader import load_tree  # noqa: E402
+from netviz.render.dot import DOT_EXECUTABLE  # noqa: E402
+from netviz.web.preview import ViewOptions, render_inventory  # noqa: E402
+from netviz.web.session import EditingSession  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from bench_pipeline import Shape, generate  # noqa: E402

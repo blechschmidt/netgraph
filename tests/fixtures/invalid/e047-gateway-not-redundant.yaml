@@ -4,7 +4,7 @@
 # The annotation is the claim; the topology is a straight line. Losing the one
 # cable between the two loses the gateway, so the claim is false and the fix is
 # either a second path or an honest deletion of the annotation.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-a
@@ -17,12 +17,12 @@ spec:
         addresses:
           - 10.0.0.1/24
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
   annotations:
-    netgraph/redundancy: gateway
+    netviz/redundancy: gateway
 spec:
   interfaces:
     - name: eth0
@@ -33,7 +33,7 @@ spec:
           - 10.0.0.2/24
         gateway: 10.0.0.1
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a

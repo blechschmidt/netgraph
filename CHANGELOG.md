@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to netgraph are recorded here. The format follows
+All notable changes to netviz are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the versioning follows
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html), with the `0.x` caveats spelled
 out in [`docs/releasing.md`](docs/releasing.md).
@@ -18,7 +18,7 @@ publish a version whose section is missing or empty — see
 
 ### Added
 
-- **Icons are a switch in the editor, not a flag you restart for.** `netgraph web` could
+- **Icons are a switch in the editor, not a flag you restart for.** `netviz web` could
   draw devices as pictures only if `--icons` had been passed when the server started, which
   made "what does this look like with icons on" a question you had to stop and restart to
   answer — while looking at the diagram that prompted it. The header now has an **icons**
@@ -34,7 +34,7 @@ publish a version whose section is missing or empty — see
   *starts*: a session opened with it can still turn icons off, and one opened without can
   still turn them on.
 
-- **`netgraph report` documents network namespaces.** A device page is where an operator
+- **`netviz report` documents network namespaces.** A device page is where an operator
   looks to answer "what is this machine", and since `spec.netns` landed it showed none of
   the stacks a machine runs. It now carries a **Network namespaces** section: the namespace
   tree, with each declared namespace indented under the one it was created from; the
@@ -50,9 +50,9 @@ publish a version whose section is missing or empty — see
   the other's half: a VRF is described once, in *Routing*, and named in the namespace section
   only to say which stack it is an instance of. Closes follow-up 22.
 
-- **`netgraph query`, and `--select` on six more commands: one selector language.** Element
+- **`netviz query`, and `--select` on six more commands: one selector language.** Element
   selection was spelled a different way in every place that needed it. `filter_graph` took
-  fixed keyword predicates; `netgraph list` had its own flags; a `kind: testsuite` assertion
+  fixed keyword predicates; `netviz list` had its own flags; a `kind: testsuite` assertion
   had its own matchers; the editor's search box was a substring match. None of the four could
   express the questions operators actually ask — *every access switch in site north with no
   uplink*, *every interface addressed in 10.20.0.0/16 that is not in a VRF*, *everything
@@ -69,9 +69,9 @@ publish a version whose section is missing or empty — see
   same expression safe in a pre-commit hook, in a browser on every keystroke, and inside an
   assertion nobody will read again for a year.
 
-  It is used in four places and implemented in one (`netgraph/query/`):
+  It is used in four places and implemented in one (`netviz/query/`):
 
-  - **`netgraph query '<expr>'`** prints the matching elements, with `--json`, `--count`,
+  - **`netviz query '<expr>'`** prints the matching elements, with `--json`, `--count`,
     `--layer`, `--print interfaces|links` for the sub-objects a scope matched, and
     `--explain` for the grammar and the whole attribute vocabulary. It exits 1 when nothing
     matched, so a query is a check.
@@ -80,7 +80,7 @@ publish a version whose section is missing or empty — see
     flags keep working and are documented as sugar for the equivalent query — `--kind K` is
     `kind = K`, `--namespace NS` is `namespace under NS`, `--neighbors-of N --depth D` is
     `within D hops of (fqn = N or name = N)` — with a test that each selects exactly what its
-    rendering does. `netgraph show --select` prints every match instead of one named element.
+    rendering does. `netviz show --select` prints every match instead of one named element.
   - **`assert: query`** in a `kind: testsuite` document, and `query:` as an alternative to
     `select:` on every assertion that takes one. With no bound the claim is that the query
     matches **nothing**, which is how a network invariant is written — *no device is missing a
@@ -145,7 +145,7 @@ publish a version whose section is missing or empty — see
   in red, a brick wall in the cisco icon theme, and a reader who can see at a glance which
   boxes the policy is expected to be on.
 
-- **`netgraph render --layer security`.** The one view whose edges are *decisions* rather
+- **`netviz render --layer security`.** The one view whose edges are *decisions* rather
   than paths. Nodes are zones, framed by the device that declares them, with `local` and
   `any` minted where the policy names them. Edges are zone pairs, **directed**, because *lan
   to wan* is a different statement from *wan to lan* and a picture that merged them would
@@ -155,17 +155,17 @@ publish a version whose section is missing or empty — see
   `--name`, `--namespace` and `--kind` reach a zone through the device it is on, since
   nothing at this layer stands for the box, so `--name fw-edge` draws one firewall's policy.
 
-- **`netgraph export nftables`.** The seventh configuration dialect, and the first that
+- **`netviz export nftables`.** The seventh configuration dialect, and the first that
   writes what a device *refuses* rather than how it is wired. One `etc/nftables.conf`: a
-  `table inet netgraph` with a `set` per zone, the three base chains carrying their stated
+  `table inet netviz` with a `set` per zone, the three base chains carrying their stated
   policies, and NAT chains only where a translation needs them. `destroy table` precedes it,
-  so applying the file replaces netgraph's table and leaves everything else on the box
+  so applying the file replaces netviz's table and leaves everything else on the box
   exactly as it was. Nothing is inferred — no connection-tracking rule the document did not
   ask for, no loopback exemption, no rate limit — and `invert` is refused rather than
-  written matching the opposite of what the inventory states. `netgraph drift` reads the
+  written matching the opposite of what the inventory states. `netviz drift` reads the
   dialect back, and grants it no coverage: what a ruleset sees is not what drift compares.
   The generated file is checked by a real `nft --check` in the suite, which is the one gate
-  here that is not netgraph reading its own output.
+  here that is not netviz reading its own output.
 
 - **Policy-based routing: `spec.route_tables`, `spec.routes[].table` and `spec.routing_policy`
   (§16.2, §16.4).** Everywhere else in §16 a device answers one question about a packet —
@@ -204,12 +204,12 @@ publish a version whose section is missing or empty — see
 - **The routing view, the routes script and networkd carry it.** `--layer routing` labels a
   router with its rule count and lists its tables, its routes and its database — in *priority*
   order, which is the order the device walks it — on the tooltip and in `-f json`.
-  `netgraph export routes` writes the rules beside the routes they select, routes first so no
+  `netviz export routes` writes the rules beside the routes they select, routes first so no
   rule ever diverts traffic into a table that is still empty; each rule is a `del` of its
   priority followed by an `add`, which is how `ip rule` is made idempotent. A table is written
   by **number** with its name in a trailing comment, since a name resolves only through
-  `/etc/iproute2/rt_tables` and this script does not edit that file. `netgraph export networkd`
-  writes the database as `[RoutingPolicyRule]` sections; `netgraph export interfaces` projects
+  `/etc/iproute2/rt_tables` and this script does not edit that file. `netviz export networkd`
+  writes the database as `[RoutingPolicyRule]` sections; `netviz export interfaces` projects
   it as `route-table` and `policy` stanzas; frr, netplan and ifupdown name it in their
   manifests with the emitter that does write it.
 
@@ -257,10 +257,10 @@ publish a version whose section is missing or empty — see
   the view exists for — how does the stack inside this container reach the wire? A machine
   with one stack is drawn only as context for one that has more.
 
-- **`netgraph export interfaces` carries all of it, and the four dialects that cannot
+- **`netviz export interfaces` carries all of it, and the four dialects that cannot
   refuse.** The neutral dialect grows a `netns` stanza and two interface attributes, so a
-  machine's namespaces and pairs survive a round trip through `netgraph import` and are
-  compared by `netgraph drift`. `netplan`, `networkd`, `ifupdown` and `frr` **write nothing**
+  machine's namespaces and pairs survive a round trip through `netviz import` and are
+  compared by `netviz drift`. `netplan`, `networkd`, `ifupdown` and `frr` **write nothing**
   for a device that declares either: those files configure the stack they are applied *in*,
   and a netplan file listing a container's interface puts the container's address on the host.
   The refusal names every field and points at `export interfaces`.
@@ -284,12 +284,12 @@ publish a version whose section is missing or empty — see
   * **Geometry (§18)**, which is never a dependency and is therefore never asked about.
     Deleting one switch out of an arranged home lab used to hand back a tree carrying **eight
     new `W138` warnings** — the switch's position in two views, the waypoints of each of its
-    five cables, and the box round the namespace it emptied — and told you to run `netgraph
+    five cables, and the box round the namespace it emptied — and told you to run `netviz
     layout --prune`. It now hands back the tree it found, minus the switch. This is
     deliberately not `--prune`, which drops every key the current *drawing* lacks and would
     throw away the position of a device merely filtered out of the view.
 
-  `netgraph edit disconnect` grows `--cascade` for the same reason a delete has one, and the
+  `netviz edit disconnect` grows `--cascade` for the same reason a delete has one, and the
   waypoints of a dropped cable go either way. Two bugs found on the way are under **Fixed**.
 
 - **The editor cascades, and says what that costs before it does it.** On the command line a
@@ -298,7 +298,7 @@ publish a version whose section is missing or empty — see
   and what it owes you instead is the truth — once, before the fact, and **not read off the
   picture**.
 
-  The new read-only `GET /api/cascade` asks `netgraph.edit` for the set it will actually
+  The new read-only `GET /api/cascade` asks `netviz.edit` for the set it will actually
   remove, so the confirmation names what a diagram cannot show you: the tunnel three levels up
   that runs over a cable that runs to the switch, the note anchored to it in a view you are not
   looking at, the group that lists it as a member, and the layout entries that placed all of
@@ -310,9 +310,9 @@ publish a version whose section is missing or empty — see
   entry in the undo stack: elements, annotations and geometry come back together, byte for
   byte, on one `Ctrl-Z`.
 
-- **`netgraph review`, and a pull-request bot built on it.** A green check answers "does this
+- **`netviz review`, and a pull-request bot built on it.** A green check answers "does this
   branch validate?" A reviewer wants "what does this change do, and what did it break that was
-  not already broken?" — and neither half of that is in a check mark. `netgraph review --from
+  not already broken?" — and neither half of that is in a check mark. `netviz review --from
   origin/main` writes both, as one Markdown document: a verdict line, a table of what is added,
   changed, renamed and removed grouped by element kind, the findings the change *introduced*,
   and the change drawn.
@@ -325,7 +325,7 @@ publish a version whose section is missing or empty — see
   rather than as a wave of fixes.
 
   Three side documents come out of the same load and the same validation, so nothing downstream
-  can disagree with the comment: `--plan-out` (the changeset `netgraph plan --json` writes),
+  can disagree with the comment: `--plan-out` (the changeset `netviz plan --json` writes),
   `--sarif-out` (for a code-scanning upload) and `--summary-out` (the verdict and the counts,
   for a workflow step that gates on them without parsing prose).
 
@@ -333,7 +333,7 @@ publish a version whose section is missing or empty — see
   than refused: the first pull request a repository ever sees, and a `main` that is already
   broken, are exactly the cases a bot has to survive to be adopted.
 
-- **`.github/actions/netgraph-review` and `.github/workflows/netgraph-review.yml`.** The action
+- **`.github/actions/netviz-review` and `.github/workflows/netviz-review.yml`.** The action
   draws the diff to SVG and PNG, produces the changeset and the SARIF, and writes the comment
   body. The reusable workflow posts it as **one sticky comment**, edited in place on every push
   rather than added to, uploads the bundle as an artifact and the findings to code scanning,
@@ -349,16 +349,16 @@ publish a version whose section is missing or empty — see
 
   This repository reviews its own `examples/` with it — `.github/workflows/review.yml`.
 
-- **`netgraph converge plan`: drift, joined to the configuration emitters, as an ordered
-  per-device remediation.** `netgraph drift` said how the live network differs from the
-  inventory and `netgraph export config` said what a device would run if it agreed; nothing
+- **`netviz converge plan`: drift, joined to the configuration emitters, as an ordered
+  per-device remediation.** `netviz drift` said how the live network differs from the
+  inventory and `netviz export config` said what a device would run if it agreed; nothing
   joined them. This does. It takes the same captures `drift` takes and produces, per device,
   the minimal ordered set of changes that would move it from what the capture found to what
   the inventory declares — each one carrying the drift finding that asked for it, a `safe`
   or `disruptive` classification, its prerequisites, the commands that perform it and the
   commands that undo it.
 
-  **netgraph never applies any of it, and there is no flag that adds a transport.** The
+  **netviz never applies any of it, and there is no flag that adds a transport.** The
   command reads capture files and writes a plan and per-device `.txt` scripts; a person runs
   them. The security surface stays "reads files, writes files". The plan type is shaped so a
   transport *could* consume it later — every change has a stable id, prerequisites, a risk
@@ -366,37 +366,37 @@ publish a version whose section is missing or empty — see
 
   A plan touching the path a device is managed on, or shutting or deleting any interface, is
   **refused whole** unless `--allow-disruptive`, and the refusal names every offending change
-  rather than the first. The management interface is the one `netgraph export` already picks
+  rather than the first. The management interface is the one `netviz export` already picks
   for `ansible_host` and a scrape target, plus everything it is stacked on and the VLAN it
   lives in.
 
   Changes come out in a dependency order — VLANs before the ports that carry them, parents
   before what is stacked on them, addresses before routing, every addition before every
   removal and removals in the mirror order — and are grouped into maintenance batches by the
-  existing `netgraph impact` engine, so two devices share a window only when neither is in
+  existing `netviz impact` engine, so two devices share a window only when neither is in
   the other's blast radius.
 
-  `--dialect` picks `interfaces` (netgraph's own imperative grammar, one line per change, and
+  `--dialect` picks `interfaces` (netviz's own imperative grammar, one line per change, and
   the default) or one of `netplan`, `networkd`, `ifupdown`, `frr` and `wireguard`, whose
   remediation is genuinely the generated file plus a reload — computed by running the
   existing emitters over both the declared and the observed state and keeping only the files
   that differ. `--format text|json|markdown`, `-o DIR` for the scripts, `--rollback` for the
-  inverse ones, and an exit-code contract mirroring `netgraph plan`: **0** converged, **2**
+  inverse ones, and an exit-code contract mirroring `netviz plan`: **0** converged, **2**
   changes pending, **4** refused. See
   [`docs/commands/converge.md`](docs/commands/converge.md).
 
 - **Namespaces are containers you can drag things into.** The editor draws a frame per
   namespace level whenever the diagram is grouped by namespace, captioned with the namespace
   and how many elements are under it, with a triangle that folds it into the single node
-  `netgraph render --collapse` would draw. Dropping an element — or a multi-selection, or a
-  whole container — inside a frame runs `netgraph edit move`: the document is rewritten into
+  `netviz render --collapse` would draw. Dropping an element — or a multi-selection, or a
+  whole container — inside a frame runs `netviz edit move`: the document is rewritten into
   that directory, and every cable, tunnel, group, layout and annotation that referred to it
   is re-spelled. Dropping on empty canvas moves it to the root.
 
   A drop is refused **before** anything is written, naming both sides: a name already taken
   in the target namespace, two dragged documents that would collide with each other, or a
   folder the loader would skip. The new `POST /api/reparent` and
-  `netgraph.edit.containers.move_plan` are the one place that decides, so the browser's drop
+  `netviz.edit.containers.move_plan` are the one place that decides, so the browser's drop
   and the command line's move cannot diverge — including which *file* the document lands in,
   which stays the placement convention's answer.
 
@@ -410,16 +410,16 @@ publish a version whose section is missing or empty — see
   paste into it — a paste being a drop, so the copies land in that namespace.
   **New namespace…** in the canvas and container menus makes a folder by putting the first
   document in it; there is deliberately no operation that makes an empty one, because a
-  folder netgraph reads is one holding a document. `f` folds the container under the pointer
+  folder netviz reads is one holding a document. `f` folds the container under the pointer
   or the one holding the focused element. See
   [`docs/editing.md`](docs/editing.md#containers-dragging-a-document-into-a-namespace) and
   [`docs/inventory-layout.md`](docs/inventory-layout.md#rearranging-the-tree-from-the-diagram).
 
 - **A clipboard, in the editor and on the command line.** `Ctrl-C`, `Ctrl-X`, `Ctrl-V` and
-  `Ctrl-D` over the existing multi-selection, and `netgraph edit copy` /
-  `netgraph edit duplicate` for the same thing without a browser. On this canvas they do not
+  `Ctrl-D` over the existing multi-selection, and `netviz edit copy` /
+  `netviz edit duplicate` for the same thing without a browser. On this canvas they do not
   move shapes about, they write documents — so a copy is three decisions rather than a
-  memcpy, and all three are made in `netgraph.edit.clipboard` where the browser, the command
+  memcpy, and all three are made in `netviz.edit.clipboard` where the browser, the command
   line and a script get the same answer.
 
   The **name** is deduplicated in a series (`sw1` → `sw1-copy` → `sw1-copy-2`, and a copy of
@@ -444,18 +444,18 @@ publish a version whose section is missing or empty — see
 - **An action that draws the inventory, and a reusable workflow that publishes it.** A
   pipeline could already gate a pull request on the inventory validating; what it could not
   do was show anybody the network.
-  [`.github/actions/netgraph-render`](.github/actions/netgraph-render/) installs netgraph
+  [`.github/actions/netviz-render`](.github/actions/netviz-render/) installs netviz
   *and* Graphviz — which is not a Python dependency, and whose absence is otherwise
   discovered at the last step of a job that has already done all the work — runs
-  `netgraph render`, and reports where the diagram landed. It defaults to `format: html`,
+  `netviz render`, and reports where the diagram landed. It defaults to `format: html`,
   the one self-contained format: layer switcher, search box and every element's detail in a
   single file with nothing to fetch, and so publishable as it stands. `layer: l1 l2 l3`
   becomes three views behind one switcher, `args` carries anything the action does not name
-  an input for, and `graphviz: auto` skips the install for the formats netgraph writes
+  an input for, and `graphviz: auto` skips the install for the formats netviz writes
   itself. A file that is not the format it was asked for fails the step rather than the
   site.
 
-  [`.github/workflows/netgraph-pages.yml`](.github/workflows/netgraph-pages.yml) is that
+  [`.github/workflows/netviz-pages.yml`](.github/workflows/netviz-pages.yml) is that
   render plus a deployment: an inventory repository that calls it gets a live diagram of its
   own network at a URL, rebuilt from the YAML on every push, instead of the export somebody
   drew in draw.io eighteen months ago. **`runs-on` is an input** — a single label, a JSON
@@ -478,8 +478,8 @@ publish a version whose section is missing or empty — see
   under `NG-Z001`.
 
   **Themes.** A `kind: theme` document maps selectors — by kind, name, namespace glob,
-  role or label — onto style blocks. `netgraph render --theme NAME|PATH` applies one; two
-  ship (`blueprint`, `mono`); `[render] theme` in `netgraph.toml` sets the default and a
+  role or label — onto style blocks. `netviz render --theme NAME|PATH` applies one; two
+  ship (`blueprint`, `mono`); `[render] theme` in `netviz.toml` sets the default and a
   `[theme]` table declares an inventory's own rules inline. Precedence is documented and
   resolved field by field: an element's own `style`, then the theme's rules (most clauses
   first, a tie broken by the later declaration), then the icon set, then the built-in
@@ -526,7 +526,7 @@ publish a version whose section is missing or empty — see
   <kbd>Alt-N</kbd>, and a **notes** checkbox beside **IPs** and **VLANs**, hides the lot —
   a per-view switch that writes nothing, because commentary is never topology. The
   `/api/graph` answer carries an `annotations` payload beside its `geometry`, in the form
-  `netgraph render -f json` publishes, and `&annotations=0` leaves it out.
+  `netviz render -f json` publishes, and `&annotations=0` leaves it out.
 
 - **Multi-select, bulk edit and alignment in the editor.** The canvas could only ever act
   on one focused element, which was the largest remaining gap against draw.io. It now has
@@ -543,7 +543,7 @@ publish a version whose section is missing or empty — see
   With more than one thing selected, **Delete asks once**, listing what goes *and* the
   cables that will dangle as a result, and writes the lot as one entry in the undo stack;
   **Set a field**, **Remove a field** and **Move to another file** apply to every selected
-  element in one batch. Behind them is `netgraph.edit.Batch`: N typed operations across N
+  element in one batch. Behind them is `netviz.edit.Batch`: N typed operations across N
   documents as a single transaction — all-or-nothing, one conflict check, one save, one
   inverse. A batch whose seventh operation is refused leaves the tree byte-identical to
   the one it started on.
@@ -551,10 +551,10 @@ publish a version whose section is missing or empty — see
 - **Align, distribute and snap-to-grid.** Nine commands that mean nothing about a single
   shape: `align.left/centre/right/top/middle/bottom`, `distribute.horizontal/vertical` and
   `geometry.snap`, from the palette or by right-clicking inside a selection. Each is
-  computed by `netgraph.edit.arrange` against the tree's `kind: layout` documents and
+  computed by `netviz.edit.arrange` against the tree's `kind: layout` documents and
   emitted as one `set-geometry` per document that loses an entry — so a whole alignment is
   one reviewable YAML diff and one <kbd>Ctrl-Z</kbd>, and an entry that did not move comes
-  out byte-identical. The grid pitch is the inventory's, in `netgraph.toml`:
+  out byte-identical. The grid pitch is the inventory's, in `netviz.toml`:
 
   ```toml
   [editor]
@@ -568,7 +568,7 @@ publish a version whose section is missing or empty — see
   about first.
 
   It is a *view* of the existing commands, not a second set of them. Every row runs a
-  binding from `netgraph.web.bindings` under that binding's own id, and the same table now
+  binding from `netviz.web.bindings` under that binding's own id, and the same table now
   declares which rows each target offers — so a menu cannot offer a gesture the keyboard
   does not have, and `docs/commands/web.md` generates the menus beside the shortcuts.
   Every row prints its own chord, the way a palette row does.
@@ -581,9 +581,9 @@ publish a version whose section is missing or empty — see
   it. Right-clicking a *bend* still removes that bend and shows no menu.
 
 - **A published demo site: <https://blechschmidt.github.io/netgraph/>.** Until now nothing
-  in the project let a stranger see what netgraph does without first installing Python
+  in the project let a stranger see what netviz does without first installing Python
   *and* Graphviz. The site is the whole documentation set as browsable pages, and — the
-  part that matters — every example inventory rendered by `netgraph render -f html`, so
+  part that matters — every example inventory rendered by `netviz render -f html`, so
   the layers, the filters and the per-element detail are clickable at
   <https://blechschmidt.github.io/netgraph/demo/>.
 
@@ -598,14 +598,14 @@ publish a version whose section is missing or empty — see
   `docs/getting-started.md` now opens with *Try it without installing*, and the README
   carries a badge pointing at the demos.
 
-- **A first-run guided tour in the editor.** `netgraph web DIR` opens a canvas and a
+- **A first-run guided tour in the editor.** `netviz web DIR` opens a canvas and a
   command palette with four dozen entries, and nothing on screen said which of them was
   the point. The tour says it in about sixty seconds: it creates a device, cables it to
   one of yours, moves its document into another file, opens the changes drawer on the YAML
   all three gestures wrote, and undoes the lot — proving that every shape on the canvas is
   a document and that the mapping runs both ways.
 
-  Every step is a real batch through `netgraph.edit`, because a tour that mimed its writes
+  Every step is a real batch through `netviz.edit`, because a tour that mimed its writes
   would demonstrate the one thing it exists to demonstrate least well. What makes that
   safe is where the writes land: starting the tour copies the inventory's documents into a
   temporary directory and points the page at a second, always-writable session over the
@@ -618,21 +618,21 @@ publish a version whose section is missing or empty — see
   guided tour* runs it again. Keyboard-driven throughout, audited by axe-core like every
   other dialog on that page, and covered end to end in `tests/test_browser.py`.
 
-- **`netgraph export` now writes the configuration a device would actually run.** Six new
+- **`netviz export` now writes the configuration a device would actually run.** Six new
   formats — `netplan`, `networkd`, `ifupdown`, `frr`, `wireguard` and `interfaces` —
-  generate `etc/netplan/10-netgraph.yaml`, a `.network`/`.netdev` pair per stacked link,
+  generate `etc/netplan/10-netviz.yaml`, a `.network`/`.netdev` pair per stacked link,
   `etc/network/interfaces`, `etc/frr/frr.conf`, a wg-quick `.conf` per tunnel, and
-  netgraph's own vendor-neutral grammar for every device the other five have nothing to
+  netviz's own vendor-neutral grammar for every device the other five have nothing to
   say about.
 
-  Everything netgraph exported until now was *about* the network — a hosts file, a zone,
+  Everything netviz exported until now was *about* the network — a hosts file, a zone,
   a pull list, a monitoring target. None of them is the network. The configuration a
   device runs is, and until this existed the inventory was a document beside the truth
   rather than the source of it: somebody still typed the addresses into the box, and the
   typing is where the two started to disagree.
 
   Nothing is invented. A value the inventory does not state is not in the output; where a
-  dialect *requires* one netgraph deliberately does not hold — a WireGuard private key, a
+  dialect *requires* one netviz deliberately does not hold — a WireGuard private key, a
   wifi passphrase — an un-runnable `REPLACE-ME` is written instead, because an inventory
   holding key material would be a secret in version control (`docs/schema.md` §14.2).
   Three values are derived rather than read, and each is a derivation from stated facts
@@ -649,25 +649,25 @@ publish a version whose section is missing or empty — see
   dialect that does cover it, and the file is still written.
 
   `--out DIR` writes the tree: one directory per device, named after its fully-qualified
-  name, each file at the path the device keeps it at. A file netgraph generated is
+  name, each file at the path the device keeps it at. A file netviz generated is
   overwritten; one it did not is refused until `--force`; nothing is ever deleted, and
   stale files from an earlier run are reported. Without `--out`, a single device goes to
-  stdout, so `netgraph export netplan --name pc-desk | ssh pc-desk 'cat >…'` works and a
+  stdout, so `netviz export netplan --name pc-desk | ssh pc-desk 'cat >…'` works and a
   wider selection is a usage error rather than a stream nobody can split.
 
-  Every generated file carries `netgraph-dialect`, `netgraph-element` and one
-  `netgraph-source` per inventory document behind it. `netgraph drift` and
-  `netgraph import` read those keys and the same six dialects back, so
+  Every generated file carries `netviz-dialect`, `netviz-element` and one
+  `netviz-source` per inventory document behind it. `netviz drift` and
+  `netviz import` read those keys and the same six dialects back, so
   generate-then-compare needs neither `--from` nor `--host` and the round trip is exact.
   `frr` and `wireguard` describe part of a device rather than all of it and are therefore
   additive-only in a drift report; the other four are whole-device inputs. `docs/export.md`
   has the full treatment and `docs/commands/drift.md` the capability table.
 
-- **`netgraph test`: the inventory can now be tested the way code is.** A new
+- **`netviz test`: the inventory can now be tested the way code is.** A new
   `kind: testsuite` document (`docs/schema.md` §20) holds named assertions about the
   network, and the command grades them and exits non-zero when one has stopped being true.
 
-  `netgraph validate` answers "do these files cohere?" — a cable endpoint resolves, an
+  `netviz validate` answers "do these files cohere?" — a cable endpoint resolves, an
   address is inside its subnet. Every rule it applies is a statement about inventories *in
   general*, which is exactly why none of them can say that the ward switch must not be the
   only path to the ward. That is a fact about *this* network, known only to the people who
@@ -678,12 +678,12 @@ publish a version whose section is missing or empty — see
   `path-shorter-than` a hop count, `same-vlan` / `distinct-vlan`, `within-prefix`,
   `has-interface`, `port-count-at-least`, `unique` over a field expression, `count`
   comparisons, and `no-single-point-of-failure`. All of them run over the graphs
-  `netgraph render` draws and the search `netgraph path` runs, so a failing test and a
+  `netviz render` draws and the search `netviz path` runs, so a failing test and a
   drawn diagram cannot disagree about what is connected to what.
 
-  Selectors reuse the filter vocabulary `netgraph render` already parses — `select:
+  Selectors reuse the filter vocabulary `netviz render` already parses — `select:
   kind=switch, namespace=sites/north, name=sw-*` — so nobody has to learn a second query
-  language, and `from`/`to` take the three spellings `netgraph path` takes plus a selector,
+  language, and `from`/`to` take the three spellings `netviz path` takes plus a selector,
   which turns "every access switch reaches the core" into one line.
 
   A failure names the assertion, the elements, what the graph actually contained, and the
@@ -738,12 +738,12 @@ publish a version whose section is missing or empty — see
   | move a 50-node selection | 2056 ms | 950 ms |
   | redraw after dragging a node | 58 152 ms | 2 119 ms |
 
-- **A round trip with draw.io: `netgraph export drawio` and `netgraph import drawio`.**
-  netgraph's pitch is "draw.io for infrastructure, with the YAML as the source of truth".
+- **A round trip with draw.io: `netviz export drawio` and `netviz import drawio`.**
+  netviz's pitch is "draw.io for infrastructure, with the YAML as the source of truth".
   This is where it meets the actual tool: a diagram can be handed to a stakeholder who has
-  never installed netgraph, edited in draw.io, and brought back as a reviewable changeset.
+  never installed netviz, edited in draw.io, and brought back as a reviewable changeset.
 
-  **Export.** `netgraph export drawio` writes an mxGraph model of one view — `--view` picks
+  **Export.** `netviz export drawio` writes an mxGraph model of one view — `--view` picks
   which of the nine — carrying the stored arrangement (§18), so the file opens *already
   arranged* rather than as a heap draw.io lays out afresh. One vertex per node, one edge per
   link with its waypoints, a container frame per namespace so dragging a site carries its
@@ -752,26 +752,26 @@ publish a version whose section is missing or empty — see
   encoding is the default because a diagram that is text is a diagram that reviews and
   diffs, and draw.io opens both.
 
-  **Identity, not labels.** Each cell carries `netgraph:name`, `netgraph:kind`,
-  `netgraph:document`, `netgraph:hash` and the coordinates it left netgraph at. That is what
+  **Identity, not labels.** Each cell carries `netviz:name`, `netviz:kind`,
+  `netviz:document`, `netviz:hash` and the coordinates it left netviz at. That is what
   makes the label free to *mean* something on the way back.
 
-  **Import.** `netgraph import drawio FILE` reconciles by those attributes. A cell that
+  **Import.** `netviz import drawio FILE` reconciles by those attributes. A cell that
   moved becomes a geometry write, one whose label was retyped becomes a `rename` with every
   reference rewritten, one that is gone becomes a cascading `delete`, and an edge somebody
   drew becomes a `connect` on the first free port at each end. Everything is expressed as
-  `netgraph edit` operations and shown as a `netgraph plan` changeset, confirmed before a
+  `netviz edit` operations and shown as a `netviz plan` changeset, confirmed before a
   single file moves. `--dry-run`, `--auto-approve` and a switch per gesture.
 
   **What it will not do.** A missing cell is a deletion only when the file says it held the
   whole view: export narrowed by `--namespace` and nothing is ever deleted on the strength
-  of it. A file netgraph did not export carries no identity, so nothing is reconciled — it
-  is read and reported cell by cell, with the kind each one looks like, and netgraph will
+  of it. A file netviz did not export carries no identity, so nothing is reconciled — it
+  is read and reported cell by cell, with the kind each one looks like, and netviz will
   not invent hardware from a rectangle. Re-importing an untouched export changes nothing at
   all, which the suite asserts as an empty plan over every published example and every view.
 
-  `netgraph import` is now a group, and its original signature still works unchanged:
-  anything that is not the name of a sub-command is read as a capture file, so `netgraph
+  `netviz import` is now a group, and its original signature still works unchanged:
+  anything that is not the name of a sub-command is read as a capture file, so `netviz
   import caps/*.json` means what it always did.
 
   [`docs/drawio.md`](docs/drawio.md) is the workflow, including what a draw.io user may and
@@ -796,12 +796,12 @@ publish a version whose section is missing or empty — see
   `orthogonal` (right angles) and `straight` (segment to segment) — settable per link, per
   view (`views.<view>.routing`) and per inventory (`spec.routing`), most specific winning.
   `--routing` on `render`, `watch`, `diff` and `path`, and `routing` in the `[render]` table
-  of `netgraph.toml`, set a *default* that a link pinning its own style still beats;
-  `netgraph layout --write --routing STYLE` records the view's. For a fully arranged view
-  netgraph computes each route itself and writes it into the Graphviz `pos`, which is the
+  of `netviz.toml`, set a *default* that a link pinning its own style still beats;
+  `netviz layout --write --routing STYLE` records the view's. For a fully arranged view
+  netviz computes each route itself and writes it into the Graphviz `pos`, which is the
   only way a per-link style can be expressed at all — Graphviz has a graph-wide `splines`
   and nothing per edge. For a view Graphviz is laying out, only that graph-wide attribute is
-  available, and netgraph now says out loud what it could not honour rather than emitting a
+  available, and netviz now says out loud what it could not honour rather than emitting a
   document Graphviz quietly draws differently.
 
   **Label positions.** `edges.<address>.label` is `{at, offset}` — how far along the route
@@ -815,25 +815,25 @@ publish a version whose section is missing or empty — see
   `--bundle-links` counts once. A self-link is drawn as a ring standing off its node, so
   four VLANs terminating on one switch are four rings rather than one thick one.
 
-  `netgraph render -f json` publishes both halves per edge: what the inventory pinned
+  `netviz render -f json` publishes both halves per edge: what the inventory pinned
   (`waypoints`, `routing`, `label`) and, for an arranged view, the line that was drawn
   (`route`, `controls`, `drawnAs`). See
   [`docs/rendering.md`](docs/rendering.md#links-are-geometry-too), which carries a worked
   example checked against a committed golden.
 
-- **A history timeline: `netgraph log`, two revisions on `netgraph diff`, and a scrubber
+- **A history timeline: `netviz log`, two revisions on `netviz diff`, and a scrubber
   under the canvas.** The inventory is a folder of YAML in a repository, which means its
   whole history is renderable — and nothing else in this space can show you when a network
   became what it is.
 
-  **`netgraph log`** lists the commits that touched the inventory, newest first, with a
+  **`netviz log`** lists the commits that touched the inventory, newest first, with a
   one-line summary of the changeset each one carries: `3 devices added, 1 link removed,
   2 addresses moved`. The summary is a real changeset, computed by the same code
-  `netgraph plan` and `netgraph diff` use, so a commit that only reformatted a file says
+  `netviz plan` and `netviz diff` use, so a commit that only reformatted a file says
   `no change to the network`. `--from`/`--to` take a range, `-n` a count, `--json` a
   document per commit, and `--no-summary` the commit list alone with nothing read.
 
-  **`netgraph diff --from <rev> --to <rev>`** now reads any two revisions — a tag against a
+  **`netviz diff --from <rev> --to <rev>`** now reads any two revisions — a tag against a
   tag, `HEAD~10` against `HEAD` — with `--to` still defaulting to the working tree. Both
   sides come out of the object database with `git archive`: nothing is checked out, the
   index is untouched, and an uncommitted change is neither used nor disturbed.
@@ -848,7 +848,7 @@ publish a version whose section is missing or empty — see
   It is honest about its edges. A revision whose inventory does not load is shown as such —
   and stops the playback — rather than being skipped; a revision from before the inventory
   folder existed reads as an empty network rather than as a failure, and says so; a range
-  wider than `[history] max-revisions` (100 by default) is refused by `netgraph log` and
+  wider than `[history] max-revisions` (100 by default) is refused by `netviz log` and
   truncated-with-a-count by the editor rather than becoming two hundred Graphviz runs.
   Frames are cached by the pair of tree hashes they sit between, so scrubbing back over
   ground already covered is instant, and neighbouring revisions share their loaded state
@@ -859,25 +859,25 @@ publish a version whose section is missing or empty — see
   [`docs/commands/diff.md`](docs/commands/diff.md#two-revisions) and
   [`docs/commands/web.md`](docs/commands/web.md#the-history-timeline) document it.
 
-- **`netgraph lsp`, a language server, so the editor knows what netgraph knows.** An
+- **`netviz lsp`, a language server, so the editor knows what netviz knows.** An
   inventory is written by hand in a plain text editor, and until now the editor could be
   told the shape of one document — through the published JSON Schema — but nothing about
   the tree it belongs to. The server closes that: LSP 3.17 over stdio, no new dependency,
   started by your editor rather than by you.
 
-  Diagnostics are `netgraph validate`'s, on the line and column that caused them, carrying
+  Diagnostics are `netviz validate`'s, on the line and column that caused them, carrying
   the `NG-*` rule id as the diagnostic code and a link to that rule's section of
   [`docs/validation-rules.md`](docs/validation-rules.md). Completion is the JSON Schema for
   keys, enums and their documentation, *and the tree* for references: typing under a
   cable's `endpoints` offers the switches you have, and `sw-home:` offers the ports that
   switch has. Hover resolves a reference to the device, the port, its addresses, its VLAN
   and what is already cabled to it. Go-to-definition and find-references work across the
-  whole folder. Rename goes through the same write path as `netgraph edit rename`, so every
+  whole folder. Rename goes through the same write path as `netviz edit rename`, so every
   reference in every file is rewritten with the comments intact. Formatting is
-  `netgraph fmt`; the code actions are the `--fix` catalogue.
+  `netviz fmt`; the code actions are the `--fix` catalogue.
 
   It answers about the text on your screen — unsaved buffers are overlaid on the tree
-  before it is loaded — and it watches the folder the way `netgraph watch` does, so an edit
+  before it is loaded — and it watches the folder the way `netviz watch` does, so an edit
   made in a terminal refreshes the diagnostics. Opened on a lone file rather than a folder,
   the checks that can only be judged against a whole tree are held back rather than
   reported against a document that cannot satisfy them.
@@ -885,7 +885,7 @@ publish a version whose section is missing or empty — see
   [`docs/lsp.md`](docs/lsp.md) has the setup for VS Code, Neovim, Helix and Emacs, and a
   minimal VS Code client ships in [`editors/vscode/`](editors/vscode).
 
-- **`netgraph validate --fix` repairs what the inventory itself determines, and the editor
+- **`netviz validate --fix` repairs what the inventory itself determines, and the editor
   puts a `fix` button on each of those diagnostics.** Half the value of a diagnostic is
   knowing what to do about it, and for a good part of the catalogue the tree already says:
   a `kind: layout` document placing an element that has been deleted, a MAC address on a
@@ -895,7 +895,7 @@ publish a version whose section is missing or empty — see
 
   `--fix` applies every repair that has exactly one reading and reports the rest;
   `--fix --dry-run` prints the unified diff and writes nothing; `--choose W114=list` decides
-  a rule that has two. Writes go through the same path as `netgraph edit`, so comments, key
+  a rule that has two. Writes go through the same path as `netviz edit`, so comments, key
   order and quoting survive and only the lines the repair is about change.
 
   **A fix never introduces a finding.** Each is applied on its own and the tree is validated
@@ -904,7 +904,7 @@ publish a version whose section is missing or empty — see
   added. So "remove the cable" is offered, and refused on a two-device inventory where it
   would orphan a device — which is a decision for a person.
 
-  `netgraph rules --fixable` lists what can be repaired and what each repair does;
+  `netviz rules --fixable` lists what can be repaired and what each repair does;
   [`docs/validation-rules.md`](docs/validation-rules.md#fixing-a-finding) says the same,
   generated from the table so it cannot drift.
 
@@ -914,10 +914,10 @@ publish a version whose section is missing or empty — see
   in it. Its inverse is an `unset` of the position it wrote.
 
 - **The editor can be driven entirely from the keyboard, and read without a screen.**
-  `netgraph web` was becoming pointer-only, which is where visual tools stop being usable
+  `netviz web` was becoming pointer-only, which is where visual tools stop being usable
   for the people who work fastest in them.
 
-  **`Ctrl-K` opens a command palette** over every command the page has — every `netgraph
+  **`Ctrl-K` opens a command palette** over every command the page has — every `netviz
   edit` operation, every view and layer toggle, open-file, go-to-element, validate, the
   changes drawer — searched in one field alongside every element address and file path in
   the inventory. Each row prints the key that runs it, so the palette teaches the bindings;
@@ -944,12 +944,12 @@ publish a version whose section is missing or empty — see
   It is gated: `tests/test_browser.py` runs axe-core over the page in both colour schemes
   and fails CI on any WCAG 2.1 AA violation, and drives one end-to-end test — create a
   device, cable it, undo both — without dispatching a mouse event. The bindings live in
-  `netgraph.web.bindings`, are served at `GET /api/bindings`, and are what
+  `netviz.web.bindings`, are served at `GET /api/bindings`, and are what
   [`docs/commands/web.md`](docs/commands/web.md) documents, generated; a shortcut that is
   documented and dead fails the suite.
 
 - **The editor pushes instead of polling, and a second tab is a feature rather than a
-  race.** `netgraph web DIR` used to check a revision number once a second and, whenever it
+  race.** `netviz web DIR` used to check a revision number once a second and, whenever it
   moved, refetch the whole file list and re-lay-out the whole diagram. It now opens a
   server-sent-events stream, `GET /api/events`, that says *what* moved the moment it does:
   `tree-changed`, `file-changed`, `history-changed`, `disk-changed`, `presence`.
@@ -978,9 +978,9 @@ publish a version whose section is missing or empty — see
   a way to lock an inventory by closing a laptop lid. Two new routes carry it:
   `POST /api/presence` and the `clients` list on `GET /api/state`.
 
-- **`netgraph diff`, and a changes drawer in the editor: a changeset, drawn.** `netgraph
+- **`netviz diff`, and a changes drawer in the editor: a changeset, drawn.** `netviz
   plan` already answered *what changed* and every renderer already answered *what the
-  network looks like*; nothing put the two together. `netgraph diff` renders one diagram
+  network looks like*; nothing put the two together. `netviz diff` renders one diagram
   holding both states — added elements and links **green**, removed ones **red and dashed
   but still in place**, changed ones **amber with a badge naming the fields that moved**,
   everything untouched **faded**.
@@ -996,16 +996,16 @@ publish a version whose section is missing or empty — see
   moved, and that a box is the same device under another name. A rename is therefore one
   amber box badged `was <old address>`, not a red box beside a green one.
 
-  The two sides come from wherever `netgraph plan` reads them, plus `--against HEAD` (the
+  The two sides come from wherever `netviz plan` reads them, plus `--against HEAD` (the
   same side as `--from`, spelled the way the question is asked) and `--plan FILE`, which
   executes a saved plan into an edit session that is never committed — so what is drawn on
-  the right is the text `netgraph apply` would write, not a reconstruction of it. Every
+  the right is the text `netviz apply` would write, not a reconstruction of it. Every
   `render` format is supported except Mermaid, which can neither colour a node nor hold a
   changeset beside one and says so rather than drawing a diagram in which nothing
   distinguishes the deleted switch. `-f json` publishes a `diff` object on every node and
   edge — untouched ones included — plus the whole changeset under `changeset`.
 
-- **A changes drawer in `netgraph web --write`.** It lists every gesture made in the
+- **A changes drawer in `netviz web --write`.** It lists every gesture made in the
   session — one entry per gesture, not per operation, so deleting a switch is one line
   rather than five — each with the YAML hunk it wrote as a unified diff, a click on its
   label that reveals the document it changed at its line, and a per-entry **Revert**.
@@ -1020,10 +1020,10 @@ publish a version whose section is missing or empty — see
   editing can be reviewed as a diagram before it is committed. Three new API routes carry
   it: `GET /api/changes`, `GET /api/diff?against=session|git` and `POST /api/revert`.
 
-- **A handover button.** *Copy commands* hands the session over as a list of `netgraph
+- **A handover button.** *Copy commands* hands the session over as a list of `netviz
   edit` invocations, in the order they happened, for a pull-request description or somebody
   else's terminal. The rendering is never lossy: an operation a subcommand takes exactly
-  becomes that subcommand, and one it does not becomes `netgraph edit apply -f -` with the
+  becomes that subcommand, and one it does not becomes `netviz edit apply -f -` with the
   operation's own JSON on standard input. There is deliberately no third case where a
   rendering approximates an operation.
 
@@ -1052,40 +1052,40 @@ publish a version whose section is missing or empty — see
   losing exactly the list of access somebody has to go and revoke. `status: departed` keeps
   that worklist visible until it has been worked through.
 
-- **`netgraph render --layer identity`**, the ninth layer: the users and groups, joined by
+- **`netviz render --layer identity`**, the ninth layer: the users and groups, joined by
   membership, and no hardware whatsoever. A user is drawn as an oval and a group as a
   folder, in a rose palette no element kind had taken, and both have an icon in the bundled
   theme. A membership edge runs from the group to the member — the direction the fact is
   written in. Everything else is discarded, for the same reason the power view discards the
   cabling: a cable between two servers says nothing about who may log into either.
 
-- **`netgraph list users` and `netgraph list groups`.** `users` prints a `GROUPS` column,
+- **`netviz list users` and `netviz list groups`.** `users` prints a `GROUPS` column,
   which is the one fact about a person their own document cannot state. `groups` prints two
   member counts: `MEMBERS` is what the document names, `PEOPLE` is how many accounts the
   group reaches once the nesting has been walked — the number an access rule actually
   grants to, and the number no single document holds. Both tables also appear on the
-  Identity section of `netgraph report`.
+  Identity section of `netviz report`.
 
-- **`netgraph plan` and `netgraph apply`: a typed changeset between two inventory states.**
+- **`netviz plan` and `netviz apply`: a typed changeset between two inventory states.**
   The inventory is meant to be a source of truth that can be *diffed and applied*, and until
-  now only the read half existed: `netgraph drift` compared a live network against the
+  now only the read half existed: `netviz drift` compared a live network against the
   declaration and reported. The general diff engine and the write half are now here.
 
   Every element has a stable **address** — `device.core/sw-1`, `cable.core/uplink` — whose
   type is a category rather than the document's `kind`, so `kind: switch` → `kind: router`
   is an update of one element rather than the destruction of one and the creation of
-  another. `netgraph plan` diffs two loaded inventories into an ordered changeset of
+  another. `netviz plan` diffs two loaded inventories into an ordered changeset of
   `create`, `update`, `delete` and `rename` entries, each with the address and the
   field-level before/after pairs, and prints it in the terraform shape
   (`+ 3 to add, ~ 5 to change, - 1 to destroy`).
 
   Three things make the output worth reading. **Renames are detected structurally** — by
-  serial, MAC, link ends, cable label, rack slot or a `netgraph.dev/id` annotation — so a
+  serial, MAC, link ends, cable label, rack slot or a `netviz.dev/id` annotation — so a
   renamed switch is one entry rather than a delete plus a create, and only where the
   evidence names exactly one element on each side. **The entries are in dependency order**:
   a cable is destroyed before the device it terminates on and created after it. And **the
   comparison is of meaning, not text** — templates merged, ranges expanded, defaults filled
-  in — so a tree somebody has just run `netgraph fmt` over produces an empty plan.
+  in — so a tree somebody has just run `netviz fmt` over produces an empty plan.
 
   The two sides come from wherever they can: `--from <git-ref>` against the working tree
   (read with `git archive`, so the working tree is never disturbed), two folders with
@@ -1096,20 +1096,20 @@ publish a version whose section is missing or empty — see
   contradicts it, a re-patched lead keeps its document, and a trunk's VLAN set is merged
   rather than substituted.
 
-  `netgraph apply` executes a plan against the **files**, translating each entry into the
-  `netgraph edit` operations from the previous release, so comments, key order and
-  formatting survive and the same validation gate applies. `netgraph plan -out drift.plan
-  && netgraph apply drift.plan` adopts what the network reports into the inventory. The
+  `netviz apply` executes a plan against the **files**, translating each entry into the
+  `netviz edit` operations from the previous release, so comments, key order and
+  formatting survive and the same validation gate applies. `netviz plan -out drift.plan
+  && netviz apply drift.plan` adopts what the network reports into the inventory. The
   plan file records a hash of the state it was made from and apply refuses a tree that has
   moved on; `--target` applies a subset, `--auto-approve` skips the confirmation, `-n`
   prints the diff instead of writing it. `--json` and `--fail-on changes` are for CI.
 
-  **Applying to the live network is deliberately out of scope.** `netgraph apply` writes
+  **Applying to the live network is deliberately out of scope.** `netviz apply` writes
   YAML and nothing else: it opens no session to a device and there is no flag that makes
   it. See [`docs/commands/plan.md`](docs/commands/plan.md) and
   [`docs/commands/apply.md`](docs/commands/apply.md).
 
-- **`netgraph layout`, and a diagram that stays where you put it.** Until now the picture
+- **`netviz layout`, and a diagram that stays where you put it.** Until now the picture
   was derived: Graphviz laid the graph out afresh on every render, so a diagram could not
   be *arranged* — move a node and the next render moved it back. Geometry is now
   first-class, optional inventory data. A `kind: layout` document holds a position per
@@ -1119,12 +1119,12 @@ publish a version whose section is missing or empty — see
   regenerated or versioned on its own — the reasoning is recorded in
   [`docs/follow-ups.md` §16](docs/follow-ups.md).
 
-  `netgraph layout --write` runs the automatic layout once and persists the result, which
+  `netviz layout --write` runs the automatic layout once and persists the result, which
   is what makes the diagram editable from then on; running it again places what is *not*
   yet placed rather than discarding an afternoon of arranging (`--replace` asks for the
   whole view afresh, `--engine` picks a different Graphviz engine). `--clear` goes back to
   automatic, `--prune` drops geometry for elements that no longer exist. With no flags it
-  reports what is arranged and what has gone stale. Writes go through the `netgraph edit`
+  reports what is arranged and what has gone stale. Writes go through the `netviz edit`
   path, so comments and formatting survive and `--dry-run` shows the exact hunk.
 
   The renderers honour it with no flag of their own. When every node in a view is placed,
@@ -1142,11 +1142,11 @@ publish a version whose section is missing or empty — see
   [`docs/rendering.md`](docs/rendering.md#stored-arrangements).
 
 - **`W138` / `NG-Y001`, stale diagram geometry.** A warning — never an error, because
-  deleting a switch must not make `netgraph validate` fail — naming each layout key that
-  no longer resolves. `netgraph layout --prune` is the fix.
+  deleting a switch must not make `netviz validate` fail — naming each layout key that
+  no longer resolves. `netviz layout --prune` is the fix.
 
-- **`netgraph edit`, the write path.** The first way to *change* an inventory that is as
-  careful as the way netgraph reads one. Eleven typed operations — create, delete, rename,
+- **`netviz edit`, the write path.** The first way to *change* an inventory that is as
+  careful as the way netviz reads one. Eleven typed operations — create, delete, rename,
   move, set, unset, add-interface, remove-interface, connect, disconnect, and any of them as
   JSON on stdin — each applied through a round-trip parser, so comments, blank lines, key
   order and quoting style survive byte for byte and a diff of an edit is the edit. Each one
@@ -1180,7 +1180,7 @@ publish a version whose section is missing or empty — see
   before anything can be merged. See
   [`docs/docker.md`](docs/docker.md#the-development-image).
 
-- **`netgraph report`, the as-built documentation.** One command writes the document an
+- **`netviz report`, the as-built documentation.** One command writes the document an
   engineer is asked to hand over: an overview, a page per site and a page per device, with
   the layer diagrams, the address plan and its utilisation, a VLAN-to-subnet-to-device
   matrix, the cable schedule with the patch panels named, the port map of every panel, the
@@ -1191,31 +1191,31 @@ publish a version whose section is missing or empty — see
   device in every diagram links to its own page; `--format json` is the whole document in
   one file. Every table comes from the same derivation the matching command prints, so no
   two pages can disagree. The output is byte-identical between runs, `--generated-at` pins
-  the one part that is not, and every page carries the netgraph version and the inventory's
+  the one part that is not, and every page carries the netviz version and the inventory's
   git revision. `--template DIR` overrides the page templates one file at a time. See
   [`docs/commands/report.md`](docs/commands/report.md) and
   [`docs/example-report/`](docs/example-report/), which is one, committed.
 
 - **Power as a modelled layer.** A `pdu` element kind with numbered outlets, a `spec.power`
   block on every device (draw, redundant inputs naming `<pdu>:<outlet>`, PoE budget and
-  per-port PoE), a `power` layer that draws which strip feeds what, `netgraph list power`
-  for the load schedule, `netgraph export power`, and seven rules (`E037`–`E042`, `W137`)
+  per-port PoE), a `power` layer that draws which strip feeds what, `netviz list power`
+  for the load schedule, `netviz export power`, and seven rules (`E037`–`E042`, `W137`)
   covering a claimed redundancy that is not one, an over-subscribed strip and a PoE budget
   that does not add up.
 
 - **A parse cache, on by default.** A file that has been parsed once is remembered, keyed by
-  the hash of its bytes together with the netgraph, parser and model versions that read them,
+  the hash of its bytes together with the netviz, parser and model versions that read them,
   so it cannot go stale. A repeated load costs 0.30 of a cold one in a new process and 0.05 in
-  a running `netgraph watch`, where a re-render now re-parses only the file that was saved.
+  a running `netviz watch`, where a re-render now re-parses only the file that was saved.
   Nothing about a timestamp enters the key: a `touch` changes nothing and a `git checkout` of
   a revision seen before hits again.
-- **`netgraph cache info`** reports where the cache is, what is in it, and the identity an
-  entry is keyed by; **`netgraph cache clear`** empties it, `--all` for every inventory.
+- **`netviz cache info`** reports where the cache is, what is in it, and the identity an
+  entry is keyed by; **`netviz cache clear`** empties it, `--all` for every inventory.
 - **`--no-cache`**, a global flag, parses everything and remembers nothing.
-  `NETGRAPH_NO_CACHE=1` does the same for a whole environment, and `NETGRAPH_CACHE_DIR`
+  `NETVIZ_NO_CACHE=1` does the same for a whole environment, and `NETVIZ_CACHE_DIR`
   moves the cache — both of which is what a CI job wants. See
   [`docs/configuration.md`](docs/configuration.md#cache--remembering-parsed-files).
-- **`[cache]` in `netgraph.toml`** — `enabled`, `dir` and `max-size`, for an inventory that
+- **`[cache]` in `netviz.toml`** — `enabled`, `dir` and `max-size`, for an inventory that
   needs to say where its cache goes on the machines it is used on.
 
 - **`examples/docker/`**, the seventh example inventory: §23 and §24 at the scale a
@@ -1231,11 +1231,39 @@ publish a version whose section is missing or empty — see
   and an ipvlan network that enter a namespace with no veth pair and no NAT, and two rootless
   daemons — one of them nested three levels deep, through a container to a build sandbox —
   whose networks a host firewall cannot see or name. Its `tests.yaml` writes the design's
-  claims as thirteen `netgraph test` assertions. It validates clean, like the other six, and
+  claims as thirteen `netviz test` assertions. It validates clean, like the other six, and
   is drawn with `--layer netns`, `--layer security` and `--layer overlay`. Follow-up 26
   records the one thing it could not write down: there is no interface type that says
   "macvlan slave" or "tap", so an interface that can never terminate a cable is
   indistinguishable from a spare port unless it is a veth end.
+
+### Changed
+
+- **The project is now called netviz.** Every name the old one appeared in moved with it, and
+  all of them are breaking:
+
+  - the distribution and the command are `netviz`, and the importable package is `netviz`;
+  - `apiVersion:` is `netviz.dev/v1alpha1` — an inventory written against the old group is
+    refused by the loader rather than silently accepted, because a document that names an API
+    group netviz does not implement is a document it cannot promise anything about;
+  - the per-inventory settings file is `netviz.toml` and the ignore file is `.netvizignore`;
+  - the environment variables are `NETVIZ_*`;
+  - the published JSON Schema is `schema/netviz.schema.json`, and the `$id` that editors
+    fetch moved with it;
+  - the pre-commit hook ids are `netviz-validate`, `netviz-test` and `netviz-fmt`;
+  - the composite actions are `.github/actions/netviz-{render,review,validate}` and the
+    reusable workflows are `.github/workflows/netviz-{pages,review}.yml`.
+
+  There is no compatibility shim for any of them. netviz has not been published, so nothing
+  outside this repository can be reading the old names, and a shim would be a second spelling
+  to keep working for the lifetime of the tool in exchange for a migration nobody has to do.
+  Renaming an existing tree is `sed -i s/netgraph/netviz/g` over its YAML plus a rename of
+  `netgraph.toml`.
+
+  The GitHub repository, the container image and the demo site keep their URLs — those name a
+  location rather than the project, and moving them would break links that already exist.
+  `ghcr.io/blechschmidt/netgraph:main` still gives you a container whose entrypoint is
+  `netviz`.
 
 ### Fixed
 
@@ -1278,18 +1306,18 @@ publish a version whose section is missing or empty — see
   `tests/test_docker.py` now enforces that split: an image reference inside a fenced code
   block in either page must use a tag some workflow actually publishes today.
 
-- **`netgraph edit rename` lost the arrangement of the element it renamed.** A rename
+- **`netviz edit rename` lost the arrangement of the element it renamed.** A rename
   rewrote every *reference* to the element — a cable end, a tunnel's `over`, an adapter's
   `attached_to` — and nothing else. But two more places write a name down, and both are
   mapping keys rather than values: the §18 layout entries that position it, and the §21 note
   anchors and area member lists about it. So a rename handed back a tree carrying a `W138`
   and possibly a `W142`, and the coordinates were silently orphaned — the element was
-  redrawn wherever the engine put it, and `netgraph layout --prune` then dropped the
+  redrawn wherever the engine put it, and `netviz layout --prune` then dropped the
   position rather than moving it. All three move together now, in every view of every layout
   document, derived `#upstream` and `tunnel:` keys included, and each is written in the
   spelling its document was already using: a short key stays short while a short key still
   resolves, a qualified one stays qualified, and only a spelling that would now resolve to
-  something else — or to nothing — is promoted. `netgraph edit move` gets the same treatment,
+  something else — or to nothing — is promoted. `netviz edit move` gets the same treatment,
   which is where the promotion actually earns its keep. An area's `selector` is deliberately
   left alone: it names a pattern rather than an element, and rewriting one would be guessing.
 
@@ -1307,7 +1335,7 @@ publish a version whose section is missing or empty — see
   a *load* error, so the server stopped loading altogether and every cable that ended on it
   started reporting a dangling endpoint. The flag now goes with the feed it was about.
 
-- **`netgraph import drawio` put back the coordinates of the node it had just deleted.** The
+- **`netviz import drawio` put back the coordinates of the node it had just deleted.** The
   geometry write is built from the arrangement the tree held *before* the import, which still
   places everything the import removes, and it runs last — so a diagram with one node deleted
   and one dragged came back with a stale `W138` per node removed. The deleted keys are taken
@@ -1344,21 +1372,21 @@ publish a version whose section is missing or empty — see
   Also: a `file-changed` event that overtook the response to the write that caused it could
   badge a plain Ctrl-S as somebody else's conflict. The page now ignores the echo of its own
   writes, as it already did for `tree-changed`.
-- **Nothing could be drawn on Python 3.11: importing `netgraph.render` raised `ValueError`.**
+- **Nothing could be drawn on Python 3.11: importing `netviz.render` raised `ValueError`.**
   Two fields of the style resolver defaulted to a `mappingproxy`, which `dataclasses`
   refuses before 3.12 and refuses at *import* time — so on the 3.11 the package claims to
-  support, `netgraph render`, `watch`, `web`, `export` and everything else that reaches the
+  support, `netviz render`, `watch`, `web`, `export` and everything else that reaches the
   renderer failed on the import, not on the work. This is the second time the same shape of
-  bug has shipped (`netgraph lsp`, above), so the guard is now the package rather than the
+  bug has shipped (`netviz lsp`, above), so the guard is now the package rather than the
   module: `tests/test_release.py::test_no_dataclass_default_is_a_mapping_proxy` imports
-  every netgraph module and inspects every dataclass field, on whatever interpreter you run
+  every netviz module and inspects every dataclass field, on whatever interpreter you run
   it with.
-- **`netgraph plan` named a folder with backslashes on Windows.** The header of a plan, and
+- **`netviz plan` named a folder with backslashes on Windows.** The header of a plan, and
   the `description` recorded in a plan file, spelled `--to examples/home-lab` back as
   `examples\home-lab` — so the same command against the same two trees produced a different
-  document depending on who ran it. Every path netgraph prints for a person to read now goes
-  through one function, `netgraph.fsio.display_path`, which is where the "relative to here,
-  forward slashes" rule that `netgraph fmt`, `drift` and `test` already followed now lives.
+  document depending on who ran it. Every path netviz prints for a person to read now goes
+  through one function, `netviz.fsio.display_path`, which is where the "relative to here,
+  forward slashes" rule that `netviz fmt`, `drift` and `test` already followed now lives.
 - **Orthogonal links were drawn straight across the devices they passed.** An arranged
   diagram with `routing: orthogonal` routed each leg locally and avoided nothing, so a
   cable between two switches with a third between them was drawn across the third one's
@@ -1378,26 +1406,26 @@ publish a version whose section is missing or empty — see
   dragged is authoritative — routing fills the segments between bends and never touches
   one — and a link whose line already keeps clear renders byte-identically to before. A
   computed route is recomputed every render; `-f json` publishes it as `layout.routed`
-  beside the bends the inventory pins, and in `netgraph web` `Shift-R` (**Pin the computed
+  beside the bends the inventory pins, and in `netviz web` `Shift-R` (**Pin the computed
   route**) is what makes one permanent. `--no-avoid`, or `avoid = false` in `[render]`,
   turns it off. See [`docs/rendering.md`](docs/rendering.md#routing-around-things).
-- **netgraph could not be imported on Python 3.11, and the timeline crashed on 3.10.** Two
+- **netviz could not be imported on Python 3.11, and the timeline crashed on 3.10.** Two
   separate instances of the same shape of problem, both found by the CI matrix and neither
-  reachable from the version the work was done on. `netgraph lsp` declared a `mappingproxy`
+  reachable from the version the work was done on. `netviz lsp` declared a `mappingproxy`
   as a plain dataclass default, which is refused before 3.12 and refused at *import* time,
-  so every LSP command raised `ValueError: mutable default` on 3.11. And `netgraph history`
+  so every LSP command raised `ValueError: mutable default` on 3.11. And `netviz history`
   parsed git's `%aI` with `datetime.fromisoformat`, which before 3.11 accepts `+00:00` and
   not the `Z` some builds of git write, so a timeline over such a repository raised
   `ValueError: Invalid isoformat string` on 3.10. Both are one line; both now have a test.
-- **Clicking a node in `netgraph web` did not open the document that declares it.** The
+- **Clicking a node in `netviz web` did not open the document that declares it.** The
   page passed the SVG element id where the tree is keyed by element address, so the lookup
   matched nothing and the click silently did nothing at all — the one mapping the command
   exists for.
-- **`Ctrl-Z` in `netgraph web` left the editor showing text that was nowhere on disk.** The
+- **`Ctrl-Z` in `netviz web` left the editor showing text that was nowhere on disk.** The
   undo restored the file correctly and the pane kept the version it had just replaced,
   under a badge that said there was nothing unsaved. The pane is now reloaded from the file
   the undo produced.
-- **A change made outside `netgraph web` was noticed and then ignored.** The open file was
+- **A change made outside `netviz web` was noticed and then ignored.** The open file was
   compared against the *previous* file list rather than the one the change had just been
   fetched into, so the hashes always matched and the one file that had moved on disk was
   the one thing left stale. Editing an inventory in `$EDITOR` with the browser open now
@@ -1408,12 +1436,12 @@ publish a version whose section is missing or empty — see
   keep-alive made the *next* request on the same connection parse out of it. The symptom
   was a `501 Unsupported method` naming a fragment of JSON, on a request that was perfectly
   well formed.
-- **netgraph could not start on Python 3.11.** Every command raised `ValueError: mutable
+- **netviz could not start on Python 3.11.** Every command raised `ValueError: mutable
   default <class 'mappingproxy'>` while importing the configuration layer. 3.10 and 3.12
   were unaffected, which is why it survived a full test matrix — the interpreter in the
   middle was the only one that refuses that spelling of a dataclass default.
 - **A lone surrogate escape now fails to load under either YAML parser.** `description:
-  "\ud800"` names a code point UTF-8 cannot encode, so every artefact netgraph writes would
+  "\ud800"` names a code point UTF-8 cannot encode, so every artefact netviz writes would
   have raised on it. libyaml refused it and the pure-Python parser accepted it, meaning
   whether an inventory loaded depended on which PyYAML wheel was installed.
 - **The nesting-depth guard is now a limit both parsers survive.** It was 1024, which is
@@ -1423,13 +1451,13 @@ publish a version whose section is missing or empty — see
 - **`W129` reported its two tunnels in the order the files happened to be walked in.**
   Splitting one inventory across directories differently changed the finding's text, and
   where one pair of tunnels clashed on two elements, which element was named.
-- **`netgraph drift` wrote the inventory path with backslashes on Windows.** Every other
-  path netgraph prints uses forward slashes.
-- **`netgraph fmt` raised a traceback on a document `netgraph validate` accepts.** The
+- **`netviz drift` wrote the inventory path with backslashes on Windows.** Every other
+  path netviz prints uses forward slashes.
+- **`netviz fmt` raised a traceback on a document `netviz validate` accepts.** The
   round-trip parser the formatter uses resolves `-._` as a float and then fails to convert
-  it; netgraph's own loader reads the same scalar as the string it plainly is. It is now a
+  it; netviz's own loader reads the same scalar as the string it plainly is. It is now a
   diagnostic naming the file, like every other thing the formatter cannot read.
-- **Cache entries went missing when several netgraph processes filled one cache at once.**
+- **Cache entries went missing when several netviz processes filled one cache at once.**
   Every write went through a scratch file named after its destination, so two processes
   storing the same document wrote through the same file — on Windows, one of forty entries
   would end up never written at all, and stay a cache miss for good. Each writer now has
@@ -1437,12 +1465,12 @@ publish a version whose section is missing or empty — see
 
 ## [0.1.0] - 2026-07-30
 
-First release. netgraph reads a folder tree of YAML documents describing a network, checks
+First release. netviz reads a folder tree of YAML documents describing a network, checks
 that the documents agree with each other, and renders the result.
 
 ### Added
 
-- **The inventory format.** `apiVersion: netgraph.dev/v1alpha1` documents in nine kinds —
+- **The inventory format.** `apiVersion: netviz.dev/v1alpha1` documents in nine kinds —
   `switch`, `router`, `hub`, `computer`, `server`, `adapter`, `cable`, `tunnel` and
   `patchpanel` — discovered recursively under a root folder, where the folder a document
   sits in becomes its namespace. Field names and value spaces follow RFC 8343
@@ -1461,48 +1489,48 @@ that the documents agree with each other, and renders the result.
   including tunnels carried inside other tunnels.
 - **Passive plant.** Patch panels with derived ports, racks, rack units and a rack-elevation
   view.
-- **`netgraph validate`** — three passes (schema, reference resolution, semantics) over a
+- **`netviz validate`** — three passes (schema, reference resolution, semantics) over a
   catalogue of graded rules, each with an `NG-*` alias, a documented reason and a fix.
   `--strict` promotes warnings, `--disable` silences by id or alias, and the machine-readable
   forms are `--output-format json|sarif|github` for pipelines, code scanning and inline
   annotations. Exit codes: `0` clean, `1` findings, `2` usage.
-- **`netgraph render`** — seven layers (`l1`, `l2`, `l3`, `overlay`, `routing`, `rack`,
+- **`netviz render`** — seven layers (`l1`, `l2`, `l3`, `overlay`, `routing`, `rack`,
   `logical`) to `svg`, `png`, `pdf`, `dot`, `mermaid`, `json` and a self-contained
   interactive `html` page. Filters by namespace, VLAN, kind and neighbourhood; namespace
   collapsing and link bundling for inventories too large to read whole; `--icons cisco` for
   device pictures. SVG output carries per-element tooltips, `--link-template` links back to
   the YAML, and stable element ids for deep-linking.
-- **`netgraph web`** and **`netgraph watch`** — the inventory edited in one browser pane and
+- **`netviz web`** and **`netviz watch`** — the inventory edited in one browser pane and
   drawn in the other, and a live preview that re-renders on every save.
-- **`netgraph path`** — trace how two elements reach each other, at any layer, with the
+- **`netviz path`** — trace how two elements reach each other, at any layer, with the
   answer optionally drawn.
-- **`netgraph ipam`** — subnet utilisation, free space, the next free block, aggregation and
+- **`netviz ipam`** — subnet utilisation, free space, the next free block, aggregation and
   overlap detection.
-- **`netgraph export`** — hosts file, DNS zone, DHCP reservations, Ansible inventory and
+- **`netviz export`** — hosts file, DNS zone, DHCP reservations, Ansible inventory and
   Prometheus targets, generated from the same documents.
-- **`netgraph import`** — bootstrap a first inventory from LLDP, `ip -j addr`, `show`
+- **`netviz import`** — bootstrap a first inventory from LLDP, `ip -j addr`, `show`
   command output or a cabling CSV.
-- **`netgraph drift`** — the declared inventory compared against what the live network
+- **`netviz drift`** — the declared inventory compared against what the live network
   reports, with per-element coverage so an unchecked device is not silently counted as
   agreeing.
-- **`netgraph fmt`** — one canonical form for inventory YAML, with `--check` and `--diff`.
-- **`netgraph list`**, **`show`**, **`rules`**, **`schema`**, **`config`** — interrogate an
+- **`netviz fmt`** — one canonical form for inventory YAML, with `--check` and `--diff`.
+- **`netviz list`**, **`show`**, **`rules`**, **`schema`**, **`config`** — interrogate an
   inventory, the rule catalogue and the resolved configuration from the shell.
-- **`netgraph init`** — scaffold a small, valid inventory, including the JSON Schema and the
+- **`netviz init`** — scaffold a small, valid inventory, including the JSON Schema and the
   editor wiring.
-- **`netgraph completion`** — completion scripts for bash, zsh, fish and PowerShell, with
+- **`netviz completion`** — completion scripts for bash, zsh, fish and PowerShell, with
   completion of element names, namespaces, kinds, layers, formats, profiles and rule ids.
-- **`netgraph version`** — the netgraph, Python and Graphviz versions in use, the selected
+- **`netviz version`** — the netviz, Python and Graphviz versions in use, the selected
   YAML parser and the resolved dependency versions; `--json` for pasting into a bug report.
-  `netgraph --version` prints the same text.
-- **JSON Schema output** (`netgraph schema`) so an editor underlines a typo'd key as it is
-  typed, checked into `schema/` and wired up by `netgraph init`.
-- **`netgraph.toml`** — per-inventory render defaults and named profiles, so the flags a
+  `netviz --version` prints the same text.
+- **JSON Schema output** (`netviz schema`) so an editor underlines a typo'd key as it is
+  typed, checked into `schema/` and wired up by `netviz init`.
+- **`netviz.toml`** — per-inventory render defaults and named profiles, so the flags a
   diagram needs live next to the inventory instead of in shell history.
-- **CI integrations** — a `netgraph-validate` composite GitHub Action, three `pre-commit`
-  hooks (`netgraph-validate`, `netgraph-fmt`, `netgraph-fmt-check`) and a documented GitLab
+- **CI integrations** — a `netviz-validate` composite GitHub Action, three `pre-commit`
+  hooks (`netviz-validate`, `netviz-fmt`, `netviz-fmt-check`) and a documented GitLab
   recipe.
-- **Published artefacts.** `pip install netgraph` (also `pipx` and `uv tool install`), from
+- **Published artefacts.** `pip install netviz` (also `pipx` and `uv tool install`), from
   PyPI via Trusted Publishing, and a `linux/amd64` + `linux/arm64` container image at
   `ghcr.io/blechschmidt/netgraph` that already has Graphviz in it and runs unprivileged on a
   read-only root filesystem. The wheel, the sdist and the image carry build provenance
@@ -1512,11 +1540,11 @@ that the documents agree with each other, and renders the result.
 - **A compose file** for the three ways the tool is used in a container — one command at a
   time, as a live preview, and as the browser editor.
 - **Windows and macOS support**, tested in CI. Graphviz installed without landing on `PATH`
-  is found in the documented install locations, and `NETGRAPH_DOT` names the binary outright.
+  is found in the documented install locations, and `NETVIZ_DOT` names the binary outright.
 
 ### Changed
 
-- `netgraph validate` is about 3.1× faster on a 10 000-element inventory, and loading is
+- `netviz validate` is about 3.1× faster on a 10 000-element inventory, and loading is
   about 1.4× faster; both were driven by a committed profiler rather than by guesswork
   (`tools/profile_validate.py`, `tools/bench_pipeline.py`).
 - The `html` output no longer grows with the number of layers in it: the views share one

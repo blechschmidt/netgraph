@@ -2,7 +2,7 @@
 #
 # The instance holds no address and no connected route, so the isolation it was
 # declared to create does not exist: everything is still in the global table.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-a
@@ -18,7 +18,7 @@ spec:
       rd: '65001:1'
       description: customer blue, not wired up yet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-b
@@ -30,7 +30,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: ap-ceiling-01
@@ -72,7 +72,7 @@ spec:
       maximum: 25.5
     powered_by: poe
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: cam-lobby-01
@@ -103,7 +103,7 @@ spec:
     draw_watts: 5
     powered_by: poe
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: laptop-lobby

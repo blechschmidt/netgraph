@@ -1,7 +1,7 @@
 # The core of one site, in one folder: the folder is the namespace (§2), so
 # every short name written below resolves inside `sites/hq` and nowhere else.
 # That is what makes the whole site copyable as a unit.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-hq
@@ -25,7 +25,7 @@ spec:
       ipv4:
         addresses: [10.10.0.1/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-hq
@@ -52,7 +52,7 @@ spec:
       description: To the rack switch
       mtu: 1500
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-hq

@@ -5,7 +5,7 @@
 # because "she is in no group, therefore she has no access" is a claim worth
 # confirming rather than assuming, and because an account that was meant to be
 # in a group looks exactly like this.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: user
 metadata:
   name: alice

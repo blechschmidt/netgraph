@@ -1,11 +1,11 @@
-# netgraph YAML schema specification
+# netviz YAML schema specification
 
-Version: `netgraph.dev/v1alpha1`
-Status: draft — normative for netgraph 0.1.x
+Version: `netviz.dev/v1alpha1`
+Status: draft — normative for netviz 0.1.x
 
-This document specifies the on-disk YAML format that netgraph reads. It is the
-contract between the inventory author, the loader (`netgraph.loader`), the
-typed models (`netgraph.models`) and the renderers (`netgraph.render`).
+This document specifies the on-disk YAML format that netviz reads. It is the
+contract between the inventory author, the loader (`netviz.loader`), the
+typed models (`netviz.models`) and the renderers (`netviz.render`).
 
 Field names and value spaces are derived from the following standard data
 models:
@@ -20,7 +20,7 @@ models:
 | dot1q-types | `ieee802-dot1q-types` | `dot1qtypes` | IEEE Std 802.1Q-2018 |
 
 Every YAML field that has a standard counterpart is mapped to its YANG path in
-[§9 YANG mapping](#9-yang-mapping). netgraph is a *documentation and
+[§9 YANG mapping](#9-yang-mapping). netviz is a *documentation and
 visualisation* tool, not a configuration agent: it therefore records **intended**
 state, and happily accepts values for nodes that the YANG models declare
 `config false` (for example `if:phys-address` and `if:speed`). Those cases are
@@ -98,7 +98,7 @@ Each field table uses these columns:
 
 ## 2. Inventory layout and loading
 
-An *inventory* is a directory tree. netgraph walks it recursively and loads
+An *inventory* is a directory tree. netviz walks it recursively and loads
 every YAML document it finds. Folders are for humans — group by site, by rack,
 by tenant, whatever suits the team. Cross-references (§4.2) work across any file
 in the tree; the only thing a folder contributes is a *namespace* (§2.2) that
@@ -113,7 +113,7 @@ keeps names short without making them collide.
 | `NG-L003` | Symbolic links are followed, but a link that escapes the inventory root, forms a cycle, or reaches a directory already loaded through another path is an error. |
 | `NG-L004` | A file MAY contain several documents separated by `---`. Empty documents are skipped silently, but they still consume a document index. |
 | `NG-L005` | Load order is deterministic: files sorted by their byte-wise POSIX path relative to the inventory root, then by document index within the file. Renderers rely on this for stable output. |
-| `NG-L006` | A `.netgraphignore` file excludes paths from the walk. The syntax is the `.gitignore` subset described in §2.3; a file in a subdirectory applies to that subtree and overrides its parents. |
+| `NG-L006` | A `.netvizignore` file excludes paths from the walk. The syntax is the `.gitignore` subset described in §2.3; a file in a subdirectory applies to that subtree and overrides its parents. |
 | `NG-L007` | A mapping key that appears twice in the same block is an error. Silently keeping the last value would make the diagram disagree with the file. |
 | `NG-L008` | Files are read as UTF-8 (a leading BOM is tolerated) with a safe loader. Custom tags — `!Ref`, `!!python/...` — are rejected; anchors and aliases are supported within a single document. |
 
@@ -141,7 +141,7 @@ root is visible from everywhere. A reference MAY also be written fully qualified
 (`sites/berlin/rack1/sw1`), which is tried relative to the current namespace
 first and as an absolute name second.
 
-### 2.3 `.netgraphignore`
+### 2.3 `.netvizignore`
 
 Optional, one per directory, applying to that directory and everything below it.
 Blank lines and `#` comments are skipped; `!` negates a pattern and the last
@@ -171,7 +171,7 @@ the two rewrites the loader performs before validation: interface range
 expansion (§6.2.5) and template merging (§6.6). A value a template supplied is
 reported against the template's file and line, with a note naming the device
 that inherited it; a value the device overrode is reported against the device.
-`netgraph show --raw` prints a document as written, unexpanded and unmerged,
+`netviz show --raw` prints a document as written, unexpanded and unmerged,
 next to the resolved output the same command prints without it.
 
 ### 2.5 Suggested layout
@@ -186,7 +186,7 @@ inventory/
 │   │   └── cables/hq-links.yaml          # several documents in one file
 │   └── lab/
 │       └── lab.yaml
-├── .netgraphignore                       # optional exclusions (NG-L006)
+├── .netvizignore                       # optional exclusions (NG-L006)
 └── _drafts/                              # skipped (NG-L002)
 ```
 
@@ -201,7 +201,7 @@ lookup walks up to `sites/hq` and finds it there (§2.2).
 Every document is a mapping with exactly four top-level keys.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-access-01
@@ -215,7 +215,7 @@ spec:
 
 | Field | Type | Req. | Default | Notes |
 |---|---|---|---|---|
-| `apiVersion` | string | M | — | MUST be `netgraph.dev/v1alpha1` for this revision. See §12. |
+| `apiVersion` | string | M | — | MUST be `netviz.dev/v1alpha1` for this revision. See §12. |
 | `kind` | enum | M | — | One of `switch`, `router`, `hub`, `computer`, `server`, `cable`, `adapter`, `tunnel`, `patchpanel`, `pdu`, `user`, `group`, `template`, `layout`, `testsuite`, `note`, `area`, `legend`. Lower-case; other spellings are rejected. |
 | `metadata` | mapping | M | — | §3.1 |
 | `spec` | mapping | M | — | Shape depends on `kind`: §6 (devices), §7 (cable), §8 (adapter), §14 (tunnel), §15 (patchpanel), §17.1 (pdu), §19 (user, group), §6.6 (template), §18 (layout), §20 (testsuite), §21 (note, area, legend). |
@@ -226,7 +226,7 @@ graph. The last six are not. `template` declares a reusable partial device
 for elements declared elsewhere (§18); `testsuite` carries assertions about the
 network the other documents describe (§20); `note`, `area` and `legend` carry
 what the *diagram* says about that network, and nothing the tool concludes from
-it (§21). None of the six is ever drawn as a node, listed by `netgraph list`, or
+it (§21). None of the six is ever drawn as a node, listed by `netviz list`, or
 resolvable as a cable endpoint.
 
 ### 3.1 `metadata`
@@ -236,22 +236,22 @@ resolvable as a cable endpoint.
 | `name` | name | M | — | Unique within its namespace (§2.2, `NG-N002`). Grammar in §4.1. |
 | `description` | string | O | `null` | Free text, may be multi-line. Rendered as a node tooltip. |
 | `location` | mapping | O | `null` | Where the hardware physically is: §3.2. |
-| `labels` | map[string, string] | O | `{}` | Selector-friendly key/value pairs. Keys match `[a-z0-9]([-a-z0-9_.]*[a-z0-9])?` (≤63 chars) and MAY carry a DNS-style prefix (`example.com/tier`). Values ≤253 chars. The prefix `netgraph.dev/` is reserved for tool-generated labels. |
-| `annotations` | map[string, string] | O | `{}` | Per-element input to the tooling. Same key grammar as `labels`, but the `netgraph.dev/` prefix is permitted (annotations exist to carry tool keys) and values may be up to 4096 chars. Annotations are **not** selectable and never affect the graph. |
+| `labels` | map[string, string] | O | `{}` | Selector-friendly key/value pairs. Keys match `[a-z0-9]([-a-z0-9_.]*[a-z0-9])?` (≤63 chars) and MAY carry a DNS-style prefix (`example.com/tier`). Values ≤253 chars. The prefix `netviz.dev/` is reserved for tool-generated labels. |
+| `annotations` | map[string, string] | O | `{}` | Per-element input to the tooling. Same key grammar as `labels`, but the `netviz.dev/` prefix is permitted (annotations exist to carry tool keys) and values may be up to 4096 chars. Annotations are **not** selectable and never affect the graph. |
 
-Labels drive filtering (`netgraph render --select site=hq`) and grouping
+Labels drive filtering (`netviz render --select site=hq`) and grouping
 (`--group-by rack`), so prefer a small, consistent key set: `site`, `rack`,
 `role`, `env`, `owner`.
 
 Annotations are the opposite: they are read by the tool, not by the user. The
-one this revision defines is `netgraph/ignore`, which suppresses validation
+one this revision defines is `netviz/ignore`, which suppresses validation
 rules on the element carrying it (§10.11):
 
 ```yaml
 metadata:
   name: spare-switch
   annotations:
-    netgraph/ignore: "W103, E004"   # or "*" for every rule
+    netviz/ignore: "W103, E004"   # or "*" for every rule
 ```
 
 ---
@@ -293,7 +293,7 @@ metadata:
   `NG-U001`; an element whose top exceeds `rack_height` is `NG-U002`.
 * An element that names a `rack` but no `position` is in the room and nowhere in
   particular. It is not drawn on the elevation, and it collides with nothing.
-* `netgraph render --layer rack` draws one front elevation per rack, with empty
+* `netviz render --layer rack` draws one front elevation per rack, with empty
   units shown. Free-text `spec.location` (§6.1) is unaffected and stays a label.
 
 ---
@@ -355,7 +355,7 @@ and resolves to the element as a whole.
 |---|---|---|
 | `name` | §4.1 | list key (`string`) |
 | `ifname` | §4.1 | `if:name` (`string`) |
-| `ifref` | §4.2 | — (netgraph construct) |
+| `ifref` | §4.2 | — (netviz construct) |
 | `boolean` | YAML `true`/`false`. `yes`/`no`/`on`/`off` are **rejected** to avoid the YAML 1.1 Norway problem. | `boolean` |
 | `mac` | Six octets. Canonical form `xx:xx:xx:xx:xx:xx`, lower-case. `XX-XX-XX-XX-XX-XX` and `xxxx.xxxx.xxxx` are accepted and normalised. | `yang:phys-address` |
 | `ipv4-address` | Dotted quad, no zone. | `inet:ipv4-address-no-zone` |
@@ -400,7 +400,7 @@ filtering.
 #### 6.1.1 `forwarding`
 
 Maps to `ip:ipv4/forwarding` and `ip:ipv6/forwarding`, which RFC 8344 defines
-per interface. netgraph declares it once per device as the device-wide default;
+per interface. netviz declares it once per device as the device-wide default;
 an interface MAY override it (`interfaces[].ipv4.forwarding`).
 
 Default by kind: `true` for `router`, `false` for every other kind. This
@@ -455,7 +455,7 @@ Only `ethernet`, `wifi` and `lag` can terminate a cable (`NG-C009`); only
 
 RFC 8343 has **no** interface-level MTU leaf — the only standard MTU leaves are
 per address family in RFC 8344 (`ip:ipv4/mtu`, `uint16`, min 68;
-`ip:ipv6/mtu`, `uint32`, min 1280). netgraph therefore treats
+`ip:ipv6/mtu`, `uint32`, min 1280). netviz therefore treats
 `interfaces[].mtu` as the layer-2 MTU and propagates it to both families unless
 they override it. See §9.2 for the exact mapping and the
 `ietf-interfaces-common` note.
@@ -484,7 +484,7 @@ ipv4:
 
 `gateway` is the one field of these containers that RFC 8344 does not define: a
 default route lives in `ietf-routing`
-(`rt:routing/…/static-routes/…/next-hop-address`), not in `ietf-ip`. netgraph
+(`rt:routing/…/static-routes/…/next-hop-address`), not in `ietf-ip`. netviz
 keeps it on the interface anyway, because that is where an operator writes it
 and where the only check worth making — is the first hop on-link? — can be
 made. An IPv6 link-local gateway such as `fe80::1` is exempt from that check.
@@ -495,7 +495,7 @@ Address entries:
 |---|---|---|---|---|
 | `ip` | ipv4-address / ipv6-address | M | — | → `ip:address/ip`. |
 | `prefix_length` | prefix-length | C | — | → `ip:address/prefix-length`. Exactly one of `prefix_length` / `netmask`. |
-| `netmask` | netmask | C | — | IPv4 only → `ip:address/netmask`. RFC 8344 gates this on the `ipv4-non-contiguous-netmasks` feature; netgraph accepts it and normalises contiguous masks to `prefix_length`. |
+| `netmask` | netmask | C | — | IPv4 only → `ip:address/netmask`. RFC 8344 gates this on the `ipv4-non-contiguous-netmasks` feature; netviz accepts it and normalises contiguous masks to `prefix_length`. |
 
 **Shorthands.** Both are normalised to the canonical form on load, so tooling
 downstream of the loader only ever sees the long form:
@@ -539,10 +539,10 @@ interfaces:
 
 The entry above **is** forty-eight entries. Expansion happens in the loader,
 immediately after the document is parsed and before any model validation, so
-everything downstream — `netgraph validate`, the graph, every renderer,
-`netgraph show`, an editor driven by the JSON Schema — sees an ordinary list of
+everything downstream — `netviz validate`, the graph, every renderer,
+`netviz show`, an editor driven by the JSON Schema — sees an ordinary list of
 interfaces and needs no notion of a range at all. A range never appears in
-rendered output, and `netgraph show` without `--raw` prints the expansion.
+rendered output, and `netviz show` without `--raw` prints the expansion.
 
 **Grammar.** A range is a string of interface-name characters (§4.1) with one or
 more spans `[low-high]` embedded in it. Both bounds are decimal, inclusive, and
@@ -589,7 +589,7 @@ duplicates remain `NG-I001`.
 
 #### 6.2.6 `wireless`
 
-A `wifi` interface without this block is a radio netgraph knows nothing about:
+A `wifi` interface without this block is a radio netviz knows nothing about:
 `medium: wireless` joins two of them and the diagram draws a dashed line, but
 nothing says which network is on the air, in which direction, or on which
 frequency. The block supplies exactly that.
@@ -712,7 +712,7 @@ an undeclared VLAN (`NG-V004`, a warning).
 |---|---|---|---|---|
 | `id` | vlan-id | M | — | → `dot1q:vlan/vid`. Unique per device (`NG-V001`). |
 | `name` | string (≤32) | O | `null` | → `dot1q:vlan/name` (`dot1qtypes:name-type`). |
-| `description` | string | O | `null` | netgraph-only. |
+| `description` | string | O | `null` | netviz-only. |
 
 ### 6.5 Per-kind constraints
 
@@ -734,7 +734,7 @@ Fifty switches wired into the same access layer differ in three fields and agree
 in two hundred. A `kind: template` document declares the two hundred once:
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: template
 metadata:
   name: c9200l-48p
@@ -760,7 +760,7 @@ spec:
 A device then names it in `spec.from`:
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-acc-07
@@ -810,7 +810,7 @@ Within `spec`, exactly four rules apply, in this order:
 4. **Anything else the device declares wins wholesale.** A scalar replaces a
    scalar. A list that is not `interfaces` — `vlans`, `members`, `addresses`,
    `trunk_vlans` — is *replaced*, not concatenated and not merged element by
-   element. netgraph has a key for interfaces and for nothing else, and a merge
+   element. netviz has a key for interfaces and for nothing else, and a merge
    rule that only holds sometimes is worse than a rule that never does. A device
    that wants the template's VLAN database plus one more VLAN restates the list.
 
@@ -821,7 +821,7 @@ mandatory as usual.
 
 #### 6.6.2 Templates are not elements
 
-A template never appears in a graph, never appears in `netgraph list`, and is
+A template never appears in a graph, never appears in `netviz list`, and is
 never validated on its own. It has no interfaces to cable, no address to place
 in a subnet, and no node to draw. The only place it surfaces at all is as the
 **source location of a field it contributed**: a value the template got wrong is
@@ -834,7 +834,7 @@ a switch and illegal on a hub, and a template does not know which it will be
 merged into. Deep checking happens on each merged device, where the value
 finally has a context that says what it must satisfy.
 
-Use `netgraph show <name> --raw` to see a device as written and `netgraph show
+Use `netviz show <name> --raw` to see a device as written and `netviz show
 <name>` to see it merged. The pair is how a merge is inspected.
 
 | ID | Sev. | Rule |
@@ -855,7 +855,7 @@ first-class element so that it can carry its own metadata (label, length,
 category) and be validated independently of the devices it joins.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-rtr01-sw01
@@ -913,7 +913,7 @@ truth ("the dongle is the thing that breaks") while still letting the renderer
 collapse them into the host.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: adapter
 metadata:
   name: adp-usb-eth-01
@@ -971,7 +971,7 @@ and must not accumulate addresses.
   almost always an omission.
 * `passthrough: true` tells the renderer it MAY collapse the adapter, drawing
   its downstream interfaces as if they belonged to the host and folding the
-  adapter's name into the edge label. `netgraph render --no-collapse-adapters`
+  adapter's name into the edge label. `netviz render --no-collapse-adapters`
   overrides this. `passthrough: false` (media converters, docks that switch)
   forces a distinct node.
 * Collapsing never changes connectivity: the path
@@ -985,10 +985,10 @@ and must not accumulate addresses.
 
 ## 9. YANG mapping
 
-This section is normative for anyone exporting netgraph data to NETCONF/RESTCONF
+This section is normative for anyone exporting netviz data to NETCONF/RESTCONF
 or comparing an inventory against a live device. Paths are written with the
 module prefixes from the table at the top of this document. `«dev»` stands for
-the device the interface belongs to; netgraph has no single YANG node for "a
+the device the interface belongs to; netviz has no single YANG node for "a
 device", so `metadata.name` is the datastore boundary, not a data node.
 
 ### 9.1 Interface (RFC 8343)
@@ -999,13 +999,13 @@ device", so `metadata.name` is the datastore boundary, not a data node.
 | `interfaces[].description` | `…/if:description` | `string` | |
 | `interfaces[].type` | `…/if:type` | `identityref` → `ianaift:*` | Identity per §6.2.1. |
 | `interfaces[].enabled` | `…/if:enabled` | `boolean`, default `true` | Intended admin state. Compare against `if:admin-status` when diffing live state. |
-| `interfaces[].mac` | `…/if:phys-address` | `yang:phys-address` | **`config false` in RFC 8343.** netgraph stores the intended/burned-in address; an exporter targeting a live datastore MUST NOT write it. |
+| `interfaces[].mac` | `…/if:phys-address` | `yang:phys-address` | **`config false` in RFC 8343.** netviz stores the intended/burned-in address; an exporter targeting a live datastore MUST NOT write it. |
 | `interfaces[].parent` | `…/if:lower-layer-if` | `leafref` list | `config false`. Single-element list for `type: vlan`. |
 | `interfaces[].members[]` | `…/if:lower-layer-if` | `leafref` list | `config false`. One entry per member, for `type: lag` and `type: bridge`. |
 | *(derived)* | `…/if:higher-layer-if` | `leafref` list | `config false`. Computed as the inverse of `parent`/`members`; never written by hand. |
 | `cable.speed` | `…/if:speed` | `yang:gauge64` | **`config false`.** See §9.4. |
 
-RFC 8343 nodes netgraph deliberately does **not** model: `if:if-index`,
+RFC 8343 nodes netviz deliberately does **not** model: `if:if-index`,
 `if:last-change`, `if:oper-status`, `if:statistics`, `if:link-up-down-trap-enable`.
 They are operational counters or SNMP artefacts with no place in a
 source-of-truth document.
@@ -1044,7 +1044,7 @@ operational), `ip:dup-addr-detect-transmits`, `ip:autoconf`,
 
 802.1Q has no "access port" or "trunk port" — those are vendor CLI abstractions
 over three independent knobs: the port VLAN ID, the acceptable-frame-types
-filter, and per-VLAN egress/untagged membership. netgraph expands them like
+filter, and per-VLAN egress/untagged membership. netviz expands them like
 this.
 
 **Port configuration** — augment `/if:interfaces/if:interface/dot1q:bridge-port`:
@@ -1104,7 +1104,7 @@ not the wire between them. Its fields project onto both endpoint interfaces:
 |---|---|
 | `cable.speed` | `if:speed` on both endpoint interfaces (`yang:gauge64`, bit/s, `config false`) |
 | `cable.medium` | no YANG node; informs the `ianaift` identity choice at export time (`ethernetCsmacd` regardless of copper/fibre; `ieee80211` for `wireless`) |
-| `cable.duplex`, `length_m`, `category`, `connector`, `label` | netgraph-only, physical-plant metadata |
+| `cable.duplex`, `length_m`, `category`, `connector`, `label` | netviz-only, physical-plant metadata |
 
 If both endpoints and the cable declare a speed, they MUST agree (`NG-C008`).
 
@@ -1117,7 +1117,7 @@ If both endpoints and the cable declare a speed, they MUST agree (`NG-C008`).
 | `upstream.speed` | `if:speed` on the upstream interface |
 | `interfaces[]` | ordinary `if:interface` entries, each with `if:lower-layer-if = [upstream.name]` |
 | *(derived)* | `if:higher-layer-if` on the upstream port lists every downstream interface |
-| `upstream.attached_to` | no YANG node; a netgraph topology edge |
+| `upstream.attached_to` | no YANG node; a netviz topology edge |
 
 ### 9.6 Wireless (IEEE 802.11)
 
@@ -1132,7 +1132,7 @@ radio — `if:type = ianaift:ieee80211` — under
 | `wireless.band` | `…/dot11:phy/dot11:channel-starting-factor` (2407 / 5000 / 5950 MHz) |
 | `wireless.channel` | `…/dot11:phy/dot11:current-channel-number` |
 | `wireless.width_mhz` | `…/dot11:phy/dot11:current-channel-width` |
-| `wireless.tx_power_dbm` | `…/dot11:phy/dot11:current-tx-power-level` (the MIB numbers abstract levels; netgraph records dBm) |
+| `wireless.tx_power_dbm` | `…/dot11:phy/dot11:current-tx-power-level` (the MIB numbers abstract levels; netviz records dBm) |
 | `bss[].ssid` | `…/dot11:bss/dot11:ssid` (`dot11DesiredSSID` on a client radio) |
 | `bss[].bssid` | `…/dot11:bss/dot11:bssid` (`dot11DesiredBSSID` on a client radio) |
 | `bss[].security` | `…/dot11:bss/dot11:rsna-enabled` plus `dot11:privacy-invoked` |
@@ -1141,19 +1141,19 @@ radio — `if:type = ianaift:ieee80211` — under
 
 Associated stations, PHY capabilities, regulatory state and RSN cipher
 negotiation are **not** modelled; see
-[`docs/yang-mapping.md`](yang-mapping.md#what-netgraph-does-not-model-from-80211).
+[`docs/yang-mapping.md`](yang-mapping.md#what-netviz-does-not-model-from-80211).
 
 
 ---
 
 ## 10. Validation rules
 
-Every rule has a stable ID. The validator (`netgraph validate`) reports them as
+Every rule has a stable ID. The validator (`netviz validate`) reports them as
 `NG-C005: interface sw-access-01:Gi0/2 is terminated by 2 cables (cbl-a, cbl-b)`.
 IDs are permanent: once assigned, an ID is never reused for a different rule.
 
 Severity `error` fails the run (exit code 4, `ValidationError`); `warning` and
-`info` are reported but rendering proceeds. `netgraph validate --strict`
+`info` are reported but rendering proceeds. `netviz validate --strict`
 promotes every warning to an error. Individual rules can be re-graded or
 silenced per inventory (§10.11).
 
@@ -1279,7 +1279,7 @@ triggers `NG-V008` (warning) unless it matches the master exactly.
 
 Loader rules: they are checked while the document is being rewritten into the
 shape the models validate, so they are reported by every command that loads an
-inventory rather than by `netgraph validate` alone, and they have no short-id
+inventory rather than by `netviz validate` alone, and they have no short-id
 alias. §6.2.5 and §6.6 state them in context.
 
 | ID | Sev. | Rule |
@@ -1298,10 +1298,10 @@ alias. §6.2.5 and §6.6 state them in context.
 
 ### 10.10 Rule identifiers
 
-The semantic validator (`netgraph.validate`) reports the cross-document rules —
+The semantic validator (`netviz.validate`) reports the cross-document rules —
 and the per-element judgements that a single document cannot settle — under
 short ids. Each is an alias of the `NG-*` rule above it, and both spellings are
-accepted wherever a rule is named — in `netgraph.toml`, in a `netgraph/ignore`
+accepted wherever a rule is named — in `netviz.toml`, in a `netviz/ignore`
 annotation, and on the command line. The letter is the severity the rule was
 first assigned: `E` error, `W` warning, `I` info.
 
@@ -1382,7 +1382,7 @@ at all. Re-grade them per inventory (§10.11) where the exception is real.
 
 Two mechanisms, both additive; a rule is silenced if either applies.
 
-**Per inventory** — `netgraph.toml` at the inventory root:
+**Per inventory** — `netviz.toml` at the inventory root:
 
 ```toml
 [validate]
@@ -1398,14 +1398,14 @@ nothing is worse than a failed run. Unknown keys inside `[validate]` are
 rejected for the same reason, while unknown *top-level* tables are ignored so a
 file shared with a later version still loads.
 
-**Per element** — the `netgraph/ignore` annotation (§3.1), whose value is a
+**Per element** — the `netviz/ignore` annotation (§3.1), whose value is a
 list of ids separated by commas, semicolons or spaces:
 
 ```yaml
 metadata:
   name: media-converter
   annotations:
-    netgraph/ignore: "W101 W103"
+    netviz/ignore: "W101 W103"
 ```
 
 A finding names every element it involves, so annotating *either* end of a
@@ -1565,7 +1565,7 @@ examples/small-office/
 **`routers/rtr-edge-01.yaml`**
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-edge-01
@@ -1646,7 +1646,7 @@ appear in the parent's `trunk_vlans`, satisfying `NG-V005`.
 **`switches/sw-access-01.yaml`**
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-access-01
@@ -1735,7 +1735,7 @@ bridge parent by taking the union of its members' VLAN sets.
 **`hosts/pc-alice.yaml`** and **`hosts/srv-nas-01.yaml`**
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-alice
@@ -1767,7 +1767,7 @@ spec:
 ```
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-nas-01
@@ -1795,7 +1795,7 @@ spec:
 **`cables/hq-links.yaml`** — one file, three documents:
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-rtr01-sw01
@@ -1811,7 +1811,7 @@ spec:
   length_m: 1.5
   label: A-014
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-sw01-alice
@@ -1825,7 +1825,7 @@ spec:
   length_m: 12
   label: B-002
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-sw01-nas
@@ -1849,7 +1849,7 @@ Two ports terminate no cable, and the difference between them is the whole of
 `NG-C015` (info). `Gi0/3` says `enabled: false`, which documents the spare
 patch and silences the rule at the same time. `ge-0/0/0` is up and faces an ISP
 that is not an element of this inventory, so it *is* reported — annotate the
-router with `netgraph/ignore: "NG-C015"` to say that the far end lives outside
+router with `netviz/ignore: "NG-C015"` to say that the far end lives outside
 the tree on purpose.
 
 ### 11.2 Lab bench: adapter, hub and a wireless link
@@ -1868,7 +1868,7 @@ examples/lab-bench/
 **`bench.yaml`**
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: laptop-01
@@ -1891,7 +1891,7 @@ spec:
       ipv6:
         addresses: [2001:db8:50::60/64]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: adapter
 metadata:
   name: adp-usb-eth-01
@@ -1917,7 +1917,7 @@ spec:
       ipv4:
         addresses: [192.168.50.61/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: hub
 metadata:
   name: hub-lab-01
@@ -1942,7 +1942,7 @@ spec:
       description: Spare
       enabled: false
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-legacy-01
@@ -1961,7 +1961,7 @@ spec:
           - ip: 192.168.50.20
             netmask: 255.255.255.0
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: ap-lab-01
@@ -1998,7 +1998,7 @@ VLAN-aware, which is exactly what `mac-bridge` means. `pc-legacy-01` uses the
 **`cables.yaml`**
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-dongle-hub}
 spec:
@@ -2008,7 +2008,7 @@ spec:
   category: cat5e
   length_m: 1
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-legacy-hub}
 spec:
@@ -2019,7 +2019,7 @@ spec:
   category: cat5e
   length_m: 3
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-ap-hub}
 spec:
@@ -2029,7 +2029,7 @@ spec:
   category: cat5e
   length_m: 2
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: assoc-laptop-ap
@@ -2050,7 +2050,7 @@ Points worth noting:
 * Everything on the hub is in `192.168.50.0/24`, satisfying `NG-H005`.
 * With `passthrough: true` the default rendering draws
   `laptop-01 —(usb)— hub-lab-01` with the dongle folded into the edge label;
-  `netgraph render --no-collapse-adapters` draws `adp-usb-eth-01` as its own
+  `netviz render --no-collapse-adapters` draws `adp-usb-eth-01` as its own
   node. Connectivity is identical either way.
 * The graph is connected: the laptop reaches the bench segment twice, once over
   Wi-Fi via `ap-lab-01` and once over USB via the hub, so `NG-C014` stays quiet.
@@ -2076,7 +2076,7 @@ examples/dc-rack/
 **`fabric/rtr-spine-01.yaml`**
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-spine-01
@@ -2120,7 +2120,7 @@ spec:
 **`fabric/sw-tor-a.yaml`**
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-tor-a
@@ -2200,7 +2200,7 @@ in its name, MAC/IP suffixes and the absence of the `srv-app-01` and IPMI
 ports.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-tor-b
@@ -2256,7 +2256,7 @@ spec:
 **`compute/srv-db-01.yaml`**
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-db-01
@@ -2338,7 +2338,7 @@ MTU checks on their cables resolve through `bond0` (§10.6).
 **`compute/srv-app-01.yaml`**
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-app-01
@@ -2366,7 +2366,7 @@ spec:
 **`cables.yaml`**
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-spine-tora, labels: {site: dc1, rack: r07}}
 spec:
@@ -2378,7 +2378,7 @@ spec:
   length_m: 5
   label: R07-F-001
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-spine-torb, labels: {site: dc1, rack: r07}}
 spec:
@@ -2390,7 +2390,7 @@ spec:
   length_m: 5
   label: R07-F-002
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-tora-torb-peer, description: MLAG peer link}
 spec:
@@ -2402,7 +2402,7 @@ spec:
   length_m: 1
   label: R07-F-003
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-tora-db01}
 spec:
@@ -2413,7 +2413,7 @@ spec:
   connector: sfp+
   length_m: 2
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-torb-db01}
 spec:
@@ -2424,7 +2424,7 @@ spec:
   connector: sfp+
   length_m: 2
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-tora-app01}
 spec:
@@ -2435,7 +2435,7 @@ spec:
   connector: sfp+
   length_m: 2
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-tora-db01-ipmi}
 spec:
@@ -2467,7 +2467,7 @@ Known limitations this example makes visible:
 
 ## 12. Compatibility policy
 
-`apiVersion` is `«group»/«version»`. The group is `netgraph.dev`; the version
+`apiVersion` is `«group»/«version»`. The group is `netviz.dev`; the version
 follows the Kubernetes convention: `v1alpha1` may change incompatibly between
 minor releases, `v1beta1` only between majors, `v1` never.
 
@@ -2477,7 +2477,7 @@ Within one `apiVersion`:
   non-breaking change and MAY happen in a patch release.
 * Adding a value to an enum, or adding a new `kind`, is non-breaking for
   readers of older documents but makes newer documents unreadable by older
-  netgraph versions. It requires a minor release.
+  netviz versions. It requires a minor release.
 * Renaming or removing a field, changing a default, tightening a constraint, or
   changing a rule's severity from `warning` to `error` is breaking and requires
   a version bump.
@@ -2489,7 +2489,7 @@ everything else with `NG-D002` rather than guessing. When a second version
 exists, documents of different versions may coexist in one inventory; the
 loader converts older documents to the current internal model on read.
 
-This section is normative for the schema. The same policy for netgraph's *other*
+This section is normative for the schema. The same policy for netviz's *other*
 public surfaces — the CLI, the JSON output documents, the exit codes, the rule
 ids, the published integrations — and the four things a breaking change to any of
 them has to carry, are in [`releasing.md`](releasing.md#what-is-public-api).
@@ -2507,7 +2507,7 @@ their absence:
   devices, which would let `upstream.attached_to` name a specific receptacle
   (§8.1).
 * **Per-inventory configuration** beyond validation and rendering:
-  `netgraph.toml` at the inventory root carries rule suppression and severity
+  `netviz.toml` at the inventory root carries rule suppression and severity
   overrides (§10.11), a `[render]` table of renderer defaults and any number of
   named `[profile.<name>]` blocks — see
   [`docs/configuration.md`](configuration.md). What remains deferred is
@@ -2522,13 +2522,13 @@ their absence:
 
 Everything above describes what a document may contain. A JSON Schema says the
 same thing in a form an editor can act on, so a misspelt key is underlined as
-you type it rather than discovered by the next `netgraph validate`.
+you type it rather than discovered by the next `netviz validate`.
 
 <!-- norun: the first line redirects, and the last writes a schema file into the reader's directory -->
 ```console
-$ netgraph schema > netgraph.schema.json          # every kind, in one schema
-$ netgraph schema --kind cable                    # just one kind
-$ netgraph schema -o schema/netgraph.schema.json
+$ netviz schema > netviz.schema.json          # every kind, in one schema
+$ netviz schema --kind cable                    # just one kind
+$ netviz schema -o schema/netviz.schema.json
 ```
 
 The output is [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/release-notes),
@@ -2536,13 +2536,13 @@ generated from the same pydantic models the loader uses. `--all` is the default
 and produces a union discriminated on `kind`, so one schema covers every file
 in a tree; `-k`/`--kind` narrows it to a single kind when a directory holds only
 one. A generated copy is committed at
-[`schema/netgraph.schema.json`](../schema/netgraph.schema.json) and refreshed by
+[`schema/netviz.schema.json`](../schema/netviz.schema.json) and refreshed by
 `python tools/gen_json_schema.py`; the test suite fails when it drifts from the
 models.
 
 ### 13.1 What the schema checks
 
-| | Schema | `netgraph validate` |
+| | Schema | `netviz validate` |
 |---|---|---|
 | Unknown or misspelt keys | yes (`NG-D005`) | yes |
 | Required keys, enum values, numeric ranges | yes | yes |
@@ -2552,7 +2552,7 @@ models.
 | Loader rewrites: `interfaces[].range` and `spec.from` | shape only | yes |
 
 The schema is the fast, local half. It is not a substitute for
-`netgraph validate`, and CI should keep running the latter.
+`netviz validate`, and CI should keep running the latter.
 
 `range` and `from` (§6.2.5, §6.6) are consumed by the loader, so the schema
 describes their *shape* — the bracket grammar, the reference grammar, that an
@@ -2563,7 +2563,7 @@ need the tree.
 
 ### 13.2 Per-file modeline
 
-`netgraph init` writes both halves of this section into a new inventory — the
+`netviz init` writes both halves of this section into a new inventory — the
 schema next to the tree, and the modeline below on every document it
 generates — so a scaffolded tree is wired up before it is first opened. What
 follows is for a tree that already exists.
@@ -2573,8 +2573,8 @@ configuration at all, which makes it the right choice for a small tree or for a
 file you want to be self-describing:
 
 ```yaml
-# yaml-language-server: $schema=https://raw.githubusercontent.com/netgraph/netgraph/main/schema/netgraph.schema.json
-apiVersion: netgraph.dev/v1alpha1
+# yaml-language-server: $schema=https://raw.githubusercontent.com/netviz/netviz/main/schema/netviz.schema.json
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-office
@@ -2583,7 +2583,7 @@ metadata:
 A relative path works too, and keeps the tree usable offline:
 
 ```yaml
-# yaml-language-server: $schema=../../schema/netgraph.schema.json
+# yaml-language-server: $schema=../../schema/netviz.schema.json
 ```
 
 ### 13.3 VS Code
@@ -2596,7 +2596,7 @@ path:
 ```json
 {
   "yaml.schemas": {
-    "./schema/netgraph.schema.json": [
+    "./schema/netviz.schema.json": [
       "inventory/**/*.yaml",
       "examples/**/*.yaml"
     ]
@@ -2617,13 +2617,13 @@ wrong place:
 
 <!-- norun: writes a schema file into the reader's directory -->
 ```console
-$ netgraph schema -k cable -o schema/netgraph-cable.schema.json
+$ netviz schema -k cable -o schema/netviz-cable.schema.json
 ```
 
 ```json
 {
   "yaml.schemas": {
-    "./schema/netgraph-cable.schema.json": ["inventory/**/cables/*.yaml"]
+    "./schema/netviz-cable.schema.json": ["inventory/**/cables/*.yaml"]
   }
 }
 ```
@@ -2634,12 +2634,12 @@ The schema is versioned with the documents it describes. Its `$id` carries the
 `apiVersion` it belongs to:
 
 ```
-https://netgraph.dev/schema/v1alpha1/element.json
-https://netgraph.dev/schema/v1alpha1/cable.json
+https://netviz.dev/schema/v1alpha1/element.json
+https://netviz.dev/schema/v1alpha1/cable.json
 ```
 
 A future `v1beta1` gets its own `$id` alongside this one rather than replacing
-it, so a tree pinned to `netgraph.dev/v1alpha1` keeps validating against the
+it, so a tree pinned to `netviz.dev/v1alpha1` keeps validating against the
 schema that matches it. §12's compatibility rules apply to the schema exactly as
 they apply to the format: within one `apiVersion` the schema only ever grows
 optional fields.
@@ -2650,7 +2650,7 @@ The schema constrains the *data* a YAML document parses to, so anything the
 parser decides before the schema sees it is out of reach. The one that bites in
 practice is an unquoted MAC address: a YAML 1.1 parser reads `12:34:56:12:34:56`
 as a sexagesimal integer, and by the time either the schema or the loader looks
-at it the original digits are gone. Quote MAC addresses (§5). netgraph's own
+at it the original digits are gone. Quote MAC addresses (§5). netviz's own
 loader detects the case and says so; an editor will simply report that a number
 is not a string.
 
@@ -2669,7 +2669,7 @@ mirrors the cable: the same `device:interface` endpoint grammar (§4.2), the
 same undirected semantics, the same namespace rules.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: tunnel
 metadata:
   name: ipsec-hq-branch
@@ -2684,7 +2684,7 @@ spec:
   cipher: aes-256-gcm
   auth: certificate
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: tunnel
 metadata:
   name: vx-100
@@ -2731,7 +2731,7 @@ only what it is called.
 
 * **Carries** decides whether the tunnel is a layer-2 link. A layer-2 tunnel
   extends a broadcast domain across the underlay, so it carries the VLANs its
-  endpoints are configured for and `netgraph render --layer l2` annotates it
+  endpoints are configured for and `netviz render --layer l2` annotates it
   exactly as it annotates a trunk. A layer-3 tunnel carries no VLAN.
 * **Encrypts** is a property of the technology, not of the deployment. PPTP is
   listed as cleartext deliberately: MPPE is broken, so a PPTP tunnel protects
@@ -2795,20 +2795,20 @@ It projects onto the interfaces at its ends:
 |---|---|
 | `endpoints[]` | the `if:interface` named by each reference, whose `if:type` is `ianaift:tunnel` |
 | `interfaces[].parent` on a `type: tunnel` interface | `if:lower-layer-if` — the underlay port the outer packets leave by |
-| `tunnel.mtu` | netgraph-only; RFC 8343 has no layer-2 MTU node (§9.2) |
-| `type`, `mode`, `vni`, `port`, `encrypted`, `cipher`, `auth`, `over` | netgraph-only. The IETF tunnel models (`ietf-ipsec`, RFC 9061) sit outside the three this schema maps to; see [`yang-mapping.md`](yang-mapping.md) |
+| `tunnel.mtu` | netviz-only; RFC 8343 has no layer-2 MTU node (§9.2) |
+| `type`, `mode`, `vni`, `port`, `encrypted`, `cipher`, `auth`, `over` | netviz-only. The IETF tunnel models (`ietf-ipsec`, RFC 9061) sit outside the three this schema maps to; see [`yang-mapping.md`](yang-mapping.md) |
 
 ### 14.5 The overlay view
 
-`netgraph render --layer overlay` draws the encapsulation graph: every tunnel
+`netviz render --layer overlay` draws the encapsulation graph: every tunnel
 becomes a node, joined to each element it terminates on and to the tunnel it
 runs inside. The tunnel has to become a node there because nesting is a relation
 between two *links*, and a link cannot end on a link — which is exactly why
 `VXLAN over IPsec` is undrawable at layer 1 and obvious here.
 
-Below that layer a point-to-point tunnel stays an edge, so `netgraph render`
+Below that layer a point-to-point tunnel stays an edge, so `netviz render`
 shows the VPNs over the physical topology without a box in the middle of each
-one. `netgraph list tunnels` prints the same resolution as a table.
+one. `netviz list tunnels` prints the same resolution as a table.
 
 ---
 
@@ -2826,7 +2826,7 @@ devices together directly — losing the two things a patch record exists for:
 which position the run occupies, and which position is still free.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: patchpanel
 metadata:
   name: pp-mdf-a
@@ -2861,7 +2861,7 @@ The zero padding of a span follows its *low* bound, as in §6.2.5: `01-12` yield
 A cable terminates on a panel position exactly as on a device port (§4.2):
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-sw-pp-07}
 spec:
@@ -2877,7 +2877,7 @@ spec:
 A panel is **not a hop**, so the same inventory has two honest readings and
 `build_graph` offers both.
 
-`netgraph render --layer physical`
+`netviz render --layer physical`
 : The cabling record. The panel is a node and each cable segment is an edge of
   its own, which is what a technician standing in the room would find.
 
@@ -2902,8 +2902,8 @@ when the two devices are cabled together directly.** That equivalence is what
 makes the panel free to model: adding one to a correct inventory cannot change
 any layer but `physical`.
 
-The spliced edge remembers what it crossed. `netgraph render -f json` exports it
-as a `patch` object naming the segments and the positions, `netgraph path` names
+The spliced edge remembers what it crossed. `netviz render -f json` exports it
+as a `patch` object naming the segments and the positions, `netviz path` names
 the panels on the link line — as a pass-through, never as a waypoint, because a
 panel takes no decision — and an SVG tooltip lists the same record.
 
@@ -2928,7 +2928,7 @@ dropped from every spliced layer and stays visible at `--layer physical`.
 A patch panel has no YANG counterpart: RFC 8343 models interfaces of a *system*,
 and a panel is not one. Its derived positions are described here as
 `if:interface` entries of type `ianaift:ethernetCsmacd` for internal consistency
-only; nothing exports them, and `couplers` is netgraph's own.
+only; nothing exports them, and `couplers` is netviz's own.
 
 ---
 
@@ -2958,7 +2958,7 @@ silent.
 
 **There is nowhere to put a secret.** As with tunnels (§14.2), a BGP password or
 an OSPF authentication key has no field: a secret in an inventory is a secret in
-version control, and netgraph has no use for one.
+version control, and netviz has no use for one.
 
 ### 16.1 `vrfs[]` — routing instances
 
@@ -2992,21 +2992,21 @@ otherwise.
 another address in the same instance, so `10.0.0.1/24` in `blue` and
 `10.0.0.1/24` in the global table are two addresses and not a duplicate
 (`NG-A004`); two interfaces of one device may hold overlapping prefixes when
-they are in different instances (`NG-A006`); and `netgraph list subnets`,
-`netgraph ipam` and `--layer l3` each report one row, one prefix and one node
+they are in different instances (`NG-A006`); and `netviz list subnets`,
+`netviz ipam` and `--layer l3` each report one row, one prefix and one node
 *per instance*. That is the whole reason to model a VRF: it is a routing table
 of its own, so it is an address space of its own.
 
 Two devices that use the same `name` are taken to mean the same VRF — that is
 what an operator means by "the blue VRF". The route distinguisher is recorded
-because MPLS needs it, not because netgraph identifies the instance by it.
+because MPLS needs it, not because netviz identifies the instance by it.
 
 A VRF nothing is bound to holds no address and no connected route, so the
 isolation it was declared to create does not exist; that is `NG-F014`.
 
 > **Quote the `rd`.** `65001:59` is the base-60 integer 3900059 to a YAML 1.1
 > reader and `65001:99` is a string, so the class is quoted whole — exactly as
-> MAC addresses are (§5). `netgraph fmt` adds the quotes if you forget them.
+> MAC addresses are (§5). `netviz fmt` adds the quotes if you forget them.
 
 An adapter has no `vrfs` of its own and its interfaces may not declare `vrf`
 (`NG-F002`): an adapter is a *port* of the host it hangs off, and the routing
@@ -3046,7 +3046,7 @@ second table, it is a document that has stopped describing the device.
 
 **A VRF is a table too.** `table: mgmt` resolves against `spec.vrfs` as readily
 as against `spec.route_tables` (`NG-F019`) — a routing instance *is* a routing
-table, which is the whole of §16.1. What netgraph does not have for it is a
+table, which is the whole of §16.1. What netviz does not have for it is a
 *number*: a route distinguisher identifies the VRF in BGP and says nothing about
 which table an implementation gave it, so every emitter that needs a number
 refuses rather than inventing one, and says so in its manifest.
@@ -3102,7 +3102,7 @@ both is a contradiction rather than a refinement (`NG-F018`).
 
 Nothing here computes a best path. `metric` is recorded, routes are not sorted,
 and two routes for one prefix are two declarations rather than a decision:
-netgraph describes the configuration, and which route wins is the device's
+netviz describes the configuration, and which route wins is the device's
 business.
 
 ### 16.4 `routing_policy[]` — policy-based routing
@@ -3176,7 +3176,7 @@ and is refused (`NG-F016`).
 **Priority is the rule's identity.** It is where the rule sits in the walk, and
 it is what makes a document say what the device does: two rules of one family at
 one priority leave the order they are consulted in unstated, which is `NG-F020`.
-The document may list them in any order — netgraph sorts by priority everywhere
+The document may list them in any order — netviz sorts by priority everywhere
 it shows the database, because that is the only order in which the list means
 anything.
 
@@ -3196,8 +3196,8 @@ no protocol field: the portable way to route by port, by user or by application
 is to *mark* the packet where marking belongs and match `fwmark` here. See
 §16.7.
 
-`netgraph export routes` writes the database as `ip rule` commands beside the
-routes it selects; `netgraph export networkd` writes it as
+`netviz export routes` writes the database as `ip rule` commands beside the
+routes it selects; `netviz export networkd` writes it as
 `[RoutingPolicyRule]` sections. See [`docs/export.md`](export.md).
 
 ### 16.5 `routing` — dynamic protocols
@@ -3250,7 +3250,7 @@ modelling it needs per-interface areas; see §16.7.
 ### 16.6 Peers are addresses, never names
 
 A BGP neighbour is written as an **address**, because that is what the device is
-configured with. netgraph resolves it against every address the inventory
+configured with. netviz resolves it against every address the inventory
 declares, and that resolution is what draws the session in the routing view and
 what lets the two ends be compared:
 
@@ -3259,14 +3259,14 @@ what lets the two ends be compared:
 * an address that matches nothing is a **warning**, not an error (`NG-F013`): a
   correct eBGP session towards a transit provider points at an address on
   *their* router, which is not an element of this inventory and never will be.
-  What the warning says is that netgraph cannot check the far end, and that the
+  What the warning says is that netviz cannot check the far end, and that the
   diagram has nothing to draw the edge to.
 
 There is deliberately no second reference grammar. A `peer: rtr-south-core-01`
 field would be a name that could point somewhere the *device* does not, which is
 the one thing an inventory must not be able to say.
 
-An OSPF adjacency is not declared at all. It is **discovered**, so netgraph
+An OSPF adjacency is not declared at all. It is **discovered**, so netviz
 derives it the way the protocol does: two interfaces that run OSPF in the same
 area and are addressed in one subnet form one. Deriving it from the addressing
 rather than from the cables is what makes it right for two routers facing each
@@ -3303,11 +3303,11 @@ Deferred, and listed so nobody designs around the absence:
   rather than describing one.
 * **Learned state**. `spec.routes` is what somebody configured; a routing table
   is what a router computed from it, and comparing the two is
-  `netgraph drift`'s business, not the schema's.
+  `netviz drift`'s business, not the schema's.
 
 ### 16.8 The routing view
 
-`netgraph render --layer routing` draws the control plane:
+`netviz render --layer routing` draws the control plane:
 
 * **Nodes** are the elements that take part in routing — anything declaring
   `routing`, `routes`, `vrfs`, `route_tables` or `routing_policy` — labelled
@@ -3326,13 +3326,13 @@ Deferred, and listed so nobody designs around the absence:
 Nothing physical appears. Two routers are adjacent here because they exchange
 routes, which a cable neither guarantees nor is needed for.
 
-`netgraph export routes` writes the same static routes and the same policy
+`netviz export routes` writes the same static routes and the same policy
 database out as an iproute2 script, one shell function per device; see
 [`docs/export.md`](export.md).
 
 ### 16.9 YANG mapping
 
-| netgraph | YANG |
+| netviz | YANG |
 |---|---|
 | `spec.vrfs[].name` | `/ni:network-instances/ni:network-instance/ni:name` (RFC 8529) |
 | `spec.vrfs[].description` | `…/ni:network-instance/ni:description` |
@@ -3344,7 +3344,7 @@ database out as an iproute2 script, one shell function per device; see
 | `spec.routes[].blackhole` | `…/v4ur:route/v4ur:next-hop/v4ur:special-next-hop` = `blackhole` |
 | `spec.routes[].metric` | — (`ietf-routing` leaves the metric to each protocol) |
 | `spec.routes[].table` | — (`ietf-routing` has one RIB per network instance and no second table inside it) |
-| `spec.route_tables[]` | — (the same; a table is a netgraph-level container, as it is an iproute2-level one) |
+| `spec.route_tables[]` | — (the same; a table is a netviz-level container, as it is an iproute2-level one) |
 | `spec.routing_policy[]` | — (no IETF module models the routing policy database; `ietf-routing-policy` is *route* policy, which is §16.7) |
 | `spec.routing.ospf` | `…/rt:control-plane-protocols/rt:control-plane-protocol` with `type: ospf` |
 | `spec.routing.bgp` | the same list entry with `type: bgp` |
@@ -3383,7 +3383,7 @@ only silent — power is additive, exactly as routing is (§16).
 a reading: a number a file claims about a live load is stale before the file is
 saved. `draw_watts` and `capacity_watts` are the nameplate figures a load
 schedule is built from, and comparing them with what a meter says is
-`netgraph drift`'s business, not the schema's.
+`netviz drift`'s business, not the schema's.
 
 ### 17.1 Power distribution units
 
@@ -3401,7 +3401,7 @@ are what a load schedule is, and the second is the one that catches a rack fed
 from a single unit.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: pdu
 metadata:
   name: pdu-r1-a
@@ -3416,7 +3416,7 @@ spec:
   capacity_watts: 3680
   input_feed: A
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: pdu
 metadata:
   name: pdu-r1-b
@@ -3464,7 +3464,7 @@ the strip.
 
 **Placement is `metadata.location`, unchanged** (§3.2). A PDU is racked hardware
 like anything else, so it takes the same block, and a `position` is what puts it
-in a slot of `netgraph render --layer rack` — where the elevation annotates it
+in a slot of `netviz render --layer rack` — where the elevation annotates it
 with how full the unit is (§17.5). The two strips above name a rack and *no*
 `position`, which is the honest model of a 0U vertical unit: it occupies no rack
 unit, so it is in the room without being in a slot, it collides with nothing
@@ -3475,7 +3475,7 @@ a `position` like any other 1U box, and appears on it.
 independent if they are fed from different places, and the inventory has no way to
 know whether they are unless somebody writes it down. `input_feed` is free text on
 purpose: what counts as "a different feed" is site knowledge — two utility feeds,
-two UPS strings, a UPS and a generator — and netgraph's job is to notice that two
+two UPS strings, a UPS and a generator — and netviz's job is to notice that two
 feeds a device calls redundant carry the same name (`NG-E015`), not to decide what
 the names mean.
 
@@ -3489,7 +3489,7 @@ question — where does the power in this box come from and go to — and splitt
 it would put two halves of one answer in two places.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-app-01
@@ -3656,7 +3656,7 @@ other reason the two are not interchangeable.
 #### A PoE access switch
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-access-01
@@ -3682,7 +3682,7 @@ spec:
       type: ethernet
       poe: {standard: 802.3at, enabled: false}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: ap-floor-1
@@ -3707,7 +3707,7 @@ spec:
           - ssid: hq-corp
             security: wpa2-psk
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: cam-lobby-01
@@ -3725,7 +3725,7 @@ spec:
       ipv4:
         addresses: [10.1.60.21/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-sw-ap-01}
 spec:
@@ -3733,7 +3733,7 @@ spec:
   medium: copper
   category: cat6
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata: {name: cbl-sw-cam-01}
 spec:
@@ -3760,7 +3760,7 @@ devices would be a second place for the same fact to be wrong.
 
 **A PoE feed is derived.** A device that says `powered_by: poe` takes its power
 over the run that carries its traffic, so nothing declares the feed at all:
-netgraph walks that run to the far end and looks for a `poe` block on the port it
+netviz walks that run to the far end and looks for a `poe` block on the port it
 lands on. The walk **crosses patch panels** — a run that enters `front/7`
 continues from `rear/7`, because a run through a panel is electrically one run,
 for power exactly as for frames (§15.2) — since a ceiling access point patched
@@ -3803,7 +3803,7 @@ device's draw: that is what the switch sets aside. Its PD-side counterpart is wh
 
 ### 17.5 The power view
 
-`netgraph render --layer power` draws the distribution plant:
+`netviz render --layer power` draws the distribution plant:
 
 * **Nodes** are the PDUs and everything the inventory says draws or sources power.
   A PDU is not in the topology at all — it owns no interfaces (§17.1) — so its
@@ -3822,10 +3822,10 @@ device's draw: that is what the switch sets aside. Its PD-side counterpart is wh
 how full it is, everything else shows what it draws. That is the one question an
 elevation cannot otherwise answer, which is whether the rack can take another box.
 
-### 17.6 `netgraph list power`
+### 17.6 `netviz list power`
 
 One row per PDU — feed, outlets, used, free, capacity, load, failover, utilisation
-and the number of loads — shaped after the `netgraph ipam` utilisation table and
+and the number of loads — shaped after the `netviz ipam` utilisation table and
 for the same reason: the question is capacity planning, so the columns are what is
 there, what is used, what is left, and the percentage that decides whether
 anybody has to act. `LOAD` is the normal-operation figure `NG-E012` grades;
@@ -3834,7 +3834,7 @@ rack has the two the same; an A/B pair does not.
 
 ### 17.7 The load schedule
 
-`netgraph export power` writes the electrical counterpart of the pull list: one
+`netviz export power` writes the electrical counterpart of the pull list: one
 row per **feed**, with both ends located — which outlet, on which strip, on which
 feed, powering which box in which rack unit, drawing how many watts. A
 dual-corded server is two rows, which is the point. A PoE-powered camera is a row
@@ -3885,7 +3885,7 @@ inventory for being incomplete rather than for being wrong.
 Everything above describes the network. This section describes the *drawing* of
 it, and it is the one part of the schema that carries no network fact at all.
 
-A diagram netgraph lays out from scratch on every render cannot be arranged: drag
+A diagram netviz lays out from scratch on every render cannot be arranged: drag
 a switch to where it belongs and the next render puts it back, because nothing in
 the tree remembers that you moved it. A `kind: layout` document is what remembers.
 Once every node in a view has a position, the renderers reproduce the arrangement
@@ -3893,7 +3893,7 @@ exactly — the same coordinates in the SVG, in the HTML and in the JSON export 
 and the layout engine is asked to place nothing.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: layout
 metadata:
   name: default
@@ -3918,7 +3918,7 @@ spec:
 
 A layout is a document kind, like `template` (§6.6), and not an element. It is
 never indexed among the elements, never drawn as a node, never listed by
-`netgraph list`, never cabled and never counted. It names elements; it does not
+`netviz list`, never cabled and never counted. It names elements; it does not
 join them.
 
 The alternative — `spec.position` on each device — was considered and rejected;
@@ -3936,7 +3936,7 @@ short version:
 
 Several layout documents may coexist — one per site, one per audience. They are
 merged per view; where two place the same node, the first in load order wins and
-`netgraph layout` reports the conflict.
+`netviz layout` reports the conflict.
 
 ### 18.2 Coordinates
 
@@ -3951,7 +3951,7 @@ be converted wrongly.
 
 A point is written `{x: 240, y: 396}` or, as shorthand, `[240, 396]`. A size is
 `{width: 220, height: 90}` or `[220, 90]`. Both spellings mean the same thing,
-both are read, and `netgraph layout` leaves whichever one it finds alone when the
+both are read, and `netviz layout` leaves whichever one it finds alone when the
 value has not changed.
 
 ### 18.3 Views
@@ -3982,8 +3982,8 @@ An edge key is a cable's or a tunnel's address, or the synthetic id of a derived
 edge. A group key is a namespace.
 
 A key naming nothing the inventory declares is `NG-Y001` — a **warning**, not an
-error. Deleting a switch must not make `netgraph validate` fail, and geometry for
-a node that is not in the diagram places nothing. `netgraph layout --prune` drops
+error. Deleting a switch must not make `netviz validate` fail, and geometry for
+a node that is not in the diagram places nothing. `netviz layout --prune` drops
 them.
 
 ### 18.5 What is stored
@@ -4000,11 +4000,11 @@ them.
 | `groups.<namespace>.position` | yes | the centre of the cluster box |
 | `groups.<namespace>.size` | yes | its extent; nothing else decides how big a cluster is |
 
-`size` on a node is optional, and is written by `netgraph layout --write` only
+`size` on a node is optional, and is written by `netviz layout --write` only
 for a node a stored route leaves from. Graphviz derives the same box from the
 same label on every run, so a stored size otherwise buys the renderer nothing
-and goes stale the moment a device grows an interface — but a route netgraph
-computes itself has to stop at the shape it runs into, and netgraph cannot
+and goes stale the moment a device grows an interface — but a route netviz
+computes itself has to stop at the shape it runs into, and netviz cannot
 measure a label, so for those nodes the size is a fact the drawing needs. It is
 honoured on read wherever it appears, for an editor that lets somebody resize a
 box on purpose.
@@ -4018,7 +4018,7 @@ key out.
 nodes themselves, so moving either device carries the bends along instead of
 stranding them — which is what makes a hand-routed trunk worth placing. An entry
 with no waypoints is a link running directly between its two nodes. They are
-honoured but not seeded unless `netgraph layout --write --waypoints` is asked
+honoured but not seeded unless `netviz layout --write --waypoints` is asked
 for: a computed route is a handful of points per link that the render recomputes
 identically, while a hand-placed bend is a decision worth keeping.
 
@@ -4045,13 +4045,13 @@ Per view, and decided from the drawing rather than from the document:
 | some nodes | `partial` | those are pinned and the engine places the rest around them |
 | every node | `fixed` | the engine places nothing; the drawing *is* the arrangement |
 
-In `fixed` mode netgraph also draws the namespace cluster frames itself, from the
+In `fixed` mode netviz also draws the namespace cluster frames itself, from the
 stored group boxes, because the no-op layout engine does not draw clusters. A
 frame is therefore where you put it rather than wherever a layout happened to
 land; its caption sits centred above it rather than inside it, for the reason in
 [`docs/follow-ups.md` §17](follow-ups.md).
 
-A link's geometry follows the same split. In `fixed` mode netgraph computes each
+A link's geometry follows the same split. In `fixed` mode netviz computes each
 route itself and hands Graphviz the finished line, which is the only way a
 *per-link* routing style can be expressed at all — Graphviz has a graph-wide
 `splines` attribute and nothing per edge — and it is also the only mode in which
@@ -4064,16 +4064,16 @@ that story in full, with a worked example.
 The `json` renderer publishes the coordinates — a `layout` object per node, per
 edge and at the top level — so a client can draw the graph without running
 Graphviz at all. An edge's object carries both what the document pinned
-(`waypoints`, `routing`, `label`) and, in `fixed` mode, the line netgraph drew
+(`waypoints`, `routing`, `label`) and, in `fixed` mode, the line netviz drew
 (`route`, `controls`, `drawnAs`).
 
 ### 18.7 Rules
 
 | Rule | Severity | Statement |
 |---|---|---|
-| `NG-Y001` | warning | Every key names something the inventory declares. `netgraph layout --prune` drops the rest. |
+| `NG-Y001` | warning | Every key names something the inventory declares. `netviz layout --prune` drops the rest. |
 | `NG-Y002` | error | Two layout documents in one namespace do not share a name. |
-| `NG-Y003` | error | A view is one of the layers netgraph draws, a coordinate is a finite number, and a size is positive. |
+| `NG-Y003` | error | A view is one of the layers netviz draws, a coordinate is a finite number, and a size is positive. |
 
 ---
 
@@ -4100,7 +4100,7 @@ about ports — the same arrangement a `pdu` has (§17.1), and for the same reas
 ### 19.1 `user`
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: user
 metadata:
   name: ana
@@ -4139,7 +4139,7 @@ worklist.
 ### 19.2 `group`
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata:
   name: household
@@ -4164,19 +4164,19 @@ is the side an access rule is written against ("the `vpn` group may dial in") an
 because the count that matters — how many people can do this? — is then a
 property of one document rather than a search across all of them.
 
-The reverse index is *derived*: `netgraph list users` prints a `GROUPS` column,
+The reverse index is *derived*: `netviz list users` prints a `GROUPS` column,
 and it is the one fact about a person their own file cannot state.
 
 **Nesting** is what makes a hierarchy expressible: `everyone` holds
 `engineering`, which holds `ana`, and `ana` is in `everyone` without being listed
-twice. `netgraph list groups` prints both numbers — `HOLDS` is what the document
+twice. `netviz list groups` prints both numbers — `HOLDS` is what the document
 names, `PEOPLE` is how many accounts the group reaches once the nesting has been
 walked — because the second is what an access rule actually grants to and no
 single document holds it.
 
 ### 19.3 The identity view
 
-`netgraph render --layer identity` draws the identities and nothing else.
+`netviz render --layer identity` draws the identities and nothing else.
 
 **Nodes** are the `user` and `group` documents. A user is drawn as an oval, the
 shape every organisation chart uses for a person; a group as a folder, because
@@ -4230,10 +4230,10 @@ assumed.
 An inventory records what the network *is*. A `kind: testsuite` document records
 what somebody is **relying on** — that the tills reach the payment gateway, that
 the guest VLAN reaches nothing else, that no two switches claim the same
-management address — and `netgraph test` grades it, exiting non-zero when one of
+management address — and `netviz test` grades it, exiting non-zero when one of
 those claims has stopped being true.
 
-The distinction from `netgraph validate` is the whole point of the kind.
+The distinction from `netviz validate` is the whole point of the kind.
 Validation says whether the *files* are coherent: a cable endpoint resolves, an
 address is inside its subnet, a VLAN is declared before it is trunked. Every one
 of its rules is a statement about inventories in general, which is exactly why it
@@ -4242,7 +4242,7 @@ fact about *this* network, known only to the people who built it, and until it i
 written down it survives only as long as the person who remembers it.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: testsuite
 metadata:
   name: connectivity
@@ -4269,7 +4269,7 @@ spec:
 
 A test suite is **not an element**, for the same reasons `layout` (§18) and
 `template` (§6.6) are not: it declares no device, terminates no cable, is never
-drawn as a node and is never listed by `netgraph list`. It is indexed in a name
+drawn as a node and is never listed by `netviz list`. It is indexed in a name
 space of its own, so a suite called `core` next to a switch called `core` is not
 a clash — nothing ever resolves one where the other is meant.
 
@@ -4330,7 +4330,7 @@ is not how, which is the shape a segmentation requirement actually has.
 
 ### 20.3 Selectors
 
-`select` is written in the vocabulary `netgraph render` already filters with,
+`select` is written in the vocabulary `netviz render` already filters with,
 spelled as one scalar because a YAML document has nowhere to put a repeated flag:
 
 ```yaml
@@ -4345,7 +4345,7 @@ repeated flag is (`kind=switch, kind=router` selects both); different keys are
 combined with AND. It parses to the very same filter the renderer uses, so an
 assertion and a diagram cannot disagree about what `kind=switch` selects.
 
-`from` and `to` take the three spellings `netgraph path` takes — an element,
+`from` and `to` take the three spellings `netviz path` takes — an element,
 `element:interface`, or an IP address — and, when they contain `=` or a globbing
 character, a selector. `from: name=sw-*-acc-*` with `to: sw-dist-01` is "every
 access switch reaches the distribution switch", one line instead of twelve; the
@@ -4360,7 +4360,7 @@ graded against nothing is a test that reports green having checked nothing.
 above cannot. It is the whole selector language: attribute predicates over the
 resolved model, existential scopes over interfaces, links, namespaces and zones,
 and bounded graph traversal, combined with `and` / `or` / `not` and grouping.
-[`docs/query.md`](query.md) is its reference; `netgraph query --explain` prints
+[`docs/query.md`](query.md) is its reference; `netviz query --explain` prints
 its grammar.
 
 ```yaml
@@ -4419,7 +4419,7 @@ The group is lettered `K`, for *check*: `NG-C` was spent on cables and `NG-T` on
 tunnels, so neither obvious initial was available. `NG-K001` to `NG-K003` are
 reported while
 the document is read and are not suppressible. A false assertion is not a rule
-violation at all — it is a failing test, reported by `netgraph test` against the
+violation at all — it is a failing test, reported by `netviz test` against the
 assertion's own file and line.
 
 | ID | Sev. | Rule |
@@ -4434,7 +4434,7 @@ assertion's own file and line.
 
 A diagram is not only its devices. A callout saying *why* a link is orange, a
 dashed box round the DMZ, a key explaining what the colours mean — every
-diagramming tool has them, and until this revision netgraph had nowhere to write
+diagramming tool has them, and until this revision netviz had nowhere to write
 one down. Whatever somebody added to an exported drawing was lost the next time
 the picture was rendered, which is a hole in the one-to-one contract between the
 visual form and the textual one that this specification exists to keep.
@@ -4443,7 +4443,7 @@ Three kinds close it. A `note` is a callout, an `area` is a zone, a `legend` is
 a key:
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: why-orange
@@ -4455,7 +4455,7 @@ spec:
     link: cables/cbl-annexe
   color: "#fef3c7"
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: dmz
@@ -4464,7 +4464,7 @@ spec:
   members: [edge/fw-1, edge/srv-proxy]
   color: "#fee2e2"
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: legend
 metadata:
   name: key
@@ -4479,21 +4479,21 @@ rather than a property of the current implementation. It is barred from:
 
 * **validation** — the only two rules §21.4 defines about an annotation's content
   are warnings, and no annotation can produce an error that fails a build.
-  Deleting a switch must not stop `netgraph validate` because somebody once wrote
+  Deleting a switch must not stop `netviz validate` because somebody once wrote
   a note about it;
 * **the graph** — a view with three annotation documents has exactly the nodes
   and the edges of the same view without them, at every layer;
-* **`netgraph path`** — nothing an annotation says can move a hop, add one, or
+* **`netviz path`** — nothing an annotation says can move a hop, add one, or
   change which route is shortest;
-* **`netgraph plan` and `netgraph apply`** — the infrastructure half of a
+* **`netviz plan` and `netviz apply`** — the infrastructure half of a
   changeset is byte-identical with the annotations in the tree and without them.
   They are addressed after it, never paired with an element by rename detection,
   and never proposed for removal by an import;
 * **generated device configuration** — nothing the configuration dialects of
-  `netgraph export` write for a device — `netplan`, `networkd`, `ifupdown`,
+  `netviz export` write for a device — `netplan`, `networkd`, `ifupdown`,
   `frr`, `wireguard` — knows that a note about it exists.
 
-That bar is what makes the three kinds safe to add at all. netgraph's argument
+That bar is what makes the three kinds safe to add at all. netviz's argument
 is that the diagram and the network description should be one artefact, and the
 price of that argument is that the description is also what generates
 configuration and answers "can these two hosts reach each other". A decorative
@@ -4507,7 +4507,7 @@ equality rather than as a spot check.
 **They are sidecars, not elements.** Like `layout` (§18) and `testsuite` (§20),
 an annotation is a document kind and not an element: it declares no network
 fact, owns no interface, terminates no cable, is never drawn as a node, is never
-resolvable as a cable endpoint and is never listed by `netgraph list`. It names
+resolvable as a cable endpoint and is never listed by `netviz list`. It names
 elements; it does not join them.
 
 Each of the three is indexed in **a name space of its own**. A note called
@@ -4547,13 +4547,13 @@ picture of it; `views: [l3]` is for the remark that only makes sense once the
 diagram is prefixes rather than cables.
 
 `color` is a hex colour and **nothing else**: no `red`, no `rgb()`, no `hsl()`,
-no palette names of netgraph's own. That is deliberately narrow. The same value
+no palette names of netviz's own. That is deliberately narrow. The same value
 has to reach a Graphviz attribute, a Mermaid `classDef`, an SVG fill and an
 mxGraph style, and `#rrggbb` is the one syntax all four agree about — an
 annotation whose colour rendered in one exporter and came out black in another
 would be worse than one with no colour at all. It is lower-cased on load, so two
 documents that mean the same colour compare equal and a change of case does not
-show up in `netgraph plan`. The outline is derived from the fill rather than
+show up in `netviz plan`. The outline is derived from the fill rather than
 configured separately, so a custom colour brings its own matching stroke and
 there is no second field for somebody to leave inconsistent.
 
@@ -4653,7 +4653,7 @@ note produces, so it has to be expressible — reading it any other way would me
 an editor could not write back what somebody had just done.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: note
 metadata:
   name: ups-boundary
@@ -4724,7 +4724,7 @@ opposite ends — which is why a namespace clause matches the whole subtree rath
 than one level of it.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: north-site
@@ -4735,7 +4735,7 @@ spec:
   border: solid
   padding: 24
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: area
 metadata:
   name: on-the-ups
@@ -4792,7 +4792,7 @@ and words, so it names nothing that can go missing.
 | `description` | string | O | *unset* | A second line, for the row that needs one. |
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: legend
 metadata:
   name: media
@@ -4821,7 +4821,7 @@ The group is lettered `G`, for *graphic*: `NG-A` was spent on addresses and
 |---|---|---|
 | `NG-G001` | warning | Every `anchor` and every `members` entry names something the inventory declares. Reported as `W142`; the stale reference is dropped and the rest of the annotation is still drawn. |
 | `NG-G002` | error | Two annotation documents of one kind in one namespace do not share a name. The first declaration wins and the second is ignored, which keeps loading deterministic. |
-| `NG-G003` | error | Every *value* an annotation carries is well formed: a colour is `#rgb` or `#rrggbb`, a view is one netgraph draws, a text is not empty. |
+| `NG-G003` | error | Every *value* an annotation carries is well formed: a colour is `#rgb` or `#rrggbb`, a view is one netviz draws, a text is not empty. |
 | `NG-G004` | warning | An area's `selector` matches at least one element. Reported as `W143`; the box is not drawn. |
 | `NG-G005` | error | An annotation's fields *agree*: an anchor names exactly one of `element` and `link`, a position has both `x` and `y`, a note is anchored or placed, an area encloses something, a selector narrows something, and a legend is generated or written out but not both. |
 
@@ -4829,7 +4829,7 @@ The group is lettered `G`, for *graphic*: `NG-A` was spent on addresses and
 which is what an *editor* does with them. A gesture is several writes: dragging
 a note that has never been placed writes `spec.geometry.x` and then
 `spec.geometry.y`, and between those two the document says something `NG-G005`
-forbids. So `netgraph edit` refuses a write that trips `NG-G003` the moment it
+forbids. So `netviz edit` refuses a write that trips `NG-G003` the moment it
 is made — `color: red` is wrong when it is typed and wrong afterwards — and lets
 one that trips `NG-G005` through, leaving it to the gate that judges the
 finished batch. A batch is atomic, so a document that is still incoherent when
@@ -4856,7 +4856,7 @@ prevent.
 ## 22. Per-element styling and themes
 
 A diagram somebody has to read has a colour scheme, and until this revision
-netgraph had nowhere to write one down. The core switches were navy because a
+netviz had nowhere to write one down. The core switches were navy because a
 person remembered to pass a flag, or because somebody edited the exported SVG
 afterwards, and neither of those survives the next render. That is the hole §21
 closed for callouts, seen from the other side: what an element *looks like* is a
@@ -4869,7 +4869,7 @@ block; and a rendering may be given a stylesheet — a `kind: theme` document �
 that says how a whole *class* of them is drawn:
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-core-01
@@ -4898,7 +4898,7 @@ hardware. That is deliberate. Appearance is a property of the thing rather than
 a second object to keep in step with it, there is no key to go stale when the
 switch is renamed, and a `git mv` of the file moves the colour with it. The
 price is real and worth stating plainly: repainting a switch **is** an edit to
-that switch's document, so `netgraph plan` will show it and a reviewer will see
+that switch's document, so `netviz plan` will show it and a reviewer will see
 it in the diff. Unlike an annotation, a style is not invisible to the
 changeset — it is only invisible to the network.
 
@@ -4907,9 +4907,9 @@ current implementation:
 
 * **the graph** — a view drawn with a stylesheet has exactly the nodes and the
   edges of the same view drawn without one, at every layer;
-* **`netgraph path`** — no colour moves a hop, adds one, or changes which route
+* **`netviz path`** — no colour moves a hop, adds one, or changes which route
   is shortest;
-* **generated device configuration** — nothing `netgraph export` writes for a
+* **generated device configuration** — nothing `netviz export` writes for a
   device (`netplan`, `networkd`, `ifupdown`, `frr`, `wireguard`) knows that a
   fill exists;
 * **failing a build over the *network*** — the two semantic rules §22.7 defines
@@ -4955,7 +4955,7 @@ palette, and anything more particular is spelled as hex, which is always
 accepted. The hues are the ones the built-in palette already draws with, so
 `fill: green` is the green a switch has by default rather than a second,
 slightly different one. The spelling is *kept*: `navy` is what the user wrote
-and what `netgraph fmt` leaves in the file, and the resolution to `#1e3a8a`
+and what `netviz fmt` leaves in the file, and the resolution to `#1e3a8a`
 happens once, on the way to a renderer.
 
 **Shapes** are `box`, `rounded`, `ellipse`, `circle`, `diamond`, `hexagon`,
@@ -4999,7 +4999,7 @@ level too far.
 
 Three keys — `strokeWidth`, `fontColor`, `fontSize` — are camelCase, which is
 the one exception to §1's rule and is called out here rather than left for a
-reader to trip over. They are the spellings SVG, mxGraph and netgraph's own JSON
+reader to trip over. They are the spellings SVG, mxGraph and netviz's own JSON
 export already use, and a style block is the one part of a document that is read
 and written by *drawing* tools rather than by network ones. Spelling them
 `stroke_width` in YAML and `strokeWidth` everywhere else would mean the same
@@ -5009,7 +5009,7 @@ being set twice and read once.
 A link is styled the same way:
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-annexe
@@ -5031,7 +5031,7 @@ which is the next section.
 ### 22.2 Why the vocabulary is closed
 
 Every value above ends up inside a Graphviz attribute, an mxGraph style string
-or an SVG attribute, and all three are text formats that netgraph *generates*. A
+or an SVG attribute, and all three are text formats that netviz *generates*. A
 free-form pass-through would mean a fill of `red", shape="none` reaching a DOT
 file, or `#fff;shape=image;image=data:...` reaching a draw.io style. Both are
 injection, and an inventory — pulled from a branch, merged from a contributor,
@@ -5044,7 +5044,7 @@ on the way out, where a shape the renderer does not recognise falls back to a
 box rather than being written through. Nothing typed into a manifest reaches an
 output format unvalidated.
 
-The cost is that netgraph cannot express everything Graphviz can, and that is
+The cost is that netviz cannot express everything Graphviz can, and that is
 accepted rather than regretted: a diagram whose appearance is portable across
 four backends is worth more than one that can set `peripheries=3` in exactly one
 of them. What the closure buys back, beyond the safety, is a diagnostic worth
@@ -5066,13 +5066,13 @@ rather than a network, and one inventory is legitimately drawn several ways — 
 operations diagram, a black-and-white one for the wall, a simplified one for a
 slide. Keeping it out of the tree is what makes `--theme` a switch rather than
 an edit, and what stops a file somebody added to a shared folder from silently
-restyling everybody else's diagrams. The envelope is netgraph's regardless,
+restyling everybody else's diagrams. The envelope is netviz's regardless,
 because a file with `apiVersion` and `kind` at the top is what a reader of this
 project already knows how to look at, and it is read by the same strict loader
 the manifests are — no custom tags, no duplicate keys. One document per file.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: theme
 metadata:
   name: house
@@ -5126,7 +5126,7 @@ spec:
 
 Every clause is a set of alternatives, any one of which matches, and a bare
 string is accepted for the common single-value case — `kind: router` and
-`kind: [router]` are the same rule, the same shorthand `netgraph.toml` takes for
+`kind: [router]` are the same rule, the same shorthand `netviz.toml` takes for
 its repeatable options. Clauses are **conjunctive**: every clause a selector
 states must hold. An omitted clause is not a wildcard so much as an absent
 condition, and a rule with *no* clauses matches everything — which is how a
@@ -5161,7 +5161,7 @@ colour for the tiers, so it survives a black-and-white print. `mono` takes the
 colour away entirely — shape carries the kind and the line pattern carries the
 medium — which is the rule the built-in palette already follows and which `mono`
 makes literal, for a photocopier or a colour-blind reader. Both are worth
-reading as worked examples; they live in `netgraph/render/themes/`.
+reading as worked examples; they live in `netviz/render/themes/`.
 
 ### 22.4 Precedence: the ladder
 
@@ -5226,7 +5226,7 @@ publishes it (§22.6) so a consumer drawing the graph itself gets the same
 colours for the same reasons.
 
 What the ladder does **not** decide is emphasis. A `--highlight` and a
-`netgraph diff` overlay are applied on top of a resolved style and win over it,
+`netviz diff` overlay are applied on top of a resolved style and win over it,
 because a removed device drawn in the user's chosen navy instead of red would
 make the diff unreadable. The point of an overlay is that it is louder than the
 drawing underneath it.
@@ -5235,16 +5235,16 @@ drawing underneath it.
 
 Three places, and they compose rather than compete:
 
-* **`--theme NAME|PATH`** on `netgraph render` and `netgraph export`. A bundled
+* **`--theme NAME|PATH`** on `netviz render` and `netviz export`. A bundled
   name (`blueprint`, `mono`), a path to a `kind: theme` file (`.yaml` or
   `.yml`), or `none` to turn one off — the same three spellings `--icons` takes,
   for the same reason. A theme that does not exist, or whose colours do not
   parse, is reported as a usage error naming the option before the inventory is
   loaded.
-* **`[render] theme`** in `netgraph.toml`: the default for this inventory, so
+* **`[render] theme`** in `netviz.toml`: the default for this inventory, so
   the colours do not depend on somebody's shell history. A relative path
   resolves against the *configuration file* rather than the working directory —
-  the file lives with the inventory, and a colleague who runs `netgraph` from a
+  the file lives with the inventory, and a colleague who runs `netviz` from a
   parent folder must get the same picture.
 * **a `[theme]` table** in the same file, declaring rules inline, for the
   inventory that wants three lines of house style and not a second file to keep
@@ -5265,7 +5265,7 @@ style = {fill = "#f8fafc"}
 
 The entries under `[[theme.rules]]` are exactly the `spec.rules` of a theme
 document and are validated by the same models, so a mistyped colour in
-`netgraph.toml` is refused with the same wording, and under the same `NG-Z001`,
+`netviz.toml` is refused with the same wording, and under the same `NG-Z001`,
 that it would get in a `theme.yaml`.
 
 The inline rules are **appended** to the named theme's rather than merged into
@@ -5301,7 +5301,7 @@ different depending on how it was exported.
 | Mermaid | Ignores it. |
 
 Mermaid is the one that needs a sentence. A flowchart has exactly one styling
-construct, `classDef`, and it is per *class* rather than per node — netgraph
+construct, `classDef`, and it is per *class* rather than per node — netviz
 already spends it restating the built-in palette, one `classDef` per node kind
 present, so that a diagram embedded in a pull request is coloured like the
 diagrams beside it. There is nowhere left to put a per-element style, and no
@@ -5331,7 +5331,7 @@ deliberately absent from the suppressible catalogue in
 [`validation-rules.md`](validation-rules.md), exactly as `NG-G003` and `NG-G005`
 are (§21.4). There is nothing to suppress: an element whose style does not parse
 is an element that did not load, and a theme that does not parse was not applied
-to anything. `NG-Z001` is also what `netgraph edit` refuses a write against the
+to anything. `NG-Z001` is also what `netviz edit` refuses a write against the
 moment it is made, on the reasoning §21.4 sets out — a bad value is wrong when
 it is typed and wrong afterwards, so there is no half-finished gesture to
 protect.
@@ -5400,7 +5400,7 @@ dongle is not one. It is not permitted on a `hub` either, for the reason §6.5
 gives — a layer-1 repeater has no stack to duplicate.
 
 ```yaml
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-container-01
@@ -5492,7 +5492,7 @@ for what an inventory has to write instead.
 
 <!-- norun: writes netns.svg into the reader's directory -->
 ```console
-$ netgraph -i examples/containers render --layer netns -o netns.svg
+$ netviz -i examples/containers render --layer netns -o netns.svg
 ```
 
 `examples/docker` is the same view over a container runtime rather than a lab:
@@ -5520,7 +5520,7 @@ context, because the wire has to arrive somewhere.
 
 **What this view does not change is the other views.** Layer 3 still draws one
 node per *element*, so a container and the machine hosting it are one node
-there — which means `netgraph path` cannot trace out of a container through its
+there — which means `netviz path` cannot trace out of a container through its
 own host, even though the addresses and the forwarding flag say it should.
 That is recorded as follow-up 23 in [`docs/follow-ups.md`](follow-ups.md); it is
 a decision about what an element node *is* at layer 3, not about §23.
@@ -5545,13 +5545,13 @@ inventory and are the semantic validator's, as `E049`, `E050`, `W146` and
 
 ### 23.5 What generates from it
 
-`netgraph export interfaces` — the vendor-neutral dialect, which is defined as
+`netviz export interfaces` — the vendor-neutral dialect, which is defined as
 whatever holds one device's interface configuration *completely* — writes a
 `netns` stanza per namespace and a `netns`/`peer` attribute per interface. It is
-what `netgraph import` reads back and what `netgraph drift` compares, so nothing
+what `netviz import` reads back and what `netviz drift` compares, so nothing
 of §23 is lost on the round trip.
 
-[`netgraph report`](commands/report.md#a-machine-that-runs-more-than-one-network-stack)
+[`netviz report`](commands/report.md#a-machine-that-runs-more-than-one-network-stack)
 gives a machine that declares either a *Network namespaces* section on its device
 page — the tree, the interfaces homed in each stack, the veth pairs named from
 both ends, and the routes and policy rules a declared namespace holds — and adds a
@@ -5626,7 +5626,7 @@ spec:
 | `description` | string | no | *unset* | Free text. |
 
 **Every interface is in at most one zone** (`NG-B003`). That is not a
-simplification for netgraph's convenience: it is the defining property of a zone
+simplification for netviz's convenience: it is the defining property of a zone
 in every zone-based firewall there is, and it is what makes `from lan` a
 statement about a packet rather than a question. Two zones claiming one
 interface would leave every rule naming either of them ambiguous.
@@ -5835,7 +5835,7 @@ position would be one more thing to keep in step.
 
 ### 24.5 What it draws
 
-`netgraph render --layer security` draws the policy, and it is the one view
+`netviz render --layer security` draws the policy, and it is the one view
 whose edges are *decisions* rather than paths. Everywhere else an edge means
 "these two can reach each other"; here it means "and this is what is allowed to
 cross".
@@ -5878,10 +5878,10 @@ of them.
 
 ### 24.7 What generates from it
 
-`netgraph export nftables` writes `etc/nftables.conf`: one `table inet netgraph`
+`netviz export nftables` writes `etc/nftables.conf`: one `table inet netviz`
 with a `set` per zone, the three base chains carrying their stated policies, and
 whatever NAT chains the translations need. A `destroy table` of the same name
-precedes it, so applying the file replaces netgraph's table and leaves anything
+precedes it, so applying the file replaces netviz's table and leaves anything
 else on the box exactly as it was.
 
 Two properties are worth stating, because both are places a generator could

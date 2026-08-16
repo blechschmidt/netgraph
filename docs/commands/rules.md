@@ -1,7 +1,7 @@
-# `netgraph rules`
+# `netviz rules`
 
 List the validation rules, their severity and their schema aliases. The table is
-printed from `netgraph.rules.RULES` — the same source the validator reads — so it
+printed from `netviz.rules.RULES` — the same source the validator reads — so it
 always describes the build you are running rather than the build whose
 documentation you happen to have open. It needs no inventory and takes no options.
 
@@ -9,15 +9,15 @@ documentation you happen to have open. It needs no inventory and takes no option
 
 <!-- generated: synopsis rules -->
 ```text
-netgraph [GLOBAL OPTIONS] rules [OPTIONS]
+netviz [GLOBAL OPTIONS] rules [OPTIONS]
 ```
 <!-- /generated -->
 
 ## Why you would ask
 
-`netgraph rules` is the **vocabulary** for every place a rule can be named:
+`netviz rules` is the **vocabulary** for every place a rule can be named:
 `--disable` on a command line, `ignore` and `[validate.severity]` in
-`netgraph.toml`, and the `netgraph/ignore` annotation on an element. Two questions
+`netviz.toml`, and the `netviz/ignore` annotation on an element. Two questions
 it answers directly:
 
 * *A finding says `W113` — what is that, and what is it called in the
@@ -25,15 +25,15 @@ it answers directly:
   either spelling works in every suppression mechanism.
 * *What could this inventory possibly be told about?* Reading the sixty-three
   summaries end to end takes a couple of minutes and is a surprisingly good way to
-  find out what netgraph considers worth knowing about a network.
+  find out what netviz considers worth knowing about a network.
 
 For the *why* behind a rule — what it exempts, what it costs to ignore, which
 element to annotate — go to its section in
 [`docs/validation-rules.md`](../validation-rules.md). This command is the index;
 that page is the text.
 
-Shell completion knows the same list, so `netgraph validate --disable <TAB>`
-offers it without your having to run this command at all — `netgraph completion
+Shell completion knows the same list, so `netviz validate --disable <TAB>`
+offers it without your having to run this command at all — `netviz completion
 bash|zsh|fish` prints the script that installs it.
 
 ## What it prints
@@ -44,7 +44,7 @@ then infos, each numbered in the order they were added.
 
 <!-- run: -->
 ```console
-$ netgraph rules
+$ netviz rules
 RULE  SEVERITY  ALIASES           SUMMARY
 ----  --------  ----------------  ------------------------------------------------------------------------------------
 E001  error     NG-C002, NG-C003  A cable endpoint references an unknown device or interface.
@@ -161,9 +161,9 @@ I005  info      NG-N027           Both ends of a veth pair are in the same netwo
 Two things the table does not say, both deliberate:
 
 * **The severity is the default**, not necessarily the one your tree uses.
-  `[validate.severity]` in [`netgraph.toml`](../configuration.md#validate--how-findings-are-graded)
+  `[validate.severity]` in [`netviz.toml`](../configuration.md#validate--how-findings-are-graded)
   re-grades any of these, and `--strict` promotes every warning to an error.
-  `netgraph config show` prints what actually resolved for an inventory, and
+  `netviz config show` prints what actually resolved for an inventory, and
   [where it came from](../configuration.md#seeing-what-resolved-and-why).
 * **The letter of the id is history**, not state. `W` means the rule was *first*
   assigned `warning`; a rule keeps its id when an inventory re-grades it, because
@@ -186,7 +186,7 @@ of this vocabulary. See [Pass 2 — schema](../validation-rules.md#pass-2--schem
 <!-- generated: options rules -->
 | Flag | Value | Default | Meaning |
 |---|---|---|---|
-| `--fixable` | — | off | List only the rules 'netgraph validate --fix' can repair, and what each repair does. |
+| `--fixable` | — | off | List only the rules 'netviz validate --fix' can repair, and what each repair does. |
 <!-- /generated -->
 
 ## Exit codes
@@ -203,6 +203,6 @@ of this vocabulary. See [Pass 2 — schema](../validation-rules.md#pass-2--schem
   why it matters, what it exempts, and how to suppress it.
 * [`docs/validation.md`](../validation.md) — the three passes, severities, and the
   four ways to silence a finding.
-* [`netgraph validate`](validate.md) — the command that reports these rules.
+* [`netviz validate`](validate.md) — the command that reports these rules.
 * [`docs/configuration.md`](../configuration.md#validate--how-findings-are-graded) —
-  `ignore` and `[validate.severity]` in `netgraph.toml`.
+  `ignore` and `[validate.severity]` in `netviz.toml`.

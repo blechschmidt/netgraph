@@ -1,6 +1,6 @@
-# Releasing netgraph
+# Releasing netviz
 
-What a version number promises, which parts of netgraph those promises cover, and the
+What a version number promises, which parts of netviz those promises cover, and the
 mechanics of cutting a release.
 
 This page is for maintainers, but the first two sections are for everyone: they are the
@@ -9,9 +9,9 @@ things quietly.
 
 ## The versioning policy
 
-netgraph uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html): `MAJOR.MINOR.PATCH`.
+netviz uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html): `MAJOR.MINOR.PATCH`.
 While the major version is `0`, SemVer allows anything at all to change in a minor release.
-netgraph does not use that latitude in full. What `0.x` promises:
+netviz does not use that latitude in full. What `0.x` promises:
 
 | Change | Where it lands | What you must do |
 |---|---|---|
@@ -25,21 +25,21 @@ not. That is a weaker promise than `1.x` will make and a stronger one than `0.x`
 
 Two things `0.x` explicitly does **not** promise:
 
-- **The schema is `v1alpha1` and the `alpha` is meant.** `netgraph.dev/v1alpha1` may gain
+- **The schema is `v1alpha1` and the `alpha` is meant.** `netviz.dev/v1alpha1` may gain
   fields freely and may lose or rename them in a minor release. When that happens, the
   `apiVersion` string does not change — `v1alpha1` is the whole alpha line — but the change
   is recorded as `### Changed` or `### Removed` with the edit an existing inventory needs.
   §12 of [`schema.md`](schema.md#12-compatibility-policy) is the normative version of this.
 - **No Python API stability.** See "internal", below.
 
-`1.0.0` is the version at which the schema graduates to `netgraph.dev/v1`, and at that point
+`1.0.0` is the version at which the schema graduates to `netviz.dev/v1`, and at that point
 the alpha latitude above goes away.
 
 ### Pre-releases
 
 `0.2.0rc1` and friends are spelled the PEP 440 way — `a1`, `b1`, `rc1`, `.post1`, `.dev1`,
-no hyphen — because that is what the tag check accepts and what `pip install netgraph==…`
-resolves. A pre-release is published to PyPI like any other version; `pip install netgraph`
+no hyphen — because that is what the tag check accepts and what `pip install netviz==…`
+resolves. A pre-release is published to PyPI like any other version; `pip install netviz`
 will not pick it up without `--pre`.
 
 ## What is public API
@@ -53,17 +53,17 @@ shape: a shell script, a pipeline, an editor, a pinned schema, a colleague's inv
    removing one is, and so is changing what a flag defaults to.
    [`docs/commands/`](commands/README.md) is generated from Click, so it is also the
    inventory of this surface.
-2. **The `netgraph.dev/v1alpha1` document schema.** Kinds, field names, value spaces,
+2. **The `netviz.dev/v1alpha1` document schema.** Kinds, field names, value spaces,
    required-ness, and how references resolve. Normatively
    [`schema.md`](schema.md); field by field, [`schema-reference.md`](schema-reference.md);
-   machine-readably, `netgraph schema`.
+   machine-readably, `netviz schema`.
 3. **The JSON output documents.** Each carries a `schemaVersion`, and each has its own:
-   - `netgraph validate --output-format json` — the findings envelope ([ci.md](ci.md)).
-   - `netgraph validate --output-format sarif` — SARIF 2.1.0, including the rule ids and
+   - `netviz validate --output-format json` — the findings envelope ([ci.md](ci.md)).
+   - `netviz validate --output-format sarif` — SARIF 2.1.0, including the rule ids and
      the `helpUri` anchors, because code scanning deduplicates alerts on them.
-   - `netgraph render -f json` — the resolved graph.
-   - `netgraph drift --output-format json`, `netgraph path --output-format json`,
-     `netgraph ipam --output-format json`, `netgraph version --json`.
+   - `netviz render -f json` — the resolved graph.
+   - `netviz drift --output-format json`, `netviz path --output-format json`,
+     `netviz ipam --output-format json`, `netviz version --json`.
 
    Adding a key does not bump a `schemaVersion`. Removing one, renaming one, or changing
    what an existing key means does, and that is a minor release.
@@ -72,25 +72,25 @@ shape: a shell script, a pipeline, an editor, a pinned schema, a colleague's inv
    started returning `1` where it used to return `0` is a breaking change even if nothing
    else about it moved.
 5. **The rule ids and their `NG-*` aliases.** They appear in `--disable` lists, in
-   `netgraph.toml`, in suppression comments inside inventories and in code-scanning alert
+   `netviz.toml`, in suppression comments inside inventories and in code-scanning alert
    history. A rule may be added; an id may not be reused for a different rule, and a rule's
    severity may only be *raised* in a minor release.
 6. **The published integrations.** The three `pre-commit` hook ids, and the inputs and
-   outputs of the `netgraph-validate` composite action. Somebody else's
+   outputs of the `netviz-validate` composite action. Somebody else's
    `.pre-commit-config.yaml` and workflow name them.
    [`tests/test_integrations.py`](../tests/test_integrations.py) asserts them against the CLI.
-7. **The environment variables** netgraph reads: `NETGRAPH_DOT`, `NETGRAPH_YAML_LOADER`,
+7. **The environment variables** netviz reads: `NETVIZ_DOT`, `NETVIZ_YAML_LOADER`,
    `NO_COLOR`, and the ones the compose file documents in
    [`.env.example`](../.env.example).
 8. **The container image reference** `ghcr.io/blechschmidt/netgraph`, its entrypoint
-   (`netgraph` itself), its working directory (`/inventory`) and the uid it runs as.
+   (`netviz` itself), its working directory (`/inventory`) and the uid it runs as.
 
 ### What is internal
 
 Not public, changeable in a patch release, and no entry required:
 
-- **Every Python module under `netgraph.*`.** The package is a tool, not a library: there is
-  no `__all__` you can rely on, no deprecation cycle, and `netgraph.render.dot._dot_string`
+- **Every Python module under `netviz.*`.** The package is a tool, not a library: there is
+  no `__all__` you can rely on, no deprecation cycle, and `netviz.render.dot._dot_string`
   is as internal as it looks. [`architecture.md`](architecture.md#using-it-as-a-library)
   describes using it from Python anyway and says the same thing: pin an exact version.
 - **The rendered output itself** — the DOT source, the SVG markup, node ordering, colours,
@@ -98,7 +98,7 @@ Not public, changeable in a patch release, and no entry required:
   not a breaking change. The `render -f json` document is the stable surface for anything
   that wants to *parse* a topology.
 - **The `schema/` directory in this repository**, which is a regenerable artefact of
-  `netgraph schema`.
+  `netviz schema`.
 - **The golden fixtures, the example inventories and the benchmark scripts.**
 
 ### How a breaking change is recorded
@@ -163,7 +163,7 @@ itself.
 ### 3. Tag
 
 ```bash
-git tag -a "v0.2.0" -m "netgraph 0.2.0"
+git tag -a "v0.2.0" -m "netviz 0.2.0"
 git push origin "v0.2.0"
 ```
 
@@ -206,7 +206,7 @@ and by `workflow_dispatch`.
 3. **`build`** — `python -m build` for the sdist and the wheel, `twine check --strict`, and a
    CycloneDX SBOM of the wheel's dependency closure.
 4. **`verify`** — on `ubuntu-latest`, `macos-14` and `windows-latest`: a fresh virtualenv,
-   `pip install` the wheel, and `netgraph --version` from the installed console script. Then
+   `pip install` the wheel, and `netviz --version` from the installed console script. Then
    the same again from the **sdist**, which additionally proves the sdist builds — an sdist
    that unpacks but does not build is the classic release-day surprise. Neither install uses
    the checkout, so a missing package or a missing data file fails here.
@@ -309,7 +309,7 @@ settings (or as a *pending* publisher if the name is not yet claimed):
 | Field | Value |
 |---|---|
 | Owner | `blechschmidt` |
-| Repository | `netgraph` |
+| Repository | `netviz` |
 | Workflow name | `release.yml` |
 | Environment | `pypi` |
 
@@ -326,7 +326,7 @@ the package inherits the repository's visibility.
 [`tests/test_release.py`](../tests/test_release.py) asserts that the version in
 `pyproject.toml` is spelled correctly and has a matching, dated, non-empty changelog section;
 that the tag check rejects a mismatch, a missing section, an empty section and an undated
-heading; that `netgraph --version` and `netgraph version --json` report the package, Python
+heading; that `netviz --version` and `netviz version --json` report the package, Python
 and Graphviz versions; and that the release workflow pins its actions, keeps its permissions
 per job, and names the environments the trusted publisher expects. So a release that would
 fail at the gate fails on the pull request instead.

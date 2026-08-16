@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-west-01
@@ -28,7 +28,7 @@ spec:
       ipv6:
         addresses: [2001:db8:3:10::51/64]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-west-01
@@ -58,7 +58,7 @@ spec:
       ipv6:
         addresses: [2001:db8:3:20::11/64]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-west-02

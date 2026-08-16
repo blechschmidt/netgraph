@@ -1,0 +1,118 @@
+{# HTML building blocks, mirroring macros.md.j2 section for section.
+
+   Autoescaping is on for these templates, so every value that came out of the
+   inventory is escaped by Jinja. The one exception is a diagram, which arrives as
+   Markup after netviz.render.fragment has sanitised it — see
+   netviz.report.write. #}
+
+{% macro cell(value, link) -%}
+{%- set url = link(value) -%}
+{%- if url and value.text -%}<a href="{{ url }}">{{ value.text }}</a>{%- else -%}{{ value.text }}{%- endif -%}
+{%- endmacro %}
+
+{% macro table(entry, link) %}
+<section class="table" id="table-{{ entry.key }}">
+  <h3>{{ entry.title }}</h3>
+{% if entry.rows %}
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+{% for column in entry.columns %}
+          <th class="{{ column.align }}">{{ column.header }}</th>
+{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+{% for row in entry.rows %}
+        <tr>
+{% for value in row %}
+          <td class="{{ entry.columns[loop.index0].align }}">{{ cell(value, link) }}</td>
+{% endfor %}
+        </tr>
+{% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <p class="empty">{{ entry.empty }}</p>
+{% endif %}
+{% if entry.note %}
+  <p class="note">{{ entry.note }}</p>
+{% endif %}
+</section>
+{% endmacro %}
+
+{% macro fields(entries, link) %}
+<dl class="fields">
+{% for entry in entries %}
+  <dt>{{ entry.label }}</dt>
+  <dd>{{ cell(entry.value, link) }}</dd>
+{% endfor %}
+</dl>
+{% endmacro %}
+
+{% macro section(entry, link) %}
+<section class="block" id="{{ entry.key }}">
+  <h2><a class="self" href="#{{ entry.key }}">{{ entry.title }}</a></h2>
+{% if entry.blurb %}
+  <p class="blurb">{{ entry.blurb }}</p>
+{% endif %}
+{% if entry.fields %}
+{{ fields(entry.fields, link) }}
+{% endif %}
+{% for diagram in entry.diagrams %}
+  <figure id="diagram-{{ diagram.layer }}">
+{% if diagram.markup %}
+    <div class="diagram">{{ diagram.markup }}</div>
+{% elif diagram.path %}
+    <img src="{{ link(diagram.path) }}" alt="{{ diagram.title }} ({{ diagram.layer }})">
+{% else %}
+    <p class="empty">{{ diagram.note }}</p>
+{% endif %}
+    <figcaption>{{ diagram.title }} — {{ diagram.nodes }} node(s), {{ diagram.edges }} link(s)</figcaption>
+  </figure>
+{% endfor %}
+{% for entry_table in entry.tables %}
+{{ table(entry_table, link) }}
+{% endfor %}
+{% if entry.links %}
+  <ul class="links">
+{% for reference in entry.links %}
+    <li>{{ cell(reference, link) }}</li>
+{% endfor %}
+  </ul>
+{% endif %}
+{% for note in entry.notes %}
+  <p class="note">{{ note }}</p>
+{% endfor %}
+</section>
+{% endmacro %}
+
+{% macro provenance(meta) %}
+<dl class="provenance">
+  <dt>Inventory</dt><dd><code>{{ meta.inventory }}</code></dd>
+  <dt>Scope</dt><dd>{{ meta.scope }}</dd>
+  <dt>Generated</dt><dd>{{ meta.generated_at if meta.generated_at else "not stamped" }}</dd>
+  <dt>netviz</dt><dd>{{ meta.version }}</dd>
+  <dt>Inventory revision</dt>
+  <dd>
+{% if meta.revision %}
+    <code>{{ meta.revision }}</code> ({{ meta.revision_state }})
+{% else %}
+    not under version control
+{% endif %}
+  </dd>
+</dl>
+{% endmacro %}
+
+{% macro contents(page) %}
+<nav class="contents">
+  <h2>On this page</h2>
+  <ul>
+{% for section in page.sections %}
+    <li><a href="#{{ section.key }}">{{ section.title }}</a></li>
+{% endfor %}
+  </ul>
+</nav>
+{% endmacro %}

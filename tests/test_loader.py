@@ -9,8 +9,8 @@ from pathlib import Path, PurePosixPath
 import pytest
 import yaml
 
-from netgraph.errors import MAX_ECHOED_VALUE_LENGTH, LoaderError, SchemaError
-from netgraph.loader import (
+from netviz.errors import MAX_ECHOED_VALUE_LENGTH, LoaderError, SchemaError
+from netviz.loader import (
     IgnoreRuleSet,
     IgnoreStack,
     Inventory,
@@ -27,16 +27,16 @@ from netgraph.loader import (
     read_documents,
     short_name,
 )
-from netgraph.loader.ignore import compile_rules, parse_ignore_file
-from netgraph.loader.tree import _Builder, _deferred_gc, _load_file, _schema_errors
-from netgraph.models import Adapter, Cable, Switch, parse_document
+from netviz.loader.ignore import compile_rules, parse_ignore_file
+from netviz.loader.tree import _Builder, _deferred_gc, _load_file, _schema_errors
+from netviz.models import Adapter, Cable, Switch, parse_document
 
 from platform_marks import requires_mkfifo, requires_posix_permissions, requires_symlinks  # isort: skip -- tests/ is on sys.path, not a package
 
-API_VERSION = "netgraph.dev/v1alpha1"
+API_VERSION = "netviz.dev/v1alpha1"
 
 SWITCH = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: {name}
@@ -64,7 +64,7 @@ def switch(name: str) -> str:
 def read(loader_class: type[NodeLoader], text: str) -> object:
     """Construct the single document in ``text``.
 
-    ``yaml.load`` cannot be used here: netgraph's loader is selected at import
+    ``yaml.load`` cannot be used here: netviz's loader is selected at import
     time and has no PyYAML base class in common with the alternative, which is
     exactly what ``NodeLoader`` exists to describe.
     """
@@ -88,7 +88,7 @@ def inventory_root(tmp_path: Path) -> Path:
 
 
 CABLE_FILE = """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: link-a
@@ -98,7 +98,7 @@ spec:
     - core:Gi0/2
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: adapter
 metadata:
   name: dongle
@@ -283,7 +283,7 @@ def test_anchors_and_aliases_work_within_a_document(tmp_path: Path) -> None:
         root,
         "anchor.yaml",
         """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: anchored
@@ -352,12 +352,12 @@ def test_unreadable_directory_is_reported_not_raised(tmp_path: Path) -> None:
     assert any("cannot read directory" in error.message for error in inventory.errors)
 
 
-# -- .netgraphignore ------------------------------------------------------
+# -- .netvizignore ------------------------------------------------------
 
 
 def test_ignore_file_excludes_directories_and_globs(tmp_path: Path) -> None:
     root = tmp_path / "inv"
-    write(root, ".netgraphignore", "vendor/\n*.bak.yaml\n/only-at-root.yaml\n")
+    write(root, ".netvizignore", "vendor/\n*.bak.yaml\n/only-at-root.yaml\n")
     write(root, "keep.yaml", switch("keep"))
     write(root, "only-at-root.yaml", switch("rooted"))
     write(root, "deep/only-at-root.yaml", switch("deep-rooted"))
@@ -369,7 +369,7 @@ def test_ignore_file_excludes_directories_and_globs(tmp_path: Path) -> None:
 
 def test_ignore_negation_reincludes_a_file(tmp_path: Path) -> None:
     root = tmp_path / "inv"
-    write(root, ".netgraphignore", "*.gen.yaml\n!keep.gen.yaml\n")
+    write(root, ".netvizignore", "*.gen.yaml\n!keep.gen.yaml\n")
     write(root, "a.gen.yaml", switch("a"))
     write(root, "keep.gen.yaml", switch("keep"))
 
@@ -378,7 +378,7 @@ def test_ignore_negation_reincludes_a_file(tmp_path: Path) -> None:
 
 def test_nested_ignore_file_applies_to_its_subtree(tmp_path: Path) -> None:
     root = tmp_path / "inv"
-    write(root, "sub/.netgraphignore", "skip.yaml\n")
+    write(root, "sub/.netvizignore", "skip.yaml\n")
     write(root, "skip.yaml", switch("root-skip"))
     write(root, "sub/skip.yaml", switch("sub-skip"))
     write(root, "sub/keep.yaml", switch("sub-keep"))
@@ -388,7 +388,7 @@ def test_nested_ignore_file_applies_to_its_subtree(tmp_path: Path) -> None:
 
 def test_double_star_matches_across_directories(tmp_path: Path) -> None:
     root = tmp_path / "inv"
-    write(root, ".netgraphignore", "a/**/generated/\n")
+    write(root, ".netvizignore", "a/**/generated/\n")
     write(root, "a/b/generated/x.yaml", switch("gen"))
     write(root, "a/generated/y.yaml", switch("gen2"))
     write(root, "a/b/kept.yaml", switch("kept"))
@@ -399,13 +399,13 @@ def test_double_star_matches_across_directories(tmp_path: Path) -> None:
 def test_unreadable_ignore_file_is_reported(tmp_path: Path) -> None:
     root = tmp_path / "inv"
     (root).mkdir()
-    (root / ".netgraphignore").write_bytes(b"\xff\xfe not utf-8")
+    (root / ".netvizignore").write_bytes(b"\xff\xfe not utf-8")
     write(root, "keep.yaml", switch("keep"))
 
     inventory = load_tree(root)
 
     assert list(inventory.elements) == ["keep"]
-    assert any(".netgraphignore" in error.message for error in inventory.errors)
+    assert any(".netvizignore" in error.message for error in inventory.errors)
 
 
 @pytest.mark.parametrize(
@@ -437,7 +437,7 @@ def test_ignore_pattern_translation(pattern: str, path: str, is_dir: bool, expec
 
 
 def rules_from(text: str) -> IgnoreRuleSet:
-    """Compile ``text`` as a root-level ``.netgraphignore``."""
+    """Compile ``text`` as a root-level ``.netvizignore``."""
     return IgnoreRuleSet(base="", source=Path("."), rules=tuple(compile_rules(text.splitlines())))
 
 
@@ -453,7 +453,7 @@ def test_closing_bracket_may_open_a_character_class() -> None:
 
 
 def test_parse_ignore_file_reads_from_disk(tmp_path: Path) -> None:
-    path = tmp_path / ".netgraphignore"
+    path = tmp_path / ".netvizignore"
     path.write_text("# comment\nbuild/\n", encoding="utf-8")
 
     rule_set = parse_ignore_file(path, base="sub")
@@ -473,7 +473,7 @@ def test_schema_errors_are_collected_with_field_paths_and_lines(tmp_path: Path) 
         root,
         "bad.yaml",
         """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: broken
@@ -505,7 +505,7 @@ def test_missing_key_is_located_at_the_closest_known_node(tmp_path: Path) -> Non
     write(
         root,
         "no-spec.yaml",
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: nospec\n",
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n  name: nospec\n",
     )
 
     (error,) = load_tree(root).errors
@@ -648,7 +648,7 @@ def test_real_booleans_still_parse(tmp_path: Path) -> None:
         root,
         "flags.yaml",
         """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: flags
@@ -672,7 +672,7 @@ def test_norway_problem_is_rejected_by_the_model(tmp_path: Path) -> None:
         root,
         "norway.yaml",
         """\
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: norway

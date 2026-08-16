@@ -1,8 +1,8 @@
-# `netgraph apply`
+# `netviz apply`
 
-`netgraph apply` executes a plan written by [`netgraph plan`](plan.md) against
+`netviz apply` executes a plan written by [`netviz plan`](plan.md) against
 the inventory **files**. Each changeset entry becomes one or more of the typed
-operations [`netgraph edit`](edit.md) is built from, so comments, key order and
+operations [`netviz edit`](edit.md) is built from, so comments, key order and
 formatting survive, and the same validation gate applies: an edit that would
 introduce a new error is refused before anything is written.
 
@@ -30,11 +30,11 @@ introduce a new error is refused before anything is written.
 
 <!-- generated: synopsis apply -->
 ```text
-netgraph [GLOBAL OPTIONS] apply [OPTIONS] PLAN
+netviz [GLOBAL OPTIONS] apply [OPTIONS] PLAN
 ```
 <!-- /generated -->
 
-`PLAN` is a file written by `netgraph plan -out`. The inventory it is applied to
+`PLAN` is a file written by `netviz plan -out`. The inventory it is applied to
 comes from the global `-i/--inventory`, and must be the one the plan was made
 from — see [the state hash](plan.md#plan-files-and-the-state-hash).
 
@@ -44,14 +44,14 @@ from — see [the state hash](plan.md#plan-files-and-the-state-hash).
 
 <!-- norun: writes files, against an inventory that is not in the repository -->
 ```console
-$ netgraph -i net drift caps/*.json           # the network disagrees with the files
-$ netgraph -i net plan --from-live caps/*.json -out drift.plan
-$ netgraph -i net apply drift.plan            # make the files say what the network does
+$ netviz -i net drift caps/*.json           # the network disagrees with the files
+$ netviz -i net plan --from-live caps/*.json -out drift.plan
+$ netviz -i net apply drift.plan            # make the files say what the network does
 ```
 
 `drift` reports. `plan --from-live` turns the report into a changeset that adopts
 what the network says. `apply` writes it. Nothing in that sequence contacts a
-device: you collect the output, and netgraph reads what you collected.
+device: you collect the output, and netviz reads what you collected.
 
 The same three commands work for a proposal that came from a person rather than
 from a capture — `plan --to ../proposed -out change.plan` then `apply
@@ -63,10 +63,10 @@ change.plan` — which is how a reviewed change lands exactly as it was reviewed
 
 | Entry | Operations |
 |---|---|
-| `create` | [`create`](edit.md#netgraph-edit-create) with the planned body. Where the document goes is left to the placement rules, which put it where the tree's own conventions say. |
-| `delete` | [`delete`](edit.md#netgraph-edit-delete), never cascading. A plan that deletes a device also deletes the cables on it, in that order; a cascade would be `apply` doing something the plan did not say. |
-| `rename` | [`rename`](edit.md#netgraph-edit-rename), which rewrites every reference to the old name as it goes. |
-| `update` | One `set` or `unset` per field — except an interface appearing or disappearing whole, which is [`add-interface`](edit.md#netgraph-edit-add-interface) or [`remove-interface`](edit.md#netgraph-edit-remove-interface). |
+| `create` | [`create`](edit.md#netviz-edit-create) with the planned body. Where the document goes is left to the placement rules, which put it where the tree's own conventions say. |
+| `delete` | [`delete`](edit.md#netviz-edit-delete), never cascading. A plan that deletes a device also deletes the cables on it, in that order; a cascade would be `apply` doing something the plan did not say. |
+| `rename` | [`rename`](edit.md#netviz-edit-rename), which rewrites every reference to the old name as it goes. |
+| `update` | One `set` or `unset` per field — except an interface appearing or disappearing whole, which is [`add-interface`](edit.md#netviz-edit-add-interface) or [`remove-interface`](edit.md#netviz-edit-remove-interface). |
 | a `layout` address | `set-geometry`, one view at a time, because that is the unit geometry is written in. |
 
 A plan stores a field path with the list entry *named*
@@ -82,7 +82,7 @@ the right one. A name that no longer selects anything is an error, not a guess.
 **It checks the plan is about this tree.** Before anything else, the inventory is
 hashed and compared with the hash the plan recorded. A tree that has moved on
 since — a colleague pushed, a script ran, the branch changed — is refused, and
-the fix is to re-run `netgraph plan` and read the new one. There is no flag to
+the fix is to re-run `netviz plan` and read the new one. There is no flag to
 skip this: a plan applied to a state it was not made from is not a description of
 what will happen.
 
@@ -111,9 +111,9 @@ applied:
 
 <!-- norun: writes files, against an inventory that is not in the repository -->
 ```bash
-netgraph apply drift.plan --target 'device.core/*'       # one namespace
-netgraph apply drift.plan --target sw-core-01            # one element
-netgraph apply drift.plan --target 'cable.*' --target ap-1
+netviz apply drift.plan --target 'device.core/*'       # one namespace
+netviz apply drift.plan --target sw-core-01            # one element
+netviz apply drift.plan --target 'cable.*' --target ap-1
 ```
 
 A rename is matched at either end: targeting the new name plainly asks for the
@@ -134,7 +134,7 @@ says what changes, the diff says what the files will look like.
 
 <!-- norun: the output depends on the inventory being edited -->
 ```console
-$ netgraph -i net apply drift.plan --dry-run
+$ netviz -i net apply drift.plan --dry-run
 Plan: ~ 1 to change.
   ~ device.switches/sw-home  [switch]
 --- a/switches/sw-home.yaml
@@ -153,7 +153,7 @@ would change 1 file(s): switches/sw-home.yaml
 ```
 
 `--json` prints the applied operations and their inverses, the same envelope
-[`netgraph edit --json`](edit.md#--json-the-undo-stack) produces, so a caller can
+[`netviz edit --json`](edit.md#--json-the-undo-stack) produces, so a caller can
 keep an undo stack.
 
 ---
@@ -191,7 +191,7 @@ reaches the disk.
 
 ## See also
 
-- [`netgraph plan`](plan.md) — producing the changeset this executes.
-- [`netgraph edit`](edit.md) — the operations it is built from, one gesture at a time.
-- [`netgraph drift`](drift.md) — the read half of the loop.
+- [`netviz plan`](plan.md) — producing the changeset this executes.
+- [`netviz edit`](edit.md) — the operations it is built from, one gesture at a time.
+- [`netviz drift`](drift.md) — the read half of the loop.
 - [`docs/editing.md`](../editing.md) — the write path, in prose.

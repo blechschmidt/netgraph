@@ -1,5 +1,5 @@
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n0
@@ -8,7 +8,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n1
@@ -17,7 +17,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n2
@@ -26,7 +26,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n3
@@ -35,7 +35,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n4
@@ -44,7 +44,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n5
@@ -53,7 +53,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n6
@@ -62,7 +62,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n7
@@ -71,7 +71,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n8
@@ -80,7 +80,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n9
@@ -89,7 +89,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n10
@@ -98,7 +98,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n11
@@ -107,7 +107,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n12
@@ -116,7 +116,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n13
@@ -125,7 +125,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n14
@@ -134,7 +134,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n15
@@ -143,7 +143,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n16
@@ -152,7 +152,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n17
@@ -161,7 +161,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n18
@@ -170,7 +170,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n19
@@ -179,7 +179,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n20
@@ -188,7 +188,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n21
@@ -197,7 +197,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n22
@@ -206,7 +206,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n23
@@ -215,7 +215,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n24
@@ -224,7 +224,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n25
@@ -233,7 +233,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n26
@@ -242,7 +242,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n27
@@ -251,7 +251,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n28
@@ -260,7 +260,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n29
@@ -269,7 +269,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n30
@@ -278,7 +278,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n31
@@ -287,7 +287,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n32
@@ -296,7 +296,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n33
@@ -305,7 +305,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n34
@@ -314,7 +314,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n35
@@ -323,7 +323,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n36
@@ -332,7 +332,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n37
@@ -341,7 +341,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n38
@@ -350,7 +350,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n39
@@ -359,7 +359,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n40
@@ -368,7 +368,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n41
@@ -377,7 +377,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n42
@@ -386,7 +386,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n43
@@ -395,7 +395,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n44
@@ -404,7 +404,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n45
@@ -413,7 +413,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n46
@@ -422,7 +422,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n47
@@ -431,7 +431,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n48
@@ -440,7 +440,7 @@ spec:
     - name: e0
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: n49

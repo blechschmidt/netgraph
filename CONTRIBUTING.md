@@ -1,4 +1,4 @@
-# Contributing to netgraph
+# Contributing to netviz
 
 This is the practical guide: how to get a checkout running, how to run every gate
 exactly as CI runs it, and step-by-step recipes for the two changes people most
@@ -48,17 +48,17 @@ layout) and `types-PyYAML`. Check the console script is wired up:
 
 <!-- run: cwd=examples/quickstart -->
 ```console
-$ netgraph validate
+$ netviz validate
 no problems found
 ```
 
 CI runs on `ubuntu-24.04` against Python 3.10, 3.11 and 3.12, and one extra job on
-3.12 with `NETGRAPH_YAML_LOADER=python` to keep the pure-Python YAML parser from
+3.12 with `NETVIZ_YAML_LOADER=python` to keep the pure-Python YAML parser from
 becoming dead code. If you touch `loader/documents.py` or the model layer, run
 your tests both ways:
 
 ```bash
-NETGRAPH_YAML_LOADER=python pytest
+NETVIZ_YAML_LOADER=python pytest
 ```
 
 It also runs the whole suite on `windows-latest` and `macos-14`, on 3.12 each.
@@ -67,15 +67,15 @@ which six tests are skipped on Windows, with the capability each one needs. Two
 rules follow from it and are worth knowing before you write the code, not after
 CI tells you:
 
-* **Write files through `netgraph.fsio`**, never `Path.write_text`. It is the one
+* **Write files through `netviz.fsio`**, never `Path.write_text`. It is the one
   call that silently varies by platform — Python's text mode translates `\n` to
-  `\r\n` on Windows — and the canonical form `netgraph fmt` enforces is defined in
+  `\r\n` on Windows — and the canonical form `netviz fmt` enforces is defined in
   bytes. `tests/test_platform.py` fails if a new call site reintroduces it.
 * **Skip on a capability, not on a platform.** The marks in
   `tests/platform_marks.py` are per capability (`requires_symlinks`,
   `requires_mkfifo`, …) and carry their reason. A bare
   `skipif(sys.platform == "win32")` is how "the platform lacks this" quietly
-  becomes "netgraph is broken here and nobody is looking", so it is a test failure
+  becomes "netviz is broken here and nobody is looking", so it is a test failure
   rather than a convention.
 
 ## The gates
@@ -93,21 +93,21 @@ mypy src/                       # strict; CI adds --python-version per matrix en
 `ruff` and `mypy` read their whole configuration from `pyproject.toml`, so there
 are no flags to remember: line length 100, the `E W F I B C4 UP SIM RUF` rule set
 with `E501` left to the formatter, and `strict = true` with
-`warn_unreachable = true` over `src/netgraph`, `tests` and `tools`. Note that
+`warn_unreachable = true` over `src/netviz`, `tests` and `tools`. Note that
 `ruff format` also formats Python code blocks **embedded in Markdown**, so a
 snippet in a document can fail the gate.
 
 The YAML under `examples/` is documentation, and documentation that does not
-follow the format netgraph documents is documentation arguing with itself — so
+follow the format netviz documents is documentation arguing with itself — so
 there is a fourth lint gate:
 
 <!-- run: cwd=. -->
 ```console
-$ netgraph fmt --check examples
+$ netviz fmt --check examples
 0 file(s) would be reformatted, 64 already formatted
 ```
 
-Use `netgraph fmt --diff examples` to see what differs and `netgraph fmt examples`
+Use `netviz fmt --diff examples` to see what differs and `netviz fmt examples`
 to apply it. See [docs/format.md](docs/format.md) for the canonical form itself.
 
 Then the suite, with the coverage floor. CI spells the flags out even though
@@ -138,9 +138,9 @@ pytest tests/test_render.py --no-cov
 CI also has four jobs beyond `test`: `discover-examples` and `validate-examples`
 run the composite action, the SARIF upload and the annotation format over every
 inventory under `examples/` (so a broken integration breaks here rather than in
-somebody else's pipeline), `render-examples` installs netgraph **without** the
+somebody else's pipeline), `render-examples` installs netviz **without** the
 dev extras and renders every example to SVG, checking that a plain
-`pip install netgraph` can draw the documented inventories, and `docker` builds
+`pip install netviz` can draw the documented inventories, and `docker` builds
 the image and drives all three services of `docker-compose.yml` — the CLI, the
 editor and the live preview — because a compose file that parses is not a compose
 file that works. See [docs/ci.md](docs/ci.md) and [docs/docker.md](docs/docker.md).
@@ -168,7 +168,7 @@ There is also a `check-yaml` hook over `examples/`, because a YAML syntax error
 in an inventory otherwise surfaces as a loader failure well after the commit.
 
 Do not confuse `.pre-commit-config.yaml` with `.pre-commit-hooks.yaml`: the
-latter is what netgraph *publishes*, the `netgraph-validate` hook that other
+latter is what netviz *publishes*, the `netviz-validate` hook that other
 people's inventory repositories install.
 
 ## The test suite
@@ -183,14 +183,14 @@ The layout is flat: one `tests/test_<area>.py` per area, plus
 * `tests/fuzz-corpus/` — one seed file per way of being wrong, for the loader fuzzer.
 
 Two files are not example tests. `tests/test_properties.py` and
-`tests/test_fuzz_loader.py` state what netgraph may *never* do, for every input
+`tests/test_fuzz_loader.py` state what netviz may *never* do, for every input
 rather than for the ones somebody thought of, and how hard they search is a
-Hypothesis profile chosen with `NETGRAPH_HYPOTHESIS_PROFILE`: `dev` (25 examples)
+Hypothesis profile chosen with `NETVIZ_HYPOTHESIS_PROFILE`: `dev` (25 examples)
 is the default, CI runs `ci` (50) and the nightly workflow runs `deep` (1000).
 
 ```bash
-NETGRAPH_HYPOTHESIS_PROFILE=deep pytest tests/test_properties.py --no-cov
-NETGRAPH_HYPOTHESIS_PROFILE=deep pytest tests/test_fuzz_loader.py --no-cov
+NETVIZ_HYPOTHESIS_PROFILE=deep pytest tests/test_properties.py --no-cov
+NETVIZ_HYPOTHESIS_PROFILE=deep pytest tests/test_fuzz_loader.py --no-cov
 ```
 
 Run the deep profile before trusting a property you have just written: a property
@@ -207,20 +207,20 @@ the build rather than shipping a reference that has drifted.
 
 ```bash
 python tools/gen_schema_reference.py     # regenerate docs/schema-reference.md
-python tools/gen_json_schema.py          # regenerate schema/netgraph.schema.json
+python tools/gen_json_schema.py          # regenerate schema/netviz.schema.json
 python tools/gen_docs.py                 # regenerate the generated regions in docs/
-python tools/check_examples.py           # run every documented netgraph example
+python tools/check_examples.py           # run every documented netviz example
 ```
 
 **`tools/gen_schema_reference.py`** writes `docs/schema-reference.md` from
 `model_fields` plus the prose and YANG paths in
-`netgraph.models.fielddocs.FIELD_DOCS`. A field with no entry, or an entry naming
+`netviz.models.fielddocs.FIELD_DOCS`. A field with no entry, or an entry naming
 a field that no longer exists, aborts the generator rather than producing a
 quietly incomplete document. `--check` exits 1 instead of writing;
 `tests/test_docs.py` runs that path.
 
-**`tools/gen_json_schema.py`** writes `schema/netgraph.schema.json` from
-`netgraph.schema.build_schema()`. `--check` is the same drift guard, run by
+**`tools/gen_json_schema.py`** writes `schema/netviz.schema.json` from
+`netviz.schema.build_schema()`. `--check` is the same drift guard, run by
 `tests/test_schema.py`; `--kind` emits the schema for one kind to somewhere else.
 
 **`tools/gen_docs.py`** rewrites the machine-derived *regions* of the
@@ -229,13 +229,13 @@ documentation in place — the ones fenced by
 `synopsis <command path>`, `options <command path>`,
 `arguments <command path>`, `command-index base=<prefix>` and `rule-index`; the
 first three are read off Click's own decorators, the last off
-`netgraph.rules.RULES`. Everything outside the markers is prose written by a
+`netviz.rules.RULES`. Everything outside the markers is prose written by a
 human. `--check` exits 1 if a region is out of date, and `tests/test_docs.py`
 runs it, so a flag added to the CLI without regenerating the docs fails the
 suite.
 
 **`tools/check_examples.py`** executes the documentation. Every fenced
-`console`/`bash`/`sh`/`shell` block that invokes `netgraph` must carry a marker on
+`console`/`bash`/`sh`/`shell` block that invokes `netviz` must carry a marker on
 the line above it, and the tool runs the `run` ones and diffs what they print. Use
 `--list` to see what is checked and what is excused, `--update` to rewrite the
 output of failing `run` blocks, and a list of paths to narrow it to some files:
@@ -250,12 +250,12 @@ checked-in examples:
 
 <!-- norun: rewrites the committed SVGs under docs/images/ -->
 ```bash
-netgraph -i examples/home-lab render --layer l2 --title "home-lab — layer 2" \
+netviz -i examples/home-lab render --layer l2 --title "home-lab — layer 2" \
     -f svg -o docs/images/home-lab.svg
-netgraph -i examples/quickstart render -f svg -o docs/images/quickstart.svg
-netgraph -i examples/home-lab render --layer l3 --title "home-lab — layer 3" \
+netviz -i examples/quickstart render -f svg -o docs/images/quickstart.svg
+netviz -i examples/home-lab render --layer l3 --title "home-lab — layer 3" \
     -f svg -o docs/images/home-lab-l3.svg
-netgraph -i examples/home-lab render --layer l2 --icons cisco \
+netviz -i examples/home-lab render --layer l2 --icons cisco \
     --title "home-lab — layer 2, cisco icons" -f svg -o docs/images/home-lab-icons.svg
 ```
 
@@ -286,7 +286,7 @@ derives are the ones every `NG-*` help URL promises.
 
 ## Documentation conventions
 
-* **Every netgraph example carries a marker.** Immediately above the fence (blank
+* **Every netviz example carries a marker.** Immediately above the fence (blank
   lines allowed), exactly one of:
 
       <!-- run: cwd=examples/quickstart -->
@@ -296,7 +296,7 @@ derives are the ones every `NG-*` help URL promises.
   for byte. `cwd=` is relative to the repository root (`cwd=.` is the default and
   may be omitted); add `rc=1` to assert the exit code of the last command. A line
   containing only `...` matches any run of output lines. Each command line starts
-  with `$ ` and must be a bare `netgraph …` invocation — no pipes, no `&&`, no
+  with `$ ` and must be a bare `netviz …` invocation — no pipes, no `&&`, no
   redirects, no environment prefixes. A `norun` needs a real reason: it needs a
   live device, it writes into the reader's directory, it starts a server, the
   paths are illustrative, or it uses a shell pipeline. The point of requiring one
@@ -305,7 +305,7 @@ derives are the ones every `NG-*` help URL promises.
   Produce a transcript by running the command rather than by typing it:
 
   ```bash
-  NO_COLOR=1 COLUMNS=80 python -m netgraph -i examples/home-lab list vlans
+  NO_COLOR=1 COLUMNS=80 python -m netviz -i examples/home-lab list vlans
   ```
 
 * **Command flag tables are generated, never typed.** Pages under
@@ -331,7 +331,7 @@ Five steps, four files. Skip any one of them and a named test fails — which is
 point: a rule cannot ship undocumented, unfixtured or unnumbered. Follow `W133`
 (*patch run stops inside the panel*) through the tree as the worked example.
 
-**1. Allocate the id in `src/netgraph/rules.py`.** Append a `Rule` to the `RULES`
+**1. Allocate the id in `src/netviz/rules.py`.** Append a `Rule` to the `RULES`
 tuple, after the last rule of the same severity class. Ids are permanent: take the
 next free number, never reuse one, never renumber.
 
@@ -355,7 +355,7 @@ link out of, so it must match the heading you write in step 3 exactly.
 *Fails without this step:*
 `tests/test_validate.py::test_every_rule_has_a_check_and_a_unique_id`.
 
-**2. Implement the check in `src/netgraph/validate.py`.** Write a
+**2. Implement the check in `src/netviz/validate.py`.** Write a
 `Callable[[_Context], Iterator[_Draft]]` next to the other checks of its section,
 and register it in `_CHECKS` **in the same position the rule has in `RULES`**:
 
@@ -437,7 +437,7 @@ and confirm the shipped inventories still validate clean under the new rule — 
 
 <!-- run: cwd=. -->
 ```console
-$ netgraph -i examples/campus validate --strict
+$ netviz -i examples/campus validate --strict
 no problems found
 ```
 
@@ -447,10 +447,10 @@ no problems found
 
 A new output format is one module and one registry entry. Nothing else should need
 to change, and if it does, that is a bug in
-[`render/registry.py`](src/netgraph/render/registry.py)'s design rather than a
+[`render/registry.py`](src/netviz/render/registry.py)'s design rather than a
 reason to add a branch.
 
-**1. Write the backend.** A new module under `src/netgraph/render/`, exposing one
+**1. Write the backend.** A new module under `src/netviz/render/`, exposing one
 function with the shape the registry expects:
 
 ```python
@@ -465,14 +465,14 @@ that says how much detail to draw — `show_ips`, `show_vlans`,
 `link_template`, `element_ids`, `highlight`. Honour what your format can express
 and ignore the rest; `RenderOptions` says *what to draw*, never *what exists*, so
 none of it may change the topology. Do not read the inventory, the filesystem or
-`netgraph.toml`, and iterate `graph.nodes` and `graph.edges` in the order they come
+`netviz.toml`, and iterate `graph.nodes` and `graph.edges` in the order they come
 in — output must be byte-for-byte reproducible.
 
 For a binary format, produce `bytes` and leave `to_text` unset; `dot.py` is the
 model, and the three image formats are one `_image_renderer` call each because
 they all lay the graph out through it.
 
-**2. Register it in `src/netgraph/render/registry.py`.** One entry in `RENDERERS`,
+**2. Register it in `src/netviz/render/registry.py`.** One entry in `RENDERERS`,
 in help-text order, declaring everything a front end could ask:
 
 ```python
@@ -499,11 +499,11 @@ from `render/__init__.py`.
 `FORMATS = tuple(RENDERERS)` and its help text from `_describe_formats()`, and
 `--icons`, `--highlight` and `--layer` are all filtered through `supports_icons()`,
 `supports_highlight()` and `supports_layers()`. What *is* worth checking is that the
-derived lists came out right. `netgraph render --layer rack -f graphml` should either
+derived lists came out right. `netviz render --layer rack -f graphml` should either
 work or refuse with a message that names the formats which can draw an elevation;
-`netgraph path --highlight -f graphml` should offer the format only if you set
+`netviz path --highlight -f graphml` should offer the format only if you set
 `supports_highlight=True`, because `path`'s `-f` choices are `HIGHLIGHT_FORMATS`; and
-`netgraph watch -f graphml --serve` should serve it under your `media_type`.
+`netviz watch -f graphml --serve` should serve it under your `media_type`.
 
 **4. Golden fixtures.** If the format is text, add it to `FORMATS` in
 `tests/test_golden.py` and regenerate:
@@ -575,7 +575,7 @@ saying what the change achieves, capitalised, no trailing full stop, no prefix o
 tag:
 
 ```text
-Add `netgraph export`, five operational artefacts from one inventory
+Add `netviz export`, five operational artefacts from one inventory
 Model passive patch panels and rack placement
 Cut validate by 3.1x, profile-driven
 Stop an HTML page growing with the number of views
@@ -590,7 +590,7 @@ made, not just that it was; a reviewer reading it a year later is the audience.
 
 Before opening the pull request:
 
-1. every gate above passes locally, including `netgraph fmt --check examples`;
+1. every gate above passes locally, including `netviz fmt --check examples`;
 2. every generated artefact is regenerated and committed;
 3. new behaviour has an example test, and a new invariant has a property test;
 4. new documentation has its markers and `python tools/check_examples.py` reports
@@ -617,7 +617,7 @@ with them is a changelog nobody reads.
 Two entries are not optional, because a reader of the changelog is deciding whether to
 upgrade:
 
-* **A breaking change to a public surface** — the CLI, the `netgraph.dev/v1alpha1`
+* **A breaking change to a public surface** — the CLI, the `netviz.dev/v1alpha1`
   schema, a JSON output document, an exit code, a rule id, a published integration.
   It needs a `### Changed`/`### Removed` bullet naming the old shape and the new one,
   plus a migration line saying literally what to edit. The full list of public surfaces
@@ -638,7 +638,7 @@ release is actually cut.
   the invariants a change must not break.
 * [docs/testing.md](docs/testing.md) — the property and fuzz halves of the suite,
   the Hypothesis profiles and how to reproduce a failure.
-* [docs/getting-started.md](docs/getting-started.md) — netgraph from a user's side,
+* [docs/getting-started.md](docs/getting-started.md) — netviz from a user's side,
   which is worth reading once before changing it.
 * [docs/follow-ups.md](docs/follow-ups.md) — the deferred-work list, and the format
   an entry takes.

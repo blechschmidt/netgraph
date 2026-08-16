@@ -8,7 +8,7 @@
 # Each host declares the access VLAN its switch port carries, so E005 is quiet;
 # both hosts are cabled, so W103 is; no interface is left unaddressed or
 # unconfigured, so W101 is; and the switch holds no address, so W104 is.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -25,7 +25,7 @@ spec:
         mode: access
         access_vlan: 20
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -39,7 +39,7 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -53,7 +53,7 @@ spec:
         mode: access
         access_vlan: 20
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-sw
@@ -63,7 +63,7 @@ spec:
     - sw-a:GigabitEthernet0/1
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-b-sw

@@ -8,10 +8,10 @@ Graphviz can only read an SVG image when it was built against librsvg, and its
 cairo-backed outputs — ``png`` and ``pdf`` — are exactly where many builds were
 not. A raster icon is readable by every build, so each theme ships both: the SVG
 is the source and is what SVG output uses, the PNG is what everything else uses.
-See :mod:`netgraph.render.icons` for the selection rule.
+See :mod:`netviz.render.icons` for the selection rule.
 
 The PNGs are committed rather than generated at install time, because
-rasterising needs cairo and netgraph does not otherwise depend on it. Run this
+rasterising needs cairo and netviz does not otherwise depend on it. Run this
 after editing an SVG::
 
     pip install cairosvg      # not a project dependency; only this tool needs it
@@ -31,7 +31,7 @@ from pathlib import Path
 #: about 58, so four times over leaves enough resolution for a retina screen and for print.
 SCALE: int = 4
 
-ICONSETS = Path(__file__).resolve().parent.parent / "src" / "netgraph" / "render" / "iconsets"
+ICONSETS = Path(__file__).resolve().parent.parent / "src" / "netviz" / "render" / "iconsets"
 
 
 def sources(root: Path) -> list[Path]:
@@ -50,7 +50,7 @@ def render(source: Path) -> bytes:
     except ImportError:  # pragma: no cover - developer tooling
         raise SystemExit(
             "cairosvg is needed to rasterise the icons and is not installed "
-            "(it is deliberately not a netgraph dependency): pip install cairosvg"
+            "(it is deliberately not a netviz dependency): pip install cairosvg"
         ) from None
 
     payload = cairosvg.svg2png(url=str(source), scale=SCALE)

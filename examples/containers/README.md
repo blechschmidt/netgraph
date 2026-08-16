@@ -49,10 +49,10 @@ LAN (`dev: eno1`), which is the host's own answer, and once through the host
 (`dev: veth-sbx`, in `table: sandbox-egress`), which is the sandbox's. That is not
 a duplicate; it is two stacks answering one question differently, which is the
 whole of what a namespace is. A policy rule sends what the sandbox originates to
-the sandbox's table. netgraph places each entry by the interface it names, because
+the sandbox's table. netviz places each entry by the interface it names, because
 that is the only thing in the document that says which stack it is installed in.
 
-**A namespace partitions the address space, and netgraph knows it.** The `/30`
+**A namespace partitions the address space, and netviz knows it.** The `/30`
 on both ends of a pair would be overlapping prefixes on one machine
 ([`W111`](../../docs/validation-rules.md#w111--overlapping-prefixes-on-one-element))
 if the two ends were in one stack. They are not, so it is not reported — and
@@ -69,7 +69,7 @@ beside it, and every box of one machine is drawn inside a frame named after it.
 
 <!-- norun: writes containers.svg into the reader's directory -->
 ```console
-$ netgraph -i examples/containers render --layer netns -o containers.svg
+$ netviz -i examples/containers render --layer netns -o containers.svg
 ```
 
 Solid cyan lines are veth pairs — the crossing itself, which no other layer can
@@ -83,12 +83,12 @@ for them: `--layer l1` is the cabling, `--layer l2` the VLAN, `--layer l3` the
 four prefixes.
 
 That is also this view's limit, and the reason it exists: at layer 3 a container
-and the machine hosting it are still one node, so `netgraph path` cannot trace
+and the machine hosting it are still one node, so `netviz path` cannot trace
 out of a container through its own host. See follow-up 23 in
 [`docs/follow-ups.md`](../../docs/follow-ups.md).
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/containers validate
+$ netviz -i examples/containers validate
 no problems found
 ```

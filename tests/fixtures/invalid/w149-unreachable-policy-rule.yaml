@@ -4,7 +4,7 @@
 # The walk goes from the lowest priority upwards and the first match decides,
 # so the catch-all at 32766 ends it: the rule at 32800 is perfectly valid and
 # is never consulted.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-a
@@ -26,7 +26,7 @@ spec:
       src: 10.20.0.0/16
       table: main
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-b
@@ -38,7 +38,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

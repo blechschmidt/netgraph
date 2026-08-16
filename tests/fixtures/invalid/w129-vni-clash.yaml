@@ -4,7 +4,7 @@
 # into each other. Nesting them inside an IPsec tunnel is what keeps W127 quiet;
 # a layer-2 tunnel interface needs no address, which is why W101 leaves the
 # 'vx' ports alone.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -27,7 +27,7 @@ spec:
       type: tunnel
       mtu: 1350
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -50,7 +50,7 @@ spec:
       type: tunnel
       mtu: 1350
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b
@@ -58,7 +58,7 @@ spec:
   endpoints: [pc-a:eth0, pc-b:eth0]
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: tunnel
 metadata:
   name: ipsec-a-b
@@ -66,7 +66,7 @@ spec:
   type: ipsec
   endpoints: [pc-a:ipsec0, pc-b:ipsec0]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: tunnel
 metadata:
   name: vx-one
@@ -76,7 +76,7 @@ spec:
   endpoints: [pc-a:vx1, pc-b:vx1]
   over: ipsec-a-b
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: tunnel
 metadata:
   name: vx-two

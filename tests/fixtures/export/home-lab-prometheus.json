@@ -5,11 +5,11 @@
     ],
     "labels": {
       "instance": "adp-usb-eth.hosts",
-      "netgraph_element": "hosts/adp-usb-eth",
-      "netgraph_name": "adp-usb-eth",
-      "netgraph_namespace": "hosts",
-      "netgraph_kind": "adapter",
-      "netgraph_vendor": "Anker"
+      "netviz_element": "hosts/adp-usb-eth",
+      "netviz_name": "adp-usb-eth",
+      "netviz_namespace": "hosts",
+      "netviz_kind": "adapter",
+      "netviz_vendor": "Anker"
     }
   },
   {
@@ -18,11 +18,11 @@
     ],
     "labels": {
       "instance": "ap-home.wireless",
-      "netgraph_element": "wireless/ap-home",
-      "netgraph_name": "ap-home",
-      "netgraph_namespace": "wireless",
-      "netgraph_kind": "switch",
-      "netgraph_vendor": "Ubiquiti"
+      "netviz_element": "wireless/ap-home",
+      "netviz_name": "ap-home",
+      "netviz_namespace": "wireless",
+      "netviz_kind": "switch",
+      "netviz_vendor": "Ubiquiti"
     }
   },
   {
@@ -31,11 +31,11 @@
     ],
     "labels": {
       "instance": "pc-desk.hosts",
-      "netgraph_element": "hosts/pc-desk",
-      "netgraph_name": "pc-desk",
-      "netgraph_namespace": "hosts",
-      "netgraph_kind": "computer",
-      "netgraph_vendor": "Dell"
+      "netviz_element": "hosts/pc-desk",
+      "netviz_name": "pc-desk",
+      "netviz_namespace": "hosts",
+      "netviz_kind": "computer",
+      "netviz_vendor": "Dell"
     }
   },
   {
@@ -44,11 +44,11 @@
     ],
     "labels": {
       "instance": "phone.hosts",
-      "netgraph_element": "hosts/phone",
-      "netgraph_name": "phone",
-      "netgraph_namespace": "hosts",
-      "netgraph_kind": "computer",
-      "netgraph_vendor": "Apple"
+      "netviz_element": "hosts/phone",
+      "netviz_name": "phone",
+      "netviz_namespace": "hosts",
+      "netviz_kind": "computer",
+      "netviz_vendor": "Apple"
     }
   },
   {
@@ -57,11 +57,11 @@
     ],
     "labels": {
       "instance": "rtr-home.routers",
-      "netgraph_element": "routers/rtr-home",
-      "netgraph_name": "rtr-home",
-      "netgraph_namespace": "routers",
-      "netgraph_kind": "router",
-      "netgraph_vendor": "MikroTik"
+      "netviz_element": "routers/rtr-home",
+      "netviz_name": "rtr-home",
+      "netviz_namespace": "routers",
+      "netviz_kind": "router",
+      "netviz_vendor": "MikroTik"
     }
   },
   {
@@ -70,11 +70,11 @@
     ],
     "labels": {
       "instance": "srv-nas.hosts",
-      "netgraph_element": "hosts/srv-nas",
-      "netgraph_name": "srv-nas",
-      "netgraph_namespace": "hosts",
-      "netgraph_kind": "server",
-      "netgraph_vendor": "Synology"
+      "netviz_element": "hosts/srv-nas",
+      "netviz_name": "srv-nas",
+      "netviz_namespace": "hosts",
+      "netviz_kind": "server",
+      "netviz_vendor": "Synology"
     }
   },
   {
@@ -83,11 +83,11 @@
     ],
     "labels": {
       "instance": "sw-home.switches",
-      "netgraph_element": "switches/sw-home",
-      "netgraph_name": "sw-home",
-      "netgraph_namespace": "switches",
-      "netgraph_kind": "switch",
-      "netgraph_vendor": "TP-Link"
+      "netviz_element": "switches/sw-home",
+      "netviz_name": "sw-home",
+      "netviz_namespace": "switches",
+      "netviz_kind": "switch",
+      "netviz_vendor": "TP-Link"
     }
   }
 ]

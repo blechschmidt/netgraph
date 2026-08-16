@@ -2,7 +2,7 @@
 #
 # 'cbl-loop' joins 'sw-a' to itself. Legal - a loopback plug is a real thing -
 # but far more often the second endpoint was never edited after a copy.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -21,7 +21,7 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-loop

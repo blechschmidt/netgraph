@@ -2,7 +2,7 @@
 #
 # A hub repeats every frame to every port, so its ports are a single broadcast
 # domain. 'pc-a' and 'pc-b' are wired together and cannot reach each other.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: hub
 metadata:
   name: hub-a
@@ -13,7 +13,7 @@ spec:
     - name: port2
       type: ethernet
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -25,7 +25,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -37,7 +37,7 @@ spec:
       ipv4:
         addresses: [10.0.1.1/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-hub-a
@@ -47,7 +47,7 @@ spec:
     - pc-a:eth0
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-hub-b

@@ -1,9 +1,9 @@
-# W141 - a redundancy annotation names something netgraph does not understand.
+# W141 - a redundancy annotation names something netviz does not understand.
 #
 # 'cooling' is a real thing to want and not a thing this tool can grade, so the
 # expectation is reported rather than silently ignored: an annotation nobody
 # checks reads exactly like one somebody does.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-a
@@ -16,12 +16,12 @@ spec:
         addresses:
           - 10.0.0.1/24
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
   annotations:
-    netgraph/redundancy: cooling
+    netviz/redundancy: cooling
 spec:
   interfaces:
     - name: eth0
@@ -32,7 +32,7 @@ spec:
           - 10.0.0.2/24
         gateway: 10.0.0.1
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a

@@ -2,7 +2,7 @@
 #
 # A 500 W server on a strip rated for 100 W. The strip has the outlets for it;
 # what it has not got is the amperage.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: pdu
 metadata:
   name: pdu-r1-a
@@ -10,7 +10,7 @@ spec:
   outlets: 8
   capacity_watts: 100
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: server
 metadata:
   name: srv-a
@@ -27,7 +27,7 @@ spec:
     inputs:
       - pdu-r1-a:1
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -40,7 +40,7 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-srv

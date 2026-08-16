@@ -29,8 +29,8 @@ import pytest
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
-from netgraph.edit import AppendItem, EditError, EditSession, SetGeometry, UnsetField
-from netgraph.fixes import (
+from netviz.edit import AppendItem, EditError, EditSession, SetGeometry, UnsetField
+from netviz.fixes import (
     FIXES,
     Fix,
     apply_fix,
@@ -40,9 +40,9 @@ from netgraph.fixes import (
     repair,
     spec_for,
 )
-from netgraph.loader import Inventory, load_tree
-from netgraph.rules import RULES, rule_for
-from netgraph.validate import Finding, validate
+from netviz.loader import Inventory, load_tree
+from netviz.rules import RULES, rule_for
+from netviz.validate import Finding, validate
 
 import strategies as ng  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -281,7 +281,7 @@ def test_an_ssid_bridged_into_an_undeclared_vlan_is_repaired(tmp_path: Path) -> 
     root = tmp_path / "wireless"
     root.mkdir()
     (root / "net.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata:\n  name: ap-a\n"
         "spec:\n"
@@ -311,7 +311,7 @@ def test_a_vrf_something_still_points_at_is_left_alone(tmp_path: Path) -> None:
     root = tmp_path / "vrf"
     root.mkdir()
     (root / "net.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: router\n"
         "metadata:\n  name: rtr-a\n"
         "spec:\n"
@@ -654,7 +654,7 @@ def _switch(name: str, ports: Sequence[str]) -> str:
         f"    - name: {port}\n      type: ethernet\n      mtu: 1500\n" for port in ports
     )
     return (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         f"metadata:\n  name: {name}\n"
         f"spec:\n  interfaces:\n{interfaces}"
@@ -663,7 +663,7 @@ def _switch(name: str, ports: Sequence[str]) -> str:
 
 def _computer(name: str) -> str:
     return (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         f"metadata:\n  name: {name}\n"
         "spec:\n  interfaces:\n    - name: eno1\n      type: ethernet\n      mtu: 1500\n"
@@ -673,7 +673,7 @@ def _computer(name: str) -> str:
 
 def _adapter(name: str, host: str) -> str:
     return (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: adapter\n"
         f"metadata:\n  name: {name}\n"
         f"spec:\n  upstream:\n    attached_to: {host}\n  ports: 1\n"
@@ -683,7 +683,7 @@ def _adapter(name: str, host: str) -> str:
 
 def _cable(name: str, first: str, second: str) -> str:
     return (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         f"metadata:\n  name: {name}\n"
         f"spec:\n  endpoints:\n    - {first}\n    - {second}\n  medium: copper\n"
@@ -693,7 +693,7 @@ def _cable(name: str, first: str, second: str) -> str:
 def _user(name: str, *, departed: bool = False) -> str:
     status = "  status: departed\n" if departed else ""
     return (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: user\n"
         f"metadata:\n  name: {name}\n"
         f"spec:\n  full_name: {name.title()} Example\n{status}"
@@ -703,7 +703,7 @@ def _user(name: str, *, departed: bool = False) -> str:
 def _group(name: str, members: Sequence[str]) -> str:
     listed = "".join(f"    - {member}\n" for member in members)
     return (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: group\n"
         f"metadata:\n  name: {name}\n"
         f"spec:\n  members:\n{listed}"
@@ -715,7 +715,7 @@ def _layout(nodes: dict[str, Sequence[int]]) -> str:
         f"        {name}: {{position: [{point[0]}, {point[1]}]}}\n" for name, point in nodes.items()
     )
     return (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: layout\n"
         "metadata:\n  name: default\n"
         f"spec:\n  views:\n    l1:\n      nodes:\n{placed}"

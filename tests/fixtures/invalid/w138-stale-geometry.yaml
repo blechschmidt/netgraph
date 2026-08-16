@@ -6,10 +6,10 @@
 # an arrangement that is half history is one nobody trusts.
 #
 # A warning rather than an error, and not a close call: deleting a switch must
-# not make 'netgraph validate' fail. The whole point of keeping geometry in a
+# not make 'netviz validate' fail. The whole point of keeping geometry in a
 # sidecar is that the model can change without asking the diagram's permission.
-# 'netgraph layout --prune' drops exactly these entries.
-apiVersion: netgraph.dev/v1alpha1
+# 'netviz layout --prune' drops exactly these entries.
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-a
@@ -21,7 +21,7 @@ spec:
       ipv4:
         - 10.0.0.1/24
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata:
   name: sw-b
@@ -33,7 +33,7 @@ spec:
       ipv4:
         - 10.0.0.2/24
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b
@@ -43,7 +43,7 @@ spec:
     - sw-b:port1
   medium: copper
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: layout
 metadata:
   name: default

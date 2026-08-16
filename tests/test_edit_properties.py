@@ -10,7 +10,7 @@ somebody thought of:
 inverses applied in reverse, restores the tree byte for byte — every comment,
 every blank line, every quoting choice, every file, and the absence of the files
 that were deleted along the way. That is the property the whole design of
-:mod:`netgraph.edit` exists to deliver, and it is the one that would rot first.
+:mod:`netviz.edit` exists to deliver, and it is the one that would rot first.
 
 **The graph is a function of the end state, not of the route to it.** An
 inventory edited into a shape and an inventory *written* in that shape are the
@@ -41,7 +41,7 @@ import pytest
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
-from netgraph.edit import (
+from netviz.edit import (
     AddInterface,
     CreateElement,
     DeleteElement,
@@ -54,9 +54,9 @@ from netgraph.edit import (
     UnsetField,
     YamlFile,
 )
-from netgraph.loader import load_tree, namespace_of
-from netgraph.render import Layer, RenderOptions, build_graph
-from netgraph.render.jsonexport import graph_to_dict
+from netviz.loader import load_tree, namespace_of
+from netviz.render import Layer, RenderOptions, build_graph
+from netviz.render.jsonexport import graph_to_dict
 
 import strategies as ng  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -323,11 +323,11 @@ def test_a_cable_whose_endpoints_are_written_out_of_canonical_order(tmp_path: Pa
     ``docs/follow-ups.md``.
     """
     (tmp_path / "tree.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: hub\nmetadata:\n  name: zeta\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: hub\nmetadata:\n  name: zeta\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n---\n"
-        "apiVersion: netgraph.dev/v1alpha1\nkind: hub\nmetadata:\n  name: alpha\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: hub\nmetadata:\n  name: alpha\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n---\n"
-        "apiVersion: netgraph.dev/v1alpha1\nkind: cable\nmetadata:\n  name: link\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: cable\nmetadata:\n  name: link\n"
         # ``zeta`` sorts after ``alpha``, so the model reorders these two.
         "spec:\n  endpoints:\n    - zeta:eth0\n    - alpha:eth0\n  medium: copper\n",
         encoding="utf-8",
@@ -348,14 +348,14 @@ def test_removing_a_port_takes_the_bridge_membership_with_it(tmp_path: Path) -> 
     and every cable to the device then dangles.
     """
     (tmp_path / "sw.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: switch\nmetadata:\n  name: sw\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: switch\nmetadata:\n  name: sw\n"
         "spec:\n  interfaces:\n    - name: br0\n      type: bridge\n"
         "      members: [eth0, eth1]\n"
         "    - name: eth0\n      type: ethernet\n"
         "    - name: eth1\n      type: ethernet\n",
         encoding="utf-8",
     )
-    from netgraph.edit import RemoveInterface
+    from netviz.edit import RemoveInterface
 
     session = EditSession(root=tmp_path)
     session.apply(RemoveInterface(address="sw", name="eth1"))
@@ -376,7 +376,7 @@ def test_a_document_that_cannot_be_re_emitted_exactly_still_undoes_exactly(
     behind, so the inverse has to be the pre-image instead.
     """
     text = (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: hub\n"
         "metadata:\n"
         "  name: h\n"
@@ -403,7 +403,7 @@ def test_a_document_that_cannot_be_re_emitted_exactly_still_undoes_exactly(
 def test_deleting_the_last_document_of_a_file_deletes_the_file(tmp_path: Path) -> None:
     """Absence is part of the tree state, so it is part of what undo restores."""
     (tmp_path / "one.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\nkind: hub\nmetadata:\n  name: h\n"
+        "apiVersion: netviz.dev/v1alpha1\nkind: hub\nmetadata:\n  name: h\n"
         "spec:\n  interfaces:\n    - name: eth0\n      type: ethernet\n",
         encoding="utf-8",
     )
@@ -422,7 +422,7 @@ def test_deleting_the_last_document_of_a_file_deletes_the_file(tmp_path: Path) -
 def test_unsetting_a_commented_field_and_undoing_restores_the_comment(tmp_path: Path) -> None:
     """The reason an ``unset`` is inverted by a ``write-file`` and not by a ``set``."""
     text = (
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: hub\n"
         "metadata:\n"
         "  name: h\n"

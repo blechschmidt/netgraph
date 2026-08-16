@@ -2,7 +2,7 @@
 #
 # Neither port declares a 'vlan' block, so both sit in the untagged domain and
 # 10.0.0.1 really is claimed twice.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -15,7 +15,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -28,7 +28,7 @@ spec:
       ipv4:
         addresses: [10.0.0.1/24]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

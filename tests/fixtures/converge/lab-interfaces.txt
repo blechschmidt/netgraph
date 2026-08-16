@@ -54,7 +54,7 @@ srv-lab (server) [batch 0]
         $ remove interface bond0 member eno3
   !    by hand: eno3 is a physical port the inventory does not declare
         from srv-lab:eno3: the capture reports this interface as ethernet; the inventory does not declare it
-        note: the capture reports an ethernet interface 'eno3' that the inventory does not declare. netgraph will not shut or remove a physical port it knows nothing about; declare it, or take it out of service by hand
+        note: the capture reports an ethernet interface 'eno3' that the inventory does not declare. netviz will not shut or remove a physical port it knows nothing about; declare it, or take it out of service by hand
 
 maintenance batches
   batch 0: srv-lab

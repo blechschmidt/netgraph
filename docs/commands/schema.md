@@ -1,15 +1,15 @@
-# `netgraph schema`
+# `netviz schema`
 
-Print the JSON Schema (2020-12) for netgraph documents, generated from the same
+Print the JSON Schema (2020-12) for netviz documents, generated from the same
 pydantic models the loader uses. Point an editor at it and a typo'd key is
-underlined as you type rather than found by the next `netgraph validate`. It needs
+underlined as you type rather than found by the next `netviz validate`. It needs
 no inventory — the schema describes the document format, not your network.
 
 ## Synopsis
 
 <!-- generated: synopsis schema -->
 ```text
-netgraph [GLOBAL OPTIONS] schema [OPTIONS]
+netviz [GLOBAL OPTIONS] schema [OPTIONS]
 ```
 <!-- /generated -->
 
@@ -20,11 +20,11 @@ By default one schema covering every kind, discriminated on `kind`, so a single
 
 <!-- run: -->
 ```console
-$ netgraph schema
+$ netviz schema
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://netgraph.dev/schema/v1alpha1/element.json",
-  "title": "netgraph element document",
+  "$id": "https://netviz.dev/schema/v1alpha1/element.json",
+  "title": "netviz element document",
 ...
 ```
 
@@ -35,11 +35,11 @@ that belong to that kind:
 
 <!-- run: -->
 ```console
-$ netgraph schema --kind switch
+$ netviz schema --kind switch
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://netgraph.dev/schema/v1alpha1/switch.json",
-  "title": "netgraph switch document",
+  "$id": "https://netviz.dev/schema/v1alpha1/switch.json",
+  "title": "netviz switch document",
 ...
 ```
 
@@ -48,9 +48,9 @@ a usage error rather than a flag that quietly loses:
 
 <!-- run: rc=2 -->
 ```console
-$ netgraph schema --all --kind switch
-Usage: netgraph schema [OPTIONS]
-Try 'netgraph schema --help' for help.
+$ netviz schema --all --kind switch
+Usage: netviz schema [OPTIONS]
+Try 'netviz schema --help' for help.
 
 Error: --all and --kind are mutually exclusive.
 ```
@@ -60,11 +60,11 @@ directories as needed. That is the form worth putting in a `make` target:
 
 <!-- norun: writes into the reader's directory -->
 ```bash
-netgraph schema -o schema/netgraph.schema.json
+netviz schema -o schema/netviz.schema.json
 ```
 
 The `$id` is versioned alongside `apiVersion` —
-`https://netgraph.dev/schema/v1alpha1/element.json` — and a future `v1beta1` gets
+`https://netviz.dev/schema/v1alpha1/element.json` — and a future `v1beta1` gets
 its own rather than replacing it.
 
 ## Wiring an editor to it
@@ -72,18 +72,18 @@ its own rather than replacing it.
 The schema is only useful once a language server can find it, and there are three
 ways to arrange that:
 
-* **Let [`netgraph init`](init.md) do it.** With `--schema` (the default) it
-  writes `schema/netgraph.schema.json` into the new tree *and* puts a
+* **Let [`netviz init`](init.md) do it.** With `--schema` (the default) it
+  writes `schema/netviz.schema.json` into the new tree *and* puts a
   `# yaml-language-server: $schema=…` modeline on every document it generates,
   with the relative depth computed per file. See
-  [`schema/netgraph.schema.json` and the modelines](init.md#schemanetgraphschemajson-and-the-modelines).
+  [`schema/netviz.schema.json` and the modelines](init.md#schemanetvizschemajson-and-the-modelines).
 * **Use the copy committed in this repository.**
-  [`schema/netgraph.schema.json`](../../schema/netgraph.schema.json) is the exact
-  document `netgraph schema` prints, so an editor, a pre-commit hook or a CI job
-  can reach it by path or by URL without installing netgraph first.
+  [`schema/netviz.schema.json`](../../schema/netviz.schema.json) is the exact
+  document `netviz schema` prints, so an editor, a pre-commit hook or a CI job
+  can reach it by path or by URL without installing netviz first.
   `tests/test_schema.py` fails when it drifts from the models; refresh it with
-  `netgraph schema -o schema/netgraph.schema.json`, or with
-  `python tools/gen_json_schema.py` in a checkout that has no netgraph installed.
+  `netviz schema -o schema/netviz.schema.json`, or with
+  `python tools/gen_json_schema.py` in a checkout that has no netviz installed.
 * **Do it by hand**, per file with a modeline or per tree with a `yaml.schemas`
   glob. [Editor setup](../getting-started.md#editor-setup-autocompletion-and-inline-errors)
   has the modeline, the VS Code settings block and the Neovim and JetBrains
@@ -91,12 +91,12 @@ ways to arrange that:
   per-kind mapping and a caveat about what YAML will and will not let a schema
   see.
 
-**It does not replace `netgraph validate`.** A JSON Schema sees one document at a
+**It does not replace `netviz validate`.** A JSON Schema sees one document at a
 time, so it checks structure, value grammars and the rules inside a single object
 — the [schema pass](../validation.md#the-three-passes), roughly. Whether a cable
 endpoint names an element that exists, whether names are unique, whether the two
 ends of a link agree about a VLAN: all of that needs the whole tree and stays with
-[`netgraph validate`](validate.md). Keep running it in CI.
+[`netviz validate`](validate.md). Keep running it in CI.
 
 ## Arguments
 
@@ -132,7 +132,7 @@ error.
   human-readable lookup table, generated from the same models.
 * [`docs/getting-started.md`](../getting-started.md#editor-setup-autocompletion-and-inline-errors)
   — wiring the schema into VS Code, Neovim and the JetBrains IDEs.
-* [`netgraph init`](init.md) — writes the schema and the modelines into a new
+* [`netviz init`](init.md) — writes the schema and the modelines into a new
   inventory for you.
-* [`netgraph validate`](validate.md) — the checks a single-document schema cannot
+* [`netviz validate`](validate.md) — the checks a single-document schema cannot
   make.

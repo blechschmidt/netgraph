@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Write ``schema/netgraph.schema.json`` from the pydantic models.
+"""Write ``schema/netviz.schema.json`` from the pydantic models.
 
 The schema is committed so that an editor, a pre-commit hook or a CI job can
-reach it by path or by URL without installing netgraph first. That only works
+reach it by path or by URL without installing netviz first. That only works
 if the committed copy is the one the models actually produce, which is what
 ``--check`` asserts — the same drift guard ``docs/schema-reference.md`` has.
 
@@ -13,9 +13,9 @@ Usage::
     python tools/gen_json_schema.py -k cable   # one kind, to stdout
 
 ``tests/test_schema.py`` runs the ``--check`` path, so CI fails when a model
-changes without the schema being regenerated. ``netgraph schema`` produces the
+changes without the schema being regenerated. ``netviz schema`` produces the
 identical document at runtime; this script exists so that a checkout without an
-installed netgraph can still refresh the file.
+installed netviz can still refresh the file.
 """
 
 from __future__ import annotations
@@ -30,10 +30,10 @@ from typing import Final
 REPO_ROOT: Final = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from netgraph.models import DOCUMENT_KINDS  # noqa: E402
-from netgraph.schema import build_schema  # noqa: E402
+from netviz.models import DOCUMENT_KINDS  # noqa: E402
+from netviz.schema import build_schema  # noqa: E402
 
-OUTPUT: Final = REPO_ROOT / "schema" / "netgraph.schema.json"
+OUTPUT: Final = REPO_ROOT / "schema" / "netviz.schema.json"
 
 
 def build(kind: str | None = None) -> str:

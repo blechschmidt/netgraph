@@ -1,8 +1,8 @@
 """What a rendering carries besides the picture: tooltips, links and ids.
 
 Three attributes travel with a diagram and none of them changes it: the hover
-text of :mod:`netgraph.render.details`, the ``URL`` that ``--link-template``
-builds, and the stable ``id`` of :mod:`netgraph.render.ids`. They are asserted
+text of :mod:`netviz.render.details`, the ``URL`` that ``--link-template``
+builds, and the stable ``id`` of :mod:`netviz.render.ids`. They are asserted
 at three layers, because each one can fail on its own:
 
 * the **builder** — the records and the text derived from them, with no
@@ -26,9 +26,9 @@ from xml.etree import ElementTree
 
 import pytest
 
-from netgraph.errors import RenderError
-from netgraph.loader import Inventory, load_tree
-from netgraph.render import (
+from netviz.errors import RenderError
+from netviz.loader import Inventory, load_tree
+from netviz.render import (
     Graph,
     Layer,
     LinkTemplate,
@@ -43,8 +43,8 @@ from netgraph.render import (
     to_html,
     to_image,
 )
-from netgraph.render.details import MAX_DETAIL_LENGTH
-from netgraph.render.ids import slug
+from netviz.render.details import MAX_DETAIL_LENGTH
+from netviz.render.ids import slug
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -186,7 +186,7 @@ def test_the_display_flags_reach_the_tooltips(home_lab: Inventory) -> None:
 def test_a_tooltip_is_bounded_however_long_the_description_is(tmp_path: Path) -> None:
     """A pop-up that covers the diagram it explains is worse than none."""
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: server\n"
         f"metadata: {{name: srv, description: {'prose ' * 900}}}\n"
         "spec: {interfaces: [{name: eth0, type: ethernet, ipv4: [10.0.0.1/24]}]}\n"
@@ -202,7 +202,7 @@ def test_a_tooltip_is_bounded_however_long_the_description_is(tmp_path: Path) ->
 def test_a_tooltip_counts_off_the_interfaces_it_does_not_list(tmp_path: Path) -> None:
     interfaces = "".join(f"    - {{name: port{index}, type: ethernet}}\n" for index in range(1, 21))
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: switch\n"
         "metadata: {name: sw-big}\n"
         "spec:\n  interfaces:\n" + interfaces
@@ -344,7 +344,7 @@ def test_an_id_survives_a_new_element_appearing_before_it(
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
     (tmp_path / "aaa-new.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc-new}\n"
         "spec: {interfaces: [{name: eth0, type: ethernet, ipv4: [10.9.9.9/24]}]}\n"
@@ -382,14 +382,14 @@ def test_a_very_long_name_is_truncated_but_stays_distinct() -> None:
 def test_two_names_that_slug_alike_get_different_ids(tmp_path: Path) -> None:
     """``a/b`` and ``a_b`` are two elements and must stay two ids."""
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: a_b}\n"
         "spec: {interfaces: [{name: eth0, type: ethernet}]}\n"
     )
     (tmp_path / "a").mkdir()
     (tmp_path / "a" / "b.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: b}\n"
         "spec: {interfaces: [{name: eth0, type: ethernet}]}\n"
@@ -561,17 +561,17 @@ def _hostile_graph(tmp_path: Path) -> Graph:
     import dataclasses
 
     (tmp_path / "inv.yaml").write_text(
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc-a}\n"
         "spec: {interfaces: [{name: eth0, type: ethernet, ipv4: [10.0.0.1/24]}]}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc-b}\n"
         "spec: {interfaces: [{name: eth0, type: ethernet, ipv4: [10.0.0.2/24]}]}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata: {name: cbl}\n"
         "spec: {endpoints: [pc-a:eth0, pc-b:eth0], medium: copper, label: plain}\n"
@@ -697,20 +697,18 @@ def _hostile_inventory(root: Path) -> Inventory:
     import yaml
 
     document = {
-        "apiVersion": "netgraph.dev/v1alpha1",
+        "apiVersion": "netviz.dev/v1alpha1",
         "kind": "computer",
         "metadata": {"name": "pc-a", "description": HOSTILE_TEXT},
         "spec": {"interfaces": [{"name": "eth0", "type": "ethernet", "ipv4": ["10.0.0.1/24"]}]},
     }
     (root / "inv.yaml").write_text(
-        yaml.safe_dump(document, allow_unicode=True)
-        + "---\n"
-        + "apiVersion: netgraph.dev/v1alpha1\n"
+        yaml.safe_dump(document, allow_unicode=True) + "---\n" + "apiVersion: netviz.dev/v1alpha1\n"
         "kind: computer\n"
         "metadata: {name: pc-b}\n"
         "spec: {interfaces: [{name: eth0, type: ethernet, ipv4: [10.0.0.2/24]}]}\n"
         "---\n"
-        "apiVersion: netgraph.dev/v1alpha1\n"
+        "apiVersion: netviz.dev/v1alpha1\n"
         "kind: cable\n"
         "metadata: {name: cbl}\n"
         "spec: {endpoints: [pc-a:eth0, pc-b:eth0], medium: copper, label: plain}\n",
@@ -774,7 +772,7 @@ def test_a_hostile_description_stays_inside_the_record_block(tmp_path: Path) -> 
     inventory = _hostile_inventory(tmp_path)
     page = to_html(build_graph(inventory), RenderOptions())
 
-    raw = re.search(r'<script id="netgraph-data"[^>]*>(.*?)</script>', page, re.S)
+    raw = re.search(r'<script id="netviz-data"[^>]*>(.*?)</script>', page, re.S)
     assert raw is not None
     assert "</script>" not in raw.group(1)
     assert "\\u003c/script\\u003e" in raw.group(1)

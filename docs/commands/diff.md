@@ -1,6 +1,6 @@
-# `netgraph diff`
+# `netviz diff`
 
-`netgraph diff` is [`netgraph plan`](plan.md) as a picture. The same two
+`netviz diff` is [`netviz plan`](plan.md) as a picture. The same two
 inventory states go in and the same changeset comes out of the same comparison
 code — but instead of printing it, this draws one diagram in which:
 
@@ -17,7 +17,7 @@ to look at would be lost in the churn it caused, so a removed node keeps the
 position the [layout document](layout.md) gave it and the picture stays
 comparable to the one you had before.
 
-`netgraph diff` writes nothing to the inventory and never talks to a device.
+`netviz diff` writes nothing to the inventory and never talks to a device.
 
 ## Contents
 
@@ -39,7 +39,7 @@ comparable to the one you had before.
 
 <!-- generated: synopsis diff -->
 ```text
-netgraph [GLOBAL OPTIONS] diff [OPTIONS]
+netviz [GLOBAL OPTIONS] diff [OPTIONS]
 ```
 <!-- /generated -->
 
@@ -47,7 +47,7 @@ netgraph [GLOBAL OPTIONS] diff [OPTIONS]
 
 ## Where the two sides come from
 
-Exactly as [`netgraph plan`](plan.md#where-the-two-sides-come-from) reads them,
+Exactly as [`netviz plan`](plan.md#where-the-two-sides-come-from) reads them,
 plus one spelling and one source of its own:
 
 | Invocation | Left of the diff | Right of the diff |
@@ -67,15 +67,15 @@ directory is a folder; anything else is handed to `git archive`, which reads it
 into a temporary directory, so the command cannot disturb the working tree, an
 uncommitted change or the index.
 
-`--plan` takes a file written by `netgraph plan -out`. The plan is executed into
+`--plan` takes a file written by `netviz plan -out`. The plan is executed into
 an in-memory edit session that is never committed, so what is drawn on the right
-is the same text [`netgraph apply`](apply.md) would write — produced by the same
+is the same text [`netviz apply`](apply.md) would write — produced by the same
 operations, not by a reconstruction. The state hash is checked exactly as `apply`
 checks it: a plan made against a tree that has since moved on is refused.
 
 <!-- run: cwd=. -->
 ```console
-$ netgraph -i tests/fixtures/diff/home-lab-proposed diff --from examples/home-lab -f json -o /dev/null
+$ netviz -i tests/fixtures/diff/home-lab-proposed diff --from examples/home-lab -f json -o /dev/null
 diff at layer l1: 2 added, 4 changed, 2 removed
 ```
 
@@ -90,18 +90,18 @@ each other:
 
 <!-- norun: the revisions are this reader's, not this repository's -->
 ```console
-$ netgraph -i net diff --from v1.0 --to v2.0 -f svg -o release.svg
-$ netgraph -i net diff --from HEAD~1 --to HEAD -f svg -o last-change.svg
-$ netgraph -i net diff --from 'origin/main' -f html -o review.html
+$ netviz -i net diff --from v1.0 --to v2.0 -f svg -o release.svg
+$ netviz -i net diff --from HEAD~1 --to HEAD -f svg -o last-change.svg
+$ netviz -i net diff --from 'origin/main' -f html -o review.html
 ```
 
 Both sides are read out of the **object database** with `git archive`, into a
 temporary directory that is removed afterwards. Nothing is checked out, the
 index is not touched, and an uncommitted change in the tree is neither used nor
 disturbed — so this is safe to run mid-edit, and safe to run while
-[`netgraph web`](web.md) has the same folder open.
+[`netviz web`](web.md) has the same folder open.
 
-[`netgraph log`](log.md) is how you find the two revisions, and
+[`netviz log`](log.md) is how you find the two revisions, and
 [the editor's timeline](web.md#the-history-timeline) is this command as a
 scrubber: one frame per commit, each drawn against its parent.
 
@@ -109,9 +109,9 @@ Two failures are told apart, because they mean different things:
 
 <!-- norun: the repository is the reader's -->
 ```console
-$ netgraph -i net diff --from v0.1
+$ netviz -i net diff --from v0.1
 error: v0.1 has no 'net' directory in it, so there is no inventory to read at that revision
-$ netgraph -i net diff --from v0.0
+$ netviz -i net diff --from v0.0
 error: git cannot read 'v0.0'; check that the ref exists and that the inventory directory is present in it
 ```
 
@@ -125,9 +125,9 @@ about the history; the second is a ref nobody has heard of, which is a typo.
 Colour is never the only carrier. A removed node is dashed as well as red and a
 removed link is dashed whatever medium it was declared with, so the diagram
 survives a greyscale print and a red-green reader. Every marked node also carries
-the sigil `netgraph plan` prints — `+`, `-`, `~` — in a row of its own label.
+the sigil `netviz plan` prints — `+`, `-`, `~` — in a row of its own label.
 
-An amber badge names the fields that moved, spelled the way `netgraph plan`
+An amber badge names the fields that moved, spelled the way `netviz plan`
 spells them:
 
 ```text
@@ -135,7 +135,7 @@ spells them:
 ```
 
 Three paths are spelled out and the rest counted (`+2 more`); a device whose
-whole `spec` was rewritten is one to read in `netgraph plan`, not one to fit on a
+whole `spec` was rewritten is one to read in `netviz plan`, not one to fit on a
 node label.
 
 ### Renames are one box, not two
@@ -209,7 +209,7 @@ from "this element did not change" — plus two documents at the top level:
 }
 ```
 
-`changeset` is byte-for-byte what `netgraph plan --json` would have printed. It
+`changeset` is byte-for-byte what `netviz plan --json` would have printed. It
 travels *with* the graph rather than in a second file, because a consumer of a
 diff needs both and two documents that could be paired wrongly is the failure
 that avoids.
@@ -218,16 +218,16 @@ that avoids.
 
 ## Formats
 
-Every format [`netgraph render`](render.md) has, except Mermaid: a Mermaid
+Every format [`netviz render`](render.md) has, except Mermaid: a Mermaid
 flowchart can neither colour a node nor hold a changeset beside one, so
 `-f mermaid` is refused by name rather than emitting a diagram in which nothing
 distinguishes the deleted switch.
 
 <!-- run: cwd=. rc=2 -->
 ```console
-$ netgraph -i tests/fixtures/diff/home-lab-proposed diff --from examples/home-lab -f mermaid
-Usage: netgraph diff [OPTIONS]
-Try 'netgraph diff --help' for help.
+$ netviz -i tests/fixtures/diff/home-lab-proposed diff --from examples/home-lab -f mermaid
+Usage: netviz diff [OPTIONS]
+Try 'netviz diff --help' for help.
 
 Error: mermaid output has no way to say what changed — it can colour nothing and hold no changeset beside the graph; render the diff as dot, svg, html, png, pdf, json
 ```
@@ -244,7 +244,7 @@ Error: mermaid output has no way to say what changed — it can colour nothing a
 | `--against` | `REF\|DIR` | — | Draw the inventory against this git ref or folder: '--against HEAD' is 'what have I changed since the last commit'. The same side as --from, spelled the way a diff reads. |
 | `--from` | `REF\|DIR` | — | Take the state on the left of the diff from a git ref or another folder. A directory that exists is a folder; anything else is a git ref, exported read-only. |
 | `--to` | `REF\|DIR` | — | Take the state on the right of the diff from a git ref or folder. Defaults to the inventory. |
-| `--plan` | `FILE` | — | Draw the inventory against the state a saved plan would leave it in, without writing anything. The plan is checked against the tree exactly as 'netgraph apply' checks it. |
+| `--plan` | `FILE` | — | Draw the inventory against the state a saved plan would leave it in, without writing anything. The plan is checked against the tree exactly as 'netviz apply' checks it. |
 | `--target` | `ADDRESS` | — | Mark only changes to elements this glob selects; the rest of the diagram is drawn untouched. Repeatable. |
 | `--no-renames` | — | off | Draw every rename as a deletion beside a creation rather than as one moved element. |
 | `--namespace` | `NS` | — | Keep only elements in this namespace or below it. Repeatable. |
@@ -253,7 +253,7 @@ Error: mermaid output has no way to say what changed — it can colour nothing a
 | `--name` | `GLOB` | — | Keep only elements whose name matches this glob. Repeatable. |
 | `--neighbors-of` | `NAME` | — | Keep only the neighbourhood of this element. |
 | `--depth` | `INTEGER, >= 0` | `1` | How many hops --neighbors-of reaches. |
-| `--select` | `QUERY` | — | Keep only the elements this query selects, e.g. "kind = switch and not has vrf". The flags above are sugar for the equivalent query and are combined with it; 'netgraph query --explain' prints which. See docs/query.md. |
+| `--select` | `QUERY` | — | Keep only the elements this query selects, e.g. "kind = switch and not has vrf". The flags above are sugar for the equivalent query and are combined with it; 'netviz query --explain' prints which. See docs/query.md. |
 | `--collapse` | `NS` | — | Replace this namespace and everything under it with one node, labelled with what it holds. Links crossing the boundary attach to it; links inside it are counted rather than drawn. Repeatable. |
 | `--collapse-depth` | `N` | — | Collapse every namespace N levels deep, counted from the shallowest one that branches: '--collapse-depth 1' is the site-level overview of a tree laid out as sites/<site>/<tier>. |
 | `--bundle-links`, `--no-bundle-links` | — | — | Draw parallel links between the same pair of elements as one edge, with the count in the label. Members of a declared 'lag' interface are bundled either way unless --no-bundle-links is given, since the inventory already says they are one logical link. |
@@ -269,13 +269,13 @@ Error: mermaid output has no way to say what changed — it can colour nothing a
 | `--element-ids` | — | off | Give every node, edge and namespace a stable id derived from its name, so the diagram can be deep-linked and styled from outside. dot and svg only. |
 | `--max-addresses` | `N` | `4` | Longest address list spelled out under a node before it is abbreviated to 'and N more'. 0 prints the count alone. |
 | `--rankdir` | `[tb\|lr\|bt\|rl]` | TB, top to bottom | Layout direction. A wide network reads better left to right; a deep one top to bottom. Honoured by the Graphviz backends and by mermaid. |
-| `--routing` | `[spline\|orthogonal\|straight]` | whatever the inventory's layout documents say, else spline | How links are drawn between the bends they are pinned through: 'spline' is the curve Graphviz draws, 'orthogonal' right angles, 'straight' segment to segment. A default: a link that pins a style of its own keeps it. Honoured by the Graphviz backends, the JSON export and the editor. 'netgraph layout --write' records it in the view it arranges, so the choice is the inventory's rather than the command line's from then on. |
+| `--routing` | `[spline\|orthogonal\|straight]` | whatever the inventory's layout documents say, else spline | How links are drawn between the bends they are pinned through: 'spline' is the curve Graphviz draws, 'orthogonal' right angles, 'straight' segment to segment. A default: a link that pins a style of its own keeps it. Honoured by the Graphviz backends, the JSON export and the editor. 'netviz layout --write' records it in the view it arranges, so the choice is the inventory's rather than the command line's from then on. |
 | `--avoid`, `--no-avoid` | — | avoid | Route orthogonal links around the boxes they are not attached to instead of straight across them. Only applies to an arranged diagram drawn with '--routing orthogonal': a spline has nothing to route around, and an unarranged one is routed by Graphviz, which already avoids nodes. A bend you placed yourself is never moved — routing fills the segments between them. '--no-avoid' is the local Z-and-L every orthogonal diagram was drawn with before this existed. |
 | `--title` | `TEXT` | — | Caption for the diagram. |
 | `--layer` | `[physical\|l1\|l2\|l3\|overlay\|routing\|rack\|power\|identity\|netns\|security]` | `l1` | l1 draws the physical topology; l2 annotates it with VLANs; l3 draws IP subnets and the elements addressed in them; overlay draws the tunnels; routing draws the BGP sessions and OSPF adjacencies, clustered by VRF; physical adds the patch panels l1 splices out; rack draws a front elevation per rack; power draws the PDUs and the feeds into everything they power; identity draws the users and groups; netns opens each machine up into the network stacks inside it, joined by their veth pairs; security draws the firewall zones and what the policy lets cross between them. Repeatable for -f html, which draws each layer and puts a switcher over them. |
 | `--strict` | — | off | Treat warnings as errors. |
 | `--force` | — | off | Proceed even when validation failed. The result may not match the files. |
-| `--profile` | `NAME` | — | Apply the [profile.NAME] block of netgraph.toml on top of its [render] table. Explicit flags still win over both. |
+| `--profile` | `NAME` | — | Apply the [profile.NAME] block of netviz.toml on top of its [render] table. Explicit flags still win over both. |
 | `--show-config` | — | off | Print the settings this invocation resolves to, and where each one came from, then exit without doing any work. |
 <!-- /generated -->
 
@@ -299,10 +299,10 @@ so once per side.
 
 ## See also
 
-- [`netgraph log`](log.md) — which revisions there are to diff, and what each did.
-- [`netgraph plan`](plan.md) — the same changeset, as text.
-- [`netgraph apply`](apply.md) — executing one against the files.
-- [`netgraph render`](render.md) — the formats, the layers and the filters.
-- [`netgraph layout`](layout.md) — the arrangement a removed node keeps.
-- [`netgraph web`](web.md) — the same overlay, live, over a session's edits.
+- [`netviz log`](log.md) — which revisions there are to diff, and what each did.
+- [`netviz plan`](plan.md) — the same changeset, as text.
+- [`netviz apply`](apply.md) — executing one against the files.
+- [`netviz render`](render.md) — the formats, the layers and the filters.
+- [`netviz layout`](layout.md) — the arrangement a removed node keeps.
+- [`netviz web`](web.md) — the same overlay, live, over a session's edits.
 - [`docs/editing.md`](../editing.md) — the write path, in prose.

@@ -1,4 +1,4 @@
-# How netgraph is put together
+# How netviz is put together
 
 This is the orientation note for somebody about to change the code. It says what the
 pipeline is, which module owns each stage, what each stage may assume about its input and
@@ -54,7 +54,7 @@ else re-implements it.
 
 ## Stage 1: load
 
-**Owner:** `src/netgraph/loader/` — `tree.py` (the walk), `documents.py` (the strict YAML
+**Owner:** `src/netviz/loader/` — `tree.py` (the walk), `documents.py` (the strict YAML
 parser), `inventory.py` (the index), `cache.py` (parsed files, remembered by content), plus
 `ranges.py`, `templates.py`, `provenance.py`, `ignore.py`.
 
@@ -101,7 +101,7 @@ of 5 MB on a 628-element tree — and only the machine-readable `validate` forma
 
 ## Stage 2: validate
 
-**Owner:** `src/netgraph/validate.py`, with the catalogue in `rules.py` and the suppression
+**Owner:** `src/netviz/validate.py`, with the catalogue in `rules.py` and the suppression
 settings in `config.py`.
 
 ```python
@@ -130,7 +130,7 @@ loop over resolved records rather than a second resolver.
 
 ## Stage 3: build the graph
 
-**Owner:** `src/netgraph/render/graph.py`.
+**Owner:** `src/netviz/render/graph.py`.
 
 ```python
 def build_graph(inventory: Inventory, *, layer: Layer = Layer.L1) -> Graph: ...
@@ -178,7 +178,7 @@ as one selected element still has an address in it.
 implemented inside it. A query can traverse the graph and can ask about interfaces, so it must
 see the whole graph and needs a parser and a vocabulary the renderer has no business knowing
 about; what arrives in `selected` is therefore the *answer* — a set of fully-qualified names —
-computed by `netgraph.query` against the unfiltered graph. `query/apply.py` is the eighty lines
+computed by `netviz.query` against the unfiltered graph. `query/apply.py` is the eighty lines
 that do the two in the right order, and `filter_graph` raises rather than proceeds if it is
 handed a `select` nobody answered, because rendering the whole inventory for a query that
 selects three devices is a silently wrong picture. `AggregateSpec` removes nothing: `collapse` and
@@ -188,7 +188,7 @@ selects three devices is a silently wrong picture. `AggregateSpec` removes nothi
 
 ## Stage 5: render
 
-**Owner:** `src/netgraph/render/` — the registry in `registry.py`, the backends in `dot.py`,
+**Owner:** `src/netviz/render/` — the registry in `registry.py`, the backends in `dot.py`,
 `html.py`, `mermaid.py` and `jsonexport.py`, and the shared display decisions in
 `options.py`, `details.py`, `ids.py`, `links.py`, `icons.py`, `highlight.py`, `fragment.py`.
 
@@ -201,7 +201,7 @@ def render_layers(
 ```
 
 **May assume** a `Graph` and a `RenderOptions`, and nothing else: a backend never sees the
-`Inventory`, never reads `netgraph.toml`, and never decides what exists.
+`Inventory`, never reads `netviz.toml`, and never decides what exists.
 
 The stored arrangement (§18) reaches a backend on the **`Graph`**, not in the options, and
 that placement is the point: geometry is a fact about the inventory rather than a
@@ -215,7 +215,7 @@ cases.
 as Graphviz produced them — so a caller writing to a file or stdout needs no per-format
 branching; `render_text` is for callers that want a string and have already excluded the
 binary formats. Output is byte-for-byte stable for a given graph and options, which
-`tests/test_golden.py` asserts and which is what makes `netgraph render -f dot >
+`tests/test_golden.py` asserts and which is what makes `netviz render -f dot >
 topology.dot` a file worth committing.
 
 `RENDERERS` in `registry.py` is the single declaration of a format. Every fact a front end
@@ -238,7 +238,7 @@ Everything else hangs off one of the five stages and adds no sixth.
 | `trace/` | stage 3 | `trace(inventory, source, destination, *, vlan=None, …) -> TraceResult` |
 | `testing/` | stages 2 and 3 | `run_tests(inventory, *, names=(), …) -> TestReport`, then `render_test_report(report, output_format)` — the assertions of every `kind: testsuite` document, graded over the same graphs and the same trace engine everything else reads |
 | `export/` | stage 4 | `export(export_format, context_factory) -> ExportResult`, over the same filtered `Graph` a diagram is drawn from |
-| `listing.py` | stage 3 | `LISTINGS[subject](inventory) -> Listing` — the tables `netgraph list` prints, and the ones a report shows |
+| `listing.py` | stage 3 | `LISTINGS[subject](inventory) -> Listing` — the tables `netviz list` prints, and the ones a report shows |
 | `report/` | stages 2, 3 and 4 | `generate(inventory, *, options, diagnostics, …) -> (Bundle, Diagrams)` — the as-built document, built from `listing.py`, `ipam.py`, `export/cables.py`, `power.py` and the layer graphs |
 | `fmt/` | before stage 1 | `format_paths(roots, *, mode) -> Summary` — its own round-trip parser, never on the loading path |
 | `edit/` | before stage 1, gated on 1 and 2 | `EditSession(root).apply(operation)`, then `.diff()` / `.commit()` — the only write path, and the only thing that loads the tree *as it would be* through `loader.Overlay` |
@@ -247,7 +247,7 @@ Everything else hangs off one of the five stages and adds no sixth.
 | `watch/` | all five | `run_cycle(request) -> CycleResult`, repeated by `run_watch`, published through `LiveRender`, served by `PreviewServer` |
 | `web/` | all five, on a string | `render_source(source, view=None) -> Preview`, over `load_stream` rather than `load_tree` |
 
-Four are worth a sentence more. `netgraph.graph` sits *beside* the renderers, not under
+Four are worth a sentence more. `netviz.graph` sits *beside* the renderers, not under
 them: it hands the graph `build_graph` already resolved to networkx so that connectivity
 questions are answered by graph algorithms, and it declares its own `filter_graph` — over
 `nx.MultiGraph`, with keyword predicates rather than a `FilterSpec` — so check which one an
@@ -268,7 +268,7 @@ to a diagram and to a hosts file, and each emitter records what it had to drop
 ## Cross-cutting pieces
 
 **`errors.py` and `diagnostics.py` — diagnostics.** `errors.py` holds the exception hierarchy:
-`NetgraphError` and its subclasses `ConfigurationError`, `LoaderError` (with
+`NetvizError` and its subclasses `ConfigurationError`, `LoaderError` (with
 `SchemaError`/`SchemaIssue`), `ValidationError` and `RenderError`. The CLI catches the
 base class, so a new failure mode gets a clean message by inheriting from it rather than
 by adding a `try` in `cli.py`. It also owns the text helpers every diagnostic uses —
@@ -278,7 +278,7 @@ into one sorted stream of `Diagnostic` records and serialises it as JSON, SARIF 
 GitHub workflow commands; its `LOAD_RULE` pseudo-rule gives a *load* error a rule id and
 a documented section too, so no diagnostic reaches a user without one.
 
-**`settings.py` and `config.py` — `netgraph.toml` to Click parameters.** `config.py` reads
+**`settings.py` and `config.py` — `netviz.toml` to Click parameters.** `config.py` reads
 the file: `[validate]` (`ignore`, `severity`, `strict`) and, handing them straight over,
 `[render]` and every `[profile.<name>]` block. Unknown keys inside a known table are
 rejected — a misspelt `ingore = [...]` that silently did nothing would be worse than a
@@ -287,7 +287,7 @@ version still works. `settings.py` owns the one naming rule (**a key is the long
 without its leading dashes**), the `SETTINGS` registry mapping each key to a Click
 parameter and a parser, and the precedence ladder in `resolve_settings`: explicit flag,
 then the selected profile, then `[render]`, then the Click default. Each result is a
-`Resolution` carrying its `Origin`, which `netgraph config show` prints as provenance.
+`Resolution` carrying its `Origin`, which `netviz config show` prints as provenance.
 
 **`rules.py` — the single rule catalogue.** Every rule the validator can report is declared
 here exactly once, with a permanent short id (`E###`, `W###`, `I###`), a default severity,
@@ -305,7 +305,7 @@ a Host check — because `watch` and `web` are different applications but what t
 about *being a local server* has to be identical.
 
 `fsio.py` holds the three questions about writing a file that must have the same answer
-everywhere netgraph runs: what a line ending is (`\n`, never the platform's, because a
+everywhere netviz runs: what a line ending is (`\n`, never the platform's, because a
 canonical form and a golden file are defined in bytes), how a file is replaced (through a
 sibling temporary and `os.replace`, retried for the sharing violation only Windows
 raises), and what a generated file may be called (not `nul.yaml`, which is a device on
@@ -322,44 +322,44 @@ Verified against the tree: every path below exists.
 |---|---|
 | `docs/` | specification, generated reference, rule, CI and YANG guides |
 | `examples/` | five runnable inventories, also used as golden fixtures |
-| `schema/netgraph.schema.json` | the generated JSON Schema, for editors and CI |
-| `.github/actions/netgraph-validate/` | the composite action that runs `validate` in a workflow |
-| `.pre-commit-hooks.yaml` | the `netgraph-validate` hook, for inventory repositories |
+| `schema/netviz.schema.json` | the generated JSON Schema, for editors and CI |
+| `.github/actions/netviz-validate/` | the composite action that runs `validate` in a workflow |
+| `.pre-commit-hooks.yaml` | the `netviz-validate` hook, for inventory repositories |
 | `tools/` | doc and schema generators (checked for drift by the tests), the example checker, the icon rasteriser, the pipeline and page benchmarks |
-| `src/netgraph/query/` | the selector language: lexer, parser, vocabulary, evaluator, and the layer over `filter_graph` |
-| `src/netgraph/__init__.py` | public package surface |
-| `src/netgraph/cli.py` | console-script entry point (`netgraph`) |
-| `src/netgraph/completion.py` | shell completion: the scripts, and the value completers |
-| `src/netgraph/console.py` | terminal output: tables, colour, TTY detection |
-| `src/netgraph/errors.py` | shared exception hierarchy, and the diagnostic text helpers |
-| `src/netgraph/config.py` | per-inventory settings (`netgraph.toml`); `settings.py` owns the `[render]` table, the named profiles and the precedence ladder |
-| `src/netgraph/scaffold.py` | the starter inventory `netgraph init` writes |
-| `src/netgraph/httpserve.py` | what the two local servers promise: loopback, headers, host check, and the socket options that differ by platform |
-| `src/netgraph/fsio.py` | one newline policy, one atomic replace, one reserved-file-name rule, for every platform |
-| `src/netgraph/rules.py` | catalogue of validation rules and severities |
-| `src/netgraph/diagnostics.py` | `validate` as json, SARIF 2.1.0 and GitHub workflow commands |
-| `src/netgraph/schema.py` | JSON Schema emitted for editors (`netgraph schema`) |
-| `src/netgraph/subnets.py` | IP prefixes derived from the configured addresses, partitioned by routing instance; `ipam.py` adds utilisation, free space and conflicts over them |
-| `src/netgraph/validate.py` | semantic validation engine |
-| `src/netgraph/graph.py` | the same resolved topology as a `networkx.MultiGraph`, for analysis |
-| `src/netgraph/models/` | pydantic models for every element kind; `fielddocs.py` holds one prose description and YANG path per field, for both generators |
-| `src/netgraph/loader/` | recursive YAML inventory loader: `tree.py` the walk and the two-phase build templates make necessary, `documents.py` the strict safe parser and the libyaml / pure-Python choice, `inventory.py` the index and `LoadError`, `ranges.py` bracket expansion of `interfaces[].range`, `templates.py` the registry and the spec merge, `provenance.py` which file and line each field came from, `ignore.py` `.netgraphignore` with gitignore semantics, `cache.py` the content-addressed store of parsed-and-validated files |
-| `src/netgraph/render/` | graph construction and output renderers: `graph.py` turns an inventory into nodes, edges, VLAN membership and subnets and filters them, `aggregate.py` collapses namespaces and bundles links, `options.py` is `RenderOptions` (what to draw, never what exists), `registry.py` is one entry per format — the CLI reads it, never a list of names |
-| `src/netgraph/render/dot.py` | Graphviz DOT and the SVG/PNG/PDF it produces, laid out by `templates/graph.dot.j2`; `html.py` the self-contained interactive page (`-f html`) from `templates/page.html.j2`; `mermaid.py` the flowchart exporter; `jsonexport.py` the canonical JSON graph |
-| `src/netgraph/render/details.py` | per-element hover records and tooltip text; `ids.py` the stable id each drawn node, edge and cluster carries; `links.py` the `--link-template` URL back to the document; `highlight.py` the emphasis a reader asked for; `icons.py` icon themes (a directory of images named after element kinds, the bundled ones under `iconsets/`) |
-| `src/netgraph/render/fragment.py` | the Graphviz SVG made embeddable, for the page and the preview; `assets/` holds the style sheet, the client and the record renderer `netgraph web` shares with it — inlined, never fetched |
-| `src/netgraph/trace/` | reachability tracing (`netgraph path`): `endpoints.py` resolves what the user typed, `engine.py` searches layer 2 then layer 3, `model.py` holds the result, `report.py` renders it as text or JSON |
-| `src/netgraph/testing/` | `netgraph test`: executable assertions (`kind: testsuite`). `selectors.py` parses an assertion's `select:` into the renderer's own `FilterSpec`, `fields.py` reads a value out of an element by path for `unique`, `engine.py` grades every claim against the shared graphs, `model.py` is the verdict a failure has to carry, `report.py` renders text, JSON and JUnit |
-| `src/netgraph/export/` | `netgraph export`: six operational artefacts, with `context.py` for the values every emitter reads, `names.py` for folding a name into each target grammar, `manifest.py` for what was dropped |
-| `src/netgraph/listing.py` | the tables of `netgraph list`, in a form a report can show: headers, alignment, formatted cells and the same rows as records |
-| `src/netgraph/report/` | `netgraph report`: the as-built document. `collect.py` works out the scopes and the shared derivations, `pages.py` says what each page carries, `model.py` is the format-independent document, `layout.py` the file names and cross-references, `diagrams.py` the drawings and the links inside them, `write.py` the templates and the escaping, `bundle.py` the files and how they are written, `stamp.py` the timestamp and the git revision; `templates/` and `assets/` are the editable layout (`--template DIR`) |
-| `src/netgraph/fmt/` | the canonical form of an inventory file (`netgraph fmt`): `canonical.py` shapes it, `order.py` holds the key order, `verify.py` re-reads it strictly, `runner.py` walks the paths |
-| `src/netgraph/layout/` | stored diagram geometry (`netgraph layout`): `geometry.py` is the runtime arrangement and the three-way decision a renderer makes from it, `resolve.py` merges every `kind: layout` document into one table per view and resolves its keys, `graphviz.py` reads coordinates back out of a Graphviz run and puts a partially-pinned one back on the stored coordinate system, `document.py` writes geometry as YAML somebody can still read, `seed.py` is the command's engine room |
-| `src/netgraph/edit/` | the write path (`netgraph edit`, `netgraph apply`, and the web editor): `operations.py` is the closed set of typed changes and their JSON form, `apply.py` turns each into a change and its inverse, `roundtrip.py` holds a file as documents that can be edited without touching the others, `references.py` reads the references off the models and re-spells them, `placement.py` decides where a new document goes, `tree.py` journals and hashes what may be written, `session.py` runs the validation and conflict gates |
-| `src/netgraph/plan/` | the diff engine (`netgraph plan`, `netgraph apply`): `address.py` gives every element a stable address, `document.py` is the normalised form an element is compared in and the field-level diff, `identity.py` pairs up renamed elements by structural evidence, `order.py` puts the changeset in dependency order, `diff.py` is the pure two-inventories-in-one-plan-out function, `live.py` builds the target state a capture implies, `state.py` hashes a state so a stored plan cannot be applied to another, `execute.py` translates each entry into `netgraph.edit` operations, `sources.py` reads a git ref without touching the working tree |
-| `src/netgraph/importer/` | `netgraph import`: a first inventory from live-network output. `run.py` reads the inputs, sniffs each dialect and writes the tree; `lldp.py` turns `lldpctl`/`lldpcli` neighbour records into cables, both ends at once; `iproute.py` turns `ip -j link`/`addr` into one host's interfaces, bridges, bonds and VLANs; `csvlinks.py` reads `device,port,device,port` rows (and says why not NetJSON); `draft.py` is the neutral inventory every reader appends to, and the dedup; `emit.py` writes it as commented YAML in `docs/schema.md` field order |
-| `src/netgraph/watch/` | live re-rendering (`netgraph watch`): `pipeline.py` is one load → validate → render cycle and its published state, `loop.py` decides what counts as a change, `server.py` is the loopback preview and its self-reloading page |
-| `src/netgraph/web/` | the interactive interface (`netgraph web`): `preview.py` is one pass over a document stream, `svgdoc.py` is `render/fragment.py` with the preview's answers filled in, `server.py` is five routes over all of it, `assets/` the dependency-free client (`cull.js` is what keeps a thousand-device drawing interactive) |
+| `src/netviz/query/` | the selector language: lexer, parser, vocabulary, evaluator, and the layer over `filter_graph` |
+| `src/netviz/__init__.py` | public package surface |
+| `src/netviz/cli.py` | console-script entry point (`netviz`) |
+| `src/netviz/completion.py` | shell completion: the scripts, and the value completers |
+| `src/netviz/console.py` | terminal output: tables, colour, TTY detection |
+| `src/netviz/errors.py` | shared exception hierarchy, and the diagnostic text helpers |
+| `src/netviz/config.py` | per-inventory settings (`netviz.toml`); `settings.py` owns the `[render]` table, the named profiles and the precedence ladder |
+| `src/netviz/scaffold.py` | the starter inventory `netviz init` writes |
+| `src/netviz/httpserve.py` | what the two local servers promise: loopback, headers, host check, and the socket options that differ by platform |
+| `src/netviz/fsio.py` | one newline policy, one atomic replace, one reserved-file-name rule, for every platform |
+| `src/netviz/rules.py` | catalogue of validation rules and severities |
+| `src/netviz/diagnostics.py` | `validate` as json, SARIF 2.1.0 and GitHub workflow commands |
+| `src/netviz/schema.py` | JSON Schema emitted for editors (`netviz schema`) |
+| `src/netviz/subnets.py` | IP prefixes derived from the configured addresses, partitioned by routing instance; `ipam.py` adds utilisation, free space and conflicts over them |
+| `src/netviz/validate.py` | semantic validation engine |
+| `src/netviz/graph.py` | the same resolved topology as a `networkx.MultiGraph`, for analysis |
+| `src/netviz/models/` | pydantic models for every element kind; `fielddocs.py` holds one prose description and YANG path per field, for both generators |
+| `src/netviz/loader/` | recursive YAML inventory loader: `tree.py` the walk and the two-phase build templates make necessary, `documents.py` the strict safe parser and the libyaml / pure-Python choice, `inventory.py` the index and `LoadError`, `ranges.py` bracket expansion of `interfaces[].range`, `templates.py` the registry and the spec merge, `provenance.py` which file and line each field came from, `ignore.py` `.netvizignore` with gitignore semantics, `cache.py` the content-addressed store of parsed-and-validated files |
+| `src/netviz/render/` | graph construction and output renderers: `graph.py` turns an inventory into nodes, edges, VLAN membership and subnets and filters them, `aggregate.py` collapses namespaces and bundles links, `options.py` is `RenderOptions` (what to draw, never what exists), `registry.py` is one entry per format — the CLI reads it, never a list of names |
+| `src/netviz/render/dot.py` | Graphviz DOT and the SVG/PNG/PDF it produces, laid out by `templates/graph.dot.j2`; `html.py` the self-contained interactive page (`-f html`) from `templates/page.html.j2`; `mermaid.py` the flowchart exporter; `jsonexport.py` the canonical JSON graph |
+| `src/netviz/render/details.py` | per-element hover records and tooltip text; `ids.py` the stable id each drawn node, edge and cluster carries; `links.py` the `--link-template` URL back to the document; `highlight.py` the emphasis a reader asked for; `icons.py` icon themes (a directory of images named after element kinds, the bundled ones under `iconsets/`) |
+| `src/netviz/render/fragment.py` | the Graphviz SVG made embeddable, for the page and the preview; `assets/` holds the style sheet, the client and the record renderer `netviz web` shares with it — inlined, never fetched |
+| `src/netviz/trace/` | reachability tracing (`netviz path`): `endpoints.py` resolves what the user typed, `engine.py` searches layer 2 then layer 3, `model.py` holds the result, `report.py` renders it as text or JSON |
+| `src/netviz/testing/` | `netviz test`: executable assertions (`kind: testsuite`). `selectors.py` parses an assertion's `select:` into the renderer's own `FilterSpec`, `fields.py` reads a value out of an element by path for `unique`, `engine.py` grades every claim against the shared graphs, `model.py` is the verdict a failure has to carry, `report.py` renders text, JSON and JUnit |
+| `src/netviz/export/` | `netviz export`: six operational artefacts, with `context.py` for the values every emitter reads, `names.py` for folding a name into each target grammar, `manifest.py` for what was dropped |
+| `src/netviz/listing.py` | the tables of `netviz list`, in a form a report can show: headers, alignment, formatted cells and the same rows as records |
+| `src/netviz/report/` | `netviz report`: the as-built document. `collect.py` works out the scopes and the shared derivations, `pages.py` says what each page carries, `model.py` is the format-independent document, `layout.py` the file names and cross-references, `diagrams.py` the drawings and the links inside them, `write.py` the templates and the escaping, `bundle.py` the files and how they are written, `stamp.py` the timestamp and the git revision; `templates/` and `assets/` are the editable layout (`--template DIR`) |
+| `src/netviz/fmt/` | the canonical form of an inventory file (`netviz fmt`): `canonical.py` shapes it, `order.py` holds the key order, `verify.py` re-reads it strictly, `runner.py` walks the paths |
+| `src/netviz/layout/` | stored diagram geometry (`netviz layout`): `geometry.py` is the runtime arrangement and the three-way decision a renderer makes from it, `resolve.py` merges every `kind: layout` document into one table per view and resolves its keys, `graphviz.py` reads coordinates back out of a Graphviz run and puts a partially-pinned one back on the stored coordinate system, `document.py` writes geometry as YAML somebody can still read, `seed.py` is the command's engine room |
+| `src/netviz/edit/` | the write path (`netviz edit`, `netviz apply`, and the web editor): `operations.py` is the closed set of typed changes and their JSON form, `apply.py` turns each into a change and its inverse, `roundtrip.py` holds a file as documents that can be edited without touching the others, `references.py` reads the references off the models and re-spells them, `placement.py` decides where a new document goes, `tree.py` journals and hashes what may be written, `session.py` runs the validation and conflict gates |
+| `src/netviz/plan/` | the diff engine (`netviz plan`, `netviz apply`): `address.py` gives every element a stable address, `document.py` is the normalised form an element is compared in and the field-level diff, `identity.py` pairs up renamed elements by structural evidence, `order.py` puts the changeset in dependency order, `diff.py` is the pure two-inventories-in-one-plan-out function, `live.py` builds the target state a capture implies, `state.py` hashes a state so a stored plan cannot be applied to another, `execute.py` translates each entry into `netviz.edit` operations, `sources.py` reads a git ref without touching the working tree |
+| `src/netviz/importer/` | `netviz import`: a first inventory from live-network output. `run.py` reads the inputs, sniffs each dialect and writes the tree; `lldp.py` turns `lldpctl`/`lldpcli` neighbour records into cables, both ends at once; `iproute.py` turns `ip -j link`/`addr` into one host's interfaces, bridges, bonds and VLANs; `csvlinks.py` reads `device,port,device,port` rows (and says why not NetJSON); `draft.py` is the neutral inventory every reader appends to, and the dedup; `emit.py` writes it as commented YAML in `docs/schema.md` field order |
+| `src/netviz/watch/` | live re-rendering (`netviz watch`): `pipeline.py` is one load → validate → render cycle and its published state, `loop.py` decides what counts as a change, `server.py` is the loopback preview and its self-reloading page |
+| `src/netviz/web/` | the interactive interface (`netviz web`): `preview.py` is one pass over a document stream, `svgdoc.py` is `render/fragment.py` with the preview's answers filled in, `server.py` is five routes over all of it, `assets/` the dependency-free client (`cull.js` is what keeps a thousand-device drawing interactive) |
 
 ## Using it as a library
 
@@ -369,10 +369,10 @@ usable directly. Nothing in them needs the CLI.
 ```python
 from pathlib import Path
 
-from netgraph.config import load_config
-from netgraph.loader import load_tree
-from netgraph.render import RenderOptions, build_graph, icon_theme, render
-from netgraph.validate import validate
+from netviz.config import load_config
+from netviz.loader import load_tree
+from netviz.render import RenderOptions, build_graph, icon_theme, render
+from netviz.validate import validate
 
 root = Path("inventory")
 inventory = load_tree(root)
@@ -386,12 +386,12 @@ svg = render(build_graph(inventory), "svg", options)
 `load_tree` never raises for a problem *inside* the tree; unreadable documents are collected
 on `inventory.errors`. `validate` never raises either. Text that never was a folder — a
 paste, a pipe, a snippet from a ticket — goes through `load_stream` instead, and
-`render_source` runs the whole of what `netgraph web` does per keystroke in one call:
+`render_source` runs the whole of what `netviz web` does per keystroke in one call:
 
 ```python
-from netgraph.loader import load_stream
-from netgraph.render import Layer
-from netgraph.web import ViewOptions, render_source
+from netviz.loader import load_stream
+from netviz.render import Layer
+from netviz.web import ViewOptions, render_source
 
 text = Path("topology.yaml").read_text()
 inventory = load_stream(text)  # same parser, same schema, same rules
@@ -414,7 +414,7 @@ whatever resolved still drawn.
 
 Each is load-bearing somewhere else in the tree, and a test names most of them.
 
-1. **Models forbid unknown keys.** `NetgraphModel` sets `extra="forbid"` (`models/base.py`,
+1. **Models forbid unknown keys.** `NetvizModel` sets `extra="forbid"` (`models/base.py`,
    `NG-D005`): silently ignoring a misspelt key would produce a diagram that disagrees with
    the file, which is the failure mode this tool exists to prevent. It is also what puts
    `additionalProperties: false` into the JSON Schema.
@@ -445,7 +445,7 @@ Each is load-bearing somewhere else in the tree, and a test names most of them.
 ## See also
 
 * [CONTRIBUTING.md](../CONTRIBUTING.md) — the gates, the recipes, how to run CI's checks.
-* [Testing netgraph](testing.md) — the example half and the property half of the suite,
+* [Testing netviz](testing.md) — the example half and the property half of the suite,
   and the Hypothesis profiles.
 * [The inventory schema](schema.md) — the specification the models and the loader
   implement, section by section.

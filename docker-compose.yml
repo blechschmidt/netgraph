@@ -1,12 +1,12 @@
-# netgraph, without installing netgraph.
+# netviz, without installing netviz.
 #
-#     docker compose run --rm netgraph validate      # the CLI, one shot
+#     docker compose run --rm netviz validate      # the CLI, one shot
 #     docker compose up web                          # the browser editor, :8081
 #     docker compose up watch                        # the live preview, :8080
 #
 # All three are the same image (built from ./Dockerfile) over the same mount:
-# they differ only in what they ask netgraph to do with it. The inventory they
-# read is ``examples/home-lab`` from this checkout unless NETGRAPH_INVENTORY says
+# they differ only in what they ask netviz to do with it. The inventory they
+# read is ``examples/home-lab`` from this checkout unless NETVIZ_INVENTORY says
 # otherwise, so a fresh clone can render something before it has a network of its
 # own described. Every variable used below has a default -- ``docker compose up``
 # needs no ``.env`` -- and ``.env.example`` lists them with what they do.
@@ -15,7 +15,7 @@
 # out, publishing the ports, and what to do when a bind mount delivers no
 # filesystem events.
 
-name: netgraph
+name: netviz
 
 # --------------------------------------------------------------------------- #
 # What every service shares
@@ -23,14 +23,14 @@ name: netgraph
 x-environment: &environment
   # Which YAML parser to use, ``auto`` (libyaml when the wheel carries it) or
   # ``python``. The same switch CI flips; see docs/testing.md.
-  NETGRAPH_YAML_LOADER: "${NETGRAPH_YAML_LOADER:-auto}"
+  NETVIZ_YAML_LOADER: "${NETVIZ_YAML_LOADER:-auto}"
 
-x-netgraph: &netgraph
+x-netviz: &netviz
   build:
     context: .
     dockerfile: Dockerfile
-  image: netgraph:local
-  # PID 1 in this container is netgraph itself, and a Python process that has
+  image: netviz:local
+  # PID 1 in this container is netviz itself, and a Python process that has
   # installed no SIGTERM handler ignores it when it is PID 1 -- so without an
   # init, ``docker compose down`` waits out the grace period and kills the
   # container. tini reaps and forwards instead.
@@ -39,8 +39,8 @@ x-netgraph: &netgraph
   # directory on the host, so they must land owned by the person who asked for
   # them rather than by root. Override both when your ids are not 1000; ``id -u``
   # and ``id -g`` say what they are.
-  user: "${NETGRAPH_UID:-1000}:${NETGRAPH_GID:-1000}"
-  # netgraph reads YAML and writes a diagram. It needs no privilege to do that,
+  user: "${NETVIZ_UID:-1000}:${NETVIZ_GID:-1000}"
+  # netviz reads YAML and writes a diagram. It needs no privilege to do that,
   # and an inventory is exactly the kind of file worth being careful with.
   security_opt:
     - no-new-privileges:true
@@ -57,23 +57,23 @@ x-netgraph: &netgraph
 x-inventory-ro: &inventory-ro
   # A preview and an editor only ever read. Mounting read-only means a
   # misconfigured container cannot rewrite the tree it is drawing.
-  - "${NETGRAPH_INVENTORY:-./examples/home-lab}:/inventory:ro"
+  - "${NETVIZ_INVENTORY:-./examples/home-lab}:/inventory:ro"
 
 services:
   # ------------------------------------------------------------------------- #
   # The CLI, one command at a time
   # ------------------------------------------------------------------------- #
-  #     docker compose run --rm netgraph validate
-  #     docker compose run --rm netgraph list devices
-  #     docker compose run --rm netgraph render -f svg -o topology.svg
-  #     docker compose run --rm netgraph export hosts
+  #     docker compose run --rm netviz validate
+  #     docker compose run --rm netviz list devices
+  #     docker compose run --rm netviz render -f svg -o topology.svg
+  #     docker compose run --rm netviz export hosts
   #
-  # Everything after the service name is netgraph's own argument list, because
-  # the image's entrypoint is the ``netgraph`` executable. Data goes to stdout
+  # Everything after the service name is netviz's own argument list, because
+  # the image's entrypoint is the ``netviz`` executable. Data goes to stdout
   # and commentary to stderr as it does anywhere else, so ``… render -f json |
   # jq`` works through compose too.
-  netgraph:
-    <<: *netgraph
+  netviz:
+    <<: *netviz
     # Under a profile so that ``docker compose up`` -- which brings up the two
     # servers -- does not also start a one-shot command and report it as a
     # container that exited. ``compose run`` enables the profile itself.
@@ -82,7 +82,7 @@ services:
     volumes:
       # Read-write, unlike the servers: ``render -o``, ``fmt``, ``export -o``,
       # ``init`` and ``import`` all write into the tree.
-      - "${NETGRAPH_INVENTORY:-./examples/home-lab}:/inventory:rw"
+      - "${NETVIZ_INVENTORY:-./examples/home-lab}:/inventory:rw"
     command:
       - --help
 
@@ -96,26 +96,26 @@ services:
   # this service can hold the inventory read-only and still be useful -- the tree
   # is only the seed.
   web:
-    <<: *netgraph
+    <<: *netviz
     volumes: *inventory-ro
     command:
       - web
       # 0.0.0.0 inside the container, not on the host: the published port below
       # is what decides who can reach it. A container's loopback is its own, so
-      # binding netgraph to 127.0.0.1 here would make it unreachable from
+      # binding netviz to 127.0.0.1 here would make it unreachable from
       # anywhere, including the machine running Docker.
       - --host
       - 0.0.0.0
       # There is no browser in here to open.
       - --no-open
       - --icons
-      - "${NETGRAPH_ICONS:-none}"
+      - "${NETVIZ_ICONS:-none}"
     ports:
-      # Published on loopback by default, for the reason netgraph itself binds
+      # Published on loopback by default, for the reason netviz itself binds
       # to loopback by default: an inventory describes internal topology, and
       # putting it on the network is a decision, not a default. Set
-      # NETGRAPH_BIND=0.0.0.0 to make it one.
-      - "${NETGRAPH_BIND:-127.0.0.1}:${NETGRAPH_WEB_PORT:-8081}:8081"
+      # NETVIZ_BIND=0.0.0.0 to make it one.
+      - "${NETVIZ_BIND:-127.0.0.1}:${NETVIZ_WEB_PORT:-8081}:8081"
     healthcheck:
       # No curl in the image, and no need for one: the interpreter that serves
       # the page can ask it for itself.
@@ -139,7 +139,7 @@ services:
   # ``docker compose logs``. A cycle that fails keeps the previous diagram up, so
   # a half-typed document never blanks the picture.
   watch:
-    <<: *netgraph
+    <<: *netviz
     volumes: *inventory-ro
     command:
       - watch
@@ -148,11 +148,11 @@ services:
       - 0.0.0.0
       # l1 physical, l2 with VLANs, l3 subnets, overlay tunnels, rack elevation.
       - --layer
-      - "${NETGRAPH_LAYER:-l1}"
+      - "${NETVIZ_LAYER:-l1}"
       - --icons
-      - "${NETGRAPH_ICONS:-none}"
+      - "${NETVIZ_ICONS:-none}"
     ports:
-      - "${NETGRAPH_BIND:-127.0.0.1}:${NETGRAPH_WATCH_PORT:-8080}:8080"
+      - "${NETVIZ_BIND:-127.0.0.1}:${NETVIZ_WATCH_PORT:-8080}:8080"
     environment:
       <<: *environment
       # A bind mount does not always deliver filesystem events -- Docker Desktop

@@ -2,7 +2,7 @@
 #
 # Both access points answer to 02:00:5e:10:00:01, so a client cannot tell which
 # of the two it is talking to and a roam between them is invisible.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: ap-a
@@ -23,7 +23,7 @@ spec:
           - ssid: lab
             bssid: '02:00:5e:10:00:01'
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: ap-b
@@ -44,7 +44,7 @@ spec:
           - ssid: lab-guest
             bssid: '02:00:5e:10:00:01'
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

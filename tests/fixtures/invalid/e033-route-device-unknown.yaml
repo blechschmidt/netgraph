@@ -2,7 +2,7 @@
 #
 # 'eth9' is a typo for 'eth0'. The device would refuse to install the route, so
 # 192.168.0.0/16 is unreachable while the inventory says it is served.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-a
@@ -18,7 +18,7 @@ spec:
       via: 10.0.0.2
       dev: eth9
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-b
@@ -30,7 +30,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

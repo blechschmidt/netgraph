@@ -3,7 +3,7 @@
 # 'rtr-a' peers with 10.0.0.2 as AS 65002; the router holding that address
 # declares AS 65003. The OPEN message would carry an AS the far end does not
 # recognise, so the session never establishes.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-a
@@ -22,7 +22,7 @@ spec:
         - address: 10.0.0.2
           remote_asn: 65002
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: router
 metadata:
   name: rtr-b
@@ -38,7 +38,7 @@ spec:
       asn: 65003
       router_id: 192.0.2.2
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

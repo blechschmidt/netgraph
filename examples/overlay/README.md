@@ -7,9 +7,9 @@ what the diagram does with both.
 
 <!-- run: -->
 ```console
-$ netgraph -i examples/overlay validate
+$ netviz -i examples/overlay validate
 no problems found
-$ netgraph -i examples/overlay list tunnels
+$ netviz -i examples/overlay list tunnels
 NAME                STACK             VNI  ENCRYPTED  ENDS  ENDPOINTS
 ------------------  ----------------  ---  ---------  ----  ----------------------------------------------
 tunnels/wg-mesh     wireguard           -  yes           3  rtr-branch-a:wg0, rtr-branch-b:wg0, rtr-hq:wg0
@@ -52,7 +52,7 @@ encapsulation overhead: 1500 → 1427 (IPsec, −73) → 1377 (VXLAN, −50) and
 left. The overheads are in [§14.1](../../docs/schema.md#141-tunnel-types).
 
 **VLAN 100 crosses a tunnel.** `vxlan100` is an access port in VLAN 100 on both
-routers. VXLAN carries frames, so the tunnel carries the VLAN — `netgraph -i
+routers. VXLAN carries frames, so the tunnel carries the VLAN — `netviz -i
 examples/overlay render --layer l2 --vlan 100` draws the two routers as one
 broadcast domain even though no cable between them carries VLAN 100.
 
@@ -64,10 +64,10 @@ there is nowhere to put the key, deliberately ([§14.2](../../docs/schema.md#142
 
 <!-- norun: each line writes an SVG into the reader's directory, and each carries a trailing shell comment -->
 ```console
-$ netgraph -i examples/overlay render -o l1.svg                    # physical, tunnels dashed over it
-$ netgraph -i examples/overlay render --layer l2 -o l2.svg         # VLAN 100 across the VXLAN
-$ netgraph -i examples/overlay render --layer l3 -o l3.svg         # the prefixes, tunnel prefixes included
-$ netgraph -i examples/overlay render --layer overlay -o ov.svg    # the encapsulation stack
+$ netviz -i examples/overlay render -o l1.svg                    # physical, tunnels dashed over it
+$ netviz -i examples/overlay render --layer l2 -o l2.svg         # VLAN 100 across the VXLAN
+$ netviz -i examples/overlay render --layer l3 -o l3.svg         # the prefixes, tunnel prefixes included
+$ netviz -i examples/overlay render --layer overlay -o ov.svg    # the encapsulation stack
 ```
 
 The overlay view is the one that shows nesting: `vx-100` and `gre-mgmt` each

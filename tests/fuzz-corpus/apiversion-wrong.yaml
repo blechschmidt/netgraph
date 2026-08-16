@@ -1,4 +1,4 @@
-apiVersion: netgraph.dev/v9
+apiVersion: netviz.dev/v9
 kind: switch
 metadata:
   name: a

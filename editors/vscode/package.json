@@ -1,9 +1,9 @@
 {
-  "name": "netgraph",
-  "displayName": "netgraph",
-  "description": "Diagnostics, completion, hover, go-to-definition, rename and formatting for netgraph inventory YAML.",
+  "name": "netviz",
+  "displayName": "netviz",
+  "description": "Diagnostics, completion, hover, go-to-definition, rename and formatting for netviz inventory YAML.",
   "version": "0.1.0",
-  "publisher": "netgraph",
+  "publisher": "netviz",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -23,36 +23,36 @@
   "main": "./extension.js",
   "contributes": {
     "configuration": {
-      "title": "netgraph",
+      "title": "netviz",
       "properties": {
-        "netgraph.server.path": {
+        "netviz.server.path": {
           "type": "string",
-          "default": "netgraph",
-          "markdownDescription": "The `netgraph` executable. Set this to an absolute path when netgraph is in a virtual environment VS Code does not activate."
+          "default": "netviz",
+          "markdownDescription": "The `netviz` executable. Set this to an absolute path when netviz is in a virtual environment VS Code does not activate."
         },
-        "netgraph.server.args": {
+        "netviz.server.args": {
           "type": "array",
           "items": { "type": "string" },
           "default": ["lsp"],
-          "markdownDescription": "Arguments passed to the executable. `--no-watch` turns off netgraph's own folder watching; `--log FILE` records what the server did."
+          "markdownDescription": "Arguments passed to the executable. `--no-watch` turns off netviz's own folder watching; `--log FILE` records what the server did."
         },
-        "netgraph.server.enable": {
+        "netviz.server.enable": {
           "type": "boolean",
           "default": true,
-          "description": "Run the netgraph language server for YAML files."
+          "description": "Run the netviz language server for YAML files."
         }
       }
     },
     "commands": [
       {
-        "command": "netgraph.restart",
-        "title": "netgraph: Restart language server"
+        "command": "netviz.restart",
+        "title": "netviz: Restart language server"
       }
     ],
     "yamlValidation": [
       {
         "fileMatch": ["*.yaml", "*.yml"],
-        "url": "https://raw.githubusercontent.com/blechschmidt/netgraph/main/schema/netgraph.schema.json"
+        "url": "https://raw.githubusercontent.com/blechschmidt/netgraph/main/schema/netviz.schema.json"
       }
     ]
   },

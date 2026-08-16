@@ -1,5 +1,5 @@
 {
-  "apiVersion": "netgraph.dev/v1alpha1",
+  "apiVersion": "netviz.dev/v1alpha1",
   "kind": "NetworkGraph",
   "layer": "l1",
   "nodes": [
@@ -841,7 +841,7 @@
   "changeset": {
     "schemaVersion": 1,
     "tool": {
-      "name": "netgraph",
+      "name": "netviz",
       "version": "0.1.0"
     },
     "source": {
@@ -866,7 +866,7 @@
         "address": "cable.cables/cbl-sw-nas",
         "kind": "cable",
         "document": {
-          "apiVersion": "netgraph.dev/v1alpha1",
+          "apiVersion": "netviz.dev/v1alpha1",
           "kind": "cable",
           "metadata": {
             "name": "cbl-sw-nas",
@@ -895,7 +895,7 @@
         "address": "device.hosts/srv-nas",
         "kind": "server",
         "document": {
-          "apiVersion": "netgraph.dev/v1alpha1",
+          "apiVersion": "netviz.dev/v1alpha1",
           "kind": "server",
           "metadata": {
             "name": "srv-nas",
@@ -986,7 +986,7 @@
         "address": "device.hosts/pc-new",
         "kind": "computer",
         "document": {
-          "apiVersion": "netgraph.dev/v1alpha1",
+          "apiVersion": "netviz.dev/v1alpha1",
           "kind": "computer",
           "metadata": {
             "name": "pc-new",
@@ -1031,7 +1031,7 @@
         "address": "cable.cables/cbl-sw-new",
         "kind": "cable",
         "document": {
-          "apiVersion": "netgraph.dev/v1alpha1",
+          "apiVersion": "netviz.dev/v1alpha1",
           "kind": "cable",
           "metadata": {
             "name": "cbl-sw-new"

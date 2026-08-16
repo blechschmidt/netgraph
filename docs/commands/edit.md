@@ -1,4 +1,4 @@
-# `netgraph edit`
+# `netviz edit`
 
 Change the inventory through typed operations rather than through a text editor:
 rename a switch and every reference to it, delete a device and the cables that
@@ -28,25 +28,25 @@ page is the reference for the command.
 
 <!-- norun: illustrative one-liners over an inventory that is not in the repository -->
 ```bash
-netgraph edit set core-sw spec.model 'C9300'            # write a field
-netgraph edit unset core-sw spec.location               # remove one
-netgraph edit create switch sw-new --namespace sites/hq # declare an element
-netgraph edit delete sw-old --cascade                   # remove one, and its cables
-netgraph edit rename sw-old sw-new                      # and every reference to it
-netgraph edit move sw-new sites/hq/access/sw-new.yaml   # another file, another namespace
-netgraph edit connect sw-new:Gi1/0/1 pc-desk:eno1       # a cable between two ports
-netgraph edit disconnect cbl-sw-new-pc-desk             # and back out again
-netgraph edit add-interface sw-new Gi1/0/2              # a port
-netgraph edit remove-interface sw-new Gi1/0/2 --cascade # and what terminated on it
+netviz edit set core-sw spec.model 'C9300'            # write a field
+netviz edit unset core-sw spec.location               # remove one
+netviz edit create switch sw-new --namespace sites/hq # declare an element
+netviz edit delete sw-old --cascade                   # remove one, and its cables
+netviz edit rename sw-old sw-new                      # and every reference to it
+netviz edit move sw-new sites/hq/access/sw-new.yaml   # another file, another namespace
+netviz edit connect sw-new:Gi1/0/1 pc-desk:eno1       # a cable between two ports
+netviz edit disconnect cbl-sw-new-pc-desk             # and back out again
+netviz edit add-interface sw-new Gi1/0/2              # a port
+netviz edit remove-interface sw-new Gi1/0/2 --cascade # and what terminated on it
 ```
 
-Each subcommand applies exactly one operation. `netgraph edit apply` takes any
+Each subcommand applies exactly one operation. `netviz edit apply` takes any
 number of them as JSON, which is how a script or an editor drives it.
 
 One operation has no subcommand of its own: `set-geometry`, which writes one
 view of a [`kind: layout`](../schema.md#18-layout-diagram-geometry) document.
 Coordinates are not something anybody types, so it is reached through
-[`netgraph layout`](layout.md) — or through `apply`, which is how a canvas will
+[`netviz layout`](layout.md) — or through `apply`, which is how a canvas will
 reach it when a node is dragged.
 
 ## Addresses and field paths
@@ -84,7 +84,7 @@ better. Warnings never block a write.
 
 **It refuses to clobber.** Every file it reads is hashed, and the hash is checked
 again immediately before the write. A file that changed on disk in between — your
-editor, a `git checkout`, another netgraph — is reported and the edit is dropped.
+editor, a `git checkout`, another netviz — is reported and the edit is dropped.
 `--force` does *not* skip this: overwriting somebody else's work is not something
 a flag can mean.
 
@@ -95,7 +95,7 @@ written, with git's `a/`/`b/` prefixes so `git apply` accepts it:
 
 <!-- norun: writes to the working tree; the transcript would depend on run order -->
 ```console
-$ netgraph -i examples/home-lab edit set sw-home spec.model 'TL-SG108PE' --dry-run
+$ netviz -i examples/home-lab edit set sw-home spec.model 'TL-SG108PE' --dry-run
 --- a/switches/sw-home.yaml
 +++ b/switches/sw-home.yaml
 @@ -8,7 +8,7 @@
@@ -116,12 +116,12 @@ so.
 
 `--json` prints the applied operations, the operations that undo them, and the
 files touched. Keeping the `inverse` list and feeding it back to
-`netgraph edit apply` is a complete undo:
+`netviz edit apply` is a complete undo:
 
 <!-- norun: writes to the working tree, and the JSON embeds whole files -->
 ```bash
-netgraph edit rename sw-home sw-hall --json > /tmp/change.json
-jq '.inverse' /tmp/change.json | netgraph edit apply --force
+netviz edit rename sw-home sw-hall --json > /tmp/change.json
+jq '.inverse' /tmp/change.json | netviz edit apply --force
 ```
 
 Undo is byte-exact: after applying the inverses the tree is the tree you
@@ -131,13 +131,13 @@ operation.
 
 ## Operations as JSON
 
-`netgraph edit apply` reads one JSON object or a list of them from stdin, or
+`netviz edit apply` reads one JSON object or a list of them from stdin, or
 from `-f`/`--file`. Every object carries an `op` and the keys that operation
 takes:
 
 <!-- norun: illustrative payload; the elements are not in this repository -->
 ```bash
-netgraph edit apply <<'JSON'
+netviz edit apply <<'JSON'
 [{"op": "create", "kind": "switch", "name": "sw-new", "namespace": "sites/hq",
   "spec": {"interfaces": [{"name": "Gi1/0/1", "type": "ethernet"}]}},
  {"op": "connect", "a": "sw-new:Gi1/0/1", "b": "pc-desk:eno1"},
@@ -147,7 +147,7 @@ JSON
 
 The list is applied in order and judged as one change, so an operation that is
 only valid once a later one has run — a cable to a device the previous operation
-created — is fine. `netgraph edit` with no subcommand is the same thing.
+created — is fine. `netviz edit` with no subcommand is the same thing.
 
 The full set of operations and their keys is in
 [`docs/editing.md`](../editing.md#the-operations).
@@ -183,11 +183,11 @@ Nothing is ever half-written: a refusal writes no file at all.
 
 ## Reference
 
-### `netgraph edit`
+### `netviz edit`
 
 <!-- generated: synopsis edit -->
 ```text
-netgraph [GLOBAL OPTIONS] edit [OPTIONS] [COMMAND] [ARGS]...
+netviz [GLOBAL OPTIONS] edit [OPTIONS] [COMMAND] [ARGS]...
 ```
 <!-- /generated -->
 
@@ -195,11 +195,11 @@ netgraph [GLOBAL OPTIONS] edit [OPTIONS] [COMMAND] [ARGS]...
 *No options of its own; the global options apply.*
 <!-- /generated -->
 
-### `netgraph edit set`
+### `netviz edit set`
 
 <!-- generated: synopsis edit set -->
 ```text
-netgraph [GLOBAL OPTIONS] edit set [OPTIONS] ADDRESS PATH VALUE
+netviz [GLOBAL OPTIONS] edit set [OPTIONS] ADDRESS PATH VALUE
 ```
 <!-- /generated -->
 
@@ -212,11 +212,11 @@ netgraph [GLOBAL OPTIONS] edit set [OPTIONS] ADDRESS PATH VALUE
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
 <!-- /generated -->
 
-### `netgraph edit unset`
+### `netviz edit unset`
 
 <!-- generated: synopsis edit unset -->
 ```text
-netgraph [GLOBAL OPTIONS] edit unset [OPTIONS] ADDRESS PATH
+netviz [GLOBAL OPTIONS] edit unset [OPTIONS] ADDRESS PATH
 ```
 <!-- /generated -->
 
@@ -228,11 +228,11 @@ netgraph [GLOBAL OPTIONS] edit unset [OPTIONS] ADDRESS PATH
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
 <!-- /generated -->
 
-### `netgraph edit create`
+### `netviz edit create`
 
 <!-- generated: synopsis edit create -->
 ```text
-netgraph [GLOBAL OPTIONS] edit create [OPTIONS] {switch|router|firewall|hub|computer|server|cable|adapter|tunnel|patchpanel|pdu|user|group} NAME
+netviz [GLOBAL OPTIONS] edit create [OPTIONS] {switch|router|firewall|hub|computer|server|cable|adapter|tunnel|patchpanel|pdu|user|group} NAME
 ```
 <!-- /generated -->
 
@@ -248,7 +248,7 @@ netgraph [GLOBAL OPTIONS] edit create [OPTIONS] {switch|router|firewall|hub|comp
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
 <!-- /generated -->
 
-### `netgraph edit copy`
+### `netviz edit copy`
 
 Copies an element — or a whole namespace, subtree and all — into a new document.
 The copy keeps the original's comments, gets a free name (`sw1` → `sw1-copy` →
@@ -260,7 +260,7 @@ for the whole table.
 
 <!-- generated: synopsis edit copy -->
 ```text
-netgraph [GLOBAL OPTIONS] edit copy [OPTIONS] ADDRESS
+netviz [GLOBAL OPTIONS] edit copy [OPTIONS] ADDRESS
 ```
 <!-- /generated -->
 
@@ -277,15 +277,15 @@ netgraph [GLOBAL OPTIONS] edit copy [OPTIONS] ADDRESS
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
 <!-- /generated -->
 
-### `netgraph edit duplicate`
+### `netviz edit duplicate`
 
-`netgraph edit copy` with no `--to`: the copy lands in the namespace the
+`netviz edit copy` with no `--to`: the copy lands in the namespace the
 original is in. The same operation under the name a diagram editor gives it —
-`Ctrl-D` in `netgraph web` writes exactly this.
+`Ctrl-D` in `netviz web` writes exactly this.
 
 <!-- generated: synopsis edit duplicate -->
 ```text
-netgraph [GLOBAL OPTIONS] edit duplicate [OPTIONS] ADDRESS
+netviz [GLOBAL OPTIONS] edit duplicate [OPTIONS] ADDRESS
 ```
 <!-- /generated -->
 
@@ -301,11 +301,11 @@ netgraph [GLOBAL OPTIONS] edit duplicate [OPTIONS] ADDRESS
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
 <!-- /generated -->
 
-### `netgraph edit delete`
+### `netviz edit delete`
 
 <!-- generated: synopsis edit delete -->
 ```text
-netgraph [GLOBAL OPTIONS] edit delete [OPTIONS] ADDRESS
+netviz [GLOBAL OPTIONS] edit delete [OPTIONS] ADDRESS
 ```
 <!-- /generated -->
 
@@ -318,11 +318,11 @@ netgraph [GLOBAL OPTIONS] edit delete [OPTIONS] ADDRESS
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
 <!-- /generated -->
 
-### `netgraph edit rename`
+### `netviz edit rename`
 
 <!-- generated: synopsis edit rename -->
 ```text
-netgraph [GLOBAL OPTIONS] edit rename [OPTIONS] ADDRESS NEW_NAME
+netviz [GLOBAL OPTIONS] edit rename [OPTIONS] ADDRESS NEW_NAME
 ```
 <!-- /generated -->
 
@@ -334,11 +334,11 @@ netgraph [GLOBAL OPTIONS] edit rename [OPTIONS] ADDRESS NEW_NAME
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
 <!-- /generated -->
 
-### `netgraph edit move`
+### `netviz edit move`
 
 <!-- generated: synopsis edit move -->
 ```text
-netgraph [GLOBAL OPTIONS] edit move [OPTIONS] ADDRESS FILE
+netviz [GLOBAL OPTIONS] edit move [OPTIONS] ADDRESS FILE
 ```
 <!-- /generated -->
 
@@ -350,11 +350,11 @@ netgraph [GLOBAL OPTIONS] edit move [OPTIONS] ADDRESS FILE
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
 <!-- /generated -->
 
-### `netgraph edit connect`
+### `netviz edit connect`
 
 <!-- generated: synopsis edit connect -->
 ```text
-netgraph [GLOBAL OPTIONS] edit connect [OPTIONS] A B
+netviz [GLOBAL OPTIONS] edit connect [OPTIONS] A B
 ```
 <!-- /generated -->
 
@@ -372,11 +372,11 @@ netgraph [GLOBAL OPTIONS] edit connect [OPTIONS] A B
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
 <!-- /generated -->
 
-### `netgraph edit disconnect`
+### `netviz edit disconnect`
 
 <!-- generated: synopsis edit disconnect -->
 ```text
-netgraph [GLOBAL OPTIONS] edit disconnect [OPTIONS] ADDRESS
+netviz [GLOBAL OPTIONS] edit disconnect [OPTIONS] ADDRESS
 ```
 <!-- /generated -->
 
@@ -389,11 +389,11 @@ netgraph [GLOBAL OPTIONS] edit disconnect [OPTIONS] ADDRESS
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
 <!-- /generated -->
 
-### `netgraph edit add-interface`
+### `netviz edit add-interface`
 
 <!-- generated: synopsis edit add-interface -->
 ```text
-netgraph [GLOBAL OPTIONS] edit add-interface [OPTIONS] ADDRESS NAME
+netviz [GLOBAL OPTIONS] edit add-interface [OPTIONS] ADDRESS NAME
 ```
 <!-- /generated -->
 
@@ -408,11 +408,11 @@ netgraph [GLOBAL OPTIONS] edit add-interface [OPTIONS] ADDRESS NAME
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
 <!-- /generated -->
 
-### `netgraph edit remove-interface`
+### `netviz edit remove-interface`
 
 <!-- generated: synopsis edit remove-interface -->
 ```text
-netgraph [GLOBAL OPTIONS] edit remove-interface [OPTIONS] ADDRESS NAME
+netviz [GLOBAL OPTIONS] edit remove-interface [OPTIONS] ADDRESS NAME
 ```
 <!-- /generated -->
 
@@ -425,11 +425,11 @@ netgraph [GLOBAL OPTIONS] edit remove-interface [OPTIONS] ADDRESS NAME
 | `--force` | — | off | Write even when the edit would introduce a new error. The check for files that changed on disk is never skipped. |
 <!-- /generated -->
 
-### `netgraph edit apply`
+### `netviz edit apply`
 
 <!-- generated: synopsis edit apply -->
 ```text
-netgraph [GLOBAL OPTIONS] edit apply [OPTIONS]
+netviz [GLOBAL OPTIONS] edit apply [OPTIONS]
 ```
 <!-- /generated -->
 
@@ -446,5 +446,5 @@ netgraph [GLOBAL OPTIONS] edit apply [OPTIONS]
 
 - [`docs/editing.md`](../editing.md) — the operation model, in prose.
 - [`docs/inventory-layout.md`](../inventory-layout.md) — the conventions placement follows.
-- [`netgraph fmt`](fmt.md) — the other command that writes YAML, and the canonical form `edit` keeps a canonical file in.
-- [`netgraph validate`](validate.md) — the check the write gate runs.
+- [`netviz fmt`](fmt.md) — the other command that writes YAML, and the canonical form `edit` keeps a canonical file in.
+- [`netviz validate`](validate.md) — the check the write gate runs.

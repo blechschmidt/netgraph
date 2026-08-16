@@ -6,7 +6,7 @@
 Three files come out, and each answers a different question:
 
 ``arranged-l1.drawio``
-    What ``netgraph export drawio`` produces from the fixture inventory. A
+    What ``netviz export drawio`` produces from the fixture inventory. A
     golden: a byte for byte diff of it is the review of a change to the emitter.
 ``arranged-l1-compressed.drawio``
     The same model in the deflate+base64 encoding draw.io writes by default,
@@ -31,12 +31,12 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "src"))
 
-from netgraph.export import ExportContext, ExportOptions, export  # noqa: E402
-from netgraph.fsio import write_text  # noqa: E402
-from netgraph.loader import load_tree  # noqa: E402
-from netgraph.render import build_graph  # noqa: E402
-from netgraph.render.graph import Layer  # noqa: E402
-from netgraph.render.icons import icon_theme  # noqa: E402
+from netviz.export import ExportContext, ExportOptions, export  # noqa: E402
+from netviz.fsio import write_text  # noqa: E402
+from netviz.loader import load_tree  # noqa: E402
+from netviz.render import build_graph  # noqa: E402
+from netviz.render.graph import Layer  # noqa: E402
+from netviz.render.icons import icon_theme  # noqa: E402
 
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "drawio"
 INVENTORY = FIXTURES / "inventory"
@@ -68,7 +68,7 @@ def edited(pristine: str) -> str:
 
     # 1. Moved: pc-1 dragged to the right.
     text = re.sub(
-        r'(netgraph:name="hosts/pc-1".*?<mxGeometry x=")([\d.-]+)',
+        r'(netviz:name="hosts/pc-1".*?<mxGeometry x=")([\d.-]+)',
         lambda match: match[1] + _plain(float(match[2]) + MOVED_BY),
         text,
         flags=re.DOTALL,
@@ -82,7 +82,7 @@ def edited(pristine: str) -> str:
 
     # 4. Newly connected: an edge drawn between two boxes, with no identity of
     #    its own -- exactly what draw.io produces when somebody drags a link.
-    ids = dict(re.findall(r'netgraph:name="([^"]+)"[^>]*id="(n-[^"]+)"', text))
+    ids = dict(re.findall(r'netviz:name="([^"]+)"[^>]*id="(n-[^"]+)"', text))
     drawn = (
         f'          <mxCell id="drawn-1" value="" style="edgeStyle=none;html=1;" '
         f'edge="1" parent="1" source="{ids["hosts/pc-1"]}" target="{ids["devices/sw-access"]}">\n'

@@ -4,7 +4,7 @@
 # 'vlan-a'. Each document is legal on its own: NG-I002 only rejects an interface
 # that is its own parent, so nothing shorter than the whole element sees it.
 # Both encapsulate VLAN 10, so E009 (the VID the parent carries) stays quiet.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-a
@@ -28,7 +28,7 @@ spec:
         mode: access
         access_vlan: 10
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: computer
 metadata:
   name: pc-b
@@ -40,7 +40,7 @@ spec:
       ipv4:
         addresses: [10.0.0.2/30]
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: cable
 metadata:
   name: cbl-a-b

@@ -4,7 +4,7 @@ Committed snapshots of the DOT, Mermaid and JSON renderings of the example
 inventories, plus the `aggregate/` fixture next door. `tests/test_golden.py`
 asserts each renderer reproduces its file byte for byte.
 
-They exist because `netgraph render -f dot > topology.dot` is meant to produce a
+They exist because `netviz render -f dot > topology.dot` is meant to produce a
 file worth committing. If the renderer reshuffles attribute order or node order
 between releases, every downstream diff becomes noise; these files are what
 makes that regression fail a test instead of surprising a user.

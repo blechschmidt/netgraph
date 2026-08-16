@@ -2,7 +2,7 @@
 #
 # 'adp-a' is plugged into 'adp-b', which is plugged back into 'adp-a'. Neither
 # chain ever reaches a host, so nothing that walks it can terminate.
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: adapter
 metadata:
   name: adp-a
@@ -18,7 +18,7 @@ spec:
       enabled: false
       mtu: 1500
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: adapter
 metadata:
   name: adp-b

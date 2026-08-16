@@ -1,8 +1,8 @@
-# `netgraph init`
+# `netviz init`
 
 An empty directory is a bad place to start from: the document envelope has four
 keys and an `apiVersion` nobody remembers, and the JSON Schema that would have
-told your editor about both has to be found and wired up by hand. `netgraph init`
+told your editor about both has to be found and wired up by hand. `netviz init`
 writes a tree that is already correct — it validates clean and renders at every
 layer before a line has been edited, and each document points at a schema written
 alongside it, so the first key you type is completed and the first typo
@@ -14,9 +14,9 @@ underlined.
 
 - [Synopsis](#synopsis)
 - [What it writes](#what-it-writes)
-  - [`netgraph.toml`](#netgraphtoml)
+  - [`netviz.toml`](#netviztoml)
   - [`.gitignore`](#gitignore)
-  - [`schema/netgraph.schema.json` and the modelines](#schemanetgraphschemajson-and-the-modelines)
+  - [`schema/netviz.schema.json` and the modelines](#schemanetvizschemajson-and-the-modelines)
   - [The example topology](#the-example-topology)
   - [`--minimal`: the envelope and nothing else](#--minimal-the-envelope-and-nothing-else)
 - [Where it writes, and when it refuses](#where-it-writes-and-when-it-refuses)
@@ -32,7 +32,7 @@ underlined.
 
 <!-- generated: synopsis init -->
 ```text
-netgraph [GLOBAL OPTIONS] init [OPTIONS] [PATH]
+netviz [GLOBAL OPTIONS] init [OPTIONS] [PATH]
 ```
 <!-- /generated -->
 
@@ -45,9 +45,9 @@ wiring, then the documents:
 
 ```text
 my-network/
-├── netgraph.toml                  # every setting, commented out and explained
+├── netviz.toml                  # every setting, commented out and explained
 ├── .gitignore                     # rendered diagrams are output, not source
-├── schema/netgraph.schema.json    # editor wiring, deliberately committed
+├── schema/netviz.schema.json    # editor wiring, deliberately committed
 ├── devices/rtr-gw.yaml
 ├── devices/sw-office.yaml
 ├── devices/pc-alice.yaml
@@ -60,9 +60,9 @@ on `--minimal` and `--schema` / `--no-schema`:
 
 | File | Written | Contents |
 |---|---|---|
-| `netgraph.toml` | always | Every `[validate]`, `[render]` and `[profile.*]` key commented out, with the default it would change. |
+| `netviz.toml` | always | Every `[validate]`, `[render]` and `[profile.*]` key commented out, with the default it would change. |
 | `.gitignore` | always | Rendered diagrams and `/out/`, and a comment saying why the schema is *not* ignored. |
-| `schema/netgraph.schema.json` | unless `--no-schema` | The JSON Schema this netgraph version generates, the same document `netgraph schema` prints. |
+| `schema/netviz.schema.json` | unless `--no-schema` | The JSON Schema this netviz version generates, the same document `netviz schema` prints. |
 | `devices/rtr-gw.yaml` | unless `--minimal` | The router: a WAN hand-off, a downlink, VLAN 10. |
 | `devices/sw-office.yaml` | unless `--minimal` | The switch: two access ports, no address. |
 | `devices/pc-alice.yaml` | unless `--minimal` | The host: one addressed interface, no VLAN block. |
@@ -70,59 +70,59 @@ on `--minimal` and `--schema` / `--no-schema`:
 | `devices/example.yaml` | with `--minimal` | One fully commented envelope template, in place of the four documents above. |
 
 The generated content lives in
-[`src/netgraph/scaffold.py`](../../src/netgraph/scaffold.py), where building the
+[`src/netviz/scaffold.py`](../../src/netviz/scaffold.py), where building the
 tree is a pure function and writing it is the only part that touches a disk —
 which is how `tests/test_init.py` can assert that the tree validates clean, that
 it validates clean under `--strict`, that it renders at layers `l1`, `l2` and
 `l3`, and that the schema written is the one this version generates, rather than
 assuming any of it.
 
-### `netgraph.toml`
+### `netviz.toml`
 
 The file is generated *fully commented* on purpose: what is commented out is
-exactly what netgraph already does, so uncommenting a line is a visible decision
+exactly what netviz already does, so uncommenting a line is a visible decision
 rather than a guess. It covers
 
 * `[validate]` — `strict`, and `ignore` for rules you never want reported;
 * `[validate.severity]` — re-grading a single rule to `"error"`, `"warning"` or
   `"info"` instead of silencing it;
 * `[render]` — how *this* inventory is drawn when the command line does not say
-  otherwise. Every key is a long flag of `netgraph render` without its leading
+  otherwise. Every key is a long flag of `netviz render` without its leading
   dashes, so `--collapse-depth 1` is `collapse-depth = 1` and `--no-show-ips` is
   `show-ips = false`;
 * `[profile.poster]` and `[profile.review]` — two named profiles, as examples of
   one entry per diagram you produce regularly.
 
 Because every line is commented, the file changes nothing until you edit it:
-`netgraph config show` on a fresh tree reports the built-in defaults, each with
+`netviz config show` on a fresh tree reports the built-in defaults, each with
 the place it came from. See [`docs/configuration.md`](../configuration.md).
 
 ### `.gitignore`
 
-The YAML tree is the source of truth and `netgraph render` regenerates diagrams
+The YAML tree is the source of truth and `netviz render` regenerates diagrams
 from it, so the generated file ignores `*.dot`, `*.mmd`, `*.pdf`, `*.png`, `*.svg`
 and `/out/`, with a comment inviting you to drop the line for a format you
 publish on purpose — a `network.svg` committed for a README, say.
 
-`schema/netgraph.schema.json` is deliberately *not* ignored. It is editor wiring,
-and a fresh checkout should offer completion before netgraph is installed;
+`schema/netviz.schema.json` is deliberately *not* ignored. It is editor wiring,
+and a fresh checkout should offer completion before netviz is installed;
 the file says so, and says to refresh it with
-`netgraph schema -o schema/netgraph.schema.json`.
+`netviz schema -o schema/netviz.schema.json`.
 
-### `schema/netgraph.schema.json` and the modelines
+### `schema/netviz.schema.json` and the modelines
 
 With `--schema` (the default) two things happen together: the schema is written,
 and every generated document gets a first line pointing at it —
 
 ```yaml
-# yaml-language-server: $schema=../schema/netgraph.schema.json
-apiVersion: netgraph.dev/v1alpha1
+# yaml-language-server: $schema=../schema/netviz.schema.json
+apiVersion: netviz.dev/v1alpha1
 kind: router
 ```
 
 The reference is relative rather than the published `$id`, so the tree keeps
 working offline and inside a container, and checks against the schema of the
-netgraph version that wrote it rather than of whatever is published today. The
+netviz version that wrote it rather than of whatever is published today. The
 depth is computed per file, so a document one directory down gets `../` and a
 document at the root would get none.
 
@@ -144,7 +144,7 @@ two different networks.
 They are also annotated, because the interesting part of an example is the
 reasoning:
 
-* `rtr-gw` carries a `netgraph/ignore: NG-C015` annotation, with a comment
+* `rtr-gw` carries a `netviz/ignore: NG-C015` annotation, with a comment
   explaining that `wan0` faces an ISP which is not an element of this inventory
   and so terminates no cable on purpose. Saying so on the one element that has a
   reason is what an exception looks like; deleting the rule for everybody would
@@ -153,7 +153,7 @@ reasoning:
   address of its own, and that a management address belongs on a `type: vlan`
   SVI (putting one on a bridge port is `W104`).
 * `pc-alice` notes the *absence* of a `vlan` block: the host sends untagged
-  frames and inherits the VLAN of the access port facing it, which netgraph knows
+  frames and inherits the VLAN of the access port facing it, which netviz knows
   not to complain about.
 * `cables/links.yaml` notes that it holds two documents separated by `---`, and
   that a cable is an element in its own right rather than a field on a device.
@@ -165,9 +165,9 @@ line of it is a comment, so the tree declares no elements at all and still
 validates clean — the point is to show the four keys and the values they take,
 not to hand out a network someone has to delete before writing their own. It
 lists the available kinds, shows one interface with a VLAN, and points at
-`netgraph schema --kind switch` for the full grammar of a single kind.
+`netviz schema --kind switch` for the full grammar of a single kind.
 
-A tree with no elements renders an empty graph, and `netgraph render` says so
+A tree with no elements renders an empty graph, and `netviz render` says so
 with a warning rather than failing. `--minimal` still wires the editor unless you
 also pass `--no-schema`.
 
@@ -189,8 +189,8 @@ the likeliest mistake is running `init` twice —
 <!-- norun: the transcript is of a directory the reader already scaffolded -->
 
 ```console
-$ netgraph init my-network
-error: my-network would overwrite netgraph.toml, .gitignore, schema/netgraph.schema.json, devices/rtr-gw.yaml, devices/sw-office.yaml, devices/pc-alice.yaml, cables/links.yaml; pass --force to write anyway, or name an empty directory
+$ netviz init my-network
+error: my-network would overwrite netviz.toml, .gitignore, schema/netviz.schema.json, devices/rtr-gw.yaml, devices/sw-office.yaml, devices/pc-alice.yaml, cables/links.yaml; pass --force to write anyway, or name an empty directory
 ```
 
 — and otherwise the first few entries the directory holds:
@@ -198,7 +198,7 @@ error: my-network would overwrite netgraph.toml, .gitignore, schema/netgraph.sch
 <!-- norun: the transcript is of a directory outside the repository -->
 
 ```console
-$ netgraph init notes
+$ netviz init notes
 error: notes is not empty (it holds a, b, c, d, e, ...); pass --force to write anyway, or name an empty directory
 ```
 
@@ -215,11 +215,11 @@ From nothing to a validated, rendered inventory:
 <!-- norun: writes a new inventory into the reader's directory -->
 
 ```console
-$ netgraph init my-network
+$ netviz init my-network
 created 7 files in my-network:
-  netgraph.toml
+  netviz.toml
   .gitignore
-  schema/netgraph.schema.json
+  schema/netviz.schema.json
   devices/rtr-gw.yaml
   devices/sw-office.yaml
   devices/pc-alice.yaml
@@ -227,14 +227,14 @@ created 7 files in my-network:
 
 next steps:
   cd my-network
-  netgraph validate
-  netgraph render -f svg -o network.svg
+  netviz validate
+  netviz render -f svg -o network.svg
 
-  each document points at schema/netgraph.schema.json; install a yaml-language-server (the VS Code YAML extension, nvim's yamlls) for completion and inline errors
+  each document points at schema/netviz.schema.json; install a yaml-language-server (the VS Code YAML extension, nvim's yamlls) for completion and inline errors
 ```
 
 Both printed commands succeed as they stand — that is the property the tree is
-built for. `netgraph -q init …` scaffolds without a word, which is what you want
+built for. `netviz -q init …` scaffolds without a word, which is what you want
 inside a script; the files written are the same either way.
 
 For the empty-envelope variant with no editor wiring:
@@ -242,19 +242,19 @@ For the empty-envelope variant with no editor wiring:
 <!-- norun: writes a new inventory into the reader's directory -->
 
 ```console
-$ netgraph init --minimal --no-schema my-network
+$ netviz init --minimal --no-schema my-network
 created 3 files in my-network:
-  netgraph.toml
+  netviz.toml
   .gitignore
   devices/example.yaml
 
 next steps:
   cd my-network
-  netgraph validate
-  netgraph render -f svg -o network.svg
+  netviz validate
+  netviz render -f svg -o network.svg
 ```
 
-If you already have a network, [`netgraph import`](import.md) is usually the
+If you already have a network, [`netviz import`](import.md) is usually the
 better first command: it builds the same shape of tree out of LLDP neighbours,
 `ip -j addr show` output or the cabling list you already keep, so the first
 inventory is a diff away from correct. See
@@ -289,7 +289,7 @@ inventory is a diff away from correct. See
 | Code | Meaning |
 |---|---|
 | `0` | The tree was written. |
-| `1` | netgraph refused to write: the target is not empty and `--force` was not given, it exists and is not a directory, or it cannot be listed or written to. Nothing is written in any of these cases. |
+| `1` | netviz refused to write: the target is not empty and `--force` was not given, it exists and is not a directory, or it cannot be listed or written to. Nothing is written in any of these cases. |
 | `2` | Usage error — an unknown option, or a `PATH` that names an existing file. |
 
 ---
@@ -298,7 +298,7 @@ inventory is a diff away from correct. See
 
 * [`docs/getting-started.md`](../getting-started.md) — the same tree built by
   hand, then validated, rendered and queried.
-* [`netgraph import`](import.md) — scaffold from a network that already exists.
-* [`docs/configuration.md`](../configuration.md) — the `netgraph.toml` keys the
+* [`netviz import`](import.md) — scaffold from a network that already exists.
+* [`docs/configuration.md`](../configuration.md) — the `netviz.toml` keys the
   generated file comments out.
-* [`netgraph schema`](schema.md) — regenerate or narrow the schema `init` writes.
+* [`netviz schema`](schema.md) — regenerate or narrow the schema `init` writes.

@@ -1,4 +1,4 @@
-An inventory whose only problems are ones `netgraph validate --fix` can repair.
+An inventory whose only problems are ones `netviz validate --fix` can repair.
 
 Every other fixture in `tests/fixtures/` is a single rule in isolation, which is
 what a rule's unit test wants. This one is a small *tree* that is wrong in four

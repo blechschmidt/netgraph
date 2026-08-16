@@ -1,9 +1,9 @@
-"""``netgraph init``: the tree it writes has to be one netgraph itself accepts.
+"""``netviz init``: the tree it writes has to be one netviz itself accepts.
 
 The whole promise of the command is that the two lines it prints at the end
 succeed before anything has been edited, so the assertions here are the same
 ones a new user makes in their first minute: the scaffolded tree validates
-clean, it renders at every layer, its ``netgraph.toml`` parses, and every
+clean, it renders at every layer, its ``netviz.toml`` parses, and every
 document points at a JSON Schema that is actually there.
 
 The refusal path matters just as much. Scaffolding is a convenience over files
@@ -20,17 +20,17 @@ import pytest
 import yaml
 from click.testing import CliRunner, Result
 
-from netgraph.cli import cli, main
-from netgraph.config import CONFIG_FILE_NAME, ValidationConfig, load_config
-from netgraph.loader import load_tree
-from netgraph.scaffold import (
+from netviz.cli import cli, main
+from netviz.config import CONFIG_FILE_NAME, ValidationConfig, load_config
+from netviz.loader import load_tree
+from netviz.scaffold import (
     GITIGNORE_FILE_NAME,
     SCHEMA_FILE_NAME,
     ScaffoldError,
     build_scaffold,
     write_scaffold,
 )
-from netgraph.schema import build_schema
+from netviz.schema import build_schema
 
 from platform_marks import requires_dot  # isort: skip -- tests/ is on sys.path, not a package
 
@@ -46,7 +46,7 @@ def invoke(runner: CliRunner, *args: str) -> Result:
 
 @pytest.fixture
 def inventory(runner: CliRunner, tmp_path: Path) -> Path:
-    """A default ``netgraph init`` in a directory of its own."""
+    """A default ``netviz init`` in a directory of its own."""
     target = tmp_path / "my-network"
     result = invoke(runner, "init", str(target))
     assert result.exit_code == 0, result.output
@@ -91,7 +91,7 @@ def test_the_scaffolded_tree_renders_at_every_layer(
 def test_the_command_the_next_steps_print_produces_an_svg(
     runner: CliRunner, inventory: Path
 ) -> None:
-    """`netgraph render -f svg -o network.svg`, exactly as init advertises it."""
+    """`netviz render -f svg -o network.svg`, exactly as init advertises it."""
     output = inventory / "network.svg"
     result = invoke(runner, "-i", str(inventory), "render", "-f", "svg", "-o", str(output))
     assert result.exit_code == 0
@@ -133,7 +133,7 @@ def test_the_documents_are_still_valid_yaml_under_the_modeline(inventory: Path) 
     """A modeline is a comment, so it must not disturb the document stream."""
     for document in documents(inventory):
         stream = list(yaml.safe_load_all(document.read_text(encoding="utf-8")))
-        assert all(item is None or item["apiVersion"] == "netgraph.dev/v1alpha1" for item in stream)
+        assert all(item is None or item["apiVersion"] == "netviz.dev/v1alpha1" for item in stream)
 
 
 def test_no_schema_skips_the_wiring_entirely(runner: CliRunner, tmp_path: Path) -> None:
@@ -288,8 +288,8 @@ def test_the_report_names_every_file_and_the_next_two_commands(
     for relative in build_scaffold().paths:
         assert relative in result.output
     assert f"cd {target}" in result.output
-    assert "netgraph validate" in result.output
-    assert "netgraph render -f svg -o network.svg" in result.output
+    assert "netviz validate" in result.output
+    assert "netviz render -f svg -o network.svg" in result.output
 
 
 def test_quiet_scaffolds_without_a_word(runner: CliRunner, tmp_path: Path) -> None:
@@ -343,7 +343,7 @@ def test_an_unwritable_target_is_reported_rather_than_raised_raw(
     and on Windows, which has no such mode at all.
 
     ``Path.open`` is the thing patched because that is what
-    :func:`netgraph.fsio.write_text` calls; it opens explicitly so it can pass
+    :func:`netviz.fsio.write_text` calls; it opens explicitly so it can pass
     ``newline=""``, which is what keeps the scaffold LF on every platform.
     """
 

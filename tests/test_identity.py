@@ -9,7 +9,7 @@ is here:
   ``ssh_keys`` is the one that matters most, because the mistake is silent
   everywhere else;
 * **membership resolution**, which four consumers share
-  (:mod:`netgraph.identity`) precisely so that they cannot disagree — the
+  (:mod:`netviz.identity`) precisely so that they cannot disagree — the
   validator, the identity view, the two listings and any future export. The
   tests below assert the plan and the view agree rather than asserting each
   separately;
@@ -25,10 +25,10 @@ from pathlib import Path
 
 import pytest
 
-from netgraph.errors import SchemaError
-from netgraph.identity import identity_plan
-from netgraph.loader import Inventory, load_tree
-from netgraph.models import (
+from netviz.errors import SchemaError
+from netviz.identity import identity_plan
+from netviz.loader import Inventory, load_tree
+from netviz.models import (
     API_VERSION,
     Group,
     User,
@@ -36,8 +36,8 @@ from netgraph.models import (
     UserType,
     parse_document,
 )
-from netgraph.render.graph import EdgeKind, Layer, build_graph
-from netgraph.validate import validate
+from netviz.render.graph import EdgeKind, Layer, build_graph
+from netviz.validate import validate
 
 #: A well-formed OpenSSH public key, shortened. Only the shape is checked.
 KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyForTheTestsOnlyAAAAAAAAAAA ana@laptop"
@@ -77,7 +77,7 @@ def tree(tmp_path: Path, *documents: str) -> Inventory:
 
 
 USERS = """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: user
 metadata: {name: ana}
 spec: {full_name: Ana Brandt, uid: 1000}
@@ -209,20 +209,20 @@ def test_the_details_of_a_group_count_what_it_names() -> None:
 # --------------------------------------------------------------------------- #
 
 NESTED = """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: user
 metadata: {name: ana}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: user
 metadata: {name: kit}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata: {name: admins}
 spec: {members: [ana]}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata: {name: household}
 spec: {members: [admins, kit]}
@@ -256,13 +256,13 @@ def test_expansion_terminates_on_an_inventory_with_a_cycle(tmp_path: Path) -> No
     inventory = tree(
         tmp_path,
         """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata: {name: a}
 spec: {members: [b]}
 """,
         """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata: {name: b}
 spec: {members: [a]}
@@ -278,13 +278,13 @@ def test_a_member_that_resolves_to_a_device_is_not_indexed(tmp_path: Path) -> No
     inventory = tree(
         tmp_path,
         """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: pdu
 metadata: {name: pdu-1}
 spec: {outlets: 8}
 """,
         """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata: {name: admins}
 spec: {members: [pdu-1]}
@@ -303,7 +303,7 @@ def test_a_member_is_resolved_outwards_from_the_groups_own_namespace(tmp_path: P
     (tmp_path / "people" / "ana.yaml").write_text(USERS, encoding="utf-8")
     (tmp_path / "groups.yaml").write_text(
         """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata: {name: admins}
 spec: {members: [ana]}
@@ -325,7 +325,7 @@ def test_the_identity_view_draws_the_identities_and_nothing_else(tmp_path: Path)
         tmp_path,
         NESTED,
         """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: switch
 metadata: {name: sw-1}
 spec: {interfaces: [{name: eth0, type: ethernet}]}
@@ -362,7 +362,7 @@ def test_an_unresolved_member_is_drawn_as_nothing(tmp_path: Path) -> None:
     inventory = tree(
         tmp_path,
         """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata: {name: admins}
 spec: {members: [ghost]}
@@ -392,11 +392,11 @@ def test_a_login_collision_is_reported_even_when_neither_document_writes_one(
     (tmp_path / "north").mkdir()
     (tmp_path / "south").mkdir()
     body = """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: user
 metadata: {name: ana}
 ---
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata: {name: staff}
 spec: {members: [ana]}
@@ -413,7 +413,7 @@ def test_an_ambiguous_member_names_every_candidate(tmp_path: Path) -> None:
     (tmp_path / "north").mkdir()
     (tmp_path / "south").mkdir()
     user = """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: user
 metadata: {name: ana}
 """
@@ -421,7 +421,7 @@ metadata: {name: ana}
     (tmp_path / "south" / "people.yaml").write_text(user, encoding="utf-8")
     (tmp_path / "groups.yaml").write_text(
         """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata: {name: staff}
 spec: {members: [ana]}
@@ -439,13 +439,13 @@ def test_a_departed_service_account_is_not_reported(tmp_path: Path) -> None:
     inventory = tree(
         tmp_path,
         """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: user
 metadata: {name: backup}
 spec: {type: service, status: departed}
 """,
         """
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata: {name: robots}
 spec: {members: [backup]}
@@ -460,7 +460,7 @@ def test_a_three_group_cycle_is_reported_once(tmp_path: Path) -> None:
         tmp_path,
         *(
             f"""
-apiVersion: netgraph.dev/v1alpha1
+apiVersion: netviz.dev/v1alpha1
 kind: group
 metadata: {{name: {name}}}
 spec: {{members: [{nxt}]}}

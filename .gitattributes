@@ -1,20 +1,20 @@
 # Line endings, decided here rather than by whoever cloned the repository.
 #
-# netgraph's contract with its files is a byte contract. `netgraph fmt` compares
+# netviz's contract with its files is a byte contract. `netviz fmt` compares
 # the canonical form of a document against the file *as bytes* on purpose, so
 # that a stray CRLF or byte-order mark is reported rather than silently kept
-# forever (see netgraph/fmt/runner.py). The renderer goldens under
+# forever (see netviz/fmt/runner.py). The renderer goldens under
 # tests/fixtures/golden/ are asserted byte for byte for the same reason: that is
 # what makes a change to the DOT output show up as a readable diff.
 #
 # Both of those break under `core.autocrlf=true`, which is the default on a
 # Windows install of Git: every YAML file in the checkout arrives CRLF, so
-# `netgraph fmt --check examples` reports all of examples/ as unformatted and
-# every golden comparison fails on every line. Neither is a netgraph bug and
-# neither has a fix in netgraph -- the fix is to stop Git translating.
+# `netviz fmt --check examples` reports all of examples/ as unformatted and
+# every golden comparison fails on every line. Neither is a netviz bug and
+# neither has a fix in netviz -- the fix is to stop Git translating.
 #
 # `eol=lf` is therefore not a style preference. It is the same instruction the
-# code gives Python when it writes these files (`newline=""`, netgraph/fsio.py),
+# code gives Python when it writes these files (`newline=""`, netviz/fsio.py),
 # stated to the other program that touches them.
 
 # Everything text-like is LF in the working tree, whatever the clone's config
@@ -25,7 +25,7 @@
 # The two sets of files where this is load-bearing rather than tidy.
 # ---------------------------------------------------------------------------
 
-# Inventory YAML: `netgraph fmt --check` is a CI gate over examples/, and the
+# Inventory YAML: `netviz fmt --check` is a CI gate over examples/, and the
 # canonical form it checks against is LF.
 *.yaml text eol=lf
 *.yml  text eol=lf
@@ -56,12 +56,12 @@ tests/fixtures/** text eol=lf
 *.woff2 binary
 
 # SVG is XML, so it is text -- and it is committed output (docs/images/), which
-# means it has to be reproducible from a `netgraph render` on any platform.
+# means it has to be reproducible from a `netviz render` on any platform.
 *.svg text eol=lf
 
 # A .drawio file is XML too, and the fixtures under tests/fixtures/drawio/ are
-# compared byte for byte against what `netgraph export drawio` writes. The
-# writer emits LF (netgraph/fsio.py), so the checkout has to hold LF.
+# compared byte for byte against what `netviz export drawio` writes. The
+# writer emits LF (netviz/fsio.py), so the checkout has to hold LF.
 *.drawio text eol=lf
 
 # ---------------------------------------------------------------------------
@@ -72,8 +72,8 @@ tests/fixtures/** text eol=lf
 # stay LF even when checked out on Windows and run under WSL or Git Bash.
 *.sh text eol=lf
 
-# PowerShell reads LF perfectly well, and the completion script netgraph
-# generates is written with LF (netgraph/completion.py), so a committed one
+# PowerShell reads LF perfectly well, and the completion script netviz
+# generates is written with LF (netviz/completion.py), so a committed one
 # should match what the command emits.
 *.ps1 text eol=lf
 
@@ -81,4 +81,4 @@ tests/fixtures/** text eol=lf
 # Generated files, marked so a diff of them is collapsed by default in review.
 # ---------------------------------------------------------------------------
 # Written by tools/gen_json_schema.py; the source is the pydantic models.
-schema/netgraph.schema.json linguist-generated=true
+schema/netviz.schema.json linguist-generated=true
