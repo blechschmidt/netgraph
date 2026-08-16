@@ -407,6 +407,12 @@ jobs:
       # one as a plain file for anyone who does not want to talk to a registry to
       # read it. The one buildx attached above is the authoritative copy; this is
       # the readable one, and only a release has somewhere to put it.
+      # The action writes ``output-file`` without creating the directory above
+      # it; see the same step in pypi.yaml.
+      - name: Make somewhere for the SBOM to go
+        if: inputs.sbom-artifact != ''
+        run: mkdir -p sbom
+
       - name: Generate an SPDX SBOM of the published image
         if: inputs.sbom-artifact != ''
         uses: anchore/sbom-action@7b36ad622f042cab6f59a75c2ac24ccb256e9b45 # v0.20.4

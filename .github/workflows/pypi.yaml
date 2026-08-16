@@ -208,6 +208,13 @@ jobs:
           ./sbom-env/bin/pip install "dist/netviz-${VERSION}-py3-none-any.whl"
           ./sbom-env/bin/pip list
 
+      # anchore/sbom-action writes ``output-file`` with a bare ``writeFileSync``
+      # and never creates the directory above it, so a path with a directory in
+      # it fails with ENOENT *after* the scan has run -- the scan reports
+      # success and the step fails on the write.
+      - name: Make somewhere for the SBOM to go
+        run: mkdir -p sbom
+
       - name: Generate a CycloneDX SBOM of the wheel and its closure
         uses: anchore/sbom-action@7b36ad622f042cab6f59a75c2ac24ccb256e9b45 # v0.20.4
         with:
